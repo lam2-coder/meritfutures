@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->171<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->173<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -6298,6 +6298,159 @@ after it.**
 **AND ONE THING THE PLAN SAYS PLAINLY RATHER THAN LEAVING AS A QUESTION.** `M06`'s success condition is *"not that the dashboard exists but that the founder looks at it and believes it."* **Nothing in this wave delivers the second half.** Each slice delivers a document with real numbers and a stated absence where a number is missing, which is the precondition for belief and not belief.
 
 **Measured on this branch with `pnpm install` first and each command run separately: 33 of 33 gates, 15 of 15 invariants, 212 test files / 4,981 passed / 6 skipped.** The `main` baseline of 33 / 15 / 212 files / 4,981 passed / 6 skipped was reproduced exactly on a branch sitting at `origin/main` before a line changed, and nothing moved, because no test file was touched. **`CI-06c` was watched failing once and is recorded rather than smoothed over**: the plan committed without its `INDEX` row reports *"not in INDEX"*, which is that gate reading completeness in the direction that catches a document nobody can find. **NO ADR NUMBER, NO MIGRATION NUMBER, no `SD-M6-nn`, no `GS-nnn`, no `M6-N-nn`, no `SystemReason` member, no `SqlExecutorReason` member and no source file touched.** `packages/ledger`, `packages/db/migrations`, `apps/api/src/admin-source/`, `apps/worker/src/index.ts` and `apps/api/test/wiring.test.ts` are untouched; `wiring.test.ts` was READ for its `BLOCKED` reasons and its triple stands at `{declared: 23, wired: 6, blocked: 17}`.
+
+## The admin barrel carries all 74 of its names, and the next omission is a red suite (2026-08-28, session 332)
+
+**[WAVE-06](plans/WAVE-06-admin-console-transport.md)'s `W6-b`. THE COUNT WAS RE-DERIVED RATHER THAN INHERITED AND IT IS 23, MATCHING SECTION 5.1 NAME FOR NAME.** [`feed.ts`](../apps/admin/src/feed.ts) was missing all fourteen because the module was not a leg at all, [`liability.ts`](../apps/admin/src/liability.ts) eight of thirteen, [`page.ts`](../apps/admin/src/page.ts) one of eleven, and the other five modules were complete at 36 of 36. **The surface is 74 names over 8 modules and the barrel carried 51.** The dispatch said a second measurement that disagreed would be a finding rather than an error; it agrees, and the agreement is the report.
+
+**THE ASSERTION IS THE SLICE AND THE EXPORTS ARE THE SMALLER HALF, WHICH IS WHY THE DESIGN IS ARGUED IN THE FILE RATHER THAN CHOSEN IN A COMMIT MESSAGE.** [`apps/api/src/admin-source/index.ts`](../apps/api/src/admin-source/index.ts) keeps two independent defences against a merge dropping a leg and its header argues both. **The `Pick`-over-data half DOES NOT TRANSFER TO A BARREL OF RE-EXPORTS**, and [`apps/worker/src/index.ts`](../apps/worker/src/index.ts) had already written down why: there is no runtime value here for a type to be taken over, and minting one would put a second copy of the surface in the file whose whole job is to hold one copy of it. **WHAT TRANSFERS IS THE PRINCIPLE, WHICH IS THAT THE TWO HALVES MUST FAIL AT DIFFERENT TIMES.** Section A of [`service.test.ts`](../apps/admin/test/service.test.ts) imports all 74 names FROM THE BARREL by name and binds each to its own module's declaration, so a deletion in `index.ts` is a `tsc` error naming the member, in the gate that was green over the 2026-08-28 worker deletion. Section B reads each module's SOURCE and asserts the barrel re-exports every name it declares. **NEITHER SUBSUMES THE OTHER, AND THE ASYMMETRY IS THE WHOLE ARGUMENT: the compile half catches DELETIONS early and by name, and the text half is the only one that can see a name that was NEVER ADDED.** All 23 were never-added, and a name nobody imports is a name nobody misses. **`B.4` is a third property neither reaches**: the barrel's binding must BE the module's binding, so a name re-exported from the wrong place fails while present and type-checking. **`B.5` keeps section A honest**, deriving its coverage from the test file's own source rather than from a second list, so the compile half cannot shrink unnoticed.
+
+**SEVEN SEEDS, ALL SEVEN CAUGHT, AND FOUR LEFT `pnpm run typecheck` AT ZERO ERRORS, WHICH IS THE DEMONSTRATION THE SLICE EXISTS FOR.** Removing `assertFloatIsNotReserve` from the barrel and from section A is **exactly the state `main` was in**, and `tsc` is silent over it while `B.1` and `B.5` go red; removing the `feed.ts` leg entirely is **also the state `main` was in**, and `B.2` and `B.7` catch it. Re-exporting `figure` and `absent` under each other's names, with both names present, is caught by **`B.4` alone** and is invisible to the type checker and the text sweep alike. Deleting one section A line while the barrel is correct is caught by **`B.5` alone**. The two deletion seeds are caught by both halves, with `tsc` naming `renderRow` and `FeedRow`.
+
+**`B.2` SWEEPS `src/` RECURSIVELY THOUGH THE DIRECTORY IS FLAT TODAY**, because `W6-c` adds `src/api/` and `src/http/` and a top-level sweep would stop covering this package on the very next slice, silently and while staying green. **A control that has to be widened by the slice it was written to catch is not a control.** The recursion is exercised by a seeded `src/api/types.ts` rather than by the committed tree. **`ADMIN_BARREL_LEGS` IS DATA AND `ADMIN_MODULES_NOT_RE_EXPORTED` SHIPS EMPTY**, which is the honest starting state rather than an oversight: every module under `src/` is a leg. The escape hatch exists so the first slice needing an unexported module does not have to weaken the sweep to land. **Every later slice adding a module to `apps/admin/src/` now pays one line**, which is the cost `P7-l` recorded for the worker barrel, recorded again here so no later slice discovers it.
+
+**THE BARREL'S OWN HEADER WAS FALSE AND IS CORRECTED IN PLACE.** It listed the event feed among the *"M06 surfaces this package does not contain"* while `feed.ts` sat one directory away exporting fourteen names. **That is `RI-14`'s error class exactly** -- *"No reason claims a named thing does not exist while the tree exports it"* -- **in a file `RI-14` does not read**, its inputs being three named source files under `apps/api` and `apps/worker`. The omission and the false sentence are one defect and not two: a barrel that omits a module omits the module's description of itself too.
+
+**THE NO-MUTATION FENCE WAS NOT MOVED AND THAT WAS READ RATHER THAN ASSUMED.** None of the fifteen runtime values the barrel gained begins with any of the 21 verbs, and the eight type-only names never reach `Object.keys`. `WAVE-06` section 9 says a slice that has to weaken that assertion is a slice in the wrong wave; this one did not have to.
+
+**NOTHING ELSE IN THOSE MODULES WAS REPAIRED**, per the `W6-b` row. Section 5.2's finding about `assertNamesNoSubject` and `assertWithheld` reading a line array a rendered page will not use is `W6-d`'s and `W6-f`'s and is untouched. **`apps/admin/package.json` AND `tsconfig.json` WERE NOT TOUCHED and nothing was needed in them**, session 331 holding `apps/admin`'s framework; the type-only `@merit/rules-engine` import for `Cents` stands unchanged and **no re-export added here makes engine code reachable at runtime from this deployable**.
+
+**NO ADR NUMBER, NO MIGRATION NUMBER, no `SD-M6-nn`, no `GS-nnn`, no `M6-N-nn`, no `SystemReason` member, no `SqlExecutorReason` member, no `pg` import, no hostname and no `fetch`.** `packages/ledger`, `packages/db/migrations`, `docs/plans/M05-payout-system.md`, `docs/architecture/STATE_MACHINES.md`, `docs/plans/WAVE-06-admin-console-transport.md`, `apps/api/test/wiring.test.ts` and `packages/tooling/**` are untouched.
+
+**Measured with `pnpm install` first and each command run separately, `pnpm run verify` never run: 33 of 33 gates, 15 of 15 invariants, typecheck 0, lint 0, format:check clean, 213 test files / 5,035 passed / 6 skipped, `falsify.mjs` clean with the tree clean after it.** The `main` baseline of 33 / 15 / 0 / 0 / clean / **213 files / 5,028 passed / 6 skipped** was reproduced exactly on a branch sitting at `origin/main` (`3c95dda`) before a line changed, and `apps/admin` moved from **200 passing tests in 8 suites to 207 in 8**. **`WAVE-06` section 11 rule 7 states the baseline as 212 files / 4,981 passed, which was `main` when the plan was written and is not `main` now**; the dispatch's figures are the ones that reproduced.
+
+---
+
+## The in-flight obligation is a firm-scoped liability, no code can hold it, and `0054` returns to the pool unspent (2026-08-28, session 330)
+
+**[ADR-181](decisions/ADR-181.md) lands, `status: proposed`, approval line UNSIGNED, and `0054` IS
+NOT TAKEN.** [ADR-174](decisions/ADR-174.md) section 3 declined to rule which account carries the
+external leg's in-flight obligation and named three shapes, each of which needed an answer to its
+finding (C). [ADR-180](decisions/ADR-180.md) supplied that answer. **This entry rules the shape.**
+
+**THE RULING IS SHAPE (i), AND ITS CLASS AND SCOPE ARE DERIVED RATHER THAN CHOSEN.** The sign is
+read out of [`posting.ts:235-236`](../packages/ledger/src/posting.ts) and not assumed. `LT-06`
+DEBITS `trader_wallet`, so its open slot is a CREDIT; `LT-07` CREDITS `firm_treasury`, so its open
+slot is a DEBIT. **One account rises when the trader's claim is extinguished and falls when the
+cash leaves, which is an obligation**, and [ADR-174](decisions/ADR-174.md) clause 3 keeps `LT-07`
+firm-only. So: a **FIRM-SCOPED `liability`**.
+
+**NONE OF THE SEVEN DECLARED CODES CAN HOLD ONE, AND EACH REFUSAL HAS ITS OWN STEP.** Two firm codes
+are ruled another kind by [`0052`](../packages/db/migrations/0052_chart_of_accounts.sql) and
+[`0053`](../packages/db/migrations/0053_firm_treasury_kind.sql), read out of the constraint the
+migration set INSTALLS rather than out of either file by name. Three liability codes are per
+identity. **The two silences are refused on what the tree says they ARE rather than on their
+silence**: [`checkout.ts:1682`](../apps/api/src/routes/checkout.ts) calls crediting `psp_clearing`
+booking a receivable, which is an ASSET, and `SD-M5-03` anchors `reserve` outside this ledger on
+purpose, so giving it this posting makes the `RCR` numerator grow as withdrawals are approved.
+
+**SHAPE (ii) IS REFUSED ON A COST AND NOT ON BEING WRONG.** Deleting `LT-06` inverts
+[M20:156](plans/M20-wallet.md)'s ruled halt behaviour, *"the halt is holding a transfer, not a
+claim"*, in a module this session does not own, and
+[STATE_MACHINES section 3.2](architecture/STATE_MACHINES.md)'s middle state exists to be the
+interval this obligation stands in. **Shape (iii) is refused because a code ruled a liability BY
+the posting that needed one is [`0009:46`](../packages/db/migrations/0009_ledger.sql)'s failure
+with the direction reversed**, and it would be harder to see because it mints nothing.
+
+**THE SECOND FINDING IS WHY THE MIGRATION NUMBER STAYS IN THE POOL, AND IT IS A MEASUREMENT RATHER
+THAN A PREFERENCE.** [ADR-174](decisions/ADR-174.md) finding 3 priced the eighth code at *"TWO
+merged migrations and a third statement in TypeScript"*. **It is thirteen files, SEVEN of them
+outside this session's fence**, and one is [GLOSSARY](GLOSSARY.md)'s class list, which
+[`0027:104`](../packages/db/migrations/0027_triggers_invariants.sql) records as the control that
+actually caught `firm_payable`. **A migration widening the vocabulary while GLOSSARY still says
+seven has disabled the control that caught the last one.** Two further grounds: `0009`'s CHECK and
+`0027`'s `LEDGER-C2` are a two-guard design that one migration defeats by construction, which is
+what [`0027:97-100`](../packages/db/migrations/0027_triggers_invariants.sql) anticipates in terms;
+and **minting it today unblocks nothing**, because `LT-06`'s debit leg is per identity and nothing
+in this tree creates an identity ledger account ([ADR-177](decisions/ADR-177.md) section 7 clause
+3). **NO NAME IS MINTED EITHER**, and two spellings are refused in advance: `firm_payable`, because
+[`probe_ledger_constraints.sql:84`](../scripts/db/probe_ledger_constraints.sql) uses it as the live
+negative fixture, and any `payouts_*` spelling, because that is the internal leg's word and
+`SD-M5-07` retired a pooled `payouts` class.
+
+**EXECUTED, NOT BELIEVED.** PostgreSQL 16, `0001` through `0053` applied forward-only from empty
+under `ON_ERROR_STOP`, 114 base tables, `ledger_accounts` at exactly two rows. Both guards fire
+INDEPENDENTLY, with guard two watched after guard one was dropped inside a transaction, which
+[ADR-174](decisions/ADR-174.md) finding 3 asserted from DDL. The `ELSE true` hole is open for
+exactly two codes. **AND THE WHOLE SHAPE WAS BUILT END TO END AND POSTS CORRECTLY**: both guards
+superseded, a sixth constraint arm, the row seeded firm-scoped `liability`, and `LT-06` and `LT-07`
+posted at 25,000 cents with zero-sum, `LEDGER-C1` and `LEDGER-C2` all passing and a global sum of
+**0**. The obligation stands at `-25000` cents between the two moments and 0 after both. **The
+refusal is about a transcription set and a control, not about whether the arithmetic works.**
+
+**THE ZERO ON THE OBLIGATION ACCOUNT IS NOT [ADR-174](decisions/ADR-174.md)'s ZERO.** That entry's
+zero was on `firm_treasury`, the cash account, and it was the fingerprint of the defect. An
+in-flight obligation returning to zero once both legs have run is the account doing its job.
+
+**FOUND AND NOT IN THE DISPATCH: `wallet_withdrawals` HAS A TERMINAL `failed` STATE WITH NO LEDGER
+POSTING ANYWHERE IN THE CORPUS.** [STATE_MACHINES section 3.2](architecture/STATE_MACHINES.md) draws
+`transferring --> failed: G-TRANSFER-EXHAUSTED` and rows it with `wallet.withdrawal_failed`;
+[M05](plans/M05-payout-system.md) section 2.1 declares eight transactions and not one of them is a
+wallet withdrawal that failed on the rail. **A rail-exhausted withdrawal therefore strands the
+obligation**: the wallet claim is gone, no cash left, and the trader's money is in neither place
+they could be shown it. **It is the one genuine argument for shape (ii)** and the entry says so.
+**No ninth transaction is minted and no id is claimed for one**, because that is a design and a
+member of a declared identifier series; the repair is owed and `SD-M5-05`'s `reversal_of` is the
+mechanism it will use.
+
+**A SECOND LANDMINE, MEASURED.** `M05`'s line numbers are cited from `docs/` and from merged
+migrations and **nothing checks them**: `RI-15` reads six named SOURCE files and its own `covers`
+line records that it reads `docs/` *"NOT AT ALL"*.
+[`0038`](../packages/db/migrations/0038_account_adjustments.sql)'s header cites `M05:560` for the
+batch 1 gate's recognition ruling; `M05:560` is a row of the alarm table and the ruling is at
+`M05:151`. A merged migration is never edited, so that citation is stale forever. **This session's
+amendment to `M05` is LINE-COUNT NEUTRAL for exactly this reason.**
+
+**`M05` section 2.1's `LT-06` and `LT-07` rows are AMENDED ADDITIVELY.** Each keeps every word it
+carried, the `NOT RULED` phrase and the quotation of what it used to read included, and gains what
+this entry rules. **Both stay UNPOSTABLE. `packages/rail` is untouched and stays green**, because
+this entry mints no code, adds no constraint arm, seeds no row and rewrites neither row's opening
+text, which is what [`lt-07.test.ts`](../packages/rail/test/lt-07.test.ts)'s armed assertions watch.
+[ADR-177](decisions/ADR-177.md) and [ADR-180](decisions/ADR-180.md) each had to edit that package
+and each recorded the fence question in its approval block; this one does not have to.
+
+**No migration number, no code minted, no name minted, no `SystemReason` member, no
+`SqlExecutorReason` member, no `pg` import and no cast past a key type.** `0009`, `0027`, `0038`,
+`0052` and `0053` are byte for byte unchanged. `apps/api` and `apps/admin` are untouched, so
+`wiring.test.ts`'s `{declared, wired, blocked}` triple does not move.
+
+**Fourteen defects seeded against the tree and every one was caught: TWELVE by
+[`in-flight-obligation.test.ts`](../packages/ledger/test/in-flight-obligation.test.ts) and TWO by
+[`accounts.test.ts`](../packages/ledger/test/accounts.test.ts) beside it.** The two the new file did
+not catch are an eighth code added to `0009`'s CHECK alone and to `0027`'s `NOT IN` alone, and the
+division is deliberate: `accounts.test.ts` exists to hold those two lists and `accounts.ts` against
+each other, and a second file re-reading them would be a fourth copy with nothing checking it.
+**Eleven further perturbations were run against a running database, seven refused and four
+ACCEPTED**, because a hole is watched rather than asserted, and all eleven behaved as designed.
+
+**Measured with `pnpm install` first and each command run separately: 33 of 33 gates, 15 of 15
+invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 214 test files / 5,044 passed /
+6 skipped, `falsify.mjs` clean with the tree clean after it.** The `main` baseline of 33 / 15 / 0 /
+0 / clean / **213 files / 5,028 passed / 6 skipped** was reproduced exactly before a line changed.
+
+## The framework is ruled for `apps/admin`, and the question underneath it was answered rather than defaulted (2026-08-28, session 331)
+
+**[ADR-182](decisions/ADR-182.md) LANDS, `status: proposed`, approval line UNSIGNED. It is the ruling [ADR-095](decisions/ADR-095.md) ruling 2 declined by name**, in that entry's own words: *"`apps/admin` gets none by this entry: the admin console is M06's and is in no P4 slice, so an entry whose fence is P4 `P4-c` may not decide it."* It is [WAVE-06](plans/WAVE-06-admin-console-transport.md)'s `W6-a`, the only slice in that wave that REQUIRED a number.
+
+**RULING 1: `apps/admin` SERVES HTTP AND IT NEVER SERVES `/api/v1`, AND THE CENTRAL QUESTION WAS TREATED AS LIVE RATHER THAN INHERITED FROM THE PLAN'S NAME.** `apps/api` at `MERIT_API_SURFACE=operator` is `api-admin`, on the SAME `ADMIN_ORIGIN` under `/api/v1` ([`INFRA:44`](architecture/INFRA.md)), separated from the console by path ([`INFRA:53`](architecture/INFRA.md)). Its **27 registered routes** were re-derived over a real `compose()` in this session rather than quoted: 26 modules, 27 registered, 45 withheld on `operator`, and 46 registered on `public`. **Those routes are the console's DATA SOURCE and not a substitute for it.**
+
+**THE LOSING SHAPES ARE PRICED RATHER THAN ASSUMED AWAY, AND THE ONE WORTH TAKING SERIOUSLY WAS NEVER `apps/api`.** Folding the console into the API makes [`INFRA:43`](architecture/INFRA.md) false, takes [`ADR-083:49`](decisions/ADR-083.md)'s back door deliberately, and, because **`RI-04` forbids `apps/api` declaring `@merit/admin`**, moves 2,802 lines out of a directory [`P5-l`](plans/P5-payouts-and-wallet.md) and [`P6-j`](plans/P6-live-tier.md) both hold. **The real alternative was NO FRAMEWORK**, a `node:http` server over [`renderLiabilityHome`](../apps/admin/src/page.ts)'s existing string lines, which costs zero dependencies. **It is refused on a property of the controls.** [ADR-095](decisions/ADR-095.md) ruling 3 forbids a UI serving `/api/v1` or an operator path and exactly two checks enforce it: `RI-09` reads PATHS and `RI-11` reads a routing CONFIG and a directive. **A hand-written router table gives neither anything to read**, which `RI-09`'s own `covers` states at [`repo-invariants.mjs:1334-1335`](../packages/tooling/checks/repo-invariants.mjs), so that shape is **the one in which both mechanical halves of ruling 3 go silent, in the deployable [SECURITY](architecture/SECURITY.md) treats as total loss when owned.**
+
+**RULING 2: NEXT.JS APP ROUTER ON THE CATALOG VERSIONS ALREADY ADMITTED, SO THE FIVE ENTRIES [ADR-095](decisions/ADR-095.md) RULING 1 TOOK GAIN A THIRD IMPORTER AND NO SIXTH ENTRY.** **The `VG-12` closure delta is ZERO and it was diffed rather than argued: 427 package keys in [`pnpm-lock.yaml`](../pnpm-lock.yaml)'s `packages:` block before and 427 after, and the two sorted lists are byte-identical.** The lockfile gained **15 lines, every one inside the `apps/admin` importer block**, and [`pnpm-workspace.yaml`](../pnpm-workspace.yaml) took no diff at all: the slice held that fence. **The session did NOT grant the admission**, because [`STRATEGY:192`](testing/STRATEGY.md) says of one that it is an admission *"a session cannot grant itself"*; the entry recommends that none is needed and says the recommendation is not the answer.
+
+**THE MANIFEST GAINED `build` AND `dev` AND ITS `start` BECAME `next start`, AND THE SCRIPT CHANGE IS THE LOAD-BEARING ONE.** `node --experimental-strip-types src/index.ts` starts a module that prints one line and returns, so a platform reads a healthy service where nothing is served: a manifest wrong in the direction that looks like it works. **Both scripts were RUN**: `next build` exits 1 on *"Couldn't find any `pages` or `app` directory"* and `next start` exits 1 on *"Could not find a production build"*, which is wrong in the honest direction.
+
+**THE `tsconfig` DID NOT MOVE, AND THAT REVERSES THE SLICE AS DISPATCHED RATHER THAN QUIETLY SKIPPING IT.** [ADR-095](decisions/ADR-095.md) `F7` places the `jsx` keys and the `dom` lib *"with the first page rather than here"*, and both prior instances did exactly that. The collision argument that justified landing the React type packages early is about `pnpm-lock.yaml` being SERIALIZED across slices, and it does not reach a file one slice touches. **So [`apps/admin/tsconfig.json`](../apps/admin/tsconfig.json) is now `W6-d`'s fence**, and two other fences moved with it: `W6-i` gains [`e2e/tsconfig.json`](../e2e/tsconfig.json), whose `include` names the two app `e2e` directories by hand, and `W6-c` gains the two `ADR-012` assertions nothing in this repository makes today.
+
+**`ADR-012` IS DISCHARGED IN FOUR CLAUSES AND THE ENTRY SAYS WHICH TWO HAVE NO CHECK.** No `NEXT_PUBLIC_` identifier in this deployable ever, which is the single mechanism by which a framework writes a resolved hostname into a client bundle; a RELATIVE API base URL, available only because both services sit on one origin; `ADMIN_ORIGIN` read at request time through [`resolveAdminOrigin`](../apps/admin/src/origin.ts) with no default and a throw when unset; and no `next.config`. **Clauses one and two are rules with no mechanism and `W6-c` is named as the slice that can make them checks.**
+
+**[ADR-171](decisions/ADR-171.md) IS UNMOVED AND WAS RE-MEASURED RATHER THAN CITED.** `admin_actions.actor` is `text NOT NULL` with no foreign key ([`0017_events_and_audit.sql:77`](../packages/db/migrations/0017_events_and_audit.sql)), and `grep -rn "admin_sessions\|admin_users\|admin_actors\|operator_sessions" packages/db/migrations/` returns **zero lines**. **No table in the registry holds an operator, a role or an operator session**, so every write in `M06` and every read's actual rows stay behind an SSO purchase that is the founder's. **This ruling is deliberately IN FRONT of that blocker**: a framework, a manifest and a boundary need no principal.
+
+**TWO STALE REASONS ARE REPORTED RATHER THAN REACHED PAST, AND ONE OF THEM IS THIS RULING'S OWN COST.** [`pnpm-workspace.yaml:144`](../pnpm-workspace.yaml)'s `next:` comment still reads *"in `apps/portal` and `apps/site` and in NO other package"*, which this entry falsifies **in the one file the slice may not touch**, with nothing mechanical to notice; the sentence moves in the commit that carries the founder's `VG-12` answer. And [`apps/admin/src/index.ts:126`](../apps/admin/src/index.ts) still reads *"there is no server here to receive a request carrying them"* in a file **session 332 holds this wave**, so the line is reported and `W6-d` is named as the slice that makes it false in fact.
+
+**One prediction was wrong in the cheap direction.** [WAVE-06](plans/WAVE-06-admin-console-transport.md) rowed [`INDEX`](INDEX.md) as a `W6-a` and `W6-e` collision at one row each; `W6-a` needed none, because `CI-06c` reads the `decisions/` directory row and the per-entry registry is a generated span.
+
+**No migration number, no `SD-M6-nn`, no `GS-nnn`, no `M6-N-nn`, no `SystemReason` member, no `pg` import, and no file outside the fence.** Measured with `pnpm install` first and each command run separately, reproduced on `main` before a line changed and unmoved after: **33 of 33 gates, 15 of 15 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 213 test files / 5,028 passed / 6 skipped.** `falsify.mjs` ran LAST and ALONE on a committed tree: 33 gates clean and dirty, 80 scope cases, 10 loader cases, **no seed uncaught**.
 
 ---
 
