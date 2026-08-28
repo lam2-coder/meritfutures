@@ -553,10 +553,18 @@ export function buildLiabilityHome(input: LiabilityHomeInput): LiabilityHomePage
     panel(
       'P-M6-01',
       'Open liability',
+      // THREE COMPONENTS UNDER THE TOTAL AND NOT TWO, WHICH IS ADR-195 CLAUSE 1
+      // ARRIVING ON THE PAGE. P-M6-01 requires the components "shown separately
+      // as well as summed", and the third is the firm-scoped
+      // `withdrawals_in_flight` obligation. It renders ABSENT with its reason on
+      // every row today, because no column supplies it: a panel that printed two
+      // components under a total defined as three would be the sum saying one
+      // thing and the breakdown saying another.
       [
         three.openLiability,
         three.openLiabilityComponents.withdrawable,
         three.openLiabilityComponents.wallet,
+        three.openLiabilityComponents.withdrawalsInFlight,
       ],
       input.renderedAt,
       suspect,

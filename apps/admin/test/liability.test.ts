@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, test } from 'vitest';
 
 import type { Cents } from '@merit/rules-engine';
@@ -143,6 +145,165 @@ describe('M6-A-08: an incoherent row is refused rather than rendered', () => {
     expect(centsOf(theThreeNumbers(GS_115).remainingLadderExposure)).toBeGreaterThan(
       centsOf(theThreeNumbers(GS_115).openLiability),
     );
+  });
+});
+
+// =============================================================================
+// M6-A: ADR-195's THIRD COMPONENT, AND THE SUM THAT DOES NOT MOVE
+// =============================================================================
+// INV-M6-15: "Open Liability does not move when a wallet withdrawal is
+// approved, and it falls when that withdrawal's cash leaves."
+//
+// ADR-195 section 4 states the whole rule as a table over three postings, and
+// this suite IS that table rather than a paraphrase of it. `W` is withdrawable
+// across funded accounts, `B` is wallet balances, `F` is the firm-scoped
+// `withdrawals_in_flight` obligation, all integer cents and all magnitudes:
+//
+//   LT-06 approval        W unchanged, B falls by amount, F rises by amount
+//                         P-M6-01 UNCHANGED. The debt changed form
+//   LT-07 settlement      W unchanged, B unchanged, F falls by amount
+//                         P-M6-01 FALLS by amount. Merit paid
+//   LT-09 rail exhausted  W unchanged, B rises by amount, F falls by amount
+//                         P-M6-01 UNCHANGED. Nothing new is owed
+//
+// THE APPROVAL CASE IS THE ONE ADR-195 SECTION 9 ASKED FOR BY NAME, and it is
+// the case a two-term panel fails: under two terms the approval moves only `B`,
+// so the reported liability falls at the wrong event and then never reports the
+// right one.
+//
+// THE FIXTURE CARRIES A LARGE WALLET FOR THE SAME REASON GS-229 CARRIES A LARGE
+// FLOAT. On a book with an empty wallet there is nothing for `LT-06` to move
+// out of, and a suite that proved conservation over a zero would have proved
+// nothing.
+// =============================================================================
+
+/** The obligation's provenance, which ADR-195 clause 3 makes a choice of two. */
+const IN_FLIGHT_SOURCE = 'ledger balance of withdrawals_in_flight (ADR-195 clause 3)';
+
+/** GS-115's book with a wallet worth moving out of, and nothing yet in flight. */
+const WITH_WALLET: LiabilitySnapshot = { ...GS_115, walletBalancesCents: 250_000n };
+
+const APPROVED_CENTS = 25_000n;
+
+const withTerms = (walletCents: Cents, inFlightCents: Cents): LiabilitySnapshot => ({
+  ...WITH_WALLET,
+  walletBalancesCents: walletCents,
+  withdrawalsInFlight: { cents: inFlightCents, source: IN_FLIGHT_SOURCE },
+});
+
+describe('M6-A-70: INV-M6-15, the panel is invariant across the approval', () => {
+  // Before LT-06: 250,000c in the wallet and nothing in flight. The obligation
+  // is SUPPLIED as zero here rather than omitted, because "measured and empty"
+  // and "no supplier" are different claims and M6-A-71 is the second one.
+  const before = theThreeNumbers(withTerms(250_000n, 0n));
+  const afterApproval = theThreeNumbers(withTerms(250_000n - APPROVED_CENTS, APPROVED_CENTS));
+
+  test('the three components are summed into the total', () => {
+    expect(centsOf(afterApproval.openLiability)).toBe(
+      centsOf(afterApproval.openLiabilityComponents.withdrawable) +
+        centsOf(afterApproval.openLiabilityComponents.wallet) +
+        centsOf(afterApproval.openLiabilityComponents.withdrawalsInFlight),
+    );
+  });
+
+  test('LT-06 moves amount_cents between two terms and the total does NOT move', () => {
+    expect(centsOf(afterApproval.openLiability)).toBe(centsOf(before.openLiability));
+    expect(centsOf(afterApproval.openLiabilityComponents.wallet)).toBe(
+      centsOf(before.openLiabilityComponents.wallet) - APPROVED_CENTS,
+    );
+    expect(centsOf(afterApproval.openLiabilityComponents.withdrawalsInFlight)).toBe(
+      centsOf(before.openLiabilityComponents.withdrawalsInFlight) + APPROVED_CENTS,
+    );
+    expect(centsOf(afterApproval.openLiabilityComponents.withdrawable)).toBe(
+      centsOf(before.openLiabilityComponents.withdrawable),
+    );
+  });
+
+  test('LT-07 is the only posting that moves the panel, and it falls by the amount', () => {
+    const settled = theThreeNumbers(withTerms(250_000n - APPROVED_CENTS, 0n));
+    expect(centsOf(settled.openLiability)).toBe(centsOf(before.openLiability) - APPROVED_CENTS);
+  });
+
+  test('LT-09 returns the amount to the wallet term and leaves the total where it was', () => {
+    const reversed = theThreeNumbers(withTerms(250_000n, 0n));
+    expect(centsOf(reversed.openLiability)).toBe(centsOf(afterApproval.openLiability));
+    expect(centsOf(reversed.openLiabilityComponents.wallet)).toBe(
+      centsOf(afterApproval.openLiabilityComponents.wallet) + APPROVED_CENTS,
+    );
+  });
+
+  test('a two-term panel fails the approval case, which is why the term is a TERM', () => {
+    const twoTerms = (three: ReturnType<typeof theThreeNumbers>): bigint =>
+      centsOf(three.openLiabilityComponents.withdrawable) +
+      centsOf(three.openLiabilityComponents.wallet);
+    expect(twoTerms(afterApproval)).toBe(twoTerms(before) - APPROVED_CENTS);
+  });
+
+  test('the term is a MAGNITUDE: a ledger net arriving here is refused', () => {
+    expect(() => theThreeNumbers(withTerms(250_000n, -APPROVED_CENTS))).toThrow(LiabilityError);
+  });
+
+  test('the component names both of its exits, which is the read it prevents', () => {
+    const definition = definitionOf(afterApproval.openLiabilityComponents.withdrawalsInFlight);
+    expect(definition).toContain('LT-07');
+    expect(definition).toContain('LT-09');
+    expect(definition).toContain('NOT money already gone');
+  });
+
+  test('the component carries its own source, because no column of this table holds it', () => {
+    const rendered = render(afterApproval.openLiabilityComponents.withdrawalsInFlight);
+    expect(rendered).toContain(IN_FLIGHT_SOURCE);
+    expect(rendered).toContain(GS_115.asOfInstant);
+  });
+
+  test('the total states the rule rather than leaving the reader to derive it', () => {
+    expect(definitionOf(afterApproval.openLiability)).toContain('INV-M6-15');
+  });
+
+  test('the components are still not in the three-number list', () => {
+    expect(inAdversarialOrder(afterApproval)).toHaveLength(3);
+  });
+
+  test('the third term is not the float: P-M6-07 reads the wallet column alone', () => {
+    const coverage = reserveCoverage({
+      coverage: GS_229,
+      floatCents: withTerms(250_000n - APPROVED_CENTS, APPROVED_CENTS).walletBalancesCents,
+      floatAsOfInstant: GS_229_FLOAT_AS_OF,
+    });
+    expect(centsOf(coverage.walletFloat)).toBe(250_000n - APPROVED_CENTS);
+  });
+});
+
+describe('M6-A-71: with no supplier the component is ABSENT and the total says so', () => {
+  const unsupplied = theThreeNumbers(WITH_WALLET);
+
+  test('the row carries no obligation and the component is absent, never zero', () => {
+    expect(WITH_WALLET.withdrawalsInFlight).toBeUndefined();
+    expect(readingIsPresent(unsupplied.openLiabilityComponents.withdrawalsInFlight)).toBe(false);
+  });
+
+  test('the absence names the missing column rather than saying unavailable', () => {
+    const rendered = render(unsupplied.openLiabilityComponents.withdrawalsInFlight);
+    expect(rendered).toContain('NO COLUMN');
+    expect(rendered).toContain('liability_snapshots');
+    expect(rendered).not.toContain('unavailable)');
+  });
+
+  test('the total is the first two components and states that it is INCOMPLETE', () => {
+    expect(centsOf(unsupplied.openLiability)).toBe(750_000n);
+    expect(definitionOf(unsupplied.openLiability)).toContain('INCOMPLETE');
+  });
+
+  test('a supplied row does NOT carry the incomplete clause', () => {
+    expect(definitionOf(theThreeNumbers(withTerms(250_000n, 0n)).openLiability)).not.toContain(
+      'INCOMPLETE',
+    );
+  });
+
+  test('the total stays authoritative, because the term is provably zero today', () => {
+    const reading = unsupplied.openLiability;
+    if (!readingIsPresent(reading)) throw new Error('expected a figure');
+    expect(reading.figure.authority).toBe('authoritative');
   });
 });
 
@@ -336,5 +497,29 @@ describe('M6-A-34: P-M6-07 attestation half, and the second ratio nobody supplie
     expect(readingIsPresent(floatCoverage)).toBe(false);
     expect(render(floatCoverage)).toContain('GET /admin/wallet/reconciliation');
     expect(render(floatCoverage)).not.toContain('0.00');
+  });
+
+  // THE REASON IS BOUND TO THE ROUTE MODULE RATHER THAN TO A MEMORY OF IT.
+  // This reason said the endpoint was "registered by no route module in this
+  // tree" and that had gone false: `routes/admin-wallet.ts` serves it. The
+  // repair is the one `page.ts` took on the P-M6-07 pending row when `0049`
+  // landed, and this case is what keeps it from drifting back. Reading a file
+  // from `apps/api` is `test/surface.test.ts`'s own device one suite over,
+  // where the API base path is asserted against `apps/api/src/surface.ts`
+  // because `RI-04` forbids the package dependency that would let it import.
+  test('the absence does NOT claim the endpoint is unregistered, because it is', () => {
+    const routeModule = readFileSync(
+      new URL('../../api/src/routes/admin-wallet.ts', import.meta.url),
+      'utf8',
+    );
+    expect(routeModule).toContain(
+      "export const WALLET_RECONCILIATION_PATH = '/admin/wallet/reconciliation';",
+    );
+    expect(routeModule).toContain('path: WALLET_RECONCILIATION_PATH,');
+
+    const rendered = render(coverageOf().floatCoverage);
+    expect(rendered).not.toContain('registered by no route module');
+    expect(rendered).toContain('IS registered');
+    expect(rendered).toContain('BACKEND');
   });
 });

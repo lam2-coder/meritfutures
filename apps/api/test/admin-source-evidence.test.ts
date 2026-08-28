@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { TABLE_KEYS } from '@merit/db';
+import type { SystemTx } from '@merit/db';
 import { describe, expect, test } from 'vitest';
 
 import type {
@@ -9,9 +11,14 @@ import type {
   EvidenceExporterDeps,
   EvidenceFlagRecord,
   EvidencePackRow,
+  EvidenceReadTable,
   EvidenceSubject,
+  EvidenceSubjectResult,
+  EvidenceTx,
 } from '../src/admin-source/evidence.ts';
 import {
+  EVIDENCE_COLUMNS,
+  EVIDENCE_READ_TABLES,
   EVIDENCE_REDACTION_PROFILES,
   EvidenceExportError,
   EvidenceRedactionError,
@@ -20,14 +27,18 @@ import {
   buildEvidenceDocument,
   canonicalJson,
   createEvidenceExporter,
+  evidenceReadPort,
   foreignIdentifiers,
   includesDetectorDetail,
+  readEvidenceDetectorRegistry,
+  readEvidenceSubject,
   redactionProfileFor,
   renderEvidencePack,
   sensitiveParameterNames,
 } from '../src/admin-source/evidence.ts';
 import {
   AdminSourceNotComposed,
+  IMPLEMENTED_ADMIN_READS,
   adminReadSourceParts,
   composeAdminReadSource,
 } from '../src/admin-source/index.ts';
@@ -1177,5 +1188,981 @@ describe('composeAdminReadSource', () => {
       'readLiability',
       'searchAccounts',
     ]);
+  });
+});
+
+// =============================================================================
+// 12. THE ADAPTER. `EvidenceReadPort` OVER ADR-112's KEYED ACCESSOR
+// =============================================================================
+// Everything above drives the GENERATOR through hand-written ports. This section
+// drives the one port this directory may implement, over the accessor, and it
+// asserts three separable things:
+//
+//   THE TABLES ARE REAL KEYS OF `packages/db`, which is the half the module
+//   cannot assert about itself because it holds no import of that package. The
+//   compile-time form of the same claim is the narrowing in section 12.1: a
+//   `SystemTx` satisfies `EvidenceTx` only while every member of
+//   `EVIDENCE_READ_TABLES` is a `TableKey`, which is the `TS2322` two sessions
+//   were stopped by on `events`.
+//
+//   THE COLUMN MAPS MATCH THE SCHEMA IN BOTH DIRECTIONS, read out of
+//   `packages/db/src/schema.ts` rather than restated here. A column the map has
+//   and the table does not is a typo; a column the table has and the map does
+//   not is a field somebody has to decide about, because `buildEvidenceDocument`
+//   carries these six sections through WHOLE at every audience and a new column
+//   would reach a trader the day it landed.
+//
+//   THE THREE VALUES `canonicalJson` CANNOT RENDER ARE DEMONSTRATED FAILING
+//   BEFORE THEY ARE DEMONSTRATED FIXED. A `Date` is the one that matters: it does
+//   not throw, it renders as `{}`, and `content_sha256` is the digest over
+//   exactly those bytes. A suite that only asserted the projected row would pass
+//   against a projection that had never been needed.
+// =============================================================================
+
+function read(path: string): string {
+  return readFileSync(path, 'utf8');
+}
+
+/** Every `.ts` file under a directory tree, so a sweep cannot go quiet on a new one. */
+function typescriptFilesUnder(root: string): readonly string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(root)) {
+    const full = join(root, entry);
+    if (statSync(full).isDirectory()) out.push(...typescriptFilesUnder(full));
+    else if (entry.endsWith('.ts')) out.push(full);
+  }
+  return out;
+}
+
+const SCHEMA_TS = read(join(HERE, '..', '..', '..', 'packages', 'db', 'src', 'schema.ts'));
+
+/** One Drizzle table's columns, property name to column name, READ OFF THE SOURCE. */
+function schemaColumns(exportName: string): ReadonlyMap<string, string> {
+  const pattern = new RegExp(
+    `export const ${exportName} = pgTable\\('[a-z_]+',\\s*\\{([\\s\\S]*?)\\n\\}\\);`,
+  );
+  const block = pattern.exec(SCHEMA_TS)?.[1] ?? '';
+  const columns = new Map<string, string>();
+  for (const match of block.matchAll(/^ {2}(\w+): \w+\(\s*'([a-z_0-9]+)'/gm))
+    columns.set(match[1] ?? '', match[2] ?? '');
+  return columns;
+}
+
+// -----------------------------------------------------------------------------
+// 12.1 The tables
+// -----------------------------------------------------------------------------
+
+describe('the tables this module names', () => {
+  test('are all keys packages/db registers', () => {
+    // The half the module cannot make about itself. `@merit/db` is reachable
+    // from this suite and nothing under `admin-source/` imports it, which
+    // `admin-source-flags.test.ts` pins for the whole directory.
+    for (const key of EVIDENCE_READ_TABLES) expect(TABLE_KEYS).toContain(key);
+  });
+
+  test('a SystemTx satisfies EvidenceTx structurally, which is the TS2322 check', () => {
+    // THE COMPILE-TIME FORM OF THE CASE ABOVE, and the one sessions 349 and 353
+    // were stopped by: `SystemTx.rows` is generic over `TableKey`, so this
+    // assignment fails to compile the moment `EVIDENCE_READ_TABLES` names a
+    // table `packages/db` does not register. A green `pnpm run typecheck` is
+    // half of this suite's answer about these eleven names.
+    const narrow = (tx: SystemTx): EvidenceTx => tx;
+    expect(typeof narrow).toBe('function');
+  });
+
+  test('are the eleven the read actually touches, sorted, and no wider', () => {
+    expect([...EVIDENCE_READ_TABLES]).toStrictEqual([...EVIDENCE_READ_TABLES].sort());
+    expect([...EVIDENCE_READ_TABLES]).toStrictEqual([
+      'accounts',
+      'dailyMarks',
+      'detectorDefinitions',
+      'detectorRuns',
+      'fills',
+      'identities',
+      'identityRestrictionEpisodes',
+      'payoutRequests',
+      'planVersions',
+      'riskFlags',
+      'ruleStates',
+    ]);
+  });
+
+  test('every table whose ROWS reach a pack has a column map, and the other five do not', () => {
+    // `detectorDefinitions` becomes `DetectorRegistryRow` and `riskFlags`
+    // becomes `EvidenceFlagRecord`, both field by field. `detectorRuns`,
+    // `payoutRequests` and `identityRestrictionEpisodes` contribute ONE STRING
+    // each and no row, which is what keeps a payout's `eligibility_snapshot`
+    // out of a document nobody asked to put it in.
+    expect(Object.keys(EVIDENCE_COLUMNS).sort()).toStrictEqual([
+      'accounts',
+      'dailyMarks',
+      'fills',
+      'identities',
+      'planVersions',
+      'ruleStates',
+    ]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.2 The column maps, against schema.ts itself
+// -----------------------------------------------------------------------------
+
+describe('the column maps are the schema, transcribed and checked', () => {
+  test('the reader finds a real table, so an empty map cannot pass every case below', () => {
+    // A REGEX THAT MATCHED NOTHING WOULD MAKE EVERY CASE IN THIS BLOCK VACUOUS,
+    // which is the shape `falsify.mjs`'s own warning is about: a table that went
+    // from 36 rows to 0 while every gate stayed green.
+    const accounts = schemaColumns('accounts');
+    expect(accounts.size).toBeGreaterThan(20);
+    expect(accounts.get('sizeCents')).toBe('size_cents');
+    expect(schemaColumns('thisIsNotATable').size).toBe(0);
+  });
+
+  for (const table of [
+    'accounts',
+    'identities',
+    'fills',
+    'dailyMarks',
+    'ruleStates',
+    'planVersions',
+  ])
+    test(`${table} names every column of its table and no other, with the schema's own column names`, () => {
+      const declared = schemaColumns(table);
+      const mapped = EVIDENCE_COLUMNS[table] ?? {};
+      // BOTH DIRECTIONS. A name the map has and the table does not is a typo
+      // nothing else would catch; a name the table has and the map does not is
+      // a column that would silently stop reaching a court-grade exhibit, or
+      // silently start reaching a trader, depending on which way it was added.
+      expect(Object.keys(mapped).sort()).toStrictEqual([...declared.keys()].sort());
+      for (const [property, spec] of Object.entries(mapped))
+        expect(spec[0], `${table}.${property}`).toBe(declared.get(property));
+    });
+
+  test('the plan version carries copy_blocks and invents no rule_text column', () => {
+    // `GS-112` requires "the plan's rule text" and `plan_versions` has no such
+    // column. `0028_supersede_plan_version_immutability.sql` names the one that
+    // holds it -- "`copy_blocks` (the published rule TEXT)" -- and `INV-M4-08`
+    // says the same from the reading end.
+    const planVersions = EVIDENCE_COLUMNS['planVersions'] ?? {};
+    expect(planVersions['copyBlocks']).toStrictEqual(['copy_blocks', 'json']);
+    expect(Object.values(planVersions).map((spec) => spec[0])).not.toContain('rule_text');
+    expect(schemaColumns('planVersions').has('ruleText')).toBe(false);
+  });
+
+  test('a gate result is TWO COLUMNS on a rule state and there is no gate_results table', () => {
+    // `SD-06` split it (`0015_rule_states.sql`), and {@link EvidenceSubject}
+    // says a section that would be silently empty is worse than two named ones.
+    const ruleStates = EVIDENCE_COLUMNS['ruleStates'] ?? {};
+    expect(ruleStates['engineGates']).toStrictEqual(['engine_gates', 'json']);
+    expect(ruleStates['contextGates']).toStrictEqual(['context_gates', 'json']);
+    expect(TABLE_KEYS).not.toContain('gateResults');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.3 The estate, as the accessor hands it back
+// -----------------------------------------------------------------------------
+
+type RawRow = Readonly<Record<string, unknown>>;
+type Estate = Readonly<Record<string, readonly RawRow[]>>;
+
+const PLAN_VERSION = '66666666-6666-4666-8666-666666666666';
+const RUN_ID = '88888888-8888-4888-8888-888888888888';
+const OTHER_ACCOUNT = '99999999-9999-4999-8999-999999999999';
+const IDENTITY_FLAG = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const OTHER_ACCOUNT_FLAG = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+/**
+ * ADR-112's read vocabulary and NOTHING ELSE ON THE OBJECT.
+ *
+ * `admin-source-flags.test.ts`'s recorder, one directory of tables over: the
+ * fake carries no `insert`, no `updateAt` and no `sqlExecutor`, so a module that
+ * grew a reach for one fails here rather than in a deployment.
+ */
+class Accessor implements EvidenceTx {
+  readonly calls: string[] = [];
+
+  constructor(private readonly estate: Estate) {}
+
+  private of(key: string): readonly RawRow[] {
+    return this.estate[key] ?? [];
+  }
+
+  rows(key: EvidenceReadTable): Promise<unknown[]> {
+    this.calls.push(`rows ${key}`);
+    return Promise.resolve([...this.of(key)]);
+  }
+
+  rowsWhere(key: EvidenceReadTable, where: Readonly<Record<string, unknown>>): Promise<unknown[]> {
+    this.calls.push(`rowsWhere ${key} ${Object.keys(where).sort().join('+')}`);
+    return Promise.resolve(
+      this.of(key).filter((row) => Object.entries(where).every(([k, v]) => row[k] === v)),
+    );
+  }
+
+  rowAt(key: EvidenceReadTable, at: Readonly<Record<string, unknown>>): Promise<unknown> {
+    this.calls.push(`rowAt ${key} ${Object.keys(at).sort().join('+')}`);
+    return Promise.resolve(
+      this.of(key).find((row) => Object.entries(at).every(([k, v]) => row[k] === v)),
+    );
+  }
+}
+
+function instantOf(iso: string): Date {
+  return new Date(iso);
+}
+
+function accountRow(overrides: RawRow = {}): RawRow {
+  return {
+    id: SUBJECT_ACCOUNT,
+    identityId: SUBJECT_IDENTITY,
+    userId: '12121212-1212-4121-8121-121212121212',
+    purchaseId: '13131313-1313-4131-8131-131313131313',
+    planVersionId: PLAN_VERSION,
+    // A `bigint` cents column, which is what `assertIntegerAmounts` has to be
+    // able to see as a number.
+    sizeCents: 5000000n,
+    phase: 'funded',
+    status: 'active',
+    platform: 'rithmic',
+    platformAccountRef: 'APEX-4471',
+    feed: null,
+    frontEndPermissions: [],
+    openedOn: '2026-07-01',
+    fundedOn: '2026-08-01',
+    closedOn: null,
+    closeReason: null,
+    payoutsFrozen: false,
+    reconBlocked: false,
+    expiresOn: null,
+    graduatedAt: null,
+    graduationPath: null,
+    terminalSettlementId: null,
+    graduationEligible: false,
+    createdAt: instantOf('2026-07-01T12:00:00.000Z'),
+    updatedAt: instantOf('2026-08-20T12:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function identityRow(overrides: RawRow = {}): RawRow {
+  return {
+    id: SUBJECT_IDENTITY,
+    displayName: 'Jordan R.',
+    leaderboardOptIn: false,
+    status: 'active',
+    statusReason: null,
+    maxAccountsOverride: null,
+    payoutsFrozen: false,
+    frozenReason: null,
+    frozenAt: null,
+    supportContactRef: null,
+    firstSeenAt: instantOf('2026-06-30T09:00:00.000Z'),
+    createdAt: instantOf('2026-06-30T09:00:00.000Z'),
+    updatedAt: instantOf('2026-08-20T09:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function planVersionRow(overrides: RawRow = {}): RawRow {
+  return {
+    id: PLAN_VERSION,
+    planId: '14141414-1414-4141-8141-141414141414',
+    version: 7,
+    status: 'published',
+    rules: { trailing_drawdown_cents: 200000 },
+    copyBlocks: { floor: 'Trailing drawdown of 2,000 dollars from the high-water balance.' },
+    publicSlug: 'apex-50k',
+    publicVisible: true,
+    publishedAt: instantOf('2026-06-01T00:00:00.000Z'),
+    retiredAt: null,
+    createdBy: 'ops:sam',
+    createdAt: instantOf('2026-05-30T00:00:00.000Z'),
+    feeBackRepeats: false,
+    decidedOnSimulationRunId: null,
+    simulationWaiverReason: null,
+    ...overrides,
+  };
+}
+
+function fillRow(id: bigint, executedAt: string, overrides: RawRow = {}): RawRow {
+  return {
+    id,
+    accountId: SUBJECT_ACCOUNT,
+    platform: 'rithmic',
+    platformFillId: `RF-${String(id)}`,
+    orderId: null,
+    venue: null,
+    symbol: 'ESZ6',
+    side: 'buy',
+    quantity: 2,
+    priceNumerator: 445025n,
+    priceDenominator: 100n,
+    executedAt: instantOf(executedAt),
+    tradingDay: '2026-08-20',
+    correctionOf: null,
+    isCorrected: false,
+    ingestFileId: '15151515-1515-4151-8151-151515151515',
+    rawRowId: 4001n,
+    recordedAt: instantOf(executedAt),
+    tradingDayVendor: null,
+    tradingDaySource: 'calendar',
+    createdAt: instantOf(executedAt),
+    ...overrides,
+  };
+}
+
+function markRow(id: bigint, tradingDay: string, overrides: RawRow = {}): RawRow {
+  return {
+    id,
+    accountId: SUBJECT_ACCOUNT,
+    tradingDay,
+    openingBalanceCents: 5000000n,
+    closingBalanceCents: 5012500n,
+    highBalanceCents: 5020000n,
+    lowBalanceCents: 4998000n,
+    realizedPnlCents: 12500n,
+    fillCount: 2,
+    tradedDay: true,
+    winDay: true,
+    adjustmentCents: 0n,
+    // A `bytea`, which renders as an object keyed by byte index if nothing
+    // converts it.
+    sourceHash: new Uint8Array([0xde, 0xad, 0xbe, 0xef]),
+    source: 'rithmic',
+    ingestFileId: null,
+    supersededBy: null,
+    computedAt: instantOf(`${tradingDay}T22:00:00.000Z`),
+    createdAt: instantOf(`${tradingDay}T22:00:00.000Z`),
+    ...overrides,
+  };
+}
+
+function ruleStateRow(id: bigint, tradingDay: string, overrides: RawRow = {}): RawRow {
+  return {
+    id,
+    accountId: SUBJECT_ACCOUNT,
+    tradingDay,
+    phase: 'funded',
+    floorCents: 4800000n,
+    floorLocked: false,
+    floorOpenCents: 4800000n,
+    highWaterBalanceCents: 5020000n,
+    balanceCents: 5012500n,
+    withdrawableCents: 212500n,
+    tradedDaysCount: 9,
+    winDaysCount: 6,
+    consistencyBestDayCents: 12500n,
+    consistencyPeriodProfitCents: 42000n,
+    consistencyPeriodStartDay: null,
+    payoutsSettledCount: 1,
+    payoutAnchorDay: null,
+    cadenceAnchorDay: null,
+    engineEligible: true,
+    engineGates: { profit_target: true, drawdown: true, min_days: true },
+    contextGates: { freeze: false, recon_blocked: false, kyc: true },
+    stateHash: new Uint8Array([0x01, 0x02, 0x03]),
+    engineVersion: 'engine@1.4.0',
+    computedAt: instantOf(`${tradingDay}T22:05:00.000Z`),
+    createdAt: instantOf(`${tradingDay}T22:05:00.000Z`),
+    calendarRevisionId: null,
+    ...overrides,
+  };
+}
+
+function riskFlagRow(id: string, overrides: RawRow = {}): RawRow {
+  return {
+    id,
+    identityId: SUBJECT_IDENTITY,
+    accountId: SUBJECT_ACCOUNT,
+    flagType: 'copy_cluster',
+    severity: 3,
+    status: 'open',
+    source: 'internal',
+    detectorRunId: RUN_ID,
+    evidence: {
+      window_seconds: 2,
+      counterparty_identity_id: COUNTERPARTY_IDENTITY,
+    },
+    firstDetectedOn: '2026-08-20',
+    ...overrides,
+  };
+}
+
+const REGISTRY_ROWS: readonly RawRow[] = SEEDED.map((row) => ({
+  detector: row.detector,
+  version: row.version,
+  parameters: row.parameters,
+  description: 'seeded',
+  effectiveFrom: '2026-01-01',
+  effectiveTo: null,
+  isSensitive: row.is_sensitive,
+}));
+
+function estateOf(overrides: Partial<Record<string, readonly RawRow[]>> = {}): Estate {
+  return {
+    accounts: [accountRow()],
+    identities: [identityRow()],
+    planVersions: [planVersionRow()],
+    fills: [fillRow(902n, '2026-08-20T14:31:00.000Z'), fillRow(901n, '2026-08-20T14:30:00.000Z')],
+    dailyMarks: [markRow(52n, '2026-08-20'), markRow(51n, '2026-08-19')],
+    ruleStates: [ruleStateRow(72n, '2026-08-20'), ruleStateRow(71n, '2026-08-19')],
+    riskFlags: [riskFlagRow(FLAG_ID)],
+    detectorRuns: [
+      { id: RUN_ID, detector: 'D-01', detectorVersion: 'v1', tradingDay: '2026-08-20' },
+    ],
+    payoutRequests: [],
+    identityRestrictionEpisodes: [],
+    detectorDefinitions: REGISTRY_ROWS,
+    ...overrides,
+  };
+}
+
+async function subjectFrom(estate: Estate = estateOf()): Promise<EvidenceSubjectResult> {
+  const result = await readEvidenceSubject(new Accessor(estate), SUBJECT_ACCOUNT);
+  expect(result).not.toBeNull();
+  return result as EvidenceSubjectResult;
+}
+
+// -----------------------------------------------------------------------------
+// 12.4 The three values canonicalJson cannot render
+// -----------------------------------------------------------------------------
+
+describe('the JSON hazards this projection exists for', () => {
+  test('a bigint THROWS, which is the loud one', () => {
+    // `JSON.stringify` has no representation for one, and every surrogate key
+    // and every cents column on these tables is a `bigint`.
+    expect(() => canonicalJson({ balance_cents: 5012500n })).toThrow(TypeError);
+  });
+
+  test('a Date renders as {} and NOTHING COMPLAINS, which is the one that matters', () => {
+    // `canonicalJson` reaches a `Date` through the same object branch every
+    // record takes, and `Object.keys(new Date())` is empty. The bytes would be
+    // wrong, the digest would be over exactly those wrong bytes, and the pack
+    // would be self-consistent about it.
+    expect(canonicalJson({ executed_at: instantOf('2026-08-20T14:30:00.000Z') })).toBe(
+      '{"executed_at":{}}',
+    );
+  });
+
+  test('a Uint8Array renders as an object keyed by byte index', () => {
+    expect(canonicalJson({ source_hash: new Uint8Array([0xde, 0xad]) })).toBe(
+      '{"source_hash":{"0":222,"1":173}}',
+    );
+  });
+
+  test('a projected subject renders whole, and every one of the three is converted', async () => {
+    const { subject } = await subjectFrom();
+    const rendered = canonicalJson(subject);
+    expect(rendered).toContain('"executed_at":"2026-08-20T14:30:00.000Z"');
+    expect(rendered).toContain('"source_hash":"deadbeef"');
+    expect(rendered).toContain('"id":"901"');
+    expect(rendered).toContain('"size_cents":5000000');
+    expect(rendered).not.toContain('{}');
+  });
+
+  test('the projected subject also survives the generators own integer refusal', async () => {
+    const { subject } = await subjectFrom();
+    // `assertIntegerAmounts` walks numbers and refuses a fractional one. A cents
+    // column carried as a STRING would walk past it, which is why `int` is a
+    // number and `bigid` is not.
+    expect(() => {
+      assertIntegerAmounts(subject);
+    }).not.toThrow();
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.5 The subject
+// -----------------------------------------------------------------------------
+
+describe('readEvidenceSubject', () => {
+  test('answers null for an account that is not there, which the route answers 404', async () => {
+    expect(await readEvidenceSubject(new Accessor(estateOf()), OTHER_ACCOUNT)).toBeNull();
+  });
+
+  test('an account that has never traded is a subject with empty sections, not a 404', async () => {
+    const { subject, cost } = await subjectFrom(
+      estateOf({ fills: [], dailyMarks: [], ruleStates: [] }),
+    );
+    expect(subject.account_id).toBe(SUBJECT_ACCOUNT);
+    expect(subject.fills).toStrictEqual([]);
+    expect(cost.fills).toBe(0);
+  });
+
+  test('refuses an account whose identity row is missing rather than blanking the section', async () => {
+    // `accounts.identity_id` REFERENCES `identities(id)`, so this cannot happen
+    // while the constraint holds. A pack whose subject section is blank is an
+    // exhibit saying the firm does not know who this is.
+    await expect(
+      readEvidenceSubject(new Accessor(estateOf({ identities: [] })), SUBJECT_ACCOUNT),
+    ).rejects.toThrow(/has no `identities` row/);
+  });
+
+  test('refuses an account whose pinned plan version is missing', async () => {
+    // GS-112 requires the plan's rule text, and a pack that omits the rule it is
+    // arguing about proves nothing.
+    await expect(
+      readEvidenceSubject(new Accessor(estateOf({ planVersions: [] })), SUBJECT_ACCOUNT),
+    ).rejects.toThrow(/rule text/);
+  });
+
+  test('carries the plan version whole, including copy_blocks', async () => {
+    const { subject } = await subjectFrom();
+    expect(subject.plan_version['copy_blocks']).toStrictEqual({
+      floor: 'Trailing drawdown of 2,000 dollars from the high-water balance.',
+    });
+    expect(subject.plan_version['rule_text']).toBeUndefined();
+  });
+
+  test('orders fills, marks and rule states OLDEST FIRST with the row id as the tie-break', async () => {
+    // `account.ts`'s rule and its reason: a dispute about a specific day is
+    // worked from before it to after it. The estate hands them back newest
+    // first, so an unsorted implementation fails this.
+    const { subject } = await subjectFrom();
+    expect(subject.fills.map((row) => row['id'])).toStrictEqual(['901', '902']);
+    expect(subject.marks.map((row) => row['trading_day'])).toStrictEqual([
+      '2026-08-19',
+      '2026-08-20',
+    ]);
+    expect(subject.rule_states.map((row) => row['trading_day'])).toStrictEqual([
+      '2026-08-19',
+      '2026-08-20',
+    ]);
+  });
+
+  test('breaks a tie on the id as a NUMBER, because "10" sorts before "9" as text', async () => {
+    const { subject } = await subjectFrom(
+      estateOf({
+        fills: [fillRow(10n, '2026-08-20T14:30:00.000Z'), fillRow(9n, '2026-08-20T14:30:00.000Z')],
+      }),
+    );
+    expect(subject.fills.map((row) => row['id'])).toStrictEqual(['9', '10']);
+  });
+
+  test('pushes every section down as an equality rather than reading a table whole', async () => {
+    // ADR-112's vocabulary is a typed equality. The only whole-table read this
+    // module makes is the registry, and section 12.7 says why that one must be.
+    const accessor = new Accessor(estateOf());
+    await readEvidenceSubject(accessor, SUBJECT_ACCOUNT);
+    expect(accessor.calls).toContain('rowsWhere fills accountId');
+    expect(accessor.calls).toContain('rowsWhere riskFlags identityId');
+    expect(accessor.calls.filter((call) => call.startsWith('rows '))).toStrictEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.6 The flags, the detector attribution and the ToS clause
+// -----------------------------------------------------------------------------
+
+describe('the flag set is the accounts plus the persons', () => {
+  test('keeps this accounts flags and the identity-level ones, and drops another accounts', async () => {
+    // `account.ts`'s narrowing, adopted rather than reinvented: `IS NULL` is not
+    // a term this directory can mint, so the read is keyed on the identity and
+    // the predicate runs in memory. `full-detail` bounds the DETAIL and never
+    // the SCOPE.
+    const { subject, cost } = await subjectFrom(
+      estateOf({
+        riskFlags: [
+          riskFlagRow(FLAG_ID),
+          riskFlagRow(IDENTITY_FLAG, { accountId: null }),
+          riskFlagRow(OTHER_ACCOUNT_FLAG, { accountId: OTHER_ACCOUNT }),
+        ],
+      }),
+    );
+    expect(subject.flags.map((flag) => flag.flag_id)).toStrictEqual([FLAG_ID, IDENTITY_FLAG]);
+    expect(cost.identityFlags).toBe(3);
+    expect(cost.flags).toBe(2);
+  });
+
+  test('reads detector and detector_version off the RUN, which risk_flags does not carry', async () => {
+    // `risk_flags` has `detector_run_id` and no detector column;
+    // `detector_runs` has both names. This is `flags.ts`'s reading of the same
+    // two tables, with the version it does not need.
+    const { subject } = await subjectFrom();
+    expect(subject.flags[0]?.detector).toBe('D-01');
+    expect(subject.flags[0]?.detector_version).toBe('v1');
+    expect(schemaColumns('riskFlags').has('detector')).toBe(false);
+  });
+
+  test('an unattributed flag carries null and NOT a sentinel, because the field is nullable', async () => {
+    const { subject } = await subjectFrom(
+      estateOf({ riskFlags: [riskFlagRow(FLAG_ID, { detectorRunId: null })] }),
+    );
+    expect(subject.flags[0]?.detector).toBeNull();
+    expect(subject.flags[0]?.detector_version).toBeNull();
+  });
+
+  test('reads one run per distinct id rather than the table, which is one row per night', async () => {
+    const accessor = new Accessor(
+      estateOf({ riskFlags: [riskFlagRow(FLAG_ID), riskFlagRow(IDENTITY_FLAG)] }),
+    );
+    await readEvidenceSubject(accessor, SUBJECT_ACCOUNT);
+    expect(accessor.calls.filter((call) => call === 'rowAt detectorRuns id')).toHaveLength(1);
+  });
+});
+
+describe('the ToS clause is the enforcements and never a map', () => {
+  test('carries null when nothing has cited the flag, and NEVER invents one', async () => {
+    // STATE finding B: `risk_flags` carries no clause column and `DEP-M7-05`
+    // still owes two of the three texts. A flag-type-to-clause map written here
+    // would be the hand-listed drift `INV-M7-10` exists to prevent, one table
+    // over.
+    const { subject, cost } = await subjectFrom();
+    expect(subject.flags[0]?.tos_clause).toBeNull();
+    expect(cost.clauseSources).toBe(0);
+  });
+
+  test('takes the clause off a held payout request', async () => {
+    // `payout_requests_hold_is_complete`: a held payout carries a cited flag AND
+    // a clause AND a reason, or it carries none of them.
+    const { subject } = await subjectFrom(
+      estateOf({
+        payoutRequests: [
+          {
+            id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            accountId: SUBJECT_ACCOUNT,
+            holdFlagId: FLAG_ID,
+            holdTosClause: 'ToS 9.3',
+          },
+        ],
+      }),
+    );
+    expect(subject.flags[0]?.tos_clause).toBe('ToS 9.3');
+  });
+
+  test('takes the clause off an identity restriction episode', async () => {
+    const { subject, cost } = await subjectFrom(
+      estateOf({
+        identityRestrictionEpisodes: [
+          {
+            id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            identityId: SUBJECT_IDENTITY,
+            flagId: FLAG_ID,
+            tosClause: 'ToS 9.4',
+          },
+        ],
+      }),
+    );
+    expect(subject.flags[0]?.tos_clause).toBe('ToS 9.4');
+    expect(cost.clauseSources).toBe(1);
+  });
+
+  test('ignores a payout request that is not held, which carries no flag and no clause', async () => {
+    const { subject, cost } = await subjectFrom(
+      estateOf({
+        payoutRequests: [
+          {
+            id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            accountId: SUBJECT_ACCOUNT,
+            holdFlagId: null,
+            holdTosClause: null,
+          },
+        ],
+      }),
+    );
+    expect(subject.flags[0]?.tos_clause).toBeNull();
+    expect(cost.payoutRequests).toBe(1);
+    expect(cost.clauseSources).toBe(0);
+  });
+
+  test('two enforcements citing one flag under the SAME clause is one answer, not a conflict', async () => {
+    const { subject } = await subjectFrom(
+      estateOf({
+        payoutRequests: [
+          { accountId: SUBJECT_ACCOUNT, holdFlagId: FLAG_ID, holdTosClause: 'ToS 9.3' },
+        ],
+        identityRestrictionEpisodes: [
+          { identityId: SUBJECT_IDENTITY, flagId: FLAG_ID, tosClause: 'ToS 9.3' },
+        ],
+      }),
+    );
+    expect(subject.flags[0]?.tos_clause).toBe('ToS 9.3');
+  });
+
+  test('two enforcements citing one flag under DIFFERENT clauses is a refusal', async () => {
+    // `EvidenceFlagRecord.tos_clause` is one string and a pack is the document a
+    // dispute is argued from. Stating one of them would cite a rule the firm did
+    // not cite for the other enforcement. A ruling that makes the field a list
+    // retires this; nothing is guessed in the meantime.
+    await expect(
+      readEvidenceSubject(
+        new Accessor(
+          estateOf({
+            payoutRequests: [
+              { accountId: SUBJECT_ACCOUNT, holdFlagId: FLAG_ID, holdTosClause: 'ToS 9.3' },
+            ],
+            identityRestrictionEpisodes: [
+              { identityId: SUBJECT_IDENTITY, flagId: FLAG_ID, tosClause: 'ToS 12.1' },
+            ],
+          }),
+        ),
+        SUBJECT_ACCOUNT,
+      ),
+    ).rejects.toThrow(EvidenceExportError);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.7 The registry
+// -----------------------------------------------------------------------------
+
+describe('readEvidenceDetectorRegistry', () => {
+  test('reads the WHOLE table, because INV-M7-10s strip list is a union over it', async () => {
+    // A read narrowed to the detectors that flagged THIS account would compute a
+    // strip list missing every name only another detector claims, and
+    // `sensitiveParameterNames` says why that matters: `severity` and
+    // `window_trading_days` belong to several detectors at once.
+    const accessor = new Accessor(estateOf());
+    const registry = await readEvidenceDetectorRegistry(accessor);
+    expect(accessor.calls).toStrictEqual(['rows detectorDefinitions']);
+    expect(registry).toHaveLength(SEEDED.length);
+  });
+
+  test('produces exactly the strip list the seed produces, computed and not restated', async () => {
+    const registry = await readEvidenceDetectorRegistry(new Accessor(estateOf()));
+    expect([...sensitiveParameterNames(registry)].sort()).toStrictEqual(seededParameterNames());
+  });
+
+  test('an is_sensitive it cannot read is a refusal, because a name it misses is a name that ships', async () => {
+    await expect(
+      readEvidenceDetectorRegistry(
+        new Accessor(
+          estateOf({
+            detectorDefinitions: [
+              { detector: 'D-99', version: 'v1', parameters: {}, isSensitive: 'yes' },
+            ],
+          }),
+        ),
+      ),
+    ).rejects.toThrow(/is_sensitive/);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.8 The refusals, one per kind
+// -----------------------------------------------------------------------------
+
+describe('the column readers refuse rather than render', () => {
+  test('a cents column past the safe integer range is a refusal and not a rounding', async () => {
+    await expect(
+      readEvidenceSubject(
+        new Accessor(estateOf({ accounts: [accountRow({ sizeCents: 9007199254740993n })] })),
+        SUBJECT_ACCOUNT,
+      ),
+    ).rejects.toThrow(/outside the range a JSON number holds exactly/);
+  });
+
+  test('a NOT NULL text column arriving empty is the transcription disagreeing with the database', async () => {
+    await expect(
+      readEvidenceSubject(
+        new Accessor(estateOf({ accounts: [accountRow({ phase: '' })] })),
+        SUBJECT_ACCOUNT,
+      ),
+    ).rejects.toThrow(/carries no `phase`/);
+  });
+
+  test('a trading day derived from an instant is refused, because CT and UTC disagree for hours', async () => {
+    await expect(
+      readEvidenceSubject(
+        new Accessor(
+          estateOf({
+            dailyMarks: [
+              markRow(51n, '2026-08-19', { tradingDay: instantOf('2026-08-19T22:00:00.000Z') }),
+            ],
+          }),
+        ),
+        SUBJECT_ACCOUNT,
+      ),
+    ).rejects.toThrow(/not a trading day/);
+  });
+
+  test('a boolean column arriving as anything else is refused', async () => {
+    await expect(
+      readEvidenceSubject(
+        new Accessor(
+          estateOf({ ruleStates: [ruleStateRow(71n, '2026-08-19', { engineEligible: 1 })] }),
+        ),
+        SUBJECT_ACCOUNT,
+      ),
+    ).rejects.toThrow(/engine_eligible/);
+  });
+
+  test('a jsonb carrying a value canonicalJson cannot render is refused at the boundary', async () => {
+    // It should never fire, because `pg` parses JSON into plain values. It is
+    // here because when it does not fire the alternative is `canonicalJson`
+    // throwing three layers from the row, or rendering `{}` and hashing it.
+    await expect(
+      readEvidenceSubject(
+        new Accessor(
+          estateOf({
+            ruleStates: [
+              ruleStateRow(71n, '2026-08-19', {
+                engineGates: { at: instantOf('2026-08-19T00:00:00.000Z') },
+              }),
+            ],
+          }),
+        ),
+        SUBJECT_ACCOUNT,
+      ),
+    ).rejects.toThrow(/cannot render/);
+  });
+
+  test('an optional column arriving null is null, and is not an error', async () => {
+    const { subject } = await subjectFrom();
+    expect(subject.account['closed_on']).toBeNull();
+    expect(subject.account['feed']).toBeNull();
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.9 The port, end to end through the generator
+// -----------------------------------------------------------------------------
+
+describe('evidenceReadPort, driving the generator it was written for', () => {
+  function depsOver(estate: Estate = estateOf()): Recorder {
+    const recorder = recorderOf();
+    return {
+      ...recorder,
+      deps: { ...recorder.deps, reads: evidenceReadPort(new Accessor(estate)) },
+    };
+  }
+
+  test('a trader pack built from the accessor passes the redaction refusal', async () => {
+    const recorder = depsOver();
+    const pack = await createEvidenceExporter(recorder.deps).exportEvidence(REQUEST);
+    expect(pack?.audience).toBe('trader');
+    expect(recorder.written[0]?.redaction_profile).toBe('trader-facts-only');
+    expect(recorder.written[0]?.includes_detector_detail).toBe(false);
+  });
+
+  test('the bytes it stored are the digest it wrote, over a document with no {} in it', async () => {
+    const recorder = depsOver();
+    await createEvidenceExporter(recorder.deps).exportEvidence(REQUEST);
+    const bytes = recorder.stored[0];
+    expect(bytes).toBeDefined();
+    const text = Buffer.from(bytes ?? new Uint8Array()).toString('utf8');
+    expect(text).toContain('"trader-facts-only"');
+    expect(text).not.toContain('{}');
+  });
+
+  test('a trader pack carries the fills, the marks, the gate results and the rule text', async () => {
+    // `GS-112` in both directions. The positives are asserted here and the
+    // negatives are sections 4 through 8 above.
+    const recorder = depsOver();
+    await createEvidenceExporter(recorder.deps).exportEvidence(REQUEST);
+    const text = Buffer.from(recorder.stored[0] ?? new Uint8Array()).toString('utf8');
+    expect(text).toContain('"platform_fill_id":"RF-901"');
+    expect(text).toContain('"closing_balance_cents":5012500');
+    expect(text).toContain('"engine_gates"');
+    expect(text).toContain('"context_gates"');
+    expect(text).toContain('Trailing drawdown of 2,000 dollars');
+  });
+
+  test('a trader pack whose flag names another identity is REFUSED, over the accessor', async () => {
+    // The counterparty uuid reaches the document through the flag's `evidence`
+    // bag only at `full-detail`; at `trader` the allowlist drops the bag, so the
+    // case that matters is the one where it reaches a field the pack must keep.
+    const recorder = depsOver(
+      estateOf({
+        identityRestrictionEpisodes: [
+          {
+            identityId: SUBJECT_IDENTITY,
+            flagId: FLAG_ID,
+            tosClause: `ToS 9.3: coordinated with account ${COUNTERPARTY_IDENTITY}`,
+          },
+        ],
+      }),
+    );
+    await expect(createEvidenceExporter(recorder.deps).exportEvidence(REQUEST)).rejects.toThrow(
+      EvidenceRedactionError,
+    );
+    expect(recorder.written).toHaveLength(0);
+    expect(recorder.stored).toHaveLength(0);
+  });
+
+  test('an account the accessor does not hold answers null, which the route answers 404', async () => {
+    const recorder = depsOver();
+    expect(
+      await createEvidenceExporter(recorder.deps).exportEvidence({
+        ...REQUEST,
+        accountId: OTHER_ACCOUNT,
+      }),
+    ).toBeNull();
+    expect(recorder.written).toHaveLength(0);
+  });
+
+  test('an internal pack over the accessor carries the detectors section and the whole flag', async () => {
+    const recorder = depsOver();
+    await createEvidenceExporter(recorder.deps).exportEvidence({
+      ...REQUEST,
+      audience: 'internal',
+    });
+    const text = Buffer.from(recorder.stored[0] ?? new Uint8Array()).toString('utf8');
+    expect(text).toContain('"detectors"');
+    expect(text).toContain(COUNTERPARTY_IDENTITY);
+    expect(recorder.written[0]?.includes_detector_detail).toBe(true);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12.10 What this adapter is still two ports short of
+// -----------------------------------------------------------------------------
+
+describe('exportEvidence still does not join IMPLEMENTED_ADMIN_READS, and the reason is measured', () => {
+  const SRC = join(HERE, '..', 'src');
+
+  test('every table this read needs was ALREADY registered, so no table is what blocks it', () => {
+    // The opposite of what sessions 349 and 353 found for `events`. Nothing here
+    // waits on `packages/db`.
+    for (const key of EVIDENCE_READ_TABLES) expect(TABLE_KEYS).toContain(key);
+  });
+
+  test('nothing in this deployable implements EvidencePackStore, and no table registration would', () => {
+    // `evidence_packs.storage_ref` is "Private object storage, signed URL only"
+    // in the DDL's own comment. A store is not a table, so no registration
+    // reaches it, and a `download_url` invented here is a pack an operator cites
+    // and nobody can open.
+    //
+    // THE PROBE IS THE INTERFACE NAME AND NOT THE COLUMN NAME. A first version
+    // swept for `storage_ref:` and matched the DECLARATION, which is this file
+    // asserting that a type it declares is declared. The measurement that means
+    // something is that ONE file in the whole deployable mentions the port at
+    // all: nothing references it, so no deployment can install one.
+    const mentions = typescriptFilesUnder(SRC)
+      .filter((file) => read(file).includes('EvidencePackStore'))
+      .map((file) => file.slice(SRC.length + 1));
+    expect(mentions).toStrictEqual([join('admin-source', 'evidence.ts')]);
+  });
+
+  test('the writer is an INSERT and its home is the write side, which already registers the table', () => {
+    // `routes/admin-writes.ts` names `evidencePacks` in `ADMIN_WRITE_TABLES` and
+    // `AdminWriteTx` carries `insert`. THIS directory's stated property is a
+    // handle it cannot write through, so the row is reported as the write side's
+    // rather than minted here.
+    const writes = read(join(SRC, 'routes', 'admin-writes.ts'));
+    expect(writes).toContain("'evidencePacks'");
+    expect(writes).toContain('insert(key: AdminWriteTable');
+    for (const name of readdirSync(join(SRC, 'admin-source')))
+      expect(read(join(SRC, 'admin-source', name)), `${name} writes`).not.toContain('.insert(');
+  });
+
+  test('IMPLEMENTED_ADMIN_READS does not name it, so the wiring triple does not move', () => {
+    // A METHOD IS NOT A PORT. `composeImplementedAdminReads` takes ONE
+    // parameter, an `AdminSourceBackend`, and no door onto this database
+    // produces a signed URL, so a key added there would have to invent a store.
+    expect(IMPLEMENTED_ADMIN_READS).not.toContain('exportEvidence');
+    expect(read(join(SRC, 'start.ts'))).not.toContain('setAdminReadSource(');
+  });
+
+  test('and the run-time defence still names it, over a green typecheck', () => {
+    // The third of the three, and the only one that fires at run time. It is
+    // thrown SYNCHRONOUSLY where the port's signature returns a promise, which
+    // is why this case does not await.
+    expect(() => composeAdminReadSource({}).exportEvidence(REQUEST)).toThrow(
+      AdminSourceNotComposed,
+    );
+    expect(() => composeAdminReadSource({}).exportEvidence(REQUEST)).toThrow(/exportEvidence/);
   });
 });

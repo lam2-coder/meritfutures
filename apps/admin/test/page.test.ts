@@ -610,3 +610,68 @@ describe('M6-A-37: the page refuses a rendering that folds the float into reserv
     expect(ratioLine).toContain('SUSPECT, data trust is red');
   });
 });
+
+describe('M6-A-72: the P-M6-01 panel shows THREE components under the total', () => {
+  const page = buildLiabilityHome(INPUT);
+  const openLiability = page.panels.find((panel) => panel.origin === 'P-M6-01');
+
+  test('the panel prints the total and all three components', () => {
+    expect(openLiability?.readings).toHaveLength(4);
+  });
+
+  test('the third component renders absent with its reason and never as a zero', () => {
+    const line = openLiability?.lines.find((entry) =>
+      entry.includes('in-flight withdrawal component'),
+    );
+    expect(line).toContain('not available');
+    expect(line).toContain('NO COLUMN');
+    expect(line).not.toContain('component: 0.00');
+  });
+
+  test('the total is the two supplied components and says it is INCOMPLETE', () => {
+    const total = openLiability?.lines.find((entry) => entry.startsWith('Open liability: '));
+    // 750,000c, which `formatCents` renders in units and not in cents.
+    expect(total).toMatch(/^Open liability: 7500\.00 /);
+    expect(total).toContain('INCOMPLETE');
+  });
+
+  test('a supplied obligation is summed into the total and the clause goes', () => {
+    const supplied = buildLiabilityHome({
+      ...INPUT,
+      snapshot: {
+        ...INPUT.snapshot,
+        walletBalancesCents: 225_000n,
+        withdrawalsInFlight: { cents: 25_000n, source: 'withdrawals_in_flight ledger balance' },
+      },
+    });
+    const total = supplied.panels
+      .find((panel) => panel.origin === 'P-M6-01')
+      ?.lines.find((entry) => entry.startsWith('Open liability: '));
+    // INV-M6-15 on the page bytes: the approval moved 25,000c out of the wallet
+    // term and into the obligation term, and the total is where it was.
+    expect(total).toMatch(/^Open liability: 7500\.00 /);
+    expect(total).not.toContain('INCOMPLETE');
+  });
+
+  test('the live figure still reads the total, so the third term cannot break INV-M6-12', () => {
+    const live = buildLiabilityHome({
+      ...INPUT,
+      snapshot: {
+        ...INPUT.snapshot,
+        walletBalancesCents: 225_000n,
+        withdrawalsInFlight: { cents: 25_000n, source: 'withdrawals_in_flight ledger balance' },
+      },
+      live: {
+        movement: {
+          cents: 1_000n,
+          asOfInstant: '2026-08-21T12:55:00.000Z',
+          feed: 'indicative marks feed',
+        },
+        sameDayAdjustments: { cents: 0n, asOfInstant: '2026-08-21T12:55:00.000Z' },
+      },
+    }).live;
+    expect(live.kind).toBe('indicative');
+    if (live.kind !== 'indicative') throw new Error('expected the indicative arm');
+    expect(live.terms.lastClosed.cents).toBe(750_000n);
+  });
+});
