@@ -202,6 +202,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-181](ADR-181.md) | the external leg's in-flight obligation is a firm-scoped liability and none of the seven codes can hold it, so the shape is ruled and `0054` returns to the pool unspent  (2026-08-28, status: proposed) |
 | [ADR-182](ADR-182.md) | `apps/admin` renders in Next.js App Router, and the ruling that costs something is the one underneath it: the console SERVES HTTP, so the operator surface's 27 routes are its data source and never its alternative (2026-08-28, status: proposed) |
 | [ADR-183](ADR-183.md) | an identity's three ledger positions are opened by the database when the identity is created, and `0054` is spent  (2026-08-28, status: proposed) |
+| [ADR-184](ADR-184.md) | the admin event feed gets its contract row, and the ruling underneath it is that the read belongs on `AdminReadSource` as a seventh method while `INV-M6-10`'s two modes move into the REQUEST (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

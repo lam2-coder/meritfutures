@@ -1077,6 +1077,54 @@ type IdentityGraph = {
 };
 ```
 
+### GET /admin/events
+The event feed. [M06](../plans/M06-admin-ops-console.md) section 1.1's fifth surface, added by [ADR-184](../decisions/ADR-184.md); `apps/admin/src/feed.ts` implemented it in 507 lines while this section carried no row for it.
+
+**`scope` is required and has no default**, which is `INV-M6-10` carried in the request rather than in a handler. The invariant is "the admin console renders trader-identifying data only when the query names a specific subject", and whether a query names one is therefore a value the caller states.
+
+```ts
+type EventFeedQuery = {
+  // REQUIRED. There is no default: `operational` would silently redact a
+  // drill-down and either named arm would hand a bulk screen the licence a
+  // named query earns.
+  scope: "operational" | "identity" | "account";
+  identity_id?: string;   // required when `scope` is `identity`, refused otherwise
+  account_id?: string;    // required when `scope` is `account`, refused otherwise
+  limit?: number; cursor?: string;
+};
+
+type AdminEventItem = {
+  id: string;             // `events.id` is `bigint`, so a string: a JSON number loses the order past 2^53
+  event_name: string;
+  occurred_at: string;    // when the fact happened
+  recorded_at: string;    // when we learned it. Corrections make these differ
+  identity_id: string | null;   // `null` where the row carried none, `"withheld"` where the scope does not admit it
+  account_id: string | null;
+  subject_kind: string; subject_id: string;
+  actor_kind: string; actor_id: string | null;
+  correlation_id: string | null;
+  payload: Record<string, unknown>;   // every key ending `identity_id` or `account_id` withheld the same way
+  withheld: boolean;            // whether anything on THIS row was withheld
+  instants_incoherent: boolean; // we learned it before it happened, which cannot be true
+};
+
+type EventFeedResponse = { scope: EventFeedQuery["scope"]; data: AdminEventItem[]; next_cursor: string | null };
+```
+
+**A subject sent under a scope that does not name it is `validation_failed`, never ignored.** `?scope=operational&identity_id=...` is two different queries in one request and the server does not pick between them. Ignoring the parameter is the handler remembering, and a property a handler has to remember is `FM-M6-10`, "a bulk PII surface hiding inside a convenience feature".
+
+**Withholding is a rule on the shape of the key and not a column list.** Any key ending `identity_id` or `account_id` is gated, so `kyc.dedupe_hit`'s `matched_identity_id` and `identity.merged`'s `merged_identity_id` are covered by construction. [`packages/db/src/scope.ts`](../../packages/db/src/scope.ts) records those two as the reason `events` cannot be scoped at all: a row whose own tenancy column is correct still names a different identity inside `jsonb`. A scope rule cannot express that and a projection can.
+
+**A withheld value is the string `withheld` in the field, and the field is present.** A row with no identity shown must not read as a row with no identity involved. The set of values withheld is **never a field on this response**: a response carrying it would ship every withheld identifier to the caller, which is the bulk read with an extra step.
+
+**In a named scope the subject the query named renders and a different one does not**, because the invariant's licence is for the one subject named. `actor_id` is an operator string on `admin_actions.actor`'s precedent, not a trader identifier, and is never withheld.
+
+**There is no `total` and there is no way to add one.** [ADR-157](../decisions/ADR-157.md) refuses the scalar aggregate on the read path. Section 1's envelope already carries both honest facts: `data.length` is counted rather than claimed, and `next_cursor === null` is the difference between an exhausted query and a full page. An operator who believes a truncated page is the whole story during an incident is what that distinction exists against.
+
+**Ordered by `recorded_at` descending, ties broken on `id`.** This is the operational timeline, so what an operator watching an incident needs is what we learned, in the order we learned it: a late vendor webhook about Tuesday's fact belongs at the top of Thursday's feed rather than buried in Tuesday. `id` is the only total order this append-only table has.
+
+Auth: admin session, all three roles; the read-side risk `AS-M6-05` names is bounded here by the withholding rather than by a role. Rate limit: see section 11, admin. Errors: `validation_failed`, `unauthenticated`, `forbidden`.
+
 ### GET /admin/evidence/:accountId
 Generates and returns the [evidence pack](../GLOSSARY.md#evidence-pack).
 ```ts
@@ -1342,6 +1390,9 @@ Every row is a named test that must exist before the endpoint ships ([VG-5](../.
 | Trader session calls `/internal/*` from the public origin | `admin_sso` | 404 |
 | Admin session from a non-allowlisted IP | `admin_sso` | 403 at the edge |
 | `readonly` role calls any admin mutation | `admin_sso` | 403 |
+| `GET /admin/events` with no `scope` parameter | `admin_sso` | 400 `validation_failed` naming `scope`. **Not defaulted**: whether the query names a subject is what `INV-M6-10` turns on, so a request that does not say is refused rather than answered under a guess |
+| `GET /admin/events?scope=operational` on rows carrying identities | `admin_sso` | 200 with every `identity_id` and `account_id` the string `withheld`, including keys ending `identity_id` inside `payload`. The page an unfiltered read would have been is the bulk identity screen `INV-M6-10` says does not exist |
+| `GET /admin/events?scope=identity&identity_id={A}` on a row naming identity B inside its payload | `admin_sso` | 200 with A rendered and B `withheld`. The licence a named query earns is for the subject it named |
 | Payout body with `amount_cents` greater than cap | `session` | approved amount clamped, never the requested value |
 | Payout body omitting `amount_cents` entirely | `session` | approved amount equals `min(cap, withdrawable)`, `amount_supplied` false |
 | Payout body with `amount_cents` below `min_payout_cents` | `session` | `payout_not_eligible` with `minimum_amount` failing; no partial payment |
