@@ -217,18 +217,52 @@ export class SettlementAnchorError extends Error {
 /**
  * THE THREE THINGS THAT MAKE `LT-07` UNWRITABLE IN THIS TREE TODAY.
  *
- * P5 section 8 puts `LT-07` inside this slice and this slice does not have an
- * ADR number, so each of these is REPORTED with the primary source that says it
- * rather than resolved by picking. `test/lt-07.test.ts` asserts all three by
- * reading those sources, so none of them is a comment that can go stale
- * quietly: the day any of them is fixed, this package goes red.
+ * P5 section 8 puts `LT-07` inside this slice and this slice had no ADR number,
+ * so each of these was REPORTED with the primary source that says it rather
+ * than resolved by picking. `test/lt-07.test.ts` asserts all three by reading
+ * those sources, so none of them is a comment that can go stale quietly: the
+ * day any of them is fixed, this package goes red.
  *
- * Each entry is `{id, claim, sources}`, and the sources are paths a second
- * reader can open.
+ * ALL THREE ARE NOW RULED AND THE CLAIMS BELOW ARE UNCHANGED, WHICH IS THE
+ * POINT. Session 315 took ADR-174 for (A) and (C) and ADR-175 for (B), and
+ * neither entry amends a primary source this file reads, so every original
+ * assertion still passes. What each finding gained is a `ruled` field naming
+ * the entry that decided it and what that entry left open, because a finding
+ * whose disposition lives only in a document nobody greps for is a finding on
+ * its way back to being reported a third time.
+ *
+ * (A) IS RULED AND STILL BLOCKS: ADR-174 found the DEBIT slot wrong as well.
+ * `LT-06` credits `firm_treasury` `amount_cents` and `LT-07` debits it, and
+ * `posting.ts` writes `+amountCents` on a debit and `-amountCents` on a credit,
+ * so the external leg moves `firm_treasury` by ZERO whatever its kind. A code
+ * minted for the credit slot would complete a posting wrong in the other slot,
+ * so no code is minted and migration `0052` returned to the pool unspent.
+ *
+ * (B) IS RULED AND CLOSED: the two conventions are one rule under two
+ * spellings, a key names the EVENT and never the DOOR, and `LT-07`'s key is
+ * `${kind} ${wallet_withdrawals.idempotency_key}`. THIS PACKAGE STILL MINTS
+ * NONE, because the caller that mints it is the receiver and this is the port.
+ *
+ * (C) IS RECORDED AS AN ABSENCE AND NO DIRECTION IS INFERRED. The absence is
+ * larger than this finding says: against PostgreSQL 16 with every merged
+ * migration applied, `ledger_accounts` holds ZERO rows, and the database
+ * accepts `firm_treasury` as an asset, as a liability and as revenue in turn.
+ * Nothing seeds the chart of accounts at all.
+ *
+ * Each entry is `{id, claim, ruled, sources}`, and the sources are paths a
+ * second reader can open.
  */
 export const LT_07_FINDINGS = [
   {
     id: 'A',
+    ruled:
+      'ADR-174. RULED AND STILL BLOCKED. The credit slot is not the only defect: LT-06 credits ' +
+      'firm_treasury amount_cents and LT-07 debits it, so the external leg moves that account by ' +
+      'zero whatever its kind, and no code is minted for a slot whose sibling is wrong. ' +
+      'trader_wallet is refused on arithmetic rather than on scope, because LT-06 already debits ' +
+      'it at approval. Migration 0052 returned to the pool unspent. What stays open is which ' +
+      "account carries the external leg's in-flight obligation, and that cannot be settled while " +
+      'finding C is.',
     claim:
       "LT-07's credit leg names an account class that does not exist. M05 section 2.1 writes " +
       'LT-07 as `debit firm_treasury; credit the payout wallet position`, and ' +
@@ -246,6 +280,14 @@ export const LT_07_FINDINGS = [
   },
   {
     id: 'B',
+    ruled:
+      'ADR-175. RULED AND CLOSED. The two conventions are one rule under two spellings: a ' +
+      'ledger_transactions.idempotency_key names the EVENT it posts and never the DOOR that ' +
+      'reached it. PAYOUT_ENDPOINT is a module constant three call sites share, so LT-01s prefix ' +
+      'names the payout-approval event and is merely spelled as a route. LT-07s key is the ' +
+      'transaction kind against the withdrawals stored key. LT-01s three doors are NOT ' +
+      're-spelled, because ledger_entries is append-only and re-spelling a landed key costs a ' +
+      'compensating posting.',
     claim:
       "LT-07's ledger idempotency key has two recorded conventions in this tree and they point " +
       'opposite ways. LT-01 is posted under `${PAYOUT_ENDPOINT} ${idempotencyKey}` by three ' +
@@ -264,6 +306,12 @@ export const LT_07_FINDINGS = [
   },
   {
     id: 'C',
+    ruled:
+      'ADR-174 section 4. RECORDED AS AN ABSENCE and no direction is inferred from it. Executed ' +
+      'against PostgreSQL 16 with every merged migration applied: ledger_accounts holds ZERO ' +
+      'rows, and the database accepted firm_treasury as asset, as liability and as revenue in ' +
+      'turn. Nothing seeds the chart of accounts at all, so four of the seven codes have no kind ' +
+      'written anywhere in this tree.',
     claim:
       'No file in this tree says whether firm_treasury is an asset or a liability, so a ' +
       'receiver cannot derive which direction LT-07 moves it. ledger_accounts.kind is ' +
