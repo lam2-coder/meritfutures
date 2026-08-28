@@ -1299,14 +1299,30 @@ export const ADMIN_READ_ENDPOINTS: readonly AdminEndpointSpec[] = [
       // Section 8 spells the parameter into the heading, `GET
       // /admin/accounts?query=`, so an absent one is a validation failure and
       // never an implied "everybody".
+      //
+      // THE TERM LIST BELOW IS SIX AND WAS SEVEN, AND ADR-194 IS WHY. It is a
+      // TRANSCRIPTION of section 8's own sentence, and the seventh form the
+      // contract used to carry, a name fragment, is a pattern the operator
+      // composes rather than a value the estate holds: `identities.display_name`
+      // is the only name column in the schema, it is a leaderboard handle that
+      // INV-M11-10 says is not a legal name, and no legal name is stored
+      // anywhere. `admin-reads.test.ts` binds this message to that sentence, so
+      // neither half can be narrowed alone.
+      //
+      // WHAT THIS DOES NOT DO IS CHECK THE FORM OF THE TERM, and that is ADR-194
+      // clause 4 rather than an omission. Whether a term names a subject is a
+      // question only a lookup answers: `jo` is a legitimate exact coupon code.
+      // The refusal lives in the ADAPTER, which reads by equality and by nothing
+      // else, and a route-side pattern check would be a second answer that can
+      // be reordered away.
       const raw = queryParam(request, 'query');
       const query = raw === null ? '' : raw.trim();
       if (query === '')
         errors.push({
           path: 'query',
           message:
-            'must name a specific subject: an account id, platform ref, email, identity id, ' +
-            'name fragment, coupon, or payout id',
+            'must name an exact subject: an account id, platform ref, email, identity id, ' +
+            'coupon, or payout id',
         });
       const { limit, cursor } = readPaging(request, errors);
       if (errors.length > 0) return adminValidationFailed(reply, request.id, errors);
