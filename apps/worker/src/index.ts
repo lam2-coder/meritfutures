@@ -516,6 +516,29 @@ export type {
 } from './detectors/runner.ts';
 
 // -----------------------------------------------------------------------------
+// P7-f's THREE FILL DETECTORS (session 309)
+// -----------------------------------------------------------------------------
+// APPENDED. `P7` section 9 rows this file as the phase's largest collision --
+// seven slices on one hand-maintained barrel -- and names the hazard precisely:
+// "a keep-both merge of a re-export list type-checks and drops nothing, which is
+// what makes a lost leg easy to miss". So the resolution is an APPEND, both
+// sides are kept, and the whole barrel is re-read after any merge rather than
+// trusted to the type checker, which cannot see an export that is simply gone.
+export {
+  CANARY_INSTANT,
+  D01,
+  D04,
+  D05,
+  FILL_DETECTORS,
+  fillClustering,
+  fillClusteringNightly,
+  martingaleSequences,
+  martingaleSequencesNightly,
+  newsWindowClustering,
+  newsWindowClusteringNightly,
+} from './detectors/fills.ts';
+export type { FillClusteringOptions } from './detectors/fills.ts';
+
 // The graph detectors (`P7-g`), and the count they ship at
 // -----------------------------------------------------------------------------
 //

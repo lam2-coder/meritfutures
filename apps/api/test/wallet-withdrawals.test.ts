@@ -45,6 +45,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BASE_PATH, buildServer, discoverRouteModules } from '../src/index.ts';
 import {
+  identityScope,
   storedKey,
   type IdempotencyRecord,
   type IdempotencyScope,
@@ -1295,13 +1296,20 @@ describe('databaseWithdrawalBackend reads and writes through the accessor', () =
     await expect(run(recorder)).rejects.toThrow(/returned 0 rows/);
   });
 
-  it('answers 503 through the route, because no `IdempotencyStore` exists in this tree', async () => {
-    const recorder = seeded(elapsed);
-    useWithdrawalBackend(databaseWithdrawalBackend(recorder.db, () => NOW));
-    const res = await withdraw();
-    expect(res.statusCode).toBe(503);
-    expect(res.json().code).toBe('service_unavailable');
-    // AND NOTHING WAS READ OR WRITTEN. The refusal is before the transaction.
-    expect(recorder.calls).toStrictEqual([]);
+  it('installs the REAL idempotency store, over the scoped door', async () => {
+    // THIS CASE REPLACES ONE THAT ASSERTED A 503, AND THE REPLACEMENT IS A
+    // CORRECTION. The adapter supplied the unwired store on the strength of
+    // `idempotency.ts`'s header, which says no `IdempotencyStore` implementation
+    // exists in this tree and is STALE: `databaseIdempotencyStore` is at
+    // `src/idempotency-store.ts:144` and has its own suite. The port is
+    // therefore wireable, `start.ts` installs it, and `wiring.test.ts` counts it
+    // among the wired rather than among the blocked.
+    const recorder = recordingDb({});
+    const store = databaseWithdrawalBackend(recorder.db, () => NOW).idempotency;
+    expect(await store.find(identityScope(IDENTITY), 'k')).toBeNull();
+    expect(recorder.openedFor).toStrictEqual([IDENTITY]);
+    expect(recorder.calls).toStrictEqual([
+      { verb: 'rowAt', key: 'idempotencyKeys', address: { key: 'k' } },
+    ]);
   });
 });

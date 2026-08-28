@@ -1172,7 +1172,8 @@ type WalletCorrectionRequest = {
   direction: "credit" | "debit";
   amount_cents: number;               // integer cents, > 0. The magnitude; direction carries the sign
   cause: string;                      // the business event, human readable. NOT NULL in the row
-  corrects_entry_id: string;          // the entry being compensated. Becomes `reference_id`
+  corrects_entry_id?: string;         // OPTIONAL, and it does NOT become `reference_id`.
+                                      // See ADR-173 and the paragraph below
   reason: string;
   second_approver: string;            // dual control, see below
 };
@@ -1186,7 +1187,11 @@ type WalletCorrectionResponse = {
   occurred_at: string;
 };
 ```
-Auth: `admin_sso`, role `owner`. `reason` required and audited. Errors: `validation_failed` (non-integer, zero or negative amount, empty `reason`, empty `cause`), `precondition_failed` (dual control not satisfied), `conflict` (`corrects_entry_id` does not belong to this identity), `insufficient_funds` (below), `forbidden`, `not_found`.
+Auth: `admin_sso`, role `owner`. `reason` required and audited. Errors: `validation_failed` (non-integer, zero or negative amount, empty `reason`, empty `cause`), `precondition_failed` (dual control not satisfied), `conflict` (`corrects_entry_id` is present and does not belong to this identity), `insufficient_funds` (below), `forbidden`, `not_found`.
+
+**`corrects_entry_id` DOES NOT BECOME `reference_id`, AND IT IS OPTIONAL.** [ADR-173](../decisions/ADR-173.md), ruled against a running database with `0001` through `0051` applied. [`0038`](../../packages/db/migrations/0038_account_adjustments.sql)'s `assert_adjustment_wallet_entry_matches` binds `wallet_entries.reference_id` to the ADJUSTMENT's id, and the corrected entry's id is a `bigint` ([`0011:49`](../../packages/db/migrations/0011_wallet.sql)) that a `uuid` column ([`0011:78`](../../packages/db/migrations/0011_wallet.sql)) could not hold in any case: the write fails on `invalid input syntax for type uuid` before any constraint is reached. **No column anywhere in the schema records which entry a correction corrects, and none is owed.** The durable record is the [`admin_actions`](data-model/admin_actions.md) row's `before.corrected_entry`, which carries the whole entry as it stood before the correction, plus an `evidence_refs` entry of kind `wallet_entry`. That is [ADR-158](../decisions/ADR-158.md) clause 7's instrument, and `0026` revokes `UPDATE, DELETE` on `admin_actions` from `merit_app` and `PUBLIC` exactly as it does on `wallet_entries`.
+
+**The field is OPTIONAL because a correction need not correct an entry.** [`0038`](../../packages/db/migrations/0038_account_adjustments.sql) closes `account_adjustments.reason_code` at `goodwill`, `reconciliation_error` and `promotional_credit`, and a goodwill credit for a support failure repairs no entry at all while still landing in the wallet as `provenance: "correction"`, that being the only value [`0011`](../../packages/db/migrations/0011_wallet.sql)'s closed list offers it.
 
 **A correcting DEBIT that would take the running balance below zero is refused by the database.** `wallet_entries.balance_after_cents` is `CHECK (balance_after_cents >= 0)`, and because the table is append-only the correction lands at the END of the statement and is computed against the CURRENT balance rather than the balance at the time of the entry it corrects. So an operator correcting an old over-credit that has since been spent gets `insufficient_funds`, and the remedy is a debt rather than a negative wallet.
 
