@@ -356,7 +356,7 @@ export function deliveryValues(attempt: DeliveryAttempt): DigestValues {
         'a hash',
     );
 
-  if (!delivered !== !stated(attempt.failureReason))
+  if (!delivered !== stated(attempt.failureReason))
     throw new DigestRowError(
       `${where}: report_deliveries_failure_states_its_reason. A failed delivery with no stated ` +
         'reason records that something went wrong and NOT what, which is the alarm arriving ' +

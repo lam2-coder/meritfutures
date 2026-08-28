@@ -1014,6 +1014,7 @@ export const WORKER_MODULES_BEHIND_A_LEG: Readonly<Record<string, string>> = {
   './provisioning/compensation.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/machine.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/payload.ts': 're-exported through ./provisioning/index.ts',
+  './provisioning/ports.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/saga.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/vocabulary.ts': 're-exported through ./provisioning/index.ts',
 };
