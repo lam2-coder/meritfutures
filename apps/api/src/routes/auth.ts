@@ -278,6 +278,21 @@ export interface VerifyResponse {
   readonly auth_factor: AuthFactor;
 }
 
+/**
+ * What the REQUEST carries that a MINTED session records. `SD-M4-03`.
+ *
+ * Both members are nullable because both sources are: `request.ip` is `''`
+ * behind some proxies and `user-agent` is a header a client may omit. A NULL
+ * here is an honest "not offered" and `userAgentFamily` already answers
+ * `unknown` for one.
+ */
+export interface RequestContext {
+  /** `sessions.created_ip`. */
+  readonly requestIp: string | null;
+  /** `sessions.created_user_agent`, RAW. The COARSE family is derived on read. */
+  readonly userAgent: string | null;
+}
+
 /** A response that also establishes the session cookie. */
 export interface Established<T> {
   readonly response: T;
@@ -414,10 +429,11 @@ export interface Me {
  * Everything this surface needs from outside the process. One method per
  * endpoint, and no method takes or returns a Fastify type.
  *
- * `databaseAuthBackend` in `../auth-backend.ts` implements four of these against
- * the real accessor and raises {@link AuthBackendUnwired} from the other twelve,
- * each carrying its own blocker. See this file's header for which four and why,
- * and that file's header for the two constructions the other twelve wait on.
+ * `databaseAuthBackend` in `../auth-backend.ts` implements FIVE of these against
+ * the real accessor and raises {@link AuthBackendUnwired} from the other eleven,
+ * each carrying its own blocker. See this file's header for which and why, and
+ * that file's header for what the eleven wait on. The fifth is `verifyOtp`,
+ * wired by ADR-200.
  */
 export interface AuthBackend {
   /** Resolve the session cookie's value. `null` for an unknown or dead token. */
@@ -426,8 +442,25 @@ export interface AuthBackend {
   /** Consult `otp_send_budget` and, if it permits, issue the challenge. */
   requestOtp(input: OtpRequest, requestIp: string | null): Promise<OtpOutcome>;
 
-  /** Complete a challenge. `null` is a bad or expired code, deliberately indistinguishable. */
-  verifyOtp(input: VerifyRequest): Promise<Established<VerifyResponse> | null>;
+  /**
+   * Complete a challenge. `null` is a bad or expired code, deliberately indistinguishable.
+   *
+   * IT TAKES THE REQUEST CONTEXT BECAUSE THIS IS THE CALL THAT MINTS THE
+   * SESSION, and `SD-M4-03` makes `sessions.created_ip` and
+   * `sessions.created_user_agent` the creation half of a pair the trader-visible
+   * session list is built on: the anomaly signal that a session "moved country
+   * mid-life" (`AS-M4-05`) is only expressible if the creation values are
+   * written at creation. A minter with no access to them writes NULL forever and
+   * nothing later can recover what the values were. ADR-200.
+   *
+   * IT IS AN OBJECT AND NOT TWO POSITIONAL STRINGS, where {@link requestOtp}
+   * takes one bare `requestIp`. Two adjacent nullable strings is the shape a
+   * caller swaps, and a swapped pair here writes a user agent into an `inet`.
+   */
+  verifyOtp(
+    input: VerifyRequest,
+    context: RequestContext,
+  ): Promise<Established<VerifyResponse> | null>;
 
   /** Elevate the CURRENT session. Never issues a new one. */
   elevate(session: AuthSession, input: ElevateRequest): Promise<ElevateResponse | null>;
@@ -929,6 +962,23 @@ function requestIp(request: FastifyRequest): string | null {
 }
 
 /**
+ * The request's own {@link RequestContext}, built in one place.
+ *
+ * THE RAW USER AGENT IS CARRIED AND NOT THE FAMILY. `sessions.created_user_agent`
+ * is `text` and `SessionRow.user_agent_family` is *"Coarse, never the raw
+ * string"*: the column stores what arrived and `userAgentFamily` narrows it on
+ * the way out, so a family computed here would store a value no later reading
+ * could widen.
+ */
+function requestContext(request: FastifyRequest): RequestContext {
+  const agent = request.headers['user-agent'];
+  return {
+    requestIp: requestIp(request),
+    userAgent: typeof agent === 'string' && agent !== '' ? agent : null,
+  };
+}
+
+/**
  * API_CONTRACT section 3 and 3.1, in the document's order.
  *
  * `POST /phone/change/:id/cancel` IS THE ONE ROW WHOSE FACTOR THE CORPUS DOES
@@ -971,7 +1021,7 @@ export const AUTH_ENDPOINTS: readonly EndpointSpec[] = [
     handle: async ({ request, reply, backend: b }) => {
       const parsed = validateVerifyRequest(request.body);
       if (!parsed.ok) return sendValidationFailed(reply, request.id, parsed.errors);
-      const established = await b.verifyOtp(parsed.value);
+      const established = await b.verifyOtp(parsed.value, requestContext(request));
       // "unauthenticated (bad or expired code, deliberately indistinguishable)".
       if (established === null)
         return sendProblem(reply, problem('unauthenticated', 401, request.id));

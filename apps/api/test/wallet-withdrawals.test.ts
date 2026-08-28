@@ -100,6 +100,7 @@ import {
   type WithdrawalInsert,
   type WithdrawalTx,
 } from '../src/routes/wallet-withdrawals.ts';
+import { NO_PRE_IDENTITY_DOORS } from './db-recorder.ts';
 
 // -----------------------------------------------------------------------------
 // The fixture
@@ -1186,6 +1187,7 @@ function recordingDb(replies: {
       return fn(handle as never);
     },
     firm: <T>(fn: (tx: never) => Promise<T>): Promise<T> => fn(handle as never),
+    ...NO_PRE_IDENTITY_DOORS,
   };
   return { db: db as ApiDbLike, calls, openedFor };
 }

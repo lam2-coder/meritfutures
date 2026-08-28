@@ -33,7 +33,7 @@
 // moved, with every gate in the repository green over it. ADR-171.
 //
 // -----------------------------------------------------------------------------
-// TWO DOORS, AND THE THIRD IS ABSENT ON PURPOSE
+// FOUR DOORS, AND THE ONE THAT IS STILL ABSENT IS THE ONE ADR-171 REFUSED
 // -----------------------------------------------------------------------------
 // `scoped(identityId, fn)`  every read and write a request handler makes on
 //                           behalf of the caller it resolved.
@@ -42,14 +42,34 @@
 //                           "the first `firm` row whose reason is TIMING rather
 //                           than ownership": the challenge is written before
 //                           anybody is anybody.
+// `resolution(fn)`          the PRE-IDENTITY READ. One table, one address:
+//                           `users` by `email`. ADR-126 built it "because
+//                           `POST /auth/verify` must turn the address a person
+//                           typed into the identity that owns it", and ADR-197
+//                           exported it.
+// `establishment(fn)`       the identity and its first login, in ONE unit of
+//                           work. ADR-196 clause 2, ADR-197 ruling 3.
 //
-// THERE IS NO `system(reason, fn)` HERE AND ITS ABSENCE IS THE POINT.
-// `SystemReason` is `'nightly-batch' | 'operator-console'` (ADR-084 section 5,
-// ADR-096 clause 3), a request handler is neither, and ADR-109 clause 1 refused
-// to widen that vocabulary to solve what turned out to be a predicate problem.
-// A door declared here would be a door somebody uses, and the two things this
-// surface genuinely cannot reach (see `auth-backend.ts`'s header) are not made
-// reachable by a third word.
+// THE LAST TWO ARE ADR-200 AND THEY DO NOT OVERTURN ADR-171 CLAUSE 1, WHICH IS
+// ABOUT A DIFFERENT DOOR AND A DIFFERENT ARGUMENT. That clause refuses
+// `operator(fn)`, and section 5 of that entry is why: a door over `SystemTx`
+// would arrive on the object `databaseAuthBackend` already holds, and
+// `db.operator(tx => tx.rowAt('users', { email }))` would then be ADR-120's B1
+// answered at the reason word `'operator-console'`, inside a handler serving an
+// anonymous request. THE TWO DOORS BELOW ARE THAT ARGUMENT'S OWN REMEDY RATHER
+// THAN ITS CASUALTY: each is narrowed AT THE DOOR by a type in `packages/db`
+// -- `ResolutionDb` reads one row of one table at one address and cannot be
+// composed into a transaction at all, `EstablishmentTx` carries ONE VERB and no
+// executor -- and `auth-backend.ts` is not a file they leak into, it is the
+// caller they were built for and named for.
+//
+// THERE IS STILL NO `system(reason, fn)` HERE AND ITS ABSENCE IS STILL THE
+// POINT. `SystemReason` is `'nightly-batch' | 'operator-console'` (ADR-084
+// section 5, ADR-096 clause 3), a request handler is neither, and ADR-109
+// clause 1 refused to widen that vocabulary to solve what turned out to be a
+// predicate problem. ADR-171 section 9's condition -- that the door is takeable
+// by the slice landing an `AdminSessionSource` -- is untouched by this file and
+// no slice has met it.
 //
 // -----------------------------------------------------------------------------
 // THE CAST IS HERE AND IT IS HERE ONCE
@@ -86,8 +106,8 @@
 // tried to prove it here would be agreeing with its own fake.
 // =============================================================================
 
-import { firmDb, scopedDb, transaction } from '@merit/db';
-import type { FirmTx, IdentityId, ScopedTx } from '@merit/db';
+import { establishmentDb, firmDb, resolutionDb, scopedDb, transaction } from '@merit/db';
+import type { EstablishmentTx, FirmTx, IdentityId, ResolutionDb, ScopedTx } from '@merit/db';
 
 /** Raised when a door is asked for something it must not guess about. */
 export class DbDoorError extends Error {
@@ -115,11 +135,13 @@ export function isIdentityId(value: string): boolean {
 }
 
 /**
- * The two doors this deployable opens onto the trader database.
+ * The four doors this deployable opens onto the trader database.
  *
  * Each takes the whole unit of work rather than handing back a handle, so a
  * transaction cannot outlive the function that opened it and no caller has a
- * `commit` to forget.
+ * `commit` to forget. {@link ApiDb.resolution} keeps that shape even though the
+ * handle behind it is not transactional, because the property worth holding is
+ * that a handle never escapes the call.
  */
 export interface ApiDb {
   /**
@@ -134,6 +156,29 @@ export interface ApiDb {
 
   /** Rows that belong to nobody. `FirmTableKey` and nothing else. */
   firm<T>(fn: (tx: FirmTx) => Promise<T>): Promise<T>;
+
+  /**
+   * The pre-identity read: `users` by `email`, one row or none.
+   *
+   * IT TAKES THE UNIT OF WORK AND NOT A HANDLE EVEN THOUGH `ResolutionDb` IS
+   * NOT TRANSACTIONAL, and the shape is the point rather than a formality: the
+   * handle stays inside the call, so no adapter can hold one and reach past its
+   * own function. `packages/db` gives it no `transaction` overload, which is
+   * ADR-126's own ruling that a pre-identity reader "can be composed into
+   * nothing", and nothing here composes it.
+   */
+  resolution<T>(fn: (rx: ResolutionDb) => Promise<T>): Promise<T>;
+
+  /**
+   * The identity and its first `users` row, in ONE unit of work.
+   *
+   * `EstablishmentTx` CARRIES ONE VERB, so what this door grants is an ACT and
+   * never an authority: there is no `insert`, no `updateAt`, no `rowAt` and no
+   * `sqlExecutor` reachable through it. A caller cannot write an `identities`
+   * row without the `users` row ADR-196 clause 2 binds to it, because the
+   * statement that writes the first is the statement that writes the second.
+   */
+  establishment<T>(fn: (tx: EstablishmentTx) => Promise<T>): Promise<T>;
 }
 
 /**
@@ -158,5 +203,14 @@ export const LIVE_DB: ApiDb = {
   },
   firm<T>(fn: (tx: FirmTx) => Promise<T>): Promise<T> {
     return transaction(firmDb(), fn);
+  },
+  // NO `transaction` HERE, BECAUSE THE ACCESSOR OFFERS NONE FOR THIS HANDLE AND
+  // THAT ABSENCE IS ADR-126's RULING. The read is one statement on the pool and
+  // the door exists so the handle does not outlive the call.
+  resolution<T>(fn: (rx: ResolutionDb) => Promise<T>): Promise<T> {
+    return fn(resolutionDb());
+  },
+  establishment<T>(fn: (tx: EstablishmentTx) => Promise<T>): Promise<T> {
+    return transaction(establishmentDb(), fn);
   },
 };

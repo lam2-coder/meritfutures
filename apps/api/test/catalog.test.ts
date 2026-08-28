@@ -34,7 +34,7 @@ import type {
   PurchaseRow,
 } from '../src/routes/catalog.ts';
 import type { ApiDb } from '../src/db.ts';
-import { recordingDb } from './db-recorder.ts';
+import { NO_PRE_IDENTITY_DOORS, recordingDb } from './db-recorder.ts';
 
 // CI-02, the `unit` project.
 //
@@ -661,6 +661,7 @@ test('the identity reaching the scoped door is the sessions, never one off the r
       return recordingDb({ rows: [] }).db.scoped(identityId, fn);
     },
     firm: (fn) => recordingDb({ rowAt: undefined }).db.firm(fn),
+    ...NO_PRE_IDENTITY_DOORS,
   };
   useCatalogReads(databaseCatalogReads(watching));
   const { app } = buildServer({ surface: 'public', modules: onDisk });
@@ -718,6 +719,7 @@ function filteringDb(rows: {
     scoped: <T>(identityId: string, fn: (tx: never) => Promise<T>): Promise<T> =>
       fn(handle(identityId) as never),
     firm: <T>(fn: (tx: never) => Promise<T>): Promise<T> => fn(handle(null) as never),
+    ...NO_PRE_IDENTITY_DOORS,
   };
 }
 

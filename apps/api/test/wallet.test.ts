@@ -72,6 +72,7 @@ import walletModule, {
   WalletRowError,
   type WalletEntry,
 } from '../src/routes/wallet.ts';
+import { NO_PRE_IDENTITY_DOORS } from './db-recorder.ts';
 
 // -----------------------------------------------------------------------------
 // Two identities. Every id is a uuid because `db.ts` refuses anything else
@@ -207,6 +208,7 @@ function storeDb(rows: Row[]): { db: ApiDb; calls: Call[] } {
     scoped: <T>(identityId: string, fn: (tx: never) => Promise<T>): Promise<T> =>
       fn(handle('scoped', identityId) as never),
     firm: <T>(fn: (tx: never) => Promise<T>): Promise<T> => fn(handle('firm') as never),
+    ...NO_PRE_IDENTITY_DOORS,
   };
   return { db, calls };
 }
