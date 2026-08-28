@@ -13,15 +13,36 @@
 
 BEGIN;
 
--- Fixtures: one identity, the two per-identity positions, and fees.
+-- Fixtures: one identity and the two per-identity positions. Fees is READ below.
 INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
   ON CONFLICT DO NOTHING;
 
+-- The two per-identity positions. These are still seeded here because nothing
+-- in this tree creates a ledger account for an identity, at any point.
 INSERT INTO ledger_accounts (id, code, kind, scope, identity_id) VALUES
   ('aaaaaaaa-0000-0000-0000-000000000001','trader_withdrawable','liability','identity','11111111-1111-1111-1111-111111111111'),
-  ('aaaaaaaa-0000-0000-0000-000000000002','trader_wallet','liability','identity','11111111-1111-1111-1111-111111111111'),
-  ('aaaaaaaa-0000-0000-0000-000000000003','fees_revenue','revenue','firm',NULL)
+  ('aaaaaaaa-0000-0000-0000-000000000002','trader_wallet','liability','identity','11111111-1111-1111-1111-111111111111')
   ON CONFLICT DO NOTHING;
+
+-- fees_revenue IS READ AND NOT SEEDED, because 0052 seeds it (ADR-177) and this
+-- probe pre-dates the chart existing. It used to INSERT its own row under
+-- ON CONFLICT DO NOTHING and pin the id; once the seed exists that clause SKIPS
+-- the row, the pinned uuid names nothing, and the LEDGER-C1 block below raises
+-- LEDGER-C2 on a dangling account instead of probing C1 at all. A fixture that
+-- silently stops exercising its constraint is the failure this whole file
+-- exists to prevent, so the id is now resolved from the chart rather than
+-- asserted onto it.
+CREATE TEMP VIEW probe_fees_revenue AS
+  SELECT id FROM ledger_accounts WHERE code = 'fees_revenue' AND scope = 'firm';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM probe_fees_revenue) THEN
+    RAISE EXCEPTION
+      'PROBE FAILED: no firm fees_revenue account. 0052 seeds it; this probe '
+      'reads it and no longer creates one';
+  END IF;
+END $$;
 
 INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
   VALUES ('bbbbbbbb-0000-0000-0000-000000000001','payout_approval','probe',
@@ -40,7 +61,7 @@ BEGIN
     INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents) VALUES
       ('bbbbbbbb-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000002', 100000),
       ('bbbbbbbb-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000002', -90000),
-      ('bbbbbbbb-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000003', -10000);
+      ('bbbbbbbb-0000-0000-0000-000000000001',(SELECT id FROM probe_fees_revenue), -10000);
     -- The trigger is DEFERRED, so it fires here, not on the INSERTs above.
     SET CONSTRAINTS ALL IMMEDIATE;
     RAISE EXCEPTION 'PROBE FAILED: LEDGER-C1 admitted opposite signs on one account';
