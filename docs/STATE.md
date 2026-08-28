@@ -6906,3 +6906,109 @@ the tree clean after it.
 **`apps/admin/tsconfig.json` takes `ADR-095` `F7`'s three keys and carries its prose in a `//` KEY**, because `surface.test.ts` reads every `.json` in this package through `JSON.parse` and a JSONC tsconfig fails two of its cases with a syntax error rather than a finding. A second, narrower [`src/app/tsconfig.json`](../apps/admin/src/app/tsconfig.json) gives Vitest `react-jsx`, on [`apps/portal/src/app/calendar/tsconfig.json`](../apps/portal/src/app/calendar/tsconfig.json)'s measured precedent.
 
 **Ten seeded defects, all ten caught, each by the case named for it.** Measured with `pnpm install` first and each command run separately, with the `main` baseline reproduced before a line changed: **33 of 33 gates, 16 of 16 invariants** with `RI-04` at five separate deployables and `RI-09` and `RI-11` unmoved, `typecheck` 0, `lint` 0, `format:check` clean, and **218 files / 5,139 passed / 6 skipped becoming 219 / 5,161 / 6**. `falsify.mjs` ran alone and the working tree was clean after it.
+
+## `apps/admin` joins the CI that guards the other two UI deployables, and the one gate it does NOT join is reported with the bytes (2026-08-28, session 346)
+
+**FOUR PARTS, FOUR COMMITS, ALL FOUR LANDED.** `W6-i`'s Playwright project, the build stage, the
+missing `next.config.mjs`, and a `format:check` glob that had never read a `.tsx`. Every one of the
+four was a gap another session measured and registered rather than reached for, and none of them
+needed an ADR number or a migration number.
+
+**`CI-08` IS AT THREE OF THREE PROJECTS AND THE ROW MOVED IN THE SAME COMMIT AS THE PROJECT.**
+Derived from [`playwright.config.ts`](../playwright.config.ts) at reporting time: `site`, `portal`,
+`admin`. **24 Playwright tests pass**, up from 16, which is
+[DESIGN_SYSTEM](design/DESIGN_SYSTEM.md) section 8's four renderings applied to two more surfaces.
+The condition `W6-i` was dispatched with is the one that mattered: `CI-06/gate-inventory` never asks
+whether a `Contents` cell is TRUE, so a register left saying two would have carried a count that is
+false in the direction which looks like success, and nothing in this repository would have said so.
+
+**THE COMPLIANT FIXTURE'S DOM IS THE ROUTE'S AND THE STYLESHEET IS THIS SESSION'S, WHICH IS A JOINT
+AND IS STATED AS ONE.** `apps/admin/src/**` is session 344's, so no page was written here.
+Everything from `<main>` down in
+[`liability-home.compliant.html`](../apps/admin/e2e/fixtures/liability-home.compliant.html) was
+lifted out of `.next/server/app/index.html` after a real `next build`, with the framework's own
+streaming markers dropped and nothing else changed. But
+[`layout.tsx`](../apps/admin/src/app/layout.tsx) ships **no stylesheet at all**, and `SS-01` to
+`SS-08` read COMPUTED STYLE, so the page an operator receives today computes Chromium's defaults:
+pure black on pure white, neither of which is in the token set. **So the pass asserts that this
+console's MARKUP is compliant when the design system is applied to it, and it does not assert that
+the shipped page applies one.** That is the fifth finding below and it belongs to the slice that
+gives this app a stylesheet.
+
+**BOTH DIRECTIONS WERE WATCHED FAILING RATHER THAN ASSERTED.** The `SS-02` severity stripe narrowed
+from 6px to 1px takes the seeded surface to 4 failed; a non-token `--accent` on the compliant
+fixture takes it to 2 failed, naming `SS-04 main > article > p > code`, and the fact that it is 2
+rather than 4 is the light media query redefining the token, which is the four-rendering matrix
+doing exactly what it exists for.
+
+**THE DELICATE QUESTION, ANSWERED WITH THE BYTES: `VG-2` WOULD NOT READ THIS APP'S OUTPUT.** Adding
+`apps/admin` to `CI-07` opens a reporting obligation and closes no hole.
+[`vg2-no-secrets-in-bundle.mjs:37`](../scripts/ci/vg2-no-secrets-in-bundle.mjs) hard-codes
+`BUNDLE_DIRS` to `apps/portal/.next/static` and `apps/portal/.next/server`, and its own comment two
+lines up still calls the portal _"the one deployable that builds a bundle"_, which stopped being
+true when the site's build step landed on 2026-08-27. **Derived after all three builds on this
+tree: the scan reads 249 emitted file(s) and 5,831,402 byte(s), while `apps/site` emits 219 file(s)
+and 4,739,271 byte(s) and `apps/admin` emits 92 file(s) and 3,798,346 byte(s) that nothing greps.**
+One of three bundles, 249 of 560 files, 5.8 of 14.4 MB, and the check prints `PASS` in exactly the
+same words either way. `scripts/ci/**` is in no fence in [WAVE-06](plans/WAVE-06-admin-console-transport.md),
+so the gap is written into the job beside the step that made it one of three, and left.
+
+**[ADR-012](decisions/ADR-012.md) HOLDS BY A CHAIN THAT DOES NOT RUN THROUGH `VG-2`, AND THE CHAIN
+IS MEASURABLE.** `W6-c` landed two sweeps over EVERY file in `apps/admin`, refusing an absolute
+origin and any build-time inlining prefix, and the emitted source maps carry those same files
+verbatim: the identifier `ADMIN_ORIGIN` occurs 6 times under `apps/admin/.next` and every occurrence
+is inside a `.js.map` as the source's own prose, never a resolved value. `resolveAdminOrigin` reads
+the environment at request time and has no default. **No domain was written anywhere in this branch,
+in any file, in any form.**
+
+**THE LARGEST FINDING FALSIFIES A FROZEN ADR AND WAS FOUND BY MEASURING RATHER THAN BY READING.**
+[`e2e/tsconfig.json`](../e2e/tsconfig.json)'s `//include` key said a third `e2e` directory _"would
+be typechecked by the APP's project, whose lib has no DOM"_, and
+[ADR-182](decisions/ADR-182.md) section 8 item 4 repeats it as the reason `W6-i` gains the file.
+**No app tsconfig reads its own `e2e/` directory.** `apps/site`, `apps/portal` and `apps/admin` each
+include `src/**/*.ts`, `src/**/*.tsx` and `test/**/*.ts` and nothing else. With the admin entry
+removed, `tsc -p e2e --listFiles` names **no file at all** under `apps/admin/e2e`, and the app's own
+`tsc --noEmit --listFiles` names none either. So the entry buys **coverage at all** rather than a
+project swap, which is this project's own opening sentence turned on the specs: a TypeScript
+directory no `tsc` invocation reaches is a directory that rots. The tsconfig's prose is corrected
+here; the ADR is frozen and moves by an ADR rather than by a commit.
+
+**A DEPLOYABLE ACQUIRING ITS FIRST ROUTE IS AN EVENT NO GATE IN THIS REPOSITORY CAN SEE.** `CI-07`'s
+activation condition, a `page`, `layout` or `route` file under `apps/*/src/app/`, was satisfied by
+`apps/portal` on 2026-08-27; the row is Implemented and its probe is retired. So `W6-d` making a
+THIRD app buildable turned nothing red, and [session 340](sessions/2026-08-28-session-340.md) named
+it as a landmine in its own words: _"this app's `next build` is in no CI job, so a page that stops
+compiling turns nothing red until somebody runs it by hand"_. The step is written by hand in this
+branch, and the job's comment now says the count out loud after being wrong twice in the same
+direction.
+
+**THE FORMAT GLOB WOULD HAVE BEEN RED ON LANDING AND THE WHOLE SWEEP WAS TAKEN.** Derived at the
+moment of the change: **27 `.tsx` newly covered** (`apps/admin` 3, `apps/portal` 12, `apps/site`
+12), of which **5 were unformatted, all five in `apps/site/src/app/`**. Formatting only what `W6-i`
+holds would leave `format:check` failing for a reason nobody in the next session caused; not
+widening leaves the hole [session 340](sessions/2026-08-28-session-340.md) named and session 344 is
+writing into right now. **The cost to a reviewer is 5 files, 14 insertions and 17 deletions**,
+entirely JSX text rewrapping inside element children where the framework collapses the whitespace
+either way, reproducible in one command, and **the test count did not move**, which is the assertion
+that no rendered string did. `.html` is deliberately NOT added: the six slop-score fixtures are
+hand-written DOM whose whitespace is part of the fixture, since `SS-06` splits RENDERED TEXT on
+sentence boundaries and `SS-08` reads rendered text, so a formatter between a seeded violation and
+the check it exists to fire is a control with a rewriter in the middle of it.
+
+**`scripts/corpus/gates.mjs` WAS IN THE FENCE AND NEEDED NO EDIT.** `INVENTORY_PROBES` is an empty
+`Map` and `CI-08`'s row carries no activation condition, so the register has nothing to shrink and
+an entry added here would be furniture. **Two further things are reported and not repaired:** the
+root [`package.json`](../package.json)'s `//typecheck` key now says the `e2e` project owns _"the two
+apps' e2e directories"_ where it owns three, made false by this session and outside its fence, which
+is that file's `format` and `format:check` globs only; and `apps/admin` prerenders **two** routes,
+`/` and the framework's own `/_not-found`, where session 340's log says one.
+
+**NO ADR NUMBER, NO MIGRATION NUMBER AND NO SUITE IDENTIFIER OF ANY KIND.** `apps/admin/src/**`,
+`apps/admin/test/**`, `apps/api/**`, `packages/**`, [API_CONTRACT](architecture/API_CONTRACT.md),
+`scripts/ci/**`, `pnpm-workspace.yaml` and `pnpm-lock.yaml` were not touched, and
+`apps/admin/package.json` needed nothing: `e2e/pass.ts:17` is the only file in this repository that
+imports `@playwright/test`, verified rather than assumed. **Measured with `pnpm install` first, each
+command run separately and `pnpm run verify` never run, reproduced on `main` at `3c456173` before a
+line changed: 33 of 33 gates, 16 of 16 invariants, `typecheck` 0, `lint` 0, `format:check` clean
+under the WIDENED glob, and 220 test files / 5,171 passed / 6 skipped unchanged in both directions.**
+`falsify.mjs` ran on a committed tree and the working tree was clean after it.
