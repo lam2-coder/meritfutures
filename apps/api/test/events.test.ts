@@ -888,8 +888,18 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
 
 const SCOPED_DB = read('../../../packages/db/src/scoped-db.ts');
 
-/** One buildable spec, reused so every case below varies the HANDLE and not the event. */
-const SPEC_HELD: EmitSpec = { name: 'payout.held', payload: PAYLOADS['payout.held'] };
+/**
+ * One writable spec, reused so every case below varies the HANDLE and not the event.
+ *
+ * IT CARRIES NO MONEY AND THE CHOICE IS SECTION 8's. `payout.held` was the first
+ * pick and it is one of the three names a `jsonb` column cannot take, so every
+ * case here would have been asserting on the wrong refusal. `payout.hold_released`
+ * carries both tenancy columns and no `_cents` field, so it reaches the insert.
+ */
+const SPEC_HELD: EmitSpec = {
+  name: 'payout.hold_released',
+  payload: PAYLOADS['payout.hold_released'],
+};
 
 /** A `SystemTx`-shaped double, recording what it was asked to write. */
 function recorder(returning: readonly unknown[] = [{ id: 1n }]): {
@@ -1069,22 +1079,18 @@ describe('composed, the sink writes where the unwired default rejects', () => {
     await sink.emit(tx, SPEC_HELD);
 
     expect(writes).toHaveLength(1);
-    expect(writes[0]?.values['eventName']).toBe('payout.held');
+    expect(writes[0]?.values['eventName']).toBe('payout.hold_released');
     expect(writes[0]?.values['occurredAt']).toStrictEqual(CLOCK);
     expect(writes[0]?.values['identityId']).toBe(ID.identity);
     expect(writes[0]?.values['accountId']).toBe(ID.account);
   });
 
-  test('the seven buildable names all reach the writer, and the untenanted one still does not', async () => {
+  test('the untenanted name still does not reach the writer, which the composition cannot route around', async () => {
     // `assertTenanted` IS NOT BYPASSED BY THE WRITER AND THAT IS THE POINT.
     // Session 358 put it inside `emit`, and `emit` builds before it writes, so
-    // composing a writer cannot route around it.
+    // composing a writer cannot route around it. Which of the SEVEN buildable
+    // names then reach the insert is section 8's question and not this one.
     const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock: () => CLOCK });
-    for (const name of BUILDABLE) {
-      const { tx, writes } = recorder();
-      await sink.emit(tx, { name, payload: PAYLOADS[name] });
-      expect(writes, name).toHaveLength(1);
-    }
 
     const { tx, writes } = recorder();
     await expect(
@@ -1094,5 +1100,133 @@ describe('composed, the sink writes where the unwired default rejects', () => {
       }),
     ).rejects.toThrow(/reaches neither/);
     expect(writes).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// 8. THE MONEY PAYLOAD NO `jsonb` COLUMN CAN TAKE
+// =============================================================================
+// FOUND BY WRITING A REAL ROW AND NOT BY READING. Against a live PostgreSQL with
+// every migration applied, four of the eight names write, `payout.freeze_expiring`
+// is refused by `assertTenanted`, and the other three fail at the DRIVER. Nothing
+// in any suite could see it, because every writer double records what it is handed
+// and none of them serialises. These cases are that gap closed.
+
+describe('the two rules that together make a money payload unwritable', () => {
+  test('`payload` is a `jsonb` column, which is the storage half of the contradiction', () => {
+    expect(SCHEMA).toContain("payload: jsonb('payload').notNull()");
+  });
+
+  test('`JSON.stringify` refuses a bigint outright, which is the serialiser half', () => {
+    // DRIZZLE'S JSONB MAPPING IS `JSON.stringify(value)`, so this language fact IS
+    // the driver's behaviour. Asserted here rather than cited, because the tree
+    // holds no copy of that file and a version bump would silently change it.
+    expect(() => JSON.stringify({ approved_cents: 150_000n })).toThrow(TypeError);
+    expect(() => JSON.stringify({ approved_cents: 150_000n })).toThrow(/BigInt/);
+  });
+
+  test('`assertPayloadRules` refuses a `_cents` value that is NOT a bigint, which is the producer half', () => {
+    // THE TWO HALVES MEET HERE AND THE MEETING IS THE FINDING: every possible
+    // `_cents` value is refused by one rule or the other.
+    expect(() => assertPayloadRules({ approved_cents: 150_000 })).toThrow(/rather than a bigint/);
+  });
+
+  test('the writer refuses the payload and NAMES the field, rather than throwing at the driver', async () => {
+    const { tx, writes } = recorder();
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent({ name: 'payout.approved', payload: PAYLOADS['payout.approved'] }, CLOCK),
+      ),
+    ).rejects.toThrow(/carries a bigint at `payload\.requested_cents`/);
+    expect(writes).toHaveLength(0);
+  });
+
+  test('it names the RULING it needs and never the caller', async () => {
+    const { tx } = recorder();
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent({ name: 'payout.held', payload: PAYLOADS['payout.held'] }, CLOCK),
+      ),
+    ).rejects.toThrow(
+      /THE REPAIR IS A RULING ON WHAT A `_cents` VALUE IS INSIDE A `jsonb` PAYLOAD/,
+    );
+  });
+
+  test('the walk is recursive, because the catalogue nests its money', async () => {
+    // `ledger.transaction_posted` carries an `entries` ARRAY of
+    // `{ ledger_account_code, amount_cents }`, so a check that stopped at the top
+    // level would pass the exact payload this rule exists for. The name is not one
+    // of the eight, so the shape is exercised on a payload that is.
+    const { tx } = recorder();
+    const envelope = buildEvent(
+      {
+        name: 'payout.blocked',
+        payload: {
+          ...PAYLOADS['payout.blocked'],
+          gate_results: { entries: [{ ledger_account_code: 'X', amount_cents: 1n }] },
+        },
+      },
+      CLOCK,
+    );
+    await expect(TRANSACTION_EVENT_WRITER.insert(tx, envelope)).rejects.toThrow(
+      /bigint at `payload\.gate_results\.entries\[0\]\.amount_cents`/,
+    );
+  });
+
+  test('the refusal is the WRITER`s and not the producer`s, so a non-jsonb sink is unaffected', async () => {
+    // THE LIMIT BELONGS TO THE STORAGE AND NOT TO THE EVENT. `buildEvent` still
+    // builds, and a sink over a writer that does not serialise still receives the
+    // envelope, which is why this check is here rather than in `assertPayloadRules`.
+    const written: EventEnvelope[] = [];
+    const sink = makeEventSink({
+      writer: { insert: (_tx, row) => (written.push(row), Promise.resolve()) },
+      clock: () => CLOCK,
+    });
+    await sink.emit({}, { name: 'payout.approved', payload: PAYLOADS['payout.approved'] });
+    expect(written[0]?.payload['approved_cents']).toBe(150_000n);
+  });
+
+  test('exactly three of the eight names carry money, and exactly those three are unwritable', async () => {
+    // DERIVED OVER THE CATALOGUE THIS FILE CARRIES rather than listed, so a name
+    // gaining a `_cents` field moves this count instead of slipping past it.
+    const carries = (name: EventName): boolean =>
+      Object.keys(PAYLOADS[name]).some((field) => field.endsWith('_cents'));
+    const money = EVENT_NAMES.filter(carries);
+    expect(money).toStrictEqual(['payout.requested', 'payout.approved', 'payout.held']);
+
+    for (const name of BUILDABLE) {
+      const { tx, writes } = recorder();
+      const attempt = TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent({ name, payload: PAYLOADS[name] }, CLOCK),
+      );
+      if (carries(name)) {
+        await expect(attempt, name).rejects.toThrow(/carries a bigint/);
+        expect(writes, name).toHaveLength(0);
+      } else {
+        await attempt;
+        expect(writes, name).toHaveLength(1);
+      }
+    }
+  });
+
+  test('across the CATALOGUE the same shape is 33 of the 102 readable rows', () => {
+    // THE SCALE OF THE FINDING, BOUND HERE RATHER THAN LEFT IN A PULL REQUEST
+    // BODY, beside the 34 that name no tenancy column. The two sets are different
+    // questions about the same 102 rows.
+    const rows = EVENTS_MD.split('\n')
+      .filter((line) => /^\| `[a-z_]+\.[a-z_]+`/.test(line))
+      .map((line) =>
+        line
+          .split(/(?<!\\)\|/)
+          .slice(1, -1)
+          .map((cell) => cell.trim()),
+      )
+      .filter((cells) => cells.length === 4);
+    const readable = rows.filter((cells) => cells[2]?.startsWith('`{'));
+    expect(readable).toHaveLength(102);
+    expect(readable.filter((cells) => /_cents\b/.test(cells[2] ?? ''))).toHaveLength(33);
   });
 });

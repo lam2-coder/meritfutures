@@ -47,6 +47,22 @@
 // anything: see `EventInsertTx` below, where it is stated where a caller meets
 // it.
 //
+// AND WRITING THE FIRST REAL ROW FOUND A SECOND THING NO SUITE COULD. Against a
+// live PostgreSQL with all 58 migrations applied, FOUR of these eight names write
+// and read back through the `either` predicate; ONE is `payout.freeze_expiring`,
+// refused by `assertTenanted` below; and THREE fail at the DRIVER with
+// `TypeError: Do not know how to serialize a BigInt`. `events.payload` is
+// `jsonb`, drizzle's jsonb mapping is `JSON.stringify`, and `JSON.stringify`
+// refuses a `bigint` outright, while `assertPayloadRules` below REFUSES a
+// `_cents` value that is NOT a `bigint`. The two rules together make every money
+// payload in the catalogue unwritable, and 33 of the 102 readable catalogue rows
+// carry a `_cents` field. NO UNIT TEST COULD SEE IT, because every writer double
+// in every suite records what it is handed and none of them serialises.
+// `assertSerialisablePayload` refuses it by name and states the ruling it needs,
+// which is EVENTS' to give: what a `_cents` value IS inside a `jsonb` payload. A
+// JSON number loses digits above 2^53 and a JSON string is exact but is a format
+// no document states, so neither is invented here.
+//
 // `payout.freeze_expiring` IS THE COUNTEREXAMPLE ADR-191 HAD TO ANSWER AND IT IS
 // ANSWERED RATHER THAN CLOSED. Its catalogue payload is `{ payout_request_id,
 // flag_id, expires_at, lead_hours }`: an event about one trader's frozen payout
@@ -898,6 +914,79 @@ function assertEventInsertTx(tx: object, name: EventName): asserts tx is EventIn
 }
 
 /**
+ * The first `bigint` in a payload, by path, or `undefined`.
+ *
+ * WALKED THE WAY `assertPayloadRules` WALKS, and for the same reason: the money
+ * this rule is about is nested. `payout.approved` carries `gate_results` as an
+ * object and `ledger.transaction_posted` carries an `entries` ARRAY of
+ * `{ ledger_account_code, amount_cents }`, so a check that stopped at the top
+ * level would pass the exact payload the rule exists for.
+ */
+function firstBigint(value: unknown, path = 'payload'): string | undefined {
+  if (typeof value === 'bigint') return path;
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      const found = firstBigint(item, `${path}[${index}]`);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+  if (value === null || typeof value !== 'object') return undefined;
+  for (const [key, nested] of Object.entries(value)) {
+    const found = firstBigint(nested, `${path}.${key}`);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Refuse a payload no `jsonb` column can be handed, and name the ruling it needs.
+ *
+ * THIS IS A FINDING RATHER THAN A RULE, AND IT WAS FOUND BY WRITING A REAL ROW.
+ * `events.payload` is `jsonb` (`schema.ts`), drizzle's jsonb mapper is
+ * `JSON.stringify(value)`, and `JSON.stringify` THROWS on a `bigint`:
+ * `TypeError: Do not know how to serialize a BigInt`. Meanwhile
+ * {@link assertPayloadRules} REFUSES a `_cents` value that is not a `bigint`,
+ * because `Cents` is `bigint` everywhere in this tree and a `number` reaching
+ * here may already have lost digits. SO THE TWO RULES TOGETHER MAKE EVERY MONEY
+ * PAYLOAD UNWRITABLE, and that is stated here rather than discovered as a driver
+ * `TypeError` on a money path in production.
+ *
+ * NO UNIT TEST COULD SEE IT. Every writer double in every suite is a function
+ * that records what it was handed; none of them serializes, so the producer and
+ * its fixtures are green over a payload the storage layer cannot take.
+ *
+ * THE REPAIR IS A RULING AND IT IS NOT THIS FILE'S. What a `_cents` value looks
+ * like INSIDE a `jsonb` payload is EVENTS' to say and EVENTS is frozen: a JSON
+ * number loses digits above 2^53, which is the constitution's no-floats rule in
+ * a financial path, and a JSON string is exact but is a wire format no document
+ * states and every consumer would have to know. Inventing either here would put
+ * a format in a forever-retained column on a producer's authority, which is
+ * ADR-159 clause 1's refusal. So this REFUSES and names the question.
+ *
+ * IT BREAKS NO CALLER, and that is measured rather than hoped: of the eight
+ * names this producer carries, THREE carry a `_cents` field and all three
+ * already fail at the driver today. This changes the message and not the
+ * outcome.
+ */
+function assertSerialisablePayload(row: EventEnvelope): void {
+  const at = firstBigint(row.payload);
+  if (at === undefined) return;
+  throw new EventError(
+    `${row.eventName} carries a bigint at \`${at}\` and \`events.payload\` is a \`jsonb\` ` +
+      'column, whose driver mapping is `JSON.stringify`, which refuses a BigInt outright. THIS ' +
+      'IS A CONTRADICTION BETWEEN TWO RULES AND NOT A CALLER ERROR: EVENTS section 1 puts ' +
+      'integer cents in `_cents` fields, `Cents` is `bigint`, and `assertPayloadRules` above ' +
+      'REFUSES a `_cents` value that is not one, because a `number` reaching here may already ' +
+      'have lost digits. So every money payload in the catalogue is unwritable, and no suite ' +
+      'could see it because a writer double never serialises. THE REPAIR IS A RULING ON WHAT A ' +
+      '`_cents` VALUE IS INSIDE A `jsonb` PAYLOAD, which EVENTS has to give: a JSON number loses ' +
+      'digits above 2^53 and a JSON string is exact but is a format no document states. This ' +
+      'file invents neither',
+  );
+}
+
+/**
  * The writer, over the transaction it is handed and over nothing else.
  *
  * IT OPENS NO DOOR, WHICH IS WHY IT CAN LIVE IN A FILE THAT NAMES NO PACKAGE.
@@ -925,6 +1014,7 @@ function assertEventInsertTx(tx: object, name: EventName): asserts tx is EventIn
 export const TRANSACTION_EVENT_WRITER: EventWriter = {
   async insert(tx: object, row: EventEnvelope): Promise<void> {
     assertEventInsertTx(tx, row.eventName);
+    assertSerialisablePayload(row);
     const written = await tx.insert(EVENT_WRITE_TABLE, { ...row });
     if (written.length !== 1)
       throw new EventError(
