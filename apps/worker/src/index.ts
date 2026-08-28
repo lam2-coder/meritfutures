@@ -736,6 +736,87 @@ export type {
   SharedDestination,
 } from './detectors/identity.ts';
 
+// -----------------------------------------------------------------------------
+// THE BREAKER AND CUSUM EVALUATOR (session 320, `P7-k`)
+// -----------------------------------------------------------------------------
+// `SD-M6-02`'s DAILY PRODUCER, and `plan_breaker_state`'s first writer since
+// `0016` landed the table. `GS-113` is the gate.
+//
+// **`INV-M5-12` IS THE ONE TO READ AND IT IS ENFORCED BY THE WRITE UNION**:
+// `BREAKER_WRITE_TABLES` has exactly ONE member, so the breaker pauses SALES and
+// there is no `key` this port accepts that reaches a payout, a wallet, a halt or
+// a restriction. A trader who has earned money is paid while Merit has stopped
+// selling.
+//
+// **`insufficient_data` IS FIRST CLASS AND SALES ARE NOT PAUSED THERE**
+// (`AS-M6-02`, `GS-113`), `sample_size` is written beside `min_sample` on every
+// row, and `breaker.state_changed` carries the sample size into the alert
+// (`M06:265`) as a REQUIRED field rather than an optional one.
+//
+// **IT DECLINES TODAY AND THAT IS THE HONEST OUTCOME**: `OQ-M6-02` is the
+// founder's, so `LOSS_RATIO_POLICY` ships both minimum terms `unstated` and
+// `BreakerDeclined` is the named way to say "I have no floor". The CUSUM folds
+// in integer basis points (`ADR-167` clause 4) and renders ABSENT until
+// `DEP-M6-05` supplies `mu_0` and `sigma` (`ADR-167` clause 5).
+export {
+  BREAKER_READ_TABLES,
+  BREAKER_STATES,
+  BREAKER_STATE_CHANGED,
+  BREAKER_WRITE_TABLES,
+  BreakerDeclined,
+  BreakerUnwired,
+  LOSS_RATIO_POLICY,
+  SALES_PAUSED_STATE,
+  UNWIRED_BREAKER_IO,
+} from './breaker/ports.ts';
+export type {
+  BreakerEvent,
+  BreakerEventPort,
+  BreakerFilter,
+  BreakerFilterTerm,
+  BreakerIo,
+  BreakerReadTable,
+  BreakerRow,
+  BreakerState,
+  BreakerStateChanged,
+  BreakerTerms,
+  BreakerTx,
+  BreakerValues,
+  BreakerWriteTable,
+  LossRatioPolicy,
+  PolicyNumber,
+} from './breaker/ports.ts';
+export {
+  BreakerRowError,
+  UNCALIBRATED_CUSUM,
+  applyOverride,
+  cusumOf,
+  decideState,
+  evaluateBreaker,
+  foldCusum,
+  foldWindow,
+  lossRatioBp,
+  passRateBp,
+  resolvePolicy,
+  salesPaused,
+  stateChangedEvent,
+  toBreakerStateRow,
+} from './breaker/evaluate.ts';
+export type {
+  BreakerDecision,
+  BreakerEvaluationReport,
+  BreakerFloor,
+  BreakerOverride,
+  CusumFold,
+  CusumParameters,
+  PassRateDay,
+  PreviousEvaluation,
+  ResolvedPolicy,
+  StateInput,
+  StateOutcome,
+  WindowFold,
+} from './breaker/evaluate.ts';
+
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
 
@@ -757,6 +838,7 @@ export function main(): void {
   console.log(
     `merit ${SERVICE}: nightly batch built, provisioning saga built, expiry sweep built, ` +
       'detector runner built, seven identity and payment detectors built and every one of them ' +
-      'declining on an unseeded threshold, job interface built, no job store and no scheduler yet',
+      'declining on an unseeded threshold, breaker evaluator built and declining on an unstated ' +
+      'minimum sample, job interface built, no job store and no scheduler yet',
   );
 }
