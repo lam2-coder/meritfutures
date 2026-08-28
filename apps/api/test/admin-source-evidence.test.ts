@@ -26,6 +26,11 @@ import {
   renderEvidencePack,
   sensitiveParameterNames,
 } from '../src/admin-source/evidence.ts';
+import {
+  AdminSourceNotComposed,
+  adminReadSourceParts,
+  composeAdminReadSource,
+} from '../src/admin-source/index.ts';
 import { EVIDENCE_PACK_AUDIENCES } from '../src/routes/admin-reads.ts';
 import type { AdminPrincipal, EvidencePackAudience } from '../src/routes/admin-reads.ts';
 
@@ -957,4 +962,44 @@ test('neither the module nor this suite names a real admin domain', () => {
     for (const host of hosts)
       expect(host.endsWith('.invalid') || host.endsWith('.example')).toBe(true);
   }
+});
+
+// =============================================================================
+// 11. The composition, and the leg a keep-both merge would drop
+// =============================================================================
+
+describe('composeAdminReadSource', () => {
+  test('the exportEvidence key reaches this slice, detached from its object', async () => {
+    // The composition passes the METHOD and not the exporter, so a bound `this`
+    // would break here rather than at the first real export.
+    const recorder = recorderOf();
+    const source = composeAdminReadSource(adminReadSourceParts({ evidence: recorder.deps }));
+    const pack = await source.exportEvidence(REQUEST);
+    expect(pack?.audience).toBe('trader');
+    expect(recorder.written).toHaveLength(1);
+  });
+
+  test('a method no module supplies THROWS WITH ITS OWN NAME rather than being absent', () => {
+    // P7 section 5.5 and section 9: a keep-both merge that drops a leg
+    // type-checks. This is what makes the drop loud at the first request.
+    const source = composeAdminReadSource({});
+    expect(() =>
+      source.listFlags({ flagType: null, status: null, severity: null, limit: 25, cursor: null }),
+    ).toThrow(/listFlags/);
+    expect(() => source.readLiability()).toThrow(AdminSourceNotComposed);
+  });
+
+  test('every one of the six methods is present on a composed source', () => {
+    // The count is read off the port rather than typed, so a seventh method
+    // added to `AdminReadSource` is a red test here rather than a silent gap.
+    const source = composeAdminReadSource({});
+    expect(Object.keys(source).sort()).toEqual([
+      'exportEvidence',
+      'listFlags',
+      'readAccount',
+      'readIdentityGraph',
+      'readLiability',
+      'searchAccounts',
+    ]);
+  });
 });
