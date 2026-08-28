@@ -46,29 +46,27 @@
 // recomputation section 3.2 refuses.
 //
 // -----------------------------------------------------------------------------
-// TWO COLUMNS THE SCALAR SWEEP CANNOT ADMIT UNDER THEIR OWN NAMES, AND THEY ARE
-// OMITTED RATHER THAN RENAMED
+// TWO COLUMNS THIS MODULE ONCE OMITTED, AND THE SWEEP THAT NOW ADMITS THEM
 // -----------------------------------------------------------------------------
 // **`daily_marks.traded_day` AND `daily_marks.win_day` ARE BOOLEANS WHOSE NAMES
-// END `_day`.** `assertContractScalars` reads the NAME and refuses anything
-// under a `_day` or `_on` key that is not a `YYYY-MM-DD` exchange trading day,
-// which is correct for every typed response in section 8 and collides with the
-// schema here, on the one route the corpus does not type.
+// END `_day`, AND THEY ARE CARRIED.** `assertContractScalars` refused them when
+// this module was written, so both were omitted with the reason on the line and
+// the sweep was reported rather than edited, because `admin-reads.ts` was not
+// that session's fence. **It was the next session's, the rule was wrong, and the
+// evidence is in API_CONTRACT itself**: section 6's `MarkListItem` declares
+// `traded_day: boolean; win_day: boolean;`, so the document section 1's Time
+// rule is written in also declares two booleans under day-shaped names, and
+// `routes/account-reads.ts` already ships both on `GET
+// /accounts/:accountId/marks`. The sweep now admits a boolean by TYPE. Every
+// column of `daily_marks` is here.
 //
-// Three answers were available and two are worse. Carrying them is a 500 on
-// every drill-down that has a mark. Renaming them puts a field name in an
-// operator's hands that no column has, on the screen whose whole discipline is
-// that it shows the stored row. **So they are OMITTED, the omission is asserted
-// rather than incidental, and it is reported to whoever owns the sweep**: this
-// module's fence does not reach `admin-reads.ts` and a gate is never weakened to
-// pass it. Every other column of `daily_marks` is here.
-//
-// **A NULL TRADING DAY IS AN ABSENT KEY FOR THE SAME REASON.** The sweep refuses
-// `null` under a day-shaped name too, and eleven nullable `date` columns feed
-// these sections. A nullable day is therefore present when the row has one and
-// absent when it does not, which is the only shape the sweep admits and is
-// stated here because "absent" and "null" are different answers everywhere else
-// in this codebase.
+// **A NULL TRADING DAY IS AN EXPLICIT `null`**, which is the same repair. The
+// sweep refused `null` under a day-shaped name, so eleven nullable `date`
+// columns arrived as an ABSENT KEY and a reader diffing two drill-downs watched
+// keys appear and disappear as an account funded and closed. The contract writes
+// `funded_on: string | null` and `closed_on: string | null` in `AccountDetail`,
+// so the key is present and the value is `null`, which is what every other
+// nullable column in these projections already did.
 //
 // -----------------------------------------------------------------------------
 // WHICH ROWS EACH SECTION READS, WHERE THE CONTRACT SAYS ONLY "EVERY"
@@ -295,20 +293,25 @@ function day(row: unknown, name: string, at: string): string {
 }
 
 /**
- * A NULLABLE `date` column, as a key that is present or a key that is not.
+ * A NULLABLE `date` column, as a key that is always present and a value that is
+ * the day or `null`.
  *
- * See the header: `assertContractScalars` refuses `null` under a day-shaped
- * name, so the two shapes this response can carry are the day and no key at all.
- * The spread is at the call site so a reader sees which columns are nullable.
+ * See the header. This returned NO KEY AT ALL until the sweep was repaired,
+ * because `assertContractScalars` refused a `null` under a day-shaped name. The
+ * contract declares `funded_on: string | null` and `closed_on: string | null`,
+ * so an absent key was a wire shape the contract never wrote, and it was the
+ * only place in this tree where an absent key and a `null` meant the same thing.
+ * The spread is kept at the call site so a reader still sees which columns are
+ * nullable.
  */
 function optionalDay(
   row: unknown,
   property: string,
   wire: string,
   at: string,
-): Record<string, string> {
+): Record<string, string | null> {
   const value = field(row, property);
-  if (value === null || value === undefined) return {};
+  if (value === null || value === undefined) return { [wire]: null };
   return { [wire]: asDay(value, property, at) };
 }
 
@@ -438,10 +441,12 @@ function projectMark(row: unknown): Record<string, unknown> {
     low_balance_cents: cents(field(row, 'lowBalanceCents'), `${at}'s low balance`),
     realized_pnl_cents: cents(field(row, 'realizedPnlCents'), `${at}'s realized pnl`),
     fill_count: count(row, 'fillCount', at),
-    // `traded_day` AND `win_day` ARE ABSENT AND THAT IS THE HEADER'S SECTION ON
-    // the scalar sweep, not an oversight: both are `boolean NOT NULL` columns
-    // whose names end `_day`, and `assertContractScalars` refuses anything under
-    // that shape of name which is not a `YYYY-MM-DD`.
+    // BOTH ARE `boolean NOT NULL` COLUMNS WHOSE NAMES END `_day` and both are
+    // carried, in the DDL's own names, on the sweep's own repaired rule. See the
+    // header. `traded_day` is `fill_count > 0` by CHECK constraint rather than by
+    // convention, so it is beside the count it is defined from.
+    traded_day: boolean(row, 'tradedDay', at),
+    win_day: boolean(row, 'winDay', at),
     adjustment_cents: cents(field(row, 'adjustmentCents'), `${at}'s adjustment`),
     source_hash: hash(row, 'sourceHash', at),
     source: text(row, 'source', at),

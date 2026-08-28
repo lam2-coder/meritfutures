@@ -80,7 +80,17 @@
 // formatted strings". `assertContractScalars` walks every response this module
 // returns and refuses any member whose NAME ends `_cents` or `_bp` and whose
 // value is not a safe integer, and any member whose name ends `_day` or `_on`
-// that is not a `YYYY-MM-DD` exchange trading day.
+// whose value is not one of the three forms the contract declares under such a
+// name.
+//
+// THE NAME SAYS WHICH RULE APPLIES AND THE CONTRACT SAYS WHAT THAT RULE ADMITS.
+// The `_day` suffix was read here as "this value IS a trading day", and section
+// 6's `MarkListItem` declares `traded_day: boolean` and `win_day: boolean` on
+// one line of the same document section 1's Time rule is written in. So the
+// rule's SHAPE was right and its EXTENT was wrong: it admitted one of the three
+// forms the contract writes under a day-shaped name and refused the other two.
+// The repair is at {@link assertContractScalars} and it TIGHTENS as well as
+// widens, because a `Date` under such a name used to pass.
 //
 // IT READS THE NAME RATHER THAN A LIST OF FIELDS, which is what makes it hold
 // for a field nobody has added yet. `cusum.statistic` and `cusum.threshold` are
@@ -327,6 +337,31 @@ const TRADING_DAY_KEY = /_(?:day|on)$/;
 const TRADING_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * A value the walk may DESCEND INTO: a plain object or an array, and nothing
+ * else.
+ *
+ * THIS IS THE HALF OF THE DAY RULE THAT TIGHTENS. The container exemption below
+ * used to be `typeof member === 'object' && member !== null`, and a `Date`
+ * satisfies that: `Object.entries(new Date())` is `[]`, so a `Date` under a
+ * day-shaped name was walked, found to carry nothing, and ADMITTED. It then
+ * serialises as `"2026-08-27T00:00:00.000Z"`, which is a UTC instant standing
+ * where the contract types an exchange trading day. That is the exact defect
+ * this sweep exists to catch, reaching an operator THROUGH the sweep.
+ *
+ * NO PROJECTOR IN THIS TREE HANDS THE SWEEP A `Date` UNDER SUCH A NAME TODAY,
+ * because each converts one to `YYYY-MM-DD` through its UTC parts first. That is
+ * a property of every writer rather than a property of this reader, which makes
+ * it a thing to remember. A `Date` arriving here is a converter that was skipped,
+ * and this is where it is refused rather than served.
+ */
+function isWalkableContainer(value: unknown): boolean {
+  if (Array.isArray(value)) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
  * Refuse a response body that breaks section 1's scalar rules.
  *
  * WALKED RATHER THAN CHECKED FIELD BY FIELD. A per-field check is a list that
@@ -363,18 +398,48 @@ export function assertContractScalars(value: unknown, path: string): void {
       // A CONTAINER NAMED FOR A DAY IS NOT A DAY. `LiabilityResponse` carries
       // `eligible_next_7d.by_day`, an ARRAY whose elements each carry a
       // `trading_day`, and a rule that read the name alone would refuse the
-      // shape the contract declares. So the check is type directed: an object
-      // or an array under a day-shaped name is walked, and anything else must
-      // be a `YYYY-MM-DD` string.
-      if (typeof member === 'object' && member !== null) {
+      // shape the contract declares. So the check is type directed. What it may
+      // descend into is a PLAIN container and never any object at all, which is
+      // {@link isWalkableContainer} and is the `Date` this branch used to admit.
+      if (isWalkableContainer(member)) {
         assertContractScalars(member, at);
         continue;
       }
+      // `null` AND `boolean` ARE THE CONTRACT'S OWN OTHER TWO FORMS UNDER A
+      // DAY-SHAPED NAME, AND THEY ARE ADMITTED BY TYPE RATHER THAN BY A LIST OF
+      // FIELD NAMES.
+      //
+      // Read the `ts` blocks of API_CONTRACT and every key ending `_day` or
+      // `_on` is declared in one of three forms. Eleven are a `YYYY-MM-DD`
+      // string. Five are `string | null`: `funded_on` and `closed_on` in
+      // `AccountDetail`, `trading_day` in `TimelineItem`,
+      // `next_eligible_trading_day` in two progress blocks, and
+      // `covered_through_day` in the calendar panel's freshness. TWO ARE
+      // `boolean`: section 6's `MarkListItem` writes `traded_day: boolean;
+      // win_day: boolean;` on one line, and `routes/account-reads.ts` already
+      // ships both of them on `GET /accounts/:accountId/marks`. A sweep that
+      // refused this document's own declarations was refusing the wrong thing.
+      //
+      // WHY BY TYPE AND NOT BY AN EXEMPTED LIST OF NAMES. A list of the two
+      // names is a hand-maintained list, which `RI-05`'s `covers` calls "a
+      // hand-maintained count in a different costume, and it drifts the same
+      // way", and it is ALREADY out of date: `trading_calendar.is_half_day`
+      // (`0004_catalog.sql:323`) is a third `boolean` under a day-shaped name,
+      // on the trading calendar table itself.
+      //
+      // WHAT ADMITTING A BOOLEAN COSTS, WHICH IS THE QUESTION A CONTROL HAS TO
+      // ANSWER BEFORE IT LOOSENS. This rule catches a value that COULD be a day
+      // and is the wrong FORM of one: a UTC instant, an epoch number, a `Date`.
+      // All three are still refused. No date rendering path in any language
+      // produces `true`, so a boolean here is a field the contract declares as a
+      // predicate and never a trading day that went wrong on its way to the
+      // wire.
+      if (member === null || typeof member === 'boolean') continue;
       if (typeof member !== 'string' || !TRADING_DAY.test(member))
         throw new AdminReadError(
-          `\`${at}\` is ${JSON.stringify(member)}, and API_CONTRACT section 1 makes every ` +
-            '`*_day` and `*_on` a `YYYY-MM-DD` exchange trading day, never a UTC date and ' +
-            'never a timestamp',
+          `\`${at}\` is ${JSON.stringify(member)}, and API_CONTRACT declares every ` +
+            '`*_day` and `*_on` member as a `YYYY-MM-DD` exchange trading day, as `null`, or ' +
+            'as a boolean predicate. Section 1: never a UTC date and never a timestamp',
         );
       continue;
     }
