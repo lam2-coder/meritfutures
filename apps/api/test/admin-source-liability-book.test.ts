@@ -1,14 +1,18 @@
 // =============================================================================
 // apps/api/test/admin-source-liability-book.test.ts
 // =============================================================================
-// `readLiabilityBook`, WHICH IS THE 28 LEAVES OF `LiabilityResponse` THIS
-// ESTATE CAN PRODUCE AND IS NOT `AdminReadSource.readLiability`.
+// `readLiabilityBook`, WHICH IS THE LEAVES OF `LiabilityResponse` THIS ESTATE
+// CAN PRODUCE AND IS NOT `AdminReadSource.readLiability`.
+//
+// NO NUMERAL STANDS HERE, on `admin-source/index.ts`'s own stated reason and
+// because this header carried 28 against a module that produced 27. The count
+// is DERIVED by the last describe block in this file and by nothing else.
 //
 // THE LAST CASE IS THE ONE THIS FILE EXISTS FOR AND IT IS ARITHMETIC RATHER
 // THAN PROSE. It reads `LiabilityResponse`'s field paths out of API_CONTRACT
 // through `RI-18`'s own `copiesOf`, folds them to LEAVES, runs the reader over a
 // fixture, and asserts that the leaves the reader produced plus the twelve
-// leaves the four blockers hold are EXACTLY the contract's leaves. So the
+// leaves the blockers hold are EXACTLY the contract's leaves. So the
 // measurement is a subtraction the suite performs rather than a number a session
 // wrote down, and the day a blocker lifts the arithmetic is what says so.
 //
@@ -37,9 +41,18 @@ import { describe, expect, it } from 'vitest';
 
 import { TABLE_KEYS } from '@merit/db';
 
-import { LIABILITY_READ_TABLES, readLiabilityBook } from '../src/admin-source/liability.ts';
+import {
+  ELIGIBLE_HORIZON_TRADING_DAYS,
+  LIABILITY_READ_TABLES,
+  readLiabilityBook,
+  readTradingHorizon,
+} from '../src/admin-source/liability.ts';
 import { AdminReadError } from '../src/routes/admin-reads.ts';
-import type { LiabilityReadTable, LiabilityTx } from '../src/admin-source/liability.ts';
+import type {
+  LiabilityReadTable,
+  LiabilityTx,
+  TradingHorizon,
+} from '../src/admin-source/liability.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 
@@ -228,28 +241,30 @@ async function read(overrides: Rows = {}) {
 // -----------------------------------------------------------------------------
 
 describe('the tables this module may reach', () => {
-  it('names eight real TableKeys, sorted, and no others', () => {
+  it('names ten real TableKeys, sorted, and no others', () => {
     for (const key of LIABILITY_READ_TABLES) expect(TABLE_KEYS).toContain(key);
     expect([...LIABILITY_READ_TABLES]).toStrictEqual([...LIABILITY_READ_TABLES].sort());
-    expect(LIABILITY_READ_TABLES).toHaveLength(8);
+    expect(LIABILITY_READ_TABLES).toHaveLength(10);
   });
 
-  it('still does not name trading_calendar, which is now a choice rather than a wall', () => {
-    // THE CLEARING CONDITION FOR `eligible_next_7d` HAS FIRED AND THE FIRST
-    // ASSERTION IS INVERTED IN THE DIFF THAT FIRED IT. It read
-    // `expect(TABLE_KEYS).not.toContain('tradingCalendar')`, because the array
-    // below is typed over `TableKey` and could not carry the name even to try.
-    // `packages/db/src/scope.ts` registers the table `firm` under ADR-103
-    // clause 2, so a `Tx` naming it now compiles.
+  it('NOW names trading_calendar, which is the whole of what B1 bought', () => {
+    // THE SECOND HALF OF THIS CASE IS INVERTED IN THE DIFF THAT SPENT IT, which
+    // is the third time this pair has moved and the last time it can. It read
+    // `expect(TABLE_KEYS).not.toContain('tradingCalendar')` until session 377,
+    // then `expect(LIABILITY_READ_TABLES).not.toContain('tradingCalendar')`
+    // until this session. Both are now positive and neither can fire again.
     expect(TABLE_KEYS).toContain('tradingCalendar');
     expect(TABLE_KEYS).toContain('tradingCalendarLoads');
     expect(TABLE_KEYS).toContain('tradingCalendarRevisions');
-    // AND THE MODULE STILL DOES NOT READ IT, which is the line that has not
-    // moved and must not be read as a second blocker. The fold ADR-199 section 6
-    // describes is five leaf paths nobody has written yet; what changed is that
-    // writing them is now ordinary code in this fence rather than a `TS2322`
-    // against a registry in another one.
-    expect([...LIABILITY_READ_TABLES]).not.toContain('tradingCalendar');
+    expect([...LIABILITY_READ_TABLES]).toContain('tradingCalendar');
+    expect([...LIABILITY_READ_TABLES]).toContain('tradingCalendarLoads');
+
+    // AND THE GROUP IS STILL NOT PRODUCED, which is the line that has not moved
+    // and is now blocker B5 rather than B1. `readTradingHorizon` produces the
+    // seven trading days; the per-account fold over them has no source. A
+    // reader of this case alone would otherwise conclude the field had landed.
+    expect(BLOCKED_LEAVES).toContain('eligible_next_7d.total_cents');
+    expect(BLOCKED_LEAVES.filter((leaf) => leaf.startsWith('eligible_next_7d'))).toHaveLength(5);
   });
 });
 
@@ -532,11 +547,19 @@ describe('what the read costs, which the composition would drop', () => {
     });
   });
 
-  it('reads eight tables and no ninth', async () => {
+  it('reads eight of the ten tables, and the other two are the horizon`s', async () => {
+    // THE ARRAY IS THE MODULE'S AND THE READ IS THE BOOK'S, and they stopped
+    // being the same list the moment the calendar arrived. `readLiabilityBook`
+    // reads eight; `readTradingHorizon` reads the two the book does not, which
+    // its own case above asserts from the other side.
     const { calls } = await read();
-    expect([...new Set(calls.map((call) => call.key))].sort()).toStrictEqual([
-      ...LIABILITY_READ_TABLES,
-    ]);
+    const read8 = [...new Set(calls.map((call) => call.key))].sort();
+    expect(read8).toStrictEqual(
+      [...LIABILITY_READ_TABLES].filter(
+        (key) => key !== 'tradingCalendar' && key !== 'tradingCalendarLoads',
+      ),
+    );
+    expect(read8).toHaveLength(8);
   });
 });
 
@@ -588,7 +611,12 @@ function leavesOf(value: unknown, prefix = ''): readonly string[] {
  * the thing it is checked against proves nothing.
  */
 const BLOCKED_LEAVES = [
-  // B1: `trading_calendar` is not a `TableKey`.
+  // B5, and it was B1 UNTIL SESSION 377 REGISTERED THE CALENDAR. B1 was the
+  // horizon and it is lifted and built (`readTradingHorizon`). What holds these
+  // five is the PER-ACCOUNT half: the only forward-looking eligibility date in
+  // the estate is `rule_states.engine_gates.cadenceGap.nextEligibleTradingDay`,
+  // and nothing writes that bag or declares its shape. THE COUNT DID NOT MOVE
+  // AND THAT IS THE FINDING.
   'eligible_next_7d.total_cents',
   'eligible_next_7d.account_count',
   'eligible_next_7d.by_day[].trading_day',
@@ -642,5 +670,396 @@ describe('the subtraction this whole slice measures', () => {
     // never found the block would report zero blocked leaves and zero declared.
     const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
     expect(contract).toContain('type LiabilityResponse = {');
+  });
+});
+
+// =============================================================================
+// THE TRADING-DAY HORIZON, WHICH IS THE HALF OF `eligible_next_7d` B1 UNBLOCKED
+// =============================================================================
+// EVERY CASE BELOW WAS RUN AGAINST A LIVE POSTGRESQL 16 BEFORE IT WAS WRITTEN
+// HERE, over 34 seeded `trading_calendar` rows and two overlapping
+// `trading_calendar_loads` rows, and the doubles carry the shapes that read
+// back. `session_open_at` and `session_close_at` arrive as `Date`, the three
+// flags as `boolean`, and `trading_day`, `coverage_start_day` and
+// `coverage_end_day` as `YYYY-MM-DD` strings, which is what drizzle-orm hands
+// back for `date` and is why {@link day} admits both forms.
+//
+// THE FIXTURE IS THE ONE THE LIVE PROBE USED, AND ITS SHAPE IS THE ASSERTION.
+// Two holidays, one half day, one halted day, a weekend every five days, five
+// session rows PAST the coverage edge, and two loads that overlap by one day.
+// A calendar without all six of those cannot tell a correct walk from a wrong
+// one: a run with no weekend in it passes under date arithmetic.
+// =============================================================================
+
+const CALENDAR_SESSIONS: readonly string[] = [
+  '2026-11-16',
+  '2026-11-17',
+  '2026-11-18',
+  '2026-11-19',
+  '2026-11-20',
+  '2026-11-23',
+  '2026-11-24',
+  '2026-11-25',
+  '2026-11-27',
+  '2026-11-30',
+  '2026-12-01',
+  '2026-12-02',
+  '2026-12-03',
+  '2026-12-04',
+  '2026-12-07',
+  '2026-12-08',
+  '2026-12-09',
+  '2026-12-10',
+  '2026-12-11',
+  '2026-12-14',
+  '2026-12-15',
+  '2026-12-16',
+  '2026-12-17',
+  '2026-12-18',
+  '2026-12-21',
+  '2026-12-22',
+  '2026-12-23',
+  '2026-12-24',
+  // PAST THE COVERAGE EDGE. Rows exist and the walk must not take them.
+  '2026-12-28',
+  '2026-12-29',
+  '2026-12-30',
+  '2026-12-31',
+];
+
+/** `2026-11-26` and `2026-12-25`, both with the session columns NULL (0032 F-1). */
+const CALENDAR_HOLIDAYS: readonly string[] = ['2026-11-26', '2026-12-25'];
+
+function session(tradingDay: string): Record<string, unknown> {
+  return {
+    tradingDay,
+    // CME-shaped: opens 23:00Z the PRIOR evening and closes 22:00Z, which is 23
+    // hours later. The pair is what makes the anchor "the last CLOSED day" a
+    // real question rather than a restatement of the date, and the offset is
+    // subtracted from the close rather than written as a second date string so
+    // the fixture cannot drift into an inverted interval. IT DID EXACTLY THAT
+    // ONCE and `trading_calendar_session_ordered`'s re-assertion is what caught
+    // it, which is a positive control this suite got for free.
+    sessionOpenAt: new Date(Date.parse(`${tradingDay}T22:00:00.000Z`) - 23 * 60 * 60 * 1000),
+    sessionCloseAt: new Date(`${tradingDay}T22:00:00.000Z`),
+    isHalfDay: tradingDay === '2026-11-27',
+    isHoliday: false,
+    halted: tradingDay === '2026-12-01',
+    notes: null,
+  };
+}
+
+function holiday(tradingDay: string): Record<string, unknown> {
+  return {
+    tradingDay,
+    sessionOpenAt: null,
+    sessionCloseAt: null,
+    isHalfDay: false,
+    isHoliday: true,
+    halted: false,
+    notes: 'exchange holiday',
+  };
+}
+
+const CALENDAR: readonly unknown[] = [
+  ...CALENDAR_SESSIONS.map((d) => session(d)),
+  ...CALENDAR_HOLIDAYS.map((d) => holiday(d)),
+];
+
+/** TWO LOADS THAT OVERLAP BY ONE DAY, so the merge is exercised rather than assumed. */
+const LOADS: readonly unknown[] = [
+  {
+    id: 1n,
+    sourceId: 'cme-2026-a',
+    coverageStartDay: '2026-11-16',
+    coverageEndDay: '2026-12-15',
+    sourceDigest: Buffer.alloc(32, 1),
+    actor: 'session-380',
+  },
+  {
+    id: 2n,
+    sourceId: 'cme-2026-b',
+    coverageStartDay: '2026-12-15',
+    coverageEndDay: '2026-12-24',
+    sourceDigest: Buffer.alloc(32, 2),
+    actor: 'session-380',
+  },
+];
+
+function calendarHandle(
+  overrides: { calendar?: readonly unknown[]; loads?: readonly unknown[] } = {},
+): { tx: LiabilityTx; calls: Recorded[] } {
+  return handle({
+    tradingCalendar: overrides.calendar ?? CALENDAR,
+    tradingCalendarLoads: overrides.loads ?? LOADS,
+  });
+}
+
+function days(horizon: TradingHorizon): readonly string[] {
+  return horizon.kind === 'uncovered' ? [] : horizon.days.map((d) => d.trading_day);
+}
+
+describe('readTradingHorizon walks TRADING days and never calendar days', () => {
+  it('skips the weekend and the holiday, so seven trading days reach three days further', async () => {
+    // THE WHOLE FIELD IS IN THIS ONE ASSERTION. Anchored on 2026-11-24, seven
+    // CALENDAR days is 2026-11-25 through 2026-12-01. Seven TRADING days is
+    // 2026-11-25 through 2026-12-04, because 2026-11-26 is Thanksgiving,
+    // 2026-11-28 and 29 are a weekend, and 2026-12-05 and 06 are the next one.
+    // The two answers differ by THREE DAYS on one ordinary late-November week,
+    // which is AS-06's "five trading days is 7 calendar days in June and 9 to 10
+    // across the year-end cluster" arriving on this field.
+    const { tx } = calendarHandle();
+    const { horizon } = await readTradingHorizon(tx, '2026-11-25T00:30:00.000Z');
+
+    expect(horizon.kind).toBe('resolved');
+    expect(days(horizon)).toEqual([
+      '2026-11-25',
+      '2026-11-27',
+      '2026-11-30',
+      '2026-12-01',
+      '2026-12-02',
+      '2026-12-03',
+      '2026-12-04',
+    ]);
+    // The holiday is ABSENT from the run and the weekend days were never rows.
+    expect(days(horizon)).not.toContain('2026-11-26');
+    // And the calendar-day answer is NOT this one, stated so the difference is
+    // asserted rather than described.
+    expect(days(horizon)).not.toContain('2026-11-28');
+    expect(days(horizon)[6]).not.toBe('2026-12-01');
+  });
+
+  it('keeps the half day and the halted day, because neither is a non-session', async () => {
+    // `0004`: a half day "counts as a FULL DAY (B4 #3)" and on a halted session
+    // "day counters advance and win days do NOT (B4 #2)". Both are trading days
+    // and a walk that filtered either out would shorten the horizon on exactly
+    // the weeks the exchange is unusual. The FLAGS are carried so a caller that
+    // needs them has them; the DAYS are present either way.
+    const { tx } = calendarHandle();
+    const { horizon } = await readTradingHorizon(tx, '2026-11-25T00:30:00.000Z');
+    if (horizon.kind === 'uncovered') throw new Error('expected a walk');
+
+    expect(horizon.days.map((d) => [d.trading_day, d.is_half_day, d.halted])).toContainEqual([
+      '2026-11-27',
+      true,
+      false,
+    ]);
+    expect(horizon.days.map((d) => [d.trading_day, d.is_half_day, d.halted])).toContainEqual([
+      '2026-12-01',
+      false,
+      true,
+    ]);
+  });
+
+  it('anchors on the last CLOSED session, so a day still trading is day one', async () => {
+    // P-M6-01 dates this figure at "the last closed day" (INV-M6-11), and
+    // `liability_snapshots` carries `as_of timestamptz` with NO `trading_day`
+    // column, so the instant is resolved through the calendar rather than by
+    // taking its UTC date. At 20:00Z on 2026-11-25 that day's session is OPEN
+    // (it closes at 22:00Z), so the anchor is still 2026-11-24 and 2026-11-25 is
+    // the first day of the horizon rather than a day already behind it.
+    const { tx } = calendarHandle();
+    const open = await readTradingHorizon(tx, '2026-11-25T20:00:00.000Z');
+    const closed = await readTradingHorizon(tx, '2026-11-25T22:00:00.000Z');
+
+    expect(open.horizon.kind === 'uncovered' ? null : open.horizon.anchor_day).toBe('2026-11-24');
+    expect(days(open.horizon)[0]).toBe('2026-11-25');
+    // One instant later the session has closed and the whole window moves.
+    expect(closed.horizon.kind === 'uncovered' ? null : closed.horizon.anchor_day).toBe(
+      '2026-11-25',
+    );
+    expect(days(closed.horizon)[0]).toBe('2026-11-27');
+  });
+
+  it('reads BOTH tables and neither with a predicate', async () => {
+    // The accessor offers no `ORDER BY` and no `LIMIT` (ADR-112, ADR-157), so
+    // both reads are whole-table and the ordering is the module's fold. The
+    // recording is what shows it: a `rowsWhere` here would be a predicate this
+    // module does not claim to send.
+    const { tx, calls } = calendarHandle();
+    await readTradingHorizon(tx, '2026-11-25T00:30:00.000Z');
+
+    expect(calls.map((c) => c.key)).toEqual(['tradingCalendar', 'tradingCalendarLoads']);
+    expect(calls.every((c) => c.where === undefined)).toBe(true);
+  });
+
+  it('returns the cost, so the two unbounded reads are visible', async () => {
+    const { tx } = calendarHandle();
+    const { cost } = await readTradingHorizon(tx, '2026-11-25T00:30:00.000Z');
+    // The two loads OVERLAP at 2026-12-15, so they merge to one interval.
+    expect(cost).toEqual({ calendarRowsScanned: 34, calendarLoadsScanned: 2, coveredIntervals: 1 });
+  });
+});
+
+describe('an exhausted calendar SAYS SO, which is the whole of ADR-042 F-4', () => {
+  it('stops at the coverage edge and names how many short it is', async () => {
+    // FIVE SESSION ROWS EXIST PAST 2026-12-24 AND NOT ONE IS TAKEN. That is the
+    // case F-4 is about: coverage is a stored fact so that "we do not know about
+    // this day" is a positive answer, and a walk that read the rows would return
+    // seven days of which four are outside anything this estate has loaded.
+    const { tx } = calendarHandle();
+    const { horizon } = await readTradingHorizon(tx, '2026-12-22T00:30:00.000Z');
+
+    expect(horizon.kind).toBe('exhausted');
+    if (horizon.kind !== 'exhausted') throw new Error('expected exhausted');
+    expect(horizon.days.map((d) => d.trading_day)).toEqual([
+      '2026-12-22',
+      '2026-12-23',
+      '2026-12-24',
+    ]);
+    expect(horizon.short_by).toBe(4);
+    expect(horizon.covered_through_day).toBe('2026-12-24');
+    expect(horizon.detail).toContain('ADR-042');
+    // NON-VACUITY, and it is the assertion this case exists for: the rows the
+    // walk declined to take are really there.
+    expect(CALENDAR_SESSIONS).toContain('2026-12-28');
+    expect(CALENDAR_SESSIONS.filter((d) => d > '2026-12-24')).toHaveLength(4);
+  });
+
+  it('refuses a day outside every load interval rather than walking from it', async () => {
+    const { tx } = calendarHandle();
+    const { horizon } = await readTradingHorizon(tx, '2027-06-01T00:30:00.000Z');
+
+    expect(horizon.kind).toBe('uncovered');
+    if (horizon.kind !== 'uncovered') throw new Error('expected uncovered');
+    // The anchor RESOLVED and is still refused, which is the distinction
+    // `calendar.ts` draws between `not_a_session` and `outside_coverage`: the
+    // row exists, and the estate has no load that claims to answer for it.
+    expect(horizon.anchor_day).toBe('2026-12-31');
+    expect(horizon.detail).toContain('UNKNOWN and never a holiday');
+  });
+
+  it('refuses when NO load declares coverage, though the calendar is full of rows', async () => {
+    // THE PUREST FORM OF F-4. 34 rows and no coverage fact is an estate that has
+    // days and no record of having loaded them, and the failure F-4 names is
+    // that this is otherwise indistinguishable from an unbroken holiday.
+    const { tx } = calendarHandle({ loads: [] });
+    const { horizon, cost } = await readTradingHorizon(tx, '2026-11-25T00:30:00.000Z');
+
+    expect(horizon.kind).toBe('uncovered');
+    expect(horizon.kind === 'uncovered' ? horizon.anchor_day : 'x').toBeNull();
+    expect(cost.calendarRowsScanned).toBe(34);
+    expect(cost.coveredIntervals).toBe(0);
+  });
+
+  it('refuses when no session has closed at or before the instant', async () => {
+    const { tx } = calendarHandle();
+    const { horizon } = await readTradingHorizon(tx, '2020-01-01T00:00:00.000Z');
+
+    expect(horizon.kind).toBe('uncovered');
+    expect(horizon.kind === 'uncovered' ? horizon.detail : '').toContain('last closed day');
+  });
+
+  it('does not bridge a GAP between two loads, because a gap is unknown', async () => {
+    // ADJACENT AND OVERLAPPING MERGE; DISJOINT DOES NOT. `0032` declares no
+    // supersession column, so a load says this range was loaded and never that
+    // another was not. Coverage that stops on 2026-11-20 and resumes on
+    // 2026-12-07 leaves the fortnight between them UNKNOWN, and the walk from
+    // 2026-11-19 gets one day rather than seven.
+    const { tx } = calendarHandle({
+      loads: [
+        { ...(LOADS[0] as Record<string, unknown>), coverageEndDay: '2026-11-20' },
+        { ...(LOADS[1] as Record<string, unknown>), coverageStartDay: '2026-12-07' },
+      ],
+    });
+    const { horizon, cost } = await readTradingHorizon(tx, '2026-11-20T00:30:00.000Z');
+
+    expect(cost.coveredIntervals).toBe(2);
+    expect(horizon.kind).toBe('exhausted');
+    expect(days(horizon)).toEqual(['2026-11-20']);
+    expect(horizon.kind === 'exhausted' ? horizon.short_by : 0).toBe(6);
+  });
+});
+
+describe('the horizon refuses rows that disagree with the constraints above them', () => {
+  it('refuses a holiday carrying a session, which 0032 CHECKs in both directions', async () => {
+    // `trading_calendar_holiday_has_no_session` is `CHECK (is_holiday =
+    // (session_open_at IS NULL))`, an equality between two booleans and so a
+    // constraint in both directions at once. It is re-asserted on read because
+    // `0032` ADDED it to a table `0004` created without it, and a merged
+    // migration is never edited, only superseded (E2). F-1: R-01 is a
+    // containment lookup, so a fabricated interval is one a fill can fall inside.
+    const { tx } = calendarHandle({
+      calendar: [...CALENDAR, { ...holiday('2026-12-28'), sessionOpenAt: new Date() }],
+    });
+    await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z')).rejects.toThrow(
+      AdminReadError,
+    );
+  });
+
+  it('refuses a NON-holiday with no session, which is the other direction', async () => {
+    // THE DIRECTION A ONE-WAY CHECK WOULD MISS, and it is the one that matters
+    // to this walk: a sessionless non-holiday would be counted as a trading day
+    // and would then have no `session_close_at` for the anchor rule to read.
+    const { tx } = calendarHandle({
+      calendar: [
+        ...CALENDAR,
+        { ...session('2026-12-28'), sessionOpenAt: null, sessionCloseAt: null, isHoliday: false },
+      ],
+    });
+    await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z')).rejects.toThrow(
+      AdminReadError,
+    );
+  });
+
+  it('refuses a session that closes at or before it opens', async () => {
+    const { tx } = calendarHandle({
+      calendar: [
+        ...CALENDAR,
+        { ...session('2026-12-28'), sessionCloseAt: new Date('2026-12-27T00:00:00.000Z') },
+      ],
+    });
+    await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z')).rejects.toThrow(
+      AdminReadError,
+    );
+  });
+
+  it('refuses a backwards coverage interval rather than covering nothing quietly', async () => {
+    const { tx } = calendarHandle({
+      loads: [{ ...(LOADS[0] as Record<string, unknown>), coverageEndDay: '2026-11-01' }],
+    });
+    await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z')).rejects.toThrow(
+      AdminReadError,
+    );
+  });
+
+  it('refuses a span that is not a positive whole number of trading days', async () => {
+    const { tx } = calendarHandle();
+    for (const span of [0, -1, 2.5, Number.NaN])
+      await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z', span)).rejects.toThrow(
+        AdminReadError,
+      );
+  });
+
+  it('refuses an anchor instant that is not an instant', async () => {
+    const { tx } = calendarHandle();
+    await expect(readTradingHorizon(tx, 'the last closed day')).rejects.toThrow(AdminReadError);
+  });
+});
+
+describe('the horizon is not on the book, and the book does not pay for it', () => {
+  it('reads neither calendar table inside readLiabilityBook', async () => {
+    // `LIABILITY_READ_TABLES` names both tables and `readLiabilityBook` reads
+    // NEITHER, which the array alone would imply the opposite of. The book
+    // carries no `eligible_next_7d` (blocker B5), so two whole-table reads
+    // inside it would buy a group it cannot return.
+    const { tx, calls } = handle(estate());
+    await readLiabilityBook(tx);
+    expect(calls.map((c) => c.key)).not.toContain('tradingCalendar');
+    expect(calls.map((c) => c.key)).not.toContain('tradingCalendarLoads');
+  });
+
+  it('names both calendar tables in LIABILITY_READ_TABLES, and they are real TableKeys', () => {
+    // B1's PAYOUT, MEASURED. While `trading_calendar` was unregistered this
+    // array could not carry it even to try.
+    expect(LIABILITY_READ_TABLES).toContain('tradingCalendar');
+    expect(LIABILITY_READ_TABLES).toContain('tradingCalendarLoads');
+    for (const key of LIABILITY_READ_TABLES) expect(TABLE_KEYS).toContain(key);
+  });
+
+  it('has ELIGIBLE_HORIZON_TRADING_DAYS at EC-074 and P-M6-02 seven', () => {
+    expect(ELIGIBLE_HORIZON_TRADING_DAYS).toBe(7);
+    const ec = readFileSync(join(ROOT, 'docs/edge-cases/EC-074.md'), 'utf8');
+    expect(ec).toContain('accounts eligible now or inside 7 trading days');
   });
 });

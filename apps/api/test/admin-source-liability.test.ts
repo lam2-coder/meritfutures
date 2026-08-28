@@ -18,8 +18,24 @@
 // derivable* and *this tree can read it today* are a THIRD pair, and they come
 // apart on two of the same three figures. `src/admin-source/liability.ts` now
 // produces 27 of `LiabilityResponse`'s 40 leaf paths from live rows. The other 13
-// are FOUR blockers, none of them a column, and the last section of this file
+// are FIVE blockers, none of them a column, and the last section of this file
 // holds each with its own clearing condition.
+//
+// **B1 LIFTED AND THE COUNT DID NOT MOVE, WHICH IS SESSION 380's FINDING AND IS
+// WHY B5 IS AT THE BOTTOM OF THIS FILE.** `trading_calendar` is a `TableKey` now
+// and `readTradingHorizon` produces the next seven trading days off it. That was
+// never the whole of `eligible_next_7d`: the group is a FORECAST over those days
+// and the PER-ACCOUNT half of it has no source. TWO blockers sat on the same five
+// leaves and only one had ever been looked for.
+//
+// **AND THE STARTING MEASUREMENT WAS GREEN FOR THE SECOND SESSION RUNNING.**
+// Session 374 was dispatched to read a red and found 12 of 12 green because
+// session 372 had spent the clearing condition in its own diff. Session 380 was
+// dispatched to read a red and found 56 of 56 green, because session 377 spent
+// B1's two conditions in ITS own diff and said so. THE MECHANISM IS WORKING AND
+// THE DISPATCH IS READING IT BACKWARDS: a clearing condition is spent by the
+// session that lifts the blocker, so the NEXT session inherits a green suite and
+// an accurate map. That is the design, not a failure of it.
 //
 // This file is not the suite of that module -- `test/admin-source-liability-book.test.ts`
 // is, and it is where the subtraction is checked against API_CONTRACT. This one
@@ -42,7 +58,7 @@
 // session holding this method that its blocker had gone.
 //
 // -----------------------------------------------------------------------------
-// THE FOUR ORIGINAL BLOCKERS ARE NOT ONE BLOCKER, AND THEY CLEARED SEPARATELY
+// THE ORIGINAL BLOCKERS ARE NOT ONE BLOCKER, AND THEY CLEARED SEPARATELY
 // -----------------------------------------------------------------------------
 // `LiabilityResponse` is a projection of SIX groups, and when this file was
 // written exactly one of them had a producible source. THAT SENTENCE IS NO
@@ -93,6 +109,10 @@ import type { TableKey } from '@merit/db';
 
 import { AdminSourceNotComposed, composeAdminReadSource } from '../src/admin-source/index.ts';
 import { IMPLEMENTED_ADMIN_READS } from '../src/admin-source/index.ts';
+import {
+  ELIGIBLE_HORIZON_TRADING_DAYS,
+  LIABILITY_READ_TABLES,
+} from '../src/admin-source/liability.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const MIGRATIONS = join(ROOT, 'packages/db/migrations');
@@ -143,6 +163,41 @@ function migrationColumnNames(): ReadonlySet<string> {
       const match = declaration.exec(line);
       if (match?.[1] !== undefined) names.add(match[1].toLowerCase());
     }
+  }
+  return names;
+}
+
+/**
+ * The column names `trading_calendar` actually declares, CREATE body folded over
+ * every `ALTER TABLE` of it in the tree.
+ *
+ * TABLE-SCOPED BECAUSE THE ESTATE-WIDE CENSUS WAS WRONG HERE AND THE SUITE
+ * CAUGHT IT. A first draft of the B5 case asserted `migrationColumnNames()` does
+ * not contain `sequence`, and it went RED: `0050` declares
+ * `live_account_state.sequence integer NOT NULL`, a live tick ordinal that is
+ * "1-based PER ACCOUNT PER DAY". That is a different figure from
+ * `CalendarDay.sequence`, which M01 section 2.1 defines as "a DENSE index into
+ * the calendar", and the claim the blocker needs is about ONE TABLE. A census
+ * over 735 column names cannot make a claim about one of 114 tables.
+ */
+function tradingCalendarColumnNames(): ReadonlySet<string> {
+  const create = readFileSync(join(MIGRATIONS, '0004_catalog.sql'), 'utf8');
+  const body = create.slice(create.indexOf('CREATE TABLE trading_calendar ('));
+  const names = new Set<string>();
+  for (const line of body.slice(0, body.indexOf('\n);')).split('\n')) {
+    if (/^\s*--/.test(line)) continue;
+    const match = /^\s*([a-z_][a-z0-9_]*)\s+[a-z]/i.exec(line);
+    if (match?.[1] !== undefined) names.add(match[1].toLowerCase());
+  }
+  // AND EVERY `ADD COLUMN` ON THE TABLE, over every migration, so the fold is
+  // the table's history and not `0004`'s snapshot of it. Session 377 read the
+  // same history to transcribe the table and found no `ADD COLUMN` at all.
+  for (const file of readdirSync(MIGRATIONS).filter((name) => name.endsWith('.sql'))) {
+    const sql = readFileSync(join(MIGRATIONS, file), 'utf8');
+    for (const match of sql.matchAll(
+      /ALTER TABLE\s+trading_calendar\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?([a-z_][a-z0-9_]*)/gi,
+    ))
+      if (match[1] !== undefined) names.add(match[1].toLowerCase());
   }
   return names;
 }
@@ -380,7 +435,15 @@ describe('blocker B1: eligible_next_7d, and the TableKey that arrived', () => {
     ).toContain('ALTER TABLE trading_calendar ALTER COLUMN session_open_at  DROP NOT NULL;');
   });
 
-  it('has every OTHER input of the fold landed, so the calendar is the whole gap', () => {
+  it('has every other NAMED input landed, and named is not the same as readable', () => {
+    // THIS CASE'S TITLE USED TO READ "so the calendar is the whole gap" AND THAT
+    // CLAIM IS REFUTED BY THE B5 BLOCK BELOW. Every assertion in it is unchanged
+    // and every one still passes: ADR-199 section 6's four inputs are four real
+    // columns on three registered tables. What the case cannot see is whether
+    // anything WRITES them or declares their contents, which is the distinction
+    // session 374's own landmine named -- "`derivable` and `readable` are
+    // different claims" -- arriving one level down, on a jsonb bag rather than
+    // on a figure.
     const columns = migrationColumnNames();
     for (const name of [
       'withdrawable_cents',
@@ -392,6 +455,157 @@ describe('blocker B1: eligible_next_7d, and the TableKey that arrived', () => {
     expect(TABLE_KEYS).toContain('ruleStates');
     expect(TABLE_KEYS).toContain('accounts');
     expect(TABLE_KEYS).toContain('planVersions');
+  });
+
+  it('has the HORIZON produced, which is what lifting B1 actually bought', () => {
+    // B1's PAYOUT, ASSERTED FROM THE SIDE THAT MEASURES IT. The module reads
+    // both calendar tables now, which it could not do at all while
+    // `trading_calendar` was unregistered, and `readTradingHorizon` is executed
+    // by `admin-source-liability-book.test.ts` over a fixture taken from a live
+    // read. Neither table is on `readLiabilityBook`'s path, because the book
+    // carries no `eligible_next_7d` to spend them on.
+    expect(LIABILITY_READ_TABLES).toContain('tradingCalendar');
+    expect(LIABILITY_READ_TABLES).toContain('tradingCalendarLoads');
+    expect(ELIGIBLE_HORIZON_TRADING_DAYS).toBe(7);
+  });
+});
+
+// =============================================================================
+// BLOCKER B5, WHICH IS THE SECOND BLOCKER ON THE SAME FIVE LEAVES
+// =============================================================================
+// LIFTING B1 DID NOT MOVE THE BLOCKED-LEAF COUNT AND THAT IS THIS SESSION'S
+// FINDING. `eligible_next_7d` is a FORECAST -- ADR-199 section 6: "which accounts
+// clear their payout gates on each of the next seven trading days, and for how
+// much" -- and it is TWO folds rather than one. The horizon is built. The
+// per-account half has no source, on two INDEPENDENT legs either of which alone
+// blocks the group.
+//
+// THE CASES BELOW ARE READINGS OF THE TREE AND NONE OF THEM IMPORTS THE MODULE,
+// which is this file's shape throughout (session 349's precedent).
+// =============================================================================
+
+describe('blocker B5: eligible_next_7d`s per-account half, which nobody had looked at', () => {
+  it('has ONE forward-looking eligibility date in the whole engine, and it lives in a jsonb bag', () => {
+    // SIX GATE GROUPS DECIDE ELIGIBILITY AND EXACTLY ONE PUBLISHES A DATE.
+    // `nextEligibleTradingDay` is AS-06's resolved date on the cadence gap, and
+    // it exists because "any counter published in trading days must be rendered
+    // as a date, or the firm has published a rule its own traders cannot
+    // evaluate". Every OTHER gate clears only when the trader TRADES, so no
+    // stored row says when: `tradedDays` and `winDays` count days traded,
+    // `buffer` and `minimumAmount` move with the balance, and `consistency` is a
+    // share of profit that does not yet exist.
+    const types = readFileSync(join(ROOT, 'packages/rules-engine/src/types.ts'), 'utf8');
+    for (const gate of ['TradedDaysGate', 'WinDaysGate', 'CadenceGapGate', 'MinimumAmountGate'])
+      expect(types).toContain(gate);
+    expect(types).toContain('nextEligibleTradingDay');
+    // ONE. A second forward-looking date would make this blocker a different
+    // shape, so the count is derived rather than asserted in prose.
+    expect(types.split('nextEligibleTradingDay').length - 1).toBeGreaterThan(0);
+    expect(types).not.toContain('nextEligibleTradingDays');
+  });
+
+  it('LEG 1: nothing in this tree writes rule_states, so the bag has no producer', () => {
+    // `writeRuleState` IS A PORT AND ITS ONLY IMPLEMENTATIONS ARE A TEST DOUBLE
+    // AND A REFUSAL. `scripts/demo/world.ts` rejects the call in terms ("the
+    // demo world is sealed"), and no module of `packages/db` or `apps/worker`
+    // supplies a database one. So `rule_states.engine_gates` is a column whose
+    // contents no producer in this estate has ever determined.
+    const ports = readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8');
+    expect(ports).toContain('writeRuleState(row: RuleStateRow): Promise<void>;');
+    expect(readFileSync(join(ROOT, 'scripts/demo/world.ts'), 'utf8')).toContain(
+      'the demo world is sealed',
+    );
+    // NON-VACUITY: the port type really does carry the typed value, so the
+    // absence below is an absent WRITER rather than an absent field.
+    expect(ports).toContain('readonly engineGates: EngineGateResults;');
+  });
+
+  it('LEG 1: no primary source declares the STORED shape, and 0015 names different gates', () => {
+    // THE CONTRAST WITH `integrations.batch` IS WHAT MAKES THIS PRECISE. ADR-199
+    // clause 4 could rule the batch's two figures readable off an event nothing
+    // has emitted, because EVENTS section 5 DECLARES that event's body in the
+    // approved catalogue. Nothing declares this bag: API_CONTRACT carries no
+    // `engine_gates` shape at all, and `0015`'s own column comment names EIGHT
+    // gates where `EngineGateResults` has six.
+    expect(readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8')).not.toContain(
+      'engine_gates:',
+    );
+    const migration = readFileSync(join(MIGRATIONS, '0015_rule_states.sql'), 'utf8');
+    expect(migration).toContain('profit target, drawdown, win days, minimum days');
+    // The engine's own six, none of which that list names as such.
+    const types = readFileSync(join(ROOT, 'packages/rules-engine/src/types.ts'), 'utf8');
+    for (const member of ['cadenceGap', 'minimumAmount', 'tradedDays', 'winDays'])
+      expect(types).toContain(member);
+    expect(migration).not.toContain('cadenceGap');
+  });
+
+  it('LEG 2: R-37 counts by `sequence` subtraction and NO MIGRATION DECLARES ONE', () => {
+    // THE OTHER ROUTE ADR-199 SECTION 6 OFFERS, AND IT ENDS AT A MISSING COLUMN.
+    // Recomputing the gate needs `CalendarDay.sequence`, which M01 R-02 fixes as
+    // the mechanism ("gap counting is `calendar.sequence` subtraction, never date
+    // arithmetic"). The engine receives its slice from a PORT the caller
+    // supplies; `trading_calendar` stores no such column and the seed assigns
+    // none, so the only substitute available to an adapter is the date
+    // arithmetic AS-06 forbids.
+    expect(readFileSync(join(ROOT, 'packages/rules-engine/src/types.ts'), 'utf8')).toContain(
+      'readonly sequence: number;',
+    );
+    const calendarDdl = readFileSync(join(MIGRATIONS, '0004_catalog.sql'), 'utf8');
+    expect(calendarDdl).toContain('CREATE TABLE trading_calendar (');
+    // NON-VACUITY FIRST: the columns that ARE there are read back, so a pattern
+    // that matched nothing could not report the absence.
+    for (const column of ['trading_day', 'session_open_at', 'is_holiday', 'halted'])
+      expect(calendarDdl).toContain(column);
+    // AND THE ABSENCE, over the TABLE'S OWN HISTORY rather than over the estate.
+    const columns = tradingCalendarColumnNames();
+    // Non-vacuity again, on the fold this time: the reader really read the row.
+    expect(columns).toContain('trading_day');
+    expect(columns).toContain('is_half_day');
+    expect(columns.size).toBeGreaterThan(5);
+    expect(columns).not.toContain('sequence');
+    // AND THE NAME IS TAKEN ELSEWHERE, WHICH IS WHY THIS CASE IS TABLE-SCOPED.
+    // `0050` declares `live_account_state.sequence`, a live tick ordinal that is
+    // 1-based per account per day. An estate-wide census reports the name
+    // PRESENT and would have made this blocker look cleared by a column that has
+    // nothing to do with the calendar.
+    expect(migrationColumnNames()).toContain('sequence');
+    expect(readFileSync(join(MIGRATIONS, '0050_live_cache_and_role.sql'), 'utf8')).toContain(
+      '1-based\n  -- PER ACCOUNT PER DAY',
+    );
+    // The seed assigns none either, so nothing derives what no column stores.
+    expect(readdirSync(join(ROOT, 'packages/db/src/seed/calendars'))).toContain('generate.mjs');
+    expect(
+      readFileSync(join(ROOT, 'packages/db/src/seed/calendars/generate.mjs'), 'utf8'),
+    ).not.toContain('sequence');
+  });
+
+  it('holds the WHOLE group, on B2`s stated reason rather than a new one', () => {
+    // PRODUCING ONLY THE ACCOUNTS ELIGIBLE TODAY WOULD UNDERSTATE `total_cents`,
+    // and that figure is the one the payout wallet is funded against. EC-074 and
+    // P-M6-02 both define it over "eligible now OR inside 7 trading days", and
+    // `0009`'s own column comment on `bounded_near_term_cents` says it a third
+    // time. A partial group would be the same number under the same name meaning
+    // something narrower, which is the exact failure EC-074 is about.
+    const ec = readFileSync(join(ROOT, 'docs/edge-cases/EC-074.md'), 'utf8');
+    expect(ec).toContain('accounts eligible now or inside 7 trading days');
+    expect(readFileSync(join(ROOT, 'docs/plans/M06-admin-ops-console.md'), 'utf8')).toContain(
+      'currently eligible or become eligible inside 7 trading days',
+    );
+    expect(readFileSync(join(MIGRATIONS, '0009_ledger.sql'), 'utf8')).toContain(
+      'accounts eligible now or inside 7 trading days',
+    );
+  });
+
+  it('CLEARING CONDITION: a rule_states writer lands, or a ruling defines the forecast', () => {
+    // THIS CASE GOES RED THE DAY EITHER LEG CLEARS, AND IT NAMES WHICH. Session
+    // 363's design and session 374's four: a clearing condition fires ONCE and
+    // the session that lifts the blocker spends it in its own diff.
+    expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
+      'writeRuleState(row: RuleStateRow): Promise<void>;',
+    );
+    expect(tradingCalendarColumnNames()).not.toContain('sequence');
+    // AND THE METHOD IS STILL NOT COMPOSED, which is what the two above decide.
+    expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');
   });
 });
 
