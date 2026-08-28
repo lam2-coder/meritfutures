@@ -103,9 +103,9 @@ export default async function RootLayout({
           <p>{disclosure === null ? SIMULATED_ENVIRONMENT_QUOTE : disclosure.body}</p>
           {disclosure === null ? (
             <p data-testid="disclosure-provenance-missing">
-              This wording is quoted from the Merit glossary because no content document was
-              read by this build. The citable version, the one an agreement is recorded
-              against, arrives with the content endpoint.
+              This wording is quoted from the Merit glossary because no content document was read by
+              this build. The citable version, the one an agreement is recorded against, arrives
+              with the content endpoint.
             </p>
           ) : (
             <p data-testid="disclosure-provenance">

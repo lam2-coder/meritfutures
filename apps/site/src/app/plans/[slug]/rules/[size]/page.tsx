@@ -120,10 +120,7 @@ export default async function SizeRulesPage({ params }: SizeParams): Promise<Rea
  * request down, which is the same direction `routes/rules.ts` chose when it
  * made the assertion throw rather than return a boolean.
  */
-async function resolve(
-  slug: string,
-  size: string,
-): Promise<ReturnType<typeof rulesPage> | null> {
+async function resolve(slug: string, size: string): Promise<ReturnType<typeof rulesPage> | null> {
   const build = siteBuild();
   const read = await siteCatalog(build);
   if (read.kind !== 'read') return null;
