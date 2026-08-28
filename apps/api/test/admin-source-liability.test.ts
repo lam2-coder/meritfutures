@@ -331,41 +331,45 @@ describe('the keys this method would take are already reachable', () => {
 // nothing in this estate records.
 // =============================================================================
 
-describe('blocker B1: eligible_next_7d, and trading_calendar is not a TableKey', () => {
-  it('has the calendar unregistered while both of its satellites are registered', () => {
-    // ADR-199 section 6 lists the fold's four inputs and names this one: "ONE
-    // INPUT IS NOT YET A `TableKey` AND IT IS NAMED RATHER THAN TAKEN ... the
-    // session that NEEDS it registers it, and this one does not read it." The
-    // session that needs it is the one holding this method, and the registration
-    // is `packages/db`, which is not that session's fence, and an ADR-092-shaped
-    // entry, which is a number it does not hold. So the naming did not clear it.
+describe('blocker B1: eligible_next_7d, and the TableKey that arrived', () => {
+  it('has the calendar registered, which is the clearing condition this case was written to fire on', () => {
+    // B1 IS LIFTED AND THIS ASSERTION IS INVERTED IN THE DIFF THAT LIFTED IT.
+    // It read `expect(TABLE_KEYS).not.toContain('tradingCalendar')` and its own
+    // comment said "this case goes red the day `tradingCalendar` is registered,
+    // and `eligible_next_7d` is then five leaf paths of ordinary code". That day
+    // is this one: `packages/db/src/scope.ts` registers the table `firm` under
+    // ADR-103 clause 2, which had made it REGISTRABLE long before anybody spent
+    // the widening. A clearing condition fires ONCE and the session that lifts
+    // the blocker spends it, which is session 372's precedent on `events`.
     //
-    // THE CLEARING CONDITION IS THE KEY. This case goes red the day
-    // `tradingCalendar` is registered, and `eligible_next_7d` is then five leaf
-    // paths of ordinary code.
-    expect(TABLE_KEYS).not.toContain('tradingCalendar');
-    // Non-vacuity, and the contrast that makes the absence precise: the two
-    // neighbouring tables ARE registered, so this is one table missing from a
-    // family rather than a family nobody transcribed.
+    // WHAT LIFTED IS THE BLOCKER AND NOT THE WORK. `readLiability` still does
+    // not produce `eligible_next_7d`: the fold over the next seven trading days
+    // is five leaf paths of ordinary code that nobody has written, and the
+    // session that writes them holds this fence rather than `packages/db`. The
+    // case below states what is still missing.
+    expect(TABLE_KEYS).toContain('tradingCalendar');
+    // Non-vacuity, and the contrast that made the absence precise while it was
+    // one: the two neighbouring tables were registered first and are still here.
     expect(TABLE_KEYS).toContain('tradingCalendarLoads');
     expect(TABLE_KEYS).toContain('tradingCalendarRevisions');
   });
 
-  it('is UNREGISTERED and not UNREGISTRABLE, which one file of packages/db still denies', () => {
-    // THE DISTINCTION DECIDES WHETHER THIS BLOCKER IS A SESSION OR A RULING, and
-    // the tree gives two answers. `0032` carries `ALTER TABLE trading_calendar
-    // ALTER COLUMN session_open_at DROP NOT NULL`, ADR-094 clause 3 closed the
-    // drift fold at `ADD COLUMN` with a default of FAIL, and `schema.ts`'s
-    // `trading_calendar_loads` header still reads that the neighbour "cannot be
-    // registered" for exactly that reason.
+  it('was UNREGISTERED and never UNREGISTRABLE, which is why the lift took no ruling', () => {
+    // THE DISTINCTION DECIDED WHETHER THIS BLOCKER WAS A SESSION OR A RULING,
+    // and it was a session: this case predicted that and the registration is
+    // what settled it. `0032` carries `ALTER TABLE trading_calendar ALTER COLUMN
+    // session_open_at DROP NOT NULL`, ADR-094 clause 3 closed the drift fold at
+    // `ADD COLUMN` with a default of FAIL, and `schema.ts` went on saying the
+    // neighbour "cannot be registered" for exactly that reason.
     //
-    // ADR-103 CLAUSE 2 SUPERSEDED THAT A YEAR OF ENTRIES AGO: it replaced the
-    // stated proxy with the type-and-nullability comparison it stood for and
-    // added `ALTER COLUMN ... DROP NOT NULL` as the fold's second member,
-    // naming this table as one of the two the widening makes REGISTRABLE. So
-    // the blocker is a registration nobody has taken and never a refusal, and
-    // the sentence in `schema.ts` is stale. **REPORTED AND NOT REPAIRED**:
-    // `packages/db` is another fence.
+    // ADR-103 CLAUSE 2 HAD SUPERSEDED THAT AND ONLY THAT: it replaced the stated
+    // proxy with the type-and-nullability comparison it stood for, added
+    // `ALTER COLUMN ... DROP NOT NULL` as the fold's second member, and named
+    // this table as one of the two the widening makes REGISTRABLE. So the
+    // blocker was a registration nobody had taken and never a refusal that
+    // stood, and the four stale sentences are repaired in `packages/db` in the
+    // same branch as this inversion. THE ASSERTIONS BELOW ARE UNCHANGED: they
+    // read the ruling and the migration, and both still say what they said.
     const adr = readFileSync(join(ROOT, 'docs/decisions/ADR-103.md'), 'utf8');
     expect(adr).toContain('`otp_challenges` and `trading_calendar` become REGISTRABLE');
     expect(

@@ -234,14 +234,21 @@ describe('the tables this module may reach', () => {
     expect(LIABILITY_READ_TABLES).toHaveLength(8);
   });
 
-  it('does not name trading_calendar, which is blocker B1 and could not be named', () => {
-    // THE CLEARING CONDITION FOR `eligible_next_7d`. The fold ADR-199 section 6
-    // describes reads the next seven trading days, and the calendar is not a
-    // `TableKey`, so this array could not carry the name even to try: it is
-    // typed over `TableKey` and `tradingCalendar` is not one.
-    expect(TABLE_KEYS).not.toContain('tradingCalendar');
+  it('still does not name trading_calendar, which is now a choice rather than a wall', () => {
+    // THE CLEARING CONDITION FOR `eligible_next_7d` HAS FIRED AND THE FIRST
+    // ASSERTION IS INVERTED IN THE DIFF THAT FIRED IT. It read
+    // `expect(TABLE_KEYS).not.toContain('tradingCalendar')`, because the array
+    // below is typed over `TableKey` and could not carry the name even to try.
+    // `packages/db/src/scope.ts` registers the table `firm` under ADR-103
+    // clause 2, so a `Tx` naming it now compiles.
+    expect(TABLE_KEYS).toContain('tradingCalendar');
     expect(TABLE_KEYS).toContain('tradingCalendarLoads');
     expect(TABLE_KEYS).toContain('tradingCalendarRevisions');
+    // AND THE MODULE STILL DOES NOT READ IT, which is the line that has not
+    // moved and must not be read as a second blocker. The fold ADR-199 section 6
+    // describes is five leaf paths nobody has written yet; what changed is that
+    // writing them is now ordinary code in this fence rather than a `TS2322`
+    // against a registry in another one.
     expect([...LIABILITY_READ_TABLES]).not.toContain('tradingCalendar');
   });
 });
