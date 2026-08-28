@@ -41,10 +41,14 @@
 // -----------------------------------------------------------------------------
 // NOTHING HERE REACHES A DATABASE, AND THAT IS NOT A LIMIT OF THE FIXTURE
 // -----------------------------------------------------------------------------
-// `src/events.ts` reaches none either. Its writer is a port precisely because
-// `events` is not a `TableKey`, so what is asserted is the whole of what the
-// producer owns: which envelope one payload becomes, which payloads are refused,
-// and that the sink hands the transaction through untouched.
+// `src/events.ts` reaches none either. Its writer is a port because no writer is
+// COMPOSED and `db.ts` is the one file in this deployable that names `@merit/db`
+// (ADR-120). IT READ "precisely because `events` is not a `TableKey`" until
+// ADR-191 registered that table, and the correction matters to a reader of this
+// file: the registry's refusal is discharged and the port is unchanged, so what
+// is asserted below is still the whole of what the producer owns -- which
+// envelope one payload becomes, which payloads are refused, and that the sink
+// hands the transaction through untouched.
 // =============================================================================
 
 import { readFileSync } from 'node:fs';
@@ -710,15 +714,25 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
     ).rejects.toThrow(EventSinkUnwired);
+    // THE REASON MOVED AND THE REFUSAL DID NOT, which is the whole of ADR-191's
+    // effect on this file. It read `/SIXTH class/` while the door was shut BY
+    // THE REGISTRY; the sixth class exists now, so the message names the writer
+    // instead and this assertion follows it rather than being deleted.
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
-    ).rejects.toThrow(/SIXTH class/);
+    ).rejects.toThrow(/composed WRITER/);
   });
 
-  test('`events` really is unregistered, so the refusal above is a measurement and not a story', () => {
+  test('`events` really is REGISTERED now, so the refusal above is about the writer and not the registry', () => {
     const SCOPE = read('../../../packages/db/src/scope.ts');
-    expect(SCHEMA).not.toContain("pgTable('events'");
-    // The sentence wraps in the source, so the bind is to the half that does not.
-    expect(SCOPE).toContain('SIXTH CLASS, and ADR-106 is the precedent');
+    // THE ASSERTION IS INVERTED RATHER THAN DELETED, and the inversion is the
+    // measurement. It read `not.toContain("pgTable('events'")` and
+    // `toContain('SIXTH CLASS, and ADR-106 is the precedent')`, both of which
+    // were true for sixteen sessions and are false from ADR-191. Deleting it
+    // would have left this file with no statement of the fact its own header
+    // argues from.
+    expect(SCHEMA).toContain("pgTable('events'");
+    expect(SCOPE).toContain("class: 'either'");
+    expect(SCOPE).toContain('events: {');
   });
 });

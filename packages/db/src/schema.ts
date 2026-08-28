@@ -1,8 +1,8 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// ONE HUNDRED AND SIX TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
-// UP. The other 8 are not reachable through ANY accessor: `SCOPE_RULES` is total
+// ONE HUNDRED AND SEVEN TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
+// UP. The other 7 are not reachable through ANY accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
@@ -14,15 +14,26 @@
 // `packages/db/migrations` for the second. `test/scoped-db.test.ts` asserts
 // both, which is why the staleness could survive here and not there.
 //
-// NOT ALL 106 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
-// RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 62 of
-// the 106 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// NOT ALL 107 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
+// RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 63 of
+// the 107 are served by `scopedDb`. A `pair` table belongs to TWO identities and
 // is scoped to neither: it is excluded from `ScopedTableKey` because returning
 // the row to either party hands them the other party's identity uuid, and from
 // `FirmTableKey` because `firmDb()` takes no reason on the ground that no
 // identity is at risk. `systemDb(reason)` is its only door.
 //
-// THE ONE HUNDRED AND SIX ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE SIXTY-THIRD IS THE FIRST OF A SIXTH CLASS AND IS SERVED RATHER THAN
+// REFUSED (ADR-191). `events` is `either`: one nullable identity column of its
+// own beside one nullable account column, so a row reaches an identity the
+// `owned` way, or the `derived` way, or neither, and the predicate is the
+// DISJUNCTION of the two legs. It is in `ScopedTableKey` where `pair` is not,
+// because no row that predicate returns discloses a second party through a
+// tenancy column. It is the only table of that shape in the 114: seven others
+// carry both an identities edge and an accounts edge and every one of the seven
+// declares its identity column NOT NULL, which makes them `owned` with no
+// disjunction to write.
+//
+// THE ONE HUNDRED AND SEVEN ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -51,7 +62,7 @@
 // stale CREATE. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN OFFENDER" UNTIL
 // ADR-106, WHICH IS FALSE ABOUT THIS TREE AND WOULD HAVE TOLD A READER THAT
 // `otp_challenges` COULD NOT BE REGISTERED; ADR-094's clause was superseded by
-// ADR-103 and the sentence outlived it by one session. ELEVEN of the 106 below
+// ADR-103 and the sentence outlived it by one session. ELEVEN of the 107 below
 // carry later columns -- `sessions`, `plan_versions`, `rule_states`,
 // `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests`,
@@ -59,7 +70,9 @@
 // registered at all before ADR-094, which is why the ruling came before the
 // transcription rather than after it. `otp_challenges` IS THE ONLY ONE OF THE
 // ELEVEN THAT ALSO CARRIES AN `ALTER COLUMN`, and until it was registered the
-// fold's second member ran on no registered table at all.
+// fold's second member ran on no registered table at all. `events` IS NOT ONE OF
+// THE ELEVEN: `0017` is the whole of its DDL and no later migration touches it,
+// so the fold replays nothing onto it and the CREATE body is the column set.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -1772,6 +1785,73 @@ export const phoneChangeRequests = pgTable('phone_change_requests', {
 });
 
 // -----------------------------------------------------------------------------
+// events -- 0017_events_and_audit.sql. EITHER: `identity_id` on the row, or
+// `account_id` -> accounts, one hop. ADR-191.
+// -----------------------------------------------------------------------------
+// THE APPEND-ONLY SPINE, AND THE FIRST TABLE IN THIS FILE WHOSE TENANCY IS A
+// PROPERTY OF THE ROW RATHER THAN OF THE TABLE. `identity_id uuid NULL` and
+// `account_id uuid NULL` are both declared, neither is required, and there is no
+// CHECK tying them, so one row reaches an identity through its own column, the
+// next through the account's, and a third through neither.
+//
+// THIS TABLE WAS DELIBERATELY NOT DECLARED HERE FOR SIXTEEN SESSIONS, which is
+// why it arrives with an entry rather than as a transcription. Session 195 left
+// it out of this file ON PURPOSE, on session 192's model: a declared but
+// unregistered `pgTable` is one no drift assertion compares, because `DDL_NAMES`
+// is derived from `TABLE_KEYS`. Leaving it out of `SCOPE_RULES` alone would have
+// been half the refusal. ADR-191 is the ruling that ends it.
+//
+// NO LATER MIGRATION TOUCHES IT. `0017` is the whole of this table's DDL, so the
+// fold has nothing to replay and the CREATE body IS the column set as of the
+// last migration. That is checked rather than stated: the drift assertion reads
+// the migrations and would fail here if a later `ADD COLUMN` existed.
+//
+// `identity_id` AND `account_id` BOTH CARRY `.references()` because both foreign
+// keys are declared INLINE in the `CREATE TABLE` body and both targets are this
+// file's tables, which is the rule stated at the top of this file.
+//
+// `subject_kind` / `subject_id` ARE NOT THE TENANCY AND THE DISTINCTION IS THE
+// ONE A LATER SESSION WILL GET WRONG. `0017`'s own comment calls the pair a
+// "polymorphic subject", not a foreign key, "because the subject can be any of a
+// dozen kinds"; a plan version and a payout request are subjects and neither is
+// a person. `subject_id uuid NOT NULL` is on EVERY row including the firm ones,
+// so a rule reading it would return every event ever written to whoever's uuid
+// happened to match, which is the confidently-wrong derivation this package's
+// registry docblock opens by refusing.
+//
+// `payload` HOLDS A THIRD PARTY'S UUID ON EXACTLY TWO EVENT NAMES AND NO SCOPE
+// RULE REACHES INSIDE ONE. `kyc.dedupe_hit` carries `matched_identity_id` and
+// `identity.merged` carries `merged_identity_id` (EVENTS.md section 3). ADR-191
+// section 6 rules that a scope rule states which ROWS reach an identity and
+// nothing about what is inside one -- `idempotency_keys`' own words, out of this
+// same migration set -- and registers the two names as a projection's obligation
+// rather than a class's.
+export const events = pgTable('events', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  eventName: text('event_name').notNull(),
+  // PAYLOADS EVOLVE AND CONSUMERS MUST KNOW WHICH SHAPE THEY HOLD. A consumer
+  // that infers the shape from the fields present breaks silently the day a
+  // field becomes optional.
+  schemaVersion: smallint('schema_version').notNull().default(1),
+  // WHEN THE FACT HAPPENED versus WHEN WE LEARNED IT. Both, because they diverge
+  // on exactly the events where the difference matters: vendor corrections, late
+  // webhooks, backfills.
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  // THE TWO LEGS OF THE `either` RULE. Both nullable, and the nullability is the
+  // class rather than a gap: a firm event carries neither.
+  identityId: uuid('identity_id').references(() => identities.id),
+  accountId: uuid('account_id').references(() => accounts.id),
+  subjectKind: text('subject_kind').notNull(),
+  subjectId: uuid('subject_id').notNull(),
+  payload: jsonb('payload').notNull(),
+  actorKind: text('actor_kind').notNull(),
+  actorId: text('actor_id'),
+  correlationId: uuid('correlation_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
 // admin_actions -- 0017_events_and_audit.sql, 0043_admin_attributed_actions.sql.
 // FIRM.
 // -----------------------------------------------------------------------------
@@ -2821,11 +2901,18 @@ export const integrationContracts = pgTable('integration_contracts', {
 // transition moves it. `status` runs over `queued`, `sent`, `failed` and
 // `dropped_by_guard`, and none of the four changes whose disclosure it is.
 //
-// `event_id` REFERENCES `events(id)`, WHICH IS NOT REGISTERED, so the column is
-// transcribed alone and carries no `.references()`. It is also not a scope: the
-// event is Merit's own fact and this row is the DISCLOSURE of it, so a chain
-// through `events` would answer a different question from the one the breach
-// and privacy requests ask.
+// `event_id` REFERENCES `events(id)`, WHICH IS NOW ONE OF THIS FILE'S TABLES,
+// AND THE SECOND HALF OF THIS PARAGRAPH IS THE HALF THAT SURVIVED. The column
+// read "transcribed alone and carries no `.references()`" until ADR-191
+// registered `events`; the FK is declared inline in `0018`'s `CREATE TABLE`
+// body and the target is now here, so the file's own rule claims the edge.
+// THE OTHER HALF IS UNCHANGED AND IS NOW LOAD BEARING RATHER THAN INCIDENTAL:
+// `events` being registered means a `derived` rule through it COMPILES where
+// before it could not be written at all, which is exactly what ADR-106 reports
+// about `affiliate_commissions` and `attributions`. It is still refused, and on
+// the substantive ground rather than on the type: the event is Merit's own fact
+// and this row is the DISCLOSURE of it, so a chain through `events` would answer
+// a different question from the one the breach and privacy requests ask.
 //
 // `fields_sent` IS WHAT ACTUALLY WENT rather than what the contract permitted,
 // and it is field NAMES rather than values (INV-M10-12), so the audit trail of
@@ -2833,7 +2920,7 @@ export const integrationContracts = pgTable('integration_contracts', {
 export const integrationDispatches = pgTable('integration_dispatches', {
   id: uuid('id').primaryKey().defaultRandom(),
   integration: text('integration').notNull(),
-  eventId: bigint('event_id', { mode: 'bigint' }),
+  eventId: bigint('event_id', { mode: 'bigint' }).references(() => events.id),
   identityId: uuid('identity_id').references(() => identities.id),
   fieldsSent: text('fields_sent').array().notNull(),
   status: text('status').notNull(),
@@ -3933,11 +4020,18 @@ export const discordLinks = pgTable(
 // channel is addressed to the room, and a per-identity slice of it is not a
 // smaller version of it.
 //
-// `event_id` IS THE ONE COLUMN THAT LOOKS LIKE A PATH AND IT IS NOT ONE. It is
-// `bigint NULL REFERENCES events(id) ON DELETE RESTRICT`, it carries no
-// `.references()` because `events` is not one of this file's tables, and it is
-// NULLABLE besides -- a status post has no causing event. `integration_dispatches.event_id`
-// is the same column with the same treatment, one migration earlier.
+// `event_id` IS THE ONE COLUMN THAT LOOKS LIKE A PATH AND IT IS STILL NOT ONE,
+// AND THE REASON IS NOW THE ONLY REASON. It is `bigint NULL REFERENCES
+// events(id) ON DELETE RESTRICT`, and it read "carries no `.references()`
+// because `events` is not one of this file's tables" until ADR-191 registered
+// that table; the edge is claimed now, because the FK is inline in `0019`'s
+// `CREATE TABLE` body and the target is here. WHAT DID NOT MOVE IS THE CLASS:
+// this row is MERIT SPEAKING and the causing event is not its tenancy, so the
+// `derived` rule that ADR-191 makes WRITABLE is refused on the same ground it
+// was described by before it could be written. It is NULLABLE besides -- a
+// status post has no causing event -- so ADR-101 clause 2 refuses it a second
+// time. `integration_dispatches.event_id` is the same column with the same
+// treatment, one migration earlier.
 //
 // ANNOUNCEMENTS ARE TEMPLATE-ONLY. `template_code` is NOT NULL, so there is no
 // path by which a free-text post reaches the channel through this system, which
@@ -3951,8 +4045,9 @@ export const discordLinks = pgTable(
 // names the message it claims to be.
 export const discordAnnouncements = pgTable('discord_announcements', {
   id: uuid('id').primaryKey().defaultRandom(),
-  // NO `.references()`: `events` is not one of this file's tables.
-  eventId: bigint('event_id', { mode: 'bigint' }),
+  // `.references()` SINCE ADR-191: `events` is one of this file's tables now,
+  // and the FK is inline in the CREATE TABLE body. It is still not a scope.
+  eventId: bigint('event_id', { mode: 'bigint' }).references(() => events.id),
   templateCode: text('template_code').notNull(),
   channelId: text('channel_id').notNull(),
   renderedBody: text('rendered_body').notNull(),

@@ -1,12 +1,12 @@
 // =============================================================================
 // apps/api/src/events.ts
 // =============================================================================
-// THE EVENT PRODUCER: THE HALF ABOVE THE SINK, AND THE SINK ITSELF IS A PORT
-// BECAUSE THE ONE DOOR ONTO `events` IS NOT OPEN.
+// THE EVENT PRODUCER: THE HALF ABOVE THE SINK. THE SINK IS STILL A PORT AND THE
+// REASON IS NO LONGER THE SCOPE REGISTRY.
 //
 // P5 section 8's `P5-n` row says the producer "is the harder half and it is this
 // slice's subject", and it is, but not for the reason the row anticipated. The
-// hard half turned out to be that `events` IS NOT A `TableKey`. `P5-b` (session
+// hard half turned out to be that `events` WAS NOT A `TableKey`. `P5-b` (session
 // 274) was dispatched to register it, tried all five members of the scope
 // vocabulary against it, and stopped:
 //
@@ -18,19 +18,32 @@
 //                                 a column against `identities(id)`
 //   `root`                        is `identities`' alone
 //
-// "WHAT THE TABLE NEEDS IS A SIXTH CLASS" (`scope.ts`), and a sixth class is an
-// ADR on ADR-106's precedent. No ADR number is allocated to this session and
-// `packages/db` is outside its fence, so THE INSERT IS A PORT AND THE REASON IS
-// REPORTED RATHER THAN REACHED AROUND. P5 section 11 rule 10: "If `P5-a` did not
-// give you what you need, report it and stop."
+// THAT BLOCKER IS DISCHARGED AND THIS FILE IS NOT THE SLICE THAT SPENDS IT.
+// ADR-191 adds the sixth class -- `either`, one nullable identity column of its
+// own beside one nullable account column, with the predicate their disjunction
+// -- and registers `events` under it. So `events` IS a `TableKey` from that
+// entry, and every sentence in this header that said otherwise is corrected
+// above rather than left standing.
 //
-// `payout.freeze_expiring` IS THE CONCRETE SHAPE OF THAT BLOCKER AND IT IS IN
-// THE TABLE BELOW. Its catalogue payload is `{ payout_request_id, flag_id,
-// expires_at, lead_hours }`: an event about one trader's frozen payout that
-// carries NEITHER tenancy column, so both `identity_id` and `account_id` are
-// null on the row. A rule naming either column drops it. That is not a payload
-// this producer chose; it is EVENTS section 6 as folded by ADR-159, and it is
-// the counterexample any sixth class has to answer.
+// WHAT HAS NOT MOVED IS WHY THE INSERT IS A PORT. `db.ts` is "THE ONE FILE IN
+// THIS DEPLOYABLE THAT NAMES `@merit/db`" (ADR-120), no writer is composed, and
+// installing one is a slice with its own fence. A registered table removes the
+// REGISTRY's refusal and installs nothing; the sink below still refuses, and
+// refusing is still the correct outcome for a deployment with no writer.
+//
+// `payout.freeze_expiring` IS THE COUNTEREXAMPLE ADR-191 HAD TO ANSWER AND IT IS
+// ANSWERED RATHER THAN CLOSED. Its catalogue payload is `{ payout_request_id,
+// flag_id, expires_at, lead_hours }`: an event about one trader's frozen payout
+// whose PAYLOAD names neither tenancy column. ADR-191 section 9's answer is that
+// the payload and the ROW's tenancy columns are different things -- EVENTS.md
+// says `wallet.credited` carries `account_id` on the row, "resolved through
+// `reference_id` at write time", precisely because the trader timeline is a
+// per-account view -- so a producer writing neither column on a trader-subject
+// event is a PRODUCER defect and not a hole in the class. It is registered as
+// that entry's sharpest open item, because the failure is SILENT: the row
+// belongs to nobody and simply never appears in the trader's timeline. No
+// constraint on this table can catch it, which is why migration `0058` was
+// returned to the pool rather than spent on one.
 //
 // -----------------------------------------------------------------------------
 // WHY THIS FILE NAMES NO PACKAGE AND OPENS NO DOOR
@@ -580,12 +593,15 @@ function actor(
  * The insert, on THIS transaction.
  *
  * THE WHOLE OF WHAT IS BLOCKED, AND IT IS ONE METHOD. An adapter for it is
- * `tx.insert('events', envelope)` and nothing more -- except that `'events'` is
- * not a `TableKey`, because `packages/db/src/scope.ts` registers no rule for the
- * table and says at length why it cannot get one from the five classes that
- * exist. So the adapter is not written here, it is not faked here, and the
- * capability is not reached around: this file's fence is `apps/api/src/events.ts`
- * and the repair is an ADR minting a sixth scope class.
+ * `tx.insert('events', envelope)` and nothing more. THIS PARAGRAPH READ "except
+ * that `'events'` is not a `TableKey`, because `packages/db/src/scope.ts`
+ * registers no rule for the table" AND ADR-191 MADE THAT FALSE: the sixth scope
+ * class it named as the repair is `either`, it exists, and `events` is
+ * registered under it. **What is still missing is a composed WRITER**, which is
+ * a different thing and a smaller one. So the adapter is still not written here,
+ * still not faked here, and the capability is still not reached around: this
+ * file's fence is `apps/api/src/events.ts` and installing a writer is a slice
+ * with its own.
  *
  * THE TRANSACTION IS `object` AND THAT IS NOT LAZINESS. This deployable's
  * handles come from `@merit/db`, which this file may not name (ADR-120), and the
@@ -629,11 +645,12 @@ export interface EventSink {
 export class EventSinkUnwired extends Error {
   constructor() {
     super(
-      'no event writer is installed, so this deployment cannot record an event. The insert needs ' +
-        '`events` to be a TableKey and it is not: packages/db/src/scope.ts registers no rule for ' +
-        'the table, because all five scope classes were tried against it and each is either ' +
-        'refused by a mechanical assertion or silently lossy, and what it needs is a SIXTH class ' +
-        'and an ADR. Refusing is the correct outcome: the state change is inside the same ' +
+      'no event writer is installed, so this deployment cannot record an event. The reason is no ' +
+        'longer the scope registry: `events` IS a TableKey since ADR-191, which added the SIXTH ' +
+        'scope class `either` for it after all five earlier members were tried against the shape ' +
+        'and each was refused by a mechanical assertion or silently lossy. What is missing is a ' +
+        'composed WRITER, and installing one is a slice with its own fence. Refusing is the ' +
+        'correct outcome: the state change is inside the same ' +
         'transaction (ADR-006), so a sink that swallowed the event would roll the fact back with ' +
         "it, and a sink that returned quietly would commit a transition EVENTS' universal rule 1 " +
         'does not admit',
