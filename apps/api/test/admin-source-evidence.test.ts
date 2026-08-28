@@ -235,13 +235,25 @@ function flatten(document: EvidenceDocument): string {
 }
 
 // =============================================================================
-// 1. The profile vocabulary
+// 1. The profile vocabulary. ADR-179: A CLOSED SET OF TWO
 // =============================================================================
+
+/** `evidence.ts` as text, for the two properties a TYPE has no runtime shape for. */
+const EVIDENCE_TS = readFileSync(join(HERE, '..', 'src', 'admin-source', 'evidence.ts'), 'utf8');
+
+/** The members of `EvidenceRedactionProfile`, read off its declaration. */
+function declaredProfiles(): string[] {
+  const declared = /export type EvidenceRedactionProfile =([^;]+);/.exec(EVIDENCE_TS)?.[1] ?? '';
+  return [...declared.matchAll(/'([a-z-]+)'/g)].map((m) => m[1] as string).sort();
+}
 
 describe('SD-M6-04: the profile follows from the audience', () => {
   test('all four audiences have a profile and three of them share one', () => {
     // M06 section 4 and EC-071: `internal`, `counsel` and `regulator` carry full
-    // detail. The mapping is a transcription; only the two strings are chosen.
+    // detail. THE MAPPING IS A TRANSCRIPTION AND THE VOCABULARY IS A RULING, and
+    // ADR-179 clause 2 keeps them separate: a later entry that gives `regulator`
+    // its own profile changes THIS case, and the vocabulary case below is the
+    // one that then says a third name is a decision rather than a consequence.
     expect(Object.keys(EVIDENCE_REDACTION_PROFILES).sort()).toEqual(
       [...EVIDENCE_PACK_AUDIENCES].sort(),
     );
@@ -258,6 +270,167 @@ describe('SD-M6-04: the profile follows from the audience', () => {
     expect(includesDetectorDetail('trader')).toBe(false);
     for (const audience of EVIDENCE_PACK_AUDIENCES)
       if (audience !== 'trader') expect(includesDetectorDetail(audience)).toBe(true);
+  });
+});
+
+describe('ADR-179: the redaction vocabulary is CLOSED at two members', () => {
+  test('the union is still exactly two, so a third profile is a diff on this case', () => {
+    // `packages/db/test/scoped-db.test.ts`'s shape for `SystemReason`, for the
+    // same reason: a session that widens a closed vocabulary should find a case
+    // that says why it is closed rather than a paragraph nobody reads. The stake
+    // is AS-M6-01, which is permanent damage on a single occurrence, and a
+    // profile name that nothing refuses is a redaction that nothing performs.
+    expect(declaredProfiles()).toEqual(['full-detail', 'trader-facts-only']);
+  });
+
+  test('the vocabulary is DECLARED, and the map is annotated BY it rather than by `string`', () => {
+    // ADR-179 clause 2, and it is the one property in this file with no runtime
+    // shape at all. While the type read
+    // `(typeof EVIDENCE_REDACTION_PROFILES)[keyof typeof EVIDENCE_REDACTION_PROFILES]`
+    // the vocabulary was a SHADOW OF THE MAP, so `regulator: 'regulator-detail'`
+    // type-checked GREEN; it is now TS2322 twice, naming the type at the map and
+    // at `redactionProfileFor`'s return. BOTH HALVES ARE ASSERTED because either
+    // one alone leaves the hole open: a declared union that nothing is annotated
+    // by constrains nothing, and an annotated map whose type is derived from it
+    // is annotated by itself.
+    expect(EVIDENCE_TS).not.toMatch(/type EvidenceRedactionProfile =\s*\(typeof/);
+    expect(EVIDENCE_TS).toContain(
+      'satisfies Readonly<Record<EvidencePackAudience, EvidenceRedactionProfile>>',
+    );
+  });
+
+  test('the declared members and the produced members are the SAME SET, both directions', () => {
+    // NO PARALLEL ARRAY OF THE NAMES IS DECLARED ANYWHERE, on ADR-092's
+    // `DDL_NAMES` landmine: a `readonly EvidenceRedactionProfile[]` beside the
+    // union catches a member the union does not have and NEVER a union member
+    // the array is missing, which is how `DDL_NAMES` went one short of
+    // `SQL_NAME` with the suite green. So totality is asserted here, between the
+    // declaration and its one consumer, in both directions at once.
+    //
+    // A DECLARED MEMBER NO AUDIENCE PRODUCES IS THE SAME DEFECT SEEN FROM THE
+    // OTHER SIDE: a name a row may legally carry and that no code in this tree
+    // performs.
+    expect([...new Set(Object.values(EVIDENCE_REDACTION_PROFILES))].sort()).toEqual(
+      declaredProfiles(),
+    );
+  });
+});
+
+// =============================================================================
+// 1b. ADR-179 clause 3: WHAT EACH MEMBER PROMISES, asserted as a WHOLE
+// =============================================================================
+//
+// THE POSITIVES AND NEGATIVES BELOW ARE ASSERTED ONE AT A TIME AND THAT LEAVES A
+// HOLE THIS SECTION CLOSES. Sections 2 and 4 assert that named fields are present
+// and that named fields are absent; neither asserts that the carried set is
+// EXACTLY the promise. Adding `'detector'` to `TRADER_FLAG_FIELDS` ships the name
+// of the detector that found the flag -- internal tier always, per ADR-022 -- and
+// it was seeded against the 155 cases that existed before this section and CAUGHT
+// BY NOTHING. A promise is a set, so it is asserted as a set.
+
+describe('ADR-179 clause 3: `trader-facts-only` carries exactly what it promises', () => {
+  const document = documentFor('trader');
+
+  test('the flag carries the FIVE promised fields and no sixth', () => {
+    // M06 section 4: "the fact that a flag exists with its type and its ToS
+    // clause". A sixth field is a widening of the promise whatever it is, and
+    // the four absent ones are absent for four different reasons: `evidence` is
+    // the bag AS-M6-01 is written about, `severity` is the queue ordering, and
+    // `detector` and `detector_version` name the machinery.
+    expect(Object.keys(document.flags[0] ?? {}).sort()).toEqual([
+      'first_detected_on',
+      'flag_id',
+      'flag_type',
+      'status',
+      'tos_clause',
+    ]);
+  });
+
+  test('the document carries the promised sections and no others', () => {
+    // A section added to a trader pack is a channel nobody argued for, and a
+    // section dropped is GS-112's positive half lost. Both are this one case.
+    expect(Object.keys(document).sort()).toEqual([
+      'account',
+      'fills',
+      'flags',
+      'identity',
+      'marks',
+      'pack',
+      'plan_version',
+      'rule_states',
+    ]);
+  });
+
+  test('no comparison against a population, which is the FOURTH negative', () => {
+    // GS-112's own line names three negatives. M06 section 4, EC-071 and the
+    // wave 3 batch 1 gate closure each name a fourth: "no comparison against a
+    // population", the closure putting "population comparisons" at internal and
+    // counsel tier with the thresholds. The promise is the UNION of the three
+    // statements, so the fourth negative is asserted under its own name.
+    //
+    // IT IS CARRIED BY THE ALLOWLIST AND NOT BY THE SWEEP: a population
+    // comparison is a NAME nobody registered, so no strip list reaches it. What
+    // keeps it out is that it can only arrive in the `evidence` bag or a
+    // `detectors` section, and the trader projection admits neither.
+    const compared = documentFor(
+      'trader',
+      subjectOf({
+        flags: [
+          {
+            ...FLAG,
+            evidence: { percentile_rank_bp: 9900, cohort_accounts: 4000, cohort_median_bp: 120 },
+          },
+        ],
+      }),
+    );
+    const bytes = flatten(compared);
+    expect(bytes).not.toContain('percentile_rank_bp');
+    expect(bytes).not.toContain('cohort_accounts');
+    expect(bytes).not.toContain('cohort_median_bp');
+    expect(compared.flags[0]).not.toHaveProperty('evidence');
+  });
+
+  test('the pack row records the profile and the derived boolean together', () => {
+    expect(document.pack.redaction_profile).toBe('trader-facts-only');
+    expect(document.pack.includes_detector_detail).toBe(false);
+  });
+});
+
+describe('ADR-179 clause 3: `full-detail` strips nothing and bounds DETAIL, not SCOPE', () => {
+  const document = documentFor('internal');
+
+  test('the flag carries the WHOLE record, derived from the record rather than restated', () => {
+    // `FULL_FLAG_FIELDS` is the trader allowlist plus the six it withholds, and
+    // the promise is "everything". So the expectation is the fixture record's
+    // own key set: a field added to `EvidenceFlagRecord` and forgotten in the
+    // full projection fails here rather than shipping a pack that quietly
+    // withholds something from the audience promised everything.
+    expect(Object.keys(document.flags[0] ?? {}).sort()).toEqual(Object.keys(FLAG).sort());
+  });
+
+  test('the document carries the promised sections plus the detector registry', () => {
+    expect(Object.keys(document).sort()).toEqual([
+      'account',
+      'detectors',
+      'fills',
+      'flags',
+      'identity',
+      'marks',
+      'pack',
+      'plan_version',
+      'rule_states',
+    ]);
+  });
+
+  test('it is ONE account, which is the half the name does not say', () => {
+    // `full-detail` bounds the detail and never the scope. Every row in the
+    // document is the requested account's, and `exportEvidence` refuses a read
+    // port that answers with a different one (section 8's case). Asserted here
+    // because a reader of the NAME is likeliest to get this wrong.
+    expect(document.pack.account_id).toBe(SUBJECT_ACCOUNT);
+    expect(document.account['id']).toBe(SUBJECT_ACCOUNT);
+    for (const fill of document.fills) expect(fill['account_id']).toBe(SUBJECT_ACCOUNT);
+    for (const state of document.rule_states) expect(state['account_id']).toBe(SUBJECT_ACCOUNT);
   });
 });
 
