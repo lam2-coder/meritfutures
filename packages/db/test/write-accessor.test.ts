@@ -445,16 +445,26 @@ describe('a caller never names the tenancy column', () => {
     // column hands the row to somebody else AFTER the predicate agreed to it,
     // and `derived` is the class where this is least visible: the column being
     // moved is a foreign key, not an identity.
+    //
+    // IT READS THE PLURAL SINCE ADR-191 AND THAT IS STRICTLY STRONGER. It read
+    // `tenancyColumn` and asserted the singular was defined, which is a
+    // statement no longer true of every scoped table: an `either` row has TWO
+    // tenancy columns, so the singular reader refuses to guess and returns
+    // `undefined` exactly as it does for a `pair`. Over the plural the
+    // one-column classes are unchanged and `events` is checked on BOTH legs,
+    // which is what `refuseTenancyColumn` actually refuses.
     for (const key of SCOPED_KEYS) {
-      const sqlName = tenancyColumn(key);
-      expect(sqlName, `${key} is not firm, so it has a tenancy column`).toBeDefined();
-      const { source, conn } = { ...recording(), ...recordingConn() };
-      await expect(
-        scopedTx(source, conn, IDENTITY).updateAt(key, scopedAddress(key), {
-          [sqlName as string]: OTHER,
-        }),
-        key,
-      ).rejects.toThrow(/tenancy column/);
+      const columns = tenancyColumns(key);
+      expect(columns.length, `${key} is not firm, so it has a tenancy column`).toBeGreaterThan(0);
+      for (const sqlName of columns) {
+        const { source, conn } = { ...recording(), ...recordingConn() };
+        await expect(
+          scopedTx(source, conn, IDENTITY).updateAt(key, scopedAddress(key), {
+            [sqlName]: OTHER,
+          }),
+          `${key}.${sqlName}`,
+        ).rejects.toThrow(/tenancy column/);
+      }
     }
   });
 
@@ -489,7 +499,12 @@ describe('the tenancy reader reads something', () => {
       if (SCOPE_RULES[key].class === 'firm') {
         expect(columns, key).toEqual([]);
         expect(single, key).toBeUndefined();
-      } else if (SCOPE_RULES[key].class === 'pair') {
+      } else if (SCOPE_RULES[key].class === 'pair' || SCOPE_RULES[key].class === 'either') {
+        // FOUR ANSWERS AND NOT THREE, since ADR-191, AND THE TWO TWOS ARE NOT
+        // THE SAME TWO. A `pair` row's columns are two halves of one answer and
+        // an `either` row's are two answers of which the row uses one, so the
+        // singular reader returns `undefined` here for a THIRD distinct reason.
+        // What it must never do is pick one, which is what this branch pins.
         expect(columns.length, key).toBe(2);
         expect(columns[0], key).not.toBe(columns[1]);
         expect(
@@ -509,19 +524,24 @@ describe('the tenancy reader reads something', () => {
     // name only, which `scoped-db.test.ts` already binds to the DDL against a
     // hand-written map; what is checked here is the COLUMN, which no other
     // assertion in this package reads out of the SQL for this purpose.
+    //
+    // THE PLURAL SINCE ADR-191, for the reason above: an `either` table has two
+    // tenancy columns and BOTH have to be in the DDL, so reading the singular
+    // here would have read `undefined` for `events` rather than checking it.
     for (const key of SCOPED_KEYS) {
       const table = getTableName(TABLES[key] as PgTable);
-      const column = tenancyColumn(key) as string;
-      const declared = new RegExp(
-        `(CREATE TABLE ${table}\\s*\\([\\s\\S]*?\\n\\);|ALTER TABLE ${table}[\\s\\S]*?;)`,
-        'gi',
-      );
-      const bodies = ALL_SQL.match(declared) ?? [];
-      expect(bodies.length, `${table} is declared somewhere in migrations/`).toBeGreaterThan(0);
-      const found = bodies.some((body) =>
-        new RegExp(`(^|[\\s(,])${column}\\s`, 'i').test(body.replace(/--[^\n]*/g, '')),
-      );
-      expect(found, `${table}.${column} is declared in the DDL`).toBe(true);
+      for (const column of tenancyColumns(key)) {
+        const declared = new RegExp(
+          `(CREATE TABLE ${table}\\s*\\([\\s\\S]*?\\n\\);|ALTER TABLE ${table}[\\s\\S]*?;)`,
+          'gi',
+        );
+        const bodies = ALL_SQL.match(declared) ?? [];
+        expect(bodies.length, `${table} is declared somewhere in migrations/`).toBeGreaterThan(0);
+        const found = bodies.some((body) =>
+          new RegExp(`(^|[\\s(,])${column}\\s`, 'i').test(body.replace(/--[^\n]*/g, '')),
+        );
+        expect(found, `${table}.${column} is declared in the DDL`).toBe(true);
+      }
     }
   });
 });

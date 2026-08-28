@@ -45,6 +45,7 @@ import {
   gte,
   isNull as isNullColumn,
   lte,
+  or,
   sql,
   type SQL,
 } from 'drizzle-orm';
@@ -148,6 +149,56 @@ export function scopePredicate(key: TableKey, identityId: IdentityId): SQL {
             ),
           ),
       );
+    }
+
+    case 'either': {
+      // THE DISJUNCTION, AND IT IS THE RULING RATHER THAN A CONVENIENCE
+      // (ADR-191). The row reaches an identity through its OWN nullable identity
+      // column OR through a nullable foreign key to a row that carries one, and
+      // which of the two is a fact about the ROW. Serving one leg drops the
+      // other half of the table in silence, which is the `owned` failure with a
+      // new name.
+      //
+      // A ROW REACHING NEITHER LEG FALLS OUT WITH NO THIRD PREDICATE. SQL NULL
+      // never equals anything, so the equality drops the firm rows and the
+      // EXISTS drops them again. Adding `IS NOT NULL` here would look careful
+      // and assert nothing, which is `ledger_accounts`' sentence one class over.
+      //
+      // NO PRECEDENCE BETWEEN THE LEGS. Guarding the EXISTS with
+      // `identity_id IS NULL` would stop a row ever reaching two identity uuids,
+      // and it is refused: the rows on which the legs disagree are the rows a
+      // HARD MERGE produces, where the two uuids are ONE PERSON, and the guard
+      // would hide a merged person's account-level history from the survivor.
+      // The `EitherRule` docblock carries the argument.
+      const via = TABLES[rule.via] as PgTable;
+      const disjunction = or(
+        eq(columnByName(table, rule.column), identityId),
+        exists(
+          new QueryBuilder()
+            .select({ one: sql`1` })
+            .from(via)
+            .where(
+              and(
+                eq(columnByName(via, rule.foreignColumn), columnByName(table, rule.localColumn)),
+                scopePredicate(rule.via, identityId),
+              ),
+            ),
+        ),
+      );
+      // REFUSED RATHER THAN CAST. `or` is typed `SQL | undefined` because it
+      // returns `undefined` when EVERY argument is, which cannot happen here:
+      // both legs are constructed on the two lines above. A cast would say the
+      // same thing and say it in the one direction that is silent if it ever
+      // stops being true -- an unscoped read, which is what this file exists to
+      // make impossible.
+      if (disjunction === undefined) {
+        throw new Error(
+          `${key} is registered "either" and its disjunction constructed no predicate. ` +
+            'A scoped read with no predicate is an unscoped read. The registry and this ' +
+            'builder have drifted.',
+        );
+      }
+      return disjunction;
     }
 
     case 'pair':
@@ -344,6 +395,15 @@ export function tenancyColumns(key: TableKey): readonly string[] {
     case 'pair':
       // BOTH, and neither is more the tenancy than the other. ADR-106.
       return [rule.columnA, rule.columnB];
+    case 'either':
+      // BOTH, and for a REASON THE `pair` CASE DOES NOT HAVE (ADR-191). A pair
+      // row's two columns are two halves of one answer; an `either` row's two
+      // are two answers of which the row uses one. Re-pointing EITHER moves the
+      // row: `identity_id` moves it directly, and `account_id` moves it into
+      // whichever identity owns the account it is repointed at. `events` is
+      // APPEND-ONLY by 0017's own comment, so both are refused to `systemTx`'s
+      // `update` and neither is reachable through `scopedTx` at all.
+      return [rule.column, rule.localColumn];
     case 'firm':
       return [];
   }
@@ -937,6 +997,15 @@ function refuseUnaddressed(
  * narrowing is an `EXISTS` over ANOTHER table; it bounds which rows of this one
  * qualify and pins no column of this row to a value, so it cannot complete a
  * unique key. `pair` is unreachable through `scopedTx` at all.
+ *
+ * `either` CONTRIBUTES NOTHING EITHER, AND IT IS THE ONE CLASS WHERE THAT LOOKS
+ * WRONG (ADR-191). Its predicate names this row's own identity column in an
+ * equality, which is exactly the shape `owned` contributes from -- and it is
+ * one arm of a DISJUNCTION, so a row satisfying the other arm carries NULL
+ * there. The handle therefore fixes that column to no value at all, and
+ * counting it toward a unique key would let an address be "complete" while
+ * naming a column the matched row does not carry. A rule for this class must
+ * read the predicate's SHAPE and never the presence of a column name in it.
  */
 function handlePinnedColumns(key: ScopedTableKey): readonly string[] {
   const rule = SCOPE_RULES[key];
@@ -1587,7 +1656,9 @@ export async function insertUnderStatement(
     throw new Error(
       `${key} is registered "${rule.class}" and insertUnder proves a PARENT. An owned or root ` +
         'row carries its own tenancy column, which `insert` stamps; a firm or pair row has no ' +
-        'parent to prove. The registry moved and this list did not follow it.',
+        'parent to prove; an either row has one through a NULLABLE edge, so proving it ' +
+        'establishes tenancy for the rows that have a parent and nothing about the rows that ' +
+        'reach an identity the other way. The registry moved and this list did not follow it.',
     );
   }
   if (rule.traversal !== 'hop') {
