@@ -17,9 +17,14 @@
 // no producible source* are two claims ADR-199 correctly separates; *the figure is
 // derivable* and *this tree can read it today* are a THIRD pair, and they come
 // apart on two of the same three figures. `src/admin-source/liability.ts` now
-// produces 27 of `LiabilityResponse`'s 40 leaf paths from live rows. The other 13
-// are FIVE blockers, none of them a column, and the last section of this file
-// holds each with its own clearing condition.
+// produces 27 of `LiabilityResponse`'s 39 leaf paths from live rows, and the
+// arithmetic is checked in `admin-source-liability-book.test.ts` rather than
+// asserted here. **THE PRODUCED COUNT DID NOT MOVE WHEN `ADR-203` LANDED AND THE
+// DECLARED COUNT DID**: two groups became nullable containers, so `RI-18`'s
+// reader stopped walking into seven object members and started reporting two
+// leaves plus `gaps`' four. The other 12 are FIVE blockers holding 8 and an empty
+// `gaps` array standing over 4, none of them a column, and the last section of
+// this file holds each blocker with its own clearing condition.
 //
 // **B1 LIFTED AND THE COUNT DID NOT MOVE, WHICH IS SESSION 380's FINDING AND IS
 // WHY B5 IS AT THE BOTTOM OF THIS FILE.** `trading_calendar` is a `TableKey` now
@@ -377,12 +382,15 @@ describe('the keys this method would take are already reachable', () => {
 // SESSION 374's MEASUREMENT, IN THE FORM SESSION 363 CHOSE FOR ITS OWN. ADR-199
 // ruled three figures DERIVABLE and it is right about all three; what it did not
 // rule is that they are READABLE, and for two of the three it says so in its own
-// words. These four are what stands between `src/admin-source/liability.ts`,
-// which produces 27 of the response's 40 leaf paths from live rows, and
-// `AdminReadSource.readLiability`, which needs all 40.
+// words. These are what stands between `src/admin-source/liability.ts`, which
+// produces 27 of the response's 39 leaf paths from live rows, and
+// `AdminReadSource.readLiability`, which needs all of them.
 //
 // NOT ONE OF THEM IS A COLUMN, so no migration number clears any of them and
-// `0062` stays returned. Two are RULINGS owed and two are absences of a fact
+// `0062` stays returned. **BOTH RULINGS OWED HAVE NOW LANDED** -- `ADR-201` the
+// window, `ADR-202` and `ADR-203` the absence and its wire shape -- and a ruling
+// makes a figure SAYABLE and never PRODUCED, so B2 and B3 stay below with their
+// conditions restated rather than deleted. The other two are absences of a fact
 // nothing in this estate records.
 // =============================================================================
 
@@ -609,7 +617,7 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   });
 });
 
-describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose WIRE still blocks it', () => {
+describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose wire ADR-203 opened', () => {
   it('has the 2.5x threshold stated in FOUR documents, which is one more than this case read', () => {
     // MERIT_BUILD_MASTER_PROMPT is the constitution and INFRA is what pages on
     // it, so this is a control with an operator attached rather than a chart.
@@ -674,7 +682,7 @@ describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose WIRE
     expect(lines[0]?.trim().startsWith('payout_velocity: {')).toBe(true);
   });
 
-  it('has ALL FOUR leaves producible now, and the group is blocked on the WIRE instead', () => {
+  it('has ALL FOUR leaves producible AND a wire that can decline them, so only the COMPOSITION is left', () => {
     // WHEN THIS CASE WAS WRITTEN the numerator was producible and the
     // denominator had no definition, so one leaf of four was reachable and the
     // group was not. **ADR-201 supplied the definition and session 383 built
@@ -682,16 +690,32 @@ describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose WIRE
     // `evaluatePayoutVelocity` over these same columns, executed against a live
     // PostgreSQL.
     //
-    // THE CASE IS INVERTED RATHER THAN DELETED, because the group is still not
-    // on the book and the reason MOVED rather than lifted: the evaluator answers
-    // THREE ways -- evaluated, exhausted, uncovered -- and `LiabilityResponse`
-    // carries ONE. `ratio_bp` is a non-nullable number and `alarm` a
-    // non-nullable boolean, so an uncovered calendar would have to be rendered
-    // `0 / false`, which is indistinguishable from a quiet week. That is
-    // ADR-201 finding 3's gap with a pager attached.
+    // **THE CASE IS INVERTED A SECOND TIME AND THE FIRST INVERSION STANDS.** Its
+    // condition read: "the wire gains a shape for 'there is no window', which is
+    // a change to a response `RI-18` binds in three copies." `ADR-203` is that
+    // change and the three copies moved together, which is why it was one slice.
     //
-    // CLEARING CONDITION: the wire gains a shape for "there is no window", which
-    // is a change to a response `RI-18` binds in three copies.
+    // THE REASON MOVED RATHER THAN LIFTED, FOR THE SECOND TIME, AND THE COUNT IS
+    // HONEST ABOUT IT. The evaluator answers THREE ways -- evaluated, exhausted,
+    // uncovered -- and `LiabilityResponse` carried ONE; it carries three now,
+    // because `payout_velocity` may be `null` and `gaps` says which of the two
+    // absences it is. An uncovered calendar is no longer `0 / false` and no
+    // longer reads as a quiet week, which was ADR-201 finding 3's gap with a
+    // pager attached.
+    //
+    // WHAT IS LEFT IS THE COMPOSITION AND IT IS NOT THIS ENTRY'S. `readLiability`
+    // stays out of `IMPLEMENTED_ADMIN_READS` on B4 and B5, so nothing calls this
+    // evaluator on a served path yet. **A SHAPE THAT CAN CARRY AN ANSWER IS NOT
+    // AN ANSWER**, and a case that stopped asserting the leaves are producible
+    // would lose the half ADR-201 and session 383 actually bought.
+    //
+    // CLEARING CONDITION, RESTATED: `IMPLEMENTED_ADMIN_READS` contains
+    // `readLiability`.
+    const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
+    expect(contract).toContain(
+      'payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean } | null',
+    );
+    expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');
     const columns = migrationColumnNames();
     expect(columns).toContain('amount_cents');
     expect(columns).toContain('settled_at');
@@ -706,7 +730,7 @@ describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose WIRE
   });
 });
 
-describe('blocker B3: per_plan[].cusum, ruled ABSENT with no wire shape for absence', () => {
+describe('blocker B3: per_plan[].cusum, ruled ABSENT and given a wire shape for absence by ADR-203', () => {
   it('has ADR-167 clause 5 rendering it absent until DEP-M6-05, in those words', () => {
     const adr = readFileSync(join(ROOT, 'docs/decisions/ADR-167.md'), 'utf8');
     expect(adr).toContain('renders `per_plan[].cusum` as ABSENT until `DEP-M6-05` lands');
@@ -716,25 +740,40 @@ describe('blocker B3: per_plan[].cusum, ruled ABSENT with no wire shape for abse
     expect(adr).toContain("the wire shape is `P7-b`'s to carry");
   });
 
-  it('has all three copies of the response typing cusum REQUIRED, so there is no absent form', () => {
-    // THE TWO RULINGS ARE EACH RIGHT ALONE AND THEIR CONJUNCTION IS EMPTY, which
-    // is session 366's shape on `assertPayloadRules` arriving on a different
-    // pair. ADR-188 landed `cusum` on the wire as a required object of two
-    // numbers and a boolean; ADR-167 clause 5 rules the field absent. The only
-    // two ways to answer are to manufacture a statistic clause 5 refuses, or to
-    // change a shape `RI-18` binds in three copies -- which is another slice's
-    // and is reported rather than taken.
+  it('has all three copies of the response typing cusum NULLABLE, which is the absent form arriving', () => {
+    // **THE CLEARING CONDITION FIRED AND THIS CASE IS INVERTED IN THE DIFF THAT
+    // FIRED IT.** It read: "either half -- the calibration landing, or the shape
+    // gaining an absent form." The calibration did not land; `DEP-M6-05` is
+    // still M06 Wave 4. THE SHAPE MOVED. `ADR-202` ruled which of the two rules
+    // yields and what form the yield takes, and `ADR-203` is the transcription,
+    // in one diff across three declarations because `RI-18` makes it atomic.
     //
-    // THE CLEARING CONDITION IS EITHER HALF: the calibration landing, or the
-    // shape gaining an absent form.
+    // WHAT THE CASE HOLDS NOW IS THE PROPERTY WORTH HOLDING AFTER THE RULING,
+    // and it is not "the shape is nullable" alone. It is that the absence sits
+    // at the OBJECT and never at a member: `{ statistic: null, threshold: 4,
+    // alarm: false }` is a half-calibrated chart, a shape nothing in the corpus
+    // describes, and `ADR-202` ruling 3's second refusal. So the three member
+    // names must still be spelled non-nullable in all three copies.
+    //
+    // AND `cusum?:` STAYS REFUSED, which the original case asserted and which
+    // survives the inversion unchanged: an omitted key makes "absent, blocked on
+    // DEP-M6-05" and "this deployment did not fill the field" the same response.
     const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
-    expect(contract).toContain('cusum: { statistic: number; threshold: number; alarm: boolean }');
+    expect(contract).toContain(
+      'cusum: { statistic: number; threshold: number; alarm: boolean } | null',
+    );
     for (const rel of ['apps/api/src/routes/admin-reads.ts', 'apps/admin/src/api/types.ts']) {
       const body = readFileSync(join(ROOT, rel), 'utf8');
-      expect(body).toMatch(/readonly cusum: \{/);
-      expect(body).not.toMatch(/readonly cusum\?: /);
-      expect(body).not.toMatch(/readonly cusum: \{[^}]*\} \| null/);
+      expect(body, rel).toMatch(/readonly cusum: \{[\s\S]*?\} \| null;/);
+      expect(body, rel).not.toMatch(/readonly cusum\?: /);
+      for (const member of ['statistic', 'threshold', 'alarm'])
+        expect(body, `${rel} ${member}`).not.toContain(`readonly ${member}: number | null`);
     }
+    // THE CALIBRATION STILL HAS NOT LANDED, which is what makes the null the
+    // value this field actually takes rather than a form nobody reaches.
+    expect(readFileSync(join(ROOT, 'docs/decisions/ADR-167.md'), 'utf8')).toContain(
+      'renders `per_plan[].cusum` as ABSENT until `DEP-M6-05` lands',
+    );
   });
 
   it('has the CALIBRATION in Wave 4 and not in any migration, which is not a column', () => {

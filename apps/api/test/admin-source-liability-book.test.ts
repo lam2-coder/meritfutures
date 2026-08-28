@@ -604,11 +604,20 @@ function leavesOf(value: unknown, prefix = ''): readonly string[] {
 }
 
 /**
- * The twelve leaves the four blockers hold, as data.
+ * The leaves the blockers hold, as data.
  *
  * WRITTEN OUT RATHER THAN COMPUTED, because this list is the session's CLAIM and
  * the case below is what checks it against the contract. A claim derived from
  * the thing it is checked against proves nothing.
+ *
+ * **`ADR-203` MOVED TWO ENTRIES FROM SEVEN LEAVES TO TWO AND THE BLOCKERS DID
+ * NOT MOVE AT ALL, WHICH IS THE POINT OF THAT RULING RATHER THAN A SIDE EFFECT.**
+ * `payout_velocity` and `per_plan[].cusum` are `| null` now, and `RI-18`'s reader
+ * does not walk into a union arm, so the contract declares each as ONE leaf where
+ * it declared four and three. The figures are exactly as absent as they were
+ * yesterday; what changed is that the response can now SAY SO. A census that
+ * still listed the seven would be asserting the absence of members of an object
+ * this response no longer promises.
  */
 const BLOCKED_LEAVES = [
   // B5, and it was B1 UNTIL SESSION 377 REGISTERED THE CALENDAR. B1 was the
@@ -622,21 +631,46 @@ const BLOCKED_LEAVES = [
   'eligible_next_7d.by_day[].trading_day',
   'eligible_next_7d.by_day[].cents',
   'eligible_next_7d.by_day[].accounts',
-  // B2, LIFTED BY ADR-201 WHILE THIS BRANCH WAS OPEN AND STILL BLOCKED HERE.
-  // Ruling 2 defines `avg_30d_cents` as the trailing thirty-day settled total
-  // scaled to seven days and ruling 6 answers the empty denominator, so the
-  // blocker is gone and the FOLD IS UNWRITTEN. That is B1's shape exactly, and
-  // it is why this list is what is PRODUCED and never what is PERMITTED.
-  'payout_velocity.last_7d_cents',
-  'payout_velocity.avg_30d_cents',
-  'payout_velocity.ratio_bp',
-  'payout_velocity.alarm',
-  // B3: DEP-M6-05's calibration, and ADR-167 clause 5.
-  'per_plan[].cusum.statistic',
-  'per_plan[].cusum.threshold',
-  'per_plan[].cusum.alarm',
+  // B2, AND IT IS ONE LEAF NOW BECAUSE `ADR-203` MADE THE GROUP NULLABLE.
+  // ADR-201 ruling 2 defined `avg_30d_cents` and session 383 built
+  // `evaluatePayoutVelocity`, so all four numbers are producible; what held the
+  // group was that the evaluator answers THREE ways and the wire carried ONE.
+  // The wire carries three now. What is still unwritten is the composition:
+  // `readLiability` does not call the evaluator, which is B4 and B5's business
+  // rather than this ruling's, so the group is PRODUCED BY NOTHING and stays
+  // here. This list is what is produced and never what is permitted.
+  'payout_velocity',
+  // B3: DEP-M6-05's calibration, ADR-167 clause 5, and `ADR-202` ruling 3 is
+  // the form. One leaf, because the absence is a property of the CALIBRATION
+  // and not of the three members, which is that ruling's own second refusal.
+  'per_plan[].cusum',
   // B4: nothing records a reconciliation RUN.
   'integrations.recon.last_run_at',
+] as const;
+
+/**
+ * The four leaves that are DECLARED, PRODUCIBLE, AND ABSENT FROM THE PRODUCED
+ * VALUE FOR A THIRD REASON, which `ADR-203` created and which is worth its own
+ * list rather than being folded into the one above.
+ *
+ * `gaps` is `[]` on this book, and {@link leavesOf} cannot walk an empty array:
+ * there is no element to descend into. So these four are missing from the
+ * produced set WITHOUT being blocked by anything. Nothing in the estate is
+ * waiting on them.
+ *
+ * **AND THE REASON THE ARRAY IS EMPTY IS THE FINDING RATHER THAN THE COST.**
+ * `LiabilityBook` says a figure is absent by OMITTING the group, which is what
+ * its `Omit` list is; `LiabilityResponse` now says it by NULLING the field and
+ * naming it in `gaps`. Those are two spellings of one fact, and a book that
+ * still speaks the first cannot be served as the second. That is the same
+ * sentence as `IMPLEMENTED_ADMIN_READS` not containing `readLiability`, arriving
+ * in the arithmetic.
+ */
+const EMPTY_ARRAY_LEAVES = [
+  'gaps[].field',
+  'gaps[].cause',
+  'gaps[].awaiting',
+  'gaps[].detail',
 ] as const;
 
 describe('the subtraction this whole slice measures', () => {
@@ -652,19 +686,29 @@ describe('the subtraction this whole slice measures', () => {
     expect(declared.length).toBeGreaterThan(30);
 
     expect(produced).toStrictEqual(
-      [...declared.filter((path) => !BLOCKED_LEAVES.includes(path as never))].sort(),
+      [
+        ...declared.filter(
+          (path) =>
+            !BLOCKED_LEAVES.includes(path as never) && !EMPTY_ARRAY_LEAVES.includes(path as never),
+        ),
+      ].sort(),
     );
   });
 
-  it('holds 13 blocked leaves against 40 declared, so 27 are produced', async () => {
-    // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY. `payout_velocity`
-    // loses all four of its leaves and not three: its NUMERATOR is producible and
-    // the group is not, because three of the four depend on a window no document
-    // states.
+  it('holds 8 blocked leaves and 4 empty-array leaves against 39 declared, so 27 are produced', async () => {
+    // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY, which
+    // matters more after `ADR-203` than before it: three of the four moved and
+    // the produced count did not. 40 declared became 39 (seven object members
+    // out, two nullable containers and four `gaps` members in), 13 blocked
+    // became 8, and 27 PRODUCED IS UNCHANGED. That last equality is the claim
+    // worth holding. A wire shape that could say "absent" was added to this
+    // response and NOT ONE FIGURE became more or less available because of it,
+    // which is what it means for a shape ruling to be a shape ruling.
     const declared = await contractLeaves();
-    expect(declared).toHaveLength(40);
-    expect(BLOCKED_LEAVES).toHaveLength(13);
-    for (const leaf of BLOCKED_LEAVES) expect(declared).toContain(leaf);
+    expect(declared).toHaveLength(39);
+    expect(BLOCKED_LEAVES).toHaveLength(8);
+    expect(EMPTY_ARRAY_LEAVES).toHaveLength(4);
+    for (const leaf of [...BLOCKED_LEAVES, ...EMPTY_ARRAY_LEAVES]) expect(declared).toContain(leaf);
     const { result } = await read();
     expect(leavesOf(result?.book)).toHaveLength(27);
   });
