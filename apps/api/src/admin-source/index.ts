@@ -33,8 +33,8 @@
 // hold, which the `Pick` cannot until all seven methods exist.
 //
 // SO THE TWO FUNCTIONS HAVE DIFFERENT NAMES AND DIFFERENT JOBS.
-// `composeImplementedAdminReads` composes the two backend-read methods under the
-// compile-time guarantee. `composeAdminReadSource` assembles whatever parts a
+// `composeImplementedAdminReads` composes the backend-read methods this
+// directory implements under the compile-time guarantee. `composeAdminReadSource` assembles whatever parts a
 // deployment has into the full port. A deployment uses both.
 //
 // THE RENAME IS THE ONLY BEHAVIOURAL EDIT IN THIS RESOLUTION. Both sides shipped
@@ -91,7 +91,7 @@
 // Three lines, all of them appends to sorted lists:
 //
 //   1. `& EvidenceTx` on {@link AdminSourceTx}, so the handle carries that
-//      module's tables.
+//      module's tables. `& EventsTx` is that line, written by session 356.
 //   2. its method name in {@link IMPLEMENTED_ADMIN_READS}.
 //   3. its one arm in the object {@link composeAdminReadSource} returns.
 //
@@ -100,10 +100,11 @@
 // -----------------------------------------------------------------------------
 // THIS COMPOSES A PARTIAL PORT AND SAYS SO, WHICH IS WHY NOTHING WIRES IT
 // -----------------------------------------------------------------------------
-// `AdminReadSource` has SEVEN methods since ADR-184 ruling 1. This directory
-// implements TWO. There is therefore no value in this tree that satisfies the
-// port, `start.ts` calls no setter, and `setAdminReadSource` stays in
-// `test/wiring.test.ts`'s `BLOCKED` list with the triple unchanged.
+// `AdminReadSource` has SEVEN methods since ADR-184 ruling 1 and this directory
+// implements FOUR, which {@link IMPLEMENTED_ADMIN_READS} states as data rather
+// than this sentence stating it as prose. There is still no value in this tree
+// that satisfies the port, `start.ts` calls no setter, and `setAdminReadSource`
+// stays in `test/wiring.test.ts`'s `BLOCKED` list with the triple unchanged.
 //
 // **A METHOD IS NOT A PORT, WHICH IS WHY THE TRIPLE DOES NOT MOVE.**
 // `wiring.test.ts` counts `^export function (use|set)X(` in `src/routes/`, and
@@ -114,17 +115,17 @@
 // **THAT ENTRY'S STATED REASON IS NARROWED BY THIS SLICE AND IS NOT RETIRED BY
 // IT, AND THE DIFFERENCE MATTERS.** The reason reads: "A READ SHAPE, and the door
 // second ... None of the six methods is a projection of one table ... A live
-// adapter today would have to reach `sqlExecutor`". For `listFlags` and
-// `readIdentityGraph` that is now MEASURED FALSE: both are keyed reads plus
-// ordinary code, neither reaches the executor, and `flags.ts` and `graph.ts` are
-// the demonstration. For `readLiability` it still stands in full, and the
-// remaining three are unwritten. **The entry is `wiring.test.ts`'s, session 316
-// holds that file this wave, and this slice reports the narrowing rather than
-// editing it.**
+// adapter today would have to reach `sqlExecutor`". For `listFlags`,
+// `readIdentityGraph` and now `listEvents` that is MEASURED FALSE: all three are
+// keyed reads plus ordinary code, none reaches the executor, and `flags.ts`,
+// `graph.ts` and `events.ts` are the demonstration. For `readLiability` it still
+// stands in full. **The entry is `wiring.test.ts`'s, and this directory reports
+// the narrowing rather than editing it.**
 //
-// **`listEvents` IS THE THIRD INSTANCE AND IT IS REPORTED THE SAME WAY.**
-// ADR-184 section 3 measures it: the feed is a keyed range read over ONE table,
-// so "none of the six methods is a projection of one table" is false for it too.
+// **`listEvents` IS THE THIRD INSTANCE AND IT IS NOW WRITTEN RATHER THAN ONLY
+// PREDICTED.** ADR-184 section 3 measured it as a keyed range read over ONE
+// table, sessions 349 and 353 measured that the table was not a `TableKey`, and
+// ADR-191 registered it. `events.ts` is that prediction executed.
 // That entry now says `six` where the port declares seven, and BOTH halves of it
 // are the wiring slice's to repair, not this one's: the triple does not move,
 // so `test/wiring.test.ts` is outside this fence and reporting is the whole of
@@ -146,8 +147,12 @@
 // accessor and this directory takes none.
 // =============================================================================
 
+import { readAccountDetail } from './account.ts';
+import { readEventFeed } from './events.ts';
 import { readFlagQueue } from './flags.ts';
 import { DEFAULT_GRAPH_LIMITS, readIdentityGraph } from './graph.ts';
+import type { AccountTx } from './account.ts';
+import type { EventsTx } from './events.ts';
 import type { FlagsTx } from './flags.ts';
 import type { GraphLimits, GraphTx } from './graph.ts';
 import type { AdminReadSource } from '../routes/admin-reads.ts';
@@ -160,7 +165,7 @@ import type { AdminReadSource } from '../routes/admin-reads.ts';
  * satisfies it structurally, and because every arm of the intersection is
  * read-only, so is this.
  */
-export type AdminSourceTx = FlagsTx & GraphTx;
+export type AdminSourceTx = AccountTx & EventsTx & FlagsTx & GraphTx;
 
 /**
  * The unit of work this directory cannot open for itself.
@@ -190,7 +195,12 @@ export interface AdminSourceOptions {
  * SORTED, AND APPEND-ONLY. See the header: this array and the object below are
  * two halves of one declaration and the type checker refuses either alone.
  */
-export const IMPLEMENTED_ADMIN_READS = ['listFlags', 'readIdentityGraph'] as const;
+export const IMPLEMENTED_ADMIN_READS = [
+  'listEvents',
+  'listFlags',
+  'readAccount',
+  'readIdentityGraph',
+] as const;
 
 /** One of {@link IMPLEMENTED_ADMIN_READS}. */
 export type ImplementedAdminRead = (typeof IMPLEMENTED_ADMIN_READS)[number];
@@ -222,7 +232,10 @@ export function composeImplementedAdminReads(
 ): PartialAdminReadSource {
   const graphLimits = options.graphLimits ?? DEFAULT_GRAPH_LIMITS;
   return {
+    listEvents: async (query) => (await backend.operator((tx) => readEventFeed(tx, query))).page,
     listFlags: async (query) => (await backend.operator((tx) => readFlagQueue(tx, query))).page,
+    readAccount: async (accountId) =>
+      (await backend.operator((tx) => readAccountDetail(tx, accountId)))?.detail ?? null,
     readIdentityGraph: async (identityId) =>
       (await backend.operator((tx) => readIdentityGraph(tx, identityId, graphLimits)))?.graph ??
       null,
