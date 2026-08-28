@@ -35,9 +35,11 @@ import { BASE_PATH, buildServer, discoverRouteModules } from '../src/index.ts';
 import {
   ACCOUNT_DETAIL_SECTIONS,
   ADMIN_SESSION_COOKIE,
+  AdminDetailLeak,
   AdminReadError,
   WITHHELD,
   assertContractScalars,
+  assertNothingWithheldOnTheWire,
   namesASubject,
   setAdminReadSource,
   setAdminSessionSource,
@@ -964,6 +966,77 @@ describe('the root the port answered with is checked against the path FIRST', ()
     const res = await serveLying(OTHER_ACCOUNT);
     expect(res.statusCode).toBe(500);
     expect(res.body).not.toContain(IDENTITY);
+  });
+});
+
+describe('the walk rebuilds plain objects and returns everything else untouched', () => {
+  it('leaves a value carrying its own prototype inside a stored bag intact', async () => {
+    // A WALK THAT RECONSTRUCTED EVERY OBJECT WOULD TURN THIS INTO `{}`, which is
+    // a stored bag silently emptied on the screen whose whole discipline is that
+    // it shows the stored row. `json()` returns whatever the accessor handed
+    // back and a driver hands back `Date` for a timestamp inside `jsonb`.
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            payload: { observed: new Date('2026-08-20T10:00:00.000Z') },
+          }),
+        ],
+      }),
+    );
+    expect(res.statusCode).toBe(200);
+    const events = (JSON.parse(res.body) as Record<string, unknown>)['events'];
+    const payload = (events as readonly Record<string, unknown>[])[0]?.['payload'] as Record<
+      string,
+      unknown
+    >;
+    expect(payload['observed']).toBe('2026-08-20T10:00:00.000Z');
+  });
+});
+
+describe('the control over the serialized body catches what the key rule cannot', () => {
+  it('refuses the whole response when a withheld value survives in a free text field', async () => {
+    // THE KEY RULE CANNOT SEE THIS AND THE WIRE CONTROL CAN. `admin_actions.reason`
+    // is `NOT NULL` because `0017`'s own words are "no unexplained admin action,
+    // ever", so it is text a human wrote, and a human who pasted a second
+    // person's uuid into it has put that uuid under a key `namesASubject` does
+    // not match. It is withheld under `matched_identity_id` on the same
+    // response, so the control fires on the body rather than on the field.
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            eventName: 'kyc.dedupe_hit',
+            payload: { matched_identity_id: OTHER_IDENTITY },
+          }),
+        ],
+        adminActions: [actionRow('1', { reason: `duplicate of ${OTHER_IDENTITY}` })],
+      }),
+    );
+    // A 500 BEATS A LEAK, which is `admin-feed.ts`'s choice for the same
+    // control and `AdminReadError`'s status by ADR-190.
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toContain(OTHER_IDENTITY);
+  });
+
+  it('serves the same response when nothing was withheld to survive', async () => {
+    const res = await serve(
+      tablesOf({ adminActions: [actionRow('1', { reason: `duplicate of ${OTHER_IDENTITY}` })] }),
+    );
+    // NOTHING WAS WITHHELD, so there is no value to look for and the uuid in the
+    // free text is served. The control asserts a property of THIS response and
+    // is not a second uuid sweep; `apps/admin`'s pattern check is that layer.
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain(OTHER_IDENTITY);
+  });
+
+  it('throws AdminDetailLeak on a value it was told was withheld, and returns on none', () => {
+    expect(() => {
+      assertNothingWithheldOnTheWire({ note: OTHER_IDENTITY }, [OTHER_IDENTITY]);
+    }).toThrow(AdminDetailLeak);
+    expect(() => {
+      assertNothingWithheldOnTheWire({ note: OTHER_IDENTITY }, []);
+    }).not.toThrow();
   });
 });
 
