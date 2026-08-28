@@ -7078,3 +7078,114 @@ command run separately and `pnpm run verify` never run, reproduced on `main` at 
 line changed: 33 of 33 gates, 16 of 16 invariants, `typecheck` 0, `lint` 0, `format:check` clean
 under the WIDENED glob, and 220 test files / 5,171 passed / 6 skipped unchanged in both directions.**
 `falsify.mjs` ran on a committed tree and the working tree was clean after it.
+
+---
+
+## Two guards that passed while covering less than their own words claimed (2026-08-28, session 348)
+
+**Both repaired, in two commits, and each failure was watched happening before a line moved.**
+Neither was found by reading. `assertNamesNoSubject`'s hole surfaced when
+[session 344](sessions/2026-08-28-session-344.md)'s seed **failed to fire**, and `VG-2`'s surfaced
+when [session 346](sessions/2026-08-28-session-346.md) added a third bundle to a job whose grep
+reads a typed list of paths. **A guard that refuses too little is green all the way down**, which is
+why both of these survived their own review and why the repair for each began by reproducing it.
+
+**GUARD ONE.** [`apps/admin/src/page.ts`](../apps/admin/src/page.ts)'s uuid was `\b`-ANCHORED, and a
+`\b` is a WORD boundary, so a word character on either side removed it and the token stopped
+matching. Writing `ID` for a uuid: `see ID`, `manual-review-ID` and `ref:ID` threw, while
+`linked_to_ID`, `xID` and `IDy` passed. An underscore is a word character, which is why the first of
+those three is the spelling a real payload carries. **`M6-A-55` was written first and 4 of its 7
+cases were red on the committed regex.**
+
+**BOTH BOUNDARIES ARE DROPPED RATHER THAN REPLACED BY A LOOKAROUND, AND THE REASON IS A PROPERTY
+RATHER THAN A PREFERENCE.** Removing an assertion from a regex can only ADD matches, so the new
+pattern refuses a **strict superset** of the old one: **nothing that used to throw now passes**,
+asserted over a generated corpus rather than argued. A hex-digit lookbehind was the obvious
+alternative and is refused on a measurement: `d` is a hex digit, so `id<uuid>` would still pass, and
+`id` is exactly the prefix an operator screen glues onto an identifier. **What the widening newly
+rejects: every one of the 94 printable neighbour characters on either side, derived over the range
+rather than over three hand-picked cases, plus a uuid shape sitting inside a longer hex-and-dash
+run. What it newly accepts: nothing.** The widening is in the NEIGHBOURS and never in the SHAPE,
+pinned by four near misses that are still not uuids, because a control that had become "any long hex
+string throws" is a control the next screen writer turns off.
+
+**One case outside the fence had to move and it is the session's one fence departure.**
+[`flags-render.test.ts`](../apps/admin/test/flags-render.test.ts)'s `M6-A-45` pinned the defect with
+a committed `.not.toThrow()`. A guard repaired into a red suite is not a repaired guard, so the case
+is REWRITTEN rather than deleted and now asserts what is still true: the two legs fail at different
+times and **neither subsumes the other**, a third party's uuid being invisible to the value leg and
+a non-uuid identifier being invisible to the pattern leg.
+
+**GUARD TWO.** [`vg2-no-secrets-in-bundle.mjs`](../scripts/ci/vg2-no-secrets-in-bundle.mjs)
+hard-coded `BUNDLE_DIRS` to the portal's two directories. **It is a list of paths and not a reading
+of the estate**, and its own comment called the portal *"the one deployable that builds a bundle"*,
+false since the site's build step landed on 2026-08-27 and falser since `apps/admin` joined `CI-07`
+on 2026-08-28. **THE HOLE WAS REPRODUCED FIRST: a real AWS access key id appended to one emitted
+file in EACH of the two unscanned bundles, and the committed check exited 0 reporting "no key-shaped
+string in client output".**
+
+**Re-derived after all three builds on this tree, because two of the three apps had changed since
+the figures in the dispatch:** `apps/portal` 249 files and 5,831,402 bytes SCANNED, `apps/site` 219
+and 4,739,239 NOT, `apps/admin` 121 and 4,024,910 NOT. **249 of 589 files and 5,831,402 of
+14,595,551 bytes, 42 per cent by file and 40 per cent by byte, and the check printed `PASS` in the
+same words a full scan would.**
+
+**THE REPAIR IS A DERIVATION AND THE SOURCE IT IS DERIVED FROM IS THE WHOLE OF THE DECISION.** Three
+sources were available. **The job's steps are REFUSED**: parsing `ci.yml` makes the check a MIRROR of
+the job, and a mirror can never notice the step that is missing, which is exactly how this hole
+opened. **The directories that exist after a build are REFUSED**: the scan then silently SHRINKS
+whenever a build is dropped, which is the same partial-green shape rebuilt from a different
+mechanism. **The workspace manifests are TAKEN**, because they answer the question from the
+DECLARATION rather than from the artifact, so the expected set is known BEFORE the build and **a
+missing bundle is RED rather than a smaller number**. `apps` is read out of `pnpm-workspace.yaml`'s
+own `'apps/*'` declaration rather than trusted as a constant.
+
+**That gives `VG-2` a second job on purpose, and it closes session 346's finding 3 from the other
+side.** `CI-06/gate-inventory` cannot see a new app joining `CI-07`, because that row's activation
+condition was satisfied by the first app and the row is Implemented. **A fourth UI deployable
+landing with no build step in `CI-07` now turns `VG-2` red instead of turning nothing red.**
+
+**Six legs falsified against a scratch workspace, each watched failing**, so the repository tree was
+never seeded: a bundler that declared a build and never built it, a deployable whose build output
+this check cannot locate, a workspace that stops declaring `apps/*`, a workspace where nothing
+declares a bundle, a key seeded in the second bundler, and the clean fixture passing. **The widened
+scan is CLEAN on the real estate: 589 files, 14,595,551 bytes, exit 0, and nothing was narrowed to
+get there.** The note now names every deployable and its own figures, so a partial scan cannot print
+the same line as a full one. **`ADR-012` holds and no domain is written anywhere, in any file, in
+any form**; what this adds is that the admin bundle is now grepped as well, over 121 files and
+4,024,910 bytes, and it is clean.
+
+**FOUR FINDINGS, AND THE FIRST IS THIS SESSION'S OWN DOING.**
+[`flags-queue.tsx:239`](../apps/admin/src/app/flags/flags-queue.tsx) still calls the pattern *"a
+`\b`-anchored uuid"* and [`ci.yml:325`](../.github/workflows/ci.yml) still reports the
+one-of-three scan as an open gap; **both are false as of the two commits above and both are fenced
+out**, the first as session 350's and the second on this dispatch's NOT YOURS list, and **nothing
+mechanical in this repository can see either one**, measured rather than assumed. Second:
+**`scripts/**` is outside `format:check`'s glob entirely**, so the directory holding every gate
+runner is unformatted-unchecked and the committed `VG-2` file was not prettier-clean; the rewrite is,
+and nothing enforces that. Third: **no citation invariant reaches a session log**, so session 344's
+`page.ts:184` pointer resolves to nothing while `RI-15` and `RI-16` hold at 16 of 16. Fourth:
+**`VG-1` caught this session's own log and cost a red `CI-05`**: the first draft of the session
+file wrote the seeded key-shaped string out in full and `gitleaks git .` reported `leaks found: 1`
+over 1,987 commits. **The repair is the commit REWRITTEN rather than a `.gitleaksignore` entry**, on
+that file's own stated ground, that session 254's four fingerprints are defended only because their
+commits are in `main` while this one sat on an unmerged branch nothing is based on. **A document
+that describes a secret-scanner falsification is itself scanned by the secret scanner.** Fifth:
+**`apps/site` re-derives 32 bytes below session 346's figure with an identical file count**, and
+`next build` is byte-reproducible on this tree across three consecutive builds, so the difference is
+a tree difference rather than build noise; the likely reading is a table derived before that
+session's own `.tsx` reformat landed, reported as a difference and not as a cause.
+
+**NO ADR NUMBER, NO MIGRATION NUMBER, AND ONE SUITE IDENTIFIER**, `M6-A-55`, appended above the
+highest in the tree and appearing in exactly one file. **`docs/testing/STRATEGY.md`'s `VG-2` row was
+in the fence CONDITIONALLY, on "if what it says becomes false", and the condition was not met**: the
+row records the wiring, the expired chain and the original falsification, all in the past tense and
+all still true, and it states no scope, so it is left rather than improved. The rest of
+`apps/admin/src/page.ts`, `liability.ts`, `live-liability.ts`, `figure.ts`,
+`apps/admin/src/app/**`, `.github/workflows/ci.yml`, `playwright.config.ts`, `packages/**` and
+`apps/api/**` were not touched. **Measured with `pnpm install` first, each command run separately
+and `pnpm run verify` never run, reproduced on `main` at `9dca218d` before a line changed: 33 of 33
+gates with `CI-06/vg-inventory` unmoved, 16 of 16 invariants, `typecheck` 0, `lint` 0, `format:check`
+clean, and 222 test files / 5,227 passed / 6 skipped against a baseline of 222 / 5,220 / 6, a delta
+of +7 cases and zero files.** `falsify.mjs` ran on a committed tree and the working tree was clean
+after it.
