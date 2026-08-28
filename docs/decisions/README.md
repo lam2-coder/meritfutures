@@ -222,6 +222,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-201](ADR-201.md) | the payout-velocity window is seven trading days against thirty scaled to seven, and the settled threshold PROVES that reading rather than this entry choosing it  (2026-08-28, status: proposed) |
 | [ADR-202](ADR-202.md) | the required `cusum` object yields to the absence ruling, because a shape may not promise a value a ruling forbids producing  (2026-08-28, status: proposed) |
 | [ADR-203](ADR-203.md) | a liability figure that is not there is a `null` whose reason rides on the body, in a closed vocabulary of three, because the corpus already built this shape twice and neither copy was on the wire  (2026-08-28, status: proposed) |
+| [ADR-204](ADR-204.md) | the per-account eligibility forecast is a projection of ONE gate under five stated assumptions, because ten of the eleven conditions that decide eligibility have inputs no stored row can know seven days out  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
