@@ -217,6 +217,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-196](ADR-196.md) | an identity comes into existence at the first VERIFIED contact, in one unit of work with its `users` row, and the row it writes carries nothing  (2026-08-28, status: proposed) |
 | [ADR-197](ADR-197.md) | the OTP key is a deployment secret, the digest binds the address as typed, and the establishment door is one verb  (2026-08-28, status: proposed) |
 | [ADR-198](ADR-198.md) | a `_cents` value inside `events.payload` is a DECIMAL STRING  (2026-08-28, status: proposed) |
+| [ADR-199](ADR-199.md) | `reserve_coverage_snapshots` is `firm` and registering it is the whole of what `packages/db` owed `readLiability`, because the other three figures are DERIVABLE and `0062` returns unspent  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
