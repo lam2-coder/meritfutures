@@ -83,6 +83,16 @@ function acrossMigrations(anchor: string): readonly (readonly [string, string])[
 const CONSTRAINTS = acrossMigrations('ADD CONSTRAINT ledger_accounts_kind_matches_code');
 const SEEDS = acrossMigrations('INSERT INTO ledger_accounts');
 
+// TWO KINDS OF WRITE, SPLIT ON THE `scope` LITERAL THE STATEMENT ITSELF CARRIES.
+// Until `0054` every write was a firm seed and this partition would have been a
+// distinction with one side empty. ADR-183 provisions the per-identity positions
+// and the two halves have genuinely different properties: a firm seed writes one
+// fixed row once, and an identity write runs on every identity there will ever
+// be. The split is read out of the statement rather than out of a file name, so
+// a later migration cannot land on the wrong side by being numbered differently.
+const FIRM_SEEDS = SEEDS.filter(([, body]) => /'firm'/.test(body));
+const IDENTITY_WRITES = SEEDS.filter(([, body]) => /'identity'/.test(body));
+
 // A SLICE THAT READS NOTHING PASSES EVERY `for` LOOP BELOW, which is the shape
 // of green this file exists to refuse.
 if (CONSTRAINTS.length === 0) throw new Error('no migration installs the kind-to-code constraint');
@@ -231,10 +241,23 @@ describe('the seeds write rows the constraint in force admits', () => {
   });
 
   test('the chart is seeded once per code, and only for firm-scoped codes', () => {
-    // A migration has no identity to seed against, so the three per-identity
-    // classes still have no writer at all, anywhere in this tree.
+    // THIS CASE WENT RED WHEN `0054` LANDED AND THE SESSION CAME HERE TO SAY SO,
+    // which is what the header above says an armed case is for.
+    //
+    // It used to read, in its own comment: "A migration has no identity to seed
+    // against, so the three per-identity classes still have no writer at all,
+    // anywhere in this tree." ADR-183 is the entry that makes that false, and
+    // `0054` is how: a TRIGGER has an identity to write against (`NEW.id`) and a
+    // backfill joins to `identities`, so neither needs a literal to seed onto.
+    //
+    // THE PROPERTY THE CASE WAS PROTECTING SURVIVES INTACT AND IS NOT WEAKENED.
+    // What it was really holding is that no migration writes a per-identity row
+    // by asserting a hand-written identity onto it, and that the FIRM chart is
+    // seeded exactly once per code. Both are asserted below, the second over the
+    // firm seeds unchanged. What is new is that identity-scoped writes exist at
+    // all, and they are given their own assertions rather than an exemption.
     const seeded: string[] = [];
-    for (const [file, seed] of SEEDS) {
+    for (const [file, seed] of FIRM_SEEDS) {
       const literals = [...seed.matchAll(/'([a-z_]+)'/g)].map((m) => m[1] as string);
       for (const literal of literals) {
         if ((LEDGER_ACCOUNT_CODES as readonly string[]).includes(literal)) {
@@ -248,10 +271,55 @@ describe('the seeds write rows the constraint in force admits', () => {
     expect([...seeded].sort()).toEqual(['fees_revenue', 'firm_treasury']);
   });
 
-  test('every seed is a plain INSERT, because the silent skip is the defect ADR-177 found', () => {
+  test('the partition is total, so a write cannot escape both sets', () => {
+    // A statement naming neither scope, or naming both, would fall out of every
+    // assertion in this describe block while the block stayed green. That is
+    // the shape of green this file exists to refuse, so it is refused here.
+    expect(FIRM_SEEDS.length + IDENTITY_WRITES.length).toBe(SEEDS.length);
+    expect(FIRM_SEEDS.length).toBeGreaterThan(0);
+    expect(IDENTITY_WRITES.length).toBeGreaterThan(0);
+  });
+
+  test('an identity-scoped write names only per-identity codes and no literal identity', () => {
+    for (const [file, write] of IDENTITY_WRITES) {
+      const literals = [...write.matchAll(/'([a-z_]+)'/g)].map((m) => m[1] as string);
+      const codes = literals.filter((literal) =>
+        (LEDGER_ACCOUNT_CODES as readonly string[]).includes(literal),
+      );
+      expect(codes.length, file).toBeGreaterThan(0);
+      for (const code of codes) {
+        expect(LEDGER_ACCOUNT_SCOPE[code as keyof typeof LEDGER_ACCOUNT_SCOPE], file).toBe(
+          'identity',
+        );
+      }
+      // THE ORIGINAL PROPERTY, KEPT. A migration still has no identity to seed
+      // against: the identity comes from `NEW.id` or from a join to
+      // `identities`, never from a uuid somebody typed.
+      expect(write, file).not.toMatch(/'[0-9a-f]{8}-[0-9a-f]{4}-/i);
+      expect(write, file).toMatch(/NEW\.id|FROM identities/);
+    }
+  });
+
+  test('every FIRM seed is a plain INSERT, because the silent skip is the defect ADR-177 found', () => {
     // The CI probe seeded its own fees_revenue row under ON CONFLICT DO NOTHING
     // and pinned the id. Once that seed exists the clause skips the row and the
     // probe stops exercising LEDGER-C1. A migration runs once and forward only.
-    for (const [file, seed] of SEEDS) expect(seed, file).not.toMatch(/ON\s+CONFLICT/i);
+    //
+    // THE SCOPE OF THIS CASE IS NARROWED TO THE FIRM SEEDS AND THE NARROWING IS
+    // ARGUED RATHER THAN ASSUMED. The defect ADR-177 found is a FIXED, KNOWN row
+    // that a later seed makes redundant, leaving a pinned uuid naming nothing.
+    // `0054`'s two writes are neither fixed nor pinned: the trigger runs on every
+    // identity forever rather than once, and the clause is what makes the
+    // backfill re-runnable against a partly provisioned database. Both resolve
+    // their rows through `ledger_accounts_identity_code_uq` instead of holding a
+    // second opinion about what exists.
+    //
+    // AND THE DEFECT ITSELF WAS RE-FOUND RATHER THAN ARGUED AWAY: `0054` DID
+    // reproduce it, in `probe_ledger_constraints.sql`, whose two per-identity
+    // fixtures were pinned uuids under exactly this clause. Watched raising
+    // `LEDGER-C2: ledger_account aaaaaaaa-...-000000000002 does not exist`
+    // instead of probing C1, and repaired the way ADR-177 repaired fees_revenue:
+    // the ids are read from the chart. See ADR-183 section 8.
+    for (const [file, seed] of FIRM_SEEDS) expect(seed, file).not.toMatch(/ON\s+CONFLICT/i);
   });
 });

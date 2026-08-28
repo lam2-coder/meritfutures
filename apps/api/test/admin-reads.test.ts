@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 import { BASE_PATH, PROBLEM_MEDIA_TYPE, buildServer, discoverRouteModules } from '../src/index.ts';
+import { ADMIN_FEED_ENDPOINTS } from '../src/routes/admin-feed.ts';
 import adminReads, {
   ACCOUNT_DETAIL_SECTIONS,
   ADMIN_READ_ENDPOINTS,
@@ -409,7 +410,16 @@ test('every section 8 GET row is served or is a named projection nobody has take
     for (const part of row.slice('### GET '.length).split(','))
       declared.add((part.trim().split('?')[0] ?? '').trim());
   }
-  const served = new Set(ADMIN_READ_ENDPOINTS.map((spec) => spec.path));
+  // THE SET IS THE DEPLOYABLE'S AND NOT THIS MODULE'S, and it stopped being one
+  // module's on 2026-08-28. `W6-e` (ADR-184) put `GET /admin/events` in its own
+  // route module because the feed's safety is a property of its QUERY and
+  // `/admin/flags` records the opposite rule about its own absent filter three
+  // lines from where the two would have sat together. The sentence this test
+  // asserts is about the operator SURFACE, so a second module serving a section
+  // 8 row is not a register entry: it is a route that is served.
+  const served = new Set(
+    [...ADMIN_READ_ENDPOINTS, ...ADMIN_FEED_ENDPOINTS].map((spec) => spec.path),
+  );
   const unserved = [...declared].filter((path) => !served.has(path)).sort();
   expect(unserved).toEqual([
     '/admin/cusum',
