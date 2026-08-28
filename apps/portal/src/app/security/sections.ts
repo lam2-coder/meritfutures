@@ -32,7 +32,7 @@
 // -----------------------------------------------------------------------------
 // AND NO ROW IS STYLED AS AN ALARM
 // -----------------------------------------------------------------------------
-// `M04:265`: the portal "offers email and SMS as peers rather than as a
+// `M04:263`: the portal "offers email and SMS as peers rather than as a
 // fallback, because C-01 makes any single factor sufficient and a UI that calls
 // one of them 'fallback' is describing a hierarchy the server does not have."
 // An SMS row here is not marked suspicious and a passkey row is not marked safe:

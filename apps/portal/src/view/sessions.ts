@@ -51,7 +51,7 @@
 // changing a contract key, which is a diff on API_CONTRACT rather than a wording
 // decision taken in a component."
 //
-// NO SENTENCE HERE RANKS THE THREE FACTORS. `M04:265`'s obligation against
+// NO SENTENCE HERE RANKS THE THREE FACTORS. `M04:263`'s obligation against
 // `POST /auth/otp` is that "the portal offers email and SMS as peers rather than
 // as a fallback, because C-01 makes any single factor sufficient and a UI that
 // calls one of them 'fallback' is describing a hierarchy the server does not

@@ -103,7 +103,7 @@ describe('every active session, with the factor that established it', () => {
   });
 
   test('no factor is ranked, marked weak, or called a fallback', () => {
-    // `M04:265`: the portal "offers email and SMS as peers rather than as a
+    // `M04:263`: the portal "offers email and SMS as peers rather than as a
     // fallback, because C-01 makes any single factor sufficient and a UI that
     // calls one of them 'fallback' is describing a hierarchy the server does not
     // have". An SMS row here is not an alarm, and marking it one would also be
