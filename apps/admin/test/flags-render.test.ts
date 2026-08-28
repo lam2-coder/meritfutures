@@ -256,18 +256,25 @@ describe('M6-A-45: INV-M6-10 on a screen that names no subject', () => {
     expect(() => renderFlagQueueDocument(viaType)).toThrow(PageError);
   });
 
-  test('THE TWO LEGS FAIL AT DIFFERENT TIMES, AND THE SECOND IS WHY `flag_type` FAILS', () => {
-    // FOUND BY SEEDING AND NOT PREDICTED BY THE DISPATCH.
-    // `assertNamesNoSubject`'s pattern is a `\b`-anchored uuid, so a uuid GLUED
-    // TO A WORD CHARACTER is not a match: `linked_to_<uuid>` has a word
-    // character on the left of the first hex digit and `manual-review-<uuid>`
-    // does not. THE PATTERN LEG ALONE PASSES THE FIRST AND FAILS THE SECOND,
-    // measured here rather than argued, and the value leg is what refuses both.
+  test('THE TWO LEGS STILL FAIL AT DIFFERENT TIMES, AND NEITHER SUBSUMES THE OTHER', () => {
+    // THIS CASE RECORDED A HOLE AND NOW RECORDS ITS REPAIR, WHICH IS WHY IT IS
+    // REWRITTEN RATHER THAN DELETED.
     //
-    // The gap is in `../src/page.ts`'s regex, which is `P5-l`'s file and
-    // outside `W6-f`'s fence, so it is REPORTED and not repaired. What survives
-    // both legs is a subject id that is in no field of this response AND is
-    // glued to a word character, and that residue is the reported gap exactly.
+    // It was found by seeding, not by reading: the first draft of `M6-A-45`
+    // asserted that a subject id in `flag_type` was refused by the pattern leg
+    // and it was not. `assertNamesNoSubject`'s uuid was `\b`-anchored, so a word
+    // character on either side removed the boundary and `linked_to_<uuid>`
+    // passed while `manual-review-<uuid>` threw. The value leg was what refused
+    // both, and the residue that survived both legs was a subject id in NO field
+    // of this response AND glued to a word character.
+    //
+    // SESSION 348 DROPPED THE BOUNDARIES IN `../src/page.ts` AND THAT RESIDUE IS
+    // CLOSED. The pattern leg now refuses the glued spelling on its own, which
+    // is asserted here rather than assumed, and `M6-A-55` in `page.test.ts`
+    // holds the pattern's own before-and-after.
+    //
+    // THE TWO LEGS ARE STILL NOT ONE LEG, and the reason is the interesting
+    // half: each refuses something the other cannot see.
     const first = ROWS[0];
     expect(first).toBeDefined();
     if (first === undefined) return;
@@ -275,12 +282,41 @@ describe('M6-A-45: INV-M6-10 on a screen that names no subject', () => {
     const glued = `linked_to_${first.identity_id}`;
     const spaced = `linked to ${first.identity_id}`;
     expect(() => assertNamesNoSubject([spaced])).toThrow(PageError);
-    expect(() => assertNamesNoSubject([glued])).not.toThrow();
-
-    // And the value leg catches the one the pattern leg lets through, on the
-    // served bytes, which is where WAVE-06 rule 4 puts every control here.
+    expect(() => assertNamesNoSubject([glued])).toThrow(PageError);
     expect(() =>
       renderFlagQueueDocument({ renderedAt: RENDERED_AT, rows: [{ ...first, flag_type: glued }] }),
+    ).toThrow(PageError);
+
+    // THE PATTERN LEG ALONE: a uuid that is in no field of this response at all.
+    // The value leg searches for the three identifiers this document declines to
+    // render, so a third party's id is invisible to it and is a subject name all
+    // the same.
+    const foreign = '7c1e2d3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f';
+    expect([first.flag_id, first.identity_id, first.account_id]).not.toContain(foreign);
+    expect(() =>
+      renderFlagQueueDocument({
+        renderedAt: RENDERED_AT,
+        rows: [{ ...first, evidence_summary: `Shared exit node with ${foreign}` }],
+      }),
+    ).toThrow(PageError);
+
+    // THE VALUE LEG ALONE: an identifier of THIS response that is not uuid
+    // shaped. The contract types `identity_id` as a string, so a server that
+    // ever answers with another spelling is a shape the pattern cannot match and
+    // the value leg still refuses.
+    const unshaped = 'identity-90210';
+    expect(() => assertNamesNoSubject([`Shared exit node with ${unshaped}`])).not.toThrow();
+    expect(() =>
+      renderFlagQueueDocument({
+        renderedAt: RENDERED_AT,
+        rows: [
+          {
+            ...first,
+            identity_id: unshaped,
+            evidence_summary: `Shared exit node with ${unshaped}`,
+          },
+        ],
+      }),
     ).toThrow(PageError);
   });
 

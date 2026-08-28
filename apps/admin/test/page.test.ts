@@ -217,6 +217,128 @@ describe('M6-A-23: INV-M6-10, the home page names no subject', () => {
   });
 });
 
+// =============================================================================
+// M6-A-55: THE `\b` HOLE, MEASURED IN BOTH DIRECTIONS
+// =============================================================================
+// SESSION 344 FOUND THIS BY A SEED FAILING TO FIRE, NOT BY READING. Its first
+// draft of `M6-A-45` asserted that a subject id arriving in `flag_type` was
+// refused; it was not. The pattern was `\b`-anchored, and a word character on
+// either side of the token removes the boundary, so `linked_to_<uuid>` passed
+// while `linked to <uuid>` threw. An underscore is a word character, which is
+// why the first of those is the spelling a real payload carries.
+//
+// THE REPAIR DROPS BOTH BOUNDARIES RATHER THAN REPLACING THEM WITH A LOOKAROUND,
+// and the reason is a property rather than a preference: removing an assertion
+// from a regex can only ADD matches, so the new pattern refuses a strict
+// SUPERSET of what the old one refused. Nothing that used to throw now passes,
+// and that is asserted below over a generated corpus rather than argued.
+//
+// A hex-digit lookbehind (`(?<![0-9a-f])`) was the obvious alternative and is
+// refused for a residue it leaves: it keeps `id<uuid>` passing, because `d` is a
+// hex digit, and `id` is exactly the prefix an operator screen would glue on.
+// =============================================================================
+
+describe('M6-A-55: INV-M6-10, a uuid glued to a word character is still a uuid', () => {
+  const SUBJECT = '0e9c0b3a-1f2d-4c5e-8a7b-9d0e1f2a3b4c';
+
+  // The `\b`-anchored pattern this repair replaces, reconstructed here so the
+  // widening is DERIVED from the two patterns rather than transcribed from a
+  // session log. It is the only copy of the old regex in the tree.
+  const OLD = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+
+  const refused = (line: string): boolean => {
+    try {
+      assertNamesNoSubject([line]);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+
+  test('the three shapes session 344 measured as PASSING now throw', () => {
+    // These are the finding verbatim. Each carries a word character against the
+    // token: an underscore on the left, a letter on the left, a letter on the
+    // right.
+    for (const line of [`linked_to_${SUBJECT}`, `x${SUBJECT}`, `${SUBJECT}y`]) {
+      expect(OLD.test(line)).toBe(false);
+      expect(() => assertNamesNoSubject([line])).toThrow(PageError);
+    }
+  });
+
+  test('the three shapes it measured as THROWING still throw', () => {
+    for (const line of [`see ${SUBJECT}`, `manual-review-${SUBJECT}`, `ref:${SUBJECT}`]) {
+      expect(OLD.test(line)).toBe(true);
+      expect(() => assertNamesNoSubject([line])).toThrow(PageError);
+    }
+  });
+
+  test('EVERY printable neighbour character on either side is refused', () => {
+    // Derived over the range rather than over three hand-picked characters,
+    // because the defect was a CLASS of neighbour and a hand-picked list is how
+    // it survived the first time. 94 characters, both sides, plus the bare token.
+    const neighbours = Array.from({ length: 0x7e - 0x21 + 1 }, (_, i) =>
+      String.fromCharCode(0x21 + i),
+    );
+    expect(neighbours).toHaveLength(94);
+
+    const passing = neighbours.flatMap((c) =>
+      [`${c}${SUBJECT}`, `${SUBJECT}${c}`].filter((line) => !refused(line)),
+    );
+    expect(passing).toEqual([]);
+    expect(refused(SUBJECT)).toBe(true);
+  });
+
+  test('THE NEW PATTERN IS A STRICT SUPERSET: nothing the old one refused now passes', () => {
+    // The corpus is every neighbour pairing plus the near misses below, which is
+    // where a boundary change could plausibly LOSE a match.
+    const neighbours = ['', ' ', '_', '-', ':', '.', '/', '=', '"', 'x', 'f', '9', 'y'];
+    const corpus = neighbours.flatMap((left) =>
+      neighbours.map((right) => `${left}${SUBJECT}${right}`),
+    );
+    const lost = corpus.filter((line) => OLD.test(line) && !refused(line));
+    expect(lost).toEqual([]);
+    expect(corpus.filter((line) => refused(line))).toHaveLength(corpus.length);
+  });
+
+  test('what the widening COSTS: a uuid shape inside a longer hex-and-dash run', () => {
+    // This is the one family the repair newly refuses that is not simple
+    // adjacency, and it is stated rather than left to be found. A 16-hex first
+    // group contains an 8-hex group at an offset, and a 13-hex last group
+    // contains a 12-hex one. Both were invisible to the `\b` pattern and both
+    // are refused now.
+    const wider = [
+      '0123456789abcdef-1f2d-4c5e-8a7b-9d0e1f2a3b4c',
+      '0e9c0b3a-1f2d-4c5e-8a7b-9d0e1f2a3b4cc',
+    ];
+    for (const line of wider) {
+      expect(OLD.test(line)).toBe(false);
+      expect(() => assertNamesNoSubject([line])).toThrow(PageError);
+    }
+  });
+
+  test('and what it does NOT cost: a near miss is still not a uuid', () => {
+    // The widening is in the NEIGHBOURS and never in the SHAPE. A token one hex
+    // digit short, or one dash short, is refused by neither pattern, so this is
+    // not "any long hex string throws".
+    const nearMisses = [
+      '0e9c0b3a-1f2d-4c5e-8a7b-9d0e1f2a3b4', // 11 in the last group
+      '0e9c0b3a-1f2d-4c5e-8a7b9d0e1f2a3b4c', // a dash missing
+      '0e9c0b3g-1f2d-4c5e-8a7b-9d0e1f2a3b4c', // `g` is not hex
+      '0e9c0b3a-1f2d-4c5e-8a7-b9d0e1f2a3b4c', // the groups mis-sized
+    ];
+    for (const line of nearMisses) {
+      expect(OLD.test(line)).toBe(false);
+      expect(() => assertNamesNoSubject([line])).not.toThrow();
+    }
+  });
+
+  test('the clean page is unmoved by the widening', () => {
+    expect(() =>
+      assertNamesNoSubject(renderLiabilityHome(buildLiabilityHome(INPUT))),
+    ).not.toThrow();
+  });
+});
+
 describe('M6-A-24: the five panels nobody fills are listed, not omitted', () => {
   const page = buildLiabilityHome(INPUT);
 
