@@ -142,11 +142,11 @@
 //
 //   `lookup` REACHES NEITHER. This row is unauthenticated, so `scoped` has no
 //   identity to open with, and `certificates` is scope class `owned` on
-//   `identity_id` (`packages/db/src/scope.ts:731`), so `FirmTableKey` excludes
+//   `identity_id` (`packages/db/src/scope.ts:757`), so `FirmTableKey` excludes
 //   it and `firm` refuses the key at compile time.
 //
 //   `record` REACHES ONE. `certificate_verifications` is scope class `firm`
-//   (`packages/db/src/scope.ts:1228`), so `db.firm` can write it today.
+//   (`packages/db/src/scope.ts:1254`), so `db.firm` can write it today.
 //
 // A BACKEND WITH ONE LIVE ARM AND ONE THAT REJECTS IS WORSE THAN NO BACKEND, and
 // this file writes none for that reason: it would put a live-looking route in
