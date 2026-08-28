@@ -252,11 +252,22 @@ describe('finding C: firm_treasurys kind is RULED, and exactly one file writes i
     expect(KIND_SQL).toMatch(/WHEN\s+'firm_treasury'\s+THEN\s+kind\s*=\s*'asset'/);
     expect(KIND_SQL).not.toMatch(/'firm_treasury'\s+THEN\s+kind\s*=\s*'liability'/);
 
-    // THE PROBE IS STILL NOT A CHART. It seeds the two per-identity positions,
-    // because nothing in this tree creates one for an identity, and it writes
-    // no kind for firm_treasury at all.
-    expect(PROBE).toContain("'trader_withdrawable','liability'");
-    expect(PROBE).toContain("'trader_wallet','liability'");
+    // THE PROBE IS STILL NOT A CHART, AND IT IS LESS OF ONE THAN IT WAS.
+    //
+    // This block used to read: "It seeds the two per-identity positions, because
+    // nothing in this tree creates one for an identity, and it writes no kind
+    // for firm_treasury at all." `0054` creates them, so the probe now READS the
+    // positions instead of asserting them, on ADR-177's own precedent for
+    // `fees_revenue` one paragraph up in that file.
+    //
+    // THE REPAIR WAS NOT COSMETIC AND THE ASSERTION IS STRONGER FOR IT. Left
+    // alone, the probe's pinned uuids were skipped by their own
+    // ON CONFLICT DO NOTHING and its LEDGER-C1 block raised LEDGER-C2 on a
+    // dangling account instead of probing C1: ADR-177's defect, reproduced one
+    // code down, watched happening. So the property asserted here is now that
+    // the probe writes NO ledger_accounts row for an identity at all.
+    expect(PROBE).not.toMatch(/INSERT\s+INTO\s+ledger_accounts[^;]*'identity'/i);
+    expect(PROBE).toContain('probe_trader_wallet');
     expect(PROBE).not.toMatch(KIND);
   });
 
@@ -416,18 +427,35 @@ describe('ADR-174: the measurement the ruling turns on, held against M05', () =>
 
 describe('ADR-174 section 4: the absence is down to two codes and both are silences', () => {
   test('two migrations seed the chart, one row each, and both rows are firm-scoped', () => {
-    // THIS CASE ASSERTED AN EMPTY LIST, ADR-177 FILLED IT AND ADR-180 EXTENDED
-    // IT. Each step was armed by the one before, which is what ADR-174 section
-    // 7 built it for. A migration has no identity to seed against, so the three
-    // per-identity classes still have no writer anywhere in this tree.
+    // THIS CASE ASSERTED AN EMPTY LIST, ADR-177 FILLED IT, ADR-180 EXTENDED IT
+    // AND ADR-183 EXTENDS IT AGAIN. Each step was armed by the one before, which
+    // is what ADR-174 section 7 built it for, and each has had to come here and
+    // say so.
+    //
+    // ITS SECOND SENTENCE USED TO READ: "A migration has no identity to seed
+    // against, so the three per-identity classes still have no writer anywhere
+    // in this tree." `0054` is the writer, and it needs no identity to seed
+    // against because it does not seed: a trigger takes `NEW.id` and a backfill
+    // joins to `identities`. That sentence is the finding ADR-183 exists to make
+    // false, and it is quoted here rather than deleted.
     const seeding = [...MIGRATION_SQL]
       .filter(([, sql]) => /INSERT\s+INTO\s+ledger_accounts/i.test(sql))
       .map(([name]) => name);
-    expect(seeding).toStrictEqual(['0052_chart_of_accounts.sql', '0053_firm_treasury_kind.sql']);
+    expect(seeding).toStrictEqual([
+      '0052_chart_of_accounts.sql',
+      '0053_firm_treasury_kind.sql',
+      '0054_identity_ledger_accounts.sql',
+    ]);
     expect(SEED_SQL.match(/INSERT\s+INTO\s+ledger_accounts/gi)).toHaveLength(1);
     expect(KIND_SQL.match(/INSERT\s+INTO\s+ledger_accounts/gi)).toHaveLength(1);
     expect(SEED_SQL).toContain("'fees_revenue', 'revenue', 'firm'");
     expect(KIND_SQL).toContain("'firm_treasury', 'asset', 'firm'");
+
+    // AND THE TWO FIRM SEEDS STAY FIRM SEEDS. `0054` is the only writer that is
+    // identity scoped, and neither of the other two gained a second row, which
+    // is the half of this case that was never about the count.
+    expect(SEED_SQL).not.toMatch(/'identity'/);
+    expect(KIND_SQL).not.toMatch(/'identity'/);
   });
 
   test('0009 still ties no kind to a code, and the tie in force names five', () => {
