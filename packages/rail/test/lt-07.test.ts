@@ -266,11 +266,29 @@ describe('ADR-174: the measurement the ruling turns on, held against M05', () =>
     expect(migrations.filter((name) => name.startsWith('0052'))).toStrictEqual([]);
     // The eighth-code refusal is stated in TWO merged migrations, and a ruling
     // that minted a code would have had to supersede both.
+    // PARSED AND NOT MATCHED AS A PREFIX, and the reason is a seeded defect
+    // that got through: `toContain` over the first four codes plus the next
+    // three still matches once an EIGHTH is appended after `promotional_credit`,
+    // which is the exact widening this case exists to catch. The list is read
+    // out of the `NOT IN (...)` and compared whole, the way finding A reads
+    // `0009`'s CHECK one describe up.
     const triggers = read('packages', 'db', 'migrations', '0027_triggers_invariants.sql');
-    expect(triggers).toContain(
-      "'firm_treasury','psp_clearing','fees_revenue','reserve',\n" +
-        "      'trader_withdrawable','trader_wallet','promotional_credit'",
+    const notIn = triggers.slice(
+      triggers.indexOf('IF acct_code NOT IN ('),
+      triggers.indexOf('LEDGER-C2: ledger_account % has undeclared class'),
     );
+    const declared = [...notIn.matchAll(/'([a-z_]+)'/g)].flatMap((m) =>
+      m[1] === undefined ? [] : [m[1]],
+    );
+    expect(declared).toStrictEqual([
+      'firm_treasury',
+      'psp_clearing',
+      'fees_revenue',
+      'reserve',
+      'trader_withdrawable',
+      'trader_wallet',
+      'promotional_credit',
+    ]);
   });
 
   test('and the allocation row says the number went back to the pool', () => {
