@@ -347,6 +347,19 @@ describe('the module declares section 6.3 and nothing else', () => {
     }
   });
 
+  // GS-155, "a per-trade certificate is requested", and its v1 expectation is
+  // "v1 exposes NO SUCH KIND". The assertion below IS that expectation: the
+  // vocabulary is `['pass', 'payout']` by equality rather than by containment,
+  // so a third member added anywhere turns this red, and `0020:107` writes the
+  // same two words as `kind text NOT NULL CHECK (kind IN ('pass', 'payout'))`.
+  // `certificates.ts:504` narrows every row through
+  // `member(row['kind'], CERTIFICATE_KINDS, 'kind')`, so a stored row carrying a
+  // per-trade kind could not be built into a card at all.
+  //
+  // THE ROW'S SECOND SENTENCE IS NOT ASSERTED HERE AND CANNOT BE. It governs
+  // what the card renders "if the deferred kind is later enabled", and it binds
+  // the session that enables it rather than this one: there is no such kind to
+  // render.
   test('the closed vocabularies are the columns own CHECKs', () => {
     expect(CERTIFICATE_KINDS).toEqual(['pass', 'payout']);
     // THREE MEMBERS. `withheld` is M11 section 3.1's fourth state and `0020`

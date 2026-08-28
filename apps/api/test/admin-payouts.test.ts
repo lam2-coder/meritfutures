@@ -836,6 +836,25 @@ describe('POST /admin/payouts/:id/release', () => {
 // 9. THE ENFORCEMENT DOCUMENTS AND POSTS NOTHING
 // -----------------------------------------------------------------------------
 
+// GS-274, Ruling A, "the same hold ends in enforcement rather than release". The
+// row pins `failed` with a cited flag, a ToS clause, a written reason and an
+// EXPORTED evidence pack; that nothing is reversed because nothing was posted,
+// no LT-01, no wallet credit, no LT-03; and that the ordinal is released by the
+// move to `failed`. The five cases below are that row: the response states
+// `ordinal_released` rather than implying it, the ledger writes are asserted
+// EMPTY rather than unmentioned, a pack id that names no exported pack is
+// refused with only the lock taken, and `evidence_refs` cites the pack, the
+// clause and the hold's own flag.
+//
+// THE DISCRIMINATOR AGAINST `frozen` IS ASSERTED ABOVE, not here: `payout_status`
+// is `('approved','settled','failed','frozen')` from `0001` plus
+// `held_pending_review` from `0030`, and every one of the four originals answers
+// 409 on both endpoints. Neither verb the row names, settle or `payout_reversal`,
+// reaches this state.
+//
+// ONE RESIDUAL, STATED. "A written reason" is refused EMPTY here, over every
+// endpoint, and refused ABSENT by `admin_actions.reason NOT NULL`, which the
+// omitted-key case sets up and which no vitest run in this tree executes.
 describe('POST /admin/payouts/:id/enforce', () => {
   it('answers the contract s response, with ordinal_released stated rather than implied', async () => {
     const written: Written[] = [];

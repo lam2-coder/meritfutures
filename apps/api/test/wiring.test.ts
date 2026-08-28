@@ -34,10 +34,11 @@ import { expect, test } from 'vitest';
 // WHY THERE IS A BLOCKED LIST AND WHY IT IS NOT A WEAKENING
 // -----------------------------------------------------------------------------
 // Most of these ports CANNOT be wired today, and the reasons are rulings rather
-// than missing adapters: a door `src/db.ts` declines to declare (ADR-120), a
-// `SystemReason` that gains no member (ADR-165), a table absent from the
-// registry, a vendor adapter that does not exist in this workspace. A test that
-// demanded all twenty be wired would be a test somebody deletes.
+// than missing adapters: an identity provider this repository does not describe
+// (ADR-171), a `SystemReason` that gains no member (ADR-165), a read shape the
+// keyed accessor does not offer, a table absent from the registry, a vendor
+// adapter that does not exist in this workspace. A test that demanded all twenty
+// be wired would be a test somebody deletes.
 //
 // WHAT THE LIST DOES INSTEAD IS MAKE THE REASON A LIABILITY THAT EXPIRES. Each
 // entry names the specific thing its port waits on, at file and line. Three
@@ -106,37 +107,83 @@ const wired = new Set(matches(startSource, CALLS));
  */
 const BLOCKED: Readonly<Record<string, string>> = {
   // ---------------------------------------------------------------------------
-  // The operator door. `src/db.ts` declares `scoped` and `firm` and refuses a
-  // third, and the refusal is a ruling: `SystemReason` is
-  // `'nightly-batch' | 'operator-console'` (`packages/db/src/scoped-db.ts:197`),
-  // a request handler is neither, and ADR-165 ruled it gains no member. Every
-  // port below needs `systemDb('operator-console')`. Opening that door is an ADR
-  // and not an adapter.
+  // THE ADMIN SURFACE, AND THE FIVE ENTRIES BELOW SAID THE WRONG THING UNTIL
+  // ADR-171 READ THEM AT THEIR OWN DECLARATIONS.
+  //
+  // They said these five wait on the operator door: `systemDb('operator-console')`,
+  // which `src/db.ts` declines to declare. ADR-171 was dispatched to open it,
+  // measured what it would unblock, and REFUSED IT ON THE MEASUREMENT: the door
+  // moves NONE of the five.
+  //
+  //   `setAdminSessionSource` is the SSO port itself and no door onto this
+  //   database can serve it, because THE OPERATOR DIRECTORY IS NOT IN THIS
+  //   DATABASE. `admin_actions.actor` is `text NOT NULL` with no foreign key
+  //   (`0017_events_and_audit.sql:77`) and `routes/admin-writes.ts:133` says why:
+  //   "the operator directory is the SSO provider's and not this database's".
+  //
+  //   `useAdminWriteBackend`, `useAdminPayoutBackend` and `useAdminWalletBackend`
+  //   each require `principal(request)`, whose only resolver in this tree is that
+  //   same session source, so all three reduce to the port above BEFORE any door
+  //   is reached. Each carries at least one further blocker of its own.
+  //
+  //   `setAdminReadSource` says in its own header that what it is missing "is not
+  //   an authority, it is a shape" (`routes/admin-reads.ts:667`).
+  //
+  // `SystemReason` is `'nightly-batch' | 'operator-console'`
+  // (`packages/db/src/scoped-db.ts:197`) and ADR-165 ruled it gains no member, so
+  // the vocabulary was never the obstacle either. ADR-171 section 9 states the
+  // condition under which the door becomes takeable: the slice that lands an
+  // `AdminSessionSource` a deployment can install, because that is the first
+  // moment the door has a caller that reaches a row.
   // ---------------------------------------------------------------------------
   setAdminReadSource:
-    "`systemDb('operator-console')`, which `src/db.ts` declines to declare (ADR-120), AND the " +
-    'join and aggregate shapes the keyed accessor does not offer. The port names both itself, ' +
-    'in the refusal at `routes/admin-reads.ts:696-705`.',
+    'A READ SHAPE, and the door second. `routes/admin-reads.ts:667` states it: "WHAT IS MISSING ' +
+    'IS NOT AN AUTHORITY, IT IS A SHAPE ... There is no join and no aggregate to reach for." ' +
+    'None of the six methods is a projection of one table: `LiabilityResponse` needs a seven-day ' +
+    'forecast, a payout velocity, a reserve and a per-plan loss ratio, and `liability_snapshots` ' +
+    'carries `as_of`, `open_liability_cents`, `funded_accounts` and three exposure columns -- ' +
+    'and is scope class `firm` (`packages/db/src/scope.ts:535`), so the EXISTING `firm` door ' +
+    'already reaches every column it has. A live adapter today would have to reach `sqlExecutor` ' +
+    'to smuggle in SQL the accessor deliberately does not offer, which the port refuses by name.',
   setAdminSessionSource:
-    'the same operator door. `AdminSessionLookup` resolves an `AdminPrincipal` from an operator ' +
-    'session, and no door `ApiDb` declares reaches one: the refusal at ' +
-    '`routes/admin-reads.ts:209-215` says a deployment without it "cannot tell an operator from ' +
-    'anybody else".',
+    'THE ADMIN IDENTITY PROVIDER, AND NO DOOR ONTO THIS DATABASE COULD EVER SERVE IT. The port ' +
+    'says so at `routes/admin-reads.ts:186-197`: C-08 hardware-key SSO and the D3 IP allowlist ' +
+    'are edge controls on `ADMIN_ORIGIN`, and "the mapping from a session to an actor and a role ' +
+    'is the admin identity provider\'s". THE OPERATOR DIRECTORY IS NOT IN THIS DATABASE: ' +
+    '`admin_actions.actor` is `text NOT NULL` with no foreign key ' +
+    '(`0017_events_and_audit.sql:77`) and no table in the registry holds an operator, a role or ' +
+    'an operator session. ADR-171 rules this port never waited on the operator door, and that ' +
+    'THREE OTHER PORTS WAIT ON THIS ONE through `principal(request)`.',
   useAdminPayoutBackend:
-    "`operator()` at `systemDb('operator-console')` and `principal()` from the admin surface's " +
-    "shared helper. Neither is this module's to build; `routes/admin-payouts.ts:418` declares " +
-    'the port exactly as `admin-writes.ts` declares its own.',
+    '`principal(request)` (`routes/admin-payouts.ts:381`), which resolves only through ' +
+    '`AdminSessionSource` and is therefore blocked on `setAdminSessionSource` above. THIS IS THE ' +
+    'ONE OF THE FIVE THAT IS CLOSEST TO WIREABLE and ADR-171 section 4 says so: `AdminPayoutTx` ' +
+    'is `lockAt`, `rowAt`, `insert` and `updateAt`, every one a `SystemTx` method, plus a ' +
+    '`LedgerTx` which `routes/admin-payouts.ts:349-355` correctly observes `SystemTx` ' +
+    'structurally satisfies at a reason that already exists. ONE SUPPLIER SHORT, AND THE ' +
+    'SUPPLIER IS NOT A DOOR. Wiring it with `principal: async () => null` would report an ' +
+    'unfinished deployment as a caller who is not an operator, on the endpoint that releases ' +
+    'held payouts. MONEY PATH.',
   useAdminWalletBackend:
-    'the same operator door and `principal()`, AND TWO METHODS THAT WIRING DOES NOT REACH. ' +
-    '`writeCorrection` is refused on four constraints: `0038` is the built door for a wallet ' +
-    'correction and ADR-158 never read it, so no column holds which entry a correction corrects. ' +
-    '`reconcile` is refused on ADR-157 clause 6, which needs a join and an aggregate. Installing ' +
-    'a backend would not resolve either finding and must not paper over them.',
+    '`principal(request)` (`routes/admin-wallet.ts:538`), blocked on `setAdminSessionSource` ' +
+    'above, AND TWO METHODS THAT WIRING DOES NOT REACH. `writeCorrection` is refused on four ' +
+    'constraints: `0038` is the built door for a wallet correction and ADR-158 never read it, so ' +
+    'no column holds which entry a correction corrects (ADR-173). `reconcile` is refused on ' +
+    'ADR-157 clause 6, which needs a join and an aggregate. Installing a backend would not ' +
+    'resolve either finding and must not paper over them. MONEY PATH.',
   useAdminWriteBackend:
-    'the operator door, `principal()`, `validatePlan` from `@merit/rules-engine` (which ' +
-    '`apps/api` does not declare as a dependency), and `tradingDay()`. The last is the smallest ' +
-    'and the least tractable: nothing in this workspace maps an instant to an exchange trading ' +
-    'day, and ADR-145 names the gap rather than papering over it with a UTC date.',
+    'THREE SUPPLIERS AND NONE OF THEM IS A DOOR. `principal(request)` ' +
+    '(`routes/admin-writes.ts:266`), blocked on `setAdminSessionSource` above. `tradingDay()`, ' +
+    'which is the smallest and the least tractable: nothing in this workspace maps an instant to ' +
+    'an exchange trading day, and ADR-145 names the gap rather than papering over it with a UTC ' +
+    'date. And a projection of `ValidationResult` onto `PlanValidation`, whose `errors` is ' +
+    '`{ code, message }` where `CvViolation` is `{ id, path, detail, sizeCents }` and whose `ok` ' +
+    'is false when `materialization` is non-empty as well. THE CLAIM THAT `apps/api` DOES NOT ' +
+    'DECLARE `@merit/rules-engine` STOOD HERE AND WAS FALSE: it has been declared since session ' +
+    '252 landed `routes/payouts.ts` (`apps/api/package.json`), and `validatePlan` is exported ' +
+    '(`packages/rules-engine/src/index.ts:163`). ADR-171 finding 10. The same stale sentence ' +
+    "survives in that port's own docstring at `routes/admin-writes.ts:277-281`, which is a " +
+    "handler file and outside that entry's fence.",
 
   // ---------------------------------------------------------------------------
   // The ledger door, which is the same closed vocabulary reached from the money
@@ -205,31 +252,40 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'identity to open with, and `certificates` is scope class `owned`, so `firm` refuses the key ' +
     'AT COMPILE TIME. The port states this itself at `routes/certificates.ts:944-948`.',
   // ---------------------------------------------------------------------------
-  // The cash door, and its blocker is an ABSENT IMPLEMENTATION rather than an
-  // absent door. `databaseWithdrawalBackend` exists and its `transact` arm is
-  // fully written against the scoped door; what refuses is `idempotency`, which
-  // is `UNWIRED_STORE`.
+  // The cash door. THE REASON THAT STOOD HERE WAS FALSE AND IS REPLACED RATHER
+  // THAN DELETED, because it was true when it was written. ADR-172.
   //
-  // `routes/idempotency.ts`'s own header records why: no implementation of
-  // `IdempotencyStore` exists in this tree, because `complete` is an UPDATE of
-  // exactly one row and `systemTx`/`firmTx` hardcode `undefined` for the
-  // `WHERE`. Session 303 declined to build one here and said why in terms --
-  // "a store built here would be that gap papered over on the cash door" --
-  // and that judgement is right: `POST /wallet/withdrawals` is where cash
-  // leaves Merit, and a withdrawal replayed because its idempotency store was
-  // improvised pays twice.
+  // It read: no implementation of `IdempotencyStore` exists in this tree,
+  // because `complete` is an UPDATE of exactly one row and `systemTx`/`firmTx`
+  // hardcode `undefined` for the `WHERE`. THE SECOND HALF IS STILL TRUE AND IS
+  // A FACT ABOUT DOORS THIS STORE DOES NOT USE. `databaseIdempotencyStore`
+  // (`src/idempotency-store.ts:144`) opens `db.scoped` on all three methods and
+  // stamps through `tx.updateAt(TABLE, { key }, ...)`, which ADR-112 clause 3
+  // composes as `WHERE identity_id = $1 AND key = $2`. ELEVEN EXECUTED TESTS in
+  // `idempotency-store.test.ts` hold it, and this file said so itself twenty
+  // lines above, in `usePayoutBackend`'s entry. Both could not be true.
   //
-  // SO WIRING THIS PORT WOULD BE WORSE THAN LEAVING IT BLOCKED. A backend whose
-  // `transact` works and whose `idempotency` rejects is a route that looks
-  // installed and refuses at the last step, which is the "fixture serving real
-  // traffic" the module's own header refuses.
+  // THE PORT IS STILL BLOCKED AND THE TRUE REASON IS WORSE THAN THE FALSE ONE.
+  // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
+  // drives `requested --> approved` or `cooling --> approved`, and `:283-288`
+  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES`, on
+  // which `gateNoInFlight` (`:1233`) refuses. So a wired endpoint writes a row
+  // nothing will ever advance and then refuses that identity's every later
+  // withdrawal, permanently, behind a screen saying a withdrawal is in flight.
+  //
+  // A 503 AND A LOCKOUT BOTH REFUSE, AND ONLY ONE OF THEM IS REVERSIBLE. That
+  // is why the 503 is kept, and it is the same fail-closed direction session
+  // 303 was reaching for with the reason it had.
   // ---------------------------------------------------------------------------
   useWithdrawalBackend:
-    'an `IdempotencyStore` implementation, which no file in this tree provides. ' +
-    '`routes/idempotency.ts` states the reason: `complete` is an UPDATE of exactly one row and ' +
-    '`systemTx`/`firmTx` hardcode `undefined` for the `WHERE`. `databaseWithdrawalBackend` is ' +
-    'otherwise written and returns `UNWIRED_STORE` for that arm deliberately, on the ground that ' +
-    'a store improvised here would be that gap papered over on the cash door.',
+    'A DRIVER FOR THE APPROVAL EDGE, AND NOT THE STORE THIS ENTRY USED TO NAME (ADR-172 clause ' +
+    '5). `databaseIdempotencyStore` (`src/idempotency-store.ts:144`) exists and serves the ' +
+    'identity arm this route presents (`routes/wallet-withdrawals.ts:1506`), so the idempotency ' +
+    'half is no longer what refuses. What refuses is that NOTHING IN THIS TREE performs ' +
+    '`requested --> approved` or `cooling --> approved` (`routes/wallet-withdrawals.ts:57-60`), ' +
+    'and both statuses are in `OPEN_WITHDRAWAL_STATUSES` (`:283-288`), so `gateNoInFlight` ' +
+    '(`:1233`) would refuse that identity every later withdrawal. Wiring it trades an honest 503 ' +
+    'for a permanent per-trader lockout, and only the 503 is reversible.',
 };
 
 // -----------------------------------------------------------------------------
@@ -299,8 +355,15 @@ test('every database adapter written in this deployable is installed or accounte
   const accountedByPort = new Set([
     'databaseCertificateBackend',
     'databaseIdempotencyStore',
-    // `useWithdrawalBackend` is blocked on an absent `IdempotencyStore`; its own
-    // entry above carries the reason, so its adapter is accounted for by it.
+    // `useWithdrawalBackend` is blocked, and its own entry above carries the
+    // reason, so its adapter is accounted for by it.
+    //
+    // THE REASON WORDED HERE WAS THE REFUTED ONE, "an absent `IdempotencyStore`",
+    // AND IT SURVIVED IN THIS COMMENT AFTER THE ENTRY ABOVE WAS CORRECTED. That
+    // is the same defect ADR-172 found in this file twice already, in a third
+    // place: a claim restated somewhere nothing reads it for agreement. The
+    // reason lives in `BLOCKED` and this comment now points at it instead of
+    // paraphrasing it, because a paraphrase is what drifts.
     'databaseWithdrawalBackend',
   ]);
   const orphaned = [...factories]
