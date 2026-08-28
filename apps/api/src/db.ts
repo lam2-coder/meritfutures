@@ -11,9 +11,26 @@
 // source, and the day `DB_ADMITTED` stopped being empty is the day this
 // deployable acquired the capability everywhere at once. A reviewer asking
 // "where does apps/api reach the database" should get one answer with a path in
-// it, and `grep -rln '@merit/db' apps/api/src` returning exactly this file is
-// that answer. It is a convention and it is not a control, and it is written
-// down as a convention so nobody mistakes it for one.
+// it, and this file is that answer.
+//
+// THIS PARAGRAPH SAID TWO THINGS THAT HAVE BOTH BEEN OVERTAKEN, AND ADR-171
+// REPLACES THEM RATHER THAN LEAVING THEM BESIDE A TREE THAT REFUTES ONE AND A
+// SUITE THAT REFUTES THE OTHER.
+//
+// IT SAID `grep -rln '@merit/db' apps/api/src` RETURNS EXACTLY THIS FILE. IT
+// RETURNS TWO. `routes/account-reads.ts` imports `atMost` for the cursor bound
+// on its timeline read, and `atMost` mints a frozen `FilterTerm`: it opens no
+// connection, carries no reason and yields no handle. So the property worth
+// stating is not that one file NAMES the accessor, it is that ONE FILE TAKES A
+// HANDLE FROM IT, and that has always been the true sentence.
+//
+// AND IT SAID THE PROPERTY IS "a convention and it is not a control". IT IS A
+// CONTROL NOW. `test/db.test.ts` pins which file may take which value off the
+// accessor, and asserts separately -- first, and with a message naming the file
+// and the name -- that no file but this one takes any of `firmDb`, `scopedDb`,
+// `systemDb` or `transaction`. That case FOUND the drift above on its first
+// run, months of sessions after this paragraph described a tree that had since
+// moved, with every gate in the repository green over it. ADR-171.
 //
 // -----------------------------------------------------------------------------
 // TWO DOORS, AND THE THIRD IS ABSENT ON PURPOSE
