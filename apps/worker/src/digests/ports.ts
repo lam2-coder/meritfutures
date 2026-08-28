@@ -69,11 +69,13 @@
 //     of", which `ADR-157` would render as `max(due_at)` and does not have to:
 //     the rows are folded in TypeScript, and the fold is over ONE SCHEDULE'S
 //     delivery history, which `report_deliveries_delivered_window_idx` exists to
-//     serve and which is bounded by the horizon term below.
+//     serve and which the caller may bound with the one term below.
 //   - `every count in a digest body is a count of rows the producer already
 //     holds`, so the counting is `Array.length` rather than `count(*)`.
-//   - The one term used is `atLeast` on `due_at`, which bounds the history read
-//     to the horizon rather than reading a schedule's whole life every night.
+//   - The one term used is `atLeast` on `due_at`, and it is OPTIONAL and the
+//     CALLER'S. A horizon is a number and no document states one, so the alarm
+//     reads a schedule's whole history by default and a deployment that wants
+//     the read bounded supplies the instant and owns that choice.
 //
 // **IF THAT FOLD EVER STOPS BEING AFFORDABLE THE REMEDY IS AN ENTRY AND NOT A
 // WIDENING HERE**, which is `breaker/ports.ts`'s disposition one directory over.
