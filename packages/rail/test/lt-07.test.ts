@@ -16,7 +16,7 @@
 // binding a statement it cannot import.
 // =============================================================================
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -211,6 +211,146 @@ describe('the findings are a list a reader can walk, and every source it cites e
   test('every claim is a paragraph rather than a label', () => {
     for (const finding of LT_07_FINDINGS) {
       expect(finding.claim.length, finding.id).toBeGreaterThan(200);
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE RULINGS, AND WHAT EACH ONE MAKES CHECKABLE
+// -----------------------------------------------------------------------------
+// Session 315 ruled all three: ADR-174 takes (A) and (C), ADR-175 takes (B).
+// NEITHER ENTRY AMENDS A PRIMARY SOURCE THE CASES ABOVE READ, so every one of
+// them still passes and none was edited to accommodate a ruling. What is added
+// here is the half a ruling makes assertable that a finding did not.
+//
+// (A)'s ruling turns on a MEASUREMENT rather than on a missing name: LT-06
+// credits `firm_treasury` and LT-07 debits it, so the external leg moves that
+// account by zero. The two rows are asserted here as TEXT, so the day either is
+// repaired this package goes red and the entry has to be re-read. That is the
+// same service `finding A` performs for the credit leg, one row over.
+
+describe('the three findings are RULED, and each ruling names its entry', () => {
+  test('every finding carries a ruled disposition naming an ADR that exists', () => {
+    for (const finding of LT_07_FINDINGS) {
+      expect(finding.ruled, finding.id).toMatch(/^ADR-17[45]\b/);
+      const adr = /^(ADR-\d+)/.exec(finding.ruled)?.[1];
+      expect(adr, finding.id).toBeDefined();
+      expect(() => read('docs', 'decisions', `${adr}.md`), finding.id).not.toThrow();
+    }
+  });
+
+  test('(A) and (C) go to ADR-174 and (B) goes to ADR-175, which is the SPLIT', () => {
+    const byId = Object.fromEntries(LT_07_FINDINGS.map((f) => [f.id, f.ruled]));
+    expect(byId['A']).toContain('ADR-174');
+    expect(byId['C']).toContain('ADR-174');
+    expect(byId['B']).toContain('ADR-175');
+  });
+
+  test('a ruled disposition is a paragraph, on the same rule the claims are held to', () => {
+    for (const finding of LT_07_FINDINGS) {
+      expect(finding.ruled.length, finding.id).toBeGreaterThan(200);
+    }
+  });
+});
+
+describe('ADR-174: the measurement the ruling turns on, held against M05', () => {
+  test('LT-06 CREDITS firm_treasury and LT-07 DEBITS it, which is where the zero comes from', () => {
+    expect(M05).toContain(
+      '| LT-06 | `wallet_withdrawal_approval` | debit `trader_wallet` (identity) `amount_cents`; ' +
+        'credit `firm_treasury` `amount_cents`.',
+    );
+    expect(M05).toContain('| LT-07 | `wallet_withdrawal_settlement` | debit `firm_treasury`;');
+  });
+
+  test('and the sign that turns those two words into +a then -a is the one asserted above', () => {
+    // Stated twice on purpose: the measurement is worthless if the convention
+    // is read backwards, and session 288 read it backwards on a first draft.
+    expect(POSTING).toContain(
+      'entries.push({ account: t.debit, amountCents: t.amountCents, memo: t.memo });',
+    );
+    expect(POSTING).toContain(
+      'entries.push({ account: t.credit, amountCents: -t.amountCents, memo: t.memo });',
+    );
+  });
+
+  test('no code is minted, so no 0052 exists and the vocabulary is still seven', () => {
+    const migrations = readdirSync(join(ROOT, 'packages', 'db', 'migrations'));
+    expect(migrations.filter((name) => name.startsWith('0052'))).toStrictEqual([]);
+    // The eighth-code refusal is stated in TWO merged migrations, and a ruling
+    // that minted a code would have had to supersede both.
+    // PARSED AND NOT MATCHED AS A PREFIX, and the reason is a seeded defect
+    // that got through: `toContain` over the first four codes plus the next
+    // three still matches once an EIGHTH is appended after `promotional_credit`,
+    // which is the exact widening this case exists to catch. The list is read
+    // out of the `NOT IN (...)` and compared whole, the way finding A reads
+    // `0009`'s CHECK one describe up.
+    const triggers = read('packages', 'db', 'migrations', '0027_triggers_invariants.sql');
+    const notIn = triggers.slice(
+      triggers.indexOf('IF acct_code NOT IN ('),
+      triggers.indexOf('LEDGER-C2: ledger_account % has undeclared class'),
+    );
+    const declared = [...notIn.matchAll(/'([a-z_]+)'/g)].flatMap((m) =>
+      m[1] === undefined ? [] : [m[1]],
+    );
+    expect(declared).toStrictEqual([
+      'firm_treasury',
+      'psp_clearing',
+      'fees_revenue',
+      'reserve',
+      'trader_withdrawable',
+      'trader_wallet',
+      'promotional_credit',
+    ]);
+  });
+
+  test('and the allocation row says the number went back to the pool', () => {
+    const allocation = read('docs', 'decisions', 'ALLOCATION.md');
+    expect(allocation).toContain(
+      '**`0052` IS NOT TAKEN AND THE NUMBER RETURNS TO THE POOL UNSPENT',
+    );
+  });
+});
+
+describe('ADR-174 section 4: the absence is still an absence', () => {
+  test('nothing in any merged migration seeds the chart of accounts', () => {
+    // FINDING C's own claim says the only INSERT anywhere is the probe. This
+    // asserts the half that would change first: the day a migration seeds a
+    // ledger_accounts row it writes a `kind`, and the absence is over.
+    const dir = join(ROOT, 'packages', 'db', 'migrations');
+    const seeding = readdirSync(dir)
+      .filter((name) => name.endsWith('.sql'))
+      .filter((name) =>
+        /INSERT\s+INTO\s+ledger_accounts/i.test(readFileSync(join(dir, name), 'utf8')),
+      );
+    expect(seeding).toStrictEqual([]);
+  });
+
+  test('and no kind is tied to a code anywhere the schema can see', () => {
+    // The CHECK is on the ROW. A constraint tying the two would name both
+    // columns in one expression, and none does.
+    expect(LEDGER_SQL).not.toMatch(/CHECK\s*\([^)]*\bcode\b[^)]*\bkind\b/is);
+  });
+});
+
+describe('ADR-175: the key is ruled and this package still mints none', () => {
+  test('the entry rules the kind-prefixed spelling, and names it', () => {
+    const adr175 = read('docs', 'decisions', 'ADR-175.md');
+    expect(adr175).toContain('`wallet_withdrawal_settlement <the withdrawal');
+    expect(adr175).toContain('NAMES THE EVENT IT POSTS AND NEVER THE DOOR THAT REACHED IT');
+  });
+
+  test('LT-01s three doors are NOT re-spelled, so finding B first case still holds', () => {
+    // The ruling is forward-only. Had it re-spelled them, the case above that
+    // reads all three strings would have gone red, and this states that the
+    // green is intended rather than accidental.
+    const adr175 = read('docs', 'decisions', 'ADR-175.md');
+    expect(adr175).toContain('THREE DOORS ARE NOT RE-SPELLED');
+  });
+
+  test('and the port still holds no ledger key, because the receiver mints it', () => {
+    for (const name of ['port.ts', 'webhook.ts', 'replay.ts', 'settlement.ts', 'index.ts']) {
+      const source = read('packages', 'rail', 'src', name);
+      expect(source, name).not.toMatch(/export (function|const) \w*[Ll]edgerKey/);
     }
   });
 });
