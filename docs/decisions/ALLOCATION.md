@@ -432,8 +432,14 @@ both probes were removed with `git status --porcelain` clean after.
 | `RI-14` | **The 2026-08-28 absent-store claim, restated four times without a reader opening the file, and its row is written LATE.** The check landed on `main` in [session 316](../sessions/2026-08-28-session-316.md)'s window and this table did not learn about it until session 324, which is the note below broken once and repaired here rather than left | No reason claims a named thing does not exist while the tree exports it |
 | `RI-15` | **The four false line citations [session 316](../sessions/2026-08-28-session-316.md) found in `wiring.test.ts`**, two of them eighteen lines off inside the entry [ADR-172](ADR-172.md) wrote one session earlier to replace a false reason. It is the LOCATION half of the class `RI-14` reads the EXISTENCE half of, and the check found a FIFTH false citation in that file on its first run | No reason cites a line that does not hold the name beside it |
 
-**`RI-16` IS THE NEXT FREE NUMBER.** A session taking it writes its row here in the commit that
+| `RI-16` | **[`RI-15`](../../packages/tooling/checks/repo-invariants.mjs)'s own `covers` line, which records that it reads `docs/decisions` NOT AT ALL.** Session 329 found that while writing a plan it had been told `RI-15` would check. `RI-15` reads six source files; the other half of this corpus is 879 documents carrying 3,463 pointers, and until this check nothing mechanical followed one of them. It landed with FOUR findings, all four registered in `DOC_CITATIONS_OWNED_ELSEWHERE` and none repairable by a session holding no ADR number | No live document cites a line that does not hold the name beside it |
+
+**`RI-17` IS THE NEXT FREE NUMBER.** A session taking it writes its row here in the commit that
 writes the check, not in the ADR that names it.
+
+**`RI-16`'S ROW IS ONE COMMIT LATE AND THAT IS RECORDED TOO.** The check landed in session 333's
+first commit and this row in its third, inside the same session and the same pull request, which is
+the smallest gap the note above admits and is named rather than presented as on time.
 
 **`RI-14`'S ROW IS THE NOTE ABOVE BROKEN AND IT IS RECORDED RATHER THAN QUIETLY BACKFILLED.** The
 check landed while three sessions were live in the same file on the same night and its row was
