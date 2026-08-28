@@ -5847,3 +5847,93 @@ the unmodified tree before a line changed. **`pnpm run verify` was never run.**
 **EIGHT DEFECTS WERE SEEDED AND ALL EIGHT WERE CAUGHT**, each applied to a byte-identical copy, watched failing and reverted. **Three of them are in the migrations themselves** -- `ADJ-C3` rebound to the ledger transaction, and `admin_actions` dropped from `0026`'s revoke list -- because three of the new assertions read primary sources nobody is editing, and an assertion against such a file can be vacuous without anyone noticing.
 
 **Measured on this branch with each command run separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 204 test files / 4,452 passed / 6 skipped, `falsify.mjs` clean.** The `main` baseline of 33 / 13 / 0 / 0 / clean / 204 files / 4,443 passed / 6 skipped was reproduced exactly before a line changed; this session contributes nine cases and no test file. **No migration, no migration number, no ADR number, no `packages/db` change, no `API_CONTRACT` change, no `SystemReason` member, no `SqlExecutorReason` member, no `pg` import, no invented threshold, and [`apps/api/test/wiring.test.ts`](../apps/api/test/wiring.test.ts) untouched with its `{declared, wired, blocked}` triple unmoved.**
+
+---
+
+## Session 319: `P7-j`, the evidence-pack generator, and the strip list is a query rather than a list
+
+**[P7](plans/P7-risk-and-abuse.md) section 8's `P7-j`, THE SECOND DONE-GATE, is written.**
+[`apps/api/src/admin-source/evidence.ts`](../apps/api/src/admin-source/evidence.ts) (new),
+[`apps/api/test/admin-source-evidence.test.ts`](../apps/api/test/admin-source-evidence.test.ts) (new,
+**155 cases**) and [`apps/api/src/admin-source/index.ts`](../apps/api/src/admin-source/index.ts), the
+composition, which this session created because `P7-i` had not pushed one. **No migration number, no ADR
+number, no `SystemReason` member, no `SqlExecutorReason` member, no `pg` import, no cast past a key type,
+and no edit to [`admin-reads.ts`](../apps/api/src/routes/admin-reads.ts),
+[`wiring.test.ts`](../apps/api/test/wiring.test.ts), `schema.ts` or `scope.ts`.**
+
+**`INV-M7-10`'s MECHANISM IS NOW TESTED, WHICH [SESSION 282](sessions/2026-08-27-session-282.md) SAID THE
+SEED COULD NOT DO.** That session recorded the consequence of a uniformly `true` `is_sensitive`: a pack
+that COMPUTES its strip list and one that strips every detector UNCONDITIONALLY produce byte-identical
+output, so `GS-112` passes either way. The distinguishing fixture is a **registry**, not a seed row:
+`sensitiveParameterNames` is driven with a two-row registry whose second row is `is_sensitive: false`, and
+the two answers are asserted to DIFFER. **The union is asserted separately** and it is the reading that
+costs the most if taken per detector: `severity` and `window_trading_days` are parameters of several
+detectors at once, so one row flipped to `false` releases only the names it alone claims. The seed's
+uniformity is pinned in its own case, so **the day the column acquires its first `false` this suite goes
+red** rather than quietly absorbing it.
+
+**THE SUITE FOUND A REAL DEFECT IN THIS SESSION'S OWN CONTROL AND IT IS THE INTERESTING FINDING.** The
+"no other identity" check tested `^uuid$` against each string, which reads a value that IS an identifier
+and is blind to one that CONTAINS an identifier. **`tos_clause` is free text an operator writes during a
+dispute and `GS-112` REQUIRES a `trader` pack to carry it**, so an investigator who wrote *"coordinated
+with account `<uuid>`"* had put another identity into a trader pack through a field the pack must not
+drop, and the anchored check saw nothing at all. It is a property of every free-text column a pack
+carries. Repaired to a scan within strings, pinned by its own case, and the end-to-end refusal is watched
+firing on exactly that clause.
+
+**FOUR FINDINGS ABOUT THE CORPUS, EACH READ AT ITS SOURCE.**
+
+| # | Finding |
+| --- | --- |
+| **A** | **THERE IS NO `gate_results` TABLE AND THERE IS NOT MEANT TO BE.** `GS-112` and [API_CONTRACT:987](architecture/API_CONTRACT.md) both name "gate result" as a thing a pack carries; `grep` for `gate_results` over `packages/db` returns nothing. `SD-06` ([M01:280](plans/M01-rules-engine.md)) SPLIT it into [`rule_states.engine_gates` and `rule_states.context_gates`](../packages/db/migrations/0015_rule_states.sql), because freeze, recon, KYC and in-flight were true on the day and may not be true now. **The pack carries two columns on a rule state**, and the suite asserts them BY NAME, because a `gate_results` section built from a table that does not exist would be silently empty and would read as covered |
+| **B** | **`risk_flags` CARRIES NO ToS CLAUSE COLUMN, so the clause `GS-112` requires is not derivable from the flag.** A clause lives on the ENFORCEMENT that cites the flag: [`payout_requests.hold_tos_clause`](../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) under `payout_requests_hold_is_complete`, and `identity_restriction_episodes` under [ADR-041](decisions/ADR-041.md). An `open` flag nobody has acted on has none, and **`DEP-M7-05` still owes two of the three clause texts**. The pack carries `null` and **never invents one**: a flag-type-to-clause map written in this file would be the hand-listed drift `INV-M7-10` exists to prevent, one table over |
+| **C** | **`redaction_profile`'s VOCABULARY IS STILL UNRULED AND THIS SESSION TOOK NO ADR NUMBER.** The STRUCTURE is ruled and transcribed: [M06:299](plans/M06-admin-ops-console.md), [EC-071](edge-cases/EC-071.md) and the batch 1 gate give all four audiences a profile and collapse three into one. What no approved document spells is the two STRINGS, and [`0008_risk.sql`](../packages/db/migrations/0008_risk.sql) puts no `CHECK` on the column. `full-detail` and `trader-facts-only` are therefore **labelled as CHOSEN**, on `P7-d`'s `version: 'v1'` precedent, and **a ruling is REPORTED AS NEEDED rather than taken**: what it would fix is the two strings and a `CHECK`, never the mapping |
+| **D** | **THIS SLICE TAKES NO HANDLE OFF THE ACCESSOR AND COULD NOT.** [`src/db.ts`](../apps/api/src/db.ts) declares `scoped` and `firm` and NO `system(reason)` door, [ADR-171](decisions/ADR-171.md) refused to open one on the measurement that it unblocks none of the five admin ports, and [`db.test.ts`](../apps/api/test/db.test.ts) pins the map of which file takes which value. So the rows arrive through `EvidenceReadPort` and the row is written through `EvidencePackWriter`, and **the door remains the wiring slice's** |
+
+**THREE CONTROLS, AND THE SUITE ASSERTS THAT EACH FAILS DIFFERENTLY.** The projection is an ALLOWLIST, so
+a flag's `evidence` bag never crosses; the sweep REMOVES a key the computed strip list claims; and
+`assertTraderPackIsClean` re-derives both answers over the finished document and **THROWS rather than
+repairing**, because quietly deleting a key would ship a pack whose author never learned it leaked.
+Nothing is stored and no row is written when it fires, asserted end to end. **`AS-M6-01` is permanent
+damage on a single occurrence**, which is why the negatives are stated one at a time: seventy-eight cases,
+one per seeded parameter name, so an incident reads WHICH name leaked rather than "the pack leaked".
+
+**A BARE `2` IS NOT A THRESHOLD BY ITS VALUE, IT IS A THRESHOLD BY THE NAME IT ARRIVES UNDER.**
+`quantity: 2` is a trader fact and `window_seconds: 2` is a detector internal, and no value-based filter
+distinguishes them. That is why `INV-M7-10`'s list is NAMES, and the suite asserts both halves: the
+distinctive threshold values the fixture carried are absent, and the small integers that are trader facts
+survive.
+
+**`evidence.pack_exported` IS NOT EMITTED AND IS REPORTED AS OWED.** [M06:263](plans/M06-admin-ops-console.md)
+says the event now carries `audience` and `redaction_profile`, and the event catalogue is outside this
+fence. **The audit is not lost by the omission**: `0008_risk.sql`'s own header says export is *"ITSELF AN
+AUDITED ACT"* about the ROW, and `INV-M6-05` is satisfied by the row this slice writes.
+
+**THE COLLISION `P7` PREDICTED ON [`admin-source/index.ts`](../apps/api/src/admin-source/index.ts) HAS NOT
+HAPPENED YET AND IS STILL COMING.** `P7-i` owns that file this wave, had pushed no branch and landed
+nothing on `main` when this slice finished, so the composition was created here rather than edited.
+**It is written for the merge**: a `Partial<AdminReadSource>` whose unimplemented methods THROW WITH THEIR
+OWN NAME, so the keep-both merge that P7 section 5.5 says type-checks while dropping a leg answers
+*"no module supplies `listFlags`"* at the first request instead of compiling into silence. **Whoever
+resolves that conflict keeps BOTH keys and re-reads the file; a green typecheck is not evidence.**
+
+**Measured on this branch with `pnpm install` first and each command run separately: 33 of 33 gates,
+14 of 14 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 205 test files / 4,604
+passed / 6 skipped.** The baseline was reproduced on the dispatch tree before a line changed and read
+**33 of 33 / 13 of 13 / 0 / 0 / clean / 204 files / 4,443 passed / 6 skipped**; the invariant count moved
+from 13 to 14 because `RI-14` landed on `main` mid-session and was merged in, not because this slice
+touched [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs). **This session contributes
+one module, one composition file and 155 cases.**
+
+**AND WRITING THAT LOG FOUND A LATENT DEFECT IN [`scripts/corpus/gates.mjs`](../scripts/corpus/gates.mjs),
+REPORTED AND NOT REPAIRED.** Its span writer interpolates the generated text into the **replacement**
+argument of `String.prototype.replace`, and a replacement string is not literal text: JavaScript gives it
+a substitution vocabulary whose members can insert the parts of the subject the match did not cover. A
+session-log index line carrying a dollar sign immediately before a backtick therefore wrote **the entire
+text preceding the span back into the span**, taking [`docs/sessions/README.md`](sessions/README.md) from
+549 lines to 743 with its own frontmatter inside the generated table. **`generate` exited 0 and reported
+one span rewritten; `CI-06g` failed on the next run**, which is the gate working. **Re-running `generate`
+does not heal it**, because each run rewrites the corruption. The exposure belongs to any span whose query
+returns prose rather than an integer. The repair is one line in that runner, passing a FUNCTION as the
+replacement so the substitution vocabulary is suppressed, and it is **outside this slice's fence**: the
+prose was changed instead, which fixes the occurrence and not the class.
