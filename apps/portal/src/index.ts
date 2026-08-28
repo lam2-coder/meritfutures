@@ -27,12 +27,22 @@
 // satisfy (INV-M4-08), and a branded `DisclosureBlock` for the two compliance
 // obligations that are not rule text (INV-M4-09, NFA I-26-12).
 //
-// SEVEN OF SECTION 3.1's ELEVEN SCREENS EXIST. The four that do not are
-// SC-M4-01 and SC-M4-11 (one auth surface, money path, and P4 section 4.4 says
-// inventing a phase for it "is not a plan's to do"), SC-M4-04 the payout centre
-// and SC-M4-10 the wallet, which P4 section 6 gives to P5 because both read a
-// surface P5 creates. `surface.test.ts` asserts the boundary rather than
-// promising it, and this app is the wrong side of it by construction.
+// EIGHT OF SECTION 3.1's ELEVEN SCREENS EXIST, AND THE COUNT IS DERIVED FROM
+// `next build`'s OWN ROUTE TABLE RATHER THAN FROM THIS PARAGRAPH'S PREDECESSOR.
+// It read "SEVEN ... The four that do not are SC-M4-01 and SC-M4-11 ...,
+// SC-M4-04 the payout centre and SC-M4-10 the wallet", and SC-M4-04 has been
+// built since: `app/payouts/` is a route, `view.ts` is its view model and
+// `test/payout-center.test.ts` renders it. So the screens with a route are
+// SC-M4-02 `/accounts`, SC-M4-03 `/accounts/[account]`, SC-M4-04 `/payouts`,
+// SC-M4-05 `/calendar/[accountId]/rules`, SC-M4-06 `/purchases`, SC-M4-07
+// `/kyc`, SC-M4-08 `/certificates` and SC-M4-09 `/referrals`.
+//
+// THE THREE THAT DO NOT ARE SC-M4-01, SC-M4-10 AND SC-M4-11, and the reason is
+// unchanged for each: SC-M4-01 the auth surface and SC-M4-11 security and
+// sessions are money path under CLAUDE.md's regime table and get their own
+// ADR-003 sessions, and SC-M4-10 the wallet reads a surface P5 creates.
+// `surface.test.ts` asserts the boundary rather than promising it, and this app
+// is the wrong side of it by construction.
 //
 // EVERYTHING THAT CHANGES ANYTHING IS ABSENT, AND DELIBERATELY. No auth, no
 // session handling, no payout request, no destination change, no contact
@@ -41,10 +51,14 @@
 // own fresh context. A read-only session that had started on the elevation
 // prompt would have spent that session's budget with none of its care.
 //
-// THERE IS TRANSPORT NOW, AND IT IS ONE FILE. `src/http/client.ts`, ADR-162,
-// and `app/payouts/` is the one segment wired to it. The other five still
-// render from ports and reach nothing; each is one `load` function and a guard,
-// and none of them needs a second client.
+// THERE IS TRANSPORT NOW, AND IT IS ONE FILE. `src/http/client.ts`, ADR-162.
+// THE SENTENCE THAT FOLLOWED IT IS CORRECTED RATHER THAN LEFT STANDING: it read
+// "`app/payouts/` is the one segment wired to it. The other five still render
+// from ports and reach nothing", and the other five have since been wired. All
+// SIX segments reach the client today -- `(purchases)/source.ts`,
+// `accounts/source.ts`, `calendar/load.ts`, `kyc/source.ts` and `kyc/page.ts`,
+// `payouts/source.ts`, `referrals/data.ts` and `referrals/page.ts` -- and there
+// is still exactly one client, which is what the old sentence was protecting.
 //
 // THE FRAMEWORK ARRIVED AND THIS PARAGRAPH IS CORRECTED RATHER THAN LEFT
 // STANDING. It read "the workspace holds no Next.js, and admitting one is a
@@ -60,25 +74,43 @@
 export const SERVICE = 'portal' as const;
 
 /**
- * Not an application yet. It is a deployable that starts.
+ * The `main` a `node src/index.ts` invocation would reach, which is not how this
+ * application is served.
  *
- * IT STILL PRINTS "no surface yet" AND THAT IS ACCURATE RATHER THAN STALE.
- * There are view models and no server: nothing here listens on a port, and a
- * line claiming otherwise would be the first false statement in a module whose
- * whole subject is not making false statements on a screen.
+ * "no surface yet" WAS ACCURATE AND IS NOW FALSE, SO THE LINE MOVES. The old
+ * comment argued the string was "accurate rather than stale ... nothing here
+ * listens on a port, and a line claiming otherwise would be the first false
+ * statement in a module whose whole subject is not making false statements on a
+ * screen". `pnpm --filter @merit/portal build` prints a route table of TWELVE
+ * entries and `next start` listens, so the false statement is now the old one
+ * and the same argument requires the repair.
+ *
+ * WHAT IT SAYS INSTEAD IS THE THING A READER OF THIS ENTRY POINT NEEDS. `next`
+ * serves `src/app/`; nothing routes through this function, and a caller who
+ * reached it wanted the framework's server rather than this module's.
  */
 export function main(): void {
-  console.log(`merit ${SERVICE}: no surface yet`);
+  console.log(`merit ${SERVICE}: served by \`next start\`, not by this entry point`);
 }
 
 // -----------------------------------------------------------------------------
 // The wire shapes this app reads. API_CONTRACT sections 3 and 6, transcribed.
 // -----------------------------------------------------------------------------
+// EVERY NAME `./api/types.ts` EXPORTS APPEARS BELOW, AND THAT IS NOW MECHANICAL.
+// `test/api-types.test.ts` derives both lists from the two files and fails on a
+// name in one and not the other, so this block cannot fall behind that file the
+// way it had. `CursorPage` and the two page bounds are what it caught: the
+// envelope every paginated endpoint in section 1 returns was reachable from
+// three modules inside this application and from nothing outside it, so a
+// consumer could name `MarkListItem` and could not name the shape the endpoint
+// actually sends. The bounds are the contract's own numbers and the alternative
+// to exporting them is the next caller writing `25` and `100` as literals.
 export type {
   AccountDetail,
   AccountListItem,
   AffiliateStats,
   CertificateResponse,
+  CursorPage,
   EconomicCalendarFreshness,
   EconomicCalendarOccurrence,
   EconomicCalendarPanelResponse,
@@ -94,6 +126,7 @@ export type {
   PurchaseListItem,
   TimelineItem,
 } from './api/types.ts';
+export { PAGE_LIMIT_DEFAULT, PAGE_LIMIT_MAX } from './api/types.ts';
 
 // -----------------------------------------------------------------------------
 // ADR-162. The one file in this application that performs a network call.
