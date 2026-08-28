@@ -461,6 +461,32 @@ describe('the approval line, second half: an unverified signature never reaches 
   });
 });
 
+// GS-038 IS THE ROW THIS BLOCK AND THE DUPLICATE BLOCK ABOVE ARE FOR, AND IT IS
+// NOT DISCHARGED BY THIS SUITE. The id is written here so the next reader meets
+// the reasoning rather than repeating the search, and NOT as a discharge: a
+// grep that finds `GS-038` in this file has found this paragraph.
+//
+// The row is B4 item 9, "PSP duplicate and out-of-order delivery", against "one
+// account, correct final state".
+//
+//   THE DUPLICATE HALF IS ASSERTED WHOLE, above: one event twice is one effect
+//   and two indistinguishable 200s, with a SEED that lands the effect twice when
+//   the uniqueness check is removed, a rollback that discards the application
+//   rather than only the row, a two-different-events control and a
+//   same-id-other-provider control.
+//
+//   THE OUT-OF-ORDER HALF IS ASSERTED AS FAR AS THE DEFERRAL AND NO FURTHER.
+//   What runs below is that the event is accepted, applies nothing, stores its
+//   re-drive window, stamps no `processed_at` and no `purchase_id`, and stays
+//   one row across a redelivery. "Re-evaluated" is in this block's title and
+//   executes nowhere: `defer_attempts` counts RE-DRIVES, the receiver never
+//   increments it and says so, and the re-driver is the batch's. No batch in
+//   this tree reads `psp_webhook_events_deferred_idx`, so an out-of-order
+//   delivery stops at `out_of_order_deferred` and never reaches the correct
+//   final state the row pins.
+//
+// The row therefore stays `blocked` in section 39 with that half named. It moves
+// when the re-driver lands and is asserted, not when this comment is read.
 describe('B4 #9: out-of-order delivery is DEFERRED and re-evaluated, never applied', () => {
   test('a deferred event stores its re-drive window and applies nothing', async () => {
     const store = new FakeWebhookStore();

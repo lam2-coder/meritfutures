@@ -64,7 +64,6 @@ import { useAuthBackend } from './routes/auth.ts';
 import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
 import { databaseMethodDefinitions, setMethodDefinitionSource } from './routes/public-methods.ts';
 import { databaseWalletBackend, useWalletBackend } from './routes/wallet.ts';
-import { databaseWithdrawalBackend, useWithdrawalBackend } from './routes/wallet-withdrawals.ts';
 
 useAuthBackend(databaseAuthBackend(LIVE_DB));
 useAccountsBackend(databaseAccountsBackend(LIVE_DB));
@@ -96,24 +95,6 @@ useCatalogReads(databaseCatalogReads(LIVE_DB));
 // 'operator-console'`, and ADR-165 refused to widen it. Wiring the read does not
 // reach that and must not be read as having reached it.
 useWalletBackend(databaseWalletBackend(LIVE_DB));
-
-// `POST /wallet/withdrawals`, over the scoped door, with the idempotency store.
-//
-// THE EXTERNAL LEG IS WIRED AND IT POSTS NOTHING, which is the distinction this
-// line stands or falls on. `databaseWithdrawalBackend` is `db.scoped`, a clock
-// and `databaseIdempotencyStore`: five keyed reads, `lockScope()`, and at most
-// two INSERTs, into `payout_destinations` and `wallet_withdrawals`. There is no
-// `LedgerTx` on `WithdrawalTx` at all -- `payouts.ts`'s `PayoutTx` declares one
-// and this port deliberately does not -- so installing it grants no authority to
-// post, and the row it writes reaches `requested` or `cooling` and no further.
-//
-// WHAT IS STILL 503 IS THE APPROVAL, AND IT IS 503 BY HAVING NO DOOR RATHER THAN
-// BY AN UNWIRED PORT. `requested --> approved` under `G-WITHDRAWAL-CLEARED` and
-// `cooling --> approved` under `G-COOLING-ELAPSED` have no driver anywhere in
-// this tree, and the `LT-06` that edge carries is a ruling session 303 reported
-// and did not take. Wiring the creation does not reach that and must not be read
-// as having reached it.
-useWithdrawalBackend(databaseWithdrawalBackend(LIVE_DB));
 
 // `GET /public/methods/:statCode`, over the FIRM door.
 //

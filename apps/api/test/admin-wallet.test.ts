@@ -211,11 +211,25 @@ describe('API_CONTRACT section 8', () => {
  * as a column of `impersonation_sessions` and a document-wide `not.toContain`
  * would be asserting something true about a different endpoint. What is claimed
  * here is that THIS row's body has no such field.
+ *
+ * NARROWED FURTHER TO THE FENCED `ts` BODY BY ADR-173, WHICH IS THE LANDMINE
+ * SESSION 298 RECORDED ARRIVING. That session's own note reads: a widening grep
+ * that does not strip the prose "will get a test that fails on the file
+ * documenting a refusal and passes on the file making one". ADR-173 added a
+ * paragraph BELOW this row's body naming `account_adjustments.reason_code` in
+ * order to explain why the wire carries no such field, and the row-wide slice
+ * read that explanation as the field itself. Every assertion below already
+ * targets content inside the fence, so the narrowing removes the false positive
+ * and weakens no claim: what is asserted is still that THIS row's BODY has no
+ * such field, which is what the paragraph above always said was meant.
  */
 const CORRECTION_BLOCK = (() => {
   const start = CONTRACT.indexOf(`### POST ${WALLET_CORRECT_PATH}`);
   const end = CONTRACT.indexOf('### POST /admin/wallet/:identityId/spend-limit', start);
-  return CONTRACT.slice(start, end);
+  const row = CONTRACT.slice(start, end);
+  const open = row.indexOf('```ts');
+  const close = row.indexOf('```', open + 5);
+  return row.slice(open, close);
 })();
 
 /** The `Auth:` paragraph of one contract row, which carries the roles and the error set. */
@@ -236,6 +250,13 @@ function authLineFor(path: string): string {
 // four constraints refuse, and every one of the four is read at its own source
 // here so that "the endpoint is unwired" cannot be mistaken for "nobody got round
 // to it".
+//
+// ADR-173 RULED THE FIRST OF THE FOUR AND THREE STILL STAND, SO THE APPEND IS
+// STILL UNWRITABLE AND `admin-wallet.ts` IS UNCHANGED. What moved is the CONTRACT
+// half of item 1, not the schema half: `wallet_entries.reference_id` is still a
+// uuid bound to the adjustment's id, and what a correction corrects is recorded
+// in `admin_actions.before.corrected_entry` rather than in any column. Item 1's
+// assertion is inverted below and items 2, 3 and 4 are untouched.
 
 describe('the four constraints that refuse the correction as the contract writes it', () => {
   const wallet = readFileSync(join(REPO, 'packages/db/migrations/0011_wallet.sql'), 'utf8');
@@ -247,12 +268,24 @@ describe('the four constraints that refuse the correction as the contract writes
   it('1. `reference_id` is a uuid and `wallet_entries.id` is a bigint', () => {
     expect(wallet).toContain('reference_id           uuid NOT NULL');
     expect(wallet).toContain('id                     bigint GENERATED ALWAYS AS IDENTITY');
-    // And the contract instructs the impossible assignment in so many words.
-    expect(CORRECTION_BLOCK).toContain('the entry being compensated. Becomes `reference_id`');
     // ADJ-C3 requires that column to be the ADJUSTMENT's id, which is a uuid, so
     // the two claims on one column are not merely differently typed: they are
     // two different rows.
     expect(adjustments).toContain('w.reference_id           = NEW.id');
+    // THE SCHEMA FACTS ABOVE ARE UNCHANGED AND THE CONTRACT'S CLAIM IS NOT.
+    // This assertion read `toContain('the entry being compensated. Becomes
+    // `reference_id`')` until ADR-173 ruled that sentence wrong and deleted it:
+    // the write it instructs fails on `invalid input syntax for type uuid`
+    // before any constraint is reached, so it was never possible in any
+    // deployment. The pin is INVERTED rather than dropped, because a deleted
+    // assertion is how the sentence would come back.
+    expect(CORRECTION_BLOCK).not.toContain('Becomes `reference_id`');
+    expect(CORRECTION_BLOCK).toContain('it does NOT become `reference_id`');
+    // AND THE FIELD IS OPTIONAL, which is the half of ADR-173 the dispatch did
+    // not predict: a `goodwill` adjustment corrects no entry at all and the
+    // database accepts one, so a REQUIRED field would make a case `0038` built
+    // for unreachable through the only endpoint that reaches it.
+    expect(CORRECTION_BLOCK).toContain('corrects_entry_id?: string;');
   });
 
   it('2. a correcting debit must exactly reverse a prior adjustment credit', () => {
