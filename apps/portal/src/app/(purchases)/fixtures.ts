@@ -1,16 +1,23 @@
 // =============================================================================
 // apps/portal/src/app/(purchases)/fixtures.ts
 // =============================================================================
-// THE DATA THESE TWO PAGES RENDER UNTIL THEIR ROUTES EXIST, AND IT IS NAMED
-// `fixtures` SO THAT NOBODY HAS TO READ A COMMENT TO KNOW IT.
+// THE DATA THE SUITE RENDERS THESE TWO SCREENS FROM, AND IT IS NAMED `fixtures`
+// SO THAT NOBODY HAS TO READ A COMMENT TO KNOW IT.
 //
-// Session 253 is writing `GET /purchases` and `GET /plans/:planId/versions/:v`
-// concurrently, `GET /accounts/:accountId/certificate` is owned by no session at
-// all, and no contract row serves `content_documents` to the portal (./ports.ts
-// says all three at length). So the pages import `FIXTURE_PORTS` BY NAME, from a
-// file called `fixtures.ts`, and the seam is the import line of each page rather
-// than a binding buried in a module. When the routes land, two import lines move
-// and nothing else in this segment does.
+// THE PROMISE THIS HEADER MADE HAS BEEN KEPT AND THE RECEIPT IS THE DIFF. It
+// read: "the pages import `FIXTURE_PORTS` BY NAME, from a file called
+// `fixtures.ts`, and the seam is the import line of each page rather than a
+// binding buried in a module. When the routes land, two import lines move and
+// nothing else in this segment does." The routes landed, ADR-162 landed the
+// client, and the two import lines moved to ./source.ts. ./model.ts,
+// ./purchases-screen.ts and ./certificates-screen.ts are untouched.
+//
+// SO NOTHING BELOW IS SERVED TO ANYBODY AND THE FILE IS NOT DELETED. It is the
+// second implementation of ./ports.ts, and `apps/portal/test/purchases.test.ts`,
+// `./page-purchases.test.ts` and `./page-certificates.test.ts` render both
+// screens from it, including the certificate cases a real deployment cannot
+// produce yet: a card that arrived with a blank `verify_url` is AS-M4-03's case
+// and is not a thing a test can wait for a backend to send.
 //
 // THE VALUES ARE THE CORPUS'S OWN AND NOT INVENTED ONES. The rules object is
 // Core EOD as `DATA_MODEL` section 11 materializes it at the frozen
