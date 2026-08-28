@@ -195,6 +195,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-174](ADR-174.md) | `LT-07` is not a posting with one bad leg, it is a posting whose two legs are on the wrong sides, so no code is minted and `0052` returns to the pool unspent  (2026-08-28, status: proposed) |
 | [ADR-175](ADR-175.md) | the two ledger idempotency conventions are one rule under two spellings, and the rule is that a key names the EVENT and never the DOOR  (2026-08-28, status: proposed) |
 | [ADR-176](ADR-176.md) | the request path records the approval and does not post it, and the key it must store to make that safe (2026-08-28, status: proposed) |
+| [ADR-178](ADR-178.md) | the flag queue sorts by corroboration first, the contract's severity-then-age is kept as the order within a band, and the depth goes on the wire because the assertion cannot check a key it cannot see (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

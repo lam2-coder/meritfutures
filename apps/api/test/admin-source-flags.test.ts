@@ -25,15 +25,23 @@
 //    rather than out of invented strings.
 //
 // -----------------------------------------------------------------------------
-// THE COLLISION IS ASSERTED HERE RATHER THAN LEFT IN A COMMENT
+// SECTION 8 CHANGED DELIBERATELY WHEN ADR-178 RULED, AND HERE IS WHAT IT WAS
 // -----------------------------------------------------------------------------
-// Section 8. API_CONTRACT section 8 sorts this queue by severity then age,
-// `routes/admin-reads.ts` enforces that flat across the page, and a
-// corroboration page violates it by construction. Both sentences are read out of
-// their own documents at run time and the violation is asserted as a fact, so
-// the day either document moves this suite says so instead of a 500 discovering
-// it in front of an operator. `admin-reads.ts` is `P7-b`'s file and is NOT
-// edited by this slice.
+// IT USED TO ASSERT THE COLLISION AS A FACT. API_CONTRACT section 8 sorted this
+// queue by severity then age, `routes/admin-reads.ts` enforced that FLAT across
+// the page, and a corroboration page violated it by construction; both sentences
+// were read out of their own documents at run time and the violation was pinned,
+// so a wiring slice would meet a red test rather than a 500.
+//
+// **ADR-178 RULED, SO THE FACT IS NO LONGER TRUE AND THE ASSERTION IS INVERTED
+// RATHER THAN DELETED.** Corroboration depth is the first key and `AS-M7-03`
+// clause 3 stands unamended; API_CONTRACT section 8 is amended to scope its
+// "severity then age" to the order WITHIN one corroboration band; and
+// `assertFlagOrder` was retargeted from two keys to three. So section 8 now
+// reads BOTH amended sentences out of their own documents and asserts that the
+// `GS-120` page PASSES the route's assertion, which is the same collision
+// watched from the other side. A deleted case would have left the ruling
+// unpinned at exactly the point it is load bearing.
 // =============================================================================
 
 import { readFileSync } from 'node:fs';
@@ -67,7 +75,7 @@ import {
   composeImplementedAdminReads,
 } from '../src/admin-source/index.ts';
 import type { AdminSourceTx } from '../src/admin-source/index.ts';
-import { AdminReadError } from '../src/routes/admin-reads.ts';
+import { AdminReadError, assertFlagOrder } from '../src/routes/admin-reads.ts';
 import type { FlagListItem, FlagListQuery } from '../src/routes/admin-reads.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -746,32 +754,27 @@ describe('evidence_summary', () => {
 describe('the ordering this queue is given and the ordering the route enforces', () => {
   const CONTRACT = read(join(REPO, 'docs', 'architecture', 'API_CONTRACT.md'));
   const M07 = read(join(REPO, 'docs', 'plans', 'M07-risk-abuse.md'));
-  const ADMIN_READS = read(join(APP, 'src', 'routes', 'admin-reads.ts'));
 
   it('reads both sentences out of their own documents, because a paraphrase is what drifts', () => {
-    // API_CONTRACT section 8, `GET /admin/flags`.
+    // API_CONTRACT section 8, `GET /admin/flags`, AS AMENDED BY ADR-178.
     expect(CONTRACT).toContain(
-      'Sorted by severity then age. Filterable by type, status, severity.',
+      'Sorted by corroboration depth, then severity, then age ([ADR-178](../decisions/ADR-178.md), **AMENDED**). Filterable by type, status, severity.',
     );
-    // M07 AS-M7-03 clause 3.
+    // ADR-178 kept the old sentence rather than deleting it, and scoped it. If
+    // the scoping clause goes, the amendment has been half reverted.
+    expect(CONTRACT).toContain('It is the order **within one corroboration band**');
+    // M07 AS-M7-03 clause 3, UNAMENDED. ADR-178 moved the contract and not this.
     expect(M07).toContain(
       'The queue sorts by the number of **independent** detector families implicated on an identity, not by raw flag count.',
     );
   });
 
-  it('finds the route still enforcing severity monotonically across the page', () => {
-    // `assertFlagOrder` is module private, so this reads the refusal at its
-    // source. The day `P7-b`'s owner changes it, this case says so.
-    expect(ADMIN_READS).toContain('function assertFlagOrder');
-    expect(ADMIN_READS).toContain('if (previous.severity < current.severity)');
-  });
-
-  it('produces a page that assertFlagOrder refuses, which is the collision as a fact', async () => {
+  it('hands the GS-120 page to the route assertion itself and is accepted', async () => {
     // GS-120's own fixture: the corroborated identity is at severity 2 and the
-    // noisy one at 3, so the page inverts severity by construction. THIS IS NOT
-    // A DEFECT IN THIS ADAPTER. It is two approved documents stating different
-    // sorts for one queue, and it is asserted here so the wiring slice meets it
-    // as a red test rather than as a 500 in front of an operator.
+    // noisy one at 3, so the page STILL inverts severity. Before ADR-178 that
+    // inversion was a refusal and this case asserted it as a fact. The ruling
+    // made the inversion legal WITHIN the ordering that produced it, and the
+    // proof is the route's own function rather than a paraphrase of it.
     const { tx } = flagsTx(
       tablesOf([
         { id: 'ring-a', identityId: 'ring', detector: 'D-02', severity: 2 },
@@ -782,10 +785,41 @@ describe('the ordering this queue is given and the ordering the route enforces',
     );
     const { page } = await readFlagQueue(tx, query());
 
+    // The inversion is still there, which is why the ruling was needed.
     const inversions = page.data.filter(
       (item, index) => index > 0 && (page.data[index - 1]?.severity ?? 0) < item.severity,
     );
     expect(inversions.map((item) => item.flag_id)).toStrictEqual(['noise-1']);
+    // And the route accepts it now, because depth is on the wire and leads.
+    expect(page.data.map((item) => item.corroboration_depth)).toStrictEqual([3, 3, 3, 1]);
+    expect(() => {
+      assertFlagOrder(page.data);
+    }).not.toThrow();
+  });
+
+  it('still refuses a page that inverts severity INSIDE one corroboration band', () => {
+    // THE RULING WIDENED NOTHING. Within a band the contract's sentence is
+    // enforced exactly as it was before, and this is the case that says the
+    // retargeting did not quietly become a no-op.
+    const at = (flag_id: string, severity: 1 | 2 | 3 | 4 | 5, depth: number): FlagListItem => ({
+      flag_id,
+      identity_id: 'i',
+      account_id: null,
+      flag_type: 'copy_cluster',
+      severity,
+      status: 'open',
+      first_detected_on: '2026-08-01',
+      detector: 'D-01',
+      evidence_summary: '',
+      corroboration_depth: depth,
+    });
+    expect(() => {
+      assertFlagOrder([at('a', 2, 3), at('b', 5, 3)]);
+    }).toThrow(/sorts WITHIN a corroboration band/);
+    // And a page whose FIRST key inverts is refused where it never used to be.
+    expect(() => {
+      assertFlagOrder([at('a', 5, 1), at('b', 2, 3)]);
+    }).toThrow(/sorts this queue by corroboration first/);
   });
 });
 
