@@ -199,6 +199,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-178](ADR-178.md) | the flag queue sorts by corroboration first, the contract's severity-then-age is kept as the order within a band, and the depth goes on the wire because the assertion cannot check a key it cannot see (2026-08-28, status: proposed) |
 | [ADR-179](ADR-179.md) | the redaction vocabulary is closed at two members, it was open at exactly one line rather than at a call site, and each member's promise is written per member because the corpus states it three times in three different lengths (2026-08-28, status: proposed) |
 | [ADR-180](ADR-180.md) | `firm_treasury` is an asset, so the prose is right, the three postings written against it are backwards, and `M05` section 2.1 is amended rather than left standing  (2026-08-28, status: proposed) |
+| [ADR-181](ADR-181.md) | the external leg's in-flight obligation is a firm-scoped liability and none of the seven codes can hold it, so the shape is ruled and `0054` returns to the pool unspent  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

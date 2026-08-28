@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->171<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->172<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -6318,3 +6318,112 @@ after it.**
 **NO ADR NUMBER, NO MIGRATION NUMBER, no `SD-M6-nn`, no `GS-nnn`, no `M6-N-nn`, no `SystemReason` member, no `SqlExecutorReason` member, no `pg` import, no hostname and no `fetch`.** `packages/ledger`, `packages/db/migrations`, `docs/plans/M05-payout-system.md`, `docs/architecture/STATE_MACHINES.md`, `docs/plans/WAVE-06-admin-console-transport.md`, `apps/api/test/wiring.test.ts` and `packages/tooling/**` are untouched.
 
 **Measured with `pnpm install` first and each command run separately, `pnpm run verify` never run: 33 of 33 gates, 15 of 15 invariants, typecheck 0, lint 0, format:check clean, 213 test files / 5,035 passed / 6 skipped, `falsify.mjs` clean with the tree clean after it.** The `main` baseline of 33 / 15 / 0 / 0 / clean / **213 files / 5,028 passed / 6 skipped** was reproduced exactly on a branch sitting at `origin/main` (`3c95dda`) before a line changed, and `apps/admin` moved from **200 passing tests in 8 suites to 207 in 8**. **`WAVE-06` section 11 rule 7 states the baseline as 212 files / 4,981 passed, which was `main` when the plan was written and is not `main` now**; the dispatch's figures are the ones that reproduced.
+
+---
+
+## The in-flight obligation is a firm-scoped liability, no code can hold it, and `0054` returns to the pool unspent (2026-08-28, session 330)
+
+**[ADR-181](decisions/ADR-181.md) lands, `status: proposed`, approval line UNSIGNED, and `0054` IS
+NOT TAKEN.** [ADR-174](decisions/ADR-174.md) section 3 declined to rule which account carries the
+external leg's in-flight obligation and named three shapes, each of which needed an answer to its
+finding (C). [ADR-180](decisions/ADR-180.md) supplied that answer. **This entry rules the shape.**
+
+**THE RULING IS SHAPE (i), AND ITS CLASS AND SCOPE ARE DERIVED RATHER THAN CHOSEN.** The sign is
+read out of [`posting.ts:235-236`](../packages/ledger/src/posting.ts) and not assumed. `LT-06`
+DEBITS `trader_wallet`, so its open slot is a CREDIT; `LT-07` CREDITS `firm_treasury`, so its open
+slot is a DEBIT. **One account rises when the trader's claim is extinguished and falls when the
+cash leaves, which is an obligation**, and [ADR-174](decisions/ADR-174.md) clause 3 keeps `LT-07`
+firm-only. So: a **FIRM-SCOPED `liability`**.
+
+**NONE OF THE SEVEN DECLARED CODES CAN HOLD ONE, AND EACH REFUSAL HAS ITS OWN STEP.** Two firm codes
+are ruled another kind by [`0052`](../packages/db/migrations/0052_chart_of_accounts.sql) and
+[`0053`](../packages/db/migrations/0053_firm_treasury_kind.sql), read out of the constraint the
+migration set INSTALLS rather than out of either file by name. Three liability codes are per
+identity. **The two silences are refused on what the tree says they ARE rather than on their
+silence**: [`checkout.ts:1682`](../apps/api/src/routes/checkout.ts) calls crediting `psp_clearing`
+booking a receivable, which is an ASSET, and `SD-M5-03` anchors `reserve` outside this ledger on
+purpose, so giving it this posting makes the `RCR` numerator grow as withdrawals are approved.
+
+**SHAPE (ii) IS REFUSED ON A COST AND NOT ON BEING WRONG.** Deleting `LT-06` inverts
+[M20:156](plans/M20-wallet.md)'s ruled halt behaviour, *"the halt is holding a transfer, not a
+claim"*, in a module this session does not own, and
+[STATE_MACHINES section 3.2](architecture/STATE_MACHINES.md)'s middle state exists to be the
+interval this obligation stands in. **Shape (iii) is refused because a code ruled a liability BY
+the posting that needed one is [`0009:46`](../packages/db/migrations/0009_ledger.sql)'s failure
+with the direction reversed**, and it would be harder to see because it mints nothing.
+
+**THE SECOND FINDING IS WHY THE MIGRATION NUMBER STAYS IN THE POOL, AND IT IS A MEASUREMENT RATHER
+THAN A PREFERENCE.** [ADR-174](decisions/ADR-174.md) finding 3 priced the eighth code at *"TWO
+merged migrations and a third statement in TypeScript"*. **It is thirteen files, SEVEN of them
+outside this session's fence**, and one is [GLOSSARY](GLOSSARY.md)'s class list, which
+[`0027:104`](../packages/db/migrations/0027_triggers_invariants.sql) records as the control that
+actually caught `firm_payable`. **A migration widening the vocabulary while GLOSSARY still says
+seven has disabled the control that caught the last one.** Two further grounds: `0009`'s CHECK and
+`0027`'s `LEDGER-C2` are a two-guard design that one migration defeats by construction, which is
+what [`0027:97-100`](../packages/db/migrations/0027_triggers_invariants.sql) anticipates in terms;
+and **minting it today unblocks nothing**, because `LT-06`'s debit leg is per identity and nothing
+in this tree creates an identity ledger account ([ADR-177](decisions/ADR-177.md) section 7 clause
+3). **NO NAME IS MINTED EITHER**, and two spellings are refused in advance: `firm_payable`, because
+[`probe_ledger_constraints.sql:84`](../scripts/db/probe_ledger_constraints.sql) uses it as the live
+negative fixture, and any `payouts_*` spelling, because that is the internal leg's word and
+`SD-M5-07` retired a pooled `payouts` class.
+
+**EXECUTED, NOT BELIEVED.** PostgreSQL 16, `0001` through `0053` applied forward-only from empty
+under `ON_ERROR_STOP`, 114 base tables, `ledger_accounts` at exactly two rows. Both guards fire
+INDEPENDENTLY, with guard two watched after guard one was dropped inside a transaction, which
+[ADR-174](decisions/ADR-174.md) finding 3 asserted from DDL. The `ELSE true` hole is open for
+exactly two codes. **AND THE WHOLE SHAPE WAS BUILT END TO END AND POSTS CORRECTLY**: both guards
+superseded, a sixth constraint arm, the row seeded firm-scoped `liability`, and `LT-06` and `LT-07`
+posted at 25,000 cents with zero-sum, `LEDGER-C1` and `LEDGER-C2` all passing and a global sum of
+**0**. The obligation stands at `-25000` cents between the two moments and 0 after both. **The
+refusal is about a transcription set and a control, not about whether the arithmetic works.**
+
+**THE ZERO ON THE OBLIGATION ACCOUNT IS NOT [ADR-174](decisions/ADR-174.md)'s ZERO.** That entry's
+zero was on `firm_treasury`, the cash account, and it was the fingerprint of the defect. An
+in-flight obligation returning to zero once both legs have run is the account doing its job.
+
+**FOUND AND NOT IN THE DISPATCH: `wallet_withdrawals` HAS A TERMINAL `failed` STATE WITH NO LEDGER
+POSTING ANYWHERE IN THE CORPUS.** [STATE_MACHINES section 3.2](architecture/STATE_MACHINES.md) draws
+`transferring --> failed: G-TRANSFER-EXHAUSTED` and rows it with `wallet.withdrawal_failed`;
+[M05](plans/M05-payout-system.md) section 2.1 declares eight transactions and not one of them is a
+wallet withdrawal that failed on the rail. **A rail-exhausted withdrawal therefore strands the
+obligation**: the wallet claim is gone, no cash left, and the trader's money is in neither place
+they could be shown it. **It is the one genuine argument for shape (ii)** and the entry says so.
+**No ninth transaction is minted and no id is claimed for one**, because that is a design and a
+member of a declared identifier series; the repair is owed and `SD-M5-05`'s `reversal_of` is the
+mechanism it will use.
+
+**A SECOND LANDMINE, MEASURED.** `M05`'s line numbers are cited from `docs/` and from merged
+migrations and **nothing checks them**: `RI-15` reads six named SOURCE files and its own `covers`
+line records that it reads `docs/` *"NOT AT ALL"*.
+[`0038`](../packages/db/migrations/0038_account_adjustments.sql)'s header cites `M05:560` for the
+batch 1 gate's recognition ruling; `M05:560` is a row of the alarm table and the ruling is at
+`M05:151`. A merged migration is never edited, so that citation is stale forever. **This session's
+amendment to `M05` is LINE-COUNT NEUTRAL for exactly this reason.**
+
+**`M05` section 2.1's `LT-06` and `LT-07` rows are AMENDED ADDITIVELY.** Each keeps every word it
+carried, the `NOT RULED` phrase and the quotation of what it used to read included, and gains what
+this entry rules. **Both stay UNPOSTABLE. `packages/rail` is untouched and stays green**, because
+this entry mints no code, adds no constraint arm, seeds no row and rewrites neither row's opening
+text, which is what [`lt-07.test.ts`](../packages/rail/test/lt-07.test.ts)'s armed assertions watch.
+[ADR-177](decisions/ADR-177.md) and [ADR-180](decisions/ADR-180.md) each had to edit that package
+and each recorded the fence question in its approval block; this one does not have to.
+
+**No migration number, no code minted, no name minted, no `SystemReason` member, no
+`SqlExecutorReason` member, no `pg` import and no cast past a key type.** `0009`, `0027`, `0038`,
+`0052` and `0053` are byte for byte unchanged. `apps/api` and `apps/admin` are untouched, so
+`wiring.test.ts`'s `{declared, wired, blocked}` triple does not move.
+
+**Fourteen defects seeded against the tree and every one was caught: TWELVE by
+[`in-flight-obligation.test.ts`](../packages/ledger/test/in-flight-obligation.test.ts) and TWO by
+[`accounts.test.ts`](../packages/ledger/test/accounts.test.ts) beside it.** The two the new file did
+not catch are an eighth code added to `0009`'s CHECK alone and to `0027`'s `NOT IN` alone, and the
+division is deliberate: `accounts.test.ts` exists to hold those two lists and `accounts.ts` against
+each other, and a second file re-reading them would be a fourth copy with nothing checking it.
+**Eleven further perturbations were run against a running database, seven refused and four
+ACCEPTED**, because a hole is watched rather than asserted, and all eleven behaved as designed.
+
+**Measured with `pnpm install` first and each command run separately: 33 of 33 gates, 15 of 15
+invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 214 test files / 5,044 passed /
+6 skipped, `falsify.mjs` clean with the tree clean after it.** The `main` baseline of 33 / 15 / 0 /
+0 / clean / **213 files / 5,028 passed / 6 skipped** was reproduced exactly before a line changed.
