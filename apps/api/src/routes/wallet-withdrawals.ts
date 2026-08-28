@@ -150,6 +150,7 @@ import {
   type IdempotencyOutcome,
   type IdempotencyStore,
 } from '../idempotency.ts';
+import { databaseIdempotencyStore } from '../idempotency-store.ts';
 import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX, problem } from '../server.ts';
 import {
@@ -943,11 +944,28 @@ export function currentWithdrawalBackend(): WithdrawalBackend {
  * admit. The same is true of the INSERT: `identity_id` is written by the
  * accessor and is not in `DestinationInsert`.
  *
- * `idempotency` REFUSES BY NAME AND THE REASON IS NOT THIS SLICE'S.
- * `idempotency.ts`'s own header records that no implementation of
- * `IdempotencyStore` exists in this tree, because `complete` is an UPDATE of
- * exactly one row and `systemTx`/`firmTx` hardcode `undefined` for the `WHERE`.
- * A store built here would be that gap papered over on the cash door.
+ * `idempotency` IS `databaseIdempotencyStore`, AND THIS PARAGRAPH IS A
+ * CORRECTION RATHER THAN A DESIGN NOTE.
+ *
+ * IT READ that no implementation of `IdempotencyStore` exists in this tree,
+ * "because `complete` is an UPDATE of exactly one row and `systemTx`/`firmTx`
+ * hardcode `undefined` for the `WHERE`", on the strength of
+ * [`idempotency.ts`](../idempotency.ts)'s own header, which says exactly that.
+ * **THE HEADER IS STALE AND THE FILE BESIDE IT SAYS OTHERWISE**:
+ * [`idempotency-store.ts:144`](../idempotency-store.ts) exports
+ * `databaseIdempotencyStore(db: ApiDb): IdempotencyStore`, whose `find`,
+ * `begin` and `complete` all run through `db.scoped` with keyed addresses, and
+ * `idempotency-store.test.ts` covers it.
+ *
+ * THE OBJECTION DOES NOT REACH THAT STORE. `systemTx` and `firmTx` hardcode
+ * `undefined` for the `WHERE` and this store opens NEITHER: it opens the
+ * SCOPED door, which carries `scopePredicate` AND the address into the
+ * predicate, which is precisely what `ADR-112` gave `updateAt` for.
+ *
+ * READING A HEADER INSTEAD OF THE FILE IT DESCRIBES is the error class
+ * `MERIT_BUILD_MASTER_PROMPT`'s "caution learned the hard way" names, and the
+ * claim is corrected where it was made rather than quietly swapped, because a
+ * false sentence deleted leaves nothing for the next reader to check.
  */
 export function databaseWithdrawalBackend(
   db: ApiDb,
@@ -955,7 +973,7 @@ export function databaseWithdrawalBackend(
 ): WithdrawalBackend {
   return {
     now,
-    idempotency: UNWIRED_STORE,
+    idempotency: databaseIdempotencyStore(db),
     transact: (session, fn) =>
       db.scoped(session.identityId, async (tx) =>
         fn({
