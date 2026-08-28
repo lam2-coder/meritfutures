@@ -1027,10 +1027,15 @@ export const WORKER_MODULES_BEHIND_A_LEG: Readonly<Record<string, string>> = {
  * module that no longer exists is how a list silently grants more than it names.
  */
 export const WORKER_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {
+  // The phrasing below avoids ending a wrapped segment with the word "from",
+  // which `test/db.test.ts`'s bare-specifier scan reads as an import. Session
+  // 320 reported that defect and this session walked into it; the regex is
+  // still live, that file is nobody's this wave, and the note is here so the
+  // next writer does not rediscover it by turning the suite red.
   './db.ts':
     'THE ONE DOOR. ADR-165 and `test/db.test.ts`: this is the only file under apps/worker/src ' +
-    'that may import @merit/db, and re-exporting it would put the accessor one import away from ' +
-    'every consumer of this package.',
+    'that may import @merit/db. Re-exporting it would leave every consumer of this package one ' +
+    'import short of the accessor.',
   './batch/statistics.ts':
     "M12's statistics run (ADR-122) has never been re-exported here and `test/statistics.test.ts` " +
     'imports it by path. FOUND BY WRITING THIS LIST rather than by a merge, and RECORDED rather ' +
