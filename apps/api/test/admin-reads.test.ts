@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, sep } from 'node:path';
 
 import { afterEach, expect, test } from 'vitest';
 
@@ -848,4 +848,237 @@ test('the module is one route module named for its file, with the seven and noth
     ADMIN_READ_ENDPOINTS.map((spec) => `${spec.method} ${spec.path}`),
   );
   expect(adminReads.routes).toHaveLength(7);
+});
+
+// -----------------------------------------------------------------------------
+// 9. ADR-190: what an operator route ANSWERS, enumerated rather than assumed
+// -----------------------------------------------------------------------------
+// THREE DOCUMENTS SAID 503 AND NO ROUTE IN THIS MODULE HAS EVER SENT ONE.
+// `WAVE-06` section 4.1: *"Every one of the 26 operator routes above answers 503
+// today"*; `apps/admin/src/http/client.ts` repeats it twice; and `W6-d` built
+// `apps/admin/src/app/page.tsx` to render `toAdminErrorKind(503)` on that basis.
+// Session 336 reported the sentence false, session 344 measured the two real
+// answers, and neither session held a file that could repair it. ADR-190 rules
+// it, and this section is the table so the number cannot come back as prose.
+//
+// THE ANSWER IS NOT TWO THINGS. It is EIGHT states over one endpoint, and the
+// distinction between them is what an operator and a monitor each have to act
+// on. The three that answer 500 are INDISTINGUISHABLE ON THE WIRE and ADR-190
+// ruling 2 keeps them that way deliberately: the response may not tell an
+// unauthenticated caller which of this deployment's ports are uncomposed, and
+// the discrimination a monitor needs is in `server.ts`'s log line, where the
+// thrown `AdminReadError` names the source by hand.
+
+const NOTHING = Symbol('no source composed');
+
+/** One state of the deployment, its request, and the answer ADR-190 rules. */
+const ANSWER_TABLE: readonly {
+  readonly state: string;
+  readonly session: AdminSessionLookup | typeof NOTHING;
+  readonly read: 'composed' | 'throws' | 'empty' | typeof NOTHING;
+  readonly cookie: boolean;
+  readonly status: number;
+  readonly code: string;
+}[] = [
+  {
+    state: 'A. no session source composed, and the caller sent no cookie',
+    session: NOTHING,
+    read: NOTHING,
+    cookie: false,
+    status: 401,
+    code: 'unauthenticated',
+  },
+  {
+    state: 'B. no session source composed, and the caller sent a cookie',
+    session: NOTHING,
+    read: NOTHING,
+    cookie: true,
+    status: 500,
+    code: 'internal_error',
+  },
+  {
+    state: 'C. a session source composed, and it does not know the token',
+    session: { kind: 'unknown' },
+    read: 'composed',
+    cookie: true,
+    status: 401,
+    code: 'unauthenticated',
+  },
+  {
+    state: 'D. a session source composed, and the session is not an operator',
+    session: { kind: 'not-an-operator' },
+    read: 'composed',
+    cookie: true,
+    status: 403,
+    code: 'forbidden',
+  },
+  {
+    state: 'E. an operator session carrying a role this contract does not declare',
+    session: { kind: 'operator', principal: { actorId: 'actor-1', role: 'auditor' } },
+    read: 'composed',
+    cookie: true,
+    status: 403,
+    code: 'forbidden',
+  },
+  {
+    state: 'F. an admitted operator, and NO READ SOURCE composed',
+    session: { kind: 'operator', principal: { actorId: 'actor-1', role: 'owner' } },
+    read: NOTHING,
+    cookie: true,
+    status: 500,
+    code: 'internal_error',
+  },
+  {
+    state: 'G. everything composed, and the handler itself threw',
+    session: { kind: 'operator', principal: { actorId: 'actor-1', role: 'owner' } },
+    read: 'throws',
+    cookie: true,
+    status: 500,
+    code: 'internal_error',
+  },
+  {
+    state: 'H. everything composed, and the read found no row',
+    session: { kind: 'operator', principal: { actorId: 'actor-1', role: 'owner' } },
+    read: 'empty',
+    cookie: true,
+    status: 404,
+    code: 'not_found',
+  },
+];
+
+async function answerFor(row: (typeof ANSWER_TABLE)[number]): Promise<{
+  statusCode: number;
+  code: string;
+}> {
+  setAdminSessionSource(row.session === NOTHING ? null : sessionOf(row.session));
+  if (row.read === NOTHING) setAdminReadSource(null);
+  else if (row.read === 'throws')
+    setAdminReadSource(sourceOf({ readLiability: () => Promise.reject(new Error('handler')) }));
+  else if (row.read === 'empty')
+    setAdminReadSource(sourceOf({ readLiability: () => Promise.resolve(null) }));
+  else setAdminReadSource(sourceOf());
+  const res = await get('operator', ADDRESSES.liability, row.cookie ? COOKIE : {});
+  return { statusCode: res.statusCode, code: (JSON.parse(res.body) as { code: string }).code };
+}
+
+test('ADR-190 ruling 1: the eight states of one operator route, each measured', async () => {
+  for (const row of ANSWER_TABLE) {
+    const answer = await answerFor(row);
+    expect(answer, row.state).toStrictEqual({ statusCode: row.status, code: row.code });
+    setAdminReadSource(null);
+    setAdminSessionSource(null);
+  }
+  // NOT 503, AND THIS IS THE ASSERTION THE THREE DOCUMENTS WOULD HAVE FAILED.
+  expect(ANSWER_TABLE.map((row) => row.status)).not.toContain(503);
+});
+
+test('ADR-190 ruling 2: the three 500 states are one document, on purpose', async () => {
+  // A DEPLOYMENT THAT COMPOSED NO SESSION SOURCE, ONE THAT COMPOSED NO READ
+  // SOURCE, AND A HANDLER THAT THREW ARE THE SAME BYTES. That is the cost the
+  // ruling accepts and it is asserted rather than left to be discovered: a
+  // response that distinguished them would tell an unauthenticated caller which
+  // ports this deployment did not compose.
+  const five_hundreds = ANSWER_TABLE.filter((row) => row.status === 500);
+  expect(five_hundreds).toHaveLength(3);
+  const bodies: string[] = [];
+  for (const row of five_hundreds) {
+    setAdminSessionSource(row.session === NOTHING ? null : sessionOf(row.session));
+    if (row.read === NOTHING) setAdminReadSource(null);
+    else
+      setAdminReadSource(sourceOf({ readLiability: () => Promise.reject(new Error('handler')) }));
+    const res = await get('operator', ADDRESSES.liability, COOKIE);
+    // The request id differs per request and is the only field that may.
+    bodies.push(res.body.replaceAll(/"instance":"[^"]*"/g, '"instance":"<id>"'));
+    setAdminReadSource(null);
+    setAdminSessionSource(null);
+  }
+  expect(new Set(bodies).size).toBe(1);
+});
+
+test('ADR-190: every route THIS module registers answers the same two, never 503', async () => {
+  // OVER THE MODULE'S OWN ROUTES RATHER THAN OVER ONE ADDRESS, because the
+  // false sentence was universally quantified and a single-endpoint measurement
+  // is what let it stand for two waves.
+  for (const spec of ADMIN_READ_ENDPOINTS) {
+    const path = spec.path.replaceAll(/:[A-Za-z]+/g, 'x'.repeat(8));
+    const anonymous = await get('operator', path);
+    expect(anonymous.statusCode, `${spec.path} anonymous`).toBe(401);
+    const withCookie = await get('operator', path, COOKIE);
+    expect(withCookie.statusCode, `${spec.path} with a cookie`).toBe(500);
+  }
+});
+
+test("ADR-190 ruling 2: 503 IS section 2's code and the operator surface does send it", async () => {
+  // THE PREMISE THE RULING TURNS ON, DERIVED FROM THE SURFACE RATHER THAN
+  // ASSERTED. `service_unavailable` is not a code anybody would have to invent:
+  // API_CONTRACT section 2 declares it, and other admin modules answer it today
+  // for an uncomposed backend. The finding ADR-190 rules on is that THIS module
+  // takes the opposite decision for the same shape, on ADR-110's precedent.
+  //
+  // THE PARTITION IS DERIVED AND THE COUNTS ARE NOT PINNED, so a slice that
+  // wires a backend moves a route between the sets without turning this red.
+  const { report } = buildServer({ surface: 'operator', modules: onDisk });
+  const admin = report.registered.filter((entry) => entry.includes(' /admin/'));
+  const unavailable: string[] = [];
+  const authenticating: string[] = [];
+  for (const entry of admin) {
+    // PARSED RATHER THAN CAST, and a verb this parser does not know turns the
+    // case red instead of being skipped quietly.
+    const verb = entry.startsWith('GET ') ? 'GET' : entry.startsWith('POST ') ? 'POST' : null;
+    expect(verb, entry).not.toBeNull();
+    if (verb === null) continue;
+    const path = entry.slice(verb.length + 1);
+    const { app } = buildServer({ surface: 'operator', modules: onDisk });
+    const res = await app.inject({
+      method: verb,
+      url: `${BASE_PATH}${path.replaceAll(/:[A-Za-z]+/g, 'x'.repeat(8))}`,
+      headers: { 'content-type': 'application/json' },
+      ...(verb === 'POST' ? { payload: {} } : {}),
+    });
+    const body = JSON.parse(res.body) as { code?: string; title?: string };
+    if (res.statusCode === 503) {
+      expect(body.code, entry).toBe('service_unavailable');
+      // Every call site writes this title by hand, because `server.ts`'s own
+      // `TITLE` table has no `service_unavailable` key. ADR-190 section 7
+      // registers that as a latent defect; this asserts the wire is right
+      // whatever the table does.
+      expect(body.title, entry).toBe('Service unavailable');
+      unavailable.push(entry);
+    } else if (res.statusCode === 401) authenticating.push(entry);
+    await app.close();
+  }
+  // BOTH SETS ARE NON-EMPTY, which is the split the ruling is about.
+  expect(unavailable.length).toBeGreaterThan(0);
+  expect(authenticating.length).toBeGreaterThan(0);
+  // And every route of THIS module is in the second set, never the first.
+  for (const spec of ADMIN_READ_ENDPOINTS)
+    expect(unavailable, spec.path).not.toContain(`${spec.method} ${spec.path}`);
+});
+
+test('ADR-190: nothing outside a test composes an AdminSessionSource', async () => {
+  // WHY ONLY ONE OF THE TWO ANSWERS IS REACHABLE BY A BROWSER, and it is the
+  // measurement the console's own prose now rests on. With no supplier for the
+  // cookie, a real operator never sends one, so state A is what a deployed
+  // console meets and state B needs a caller who fabricated a token.
+  const roots = [join(ROOT, 'apps'), join(ROOT, 'packages'), join(ROOT, 'scripts')];
+  const sources: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.(ts|tsx|mjs)$/.test(entry.name) && !path.includes(`${sep}test${sep}`))
+        sources.push(path);
+    }
+  };
+  for (const root of roots) walk(root);
+  expect(sources.length).toBeGreaterThan(100);
+  const callers = sources.filter((path) => {
+    const body = readFileSync(path, 'utf8')
+      .replaceAll(/\/\*[\s\S]*?\*\//g, ' ')
+      .replaceAll(/(?<!:)\/\/[^\n]*/g, ' ');
+    return body.includes('setAdminSessionSource(');
+  });
+  // The declaration, and nothing else in the tree.
+  expect(callers).toEqual([join(ROOT, 'apps', 'api', 'src', 'routes', 'admin-reads.ts')]);
 });
