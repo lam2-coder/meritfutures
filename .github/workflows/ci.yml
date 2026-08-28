@@ -323,27 +323,21 @@ jobs:
       # scanned nothing reports the same green as a grep with nothing to find.
       #
       # IT READ ONE OF THE THREE BUNDLES THIS JOB PRODUCES AND SESSION 348
-      # CLOSED THAT. This block stated the gap as open, over figures derived
-      # from three builds on the tree of the day it was written, and both
-      # halves are stale: `scripts/ci/vg2-no-secrets-in-bundle.mjs` no longer
-      # hard-codes `BUNDLE_DIRS` to the portal's two paths. It DERIVES the
-      # expected set from `apps/*/package.json`, taking every deployable that
-      # declares a `build` script and a `next` dependency, and an app it cannot
-      # classify is a failure naming the app rather than a silent omission.
+      # CLOSED THAT. This block stated the gap as open over three hand-derived
+      # file and byte figures, and every half of it is stale:
+      # `scripts/ci/vg2-no-secrets-in-bundle.mjs` no longer hard-codes
+      # `BUNDLE_DIRS` to the portal's two paths. It DERIVES the expected set
+      # from `apps/*/package.json`, taking every deployable that declares a
+      # `build` script and a `next` dependency, and an app it cannot classify
+      # fails naming the app rather than being silently omitted. So a fourth UI
+      # deployable landing with no build step above now turns VG-2 RED, where
+      # before it would have been scanned by nothing and reported an identical
+      # PASS.
       #
-      # THE DERIVATION IS WHY NO FIGURE IS RESTATED HERE. A hand-maintained
-      # file and byte count in a workflow comment is checked by nothing and
-      # rots against the next build: session 348 re-derived `apps/site` at 32
-      # bytes below the number this block used to carry, with the file count
-      # identical. The runner's own header holds the reasoning, the three
-      # rejected sources for the target and what the derivation still cannot
-      # see, and it is the place to read rather than this one.
-      #
-      # WHAT CHANGED FOR THIS JOB: a fourth UI deployable landing with no build
-      # step above now turns VG-2 RED, where before it would have been scanned
-      # by nothing and reported the identical PASS. The step still runs AFTER
-      # the builds and never before, because an absent or empty bundle must be
-      # a failure rather than a pass over nothing.
+      # NO FIGURE IS RESTATED HERE. A hand-maintained count in a workflow
+      # comment is checked by nothing: session 348 re-derived `apps/site` 32
+      # bytes below the number this block carried. The runner's header holds
+      # the reasoning, the rejected targets and the residue; read it instead.
       - name: VG-2 no secrets in client output
         run: node scripts/ci/vg2-no-secrets-in-bundle.mjs
 
