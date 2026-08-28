@@ -27,12 +27,26 @@
 // their suppliers exist, AS-M6-04's three numbers, section 3.5's live figure,
 // and P-M6-09 gating all of it.
 //
-// NOTHING IN THIS PACKAGE MUTATES. That is a property of the tree rather than a
-// convention: there is no route, no client and no write path in it, so
-// INV-M6-01's audit middleware, INV-M6-08's dual control and section 8.1's
-// negative-authz matrix have nothing to attach to yet and none of them is
-// half-built here. Section 8.1a names where the RBAC enumeration starts when
-// the router arrives: `M6-N-09`.
+// NOTHING IN THIS PACKAGE MUTATES, and the sentence that said so is NARROWED
+// rather than left standing. It read "there is no route, no client and no write
+// path in it". `W6-c` landed `src/http/client.ts`, so THERE IS A CLIENT NOW and
+// that clause has expired; the other two hold and they are the two the claim
+// rests on. The client declares `get` and no second method, reaches only the
+// paths `apps/api/src/surface.ts` classifies as operator, and there is no write
+// path for it to reach: WAVE-06 wave 5 holds every mutating surface behind
+// ADR-171's admin identity provider. So INV-M6-01's audit middleware,
+// INV-M6-08's dual control and section 8.1's negative-authz matrix still have
+// nothing to attach to and none of them is half-built here. Section 8.1a names
+// where the RBAC enumeration starts when the router arrives: `M6-N-09`.
+//
+// THE TRANSPORT IS ONE FILE AND ITS BASE URL IS RELATIVE. `src/http/client.ts`,
+// on ADR-162's precedent, and `src/api/types.ts` holds the shapes it reads,
+// transcribed from API_CONTRACT section 8. Neither is a leg of this barrel and
+// both are in `ADMIN_MODULES_NOT_RE_EXPORTED` below with their reasons.
+// `test/surface.test.ts` asserts the count of `fetch(` call sites, that no
+// absolute origin is written anywhere in this package, and that no
+// `NEXT_PUBLIC_` identifier appears in it, which are ADR-182 section 5 clauses 1
+// and 2 made mechanical for the first time.
 //
 // The account drill-down (3.2), the identity drill-down (3.2a), the flags queue
 // (3.3) and the evidence pack are M06 surfaces this package does not contain.
@@ -228,19 +242,50 @@ export const ADMIN_BARREL_LEGS = [
 /**
  * Modules this barrel deliberately does NOT re-export, each with its reason.
  *
- * **IT IS EMPTY TODAY AND THAT IS THE HONEST STARTING STATE**, not an oversight:
- * every module under `src/` is a leg, so the sweep above is currently total and
- * the escape hatch has nothing in it. It exists anyway because the alternative
- * is that the first slice needing an unexported module has to weaken the sweep
- * to land, and a gate weakened to pass it is the one thing the conventions
- * forbid outright. A module belongs here when there is a reason to write down,
- * and the suite asserts the reason is written rather than left blank.
+ * **IT SHIPPED EMPTY AND `W6-c` IS THE FIRST SLICE TO USE IT**, which is the
+ * case `W6-b` wrote it for and said so: the alternative is that the first slice
+ * needing an unexported module has to weaken the sweep to land, and a gate
+ * weakened to pass it is the one thing the conventions forbid outright. A module
+ * belongs here when there is a reason to write down, and the suite asserts the
+ * reason is written rather than left blank.
+ *
+ * **THE TWO ENTRIES ARE THE TRANSPORT SEAM, AND EACH STATES BOTH ITS REASON AND
+ * ITS COST.** `src/api/types.ts` and `src/http/client.ts` are the shapes this
+ * console reads and the one call that reads them; neither is the read surface
+ * this barrel publishes, which is figures and folds. Being in this list means
+ * `B.1` and `B.5` do not reach them, so `test/surface.test.ts` asserts that this
+ * list holds exactly these two entries and that neither module's names reach the
+ * package surface. **That is an absence checked in both directions rather than a
+ * hole**, and it is where a later slice looks before adding a third entry.
  *
  * AN ALLOWLIST THAT FAILS IN BOTH DIRECTIONS: an unlisted module with no leg is
  * the obvious failure, and a stale entry for a module that no longer exists is
  * how a list silently grants more than it names.
  */
-export const ADMIN_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {};
+export const ADMIN_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {
+  './api/types.ts':
+    'W6-c. The wire shapes, transcribed from API_CONTRACT sections 8 and 9. They are NOT the read ' +
+    'surface this barrel publishes: every one of the 74 names above is a figure, a fold or a ' +
+    "rendering, and a wire type is the shape of somebody else's document. API_CONTRACT is the " +
+    'authority for it and `@merit/admin` offering a second import site for a contract shape is a ' +
+    'second place to read the contract from. THE COST IS STATED RATHER THAN HIDDEN: B.1 and B.5 do ' +
+    'not reach a module in this list, so `test/surface.test.ts` asserts instead that this list ' +
+    "holds exactly these two entries and that neither module's names reach the package surface, " +
+    'which turns the absence into a checked property rather than a hole. AND THE PROMOTION IS ' +
+    'OWED: B.1 requires a leg to declare more than three exports and this module declares ONE ' +
+    'today, so it cannot be a leg until it has grown, which is W6-f, W6-g, W6-h and W6-j adding ' +
+    'the shapes their own contract rows carry.',
+  './http/client.ts':
+    "W6-c. The console's one `fetch`, on ADR-162's precedent. It is deliberately NOT on the " +
+    'package surface: `package.json` publishes `.` and nothing else, so re-exporting ' +
+    "`createAdminApiClient` would put this package's only network primitive on the very surface " +
+    'this slice exists to narrow to one file. Every consumer of it is INSIDE this package and ' +
+    'reaches it by relative path, which is measured rather than assumed: no file under ' +
+    "`apps/portal/src/app/` reads the portal's client through `src/index.ts` and every one of " +
+    "them imports `../../http/client.ts` directly, so the portal's stated reason for exporting " +
+    'it (that a transport behind a deep relative path gets written again) is not what its own ' +
+    'segments do. `test/surface.test.ts` carries the assertions this costs.',
+};
 
 /**
  * The deployable starts, and says what it is rather than what it will be.
