@@ -40,6 +40,7 @@ import adminWrites, {
   ADMIN_WRITE_ROLES,
   ADMIN_WRITE_TABLES,
   DUAL_CONTROL_WINDOW_MS,
+  AdminWriteUnwired,
   resetAdminWriteBackend,
   sensitivePayloadHash,
   useAdminWriteBackend,
@@ -51,6 +52,7 @@ import type {
   AdminWriteTx,
   PlanValidation,
 } from '../src/routes/admin-writes.ts';
+import { discoverRouteModules } from '../src/registry.ts';
 import { buildServer } from '../src/server.ts';
 import { BASE_PATH } from '../src/surface.ts';
 
@@ -143,8 +145,8 @@ describe('the surface boundary', () => {
     const { app } = buildServer({ surface: 'public', modules: [adminWrites] });
     // NO BACKEND IS INSTALLED. If this 404 came from a permission check the
     // check would have needed a principal, and asking for one would have thrown
-    // `AdminWriteUnwired` and answered 503. A 404 here therefore proves the
-    // route was never registered.
+    // `AdminWriteUnwired` and answered 401 (ADR-192 clause 2). A 404 here
+    // therefore proves the route was never registered.
     const response = await app.inject({
       method: 'POST',
       url: `${BASE_PATH}/admin/accounts/${ACCOUNT_ID}/freeze`,
@@ -464,21 +466,113 @@ describe('dual control on publish', () => {
 // -----------------------------------------------------------------------------
 
 describe('the unwired backend', () => {
-  it('answers 503 rather than a plausible value', async () => {
+  // ADR-192 clause 2. THE 503 DID NOT GO AWAY; IT MOVED BEHIND THE 401. An
+  // anonymous caller may not learn which of this deployment's ports are
+  // uncomposed, so `principal`'s refusal is answered 401; every other port
+  // member's refusal is answered 503, because a caller who reached it is
+  // authenticated. Both legs are asserted, and the second is the one that would
+  // pass by accident if the module simply stopped sending 503 at all.
+  it('answers 401 and not 503 to an anonymous caller, disclosing no deployment state', async () => {
+    for (const spec of ADMIN_WRITE_ENDPOINTS) {
+      resetAdminWriteBackend();
+      const { app } = buildServer({ surface: 'operator', modules: [adminWrites] });
+      const response = await app.inject({
+        method: spec.method,
+        url: urlFor(spec.path),
+        payload: bodyFor(spec.path),
+      });
+      await app.close();
+      expect([spec.path, response.statusCode]).toEqual([spec.path, 401]);
+      expect([spec.path, (response.json() as { code: string }).code]).toEqual([
+        spec.path,
+        'unauthenticated',
+      ]);
+    }
+  });
+
+  it('answers 503 to an authenticated operator whose deployment wired no `operator`', async () => {
+    const role: AdminRole = 'owner';
+    useAdminWriteBackend({
+      ...fakeBackend(role, [], []),
+      operator: () => Promise.reject(new AdminWriteUnwired('operator')),
+    });
     const { app } = buildServer({ surface: 'operator', modules: [adminWrites] });
     const response = await app.inject({
       method: 'POST',
       url: urlFor('/admin/accounts/:accountId/note'),
       payload: { reason: 'r', initiative: 'operational', note: 'n' },
     });
+    await app.close();
     expect(response.statusCode).toBe(503);
     expect(response.json()).toMatchObject({ code: 'service_unavailable' });
-    await app.close();
+  });
+
+  it('never answers 503 before authenticating, on any route of this module', async () => {
+    // The counterfactual for the case above: a module that answered 503 to an
+    // anonymous caller on ONE route would still pass both cases above if that
+    // route were not the one they inject.
+    for (const spec of ADMIN_WRITE_ENDPOINTS) {
+      resetAdminWriteBackend();
+      const { app } = buildServer({ surface: 'operator', modules: [adminWrites] });
+      const response = await app.inject({
+        method: spec.method,
+        url: urlFor(spec.path),
+        payload: bodyFor(spec.path),
+      });
+      await app.close();
+      expect([spec.path, response.statusCode]).not.toEqual([spec.path, 503]);
+    }
   });
 });
 
 // -----------------------------------------------------------------------------
-// 4. THE MODULE CARRIES THE ABSENCE OF A REASON RATHER THAN FILLING IT
+// 4. THE DISCLOSURE, OVER THE WHOLE OPERATOR SURFACE AND NOT OVER THIS MODULE
+// -----------------------------------------------------------------------------
+// ADR-192 clause 2 is a property of the SURFACE, and four modules each behaving
+// well is not the same thing as the surface holding it. THIS SWEEP IS THE
+// CONTROL. It composes every module on disk, injects every route the operator
+// deployment registers with no credential of any kind, and refuses a 503. A
+// module added tomorrow that answers 503 before authenticating is caught here
+// rather than by the next person to measure the surface by hand, which is how
+// the split ADR-190 found survived three sessions reporting one half of it.
+//
+// IT PINS NO COUNT, on ADR-190 section 5's ground: a slice that wires a backend
+// moves a route between the answers, and a test holding a number would go red
+// for the right thing happening. What it asserts is the property.
+
+describe('no operator route discloses its deployment state to an anonymous caller', () => {
+  it('answers no 503 anywhere on the surface before authenticating', async () => {
+    const modules = await discoverRouteModules();
+    const { app, report } = buildServer({ surface: 'operator', modules });
+    await app.ready();
+    const disclosed: string[] = [];
+    const admin: string[] = [];
+    for (const endpoint of report.registered) {
+      const [method = '', declared = ''] = endpoint.split(' ');
+      const url = `${BASE_PATH}${declared.replace(/:[A-Za-z0-9_]+/g, ACCOUNT_ID)}`;
+      const carries = method !== 'GET' && method !== 'DELETE' && method !== 'HEAD';
+      const response = await app.inject({
+        method: method as 'GET',
+        url,
+        ...(carries ? { payload: {} } : {}),
+      });
+      if (response.statusCode === 503) disclosed.push(endpoint);
+      if (declared.startsWith('/admin/')) admin.push(`${endpoint} -> ${response.statusCode}`);
+    }
+    await app.close();
+    expect(disclosed).toEqual([]);
+    // THE COUNTERFACTUAL. A sweep that injected nothing would report no
+    // disclosure, so the `/admin/*` routes are listed with what they answered
+    // and every one of them must be a 401. This is also the assertion that
+    // fails if a future module answers 500 before authenticating, which
+    // discloses the same fact by a different number.
+    expect(admin.length).toBeGreaterThan(0);
+    expect(admin.filter((row) => !row.endsWith(' -> 401'))).toEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 5. THE MODULE CARRIES THE ABSENCE OF A REASON RATHER THAN FILLING IT
 // -----------------------------------------------------------------------------
 // This is the half a recorder CAN prove, and it is the half that matters for
 // reading the diff: no `reason` key reaches the accessor when the body carried
@@ -556,7 +650,7 @@ describe('the reason, before it reaches the database', () => {
 });
 
 // -----------------------------------------------------------------------------
-// 5. THE CLAUSE, AGAINST A REAL DATABASE
+// 6. THE CLAUSE, AGAINST A REAL DATABASE
 // -----------------------------------------------------------------------------
 
 const DATABASE_URL = process.env['DATABASE_URL'];

@@ -1348,7 +1348,26 @@ export function adminWalletHandler(spec: AdminWalletEndpointSpec): RouteHandler 
   return async (request: FastifyRequest, reply: FastifyReply): Promise<unknown> => {
     const active = currentAdminWalletBackend();
     try {
-      const principal = await active.principal(request);
+      // A DEPLOYMENT THAT CANNOT AUTHENTICATE ANYONE HAS AUTHENTICATED NOBODY,
+      // AND THE ANSWER TO THAT IS 401 RATHER THAN 503. ADR-192 clause 2. The
+      // unwired default rejects `principal`, and answering that rejection with
+      // the 503 tells an unauthenticated caller that this endpoint exists AND
+      // that its backend is the only thing missing, which is the disclosure this
+      // handler's own 401-before-403 paragraph refuses one branch later. Whether
+      // this process holds a backend is a fact about the deployment, and a
+      // caller who has not authenticated may not have it. The discrimination is
+      // in the log, where `AdminWalletUnwired`'s message names the port member.
+      let principal: AdminPrincipal | null;
+      try {
+        principal = await active.principal(request);
+      } catch (err) {
+        if (!(err instanceof AdminWalletUnwired)) throw err;
+        request.log.error({ err }, 'admin wallet backend is not wired: principal');
+        return sendProblem(
+          reply,
+          handlerProblem('unauthenticated', 'Unauthenticated', 401, request.id),
+        );
+      }
       if (principal === null)
         return sendProblem(
           reply,
