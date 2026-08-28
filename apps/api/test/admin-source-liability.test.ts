@@ -351,6 +351,31 @@ describe('blocker B1: eligible_next_7d, and trading_calendar is not a TableKey',
     expect(TABLE_KEYS).toContain('tradingCalendarRevisions');
   });
 
+  it('is UNREGISTERED and not UNREGISTRABLE, which one file of packages/db still denies', () => {
+    // THE DISTINCTION DECIDES WHETHER THIS BLOCKER IS A SESSION OR A RULING, and
+    // the tree gives two answers. `0032` carries `ALTER TABLE trading_calendar
+    // ALTER COLUMN session_open_at DROP NOT NULL`, ADR-094 clause 3 closed the
+    // drift fold at `ADD COLUMN` with a default of FAIL, and `schema.ts`'s
+    // `trading_calendar_loads` header still reads that the neighbour "cannot be
+    // registered" for exactly that reason.
+    //
+    // ADR-103 CLAUSE 2 SUPERSEDED THAT A YEAR OF ENTRIES AGO: it replaced the
+    // stated proxy with the type-and-nullability comparison it stood for and
+    // added `ALTER COLUMN ... DROP NOT NULL` as the fold's second member,
+    // naming this table as one of the two the widening makes REGISTRABLE. So
+    // the blocker is a registration nobody has taken and never a refusal, and
+    // the sentence in `schema.ts` is stale. **REPORTED AND NOT REPAIRED**:
+    // `packages/db` is another fence.
+    const adr = readFileSync(join(ROOT, 'docs/decisions/ADR-103.md'), 'utf8');
+    expect(adr).toContain('`otp_challenges` and `trading_calendar` become REGISTRABLE');
+    expect(
+      readFileSync(
+        join(MIGRATIONS, '0032_trading_calendar_holidays_coverage_revisions.sql'),
+        'utf8',
+      ),
+    ).toContain('ALTER TABLE trading_calendar ALTER COLUMN session_open_at  DROP NOT NULL;');
+  });
+
   it('has every OTHER input of the fold landed, so the calendar is the whole gap', () => {
     const columns = migrationColumnNames();
     for (const name of [
