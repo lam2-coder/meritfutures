@@ -593,12 +593,15 @@ function actor(
  * The insert, on THIS transaction.
  *
  * THE WHOLE OF WHAT IS BLOCKED, AND IT IS ONE METHOD. An adapter for it is
- * `tx.insert('events', envelope)` and nothing more -- except that `'events'` is
- * not a `TableKey`, because `packages/db/src/scope.ts` registers no rule for the
- * table and says at length why it cannot get one from the five classes that
- * exist. So the adapter is not written here, it is not faked here, and the
- * capability is not reached around: this file's fence is `apps/api/src/events.ts`
- * and the repair is an ADR minting a sixth scope class.
+ * `tx.insert('events', envelope)` and nothing more. THIS PARAGRAPH READ "except
+ * that `'events'` is not a `TableKey`, because `packages/db/src/scope.ts`
+ * registers no rule for the table" AND ADR-191 MADE THAT FALSE: the sixth scope
+ * class it named as the repair is `either`, it exists, and `events` is
+ * registered under it. **What is still missing is a composed WRITER**, which is
+ * a different thing and a smaller one. So the adapter is still not written here,
+ * still not faked here, and the capability is still not reached around: this
+ * file's fence is `apps/api/src/events.ts` and installing a writer is a slice
+ * with its own.
  *
  * THE TRANSACTION IS `object` AND THAT IS NOT LAZINESS. This deployable's
  * handles come from `@merit/db`, which this file may not name (ADR-120), and the
