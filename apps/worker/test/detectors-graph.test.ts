@@ -43,7 +43,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { canaryNonce, isCanaryId } from '../src/detectors/canary.ts';
-import type { CanaryRow } from '../src/detectors/canary.ts';
 import {
   CALENDAR_DAYS_PER_TRADING_DAY,
   CANARY_EPOCH,
@@ -1635,5 +1634,50 @@ describe('what this slice reports rather than repairs', () => {
   it('mints every canary at an epoch before Merit exists, so a replay still finds it', () => {
     expect(CANARY_EPOCH < '2026-01-01').toBe(true);
     expect(addCalendarDays(CANARY_EPOCH, 0)).toBe(CANARY_EPOCH);
+  });
+});
+
+// =============================================================================
+// 11. THE BARREL, WHICH IS `P7` SECTION 9's LARGEST DECLARED COLLISION
+// =============================================================================
+//
+// "SEVEN SLICES ON ONE HAND-MAINTAINED BARREL ... A keep-both merge of a
+// re-export list type-checks and drops nothing, which is what makes it easy to
+// miss rather than safe." `tsc` cannot see a leg that was dropped, because a
+// shorter list is a valid list. So the check is a derivation from the source
+// rather than a second hand-maintained copy of it.
+
+describe('apps/worker/src/index.ts, the barrel', () => {
+  const BARREL = read('apps/worker/src/index.ts');
+
+  /** Every name a module exports, read from its source. */
+  function exportedNames(path: string): readonly string[] {
+    const source = code(path);
+    const found = new Set<string>();
+    for (const match of source.matchAll(
+      /^export (?:async )?(?:function|const|class|interface|type) (\w+)/gm,
+    )) {
+      found.add(match[1] ?? '');
+    }
+    return [...found].filter((name) => name.length > 0).sort();
+  }
+
+  it('re-exports every name src/detectors/graph.ts declares', () => {
+    const missing = exportedNames('apps/worker/src/detectors/graph.ts').filter(
+      (name) => !new RegExp(`(^|[\\s,{])${name}(,|\\s|$)`, 'm').test(BARREL),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('still carries P7-es three legs beside this one, which is what a keep-both merge loses', () => {
+    for (const leg of ['./detectors/canary.ts', './detectors/ports.ts', './detectors/runner.ts']) {
+      expect(BARREL).toContain(`} from '${leg}';`);
+    }
+    expect(BARREL).toContain("} from './detectors/graph.ts';");
+    // The names a lost leg would take with it, one per module, spot checked
+    // because the regexp above only covers this slice's own file.
+    for (const name of ['canaryMint', 'UNWIRED_DETECTOR_RUNNER_IO', 'runDetectors']) {
+      expect(BARREL).toContain(name);
+    }
   });
 });
