@@ -1,14 +1,15 @@
 // =============================================================================
 // apps/admin/src/app/feed/page.tsx
 // =============================================================================
-// THE EVENT FEED ROUTE, AT `/feed`, AND IT IS THE ONE M06 SURFACE WHOSE ROUTE
-// EXISTS AND WHOSE ADAPTER CANNOT BE WRITTEN TODAY.
+// THE EVENT FEED ROUTE, AT `/feed`, AND WHAT BLOCKS IT HAS MOVED FROM THE TABLE
+// TO THE PORT.
 //
 // `GET /admin/events` is registered on the operator surface and withheld from
 // the public one, and `AdminReadSource` declares `listEvents` as its seventh
-// method (ADR-184 ruling 1, landed by session 341). What does NOT exist is a
-// module supplying it, and blocker 2 below is that measurement rather than an
-// expectation of one.
+// method (ADR-184 ruling 1, landed by session 341). **A module supplies it
+// today**: ADR-191 registered `events` and `apps/api/src/admin-source/events.ts`
+// is the adapter. What does NOT exist is a deployment that composes the port,
+// and blocker 2 below is that measurement rather than an expectation of one.
 //
 // -----------------------------------------------------------------------------
 // THIS ROUTE PERFORMS NO READ, AND WHAT IT DOES NOT CLAIM IS THE MEASUREMENT
@@ -64,11 +65,11 @@ type EventFeedRead =
 /**
  * What has to land before this route renders a row, each named with its owner.
  *
- * TWO ENTRIES, AND THE SECOND IS THIS SLICE'S OWN FINDING RATHER THAN AN
- * INHERITED EXPECTATION. The flags queue names one, because `listFlags` is
- * composed; this names two, because `listEvents` is declared on the port and no
- * module supplies it, and the reason no module supplies it is a measurement
- * about `packages/db` rather than an unwritten file.
+ * TWO ENTRIES, AND THE SECOND ONE HAS CHANGED ITS REASON RATHER THAN CLEARED.
+ * The flags queue names one, because `listFlags` is composed and so is the
+ * deployment's ability to answer with it. This names two, because `listEvents`
+ * is supplied and the PORT it lives on is not composed by any deployment: a
+ * partial `AdminReadSource` is not a value the setter accepts.
  */
 const BLOCKED_ON: readonly PendingPanel[] = [
   {
@@ -88,20 +89,19 @@ const BLOCKED_ON: readonly PendingPanel[] = [
   },
   {
     origin: 'ADR-184',
-    title: 'An adapter for `AdminReadSource.listEvents`, which no module in the tree supplies',
+    title: 'A composed `AdminReadSource`, which no deployment installs',
     blockedBy:
-      'the `events` table being unregistered in `packages/db`, which is a refusal with an ' +
-      'argument rather than a gap. `packages/db/src/scope.ts` states it: `events` carries ' +
-      '`identity_id` and `account_id` both nullable with no CHECK tying them, so no member of ' +
-      'the scope vocabulary covers it and what the table needs is a sixth class. So `TableKey` ' +
-      'does not admit it and the keyed accessor has no way to read it, which is why ' +
-      '`IMPLEMENTED_ADMIN_READS` in `apps/api/src/admin-source/index.ts` still holds two names ' +
-      'and `listEvents` is in its missing list. ADR-184 section 3 reasons that the feed is "a ' +
-      'keyed range read over ONE table" and therefore a third case where the port`s BLOCKED ' +
-      'reason is measured false; it is a keyed range read over a table the accessor cannot key, ' +
-      'so the reason still stands for this method and the narrowing does not reach it. The ' +
-      'registration is a `packages/db` ruling and this console reports it rather than assuming ' +
-      'a shape for it',
+      'three of the port`s seven methods having no module, and `listEvents` is no longer one ' +
+      'of them. THE TABLE THAT BLOCKED IT IS REGISTERED: ADR-191 gave `events` the sixth ' +
+      'scope class its two nullable tenancy columns needed, `TableKey` admits it, and ' +
+      '`apps/api/src/admin-source/events.ts` reads it, so `IMPLEMENTED_ADMIN_READS` holds ' +
+      'four names where this panel once read two. ADR-184 section 3`s reasoning that the feed ' +
+      'is "a keyed range read over ONE table" is therefore a third case where the port`s ' +
+      'BLOCKED reason is measured false, and the narrowing DOES reach this method now. WHAT ' +
+      'IS LEFT IS `exportEvidence`, `readLiability` AND `searchAccounts`: no value satisfies ' +
+      '`AdminReadSource` while any of them is missing, so `apps/api/src/start.ts` calls no ' +
+      'setter and `setAdminReadSource` stays in `wiring.test.ts`s BLOCKED list. This console ' +
+      'reports the measurement rather than assuming a shape for it',
   },
 ];
 
