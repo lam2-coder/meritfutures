@@ -8,10 +8,12 @@
 // -----------------------------------------------------------------------------
 // M04's governing sentence is "render exactly what the engine computed, never
 // recompute it, and never round it", and M04 section 1.1 makes this app one
-// "consuming `/api/v1` and nothing else". There is no API client in this app and
-// no `/api/v1` to call: `apps/portal/src/index.ts` records that "everything that
-// changes anything is absent, and deliberately", and SC-M4-01, the auth surface,
-// is money path and belongs to its own session under ADR-003.
+// "consuming `/api/v1` and nothing else". This page holds no API client:
+// `apps/portal/src/index.ts` records that "everything that changes anything is
+// absent, and deliberately", and SC-M4-01, the auth surface, now has a route at
+// `/sign-in` under ADR-003's own session. THAT SCREEN MINTS NO SESSION EITHER,
+// so this page's state is unchanged by its arrival: every factor on it is
+// unavailable and every control on it submits nothing.
 //
 // So a root page showing a balance, a gate or a payout would be showing a number
 // this app did not receive, on the one product whose entire promise is that it
@@ -68,8 +70,12 @@ export default function PortalIndex() {
         <h2>No session</h2>
         <p>
           This portal reads <code>/api/v1</code> and nothing else, and there is no session to read
-          it with. Sign-in is not built here yet, so the state below is the state that is true
-          rather than a screen standing in for one.
+          it with. The state below is the state that is true rather than a screen standing in for
+          one.
+        </p>
+        <p>
+          <a href="/sign-in">How you sign in</a>. No sign-in can be completed in this build, and
+          that screen says which part is missing rather than pretending otherwise.
         </p>
         <p>
           Content state: <strong>{state}</strong>
