@@ -27,10 +27,12 @@
 //
 //   `correct`       COMPLETE THROUGH validation, dual control, the row lock, the
 //                   precondition re-read and the `admin_actions` row. THE WRITE
-//                   ITSELF IS REFUSED, on four independent disagreements between
-//                   API_CONTRACT's body and `0038_account_adjustments.sql`. They
-//                   are enumerated below and none of them is repairable from a
-//                   route file.
+//                   ITSELF IS REFUSED, on THREE independent disagreements
+//                   between API_CONTRACT's body and
+//                   `0038_account_adjustments.sql`. There were four; ADR-173
+//                   ruled the first and the ruling is applied here. The three
+//                   that remain are enumerated below and none of them is
+//                   repairable from a route file.
 //
 //   `reconciliation` COMPLETE THROUGH the guard, the projection and the
 //                   response's own arithmetic assertions. THE READ IS REFUSED,
@@ -63,18 +65,37 @@
 //   IF entries <> 1 THEN RAISE EXCEPTION 'ADJ-C3: ...'
 //
 // Quoted rather than paraphrased, and read at the source before this module was
-// planned. Four things follow, and every one of them is a disagreement with
-// API_CONTRACT's `WalletCorrectionRequest` rather than a gap in it:
+// planned. Four things followed, and every one of them was a disagreement with
+// API_CONTRACT's `WalletCorrectionRequest` rather than a gap in it. THE FIRST IS
+// NOW RULED AND THREE STAND:
 //
-//   1. `reference_id` IS THE ADJUSTMENT'S ID AND NOT THE CORRECTED ENTRY'S.
-//      The contract says `corrects_entry_id` "Becomes `reference_id`". ADJ-C3
-//      requires `reference_id` to be `account_adjustments.id`. They cannot both
-//      hold, and the type settles it independently: `wallet_entries.reference_id`
-//      is `uuid NOT NULL` (`0011`), `wallet_entries.id` is `bigint GENERATED
-//      ALWAYS AS IDENTITY` (`0011`), and ADR-158 clause 3 makes `entry_id` a
-//      DECIMAL STRING on the wire for exactly that reason. A decimal string is
-//      not a uuid. **THERE IS NO COLUMN ANYWHERE THAT HOLDS WHICH ENTRY A
-//      CORRECTION CORRECTS.**
+//   1. RULED BY ADR-173, AND THE RULING IS APPLIED IN THIS FILE.
+//      `reference_id` IS THE ADJUSTMENT'S ID AND NOTHING ELSE. The contract used
+//      to say `corrects_entry_id` "Becomes `reference_id`"; ADJ-C3 requires
+//      `reference_id` to be `account_adjustments.id`, and the type settles it a
+//      second time: `wallet_entries.reference_id` is `uuid NOT NULL` (`0011`),
+//      `wallet_entries.id` is `bigint GENERATED ALWAYS AS IDENTITY` (`0011`),
+//      and ADR-158 clause 3 makes `entry_id` a DECIMAL STRING on the wire for
+//      exactly that reason. A decimal string is not a uuid, so the instruction
+//      was not merely wrong about which id belongs in the column: IT WAS NOT
+//      EXPRESSIBLE, and PostgreSQL refuses it with `invalid input syntax for
+//      type uuid` before any constraint gets a turn.
+//
+//      THERE IS NO COLUMN ANYWHERE THAT HOLDS WHICH ENTRY A CORRECTION
+//      CORRECTS, AND ADR-173 CLAUSE 3 RULED THAT NONE IS OWED. The durable
+//      record is the `admin_actions` row's `before.corrected_entry`, which
+//      carries the whole entry as it stood before the correction, plus an
+//      `evidence_refs` entry of kind `wallet_entry`. That row is append-only
+//      under the same `0026` revoke as the wallet itself, and it holds strictly
+//      more than a column would. The cost is named rather than hidden: the row
+//      is written by this handler and not by a trigger, so nothing in the
+//      database refuses a correction composed without one (ADR-173 section 6
+//      item 1).
+//
+//      TWO THINGS IN THIS FILE ARE THAT RULING. `corrects_entry_id` is OPTIONAL,
+//      because a `goodwill` adjustment corrects no entry and still lands as
+//      `provenance = 'correction'`; and the `conflict` check is conditioned on
+//      the field being present rather than deleted (ADR-173 clauses 4 and 5).
 //
 //   2. A CORRECTING DEBIT IS UNWRITABLE UNLESS IT EXACTLY REVERSES A PRIOR
 //      ADJUSTMENT CREDIT. `account_adjustments_debit_is_a_reversal` is
@@ -101,19 +122,23 @@
 //      correction written under a code the operator did not choose is a
 //      categorisation Merit made up about its own error.
 //
-// NONE OF THE FOUR IS REPAIRED HERE AND THE REPAIR IS NOT AVAILABLE TO THIS
-// FENCE. Item 1 needs a superseding migration; a migration is sacred once merged
-// (constitution E2). Items 2, 3 and 4 need contract rows this slice may not write
-// (API_CONTRACT is `approved`, so a change to it is an ADR and this slice has no
-// number). **The honest thing is built and the loss is named**, which is the
-// disposition ADR-158 used on its own findings and `admin-payouts.ts` used on
-// the hold the biconditional erases.
+// ITEM 1 IS REPAIRED HERE AND ITEMS 2, 3 AND 4 ARE NOT, AND THE REPAIR FOR THEM
+// IS NOT AVAILABLE TO THIS FENCE. Item 1 turned out to need no migration at all,
+// which is ADR-173's ruling and the reason it could be applied from a route file.
+// Items 2, 3 and 4 need contract rows this slice may not write (API_CONTRACT is
+// `approved`, so a change to it is an ADR and this slice has no number), and
+// item 3 needs something no document in this tree supplies: the VALUE of
+// `dual_control_threshold_cents`. **The honest thing is built and the loss is
+// named**, which is the disposition ADR-158 used on its own findings and
+// `admin-payouts.ts` used on the hold the biconditional erases.
 //
-// SO `writeCorrection` IS A PORT AND THIS MODULE COMPOSES NO POSTING. It hands
-// the wiring slice exactly the fields API_CONTRACT gives it and nothing more,
-// which is the shape that makes the gap visible: a slice that can satisfy
-// `account_adjustments` from this draft does not exist, and the four rulings it
-// is waiting on are the four above.
+// SO `writeCorrection` IS STILL A PORT AND THIS MODULE STILL COMPOSES NO
+// POSTING. It hands the wiring slice exactly the fields API_CONTRACT gives it,
+// plus the one binding ADR-173 settled, and nothing more; that is the shape that
+// makes the gap visible. A slice that can satisfy `account_adjustments` from
+// this draft does not exist, and the rulings it is waiting on are items 2, 3
+// and 4 above. **Repairing one lie in a contract row does not make a handler
+// writable and this file does not pretend otherwise.**
 //
 // AND THERE IS NO `ledger: LedgerTx` ON THE TRANSACTION HANDLE, WHICH IS THE
 // DIFFERENCE FROM `admin-payouts.ts`. That file holds one because `M05` section
@@ -329,7 +354,12 @@ export const CORRECTION_PROVENANCE = 'correction';
 // The wire shapes, transcribed from API_CONTRACT section 8
 // -----------------------------------------------------------------------------
 
-/** `WalletCorrectionRequest`. Every member is required by the contract. */
+/**
+ * `WalletCorrectionRequest`.
+ *
+ * EVERY MEMBER IS REQUIRED EXCEPT `corrects_entry_id`, which ADR-173 clause 4
+ * made optional. See that field.
+ */
 export interface WalletCorrectionBody {
   readonly direction: WalletDirection;
   /** Integer cents, > 0. The MAGNITUDE; `direction` carries the sign (`0011:55`). */
@@ -337,15 +367,27 @@ export interface WalletCorrectionBody {
   /** The business event, human readable. `wallet_entries.cause` is `NOT NULL`. */
   readonly cause: string;
   /**
-   * The entry being compensated.
+   * The entry being compensated, WHEN THERE IS ONE. OPTIONAL, per ADR-173.
    *
    * A DECIMAL STRING, because `entry_id` is one: `wallet_entries.id` is `bigint
    * GENERATED ALWAYS AS IDENTITY` and ADR-158 clause 3 refuses a JSON `number`
-   * for it. See this file's header, item 1: the contract says this "Becomes
-   * `reference_id`" and `reference_id` is a `uuid` that ADJ-C3 requires to be the
-   * adjustment's own id, so the instruction is unexecutable as written.
+   * for it.
+   *
+   * IT DOES NOT BECOME `reference_id`. ADJ-C3 binds `wallet_entries.reference_id`
+   * to the ADJUSTMENT's id and nothing else, and the type settles it a second
+   * time: a `bigint` rendered as digits is not a `uuid`. See this file's header,
+   * item 1.
+   *
+   * OPTIONAL BECAUSE TWO OF THE THREE REASONS THE DATABASE ADMITS CORRECT NO
+   * ENTRY. `0038`'s `reason_code` vocabulary is `goodwill`,
+   * `reconciliation_error` and `promotional_credit`; only the middle one is
+   * about an entry, and a `goodwill` credit repairs nothing and still lands as
+   * `provenance = 'correction'` because `0011`'s closed list offers no other
+   * value for an adjustment. A REQUIRED field would make a case `0038` built
+   * its nullable `account_id` for unreachable through the only endpoint that
+   * reaches it. ADR-173 clause 4, ruled against a running database.
    */
-  readonly corrects_entry_id: string;
+  readonly corrects_entry_id?: string;
   readonly reason: string;
   /** Dual control. See this file's header, item 3. */
   readonly second_approver: string;
@@ -484,18 +526,39 @@ export interface AdminWalletTx {
  *
  * THIS IS THE FINDING MADE CONCRETE RATHER THAN A TASK LIST. Every field here
  * comes off the contract's body or off the locked read; `account_adjustments`
- * additionally requires `reason_code`, `dual_control_threshold_cents`,
- * `destination` and, for a debit, `reverses_adjustment_id`, and NONE of those
- * four has a source in this draft or anywhere else in this tree. A wiring slice
- * cannot satisfy the schema from this and that is the point of declaring it.
+ * additionally requires `reason_code`, `dual_control_threshold_cents` and, for
+ * a debit, `reverses_adjustment_id`, and NONE of those three has a source in
+ * this draft or anywhere else in this tree. A wiring slice cannot satisfy the
+ * schema from this and that is the point of declaring it.
+ *
+ * `destination` USED TO BE A FOURTH AND IS NOT ONE. It is `'trader_wallet'`
+ * for every row this endpoint can write:
+ * `account_adjustments_reason_picks_destination` is a biconditional, so the
+ * promotional class is reachable only under `promotional_credit`, and that
+ * reason never touches a wallet. The endpoint's destination is therefore
+ * derived rather than chosen, and naming it here would declare a choice the
+ * schema does not offer.
+ *
+ * AND `correctsEntryId` IS NOT ONE EITHER, WHICH IS ADR-173'S WHOLE POINT. It
+ * is `undefined` when the operator named no entry, and no column consumes it in
+ * either case: see {@link AdminWalletBackend.writeCorrection}.
  */
 export interface WalletCorrectionDraft {
   readonly identityId: string;
   readonly direction: WalletDirection;
   readonly amountCents: bigint;
   readonly cause: string;
-  /** `wallet_entries.id` of the entry being compensated, read under the lock. */
-  readonly correctsEntryId: bigint;
+  /**
+   * `wallet_entries.id` of the entry being compensated, read under the lock, or
+   * `undefined` when the operator named none.
+   *
+   * IT IS NOT AN ADDRESS THE APPEND WRITES ANYWHERE. `reference_id` is the
+   * adjustment's own id (ADJ-C3) and no other column in the schema holds a
+   * corrected entry, so this field reaches the port as the operator's CLAIM,
+   * already validated against this identity's own statement, and the durable
+   * record of it is the `admin_actions` row written above the append.
+   */
+  readonly correctsEntryId: bigint | undefined;
   /** Absent when the caller omitted it, so `admin_actions.reason` makes the refusal. */
   readonly reason: string | undefined;
   readonly secondApprover: string;
@@ -541,9 +604,19 @@ export interface AdminWalletBackend {
   /**
    * Write the correction: the adjustment, its posting and its wallet entry.
    *
-   * REFUSED BY EVERY DEPLOYMENT TODAY, on the four constraints in this file's
-   * header. It takes the open transaction so that when it can be written it
-   * commits with the `admin_actions` row that explains it (ADR-006).
+   * REFUSED BY EVERY DEPLOYMENT TODAY, on the three constraints that still stand
+   * in this file's header. It takes the open transaction so that when it can be
+   * written it commits with the `admin_actions` row that explains it (ADR-006).
+   *
+   * ONE THING ABOUT THAT WRITE IS NOW SETTLED AND IS STATED HERE SO THE WIRING
+   * SLICE INHERITS THE RULING RATHER THAN THE CONTRACT'S ERROR:
+   * `wallet_entries.reference_id` IS `account_adjustments.id` AND NOTHING ELSE.
+   * It is never the corrected entry's id, never the ledger transaction's and
+   * never the identity's. ADJ-C3 counts the rows matching the adjustment's own
+   * id and raises by name at `COMMIT` when the count is not one, and ADR-173
+   * watched it raise. `test/admin-wallet.test.ts` asserts the binding at both
+   * migrations so that an adapter written six weeks from now cannot quietly
+   * choose a different referent.
    */
   writeCorrection(tx: AdminWalletTx, draft: WalletCorrectionDraft): Promise<WalletCorrectionRecord>;
   /**
@@ -1404,7 +1477,16 @@ export const ADMIN_WALLET_ENDPOINTS: readonly AdminWalletEndpointSpec[] = [
       // `CHECK (amount_cents > 0)`. The magnitude; direction carries the sign.
       const amountCents = centsField(ctx.body, 'amount_cents', errors, 1n);
       const cause = textField(ctx.body, 'cause', errors, true);
-      const correctsEntryId = textField(ctx.body, 'corrects_entry_id', errors, true);
+      // OPTIONAL, AND ITS ABSENCE IS NOT AN ERROR. ADR-173 clause 4: a
+      // `goodwill` adjustment corrects no entry at all, the database accepts one
+      // and it lands as `provenance = 'correction'` because `0011`'s closed list
+      // offers no other value, so a REQUIRED field here would make a case `0038`
+      // built for unreachable through the only endpoint that reaches it. The
+      // shape is `false` and NOT a defaulted value: absence and emptiness are
+      // different answers, and `textField` keeps them different.
+      const correctsEntryId = textField(ctx.body, 'corrects_entry_id', errors, false);
+      // PRESENT AND MALFORMED IS STILL AN ERROR. Optional widens what the
+      // endpoint accepts and weakens nothing about what it accepts.
       if (correctsEntryId !== undefined && !DECIMAL.test(correctsEntryId))
         errors.push({
           path: 'corrects_entry_id',
@@ -1420,7 +1502,6 @@ export const ADMIN_WALLET_ENDPOINTS: readonly AdminWalletEndpointSpec[] = [
         direction === undefined ||
         amountCents === undefined ||
         cause === undefined ||
-        correctsEntryId === undefined ||
         secondApprover === undefined
       )
         throw invalid(errors);
@@ -1456,15 +1537,19 @@ export const ADMIN_WALLET_ENDPOINTS: readonly AdminWalletEndpointSpec[] = [
         toWalletEntryRow,
       );
 
-      const target = BigInt(correctsEntryId);
-      const corrected = rows.find((row) => row.id === target);
-      // "`conflict` (`corrects_entry_id` does not belong to this identity)". The
-      // read is already narrowed to this identity, so an entry belonging to
+      // THE `conflict` CHECK, CONDITIONED ON THE FIELD BEING PRESENT AND NOT
+      // WEAKENED BY THE CONDITION. ADR-173 clause 5: an operator who names an
+      // entry gets it validated against this identity's own statement, and an
+      // operator who names none has nothing to validate. "`conflict`
+      // (`corrects_entry_id` is present and does not belong to this identity)".
+      // The read is already narrowed to this identity, so an entry belonging to
       // somebody else and an entry that does not exist are indistinguishable
       // here, and that is the fail-closed direction: the alternative is a second
       // unnarrowed read whose only purpose is to tell an operator that another
       // identity holds the row they asked about.
-      if (corrected === undefined)
+      const target = correctsEntryId === undefined ? undefined : BigInt(correctsEntryId);
+      const corrected = target === undefined ? undefined : rows.find((row) => row.id === target);
+      if (correctsEntryId !== undefined && corrected === undefined)
         throw refuse(
           'conflict',
           'Conflict',
@@ -1501,6 +1586,23 @@ export const ADMIN_WALLET_ENDPOINTS: readonly AdminWalletEndpointSpec[] = [
       // them in `0011` without a mapping table. `balance_after_cents` is the
       // before-state that matters: the append is computed from it, and after the
       // append the table cannot say what it was without re-folding the statement.
+      //
+      // AND `corrected_entry` IS THE DURABLE RECORD OF WHICH ENTRY WAS
+      // CORRECTED, WHICH IS WHY IT CARRIES THE WHOLE ENTRY AND NOT AN ID. No
+      // column anywhere in the schema records it and ADR-173 clause 3 ruled that
+      // none is owed: this row holds the corrected entry's direction, amount,
+      // provenance, cause, running balance and timestamp AS THEY STOOD BEFORE
+      // the correction, and `0026` revokes UPDATE and DELETE on `admin_actions`
+      // from `merit_app` and from PUBLIC exactly as it does on `wallet_entries`,
+      // so the record is as durable as the entry it describes. ADR-158 clause
+      // 7's instrument, and the cost of preferring it to a column is named in
+      // ADR-173 section 6 item 1: this row is written by a handler and not by a
+      // trigger, so nothing in the database refuses a correction that omits it.
+      //
+      // OMITTED, NOT NULLED, WHEN THE OPERATOR NAMED NO ENTRY. A `goodwill`
+      // credit corrects nothing, and a `corrected_entry` of `null` would be this
+      // handler asserting that an entry was looked for and not found. The same
+      // is true of the `wallet_entry` evidence ref below.
       await ctx.audit({
         action: 'wallet_entry.correct',
         // NOT `enforcement`: Merit is repairing its own record and is not acting
@@ -1512,15 +1614,19 @@ export const ADMIN_WALLET_ENDPOINTS: readonly AdminWalletEndpointSpec[] = [
         reason,
         before: {
           balance_after_cents: centsToJson(balanceBeforeCents),
-          corrected_entry: {
-            id: corrected.id.toString(),
-            direction: corrected.direction,
-            amount_cents: centsToJson(corrected.amountCents),
-            provenance: corrected.provenance,
-            cause: corrected.cause,
-            balance_after_cents: centsToJson(corrected.balanceAfterCents),
-            occurred_at: corrected.occurredAt,
-          },
+          ...(corrected === undefined
+            ? {}
+            : {
+                corrected_entry: {
+                  id: corrected.id.toString(),
+                  direction: corrected.direction,
+                  amount_cents: centsToJson(corrected.amountCents),
+                  provenance: corrected.provenance,
+                  cause: corrected.cause,
+                  balance_after_cents: centsToJson(corrected.balanceAfterCents),
+                  occurred_at: corrected.occurredAt,
+                },
+              }),
         },
         after: {
           direction,
@@ -1530,13 +1636,21 @@ export const ADMIN_WALLET_ENDPOINTS: readonly AdminWalletEndpointSpec[] = [
         },
         evidenceRefs: [
           { kind: 'second_approver', ref: secondApprover },
-          { kind: 'wallet_entry', ref: correctsEntryId },
+          ...(correctsEntryId === undefined
+            ? []
+            : [{ kind: 'wallet_entry', ref: correctsEntryId }]),
         ],
       });
 
-      // THE APPEND, WHICH THIS MODULE CANNOT COMPOSE. See this file's header for
-      // the four constraints that make it unwritable from this body, and the port
-      // for what a wiring slice would still be missing.
+      // THE APPEND, WHICH THIS MODULE STILL CANNOT COMPOSE. See this file's
+      // header for the three constraints that make it unwritable from this body,
+      // and the port for what a wiring slice would still be missing. The one
+      // thing about the append that IS settled is stated at the port:
+      // `wallet_entries.reference_id` is the adjustment's id and nothing else.
+      //
+      // `correctsEntryId` REACHES THE PORT AND IS WRITTEN TO NO COLUMN. It is
+      // `undefined` when the operator named no entry, and the record of it in
+      // either case is the `admin_actions` row above.
       const written = await ctx.backend.writeCorrection(tx, {
         identityId,
         direction: direction as WalletDirection,

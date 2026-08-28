@@ -15,10 +15,11 @@
 //
 //   `0011_wallet.sql` declares `reference_id uuid NOT NULL` and `id bigint
 //   GENERATED ALWAYS AS IDENTITY`, `0038_account_adjustments.sql` requires
-//   `wallet_entries.reference_id = account_adjustments.id`, and API_CONTRACT says
-//   `corrects_entry_id` "Becomes `reference_id`". All three are read out of their
-//   own files and compared here, so the day one of them moves this suite says so
-//   rather than a later author rediscovering it inside a money-path diff.
+//   `wallet_entries.reference_id = account_adjustments.id`, and API_CONTRACT no
+//   longer says `corrects_entry_id` "Becomes `reference_id`" because ADR-173
+//   ruled that sentence unexecutable. All three are read out of their own files
+//   and compared here, so the day one of them moves this suite says so rather
+//   than a later author rediscovering it inside a money-path diff.
 //
 // That is CLAUDE.md's own remedy for the class of error the reconciliation
 // session paid for -- "prefer a new CI gate over a bigger model whenever the
@@ -252,11 +253,18 @@ function authLineFor(path: string): string {
 // to it".
 //
 // ADR-173 RULED THE FIRST OF THE FOUR AND THREE STILL STAND, SO THE APPEND IS
-// STILL UNWRITABLE AND `admin-wallet.ts` IS UNCHANGED. What moved is the CONTRACT
-// half of item 1, not the schema half: `wallet_entries.reference_id` is still a
-// uuid bound to the adjustment's id, and what a correction corrects is recorded
-// in `admin_actions.before.corrected_entry` rather than in any column. Item 1's
-// assertion is inverted below and items 2, 3 and 4 are untouched.
+// STILL UNWRITABLE. What moved is the CONTRACT half of item 1, not the schema
+// half: `wallet_entries.reference_id` is still a uuid bound to the adjustment's
+// id, and what a correction corrects is recorded in
+// `admin_actions.before.corrected_entry` rather than in any column.
+//
+// THE RULING IS NOW APPLIED IN `admin-wallet.ts` AND THE SCHEMA HALF OF ITEM 1
+// IS ASSERTED HARDER RATHER THAN SOFTER. `corrects_entry_id` is optional, the
+// `conflict` check is conditioned on its presence, and the binding a wiring
+// slice must not get wrong -- `reference_id` is the ADJUSTMENT's id and nothing
+// else -- is asserted directly below at both migrations and at the port's own
+// documentation. Items 2, 3 and 4 are untouched, and item 3's threshold still
+// has no source anywhere in this tree.
 
 describe('the four constraints that refuse the correction as the contract writes it', () => {
   const wallet = readFileSync(join(REPO, 'packages/db/migrations/0011_wallet.sql'), 'utf8');
@@ -286,6 +294,58 @@ describe('the four constraints that refuse the correction as the contract writes
     // database accepts one, so a REQUIRED field would make a case `0038` built
     // for unreachable through the only endpoint that reaches it.
     expect(CORRECTION_BLOCK).toContain('corrects_entry_id?: string;');
+  });
+
+  it('1a. `reference_id` is the ADJUSTMENT"s id and nothing else', () => {
+    // THE EXACT THING THE OLD CONTRACT GOT WRONG, ASSERTED DIRECTLY RATHER THAN
+    // INFERRED FROM THE TWO TYPES. ADJ-C3 counts wallet_entries rows by the
+    // adjustment's own id and by four further equalities, and raises by name
+    // when the count is not one. A wiring slice that put any other uuid in that
+    // column -- the corrected entry's, the ledger transaction's, the
+    // identity's -- would be well typed and would fail at COMMIT.
+    expect(adjustments).toContain('FROM wallet_entries w');
+    expect(adjustments).toContain('WHERE w.reference_id           = NEW.id');
+    expect(adjustments).toContain('AND w.ledger_transaction_id  = NEW.ledger_transaction_id');
+    expect(adjustments).toContain("AND w.provenance             = 'correction'");
+    expect(adjustments).toContain(
+      "'ADJ-C3: adjustment % has % matching wallet_entries row(s) and must '",
+    );
+    // The migration states the binding in prose as well, and calls the
+    // adjustment a FOURTH referent rather than one of `0011`'s three.
+    expect(adjustments).toContain('`reference_id` MUST be the adjustment');
+    // AND `NEW` IS AN `account_adjustments` ROW, which is what makes `NEW.id` a
+    // uuid rather than a bigint. Asserted at the trigger declaration so the
+    // claim is not resting on the function name reading like one.
+    expect(adjustments).toContain('AFTER INSERT ON account_adjustments');
+    // NOTHING ELSE IN THE SCHEMA HOLDS A CORRECTED ENTRY. `0011` names the
+    // corrected entry only in a COMMENT on a uuid column, which is prose rather
+    // than a constraint and was never writable: ADR-173 section 6 item 2.
+    expect(wallet).toContain('-- polymorphic: payout_request,');
+    expect(wallet).toContain('-- purchase, or the corrected entry');
+  });
+
+  it('1b. the record of which entry was corrected is the `admin_actions` row', () => {
+    // ADR-173 clause 2 and clause 3: no column is owed because the durable
+    // record already exists and holds strictly more. The two halves of that
+    // claim are the contract's statement of it and the grant that makes it as
+    // durable as the wallet entry it describes.
+    const row = CONTRACT.slice(
+      CONTRACT.indexOf(`### POST ${WALLET_CORRECT_PATH}`),
+      CONTRACT.indexOf('### POST /admin/wallet/:identityId/spend-limit'),
+    );
+    expect(row).toContain('admin_actions');
+    expect(row).toContain('before.corrected_entry');
+    expect(row).toContain('`evidence_refs` entry of kind `wallet_entry`');
+    // `0026` revokes UPDATE and DELETE on `admin_actions` from `merit_app` and
+    // from PUBLIC, exactly as it does on `wallet_entries`. Read at the file that
+    // executes the revoke rather than off the ADR that cites it.
+    const grants = readFileSync(
+      join(REPO, 'packages/db/migrations/0026_roles_and_grants.sql'),
+      'utf8',
+    );
+    const revoke = grants.slice(grants.indexOf('REVOKE UPDATE, DELETE ON'));
+    const list = revoke.slice(0, revoke.indexOf('FROM merit_app, PUBLIC'));
+    for (const table of ['admin_actions', 'wallet_entries']) expect(list).toContain(table);
   });
 
   it('2. a correcting debit must exactly reverse a prior adjustment credit', () => {
@@ -361,6 +421,39 @@ describe('the refusal reconciliation stops at', () => {
     // watched keeping the code and dropping the prose that names it.
     expect(CODE).toContain('export const ADMIN_WALLET_ENDPOINTS');
     expect(SOURCE).toContain('SqlExecutorReason');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 3a. THE ONE THING ABOUT THE APPEND ADR-173 SETTLED, CARRIED IN THE MODULE
+// -----------------------------------------------------------------------------
+// The append is still refused, so no test can watch it write. What CAN be
+// asserted is that the module hands a wiring slice the ruling rather than the
+// contract's error, and that the two ways of getting the referent wrong are
+// named where a later author will read them.
+
+describe('the referent the append must use', () => {
+  it('is stated at the port as the ADJUSTMENT"s id and nothing else', () => {
+    expect(SOURCE).toContain(
+      '`wallet_entries.reference_id` IS `account_adjustments.id` AND NOTHING ELSE.',
+    );
+    // The three wrong answers are named, because "and nothing else" is the part
+    // a reader skims. The corrected entry's id is the one the contract used to
+    // instruct and the one that is not even expressible.
+    expect(SOURCE).toContain(
+      "It is never the corrected entry's id, never the ledger transaction's and",
+    );
+  });
+
+  it('and the module no longer requires the field the ruling made optional', () => {
+    // AGAINST THE CODE AND NOT THE PROSE. The header names
+    // `corrects_entry_id` in order to say what it is not, so a substring test
+    // over the raw file would pass on a handler that still demanded it.
+    expect(CODE).toContain("textField(ctx.body, 'corrects_entry_id', errors, false)");
+    expect(CODE).not.toContain("textField(ctx.body, 'corrects_entry_id', errors, true)");
+    // `second_approver` IS STILL REQUIRED, which is what makes the assertion
+    // above a statement about one field rather than about `textField`.
+    expect(CODE).toContain("textField(ctx.body, 'second_approver', errors, true)");
   });
 });
 
@@ -1096,6 +1189,76 @@ describe('POST /admin/wallet/:identityId/correct', () => {
     // `admin_actions_on_behalf_matches_initiative`, and this act is not the
     // trader's.
     expect('onBehalfOfIdentityId' in (audit?.values ?? {})).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // ADR-173 clauses 4 and 5, applied. `corrects_entry_id` IS OPTIONAL
+  // ---------------------------------------------------------------------------
+  // A `goodwill` adjustment corrects no entry at all, the database accepts one,
+  // and it lands as `provenance = 'correction'` because `0011`'s closed list
+  // offers no other value for an adjustment. ADR-173 confirmed that by
+  // execution, so a REQUIRED field here would make a case `0038` built its
+  // nullable `account_id` for unreachable through the only endpoint that
+  // reaches it.
+
+  const WITHOUT_CORRECTED_ENTRY = (() => {
+    const body = { ...CORRECTION_BODY };
+    delete body['corrects_entry_id'];
+    return body;
+  })();
+
+  it('admits a correction that names NO entry, which is the goodwill case', async () => {
+    const response = await callAs('owner', CORRECT, [], WITHOUT_CORRECTED_ENTRY);
+    expect(response.statusCode).toBe(200);
+    // AND IT IS STILL A CORRECTION. There is no other provenance an adjustment
+    // may claim, so "corrects nothing" and "is not a correction" are different
+    // statements and only the first one is true here.
+    expect((response.json() as WalletCorrectionResponse).provenance).toBe('correction');
+  });
+
+  it('hands the port `undefined` rather than a placeholder when no entry is named', async () => {
+    const written: Written[] = [];
+    await callAs('owner', CORRECT, written, WITHOUT_CORRECTED_ENTRY);
+    const draft = written.find((w) => w.kind === 'correction');
+    expect(draft).toBeDefined();
+    expect('correctsEntryId' in (draft?.values ?? {})).toBe(true);
+    expect(draft?.values['correctsEntryId']).toBeUndefined();
+  });
+
+  it('OMITS `corrected_entry` and the `wallet_entry` ref rather than nulling them', async () => {
+    // A `corrected_entry` of `null` would be this handler asserting that an
+    // entry was looked for and not found, which is a different claim from the
+    // operator naming none. `admin_actions` is append-only, so the row cannot be
+    // corrected afterwards and the distinction is permanent.
+    const written: Written[] = [];
+    await callAs('owner', CORRECT, written, WITHOUT_CORRECTED_ENTRY);
+    const audit = written.find((w) => w.kind === 'insert' && w.table === 'adminActions');
+    expect(audit?.values['before']).toEqual({ balance_after_cents: 250_000 });
+    expect(audit?.values['evidenceRefs']).toEqual([
+      { kind: 'second_approver', ref: 'sso:ops@merit' },
+    ]);
+  });
+
+  it('takes the lock and writes the audit row for a correction that names no entry', async () => {
+    // THE ORDER IS THE CONTROL AND OPTIONALITY DOES NOT MOVE IT. A body that
+    // omits the field skips the `conflict` comparison and nothing else: the
+    // lock is still first and the `admin_actions` row is still before the
+    // append.
+    const written: Written[] = [];
+    await callAs('owner', CORRECT, written, WITHOUT_CORRECTED_ENTRY);
+    expect(written.map((w) => w.kind)).toEqual(['lock', 'rows', 'insert', 'correction']);
+  });
+
+  it('still refuses a `corrects_entry_id` that is PRESENT and malformed', async () => {
+    // Optional widens what the endpoint accepts and weakens nothing about what
+    // it accepts. ADR-173 clause 5: an operator who names an entry gets it
+    // validated, and an operator who names none has nothing to validate.
+    const response = await callAs('owner', CORRECT, [], {
+      ...CORRECTION_BODY,
+      corrects_entry_id: 'not-a-number',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ errors: [{ path: 'corrects_entry_id' }] });
   });
 
   it('hands the port MONEY AS BIGINT and never as a JSON number', async () => {
