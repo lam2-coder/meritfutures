@@ -982,8 +982,10 @@ describe('the horizon refuses rows that disagree with the constraints above them
     const { tx } = calendarHandle({
       calendar: [...CALENDAR, { ...holiday('2026-12-28'), sessionOpenAt: new Date() }],
     });
+    // THE NAME AND NOT ONLY THE CLASS, on the next case's reason: `instant()`
+    // sits behind this control and throws the same class for its own reason.
     await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z')).rejects.toThrow(
-      AdminReadError,
+      /trading_calendar_holiday_has_no_session/,
     );
   });
 
@@ -991,6 +993,15 @@ describe('the horizon refuses rows that disagree with the constraints above them
     // THE DIRECTION A ONE-WAY CHECK WOULD MISS, and it is the one that matters
     // to this walk: a sessionless non-holiday would be counted as a trading day
     // and would then have no `session_close_at` for the anchor rule to read.
+    //
+    // THE MESSAGE IS ASSERTED AND NOT ONLY THE CLASS, BECAUSE THE CLASS PASSED
+    // AGAINST A ONE-DIRECTIONAL CHECK. Seeding `if (isHoliday && !sessionless)`
+    // in place of the two-way equality left this case GREEN: the row fell
+    // through to `instant()`, which refuses a null `session_open_at` for its own
+    // reason and throws the same class. So the case pinned that SOMETHING
+    // refused rather than that THIS control did, which is a guard nobody had
+    // watched fire. `AdminReadError` alone cannot tell two controls apart and
+    // the constraint name can.
     const { tx } = calendarHandle({
       calendar: [
         ...CALENDAR,
@@ -998,7 +1009,7 @@ describe('the horizon refuses rows that disagree with the constraints above them
       ],
     });
     await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z')).rejects.toThrow(
-      AdminReadError,
+      /trading_calendar_holiday_has_no_session/,
     );
   });
 
@@ -1010,7 +1021,7 @@ describe('the horizon refuses rows that disagree with the constraints above them
       ],
     });
     await expect(readTradingHorizon(tx, '2026-11-25T00:30:00.000Z')).rejects.toThrow(
-      AdminReadError,
+      /trading_calendar_session_ordered/,
     );
   });
 
