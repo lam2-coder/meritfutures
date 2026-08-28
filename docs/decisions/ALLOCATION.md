@@ -423,9 +423,17 @@ both probes were removed with `git status --porcelain` clean after.
 | `RI-10` | **The 686-specifier repair of 2026-08-25, and the check's own header is its only allocation site**, which is the defect this table exists for                                                                                        | Every relative import in shipped source names a file that exists                         |
 | `RI-12` | **The 2026-08-27 STATE.md duplication, found by eye rather than by a check**, and this row is written in the commit that writes the check as the note below requires | No document under docs/ repeats a substantial line more than 8 times |
 | `RI-13` | **The 2026-08-27 approval backlog, and the row is written in the commit that writes the check as the note below requires.** Fifty-four entries declared their own approval line withheld and twenty said what the signature was for; the other thirty-four left a founder to reconstruct the question from the ruling | Every ADR whose approval line is unsigned states what the founder must decide |
+| `RI-14` | **The 2026-08-28 absent-store claim, restated four times without a reader opening the file, and its row is written LATE.** The check landed on `main` in [session 316](../sessions/2026-08-28-session-316.md)'s window and this table did not learn about it until session 324, which is the note below broken once and repaired here rather than left | No reason claims a named thing does not exist while the tree exports it |
+| `RI-15` | **The four false line citations [session 316](../sessions/2026-08-28-session-316.md) found in `wiring.test.ts`**, two of them eighteen lines off inside the entry [ADR-172](ADR-172.md) wrote one session earlier to replace a false reason. It is the LOCATION half of the class `RI-14` reads the EXISTENCE half of, and the check found a FIFTH false citation in that file on its first run | No reason cites a line that does not hold the name beside it |
 
-**`RI-14` IS THE NEXT FREE NUMBER.** A session taking it writes its row here in the commit that
+**`RI-16` IS THE NEXT FREE NUMBER.** A session taking it writes its row here in the commit that
 writes the check, not in the ADR that names it.
+
+**`RI-14`'S ROW IS THE NOTE ABOVE BROKEN AND IT IS RECORDED RATHER THAN QUIETLY BACKFILLED.** The
+check landed while three sessions were live in the same file on the same night and its row was
+never written; nothing failed, because this table is prose beside a list rather than a derived
+span. That is the same shape as every other defect on this page: a register that does not name
+what it tracks.
 
 **`RI-12` IS THE ONLY MEMBER MINTED BY A DEFECT RATHER THAN BY A PLAN OR AN ADR.** Every other row here was claimed by a document that reasoned about the property first. `RI-12` was written the morning `docs/STATE.md` was found carrying **4,672 copies of one sentence** with every gate green, because every gate was asking whether the content was CORRECT and none was asking whether it was there ONCE. [CLAUDE.md](../../CLAUDE.md)'s own rule is what decided the shape: *"Prefer a new CI gate over a bigger model whenever the error is checkable."* **The check found a SECOND instance the first time it ran**, in [data-model/README](../architecture/data-model/README.md), which is the argument for it in one line.
 
