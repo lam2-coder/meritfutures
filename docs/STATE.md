@@ -5437,3 +5437,49 @@ holds `page.ts`, `liability.ts` and `live-liability.ts` and no session holds tha
 **[`0038`](../packages/db/migrations/0038_account_adjustments.sql) AND [`0011`](../packages/db/migrations/0011_wallet.sql) ARE BYTE FOR BYTE UNCHANGED**, as constitution `E2` requires of merged migrations.
 
 **Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean.** The dispatch baseline of 33 / 13 / 0 / 0 / clean / 191 files / 4,088 passed / 6 skipped was reproduced exactly before a line changed. **ONE FENCE EXCEPTION, ARGUED AND SEEDED.** Two assertions in [`apps/api/test/admin-wallet.test.ts`](../apps/api/test/admin-wallet.test.ts) went red on the contract edit: one pinned the very sentence this entry deletes and is **INVERTED rather than dropped**, because a deleted assertion is how the sentence comes back; the other fired on this entry's own explanatory paragraph, which is **session 298's recorded landmine arriving in the exact words it was written in**, so `CORRECTION_BLOCK` is narrowed to the fenced `ts` body, which is what that constant's own doc comment already said was meant. Three defects were seeded into the contract and all three watched failing, and `API_CONTRACT` is byte identical afterwards. **[`admin-wallet.ts`](../apps/api/src/routes/admin-wallet.ts) itself is unchanged.** **No handler code, no migration, no `packages/db` change, no gate, and no section renumbered.**
+
+## The payout rail gets a PORT, and `LT-07` turns out to be unwritable by anybody (2026-08-28, session 314)
+
+**[P5](plans/P5-payouts-and-wallet.md) section 8's `P5-m`, minus the settlement webhook session 258 claimed
+under [ADR-146](decisions/ADR-146.md). [`packages/rail`](../packages/rail/src/index.ts) is new: the payout
+rail's port, its verifier, its delivery ledger, [M05](plans/M05-payout-system.md) section 3.1's `S-1` to
+`S-7`, and one sandbox adapter. MONEY PATH, `E2` READ OWED, NOT MERGED.** No ADR number, no migration
+number, no `packages/db` change, no route, no contract change, no ledger posting, and
+[`wiring.test.ts`](../apps/api/test/wiring.test.ts)'s `{declared: 21, wired: 6, blocked: 15}` triple
+unmoved.
+
+**`LT-07` CANNOT BE POSTED BY ANY CODE IN THIS TREE, ON THREE INDEPENDENT GROUNDS, AND ALL THREE ARE
+REPORTED RATHER THAN RULED.**
+
+| # | Finding |
+|---|---|
+| **A** | **Its credit leg names an account class that does not exist.** [M05](plans/M05-payout-system.md) section 2.1 writes `LT-07` as `debit firm_treasury; credit the payout wallet position`, and [`0009`](../packages/db/migrations/0009_ledger.sql)'s `ledger_accounts_code_is_declared` declares seven codes, none of them a pooled payout position. `SD-M5-07` retired that class when it moved `LT-01`'s credit to the identity's `trader_wallet`, and **`trader_wallet` is not the substitution** because [ADR-124](decisions/ADR-124.md) records `LT-02` and `LT-07` as the FIRM-ONLY postings a global halt must refuse. **It is a migration and a ruling** |
+| **B** | **Its ledger idempotency key has two recorded conventions pointing opposite ways.** `LT-01` is `` `${PAYOUT_ENDPOINT} ${idempotencyKey}` `` in three doors that build the identical string; `LT-06`'s is the withdrawal's OWN stored key and explicitly *"NOT one naming this endpoint"*. Bare is the string `LT-06` already claims for the same withdrawal under a `text NOT NULL UNIQUE` column, so the second posting is refused by the database; endpoint-prefixed reintroduces what `LT-06` refused |
+| **C** | **No file in this tree says whether `firm_treasury` is an asset or a liability.** `ledger_accounts.kind` is a five-member CHECK and the only `INSERT INTO ledger_accounts` anywhere seeds three other codes. Recorded as an ABSENCE, with no direction inferred from it |
+
+**Each is a case in [`test/lt-07.test.ts`](../packages/rail/test/lt-07.test.ts) reading its primary source**,
+so the day one is fixed the package goes red rather than staying quietly stale.
+
+**Two granted files were deliberately not spent and each refusal is argued.** `webhooks-rail.ts` has no
+[API_CONTRACT](architecture/API_CONTRACT.md) row and its only other spelling duplicates session 258's
+`POST /webhooks/rise`, which `compose` refuses at startup;
+[OVERVIEW](architecture/OVERVIEW.md) section 3 rows **four** of this workspace's **thirteen** packages, with
+`packages/psp` itself among the nine absent, so one row for `rail` alone would make an incomplete table read
+as complete in an `approved` document.
+
+**`payout_transfers.provider` carries NO CHECK**, where `purchases.psp` closes `PspId` at two, so this
+port's provider type is derived from a DEFAULT and is deliberately **narrower** than its column; the suite
+asserts the ABSENCE, with the `status` CHECK five lines down as the control. **The approval key inverts
+`PurchaseIntent`'s rule and that is `INV-M5-06`**: a card attempt is a new key, a transfer attempt is the
+same one. **The contract's two replay controls are not one thing**: the nonce refuses a capture at 401 and
+the event id recognises the rail's own retry at 200, and folding them together breaks one direction or the
+other, seeded both ways.
+
+**`VG-12` is asked to admit nothing**, stated rather than assumed: no runtime dependency, no workspace
+dependency, three `catalog:` devDependencies already installed for `@merit/psp`, `node:crypto` a builtin,
+and `pnpm-lock.yaml` gains 12 lines that are this package's own `importers` block and no resolution.
+
+**Seven defects seeded and all seven caught**, including the ledger credit written `+amountCents`, which is
+session 288's own first draft. **33 of 33 gates, 13 of 13 invariants, typecheck 0, lint 0, format clean,
+198 files / 4,184 passed / 6 skipped**, against a `main` baseline of 191 / 4,088 / 6 reproduced exactly
+first, `falsify` clean.
