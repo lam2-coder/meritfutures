@@ -48,10 +48,22 @@
 // `NEXT_PUBLIC_` identifier appears in it, which are ADR-182 section 5 clauses 1
 // and 2 made mechanical for the first time.
 //
-// The account drill-down (3.2) and the evidence pack are M06 surfaces this
-// package does not contain. THE EVENT FEED (1.1) IS NO LONGER AMONG THEM
-// EITHER: `W6-h` landed `src/app/feed/`, and it is the one screen in this
-// package whose route exists and whose ADAPTER CANNOT BE WRITTEN YET. `GET
+// The evidence pack is the ONE M06 surface this package does not contain, and
+// that sentence named three surfaces two sessions ago. THE ACCOUNT DRILL-DOWN
+// (3.2) IS NO LONGER AMONG THEM: `W6-j` landed `src/app/accounts/`, and it is
+// the screen whose route exists and whose adapter is blocked by the SAME
+// unregistered table as the feed. `GET /admin/accounts/:accountId` is
+// registered on the operator surface and `AdminReadSource` declares
+// `readAccount`; seven of the eight sections API_CONTRACT section 8 names read
+// tables `packages/db` registers and `events` does not, and the route refuses a
+// drill-down that omits a section, so seven of eight is a rejected response
+// rather than a smaller screen. IT IS ALSO THE ONE READ IN SECTION 8 THE
+// CONTRACT DOES NOT TYPE, so that screen renders the section roster and what
+// arrived in each and never a field of one. THE EVENT FEED (1.1) IS NO LONGER
+// AMONG THEM EITHER: `W6-h` landed `src/app/feed/`, and it was the ONE screen in
+// this package whose route exists and whose ADAPTER CANNOT BE WRITTEN YET until
+// the account drill-down joined it above, on the same table and for the same
+// reason. `GET
 // /admin/events` is registered on the operator surface and `AdminReadSource`
 // declares `listEvents`, but `events` is unregistered in `packages/db` and
 // therefore is not a `TableKey`, so the keyed accessor has no way to read it
@@ -67,12 +79,27 @@
 // (`apps/api/src/admin-source/index.ts`), so each renders real rows the day an
 // operator session exists and neither waits on an adapter nobody wrote.
 //
-// AND THE IDENTITY DRILL-DOWN IS THE ONE SCREEN IN THIS PACKAGE THAT MAY
-// RENDER A SUBJECT. `INV-M6-10` grants trader-identifying data only where the
-// query names one, and M06 section 3.2a is where the bound on that licence is
-// written: no index route, no search, no list. `src/app/identities/` holds one
+// AND THE TWO DRILL-DOWNS ARE THE SCREENS IN THIS PACKAGE THAT MAY RENDER A
+// SUBJECT, which is a sentence that named ONE of them until `W6-j`.
+// `INV-M6-10` grants trader-identifying data only where the query names one,
+// and M06 section 3.2a is where the bound on that licence is written for the
+// identity: no index route, no search, no list. `src/app/identities/` holds one
 // dynamic segment and the document module, and `test/identity-render.test.ts`
 // asserts the directory rather than the intention.
+//
+// `src/app/accounts/` HOLDS THE SAME TWO FILES AND NO INDEX, FOR TWO REASONS
+// RATHER THAN ONE. Section 3.2 states no browse bound of its own, so the fence
+// is the first reason: the search surface is a different contract row and
+// `AdminReadSource.searchAccounts` is owned by no plan at all. The second
+// outlives the fence: an index with no query behind it is `FM-M6-10`, and the
+// registered endpoint already refuses one by making `?query=` a validation
+// failure when absent rather than an implied "everybody".
+//
+// THE TWO LICENCES ARE NOT THE SAME SIZE, AND THE DIFFERENCE IS THE CONTRACT
+// RATHER THAN THE SCREEN. The identity drill-down checks every served id
+// against the graph its query resolved, because `IdentityGraph` declares those
+// members. The account drill-down has one id in its closure and cannot check a
+// root at all, because its response declares no field to check one against.
 //
 // THERE IS A RENDERED DOCUMENT NOW, WHICH IS THE THIRD SENTENCE IN THIS HEADER
 // THAT `WAVE-06` HAS NARROWED RATHER THAN LEFT STANDING. `W6-d` landed

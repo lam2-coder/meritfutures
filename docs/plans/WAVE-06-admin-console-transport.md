@@ -245,18 +245,23 @@ which both surfaces serve. The public surface registers 46, and the union is
 
 ### 4.1 What is registered is not what answers
 
-**The 26 operator routes above answer TWO different things and 503 is only one of them** (amended by
-[ADR-190](../decisions/ADR-190.md); section 8.1 below carries the amendment and its measurement in full).
-The routes served by `admin-reads.ts`'s shared `adminHandler`, which is the family every screen in this wave
-reads, answer **401 `unauthenticated`** to a caller with no admin session cookie and **500 `internal_error`**
-to one carrying a cookie, because `AdminReadSource` is a port nothing wires
+**Every registered operator route answers 401 `unauthenticated` to an anonymous caller, and nothing this
+console can reach answers 503 before authenticating** (amended by [ADR-190](../decisions/ADR-190.md), then by
+[ADR-192](../decisions/ADR-192.md); section 8.1 below carries ADR-190's measurement in full and it is the
+document of what the surface did before that second entry moved it).
+
+**What a caller CARRYING a cookie meets still splits by module, and that half did not move.** The routes
+served by `admin-reads.ts`'s shared `adminHandler`, which is the family every screen in this wave reads,
+answer **500 `internal_error`**, because `AdminReadSource` is a port nothing wires
 ([`AdminReadSource:695`](../../apps/api/src/routes/admin-reads.ts),
 [`setAdminReadSource:739`](../../apps/api/src/routes/admin-reads.ts)). The routes served by the four write
-backends answer **503 `service_unavailable`** before authenticating at all, because they resolve
-`principal(request)` through a session source nothing supplies. **NEITHER SIDE OF THE PARTITION IS COUNTED
-HERE AND THAT IS DELIBERATE**: [ADR-190](../decisions/ADR-190.md) section 5 holds it and pins no cardinal, on
-its own ground that a slice wiring a backend moves a route between the sets, so a figure written down here
-would go false for the right thing happening.
+backends answer **503 `service_unavailable`**, which ADR-192 clause 1 KEPT on the ground that those four
+classes carry one fact each: *no backend is installed*. What ADR-192 clause 2 changed is the ORDER, moving
+that 503 behind the 401 so an anonymous caller is no longer told which of this deployment's ports are
+uncomposed. **NEITHER SIDE OF THE PARTITION IS COUNTED HERE AND THAT IS DELIBERATE**:
+[ADR-190](../decisions/ADR-190.md) section 5 holds it and pins no cardinal, on its own ground that a slice
+wiring a backend moves a route between the sets, so a figure written down here would go false for the right
+thing happening.
 [`wiring.test.ts:457`](../../apps/api/test/wiring.test.ts) pins the triple at
 `{ declared: 23, wired: 6, blocked: 17 }`.
 
@@ -517,8 +522,12 @@ operator reads them. `W6-f` and `W6-g` shipped that way before it was written do
 sweeps the whole `src/app/` directory for it. **Section 4.1, the `W6-f` row in section 8, section 10's
 item, the two sentences in `apps/admin/src/http/client.ts` and one in `apps/admin/src/index.ts` carried the
 old claim**: they were outside ADR-190's fence and were registered in that entry's section 7 item 5 with
-their line numbers. **ALL SIX ARE NOW REPAIRED** against that ruling, as a transcription of it and not as a
-second one, so nothing in this plan or in `apps/admin/src/` states the retired sentence any longer.
+their line numbers, and re-registered unchanged at [ADR-192](../decisions/ADR-192.md) section 10 item 5.
+**ALL SIX ARE NOW REPAIRED**, as a transcription of those two rulings and not as a third, so nothing in this
+plan or in `apps/admin/src/` states the retired sentence any longer. **The repairs carry ADR-192's answer and
+not ADR-190's**, because that entry moved the write backends' 503 behind a 401 after ADR-190 measured it in
+front: section 4.1 above states the surface as it stands, and the paragraph opening this section stays as
+ADR-190 wrote it, because it is the record of what the surface did on the day that entry measured it.
 
 **The condition that changes this** is [ADR-171](../decisions/ADR-171.md) section 9's own: the slice that
 lands an `AdminSessionSource` a deployment can install. **This plan does not schedule it, because

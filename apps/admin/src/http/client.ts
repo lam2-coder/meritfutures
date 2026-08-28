@@ -175,8 +175,8 @@ export function requestPath(path: string): string {
  * AND THIS CONSOLE AUTHORIZES NOBODY. `../roles.ts` resolves a role STRING and
  * nothing produces one; ADR-171 finding 5 puts the mapping from a session to an
  * actor and a role with the admin identity provider, which does not exist. NO
- * operator route serves a row until it does; what they answer instead is 401 or
- * 500 on this console's family and 503 on the write backends (ADR-190).
+ * operator route serves a row until it does, and every `/admin/*` route answers
+ * 401 to an anonymous caller (ADR-192); the 500 and the 503 sit behind it.
  */
 const CREDENTIALS_POLICY = 'same-origin' as const;
 
@@ -197,12 +197,12 @@ const CREDENTIALS_POLICY = 'same-origin' as const;
  * `unavailable` IS ITS OWN MEMBER AND IT STAYS, THOUGH NOT ON THE GROUND
  * WRITTEN HERE FIRST. This block read that ADR-171's blocker makes EVERY
  * operator route answer 503, and quoted a WAVE-06 section 8.1 sentence ADR-190
- * has since replaced. Both are false: that entry injected the surface route by
- * route and the answer splits by MODULE, the `adminHandler` family this console
- * reads answering 401 and 500 and the four write backends answering 503 before
- * authenticating. So 503 has NAMED PRODUCERS rather than being the state this
- * console lives in, and folding it into a general server error would still lose
- * "not built yet" from "broke just now", ADR-166's class one section over.
+ * has since replaced. Both are false. ADR-190 injected the surface route by
+ * route and found it split by MODULE; ADR-192 then moved the write backends'
+ * 503 BEHIND a 401, so every `/admin/*` route answers 401 to an anonymous caller
+ * and the 503 is what an AUTHENTICATED one meets on an unwired backend. So 503
+ * has named producers rather than being the state this console lives in, and
+ * folding it into a server error still loses ADR-166's distinction.
  *
  * `forbidden` IS MAPPED AND IS NOT AN INTERNAL FAULT, WHICH IS WHERE THIS
  * DIVERGES FROM THE PORTAL. `apps/portal/src/shell/app-shell.ts` deliberately

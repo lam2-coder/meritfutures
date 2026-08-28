@@ -44,6 +44,7 @@ import type { TableKey } from '@merit/db';
 
 import adminPayouts, {
   ADMIN_PAYOUT_ENDPOINTS,
+  AdminPayoutUnwired,
   ADMIN_PAYOUT_ROLES,
   ADMIN_PAYOUT_TABLES,
   HELD,
@@ -275,8 +276,8 @@ describe('the surface boundary', () => {
     const { app } = buildServer({ surface: 'public', modules: [adminPayouts] });
     // NO BACKEND IS INSTALLED. If this 404 came from a permission check the
     // check would have needed a principal, and asking for one would have thrown
-    // `AdminPayoutUnwired` and answered 503. A 404 here therefore proves the
-    // route was never registered.
+    // `AdminPayoutUnwired` and answered 401 (ADR-192 clause 2). A 404 here
+    // therefore proves the route was never registered.
     const response = await app.inject({
       method: 'POST',
       url: `${BASE_PATH}/admin/payouts/${PAYOUT_ID}/release`,
@@ -501,7 +502,35 @@ describe('the authorization refusals', () => {
       }
   });
 
-  it('answers 503 and not 500 when no backend is installed', async () => {
+  // ADR-192 clause 2. THE 503 DID NOT GO AWAY; IT MOVED BEHIND THE 401. Which
+  // of this deployment's ports are uncomposed is a fact about the deployment,
+  // and an anonymous caller may not have it, so `principal`'s refusal answers
+  // 401 and `operator`'s still answers 503.
+  it('answers 401 and not 503 when no backend is installed, on every route', async () => {
+    for (const spec of ADMIN_PAYOUT_ENDPOINTS) {
+      resetAdminPayoutBackend();
+      const { app } = buildServer({ surface: 'operator', modules: [adminPayouts] });
+      const response = await app.inject({
+        method: spec.method,
+        url: urlFor(spec.path),
+        payload: { reason: 'ticket 4711' },
+      });
+      await app.close();
+      expect([spec.path, response.statusCode]).toEqual([spec.path, 401]);
+      expect([spec.path, (response.json() as { code: string }).code]).toEqual([
+        spec.path,
+        'unauthenticated',
+      ]);
+    }
+  });
+
+  it('answers 503 to an authenticated operator whose deployment wired no `operator`', async () => {
+    // The leg that would pass by accident if the module simply stopped sending
+    // 503 at all.
+    useAdminPayoutBackend({
+      ...fakeBackend('owner'),
+      operator: () => Promise.reject(new AdminPayoutUnwired('operator')),
+    });
     const { app } = buildServer({ surface: 'operator', modules: [adminPayouts] });
     const response = await app.inject({
       method: 'POST',

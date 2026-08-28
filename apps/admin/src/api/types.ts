@@ -24,19 +24,31 @@
 // `GET /admin/liability`, the data source for the liability home `W6-d`
 // renders; `GET /admin/flags`, the data source for the flags queue `W6-f`
 // renders; `GET /admin/identities/:identityId/graph`, the data source for the
-// identity drill-down `W6-g` renders; and `GET /admin/events`, the data source
-// for the event feed `W6-h` renders. All four are API_CONTRACT section 8
-// headings.
+// identity drill-down `W6-g` renders; `GET /admin/events`, the data source for
+// the event feed `W6-h` renders; and `GET /admin/accounts?query=` and `GET
+// /admin/accounts/:accountId`, which `W6-j` takes together because this file's
+// partition assigns it the first and its screen renders the second. All six are
+// API_CONTRACT section 8 headings.
+//
+// THE LAST OF THOSE SIX IS THE ONE THE CONTRACT DOES NOT TYPE, and the shape of
+// its absence is recorded at the declaration rather than here: section 8 gives
+// the drill-down a SENTENCE where every other row gives a `ts` block, so what is
+// transcribed for it is the section roster and nothing below it.
 //
 // THE PARTITION IS THE WAVE'S AND IT IS WRITTEN DOWN. WAVE-06 section 9's row
 // for this file reads "FIVE SLICES, ONE TRANSCRIPTION ... each screen slice
 // adds the shapes its own contract rows carry", so the other declared read
 // shapes in section 8 are deliberately absent and each has an owner:
 //
-//   `AdminAccountSearchItem`   `GET /admin/accounts?query=`         `W6-j`
 //   `EvidencePackResponse`     `GET /admin/evidence/:accountId`     wave 5,
 //                              blocked on ADR-171 (the export is an audited ACT
 //                              and therefore behind the actor)
+//
+// `AdminAccountSearchItem` WAS THE FIRST ROW OF THAT TABLE AND IS NOT ANY MORE:
+// `W6-j` landed it at the foot of this file, beside the drill-down's roster.
+// **IT IS THE ONE SHAPE HERE WITH NO CONSUMER IN THIS PACKAGE**, and that is
+// stated at its declaration: the search screen is not built and
+// `AdminReadSource.searchAccounts` is owned by no plan at all.
 //
 // A slice that adds one of these adds it here beside its screen, which is the
 // same division WAVE-06 section 9 draws and the reason four slices can share
@@ -463,3 +475,101 @@ export type EventFeedResponse = {
   readonly data: readonly AdminEventItem[];
   readonly next_cursor: string | null;
 };
+
+/**
+ * `GET /admin/accounts?query=`. API_CONTRACT section 8, transcribed field for
+ * field.
+ *
+ * IT HAS NO CONSUMER IN THIS PACKAGE AND IT IS STILL TRANSCRIBED HERE, which is
+ * this file's own partition rather than an oversight: the header names `W6-j` as
+ * this shape's owner and `W6-j` is the drill-down. The screen behind it is NOT
+ * built, and the reason is one this file may state and may not fix: no slice in
+ * `P5`, `P6`, `P7` or `WAVE-06` writes `AdminReadSource.searchAccounts`
+ * (WAVE-06 section 10 item 3), so the route is registered against a method
+ * nothing supplies.
+ *
+ * AND ITS SEARCH TERM IS WIDER THAN THE KEYED ACCESSOR CAN EXPRESS, which is
+ * why the missing adapter is a finding and not merely an unwritten file. The
+ * contract's own list is "account id, platform ref, email, identity id, name
+ * fragment, coupon, or payout id". A FRAGMENT is a substring predicate;
+ * `ADR-112`'s vocabulary is a typed equality over declared columns, `ADR-157`
+ * adds a RANGE term and an `IS NULL` on the read path and refuses the rest. So
+ * six of those seven terms are keyed reads and the seventh is not, and an
+ * adapter that quietly served the six would narrow a contract behaviour where a
+ * reader would see a green suite.
+ *
+ * THE MONEY FIELDS ON THIS ROW HAVE NO `as_of` AND NO SOURCE, exactly as
+ * `IdentityGraph`'s three do. `INV-M6-04` makes such a number unrenderable by
+ * this console and `../figure.ts` closes its origin roster at `P-M6-01` to
+ * `P-M6-10` and `AS-M6-04`, which are `M06` section 3.1's panels. A row of this
+ * shape rendered on a section 3.2 screen would carry four numbers with no
+ * origin any of them may declare.
+ */
+export type AdminAccountSearchItem = {
+  readonly account_id: string;
+  readonly identity_id: string;
+  readonly email: string;
+  readonly plan_code: string;
+  readonly size_cents: number;
+  readonly phase: string;
+  readonly status: string;
+  readonly balance_cents: number;
+  readonly withdrawable_cents: number;
+  readonly open_flags: number;
+  readonly payouts_frozen: boolean;
+  readonly recon_blocked: boolean;
+};
+
+/**
+ * The eight sections `GET /admin/accounts/:accountId` returns, in the
+ * contract's own order and its own words.
+ *
+ * THIS IS THE ONE ADMIN READ THE CONTRACT DOES NOT TYPE, AND THAT IS WHY THIS
+ * DECLARATION IS A LIST OF NAMES RATHER THAN A LIST OF FIELDS. Section 8's row
+ * is prose: "Full drill-down: account, identity, every mark, every rule state
+ * per day with `gate_results`, every event, flags with evidence, payouts with
+ * snapshots, admin actions." Every other row in that section carries a `ts`
+ * block; this one carries a sentence.
+ *
+ * SO THE TRANSCRIPTION IS THE SECTION ROSTER AND NOTHING BELOW IT. This file's
+ * discipline is that a field not in the contract is not in this file, and the
+ * drill-down has no field in the contract to transcribe: a field list written
+ * here would be this console designing a response and then believing it. The
+ * granularity the contract does write is the section, and that is the
+ * granularity declared.
+ *
+ * `apps/api/src/routes/admin-reads.ts` REACHED THE SAME ANSWER INDEPENDENTLY
+ * AND ENFORCES IT AT THE SERVER: its `ACCOUNT_DETAIL_SECTIONS` is this list, its
+ * `projectAccountDetail` refuses a response carrying a section the contract does
+ * not name AND a response omitting one the contract does name, and its own
+ * comment records the field-level schema as a DEBT owed by whoever types this
+ * drill-down. Two copies of one roster is the cost of the console not importing
+ * the server, which is `ADR-182`'s separation and is paid here rather than
+ * argued away.
+ */
+export const ACCOUNT_DETAIL_SECTIONS = [
+  'account',
+  'identity',
+  'marks',
+  'rule_states',
+  'events',
+  'flags',
+  'payouts',
+  'admin_actions',
+] as const;
+
+/** One member of {@link ACCOUNT_DETAIL_SECTIONS}. */
+export type AccountDetailSection = (typeof ACCOUNT_DETAIL_SECTIONS)[number];
+
+/**
+ * `GET /admin/accounts/:accountId`, at the only granularity the contract
+ * declares.
+ *
+ * EVERY SECTION IS `unknown` AND THAT IS THE TRANSCRIPTION RATHER THAN A GAP TO
+ * FILL LATER. `unknown` is the type that forces a reader to prove a shape before
+ * using it; `Record<string, unknown>` or an invented interface would each let a
+ * renderer read a field name the contract never wrote. The screen that renders
+ * this reads no member of any section, and its suite asserts that from the
+ * module's own source.
+ */
+export type AdminAccountDetail = Readonly<Record<AccountDetailSection, unknown>>;
