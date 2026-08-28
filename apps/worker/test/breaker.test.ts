@@ -945,5 +945,8 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     './integrations/loops.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  expect(new Set(legs).size).toBe(22);
+  // 24 SINCE SESSION 387, WHICH ADDED `./recon/ports.ts` AND `./recon/sweep.ts`.
+  // The number is here rather than derived so that a leg DISAPPEARING is a
+  // failure and not a smaller list nobody counted.
+  expect(new Set(legs).size).toBe(24);
 });

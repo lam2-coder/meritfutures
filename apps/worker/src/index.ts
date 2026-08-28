@@ -994,6 +994,87 @@ export type {
   LoopsTrigger,
 } from './integrations/loops.ts';
 
+// -----------------------------------------------------------------------------
+// THE NIGHTLY RECONCILIATION SWEEP (session 387)
+// -----------------------------------------------------------------------------
+// `OVERVIEW` section 5.2's own stage -- "W->>W: reconciliation: our EOD balance
+// vs Rithmic stated" -- ARRIVING AS CODE FOR THE FIRST TIME. `0064` landed the
+// run record on 2026-08-28 and named the producer as one of the two things that
+// did not clear; this is that producer, AND THE COMPARISON IT RECORDS, because
+// the comparison did not exist either.
+//
+// **THAT SECOND HALF WAS MEASURED RATHER THAN ASSUMED AND IT IS THE FINDING.**
+// Nothing under `apps/*/src` or `packages/*/src` wrote `reconciliations`,
+// nothing wrote `reconciliation_runs`, and nothing set `accounts.recon_blocked`;
+// every occurrence of all three in application code is a read or a
+// registration. So a producer that wrote only the run row would have made
+// `integrations.recon.last_run_at` truthful and the panel useless, which is a
+// threshold with no window in a different table.
+//
+// **`BatchWritePort.raiseReconciliation` IS NOT THIS.** That port is `DO-3`'s
+// refusal channel -- the fold declining to run and writing no state -- and this
+// is the comparison that runs after a fold succeeded and disagrees with it.
+// `batch/ports.ts` draws the identical line one register over between
+// reconciliation and replay divergence.
+//
+// **IT IS WRITTEN AGAINST PORTS AND IT IS UNWIRED, exactly as `runNightlyBatch`,
+// the provisioning saga, the expiry sweep and the detector runner are** -- and
+// the door question, which has decided the size of three slices in this
+// deployable, is answered HERE and answered in this deployable's favour.
+// `src/db.ts`'s `LIVE_DB.batch` yields a `SystemTx` whose `rowsWhere`, `insert`
+// and `updateAt` are generic over `TableKey`, and the sweep's two tables sit in
+// two different scope classes: `reconciliation_runs` is `firm` and
+// `reconciliations` is `derived` through `account_id`. `apps/api`'s `firm` door
+// can reach the first and CANNOT NAME THE SECOND, which `routes/internal.ts`
+// already says about itself. So `apps/api` could have written the clock and
+// never the finding, and the producer belongs here by the accessor's own key
+// types rather than by preference.
+//
+// WHAT IS REAL IS THE COMPARISON, THE THREE-WAY VERDICT, THE RUN RECORD'S OPEN
+// AND CLOSE, AND THE BLOCK; WHAT IS NOT IS THE ADAPTER AND THE SCHEDULE, and the
+// difference is visible in the type rather than left to a reader.
+export {
+  EMPTY_POPULATION_STATUS,
+  ReconRowError,
+  ReconSweepError,
+  compareBalances,
+  isPlatformStated,
+  runReconciliationSweep,
+} from './recon/sweep.ts';
+export type {
+  ReconCandidate,
+  ReconOutcome,
+  ReconSweepConfig,
+  ReconSweepReport,
+  ReconUncomparableReason,
+  ReconVerdict,
+} from './recon/sweep.ts';
+
+export {
+  PLATFORM_STATED_MARK_SOURCES,
+  RECON_READ_TABLES,
+  RECON_RUN_STATUSES,
+  RECON_SOURCE,
+  RECON_STATUSES,
+  RECON_WRITE_TABLES,
+  ReconSweepUnwired,
+  UNWIRED_RECON_SWEEP_IO,
+} from './recon/ports.ts';
+export type {
+  PlatformStatedMarkSource,
+  ReconFilter,
+  ReconFilterTerm,
+  ReconReadTable,
+  ReconRow,
+  ReconRunStatus,
+  ReconStatus,
+  ReconSweepIo,
+  ReconTerms,
+  ReconTx,
+  ReconValues,
+  ReconWriteTable,
+} from './recon/ports.ts';
+
 // =============================================================================
 // THE BARREL'S OWN LEGS, AS DATA, BECAUSE A TYPE CHECKER CANNOT SEE AN EXPORT
 // THAT IS SIMPLY GONE
@@ -1056,6 +1137,8 @@ export const WORKER_BARREL_LEGS = [
   './live/ingest.ts',
   './live/ports.ts',
   './provisioning/index.ts',
+  './recon/ports.ts',
+  './recon/sweep.ts',
   './sweeps/expiry.ts',
   './sweeps/ports.ts',
 ] as const;
