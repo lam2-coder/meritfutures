@@ -56,6 +56,17 @@ import { fileURLToPath } from 'node:url';
 // cycle links; its header states the constraint that keeps it that way.
 import { ri11 } from './ui-server-endpoints.mjs';
 
+// RI-18 IS THE SECOND CHECK IN ITS OWN FILE, on RI-11's precedent above, and
+// its reason is the same one plus a cost. Its mechanism is a TypeScript parse
+// and it loads the compiler LAZILY: a static import of `typescript` costs
+// 465ms on every invocation of this file, including the single-check form the
+// usage line advertises, and only the run that reaches RI-18 should pay it.
+// The import below is of the CHECK, which reaches the parser only inside
+// `run`; the cycle is the same shape as ui-server-endpoints.mjs's and links
+// for the same reason, since `workspacePackages` is read at run time and not
+// at module evaluation.
+import { ri18 } from './response-shape-copies.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** The workspace root, three levels up from `packages/tooling/checks`. */
@@ -2984,6 +2995,7 @@ export const CHECKS = [
   ri14,
   ri15,
   ri16,
+  ri18,
 ];
 
 function main() {
