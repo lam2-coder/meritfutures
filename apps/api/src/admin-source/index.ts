@@ -122,6 +122,16 @@
 // stands in full. **The entry is `wiring.test.ts`'s, and this directory reports
 // the narrowing rather than editing it.**
 //
+// **AND `readLiability` IS NOW MEASURED RATHER THAN ASSERTED, WHICH IS THE ONLY
+// PART OF THAT SENTENCE THAT MOVED THIS WAVE.** It still stands and the reason
+// is narrower and harder than "a live adapter would have to reach
+// `sqlExecutor`": `LiabilityResponse` projects SIX groups and only the seven
+// top-level fields have a source, because `liability_snapshots` is registered
+// and the rest are not there to read. `test/admin-source-liability.test.ts`
+// holds each blocker with its own clearing condition, so the day one lifts a
+// case goes red and names it. Nothing about that measurement is a reason to
+// compose the method, and this file is unchanged below this comment.
+//
 // **`listEvents` IS THE THIRD INSTANCE AND IT IS NOW WRITTEN RATHER THAN ONLY
 // PREDICTED.** ADR-184 section 3 measured it as a keyed range read over ONE
 // table, sessions 349 and 353 measured that the table was not a `TableKey`, and

@@ -77,6 +77,12 @@ const COOKIE = { cookie: `${ADMIN_SESSION_COOKIE}=operator-token` };
 const LIABILITY: LiabilityResponse = {
   as_of: '2026-08-26T23:00:00Z',
   open_liability_cents: 4_215_000,
+  wallet_balances_cents: 812_500,
+  bounded_near_term_cents: 1_640_000,
+  remaining_ladder_exposure_cents: 9_800_000,
+  // NEGATIVE ON PURPOSE. This is the only signed figure on the response, and a
+  // fixture that carried it positive would let a clamp at zero pass the sweep.
+  absorbed_corrections_cents: -73_400,
   funded_accounts: 37,
   eligible_next_7d: {
     total_cents: 1_150_000,
@@ -93,10 +99,17 @@ const LIABILITY: LiabilityResponse = {
     alarm: true,
   },
   reserve: {
+    // DELIBERATELY NOT THE TOP-LEVEL `as_of`. A different table on a different
+    // clock, and a fixture that repeated the instant above could not tell a
+    // projection that carries both from one that dated the rail with the book.
+    as_of: '2026-08-26T22:45:00Z',
     reserve_cents: 9_000_000,
     cvar99_cents: 3_400_000,
     rcr_bp: 26_470,
     breaker_armed: false,
+    treasury_account_code: 'RESERVE-C1',
+    treasury_as_of: '2026-08-26T22:40:00Z',
+    treasury_source: 'manual_attestation',
   },
   per_plan: [
     {
