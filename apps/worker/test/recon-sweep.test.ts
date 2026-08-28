@@ -340,6 +340,27 @@ describe('3. the run record', () => {
     expect(open?.transaction).toBe(2);
   });
 
+  test('the population is the LIVE mark, which is the IS NULL term and not a filter in memory', async () => {
+    // FOUND BY A SEED THAT DID NOT FIRE. Dropping `supersededBy: isNull()` from
+    // the population read passed every other case in this file, because a
+    // recorder returns what it was handed whatever the predicate said. The read
+    // IS the definition of "live" -- `daily_marks_live_per_account_day_uq` is
+    // `(account_id, trading_day) WHERE superseded_by IS NULL` -- and a sweep that
+    // dropped the term would compare against a SUPERSEDED mark and report a
+    // match for the very correction it exists to catch.
+    const [, rec] = await sweep({ marks: [mark()], states: [state()] });
+    const marks = rec.calls.find((c) => c.op === 'rowsWhere' && c.key === 'dailyMarks');
+    expect(marks?.where).toStrictEqual({ tradingDay: DAY, supersededBy: IS_NULL });
+    // AND THE STATE READ CARRIES NO TERM AT ALL. `rule_states` is never
+    // superseded (`0015`: "a correction to the inputs produces a REPLAY"), so a
+    // term there would be a predicate over a column that does not exist.
+    const states = rec.calls.find((c) => c.op === 'rowsWhere' && c.key === 'ruleStates');
+    expect(states?.where).toStrictEqual({ tradingDay: DAY });
+    // BOTH READS ARE IN THE FIRST TRANSACTION, BEFORE THE RUN ROW EXISTS.
+    expect(marks?.transaction).toBe(1);
+    expect(states?.transaction).toBe(1);
+  });
+
   test('a whole sweep closes completed, addressed by the run id', async () => {
     const [report, rec] = await sweep({ marks: [mark()], states: [state()] });
     expect(report).toMatchObject({
