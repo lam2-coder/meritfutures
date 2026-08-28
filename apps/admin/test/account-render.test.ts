@@ -361,11 +361,15 @@ describe('M6-A-66: there is no index, no search and no list under src/app/accoun
   });
 
   test('there is no accounts/page.tsx, which would be a list with no query behind it', () => {
-    // TWO REASONS AND THE SECOND OUTLIVES THE FIRST. The search surface is a
-    // different contract row and `AdminReadSource.searchAccounts` is owned by no
-    // plan (WAVE-06 section 10 item 3), which is a fence. An index with no query
-    // behind it is FM-M6-10, "a bulk PII surface hiding inside a convenience
-    // feature", which is an invariant. This case reads the DIRECTORY, so it
+    // TWO REASONS, THE SECOND OUTLIVED THE FIRST, AND THE FIRST HAS NOW
+    // EXPIRED. It read that the search surface is a different contract row and
+    // that `AdminReadSource.searchAccounts` is owned by no plan (WAVE-06
+    // section 10 item 3), which was a fence. Session 371 wrote
+    // `apps/api/src/admin-source/search.ts` and the screen exists, at
+    // `src/app/search/`. **THIS CASE IS UNCHANGED BY THAT AND THAT IS THE
+    // POINT OF THE SECOND REASON**: an index with no query behind it is
+    // FM-M6-10, "a bulk PII surface hiding inside a convenience feature", which
+    // is an invariant and does not expire. This case reads the DIRECTORY, so it
     // fires on the file rather than on the render.
     expect(entries()).not.toContain('page.tsx');
   });

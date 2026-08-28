@@ -10,22 +10,28 @@
 // There is deliberately no `accounts/page.tsx`, and the reason has two halves
 // that are worth keeping apart.
 //
-// THE FIRST HALF IS A FENCE. `M06` section 3.2 is the drill-down and this slice
-// is that screen. The search surface is `GET /admin/accounts?query=`, a
-// different contract row, and `AdminReadSource.searchAccounts` is owned by NO
-// PLAN at all: WAVE-06 section 10 item 3 records that neither of the two account
-// methods has an owning slice. A screen for it here would be a screen this wave
-// did not schedule reading through a method nobody wrote.
+// THE FIRST HALF WAS A FENCE AND IT HAS EXPIRED. It read that the search
+// surface is `GET /admin/accounts?query=`, a different contract row, and that
+// `AdminReadSource.searchAccounts` is owned by NO PLAN at all, on WAVE-06
+// section 10 item 3. **BOTH HALVES OF THAT ARE NOW FALSE**: session 371 wrote
+// `apps/api/src/admin-source/search.ts` and the screen exists in this package,
+// at `src/app/search/`. It is still not HERE, and the second half below is why
+// it never could be.
 //
-// THE SECOND HALF IS AN INVARIANT AND IT OUTLIVES THE FENCE. An index route
-// under this directory renders a list of accounts with no query behind it, which
-// is `FM-M6-10` in its own words, "a bulk PII surface hiding inside a
-// convenience feature". The registered endpoint refuses exactly that: it makes
-// `?query=` a validation failure when absent rather than an implied
-// "everybody", citing `INV-M6-10` where it does so. So the day the search screen
-// is scheduled it arrives with a query, and never as an index somebody added for
-// tidiness. `test/account-render.test.ts` asserts the directory rather than this
-// sentence.
+// THE SECOND HALF IS AN INVARIANT AND IT OUTLIVED THE FENCE, WHICH IS THE
+// POINT OF HAVING KEPT THE TWO APART. An index route under this directory
+// renders a list of accounts with no query behind it, which is `FM-M6-10` in
+// its own words, "a bulk PII surface hiding inside a convenience feature". The
+// registered endpoint refuses exactly that: it makes `?query=` a validation
+// failure when absent rather than an implied "everybody", citing `INV-M6-10`
+// where it does so.
+//
+// SO THE SEARCH SCREEN ARRIVED WITH A QUERY AND IN ITS OWN SEGMENT.
+// `src/app/search/` publishes `/search`, renders no row until a term names a
+// subject, and refuses a page value carrying no term at all, which is the same
+// refusal the endpoint makes, one layer nearer the operator.
+// `test/account-render.test.ts` asserts this directory rather than this
+// sentence, and it is unchanged by that slice.
 //
 // -----------------------------------------------------------------------------
 // THIS ROUTE PERFORMS NO READ, AND IT NAMES NO ERROR KIND
@@ -33,10 +39,15 @@
 // It waits on TWO suppliers where the flags queue and the identity drill-down
 // wait on one, and what the second one is has MOVED rather than cleared.
 // `readAccount` is composed in `apps/api/src/admin-source/index.ts` beside
-// `readIdentityGraph`, `listFlags` and `listEvents`, because ADR-191 registered
-// `events` and session 356 wrote the adapter. What no deployment has is the PORT:
-// `exportEvidence`, `readLiability` and `searchAccounts` have no module, so no
-// value satisfies `AdminReadSource` and nothing calls `setAdminReadSource`.
+// `readIdentityGraph`, `listFlags`, `listEvents` and now `searchAccounts`,
+// because ADR-191 registered `events` and session 356 wrote the adapter. What no
+// deployment has is the PORT: `readLiability` has no module, so no value
+// satisfies `AdminReadSource` and nothing calls `setAdminReadSource`. THAT
+// SENTENCE NAMED THREE METHODS AND NAMES ONE, re-derived at this edit:
+// `searchAccounts` landed with session 371 and `exportEvidence` reaches the
+// port through `adminReadSourceParts` rather than through
+// `IMPLEMENTED_ADMIN_READS`, so an implemented-method count taken off that
+// array alone undercounts by one.
 //
 // `../../flags/page.tsx` states the measurement this route inherits, and it was
 // re-measured here against this route rather than assumed: with no admin session
@@ -83,16 +94,20 @@ const BLOCKED_ON: readonly PendingPanel[] = [
     origin: 'WAVE-06 section 10 item 3',
     title: 'The read itself: `AdminReadSource` is composed by no deployment',
     blockedBy:
-      'three of the port`s seven methods, measured rather than assumed, and `readAccount` is ' +
-      'not one of them any more. ALL EIGHT SECTIONS ARE REACHABLE NOW: `accounts`, ' +
+      'ONE of the port`s seven methods, measured rather than assumed, and `readAccount` is ' +
+      'not it. ALL EIGHT SECTIONS ARE REACHABLE NOW: `accounts`, ' +
       '`identities`, `dailyMarks`, `ruleStates`, `riskFlags`, `payoutRequests`, `adminActions` ' +
       'and `events` are all keys `packages/db` registers, ADR-191 gave the last one the sixth ' +
       'scope class it needed, and `apps/api/src/admin-source/account.ts` supplies every ' +
-      'section API_CONTRACT section 8 names. WHAT IS LEFT IS THE PORT: `exportEvidence`, ' +
-      '`readLiability` and `searchAccounts` have no module, so `apps/api/src/start.ts` calls ' +
+      'section API_CONTRACT section 8 names. THIS PANEL READ THREE AND READS ONE, RE-DERIVED ' +
+      'RATHER THAN CARRIED FORWARD: `searchAccounts` is ' +
+      '`apps/api/src/admin-source/search.ts` and `exportEvidence` reaches the port through ' +
+      '`adminReadSourceParts` rather than through `IMPLEMENTED_ADMIN_READS`, so counting off ' +
+      'that array alone undercounts by one. WHAT IS LEFT IS THE PORT: `readLiability` has no ' +
+      'module, so `apps/api/src/start.ts` calls ' +
       'no setter and `setAdminReadSource` is still in `wiring.test.ts`s BLOCKED list. A ' +
-      'partial port composed to unblock this screen would throw at the first request to one ' +
-      'of the other three',
+      'partial port composed to unblock this screen would throw at the first request to the ' +
+      'liability home',
   },
   {
     origin: 'ADR-171',
