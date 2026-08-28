@@ -596,12 +596,21 @@ export function fillClustering(options: FillClusteringOptions = {}): Detector {
       return streams;
     },
 
-    canaries: (mint: CanaryMint) => [
-      withAccountRows(
+    canaries: (mint: CanaryMint) => {
+      const subject = withAccountRows(
         mint.sameSecondFillCluster(D01, 0, { stream: 'fills', at: CANARY_INSTANT }),
         'fills',
-      ),
-    ],
+      );
+      if (at === undefined) {
+        return [subject];
+      }
+      // ON INGEST THE BATTERY SITS IN BOTH STREAMS, exactly as a real fill does:
+      // a fill that just landed is in the day's population AND in the two second
+      // window. A canary present only in the population would never pair, so
+      // every ingest run would report `degraded` and page -- which is how a
+      // canary battery gets switched off.
+      return [{ ...subject, rows: { ...subject.rows, cluster: subject.rows['fills'] ?? [] } }];
+    },
 
     scan: (input) => scanFillClustering(input, at !== undefined),
   };
@@ -887,9 +896,13 @@ function newsWindowCanary(mint: CanaryMint, ordinal: number): CanarySubject {
       releaseTradingDay: tradingDayOf(at),
     });
     fills.push({
+      // EVERY KEY IS A REAL `fills` COLUMN. The identity edge is on the
+      // `accounts` row below, because `fills` HAS NO `identity_id`
+      // (`schema.ts:3005`), and a canary carrying a column the table does not
+      // have is a canary a detector could find by reading something no real row
+      // ever supplies.
       id: subject.row(fills.length + releases.length),
       accountId: account,
-      identityId: identity,
       symbol: 'ESH6',
       side: 'buy',
       quantity: 2,
@@ -1107,7 +1120,6 @@ function martingaleCanary(mint: CanaryMint, ordinal: number): CanarySubject {
       fills.push({
         id: subject.row(fills.length),
         accountId: account,
-        identityId: identity,
         symbol: 'ESH6',
         side: 'buy',
         quantity: contracts,
@@ -1160,6 +1172,11 @@ function scanMartingale(input: DetectorScanInput): DetectorOutcome {
         'everybody who traded twice.',
     );
   }
+  // SEVERITY IS READ BEFORE A ROW IS TOUCHED, so a decline is a property of the
+  // registry rather than of whether this particular night had a match. `M07`
+  // section 3.3 cites NO case for D-05 and the seed's severity is `unstated`, so
+  // this is the line the shipped registry stops at today.
+  const wanted = statedInteger(D05, definition, 'severity');
 
   // THE DAY SERIES, per account: contracts traded and whether the day lost.
   const contracts = new Map<string, Map<string, number>>();
@@ -1238,12 +1255,8 @@ function scanMartingale(input: DetectorScanInput): DetectorOutcome {
     if (facts === undefined) {
       continue;
     }
-    // SEVERITY. `M07` section 3.3 cites NO case for D-05 and the registry's
-    // severity is `unstated`, so there is nothing here to read and
-    // {@link statedInteger} declines the run. The call below is reached only
-    // when a seed states one, and `scoreSeverity` still refuses to write a 4 or
-    // a 5 without a clock.
-    const wanted = statedInteger(D05, definition, 'severity');
+    // `scoreSeverity` still refuses to write a 4 or a 5 without a clock, even
+    // when the registry states one. Section 5 of the header.
     const scored = scoreSeverity(definition, wanted, now);
     findings.push({
       subjects: [accountId],
