@@ -27,29 +27,45 @@
 // satisfy (INV-M4-08), and a branded `DisclosureBlock` for the two compliance
 // obligations that are not rule text (INV-M4-09, NFA I-26-12).
 //
-// EIGHT OF SECTION 3.1's ELEVEN SCREENS EXIST, AND THE COUNT IS DERIVED FROM
-// `next build`'s OWN ROUTE TABLE RATHER THAN FROM THIS PARAGRAPH'S PREDECESSOR.
-// It read "SEVEN ... The four that do not are SC-M4-01 and SC-M4-11 ...,
-// SC-M4-04 the payout centre and SC-M4-10 the wallet", and SC-M4-04 has been
-// built since: `app/payouts/` is a route, `view.ts` is its view model and
-// `test/payout-center.test.ts` renders it. So the screens with a route are
-// SC-M4-02 `/accounts`, SC-M4-03 `/accounts/[account]`, SC-M4-04 `/payouts`,
-// SC-M4-05 `/calendar/[accountId]/rules`, SC-M4-06 `/purchases`, SC-M4-07
-// `/kyc`, SC-M4-08 `/certificates` and SC-M4-09 `/referrals`.
+// ALL ELEVEN OF SECTION 3.1's SCREENS NOW HAVE A ROUTE, AND THE COUNT IS
+// DERIVED FROM `next build`'s OWN ROUTE TABLE RATHER THAN FROM THIS PARAGRAPH'S
+// PREDECESSOR. That predecessor read "EIGHT ... THE THREE THAT DO NOT ARE
+// SC-M4-01, SC-M4-10 AND SC-M4-11", and it was already stale when this session
+// read it: SC-M4-10 and SC-M4-11 landed with `app/wallet/` and `app/security/`,
+// and the export blocks at the foot of this file were updated for them while
+// this paragraph was not. Both halves of that drift are repaired here.
 //
-// THE THREE THAT DO NOT ARE SC-M4-01, SC-M4-10 AND SC-M4-11, and the reason is
-// unchanged for each: SC-M4-01 the auth surface and SC-M4-11 security and
-// sessions are money path under CLAUDE.md's regime table and get their own
-// ADR-003 sessions, and SC-M4-10 the wallet reads a surface P5 creates.
-// `surface.test.ts` asserts the boundary rather than promising it, and this app
-// is the wrong side of it by construction.
+// So the screens with a route are SC-M4-01 `/sign-in`, SC-M4-02 `/accounts`,
+// SC-M4-03 `/accounts/[account]`, SC-M4-04 `/payouts`, SC-M4-05
+// `/calendar/[accountId]/rules`, SC-M4-06 `/purchases`, SC-M4-07 `/kyc`,
+// SC-M4-08 `/certificates`, SC-M4-09 `/referrals`, SC-M4-10 `/wallet` and
+// SC-M4-11 `/security`. Section 3.8's economic-calendar panel claims no
+// `SC-M4-nn` by `M04:189` and has a route of its own at `/calendar`.
 //
-// EVERYTHING THAT CHANGES ANYTHING IS ABSENT, AND DELIBERATELY. No auth, no
-// session handling, no payout request, no destination change, no contact
-// change. SECURITY C-27's authority boundary is auth and therefore money path
-// under CLAUDE.md's regime table, and ADR-003 gives it its own session with its
-// own fresh context. A read-only session that had started on the elevation
+// A ROUTE FOR EVERY SCREEN IS NOT A WORKING PRODUCT AND THIS PARAGRAPH DOES NOT
+// SAY IT IS. SC-M4-01 renders three factors and NONE of them can be completed:
+// all four routes behind it are registered and not one is wired, and
+// `app/sign-in/availability.ts` carries the measurement with each blocker
+// quoted. The screen states that rather than standing in for a sign-in, which
+// is the same rule `app/page.tsx` follows about inventing an account.
+//
+// `surface.test.ts` asserts the write boundary rather than promising it, and
+// this app is the wrong side of it by construction.
+//
+// EVERYTHING THAT CHANGES ANYTHING IS ABSENT, AND DELIBERATELY. No session
+// minting, no session handling, no payout request, no destination change, no
+// contact change. SECURITY C-27's authority boundary is auth and therefore money
+// path under CLAUDE.md's regime table, and ADR-003 gives it its own session with
+// its own fresh context. A read-only session that had started on the elevation
 // prompt would have spent that session's budget with none of its care.
+//
+// "No auth" WAS THE FIRST CLAUSE AND IT IS NARROWED RATHER THAN DELETED, which
+// is `surface.test.ts`'s own rule about amending a fence: "a session that
+// deletes an entry instead of narrowing it has removed the control while
+// appearing to satisfy it." SC-M4-01 exists as a SCREEN and submits nothing:
+// every control on it carries `submits_to: null` typed as the literal, exactly
+// as the payout centre's and the session list's do, and the write half of the
+// clause is untouched. This application still has no verb but GET.
 //
 // THERE IS TRANSPORT NOW, AND IT IS ONE FILE. `src/http/client.ts`, ADR-162.
 // THE SENTENCE THAT FOLLOWED IT IS CORRECTED RATHER THAN LEFT STANDING: it read
@@ -81,9 +97,11 @@ export const SERVICE = 'portal' as const;
  * comment argued the string was "accurate rather than stale ... nothing here
  * listens on a port, and a line claiming otherwise would be the first false
  * statement in a module whose whole subject is not making false statements on a
- * screen". `pnpm --filter @merit/portal build` prints a route table of TWELVE
+ * screen". `pnpm --filter @merit/portal build` prints a route table of FIFTEEN
  * entries and `next start` listens, so the false statement is now the old one
- * and the same argument requires the repair.
+ * and the same argument requires the repair. The number is re-derived from that
+ * build on the way past rather than carried: it read TWELVE, and three routes
+ * have landed since.
  *
  * WHAT IT SAYS INSTEAD IS THE THING A READER OF THIS ENTRY POINT NEEDS. `next`
  * serves `src/app/`; nothing routes through this function, and a caller who
@@ -289,6 +307,24 @@ export type {
 
 export { factorLabel, isRevocable, toSecurityView } from './view/sessions.ts';
 export type { ActiveSessionView, SecurityGap, SecurityView } from './view/sessions.ts';
+
+// -----------------------------------------------------------------------------
+// SC-M4-01, the last row of section 3.1 with no route, and the one screen here
+// that reads nothing at all.
+//
+// IT IS PRE-IDENTITY, so there is no identity-scoped read to perform and
+// API_CONTRACT gives this surface no GET: every endpoint behind it is a POST and
+// `./http/client.ts`'s `ApiClient` declares `get` and nothing else. What is
+// exported is the view model and the measurement it is built from, so a
+// consumer can read what this deployment can serve without importing a route
+// segment. NOTHING HERE PERFORMS OR PREPARES A WRITE: every control carries a
+// `submits_to` typed as the literal `null`, on the wallet's and the session
+// list's precedent, and `test/surface.test.ts`'s money-path name fence passes
+// over these exports unamended.
+// -----------------------------------------------------------------------------
+
+export { SIGN_IN_FACTORS, toSignInView } from './view/sign-in.ts';
+export type { FactorAvailability, SignInFactorView, SignInView } from './view/sign-in.ts';
 
 // -----------------------------------------------------------------------------
 // The shell every screen renders inside. ADR-068 requirement 4, INV-M4-09.
