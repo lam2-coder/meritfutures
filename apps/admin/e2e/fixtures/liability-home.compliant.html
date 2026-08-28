@@ -1,0 +1,228 @@
+<!doctype html>
+<!--
+  apps/admin/e2e/fixtures/liability-home.compliant.html
+
+  THE OPERATOR CONSOLE'S LIABILITY HOME, COMPLIANT, AND THE DOM IS NOT INVENTED
+  HERE. Everything from `<main>` down is what `apps/admin/src/app/page.tsx`
+  ACTUALLY SERVES at `/` on this commit, lifted out of
+  `apps/admin/.next/server/app/index.html` after `pnpm --filter @merit/admin
+  build`, with the framework's own streaming markers dropped and nothing else
+  changed. `W6-i` may not write a page: `apps/admin/src/**` is another slice's,
+  so this surface is the rendered route rather than a screen this session
+  designed.
+
+  WHAT THIS SESSION ADDED IS THE STYLESHEET AND NOTHING ELSE, and that is the
+  honest description of the gap. `apps/admin/src/app/layout.tsx` ships `<html>`,
+  `<body>` and `<main>` with NO stylesheet at all, so the served page today
+  computes Chromium's defaults: pure black on pure white, neither of which is in
+  the token set. SS-01 to SS-08 read COMPUTED STYLE, so a fixture carrying the
+  route's markup with no stylesheet would assert that the design system is
+  absent rather than that it is obeyed. The tokens below are DESIGN_SYSTEM
+  section 2.1's, in the same form `apps/portal/e2e/fixtures/dashboard.compliant.html`
+  writes them, and the session log records the divergence as a finding rather
+  than pretending this file proves the shipped page compliant.
+
+  DARK FIRST. OQ-DS-03's proposal is "light-first for the site, dark-first for
+  the portal and admin", and the reason it is a seam rather than an
+  inconsistency is when each surface is read: an operator has this open beside a
+  ledger, daily, which is `OQ-M6-04`'s "yes, daily, one screen".
+
+  IT CARRIES NO BAND AND NO FOOTER, and that is the layout's measurement rather
+  than an omission. `apps/admin/src/app/layout.tsx` states it: M04 writes two
+  shell obligations for the portal and M06 states none for this console, so a
+  fixture that added chrome here would be a fixture of a screen this deployable
+  cannot render.
+
+  THERE IS NO EXTERNAL RESOURCE OF ANY KIND IN THIS FILE. No font link, no
+  stylesheet href, no image. `apps/admin/test/surface.test.ts` sweeps EVERY file
+  in this package for an absolute origin, this file included, and a webfont link
+  is how a fixture acquires one without anybody deciding to.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Merit operator console</title>
+    <style>
+      :root {
+        --ink-950: #070c0a;
+        --ink-900: #0c1512;
+        --ink-800: #13211d;
+        --ink-700: #1c2e28;
+        --ink-600: #2a413a;
+        --ink-500: #3d5a50;
+        --ink-400: #5c7d72;
+        --ink-300: #89a79c;
+        --ink-200: #b9cec6;
+        --ink-100: #dce7e2;
+        --ink-050: #f0f5f3;
+        --brass-300: #d6a657;
+        --brass-600: #7a5314;
+        --oxide-500: #96322b;
+
+        /* Dark FIRST. This console's default, OQ-DS-03. */
+        --surface: var(--ink-950);
+        --raised: var(--ink-900);
+        --body: var(--ink-100);
+        --heading: var(--ink-100);
+        --secondary: var(--ink-300);
+        --rule: rgba(137, 167, 156, 0.3);
+        --accent: var(--brass-300);
+        --refusal: var(--oxide-500);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --surface: var(--ink-050);
+          --raised: var(--ink-100);
+          --body: var(--ink-600);
+          --heading: var(--ink-700);
+          --secondary: var(--ink-500);
+          --rule: var(--ink-200);
+          --accent: var(--brass-600);
+          --refusal: var(--oxide-500);
+        }
+      }
+
+      /* DG-08 has no way in when the reset says so. DT-03 section 4.1 makes
+         radius-sm 2px and permits radius-md on the primary action alone; this
+         surface has no action on it at all, so every corner here is square. */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        border-radius: 0;
+      }
+
+      html {
+        background-color: var(--surface);
+        color: var(--body);
+        font-family: 'Public Sans', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 26px;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--surface);
+        color: var(--body);
+      }
+
+      main {
+        padding: 24px 16px;
+        max-width: 72ch;
+      }
+
+      h1,
+      h2 {
+        font-family: Newsreader, Georgia, serif;
+        color: var(--heading);
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 36px;
+      }
+
+      h2 {
+        font-size: 20px;
+        line-height: 28px;
+        margin-top: 24px;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: var(--body);
+      }
+
+      /* DG-12 REFUSES DECORATIVE MONOSPACE AND SECTION 3 GIVES IBM PLEX MONO TO
+         NUMERALS ONLY, "never for prose". A base path is prose with a slash in
+         it, so `code` takes the body face and is distinguished by the accent
+         rather than by a second typeface nobody chose. */
+      code {
+        font-family: 'Public Sans', system-ui, sans-serif;
+        color: var(--accent);
+      }
+
+      strong {
+        color: var(--refusal);
+        font-weight: 700;
+      }
+
+      /* THE LAYOUT PRIMITIVE IS A RULED ROW. DESIGN_SYSTEM section 1.3 states
+         the structural defense DG-07 exists to hold: a row has no border on its
+         edge and no color there, so there is nothing for an accent stripe to
+         become a variant of. */
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--rule);
+      }
+
+      li {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--rule);
+        color: var(--secondary);
+      }
+
+      article {
+        background-color: var(--surface);
+      }
+
+      section {
+        background-color: var(--surface);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article data-testid="liability-home-unsupplied" data-error="unavailable">
+        <h1>Liability home</h1>
+        <p data-testid="read-state">
+          This console reads <code>/api/v1</code> on this origin and nothing else, and the read that
+          fills this page answers <strong>unavailable</strong>. What is below is what blocks it, not
+          a placeholder for it: no number on this page is invented while a supplier is missing.
+        </p>
+        <section data-testid="blocked-on">
+          <h2>What has to land first</h2>
+          <ul>
+            <li data-origin="ADR-171">
+              [ADR-171] An operator session, which is the principal every admin read resolves: NOT
+              BUILT, blocked by no admin identity provider. ADR-171 finding 4 measured that
+              `admin_actions.actor` is `text NOT NULL` with no foreign key and that no table in the
+              registry holds an operator, a role or an operator session, so `setAdminSessionSource`
+              has no supplier in this repository. `requireAdminRole` in `../roles.ts` resolves a
+              role STRING and nothing produces one. WAVE-06 section 8.1 blocker 1: it is an SSO
+              vendor selection and an operator directory, which is infrastructure the founder buys
+              rather than a file a session writes
+            </li>
+            <li data-origin="P5-l">
+              [P5-l] The `GET /admin/liability` adapter: NOT BUILT, blocked by the route is
+              registered on the operator surface and `AdminReadSource.readLiability` has no adapter.
+              WAVE-06 section 2.1 records the liability home as the surface with 1,764 lines of
+              console code, a registered route and no adapter, and gives the adapter to `P5-l`. This
+              wave holds none of the three files that slice holds
+            </li>
+            <li data-origin="API_CONTRACT section 8">
+              [API_CONTRACT section 8] Four of the five figures `buildLiabilityHome` reads have no
+              field on the response: NOT BUILT, blocked by REPORTED BY W6-d AND NOT REPAIRED HERE.
+              `liability_snapshots` in `0009_ledger.sql` carries `open_liability_cents`,
+              `wallet_balances_cents`, `bounded_near_term_cents`, `remaining_ladder_exposure_cents`
+              and `absorbed_corrections_cents`, and `LiabilityHomeInput` reads all five.
+              `LiabilityResponse` carries the first name and none of the other four, so P-M6-01
+              cannot show &quot;the two components separately as well as summed&quot;, INV-M6-11
+              cannot include wallet balances, and P-M6-02, AS-M6-04 and P-M6-10 have no source at
+              all. The one shared name is the ambiguity `../liability.ts` renamed on arrival to
+              prevent: the column is ONE COMPONENT of the panel that shares its name. API_CONTRACT
+              is `W6-e`&#x27;s file this wave and `../page.ts` is `P5-l`&#x27;s, so this slice
+              reports it rather than taking either
+            </li>
+          </ul>
+        </section>
+      </article>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,153 @@
+<!doctype html>
+<!--
+  apps/admin/e2e/fixtures/liability-home.seeded.html
+
+  THE SEEDED VIOLATION FOR THE OPERATOR CONSOLE. Same obligation as the other
+  two seeds and the same warning: DO NOT REPAIR THIS FILE. It exists so that
+  every run proves the eight checks still fire, and a check that stops firing
+  against it is a check that has stopped reading. P1 section 6.
+
+  IT IS A THIRD SEED RATHER THAN A COPY. The site's is the templated marketing
+  page and the portal's is the templated dashboard; this one is the templated
+  ADMIN CONSOLE, which is where the tells arrive as an internal tool nobody
+  designed: a gradient hero over a liability figure, severity stripes down the
+  left of every queue row, emoji standing in for status, and four shadowed
+  cards where M06 asks for one screen of ruled rows.
+
+  AND IT SEEDS THE ONE THING M06 CARES ABOUT MOST, WHICH IS NOT A COLOR. The
+  figures below carry no as-of and no definition, which is DG-17 and which
+  `apps/admin/src/liability.ts` exists to make impossible in the shipped value.
+  SS-01 to SS-08 do not read that, so it is here as prose for a reviewer rather
+  than as an assertion this file can make.
+
+  WHAT IS SEEDED, BY CHECK:
+    SS-01  a blue-to-purple gradient on the liability hero
+    SS-02  a 6px violet left border used as a severity stripe on the queue rows
+    SS-03  Poppins on the headings and Inter on the figures
+    SS-04  slate, violet, pure white and pure black
+    SS-05  four rounded stat cards with shadows
+    SS-06  "Unlock" and "Transform" opening sentences
+    SS-07  a check mark in a declared icon slot and a siren standing alone
+    SS-08  an em-dash in the reconciliation note
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Merit operator console, the templated version</title>
+    <style>
+      html {
+        background-color: #111827;
+        color: #d1d5db;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        font-size: 16px;
+      }
+
+      body {
+        margin: 0;
+        padding: 16px;
+        background-color: #111827;
+        color: #d1d5db;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: Poppins, sans-serif;
+        color: #ffffff;
+      }
+
+      /* DG-01, on an internal tool rather than on a hero, which is where it is
+         least likely to be noticed by anybody who could object. */
+      .liability {
+        padding: 24px;
+        border-radius: 16px;
+        background-image: linear-gradient(135deg, #2563eb 0%, #9333ea 100%);
+        color: #ffffff;
+        box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.45);
+      }
+
+      .cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      /* DG-08 and DG-09: the untouched default card, repeated until the screen
+         is cards. Four of them, and SS-05's configured limit is three. */
+      .card {
+        flex: 1 1 150px;
+        padding: 16px;
+        border: 1px solid #374151;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.35);
+        background-color: #1f2937;
+      }
+
+      .card .figure {
+        font-family: Inter, monospace;
+        font-size: 24px;
+        color: #c4b5fd;
+      }
+
+      /* DG-07: the colored left border, arriving as a severity stripe on a
+         queue row, which is exactly the variant DESIGN_SYSTEM section 1.3 says
+         the rule is written down to prevent somebody re-deriving. */
+      .queue-row {
+        margin-top: 12px;
+        padding: 12px 16px;
+        border-left: 6px solid #8b5cf6;
+        border-radius: 8px;
+        background-color: #1e1b4b;
+        color: #ddd6fe;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.35);
+      }
+
+      .recon {
+        margin-top: 16px;
+        padding: 16px;
+        background-color: #000000;
+        color: #9ca3af;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="liability">
+      <h1>Unlock the full liability picture</h1>
+      <p class="figure">$1,284,900.00</p>
+    </section>
+
+    <div class="cards">
+      <div class="card">
+        <p><span data-icon="status">&#9989;</span></p>
+        <h3>Open Liability</h3>
+        <p class="figure">$1,284,900</p>
+      </div>
+      <div class="card">
+        <p>&#128680;</p>
+        <h3>Bounded Near Term</h3>
+        <p class="figure">$412,000</p>
+      </div>
+      <div class="card">
+        <h3>Ladder Exposure</h3>
+        <p class="figure">$96,500</p>
+      </div>
+      <div class="card">
+        <h3>Absorbed Corrections</h3>
+        <p class="figure">$1,240</p>
+      </div>
+    </div>
+
+    <div class="queue-row">
+      <p>Transform your morning check into a single glance.</p>
+    </div>
+
+    <div class="recon">
+      <p>
+        Reconciliation last ran at 2026-08-28T06:00:00Z &#8212; everything below it is assumed
+        good.
+      </p>
+    </div>
+  </body>
+</html>

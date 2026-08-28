@@ -5,12 +5,17 @@
 
   "//lib": "`DOM` IS ADDED HERE AND NOWHERE ELSE. `extract.ts` runs inside the browser and names `document`, `getComputedStyle` and `NodeFilter`; tsconfig.base.json's lib is ES2023 with no DOM, deliberately, because every deployable in this repository runs under Node. Widening the base would let a Node path reference `window` and typecheck. This project is the only one whose code executes in a page, so it is the only one that gets the browser's vocabulary.",
 
-  "//include": "IT REACHES INTO BOTH APPS' e2e DIRECTORIES ON PURPOSE. Their spec files import this directory and would otherwise be typechecked by their own app project, whose lib has no DOM and which would then fail on `extract.ts` following the import. One project owns the pass end to end; the app tsconfigs are untouched.",
+  "//include": "IT REACHES INTO ALL THREE APPS' e2e DIRECTORIES ON PURPOSE, AND THE REASON WRITTEN HERE BEFORE 2026-08-28 WAS FALSE IN FACT. It read that those spec files `would otherwise be typechecked by their own app project, whose lib has no DOM`. NO APP PROJECT READS ITS OWN e2e DIRECTORY: apps/site/tsconfig.json, apps/portal/tsconfig.json and apps/admin/tsconfig.json each include `src/**/*.ts`, `src/**/*.tsx` and `test/**/*.ts` and nothing else, measured on this commit. So what these three entries buy is not a project SWAP, it is coverage AT ALL: with the admin entry removed, `tsc -p e2e --listFiles` names no file under apps/admin/e2e, which is this project's own opening sentence turned on the specs, a TypeScript directory no `tsc` invocation reaches is a directory that rots. The DOM half of the old sentence stays true for a different reason: a spec imports ./pass.ts, which imports ./extract.ts, which names `document`, so whichever project does read a spec needs the lib tsconfig.base.json withholds, and this is the only project that has it. THE LIST IS WRITTEN OUT AND NOT GLOBBED. ADR-182 section 8 item 4 recorded this line naming two directories by hand with `W6-i` in nobody's fence for it, and `W6-i` is the slice that adds the third. A glob `../apps/*/e2e/**/*.ts` would have covered apps/admin silently and would equally silently cover a deployable that grows an e2e directory for something that is not this pass, so each one is named and a fourth is a decision somebody takes here.",
 
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"],
     "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
-  "include": ["**/*.ts", "../apps/site/e2e/**/*.ts", "../apps/portal/e2e/**/*.ts"]
+  "include": [
+    "**/*.ts",
+    "../apps/site/e2e/**/*.ts",
+    "../apps/portal/e2e/**/*.ts",
+    "../apps/admin/e2e/**/*.ts"
+  ]
 }
