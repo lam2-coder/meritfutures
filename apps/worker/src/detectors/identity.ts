@@ -197,7 +197,31 @@
 // the other side.
 //
 // -----------------------------------------------------------------------------
-// 7. WHAT IS REAL AND WHAT IS NOT
+// 7. NO EVIDENCE OBJECT CARRIES A THRESHOLD, AND `INV-M7-04` IS WHY IT COSTS
+//    NOTHING
+// -----------------------------------------------------------------------------
+// Every `evidence` object below carries the OBSERVED numbers -- the count, the
+// correlation, the confidence, the day -- and never the registry value they were
+// compared against.
+//
+// **`INV-M7-10` IS ENFORCED SEVERAL SLICES AWAY AND THIS IS THE HALF THAT DOES
+// NOT DEPEND ON IT.** *"Detector parameters never appear in a trader-audience
+// evidence pack"*, and `P7-j` computes the `trader` strip list from
+// `detector_definitions.is_sensitive`, which is `true` for all seven of these
+// rows. So the pack strips them. **A copy of a threshold inside `risk_flags.evidence`
+// makes that stripping load-bearing in a second place**, and `AS-M6-01` is the
+// scenario where it is wrong once.
+//
+// **AND THE INVESTIGATOR LOSES NOTHING**, because `INV-M7-04` already built the
+// chain that reconstructs it: `risk_flags.detector_run_id ->
+// detector_runs.(detector, detector_version) -> detector_definitions.parameters`
+// answers *"what was it compared against"* from data, which is the whole reason
+// that chain exists. Copying the number into the flag would be a second source
+// for a fact the registry already holds, and a second source is a source that
+// drifts.
+//
+// -----------------------------------------------------------------------------
+// 8. WHAT IS REAL AND WHAT IS NOT
 // -----------------------------------------------------------------------------
 // **WHAT IS REAL** is seven detectors' predicates, windows and batteries, each
 // predicate a pure exported function with a positive fixture AND a near-miss
@@ -673,24 +697,63 @@ function edgeKey(a: string, b: string): string {
  * enforcement"*. A detector that treated a suppressed edge as live would make a
  * trader's successful dispute invisible to the next night's run.
  */
-export function liveEdges(rows: readonly DetectorRow[]): ReadonlySet<string> {
-  const edges = new Set<string>();
+export type IdentityGraph = ReadonlyMap<string, ReadonlySet<string>>;
+
+export function liveEdges(rows: readonly DetectorRow[]): IdentityGraph {
+  const graph = new Map<string, Set<string>>();
   for (const row of rows) {
     if (row['suppressed'] === true) {
       continue;
     }
     const a = text(row, 'identityA');
     const b = text(row, 'identityB');
-    if (a !== undefined && b !== undefined) {
-      edges.add(edgeKey(a, b));
+    if (a === undefined || b === undefined) {
+      continue;
     }
+    // BOTH DIRECTIONS, so `identity_links_canonical_order` is a storage fact
+    // rather than something a reader has to remember at every call site.
+    addTo(graph, a, b);
+    addTo(graph, b, a);
   }
-  return edges;
+  return graph;
 }
 
-/** Whether two identities are RELATED, meaning one live edge joins them. */
-export function related(edges: ReadonlySet<string>, a: string, b: string): boolean {
-  return a === b || edges.has(edgeKey(a, b));
+/** Whether two identities are joined by ONE live edge. */
+export function related(graph: IdentityGraph, a: string, b: string): boolean {
+  return a === b || graph.get(a)?.has(b) === true;
+}
+
+/**
+ * Whether two identities are joined by ANY path of live edges.
+ *
+ * **THE PATH AND NOT THE EDGE, AND THE THIRD PARTY IS WHY.** Two identities
+ * linked only through a third are one entity for `D-09`'s purpose even when that
+ * third holds no payout destination at all, and a detector that walked only the
+ * identities at the destination would call a household of three two unrelated
+ * parties because the person who owns the card did not withdraw this week.
+ */
+export function connected(graph: IdentityGraph, a: string, b: string): boolean {
+  if (a === b) {
+    return true;
+  }
+  const seen = new Set<string>([a]);
+  const queue = [a];
+  while (queue.length > 0) {
+    const current = queue.pop();
+    if (current === undefined) {
+      continue;
+    }
+    for (const next of graph.get(current) ?? []) {
+      if (next === b) {
+        return true;
+      }
+      if (!seen.has(next)) {
+        seen.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -873,7 +936,6 @@ export const D07_ENTITY_CAP: Detector = {
         severity,
         evidence: {
           live_account_count: entity.accountIds.length,
-          max_accounts: entity.maxAccounts,
           cap_source: entity.capSource,
           account_ids: entity.accountIds,
         },
@@ -1048,7 +1110,6 @@ export const D08_PAYMENT_VELOCITY: Detector = {
           evidence: {
             statistic: breach.statistic,
             observed: breach.observed,
-            maximum: breach.maximum,
             identity_count: breach.identityIds.length,
             fingerprint_count: breach.fingerprints.length,
           },
@@ -1136,7 +1197,7 @@ export interface SharedDestination {
  */
 export function sharedDestinations(
   transfers: readonly DetectorRow[],
-  edges: ReadonlySet<string>,
+  graph: IdentityGraph,
   maxUnrelatedIdentities: number,
 ): readonly SharedDestination[] {
   const byDestination = new Map<string, { identities: Set<string>; transfers: Set<string> }>();
@@ -1161,7 +1222,7 @@ export function sharedDestinations(
   const out: SharedDestination[] = [];
   for (const [destinationRef, bucket] of [...byDestination].sort(([a], [b]) => (a < b ? -1 : 1))) {
     const identityIds = [...bucket.identities].sort();
-    const groups = relatedComponents(identityIds, edges);
+    const groups = relatedComponents(identityIds, graph);
     if (groups > maxUnrelatedIdentities) {
       out.push({
         destinationRef,
@@ -1175,10 +1236,7 @@ export function sharedDestinations(
 }
 
 /** How many mutually-unrelated groups a set of identities falls into. */
-export function relatedComponents(
-  identityIds: readonly string[],
-  edges: ReadonlySet<string>,
-): number {
+export function relatedComponents(identityIds: readonly string[], graph: IdentityGraph): number {
   const seen = new Set<string>();
   let groups = 0;
   for (const start of identityIds) {
@@ -1186,17 +1244,9 @@ export function relatedComponents(
       continue;
     }
     groups += 1;
-    const queue = [start];
-    while (queue.length > 0) {
-      const current = queue.pop();
-      if (current === undefined || seen.has(current)) {
-        continue;
-      }
-      seen.add(current);
-      for (const other of identityIds) {
-        if (!seen.has(other) && related(edges, current, other)) {
-          queue.push(other);
-        }
+    for (const other of identityIds) {
+      if (!seen.has(other) && connected(graph, start, other)) {
+        seen.add(other);
       }
     }
   }
@@ -1251,7 +1301,6 @@ export const D09_DESTINATION_CONCENTRATION: Detector = {
           severity,
           evidence: {
             unrelated_identity_groups: hit.unrelatedGroups,
-            maximum_unrelated_identities: maximum,
             identity_count: hit.identityIds.length,
             transfer_count: hit.transferIds.length,
           },
@@ -1292,7 +1341,7 @@ export interface SelfDealAttribution {
  */
 export function selfDealAttributions(
   attributions: readonly DetectorRow[],
-  edges: ReadonlySet<string>,
+  graph: IdentityGraph,
 ): readonly SelfDealAttribution[] {
   const out: SelfDealAttribution[] = [];
   for (const row of attributions) {
@@ -1314,7 +1363,7 @@ export function selfDealAttributions(
       });
       continue;
     }
-    if (edges.has(edgeKey(buyer, affiliate))) {
+    if (related(graph, buyer, affiliate)) {
       out.push({
         attributionId,
         buyerIdentityId: buyer,
@@ -1624,7 +1673,22 @@ export const D11_DILUTION_TIMING: Detector = {
         );
       }
       findings.push({
-        subjects: [hit.accountId, hit.siblingAccountId],
+        // THE CANDIDATE AND NOT THE PAIR, AND TWO SEPARATE REASONS AGREE.
+        //
+        // The first is the battery. `D-11` is the one detector in this file
+        // whose join crosses ROWS rather than reading one, and the runner merges
+        // the synthetic subjects into the same stream, so a finding naming both
+        // ends can name a canary at one end and a real account at the other.
+        // `DetectorCanaryLeak` refuses that and fails the whole run, and it is
+        // right to: counting it real accuses a person on evidence Merit
+        // manufactured. Naming only the candidate makes the straddle
+        // unreachable rather than unlikely.
+        //
+        // The second is the evidence pack. `GS-112` asserts a `trader` pack
+        // carries "no detector parameter, no threshold and NO OTHER IDENTITY",
+        // and a sibling account id inside this trader's flag is another
+        // identity's account travelling in this trader's row.
+        subjects: [hit.accountId],
         identityId,
         accountId: hit.accountId,
         flagType,
@@ -1632,10 +1696,8 @@ export const D11_DILUTION_TIMING: Detector = {
         evidence: {
           trading_day: hit.tradingDay,
           realized_pnl_cents: hit.realizedPnlCents,
-          max_daily_profit_cents: maxDailyProfitCents,
           failing_gates: hit.failingGates,
-          sibling_account_id: hit.siblingAccountId,
-          correlation_bp: hit.correlationBp,
+          sibling_correlation_bp: hit.correlationBp,
           paired_days: hit.pairedDays,
         },
         ...(slaDueAt === undefined ? {} : { slaDueAt }),
@@ -1792,7 +1854,6 @@ export const D16_LINK_CONFIDENCE: Detector = {
               identityId === edge.identityA ? edge.identityB : edge.identityA,
             link_kind: edge.linkKind,
             confidence_bp: edge.confidenceBp,
-            hard_link_confidence_ceiling_bp: ceilingBp,
           },
           ...(slaDueAt === undefined ? {} : { slaDueAt }),
         });
@@ -1957,7 +2018,6 @@ export const D18_REGISTRATION_PHONE: Detector = {
         evidence: {
           phone_id: hit.phoneId,
           legs_satisfied: hit.legsSatisfied,
-          legs_required: FLEET_SIGNATURE_LEGS.length,
           legs: hit.legs,
         },
         ...(slaDueAt === undefined ? {} : { slaDueAt }),
