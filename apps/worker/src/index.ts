@@ -817,6 +817,225 @@ export type {
   WindowFold,
 } from './breaker/evaluate.ts';
 
+// P7-l: THE TWO DIGESTS THE PLAN ROW NAMES ACQUIRE PRODUCERS, AND THE ALARM
+// THAT WATCHES THEM ASSERTS THE QUERY AND NEVER THE JOB'S OWN REPORT.
+//
+// `report_schedules` and `report_deliveries` landed in `0040` with ZERO ROWS on
+// merge, deliberately, "so nothing below can be read as evidence that any digest
+// has ever been delivered". `weekly_loss_ratio_cusum` and `weekly_flag_queue`
+// have producers now.
+//
+// **`CRON_INVENTORY`'s RULE IS A PROPERTY OF A PARAMETER LIST HERE.**
+// `DigestAlarmIo` carries a transaction and a clock and nothing a producer could
+// hand it, `alarm.ts` imports nothing from `produce.ts`, and the handle the
+// alarm receives has no `insert`. A job that crashed after writing "success" and
+// a job that never ran are the same fact to the person who did not get the
+// digest, so they are the same input: neither is an input at all.
+//
+// **THE ROW CALLS THESE "the two MUST digests" AND `M06` SECTION 3.6 AND
+// `ADR-066` SECTION 3 BOTH DISAGREE.** `weekly_flag_queue` is sized **SHOULD**;
+// the second MUST is `daily_liability`, whose content needs
+// `AdminReadSource.readLiability` and therefore waits on `P5-l`. Reported in
+// `digests/ports.ts` beside `PRODUCED_DIGESTS`, and not repaired here.
+//
+// **NO NUMBER IN THIS SLICE IS ITS OWN.** The cadence is a schema fact
+// (`0040`'s generated column); the weekday, the hour and the day of month a
+// window closes on are stated nowhere, so `DIGEST_WINDOW_ANCHOR` ships every
+// term `unstated` and the alarm anchors on each schedule's own history instead.
+// `CADENCE_PERIOD_MS.monthly` is `null` and a monthly schedule is reported as
+// `cadence_unanchored` rather than passed over.
+export {
+  CADENCES,
+  CADENCE_BY_DIGEST,
+  CADENCE_PERIOD_MS,
+  CHANNELS,
+  DELIVERY_OUTCOMES,
+  DIGESTS,
+  DIGEST_READ_TABLES,
+  DIGEST_WINDOW_ANCHOR,
+  DIGEST_WRITE_TABLES,
+  DigestDeclined,
+  DigestUnwired,
+  FORMATS,
+  PRODUCED_DIGESTS,
+  RENDERED_FORMAT,
+  UNWIRED_DIGEST_ALARM_IO,
+  UNWIRED_DIGEST_IO,
+} from './digests/ports.ts';
+export type {
+  Cadence,
+  Channel,
+  DeliveryOutcome,
+  Digest,
+  DigestAlarmIo,
+  DigestBody,
+  DigestContentPort,
+  DigestEnvelope,
+  DigestFilter,
+  DigestFilterTerm,
+  DigestIo,
+  DigestReadTable,
+  DigestReadTx,
+  DigestRow,
+  DigestSendResult,
+  DigestTerms,
+  DigestTransport,
+  DigestTx,
+  DigestValues,
+  DigestWriteTable,
+  FlagQueueDigestBand,
+  FlagQueueDigestBody,
+  Format,
+  LossRatioDigestBody,
+  LossRatioDigestLine,
+  ProducedDigest,
+  ScheduleNumber,
+} from './digests/ports.ts';
+export {
+  DigestRowError,
+  readBoolean,
+  readInstant,
+  readInteger,
+  readNullableText,
+  readText,
+  readTextArray,
+  readTradingDay,
+  record,
+} from './digests/rows.ts';
+export {
+  DIGEST_ALARM_KINDS,
+  evaluateSchedule,
+  findUndeliveredWindows,
+  foldWindows,
+  readAlarmSchedule,
+} from './digests/alarm.ts';
+export type {
+  AlarmSchedule,
+  DigestAlarmFinding,
+  DigestAlarmKind,
+  DigestAlarmOptions,
+  DigestAlarmReport,
+  WindowFold as DigestWindowFold,
+} from './digests/alarm.ts';
+export {
+  artifactDigest,
+  decideOutcome,
+  deliveryValues,
+  lossRatioBodyFrom,
+  nextAttempt,
+  readProducerSchedule,
+  renderDigest,
+  runDigestDeliveries,
+} from './digests/produce.ts';
+export type {
+  DeliveryAttempt,
+  DigestRunReport,
+  DigestRunRequest,
+  DigestScheduleResult,
+  OutcomeDecision,
+  ProducerSchedule,
+} from './digests/produce.ts';
+
+// =============================================================================
+// THE BARREL'S OWN LEGS, AS DATA, BECAUSE A TYPE CHECKER CANNOT SEE AN EXPORT
+// THAT IS SIMPLY GONE
+// =============================================================================
+// `P7` section 9 names this file as the phase's largest collision: SEVEN SLICES
+// ON ONE HAND-MAINTAINED BARREL, and "a keep-both merge of a re-export list
+// type-checks and drops nothing, which is what makes it easy to miss rather than
+// safe". **IT HAPPENED ON 2026-08-28**: a keep-both merge deleted BOTH sides of
+// a hunk in this file and `pnpm run typecheck` reported zero errors over it.
+//
+// `apps/api/src/admin-source/index.ts` fixes that class at COMPILE TIME, because
+// its composition is an OBJECT and a `Pick` over a data array can disagree with
+// it. **A RE-EXPORT LIST HAS NO SUCH SHAPE**: there is no value here for a type
+// to be taken over, so the same trick does not transfer and forcing one would
+// mean minting a runtime object whose only purpose is to be checked.
+//
+// **SO THE LEGS ARE DATA AND THE SUITE READS THIS FILE AS TEXT AGAINST THEM.**
+// `test/digests.test.ts` asserts three things, and the third is the one that
+// catches the failure nobody is looking for:
+//
+//   1. every specifier in {@link WORKER_BARREL_LEGS} appears in a `from` clause
+//      of this file, so a dropped leg is a named failure rather than a silent
+//      one;
+//   2. every `from './...'` clause in this file is in that array, so a leg added
+//      without its data entry fails too and the two halves cannot drift;
+//   3. **every `.ts` module under `src/` is accounted for by exactly one of the
+//      three lists below**, so a NEW module is a decision somebody records
+//      rather than a file the barrel silently never met.
+//
+// The third found `batch/statistics.ts` while this list was being written: it
+// has never been re-exported here, its suite imports it by path, and it is
+// recorded below rather than added, because adding it is a barrel decision for
+// the slice that owns that file and not a tidy-up for this one.
+// =============================================================================
+
+/**
+ * Every module this barrel re-exports, by the specifier it re-exports it under.
+ *
+ * SORTED, AND APPEND-ONLY. A slice that adds a leg adds its line here in the
+ * same change, which costs one line and is the whole price of the check above.
+ */
+export const WORKER_BARREL_LEGS = [
+  './batch/nightly.ts',
+  './batch/ports.ts',
+  './batch/replay.ts',
+  './batch/state-hash.ts',
+  './breaker/evaluate.ts',
+  './breaker/ports.ts',
+  './detectors/canary.ts',
+  './detectors/fills.ts',
+  './detectors/graph.ts',
+  './detectors/identity.ts',
+  './detectors/ports.ts',
+  './detectors/runner.ts',
+  './digests/alarm.ts',
+  './digests/ports.ts',
+  './digests/produce.ts',
+  './digests/rows.ts',
+  './live/ingest.ts',
+  './live/ports.ts',
+  './provisioning/index.ts',
+  './sweeps/expiry.ts',
+  './sweeps/ports.ts',
+] as const;
+
+/**
+ * Modules that reach this barrel THROUGH a leg rather than as one.
+ *
+ * `provisioning/index.ts` is itself a barrel over these six, which is why it is
+ * the only `provisioning` specifier above. They are listed rather than left out
+ * so that the sweep in the suite is TOTAL: a module that is neither a leg, nor
+ * behind one, nor deliberately absent is a module nobody has decided about.
+ */
+export const WORKER_MODULES_BEHIND_A_LEG: Readonly<Record<string, string>> = {
+  './provisioning/admission.ts': 're-exported through ./provisioning/index.ts',
+  './provisioning/compensation.ts': 're-exported through ./provisioning/index.ts',
+  './provisioning/machine.ts': 're-exported through ./provisioning/index.ts',
+  './provisioning/payload.ts': 're-exported through ./provisioning/index.ts',
+  './provisioning/saga.ts': 're-exported through ./provisioning/index.ts',
+  './provisioning/vocabulary.ts': 're-exported through ./provisioning/index.ts',
+};
+
+/**
+ * Modules this barrel deliberately does NOT re-export, each with its reason.
+ *
+ * AN ALLOWLIST THAT FAILS IN BOTH DIRECTIONS, in the NO-FLOATS list's idiom: an
+ * unlisted module with no leg is the obvious failure, and a stale entry for a
+ * module that no longer exists is how a list silently grants more than it names.
+ */
+export const WORKER_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {
+  './db.ts':
+    'THE ONE DOOR. ADR-165 and `test/db.test.ts`: this is the only file under apps/worker/src ' +
+    'that may import @merit/db, and re-exporting it would put the accessor one import away from ' +
+    'every consumer of this package.',
+  './batch/statistics.ts':
+    "M12's statistics run (ADR-122) has never been re-exported here and `test/statistics.test.ts` " +
+    'imports it by path. FOUND BY WRITING THIS LIST rather than by a merge, and RECORDED rather ' +
+    'than repaired: adding a leg is a decision for the slice that owns that file.',
+};
+
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
 
@@ -839,6 +1058,8 @@ export function main(): void {
     `merit ${SERVICE}: nightly batch built, provisioning saga built, expiry sweep built, ` +
       'detector runner built, seven identity and payment detectors built and every one of them ' +
       'declining on an unseeded threshold, breaker evaluator built and declining on an unstated ' +
-      'minimum sample, job interface built, no job store and no scheduler yet',
+      'minimum sample, two digest producers built and the delivery dead-man switch built and ' +
+      'reading the delivery table rather than any run report, job interface built, no job store ' +
+      'and no scheduler yet',
   );
 }

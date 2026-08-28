@@ -623,10 +623,12 @@ export interface DigestAlarmIo {
  * member: `LIVE_DB.batch` is `transaction(systemDb('nightly-batch'), fn)`, and a
  * scheduled digest is a scheduled job, which is what `'nightly-batch'` names.
  *
- * **`tradingDayOf` IS INJECTED AND IS NOT COMPUTED HERE.**
- * `report_deliveries.covers_through_trading_day` is a `date` and the trading day
- * follows the exchange session calendar maintained as data (`CLAUDE.md`,
- * `ADR-042`); a job deriving one from a UTC instant would be inventing a
+ * **`tradingDayOf` IS INJECTED AND IS NOT COMPUTED HERE.** It returns the LAST
+ * CLOSED exchange trading day at the instant it is given, which is exactly what
+ * `report_deliveries.covers_through_trading_day` means: "the last closed trading
+ * day the digest reports, which is a different fact from `due_at`". The trading
+ * day follows the exchange session calendar maintained as data (`CLAUDE.md`,
+ * `ADR-042`), so a job deriving one from a UTC instant would be inventing a
  * calendar. `INV-M6-04` is why the column exists at all: "every number names its
  * as-of moment and its source, and a digest that leaves the console loses the
  * page that would have said so".
