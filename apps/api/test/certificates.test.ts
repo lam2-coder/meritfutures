@@ -941,17 +941,45 @@ describe('the image response is metadata this suite can check and pixels it cann
 // -----------------------------------------------------------------------------
 
 describe('the slice builds two rows and no third', () => {
-  test('nothing here registers `GET /verify/:code`, which the contract defines nowhere', () => {
-    // ADR-168 foreclosure 1: a public oracle over Merit's own payout book is
-    // its own ruling with its own session, and `AS-M11-04` is the reason it is
-    // not taken in passing.
+  test('this module builds neither `GET /verify/:code` nor the revoke row', () => {
+    // -------------------------------------------------------------------------
+    // THIS CASE READ `expect(all.filter((e) => e.includes('/verify/')))
+    // .toEqual([])` AND IT WAS RIGHT WHEN IT WAS WRITTEN. ADR-168 foreclosure 1
+    // recorded `GET /verify/:code` as named by M11 and DEFINED BY NO SECTION of
+    // the contract, so nothing could build it and this assertion said so.
+    //
+    // ADR-170 DEFINED IT, in API_CONTRACT section 6.3, and `routes/verify.ts`
+    // is the slice that transcribed it. THE CLAUSE IS NOT WEAKENED AND WAS NOT
+    // WEAKENED TO PASS: its purpose was that no verify row arrive in this
+    // deployable without a ruling behind it, and it did that job. The arrival is
+    // flagged and ADR-170 is the ruling.
+    //
+    // WHAT IT ASSERTS NOW IS THE PROPERTY THAT SURVIVES: the row is built by a
+    // DIFFERENT MODULE. `certificates.ts` contributes section 6.3's two
+    // certificate rows and nothing else, and the two rows ADR-170 admitted are
+    // `verify.ts`' and `admin-certificates.ts`'. Reading the module rather than
+    // the surface is the comparison ADR-153 section 4 names and is what does not
+    // go stale on the next entry that lands a row.
+    // -------------------------------------------------------------------------
+    const declared = certificatesModule.routes.map((r) => `${r.method} ${r.path}`);
+    expect(declared.filter((e) => e.includes('/verify/'))).toEqual([]);
+    expect(declared.filter((e) => e.includes('/admin/'))).toEqual([]);
+    expect(declared).toEqual(['GET /certificates', 'GET /certificates/:code/image.png']);
+
+    // And on the surface, the TRADER-FACING `/certificates` prefix is still
+    // exactly these two. The verify row is a `/verify/` path and does not appear
+    // here at all; the revoke row is `/admin/certificates/:id/revoke` and is
+    // excluded by the `/admin/` term rather than by the filter happening to miss
+    // it, because a bare `/certificates` substring matches it too.
     const report = buildServer({ surface: 'public', modules: onDisk }).report;
     const all = [...report.registered, ...report.withheld];
-    expect(all.filter((e) => e.includes('/verify/'))).toEqual([]);
-    expect(all.filter((e) => e.includes('/certificates'))).toEqual([
+    expect(all.filter((e) => e.includes('/certificates') && !e.includes('/admin/'))).toEqual([
       'GET /certificates',
       'GET /certificates/:code/image.png',
     ]);
+    // The revoke row exists, is somebody else's, and is withheld from this
+    // surface. ADR-170 clause 2 and ADR-083 section 4.
+    expect(report.withheld).toContain('POST /admin/certificates/:id/revoke');
   });
 
   test('the ordering is total at one instant, which is what a cursor needs', () => {

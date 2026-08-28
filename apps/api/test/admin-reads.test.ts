@@ -145,7 +145,14 @@ const PACK: EvidencePackResponse = {
   audience: 'counsel',
 };
 
-function flag(id: string, severity: 1 | 2 | 3 | 4 | 5, on: string): FlagListItem {
+/**
+ * One `FlagListItem`, at a corroboration depth ADR-178 made the FIRST sort key.
+ *
+ * THE DEPTH DEFAULTS TO 1 AND NOT TO 0, so a caller that does not care about the
+ * first key produces a page that is one flat band and exercises the contract's
+ * "severity then age" exactly as it did before the ruling.
+ */
+function flag(id: string, severity: 1 | 2 | 3 | 4 | 5, on: string, depth = 1): FlagListItem {
   return {
     flag_id: id,
     identity_id: 'id-1',
@@ -156,6 +163,7 @@ function flag(id: string, severity: 1 | 2 | 3 | 4 | 5, on: string): FlagListItem
     first_detected_on: on,
     detector: 'dup-v3',
     evidence_summary: 'two accounts, one fill sequence',
+    corroboration_depth: depth,
   };
 }
 
@@ -544,44 +552,75 @@ test('section 1 s pagination rule: cursor only, limit an integer from 1 to the m
   ).toBe(200);
 });
 
+/**
+ * ADR-178's three keys, at the boundary that enforces them.
+ *
+ * The first two cases are the contract's own sentence WITHIN one corroboration
+ * band and are unchanged in substance by the ruling. The last two are the key
+ * the ruling added: a page that ranks one loud detector above three agreeing
+ * ones is refused where it used to be the only page this route accepted, and the
+ * `GS-120` shape that used to 500 is now the one that is served.
+ */
 test('the flag queue is refused when it inverts triage', async () => {
+  const pageOf = async (data: readonly FlagListItem[]): Promise<number> => {
+    setAdminReadSource(sourceOf({ listFlags: () => Promise.resolve({ data, next_cursor: null }) }));
+    return (await get('operator', ADDRESSES.flags, COOKIE)).statusCode;
+  };
+  setAdminSessionSource(sessionOf(operator('owner')));
+
+  // Severity inverted inside one band.
+  expect(await pageOf([flag('f-1', 2, '2026-08-01'), flag('f-2', 5, '2026-08-02')])).toBe(500);
+  // Age inverted at one severity inside one band.
+  expect(await pageOf([flag('f-2', 5, '2026-08-02'), flag('f-3', 5, '2026-08-01')])).toBe(500);
+  // Both keys respected inside one band.
+  expect(
+    await pageOf([
+      flag('f-3', 5, '2026-08-01'),
+      flag('f-2', 5, '2026-08-02'),
+      flag('f-1', 2, '2026-08-01'),
+    ]),
+  ).toBe(200);
+
+  // ADR-178's first key inverted: one uncorroborated 5 above a corroborated 2.
+  expect(await pageOf([flag('f-4', 5, '2026-08-01', 1), flag('f-5', 2, '2026-08-01', 3)])).toBe(
+    500,
+  );
+  // `GS-120`'s own shape, which this route refused before the ruling.
+  expect(await pageOf([flag('f-5', 2, '2026-08-01', 3), flag('f-4', 5, '2026-08-01', 1)])).toBe(
+    200,
+  );
+  // A depth that is not a count is corruption rather than a band.
+  expect(await pageOf([{ ...flag('f-6', 5, '2026-08-01'), corroboration_depth: 1.5 }])).toBe(500);
+});
+
+/**
+ * `projectFlag` carries ADR-178's key to the wire, asserted on the BODY.
+ *
+ * THIS CASE EXISTS BECAUSE THE ORDER ASSERTION CANNOT COVER IT. `assertFlagOrder`
+ * runs on the PORT's rows, before the projection, so a `projectFlag` that
+ * emitted a constant depth would ship a wrong sort key to the operator with the
+ * adapter right, the ordering right and the assertion passing. That mutation was
+ * seeded and NOTHING CAUGHT IT until this case existed, which is the field-by-
+ * field projection's own warning arriving on the one field that is new.
+ */
+test('the served flag carries the corroboration depth the port computed', async () => {
   setAdminSessionSource(sessionOf(operator('owner')));
   setAdminReadSource(
     sourceOf({
       listFlags: () =>
         Promise.resolve({
-          data: [flag('f-1', 2, '2026-08-01'), flag('f-2', 5, '2026-08-02')],
+          data: [flag('f-1', 2, '2026-08-01', 3), flag('f-2', 5, '2026-08-02', 1)],
           next_cursor: null,
         }),
     }),
   );
-  expect((await get('operator', ADDRESSES.flags, COOKIE)).statusCode).toBe(500);
-
-  setAdminReadSource(
-    sourceOf({
-      listFlags: () =>
-        Promise.resolve({
-          data: [flag('f-2', 5, '2026-08-02'), flag('f-3', 5, '2026-08-01')],
-          next_cursor: null,
-        }),
-    }),
-  );
-  expect((await get('operator', ADDRESSES.flags, COOKIE)).statusCode).toBe(500);
-
-  setAdminReadSource(
-    sourceOf({
-      listFlags: () =>
-        Promise.resolve({
-          data: [
-            flag('f-3', 5, '2026-08-01'),
-            flag('f-2', 5, '2026-08-02'),
-            flag('f-1', 2, '2026-08-01'),
-          ],
-          next_cursor: null,
-        }),
-    }),
-  );
-  expect((await get('operator', ADDRESSES.flags, COOKIE)).statusCode).toBe(200);
+  const res = await get('operator', ADDRESSES.flags, COOKIE);
+  expect(res.statusCode).toBe(200);
+  const body = JSON.parse(res.body) as { data: FlagListItem[] };
+  expect(body.data.map((item) => item.corroboration_depth)).toStrictEqual([3, 1]);
+  // And the whole row, so a field dropped anywhere in the projection is caught
+  // by the same case rather than by the next one somebody remembers to write.
+  expect(body.data[0]).toStrictEqual(flag('f-1', 2, '2026-08-01', 3));
 });
 
 test('a flag filter outside the closed vocabulary is a validation failure', async () => {

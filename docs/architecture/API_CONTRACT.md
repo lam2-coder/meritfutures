@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, STATE_MACHINES.md, SECURITY.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md, ../../research/SECURITY_LANDSCAPE.md]
-last_updated: 2026-08-27
+last_updated: 2026-08-28
 ---
 
 # API Contract (Constitution B2)
@@ -1012,9 +1012,20 @@ type FlagListItem = {
   flag_id: string; identity_id: string; account_id: string | null;
   flag_type: string; severity: 1|2|3|4|5; status: "open"|"investigating"|"dismissed"|"enforced";
   first_detected_on: string; detector: string; evidence_summary: string;
+  // How many INDEPENDENT detector families are implicated on `identity_id`.
+  // The queue's first sort key (ADR-178, `AS-M7-03` clause 3). Computed per
+  // request and held in no column, so it is NOT a filter and NOT a cursor a
+  // client may compose.
+  corroboration_depth: number;
 };
 ```
-Sorted by severity then age. Filterable by type, status, severity.
+Sorted by corroboration depth, then severity, then age ([ADR-178](../decisions/ADR-178.md), **AMENDED**). Filterable by type, status, severity.
+
+**The first key is a security control and not a rendering choice.** [M07](../plans/M07-risk-abuse.md)'s `AS-M7-03` clause 3 rules that the queue sorts by the number of independent detector families implicated on an identity, never by raw flag count, so that poisoning one detector does not move an identity up the queue. An adversary who trades a public signal service from a shared VPN exit manufactures dozens of technically correct flags against innocent strangers; a queue ordered by severity or by count hands that adversary the top of it. `GS-120`.
+
+**This sentence read "Sorted by severity then age" and that order is KEPT rather than deleted.** It is the order **within one corroboration band**, and once the first key ties it is the only order an operator sees. The band is a DEPTH and not an identity: two identities at the same depth interleave by severity. Directions, which this section never stated: most corroborated first, then most severe first, then oldest first.
+
+**`corroboration_depth` is on the wire because the order is otherwise neither checkable nor readable.** `assertFlagOrder` cannot enforce a key it cannot see, and an operator shown a severity 3 above a severity 5 has nothing on the row that says why. `risk_flags_queue_idx (status, severity DESC, first_detected_on)` now serves the SECOND key rather than the first; the depth is not computable in this schema without a `GROUP BY` over a join, which [ADR-157](../decisions/ADR-157.md) refuses on the read path, so it is computed in memory over rows already read.
 
 ### POST /admin/flags/:flagId/status
 ```ts
