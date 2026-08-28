@@ -15,7 +15,7 @@
 //
 // THE FEED IS THE ONE READ WHERE AN ABSENT FILTER CHANGES WHAT MAY BE RENDERED,
 // AND `admin-reads.ts` SAYS THE OPPOSITE ABOUT ITS OWN QUEUE IN TERMS. At
-// `admin-reads.ts:1328` the flag queue records: "FILTERABLE, not filtered ...
+// `admin-reads.ts:1354` the flag queue records: "FILTERABLE, not filtered ...
 // an absent filter is the whole queue and is correct." For `events` an absent
 // filter is the bulk identity screen `INV-M6-10` says does not exist. Two rules
 // that read alike and mean opposite things do not belong in one file where a
@@ -110,10 +110,23 @@
 // port and four admin WRITE backends. A second read port would be a second name
 // for one door and a second wiring obligation.
 //
-// **THE METHOD IS NOT ADDED IN THIS SLICE AND THE ENTRY SAYS SO.** ADR-184 is
-// `status: proposed` with its approval line UNSIGNED, and the three edits the
-// signing slice owes are named in its section 5 with the file and line of each.
-// Until then this handler refuses the READ and enforces the REQUEST.
+// **THE METHOD IS ON THE PORT NOW.** `AdminReadSource.listEvents` is declared at
+// `admin-reads.ts:726` and `composeAdminReadSource` carries its arm, so a
+// deployment that composes a feed adapter has somewhere to put it. ADR-184
+// section 5 said three files had to move together and the count is SIX,
+// measured: the two typed `AdminReadSource` literals in `test/admin-reads.test.ts`
+// and `test/admin-breaker.test.ts` do not compile without the leg, and
+// `test/admin-source-evidence.test.ts` holds a THIRD hardcoded method list
+// beside the two that entry named.
+//
+// **WHAT STILL WAITS IS THE HANDLER, AND IT IS ONE CALL RATHER THAN A RULING.**
+// This handler refuses the READ and enforces the REQUEST, exactly as before:
+// `AdminReadSource` declares the method and no module in this tree implements
+// it, so calling it would replace {@link AdminFeedNotComposed} with
+// `AdminSourceNotComposed('listEvents')` and change nothing a caller sees. The
+// slice that writes the adapter takes both in one commit, and
+// {@link AdminEventFeedResponse} is the shape it returns: it is declared here,
+// referenced nowhere, and waiting for that call.
 //
 // -----------------------------------------------------------------------------
 // WHAT AN UNWIRED DEPLOYMENT ACTUALLY ANSWERS, MEASURED RATHER THAN INHERITED
@@ -121,7 +134,7 @@
 // `WAVE-06` section 4.1 states that every operator route "answers 503 today".
 // **IT IS 500, AND THE MEASUREMENT IS IN ADR-184 SECTION 7.** `adminHandler`
 // resolves `currentReadSource()` BEFORE it calls `spec.handle`
-// (`admin-reads.ts:823`), that throws an `AdminReadError` carrying no
+// (`admin-reads.ts:849`), that throws an `AdminReadError` carrying no
 // `statusCode`, and `server.ts`'s error handler maps an absent status to 500.
 //
 // **THAT 500 IS THE DESIGN AND NOT A DEFECT TO ROUTE AROUND.** `STATUS_CODE`
@@ -205,8 +218,28 @@ export function licensedBy(scope: FeedScope): readonly string[] {
 }
 
 // -----------------------------------------------------------------------------
-// The rows
+// The query the port is handed, and the rows it hands back
 // -----------------------------------------------------------------------------
+
+/**
+ * What `AdminReadSource.listEvents` is asked for.
+ *
+ * THE SCOPE IS A FIELD OF THE QUERY AND NOT A PAIR OF OPTIONAL IDS, which is
+ * ADR-184 ruling 2 carried one layer down. The losing shape is
+ * `identity_id?`/`account_id?` on the query with an adapter that works out what
+ * their combination meant; that is `FM-M6-10` moved from the handler into the
+ * adapter rather than removed, because there is still a value meaning "I did
+ * not check". {@link FeedScope} has no such arm, so an adapter cannot hold one.
+ *
+ * `limit` and `cursor` are the two fields `FlagListQuery` already carries under
+ * those names (`admin-reads.ts:640`), because a second vocabulary for one
+ * envelope is how two pages of one contract drift apart.
+ */
+export interface AdminEventQuery {
+  readonly scope: FeedScope;
+  readonly limit: number;
+  readonly cursor: string | null;
+}
 
 /**
  * One `events` row as the port hands it over, BEFORE `INV-M6-10` is applied.
@@ -478,8 +511,16 @@ export function parseFeedPaging(
  *
  * NAMES THE METHOD, in `AdminSourceNotComposed`'s idiom and for its reason: a
  * deployment missing a leg answers which leg at the first request rather than
- * returning nothing. ADR-184 ruling 1 fixes the method's name and home, and its
- * section 5 names the three edits that make this line unreachable.
+ * returning nothing. ADR-184 ruling 1 fixed the method's name and home and the
+ * port now declares it.
+ *
+ * THIS LINE IS STILL REACHED, AND WHAT REMOVES IT IS ONE CALL. The handler
+ * below reads through no port yet, so this refusal is the live one; the slice
+ * that has the handler call `source.listEvents` deletes this class and inherits
+ * `AdminSourceNotComposed('listEvents')`, which says the same thing one layer
+ * down. TWO STATEMENTS OF ONE REFUSAL EXIST UNTIL THEN and it is reported
+ * rather than denied: they cannot disagree, because neither is reachable on a
+ * deployment the other is not.
  */
 export class AdminFeedNotComposed extends Error {
   constructor() {
