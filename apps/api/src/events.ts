@@ -47,21 +47,31 @@
 // anything: see `EventInsertTx` below, where it is stated where a caller meets
 // it.
 //
-// AND WRITING THE FIRST REAL ROW FOUND A SECOND THING NO SUITE COULD. Against a
-// live PostgreSQL with all 58 migrations applied, FOUR of these eight names write
-// and read back through the `either` predicate; ONE is `payout.freeze_expiring`,
-// refused by `assertTenanted` below; and THREE fail at the DRIVER with
-// `TypeError: Do not know how to serialize a BigInt`. `events.payload` is
-// `jsonb`, drizzle's jsonb mapping is `JSON.stringify`, and `JSON.stringify`
-// refuses a `bigint` outright, while `assertPayloadRules` below REFUSES a
-// `_cents` value that is NOT a `bigint`. The two rules together make every money
-// payload in the catalogue unwritable, and 33 of the 102 readable catalogue rows
-// carry a `_cents` field. NO UNIT TEST COULD SEE IT, because every writer double
-// in every suite records what it is handed and none of them serialises.
-// `assertSerialisablePayload` refuses it by name and states the ruling it needs,
-// which is EVENTS' to give: what a `_cents` value IS inside a `jsonb` payload. A
-// JSON number loses digits above 2^53 and a JSON string is exact but is a format
-// no document states, so neither is invented here.
+// AND WRITING THE FIRST REAL ROW FOUND A SECOND THING NO SUITE COULD, WHICH
+// ADR-198 HAS NOW RULED. Session 366 wrote against a live PostgreSQL with all 58
+// migrations applied and found that FOUR of these eight names wrote, ONE was
+// `payout.freeze_expiring` refused by `assertTenanted` below, and THREE failed at
+// the DRIVER with `TypeError: Do not know how to serialize a BigInt`.
+// `events.payload` is `jsonb`, drizzle's jsonb mapping is `JSON.stringify`, and
+// `JSON.stringify` refuses a `bigint` outright, while `assertPayloadRules` below
+// REFUSES a `_cents` value that is NOT a `bigint`. The two rules together made
+// every money payload in the catalogue unwritable, and 33 of the 102 readable
+// catalogue rows carry a `_cents` field. NO UNIT TEST COULD SEE IT, because every
+// writer double in every suite records what it is handed and none of them
+// serialises.
+//
+// ADR-198 IS THE RULING AND EVENTS SECTION 13 IS THE FORMAT: a `_cents` value
+// inside an `events.payload` is a DECIMAL STRING, `/^(0|-?[1-9][0-9]*)$/`. The
+// reason is the type a consumer holds rather than the size of the number. The
+// 2^53 ceiling is theoretical for every figure this system can produce, but a
+// JSON number would hand every JavaScript reader of an append-only, forever
+// retained table an IEEE-754 double, which is the one type `assertPayloadRules`
+// refuses on the way in, and nothing downstream could then tell an exact value
+// from one that lost digits. `encodeCentsForStorage` below applies it AT THE
+// WRITER, so the domain form stays `bigint` everywhere above the column and
+// `assertPayloadRules` is untouched. `assertSerialisablePayload` survives,
+// narrowed to ADR-198 clause 6: a `bigint` under a key that does NOT end
+// `_cents` has no declared format and is still refused by name.
 //
 // `payout.freeze_expiring` IS THE COUNTEREXAMPLE ADR-191 HAD TO ANSWER AND IT IS
 // ANSWERED RATHER THAN CLOSED. Its catalogue payload is `{ payout_request_id,
@@ -85,12 +95,14 @@
 // ALERT and FEED, not TL, so the sharpest form of the harm -- the row never
 // appearing in the trader's TIMELINE -- is not this name's; what is this name's
 // is that no trader-scoped read of `events` reaches the row at all. Read across
-// the whole catalogue rather than this one name: 34 of the 102 rows whose
+// the whole catalogue rather than this one name: 35 of the 102 rows whose
 // payload can be read name neither column, 3 more carry their payload by
-// reference and are excluded rather than assumed, and EXACTLY ONE of the 34
+// reference and are excluded rather than assumed, and EXACTLY ONE of the 35
 // carries the TL consumer. It is `payout.settled`, it has no producer in this
 // tree yet, and it is the second instance of this shape waiting for the slice
-// that writes it.
+// that writes it. THE COUNT READ 34 UNTIL SESSION 370 DERIVED IT MECHANICALLY
+// AND FOUND 35; the claim resting on it, that exactly one of the set carries
+// `TL`, is unmoved. It is a case in the suite now rather than a typed figure.
 //
 // -----------------------------------------------------------------------------
 // WHY THIS FILE NAMES NO PACKAGE AND OPENS NO DOOR
@@ -593,9 +605,9 @@ export function buildEvent(spec: EmitSpec, defaultOccurredAt: Date): EventEnvelo
  * section 1's rule is that an event exists if and only if the fact does, and a
  * row nobody can reach is not the honest half of that pair.
  *
- * WHAT THIS IS NOT. It is not a claim that every event belongs to somebody: 34
+ * WHAT THIS IS NOT. It is not a claim that every event belongs to somebody: 35
  * of the 102 catalogue rows whose payload can be read name neither column, and
- * 33 of those are consumed only by firm-level readers, where an untenanted row
+ * 34 of those are consumed only by firm-level readers, where an untenanted row
  * is exactly right. A producer for one of those would DECLARE the row
  * firm-level and this would read the declaration. NO ROW IN EVENTS DECLARES ONE
  * TODAY, so the field is not invented here, on ADR-159 clause 1's rule that a
@@ -914,13 +926,127 @@ function assertEventInsertTx(tx: object, name: EventName): asserts tx is EventIn
 }
 
 /**
+ * The canonical form of a `_cents` value inside `events.payload`.
+ *
+ * ADR-198 clause 1, and EVENTS section 13 states the same expression. An
+ * optional leading `-`, then either `0` or a nonzero digit followed by any
+ * digits. No `+`, no leading zeros, no `-0`, no decimal point, no exponent, no
+ * thousands separator, no whitespace and never the empty string, so that ONE
+ * string denotes one integer and a reader comparing two rows may compare their
+ * text.
+ */
+export const CENTS_IN_PAYLOAD = /^(0|-?[1-9][0-9]*)$/;
+
+/**
+ * A `bigint` cents value as EVENTS section 13 declares it on the wire.
+ *
+ * `toString()` on a `bigint` is already canonical -- it never emits `+`, a
+ * leading zero, a `-0` or an exponent -- so this asserts the property rather
+ * than constructing it, and the assertion is what stands between a future
+ * refactor and a format nothing checks.
+ */
+export function centsToPayload(value: bigint): string {
+  const text = value.toString();
+  if (!CENTS_IN_PAYLOAD.test(text))
+    throw new EventError(
+      `${text} is not the canonical form ADR-198 clause 1 declares for a \`_cents\` value. ` +
+        'A `bigint` renders canonically by construction, so this firing means the value reaching ' +
+        'here is not a `bigint`',
+    );
+  return text;
+}
+
+/**
+ * The inverse, and the ONLY parse of this format in the corpus.
+ *
+ * ADR-198 clause 4. A reader that spells its own parse is a second
+ * implementation of a format living in an append-only column, which is
+ * ADR-159 clause 1's refusal one level up. It REFUSES a JSON `number` by name
+ * rather than accepting it, because a `number` reaching a money parse is the
+ * exact defect the string format exists to prevent and admitting it here would
+ * give that defect a supported path.
+ */
+export function centsFromPayload(value: unknown): bigint {
+  if (typeof value === 'number')
+    throw new EventError(
+      `a \`_cents\` value in an \`events.payload\` is a decimal STRING (ADR-198 clause 1, ` +
+        'EVENTS section 13) and this one is a `number`. A JSON number reaching a money parse has ' +
+        'already been through an IEEE-754 double and nothing here can tell an exact value from ' +
+        'one that lost digits, which is the whole reason the format is a string',
+    );
+  if (typeof value !== 'string' || !CENTS_IN_PAYLOAD.test(value))
+    throw new EventError(
+      `${JSON.stringify(value)} is not a \`_cents\` value. EVENTS section 13 declares the ` +
+        'canonical form `/^(0|-?[1-9][0-9]*)$/`: no `+`, no leading zeros, no `-0`, no decimal ' +
+        'point, no exponent, no separator and never the empty string',
+    );
+  return BigInt(value);
+}
+
+/**
+ * A payload with every `_cents` `bigint` rendered as ADR-198 clause 1's string.
+ *
+ * WALKED THE WAY {@link assertPayloadRules} WALKS, and for the same reason: the
+ * money this rule is about is nested. `payout.approved` carries `gate_results`
+ * as an object and `ledger.transaction_posted` carries an `entries` ARRAY of
+ * `{ ledger_account_code, amount_cents }`, so an encoder that stopped at the top
+ * level would hand the driver the exact payload the format exists for.
+ *
+ * IT BUILDS A NEW STRUCTURE AND MUTATES NOTHING. The caller's payload is the
+ * producer's own object, often the same object it is about to use for something
+ * else in the transaction it is emitting inside, and a writer that rewrote it
+ * would change a value under a caller that never asked for storage.
+ *
+ * IT TOUCHES `_cents` KEYS AND NOTHING ELSE, which is ADR-198 clause 6. EVENTS
+ * declares a format for `_cents` fields and declares none for anything else, so
+ * a `bigint` anywhere else survives this walk and is refused by name below
+ * rather than silently acquiring a format no document states.
+ */
+export function encodeCentsForStorage(
+  payload: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  return encodeValue(payload) as Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Whether a value is a plain object this walk may REBUILD.
+ *
+ * A `Date`, a `Map`, a `Buffer` and a class instance are all `typeof 'object'`,
+ * and `Object.entries` on a `Date` is `[]`, so a walk that rebuilt one would
+ * turn a timestamp into `{}` and store the loss. `JSON.stringify` renders a
+ * `Date` through `toJSON` and this walk leaves it exactly where it found it, so
+ * a payload carrying one serialises today the way it did before ADR-198.
+ */
+function isPlainObject(value: object): boolean {
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/** {@link encodeCentsForStorage}'s recursion, carrying the key its value sits under. */
+function encodeValue(value: unknown, key?: string): unknown {
+  if (typeof value === 'bigint')
+    return key !== undefined && key.endsWith('_cents') ? centsToPayload(value) : value;
+  // THE KEY IS NOT CARRIED INTO AN ARRAY'S ELEMENTS, AND THAT IS ADR-198 CLAUSE 6
+  // READ STRICTLY. Every `_cents` field in the catalogue is a SCALAR, so a
+  // `_cents` key holding an array is a shape no row declares; encoding its
+  // elements would invent a format for it. `assertPayloadRules` refuses that
+  // shape at the producer and `assertSerialisablePayload` refuses it here, by
+  // path. What DOES survive is the nested case the ruling is about, because an
+  // OBJECT inside an array is walked on its own keys: `entries: [{
+  // ledger_account_code, amount_cents }]` encodes.
+  if (Array.isArray(value)) return value.map((item) => encodeValue(item));
+  if (value === null || typeof value !== 'object' || !isPlainObject(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([name, nested]) => [name, encodeValue(nested, name)]),
+  );
+}
+
+/**
  * The first `bigint` in a payload, by path, or `undefined`.
  *
- * WALKED THE WAY `assertPayloadRules` WALKS, and for the same reason: the money
- * this rule is about is nested. `payout.approved` carries `gate_results` as an
- * object and `ledger.transaction_posted` carries an `entries` ARRAY of
- * `{ ledger_account_code, amount_cents }`, so a check that stopped at the top
- * level would pass the exact payload the rule exists for.
+ * WALKED THE WAY {@link assertPayloadRules} WALKS, and for the same reason the
+ * encoder above is: a check that stopped at the top level would pass the exact
+ * payload the money rule exists for.
  */
 function firstBigint(value: unknown, path = 'payload'): string | undefined {
   if (typeof value === 'bigint') return path;
@@ -940,49 +1066,36 @@ function firstBigint(value: unknown, path = 'payload'): string | undefined {
 }
 
 /**
- * Refuse a payload no `jsonb` column can be handed, and name the ruling it needs.
+ * Refuse a `bigint` that survived the encoder, which is ADR-198 clause 6.
  *
- * THIS IS A FINDING RATHER THAN A RULE, AND IT WAS FOUND BY WRITING A REAL ROW.
- * `events.payload` is `jsonb` (`schema.ts`), drizzle's jsonb mapper is
- * `JSON.stringify(value)`, and `JSON.stringify` THROWS on a `bigint`:
- * `TypeError: Do not know how to serialize a BigInt`. Meanwhile
- * {@link assertPayloadRules} REFUSES a `_cents` value that is not a `bigint`,
- * because `Cents` is `bigint` everywhere in this tree and a `number` reaching
- * here may already have lost digits. SO THE TWO RULES TOGETHER MAKE EVERY MONEY
- * PAYLOAD UNWRITABLE, and that is stated here rather than discovered as a driver
- * `TypeError` on a money path in production.
+ * THIS CHECK USED TO REFUSE EVERY MONEY PAYLOAD AND NOW REFUSES ALMOST NONE,
+ * and the reason is the ruling rather than a loosening. `events.payload` is
+ * `jsonb` (`schema.ts`), drizzle's jsonb mapper is `JSON.stringify(value)`, and
+ * `JSON.stringify` THROWS on a `bigint`: `TypeError: Do not know how to
+ * serialize a BigInt`. {@link assertPayloadRules} meanwhile REFUSES a `_cents`
+ * value that is not a `bigint`. Session 366 found that the two rules together
+ * made every money payload in the catalogue unwritable, and ADR-198 gives the
+ * format that resolves it: a `_cents` value is a decimal STRING in the column
+ * and stays a `bigint` everywhere above it.
  *
- * NO UNIT TEST COULD SEE IT. Every writer double in every suite is a function
- * that records what it was handed; none of them serializes, so the producer and
- * its fixtures are green over a payload the storage layer cannot take.
- *
- * THE REPAIR IS A RULING AND IT IS NOT THIS FILE'S. What a `_cents` value looks
- * like INSIDE a `jsonb` payload is EVENTS' to say and EVENTS is frozen: a JSON
- * number loses digits above 2^53, which is the constitution's no-floats rule in
- * a financial path, and a JSON string is exact but is a wire format no document
- * states and every consumer would have to know. Inventing either here would put
- * a format in a forever-retained column on a producer's authority, which is
- * ADR-159 clause 1's refusal. So this REFUSES and names the question.
- *
- * IT BREAKS NO CALLER, and that is measured rather than hoped: of the eight
- * names this producer carries, THREE carry a `_cents` field and all three
- * already fail at the driver today. This changes the message and not the
- * outcome.
+ * SO WHAT IS LEFT HERE IS THE CASE THE RULING DELIBERATELY DID NOT COVER. A
+ * `bigint` under a key that does NOT end `_cents` is a money-sized value whose
+ * wire shape no document states, and inventing one here would put a format in a
+ * forever-retained column on a producer's authority, which is ADR-159 clause 1's
+ * refusal. The repair is a `_cents` key or an amendment to EVENTS, and the
+ * message names both rather than leaving a caller to guess.
  */
-function assertSerialisablePayload(row: EventEnvelope): void {
-  const at = firstBigint(row.payload);
+function assertSerialisablePayload(row: EventEnvelope, payload: unknown): void {
+  const at = firstBigint(payload);
   if (at === undefined) return;
   throw new EventError(
-    `${row.eventName} carries a bigint at \`${at}\` and \`events.payload\` is a \`jsonb\` ` +
-      'column, whose driver mapping is `JSON.stringify`, which refuses a BigInt outright. THIS ' +
-      'IS A CONTRADICTION BETWEEN TWO RULES AND NOT A CALLER ERROR: EVENTS section 1 puts ' +
-      'integer cents in `_cents` fields, `Cents` is `bigint`, and `assertPayloadRules` above ' +
-      'REFUSES a `_cents` value that is not one, because a `number` reaching here may already ' +
-      'have lost digits. So every money payload in the catalogue is unwritable, and no suite ' +
-      'could see it because a writer double never serialises. THE REPAIR IS A RULING ON WHAT A ' +
-      '`_cents` VALUE IS INSIDE A `jsonb` PAYLOAD, which EVENTS has to give: a JSON number loses ' +
-      'digits above 2^53 and a JSON string is exact but is a format no document states. This ' +
-      'file invents neither',
+    `${row.eventName} carries a bigint at \`${at}\` under a key that does not end \`_cents\`, ` +
+      'and `events.payload` is a `jsonb` column whose driver mapping is `JSON.stringify`, which ' +
+      'refuses a BigInt outright. ADR-198 clause 1 gives a format to `_cents` fields -- a decimal ' +
+      'string, EVENTS section 13 -- and clause 6 gives one to NOTHING ELSE, so this value would ' +
+      'be stored in a shape no document states, in a table that is append-only and retained ' +
+      'forever. THE REPAIR IS THE KEY OR THE CATALOGUE: name the field `_cents` if it is money, ' +
+      'or amend EVENTS to declare what this field is. This file invents neither',
   );
 }
 
@@ -1014,8 +1127,9 @@ function assertSerialisablePayload(row: EventEnvelope): void {
 export const TRANSACTION_EVENT_WRITER: EventWriter = {
   async insert(tx: object, row: EventEnvelope): Promise<void> {
     assertEventInsertTx(tx, row.eventName);
-    assertSerialisablePayload(row);
-    const written = await tx.insert(EVENT_WRITE_TABLE, { ...row });
+    const payload = encodeCentsForStorage(row.payload);
+    assertSerialisablePayload(row, payload);
+    const written = await tx.insert(EVENT_WRITE_TABLE, { ...row, payload });
     if (written.length !== 1)
       throw new EventError(
         `${row.eventName} wrote ${written.length} rows to \`${EVENT_WRITE_TABLE}\` where exactly ` +

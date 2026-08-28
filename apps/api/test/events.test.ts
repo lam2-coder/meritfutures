@@ -75,6 +75,10 @@ import {
   assertPayloadRules,
   buildEvent,
   isUuid,
+  CENTS_IN_PAYLOAD,
+  centsFromPayload,
+  centsToPayload,
+  encodeCentsForStorage,
   makeEventSink,
   EVENT_WRITE_TABLE,
   TRANSACTION_EVENT_WRITER,
@@ -94,6 +98,39 @@ const MIGRATION = read('../../../packages/db/migrations/0017_events_and_audit.sq
 const SCHEMA = read('../../../packages/db/src/schema.ts');
 const EVENTS_MD = read('../../../docs/architecture/EVENTS.md');
 const SWEEP_PORTS = read('../../../apps/worker/src/sweeps/ports.ts');
+const EVENTS_SRC = read('../src/events.ts');
+
+/**
+ * Every catalogue row in EVENTS, as its four cells.
+ *
+ * DERIVED FROM THE DOCUMENT AT RUN TIME rather than counted into a comment, so
+ * that a row added, a payload changed or a consumer moved shows up as a moved
+ * number instead of as a sentence that quietly stopped being true. The split
+ * respects `\|`, which several payload cells carry inside a union of string
+ * literals; splitting on a bare `|` reports those rows as five, six or seven
+ * cells and drops them, which is how one derivation of these counts read 92.
+ */
+const CATALOGUE_ROWS: readonly string[][] = EVENTS_MD.split('\n')
+  .filter((line) => /^\| `[a-z0-9_]+\.[a-z0-9_]+`/.test(line))
+  .map((line) =>
+    line
+      .split(/(?<!\\)\|/)
+      .slice(1, -1)
+      .map((cell) => cell.trim()),
+  )
+  .filter((cells) => cells.length === 4);
+
+/**
+ * The catalogue rows whose payload is a literal.
+ *
+ * THE THREE EXCLUDED ARE NAMED AND NOT DROPPED: `day.closed`, `breach.detected`
+ * and `payout.approved` give their payload by reference, as the word "above" or
+ * "below" pointing at a fenced block. A count over the table cells alone would
+ * miss `payout.approved`'s SIX `_cents` fields entirely.
+ */
+const READABLE_ROWS: readonly string[][] = CATALOGUE_ROWS.filter((cells) =>
+  cells[2]?.startsWith('`{'),
+);
 
 // -----------------------------------------------------------------------------
 // Fixtures: the catalogue's own payloads, transcribed
@@ -1112,7 +1149,7 @@ describe('composed, the sink writes where the unwired default rejects', () => {
 // in any suite could see it, because every writer double records what it is handed
 // and none of them serialises. These cases are that gap closed.
 
-describe('the two rules that together make a money payload unwritable', () => {
+describe('the two rules that together made a money payload unwritable, and ADR-198 which resolves them', () => {
   test('`payload` is a `jsonb` column, which is the storage half of the contradiction', () => {
     expect(SCHEMA).toContain("payload: jsonb('payload').notNull()");
   });
@@ -1125,70 +1162,176 @@ describe('the two rules that together make a money payload unwritable', () => {
     expect(() => JSON.stringify({ approved_cents: 150_000n })).toThrow(/BigInt/);
   });
 
-  test('`assertPayloadRules` refuses a `_cents` value that is NOT a bigint, which is the producer half', () => {
-    // THE TWO HALVES MEET HERE AND THE MEETING IS THE FINDING: every possible
-    // `_cents` value is refused by one rule or the other.
+  test('`assertPayloadRules` STILL refuses a `_cents` value that is not a bigint', () => {
+    // ADR-198 CLAUSE 3: THE DOMAIN RULE IS UNTOUCHED. Teaching this to accept the
+    // canonical string would admit at the producer the type the whole ruling
+    // exists to keep out, which is weakening a gate to pass it. The string exists
+    // only from the moment the payload becomes storage.
     expect(() => assertPayloadRules({ approved_cents: 150_000 })).toThrow(/rather than a bigint/);
+    expect(() => assertPayloadRules({ approved_cents: '150000' })).toThrow(/rather than a bigint/);
+    expect(() => assertPayloadRules({ approved_cents: 150_000n })).not.toThrow();
   });
 
-  test('the writer refuses the payload and NAMES the field, rather than throwing at the driver', async () => {
-    const { tx, writes } = recorder();
-    await expect(
-      TRANSACTION_EVENT_WRITER.insert(
-        tx,
-        buildEvent({ name: 'payout.approved', payload: PAYLOADS['payout.approved'] }, CLOCK),
-      ),
-    ).rejects.toThrow(/carries a bigint at `payload\.requested_cents`/);
-    expect(writes).toHaveLength(0);
+  // ---------------------------------------------------------------------------
+  // ADR-198 clause 1, the format itself
+  // ---------------------------------------------------------------------------
+
+  test('the format EVENTS section 13 states is the expression this file carries', () => {
+    // BOUND TO THE DOCUMENT AS TEXT rather than retyped, which is this suite's
+    // rule everywhere else and is what keeps a format in a forever-retained
+    // column from having two spellings.
+    expect(EVENTS_MD).toContain('/^(0|-?[1-9][0-9]*)$/');
+    expect(EVENTS_MD).toContain('A `_cents` value is a JSON STRING');
+    expect(EVENTS_MD).toContain('## 13. Money in a payload: the wire format');
+    expect(CENTS_IN_PAYLOAD.source).toBe('^(0|-?[1-9][0-9]*)$');
   });
 
-  test('it names the RULING it needs and never the caller', async () => {
-    const { tx } = recorder();
-    await expect(
-      TRANSACTION_EVENT_WRITER.insert(
-        tx,
-        buildEvent({ name: 'payout.held', payload: PAYLOADS['payout.held'] }, CLOCK),
-      ),
-    ).rejects.toThrow(
-      /THE REPAIR IS A RULING ON WHAT A `_cents` VALUE IS INSIDE A `jsonb` PAYLOAD/,
+  test.each([
+    ['0', 0n],
+    ['1', 1n],
+    ['150000', 150_000n],
+    ['-1', -1n],
+    ['-150000', -150_000n],
+    ['9007199254740993', 9_007_199_254_740_993n],
+    ['170141183460469231731687303715884105727', 2n ** 127n - 1n],
+  ])('%s round-trips exactly', (text, value) => {
+    expect(centsToPayload(value)).toBe(text);
+    expect(centsFromPayload(text)).toBe(value);
+  });
+
+  test('the canonical form refuses every near miss, one at a time', () => {
+    for (const bad of ['', '+1', '01', '-0', '1.0', '1e3', '1_000', ' 1', '1 ', '0x10', '-', 'abc'])
+      expect(() => centsFromPayload(bad), bad).toThrow(/is not a `_cents` value/);
+  });
+
+  test('the parse refuses a JSON `number` BY NAME rather than accepting it', () => {
+    // ADR-198 CLAUSE 4. A parse that took a number would give the exact defect the
+    // string format exists to prevent a supported path back in.
+    expect(() => centsFromPayload(150_000)).toThrow(/is a decimal STRING/);
+    expect(() => centsFromPayload(150_000)).toThrow(/IEEE-754 double/);
+  });
+
+  test('`-0n` renders `0`, so the format has one spelling for zero', () => {
+    expect(centsToPayload(-0n)).toBe('0');
+    expect(centsFromPayload(centsToPayload(-0n))).toBe(0n);
+  });
+
+  // ---------------------------------------------------------------------------
+  // The encoder, which is where the ruling becomes a row
+  // ---------------------------------------------------------------------------
+
+  test('the encoder renders a `_cents` bigint and leaves everything else alone', () => {
+    const encoded = encodeCentsForStorage({
+      approved_cents: 150_000n,
+      split_bp: 9000,
+      clamp_reason: 'cap',
+      plan_version_id: ID.planVersion,
+      hold_expires_at: null,
+    });
+    expect(encoded).toStrictEqual({
+      approved_cents: '150000',
+      split_bp: 9000,
+      clamp_reason: 'cap',
+      plan_version_id: ID.planVersion,
+      hold_expires_at: null,
+    });
+  });
+
+  test('a null `_cents` stays null, so "no figure" and "zero cents" stay different rows', () => {
+    // ADR-198 CLAUSE 2. `assertPayloadRules` admits a null `_cents` and encoding
+    // an absence as `"0"` would collapse the two forever, on an append-only table.
+    expect(encodeCentsForStorage({ approved_cents: null })).toStrictEqual({
+      approved_cents: null,
+    });
+  });
+
+  test('the walk is recursive, because the catalogue nests its money', () => {
+    // `payout.approved` carries `gate_results` as an OBJECT and
+    // `ledger.transaction_posted` carries an `entries` ARRAY of
+    // `{ ledger_account_code, amount_cents }`, so an encoder that stopped at the
+    // top level would hand the driver the exact payload the format exists for.
+    expect(
+      encodeCentsForStorage({
+        gate_results: { withdrawable_cents: 214_250n },
+        entries: [
+          { ledger_account_code: 'trader_payable', amount_cents: -135_000n },
+          { ledger_account_code: 'cash', amount_cents: 135_000n },
+        ],
+      }),
+    ).toStrictEqual({
+      gate_results: { withdrawable_cents: '214250' },
+      entries: [
+        { ledger_account_code: 'trader_payable', amount_cents: '-135000' },
+        { ledger_account_code: 'cash', amount_cents: '135000' },
+      ],
+    });
+  });
+
+  test('the encoder MUTATES NOTHING, because the payload is the producer`s own object', () => {
+    // A writer that rewrote the caller's object would change a value under a
+    // producer that is still inside the transaction it emitted from.
+    const payload = { approved_cents: 150_000n, entries: [{ amount_cents: 1n }] };
+    const encoded = encodeCentsForStorage(payload);
+    expect(payload.approved_cents).toBe(150_000n);
+    expect(payload.entries[0]?.amount_cents).toBe(1n);
+    expect(encoded).not.toBe(payload);
+  });
+
+  test('a non-plain object is left exactly where it was found', () => {
+    // `Object.entries` on a `Date` is `[]`, so a walk that REBUILT one would turn
+    // a timestamp into `{}` and store the loss. `JSON.stringify` renders it
+    // through `toJSON`, and this walk must not get in the way of that.
+    const when = new Date('2026-08-28T00:00:00.000Z');
+    const encoded = encodeCentsForStorage({ occurred: when, approved_cents: 1n });
+    expect(encoded['occurred']).toBe(when);
+    expect(JSON.stringify(encoded)).toBe(
+      '{"occurred":"2026-08-28T00:00:00.000Z","approved_cents":"1"}',
     );
   });
 
-  test('the walk is recursive, because the catalogue nests its money', async () => {
-    // `ledger.transaction_posted` carries an `entries` ARRAY of
-    // `{ ledger_account_code, amount_cents }`, so a check that stopped at the top
-    // level would pass the exact payload this rule exists for. The name is not one
-    // of the eight, so the shape is exercised on a payload that is.
-    const { tx } = recorder();
+  test('a bigint under a key that does NOT end `_cents` is still refused, which is clause 6', async () => {
+    // EVENTS DECLARES A FORMAT FOR `_cents` AND FOR NOTHING ELSE, so encoding this
+    // one would put a shape no document states into a column retained forever.
+    const { tx, writes } = recorder();
     const envelope = buildEvent(
       {
         name: 'payout.blocked',
-        payload: {
-          ...PAYLOADS['payout.blocked'],
-          gate_results: { entries: [{ ledger_account_code: 'X', amount_cents: 1n }] },
-        },
+        payload: { ...PAYLOADS['payout.blocked'], gate_results: { rows_scanned: 12n } },
       },
       CLOCK,
     );
     await expect(TRANSACTION_EVENT_WRITER.insert(tx, envelope)).rejects.toThrow(
-      /bigint at `payload\.gate_results\.entries\[0\]\.amount_cents`/,
+      /carries a bigint at `payload\.gate_results\.rows_scanned` under a key that does not end/,
     );
+    expect(writes).toHaveLength(0);
   });
 
-  test('the refusal is the WRITER`s and not the producer`s, so a non-jsonb sink is unaffected', async () => {
-    // THE LIMIT BELONGS TO THE STORAGE AND NOT TO THE EVENT. `buildEvent` still
-    // builds, and a sink over a writer that does not serialise still receives the
-    // envelope, which is why this check is here rather than in `assertPayloadRules`.
-    const written: EventEnvelope[] = [];
-    const sink = makeEventSink({
-      writer: { insert: (_tx, row) => (written.push(row), Promise.resolve()) },
-      clock: () => CLOCK,
-    });
-    await sink.emit({}, { name: 'payout.approved', payload: PAYLOADS['payout.approved'] });
-    expect(written[0]?.payload['approved_cents']).toBe(150_000n);
+  test('the clause-6 refusal names the two repairs and neither is this file inventing one', async () => {
+    const { tx } = recorder();
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent(
+          { name: 'payout.blocked', payload: { ...PAYLOADS['payout.blocked'], seq: 1n } },
+          CLOCK,
+        ),
+      ),
+    ).rejects.toThrow(/THE REPAIR IS THE KEY OR THE CATALOGUE/);
   });
 
-  test('exactly three of the eight names carry money, and exactly those three are unwritable', async () => {
+  test('a `_cents` key holding an ARRAY is refused rather than given an invented format', async () => {
+    // Every `_cents` field in the catalogue is a SCALAR, so the encoder does not
+    // carry the key into an array's elements. `assertPayloadRules` refuses this at
+    // the producer; the writer refuses it again by path.
+    expect(() => assertPayloadRules({ amounts_cents: [1n] })).toThrow(/rather than a bigint/);
+    expect(encodeCentsForStorage({ amounts_cents: [1n] })).toStrictEqual({ amounts_cents: [1n] });
+  });
+
+  // ---------------------------------------------------------------------------
+  // The three names that could not be written, written
+  // ---------------------------------------------------------------------------
+
+  test('exactly three of the eight names carry money, and all three now WRITE', async () => {
     // DERIVED OVER THE CATALOGUE THIS FILE CARRIES rather than listed, so a name
     // gaining a `_cents` field moves this count instead of slipping past it.
     const carries = (name: EventName): boolean =>
@@ -1198,35 +1341,103 @@ describe('the two rules that together make a money payload unwritable', () => {
 
     for (const name of BUILDABLE) {
       const { tx, writes } = recorder();
-      const attempt = TRANSACTION_EVENT_WRITER.insert(
+      await TRANSACTION_EVENT_WRITER.insert(
         tx,
         buildEvent({ name, payload: PAYLOADS[name] }, CLOCK),
       );
-      if (carries(name)) {
-        await expect(attempt, name).rejects.toThrow(/carries a bigint/);
-        expect(writes, name).toHaveLength(0);
-      } else {
-        await attempt;
-        expect(writes, name).toHaveLength(1);
-      }
+      expect(writes, name).toHaveLength(1);
     }
+  });
+
+  test('the six `_cents` fields of `payout.approved` reach the row as strings and parse back', async () => {
+    // THE ROW EVENTS CALLS "the single most audited event in the system", and the
+    // six figures are why this name was the sharpest case.
+    const { tx, writes } = recorder();
+    await TRANSACTION_EVENT_WRITER.insert(
+      tx,
+      buildEvent({ name: 'payout.approved', payload: PAYLOADS['payout.approved'] }, CLOCK),
+    );
+    const stored = writes[0]?.values['payload'] as Record<string, unknown>;
+    expect(stored['approved_cents']).toBe('150000');
+    expect(stored['trader_cents']).toBe('135000');
+    expect(stored['firm_cents']).toBe('15000');
+    expect(stored['cap_cents']).toBe('150000');
+    expect(stored['requested_cents']).toBe('200000');
+    expect(stored['withdrawable_cents']).toBe('214250');
+    // `_bp` IS UNCHANGED, which is clause 5.
+    expect(stored['split_bp']).toBe(9000);
+    for (const [key, value] of Object.entries(stored))
+      if (key.endsWith('_cents'))
+        expect(centsFromPayload(value)).toBe(PAYLOADS['payout.approved'][key]);
+  });
+
+  test('the written payload survives `JSON.stringify`, which is what the driver does to it', async () => {
+    // THE DEFECT WAS A DRIVER `TypeError` AND THIS IS THE ASSERTION THAT SEES IT.
+    // Every writer double in this repository records what it is handed and none of
+    // them serialises, which is exactly why no suite could see the original bug.
+    for (const name of BUILDABLE) {
+      const { tx, writes } = recorder();
+      await TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent({ name, payload: PAYLOADS[name] }, CLOCK),
+      );
+      expect(() => JSON.stringify(writes[0]?.values['payload']), name).not.toThrow();
+    }
+  });
+
+  test('a value above 2^53 survives, which a JSON number could not have', async () => {
+    // THE MAGNITUDE CEILING IS THEORETICAL FOR THIS SYSTEM AND THE FORMAT IS EXACT
+    // ANYWAY. `Number(9007199254740993n)` is 9007199254740992, one cent short, and
+    // silently so.
+    const huge = BigInt(Number.MAX_SAFE_INTEGER) + 2n;
+    expect(Number(huge).toString()).not.toBe(huge.toString());
+    const { tx, writes } = recorder();
+    await TRANSACTION_EVENT_WRITER.insert(
+      tx,
+      buildEvent(
+        { name: 'payout.held', payload: { ...PAYLOADS['payout.held'], approved_cents: huge } },
+        CLOCK,
+      ),
+    );
+    const stored = writes[0]?.values['payload'] as Record<string, unknown>;
+    expect(stored['approved_cents']).toBe('9007199254740993');
+    expect(centsFromPayload(stored['approved_cents'])).toBe(huge);
+  });
+
+  test('the encoding is the WRITER`s, so a sink over a non-serialising writer still sees `bigint`', async () => {
+    // ADR-198 CLAUSE 3, AND THIS CASE IS WHY THE ENCODING IS NOT IN `buildEvent`.
+    // The limit belongs to the `jsonb` column and not to the event, so the domain
+    // type reaches every sink that is not writing to one.
+    const written: EventEnvelope[] = [];
+    const sink = makeEventSink({
+      writer: { insert: (_tx, row) => (written.push(row), Promise.resolve()) },
+      clock: () => CLOCK,
+    });
+    await sink.emit({}, { name: 'payout.approved', payload: PAYLOADS['payout.approved'] });
+    expect(written[0]?.payload['approved_cents']).toBe(150_000n);
   });
 
   test('across the CATALOGUE the same shape is 33 of the 102 readable rows', () => {
     // THE SCALE OF THE FINDING, BOUND HERE RATHER THAN LEFT IN A PULL REQUEST
-    // BODY, beside the 34 that name no tenancy column. The two sets are different
+    // BODY, beside the 35 that name no tenancy column. The two sets are different
     // questions about the same 102 rows.
-    const rows = EVENTS_MD.split('\n')
-      .filter((line) => /^\| `[a-z_]+\.[a-z_]+`/.test(line))
-      .map((line) =>
-        line
-          .split(/(?<!\\)\|/)
-          .slice(1, -1)
-          .map((cell) => cell.trim()),
-      )
-      .filter((cells) => cells.length === 4);
-    const readable = rows.filter((cells) => cells[2]?.startsWith('`{'));
-    expect(readable).toHaveLength(102);
-    expect(readable.filter((cells) => /_cents\b/.test(cells[2] ?? ''))).toHaveLength(33);
+    expect(CATALOGUE_ROWS).toHaveLength(105);
+    expect(READABLE_ROWS).toHaveLength(102);
+    expect(READABLE_ROWS.filter((cells) => /_cents\b/.test(cells[2] ?? ''))).toHaveLength(33);
+  });
+
+  test('the rows naming NEITHER tenancy column are 35, and exactly one carries TL', () => {
+    // THE HEADER OF `src/events.ts` AND `assertTenanted` BOTH READ 34 UNTIL THIS
+    // CASE WAS WRITTEN. Derived rather than typed from here on, which is the only
+    // thing that keeps a count in a comment honest.
+    const neither = READABLE_ROWS.filter(
+      (cells) => !/\bidentity_id\b/.test(cells[2] ?? '') && !/\baccount_id\b/.test(cells[2] ?? ''),
+    );
+    expect(neither).toHaveLength(35);
+    const timeline = neither.filter((cells) => /\bTL\b/.test(cells[3] ?? ''));
+    expect(timeline).toHaveLength(1);
+    expect(timeline[0]?.[0]).toContain('payout.settled');
+    expect(EVENTS_SRC).toContain('35 of the 102');
+    expect(EVENTS_SRC).not.toContain('34 of the 102');
   });
 });
