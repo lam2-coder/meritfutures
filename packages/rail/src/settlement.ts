@@ -307,19 +307,27 @@ export const LT_07_FINDINGS = [
   {
     id: 'C',
     ruled:
-      'ADR-174 section 4. RECORDED AS AN ABSENCE and no direction is inferred from it. Executed ' +
-      'against PostgreSQL 16 with every merged migration applied: ledger_accounts holds ZERO ' +
-      'rows, and the database accepted firm_treasury as asset, as liability and as revenue in ' +
-      'turn. Nothing seeds the chart of accounts at all, so four of the seven codes have no kind ' +
-      'written anywhere in this tree.',
+      'ADR-174 section 4 recorded it as an ABSENCE. ADR-177 ANSWERS IT FOR FOUR OF THE SEVEN ' +
+      'CODES AND LEAVES THIS ONE OPEN. Migration 0052 seeds the chart, which held ZERO rows ' +
+      'until it, and binds kind to code for fees_revenue as revenue and for trader_wallet, ' +
+      'trader_withdrawable and promotional_credit as liability, each derived from a posting the ' +
+      'corpus already states read through the sign convention. firm_treasury, psp_clearing and ' +
+      'reserve fall through an ELSE true that is deliberate. THIS CODE IS REFUSED ON A ' +
+      'CONTRADICTION RATHER THAN ON SILENCE: five documents call it the account where cash ' +
+      'books, and LT-02, LT-06 and LT-07 every one read as a liability under the same sign ' +
+      'convention, so the arithmetic and the prose are each unanimous and opposite. LT-07 is ' +
+      'still blocked and the reason is now one question rather than an absence.',
     claim:
       'No file in this tree says whether firm_treasury is an asset or a liability, so a ' +
       'receiver cannot derive which direction LT-07 moves it. ledger_accounts.kind is ' +
-      "CHECK (kind IN ('asset','liability','revenue','expense','equity')) and nothing seeds a " +
-      'row for firm_treasury: the only INSERT into ledger_accounts anywhere is ' +
-      'scripts/db/probe_ledger_constraints.sql, which seeds trader_withdrawable, trader_wallet ' +
-      'and fees_revenue and not this one. This is reported as an ABSENCE and no direction is ' +
+      "CHECK (kind IN ('asset','liability','revenue','expense','equity')); 0052 ties four of " +
+      'the seven codes to a kind and leaves this one untied, and no migration seeds a ' +
+      'firm_treasury row. This is reported as an ABSENCE and no direction is ' +
       'inferred from it here.',
-    sources: ['packages/db/migrations/0009_ledger.sql', 'scripts/db/probe_ledger_constraints.sql'],
+    sources: [
+      'packages/db/migrations/0009_ledger.sql',
+      'packages/db/migrations/0052_chart_of_accounts.sql',
+      'docs/decisions/ADR-177.md',
+    ],
   },
 ] as const;
