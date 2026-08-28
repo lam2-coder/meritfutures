@@ -62,6 +62,25 @@ const write = (root: string, rel: string, body: string): void => {
   writeFileSync(join(root, rel), body);
 };
 
+/**
+ * The packages the fixture declares, in ONE place.
+ *
+ * The RI-08 case below builds "every package in this workspace" from this list
+ * rather than from a second copy of it, on the rule the fixture's own RI-04
+ * comment states: a fixture that maintains its own copy of the thing under test
+ * goes stale in step with it and cannot fail.
+ */
+const FIXTURE_PACKAGES = ['rules-engine', 'db', 'ledger'] as const;
+
+/** A file of `n` lines carrying each name on its own one-based line. */
+const linesNaming = (n: number, at: Readonly<Record<number, string>>): string =>
+  Array.from({ length: n }, (_, i) => {
+    const name = at[i + 1];
+    return name === undefined ? '//' : `export function ${name}(): void {}`;
+  })
+    .join('\n')
+    .concat('\n');
+
 /** A tree that satisfies every invariant, which each case then breaks in one way. */
 function cleanTree(): string {
   const root = mkdtempSync(join(tmpdir(), 'merit-invariants-'));
@@ -79,7 +98,8 @@ function cleanTree(): string {
     'const BLOCKED = {\n' +
       '  useRailBackend:\n' +
       "    'a vendor adapter this workspace does not ship, named in no package.json.',\n" +
-      '};\n',
+      '};\n' +
+      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:538`).\n',
   );
   write(root, 'apps/api/src/idempotency.ts', '// The protocol over the store port.\n');
   write(root, 'apps/api/src/routes/wallet-withdrawals.ts', '// The external leg.\n');
@@ -89,7 +109,7 @@ function cleanTree(): string {
   // wrong. Each one carries a citation that is TRUE against this fixture, so the
   // clean direction is a real pass rather than an empty one.
   write(root, 'apps/api/src/idempotency-store.ts', 'export const databaseIdempotencyStore = 1;\n');
-  write(root, 'apps/worker/src/detectors/fills.ts', '// No citation here, and that is allowed.\n');
+  write(root, 'apps/worker/src/detectors/fills.ts', linesNaming(1100, { 1059: 'martingale' }));
   // RI-16 READS docs/ AND ITS REGISTER NAMES TWO DOCUMENTS AND TWO SOURCE
   // FILES, so the fixture carries all four and reproduces all four registered
   // findings. THE REGISTER SHRINKS ONLY: an entry matching no finding is itself
@@ -112,6 +132,35 @@ function cleanTree(): string {
       '| 4 | the store that exists | `databaseIdempotencyStore` ' +
       '(`apps/api/src/idempotency-store.ts:1`) |\n',
   );
+  // AND THE FOUR THE IN-TOKEN NAME BINDING ADDED, which point from a plan into
+  // `apps/admin/src/page.ts` and are each THIRTY lines short. The fixture
+  // reproduces the drift at the same distance rather than at some other one, so
+  // a case reads the register's own numbers back.
+  write(
+    root,
+    'apps/admin/src/page.ts',
+    Array.from({ length: 680 }, (_, i) => {
+      const name = {
+        249: 'assertNamesNoSubject',
+        293: 'assertFloatIsNotReserve',
+        421: 'buildLiabilityHome',
+        660: 'renderLiabilityHome',
+      }[i + 1];
+      return name === undefined ? '//' : `export function ${name}(): void {}`;
+    })
+      .join('\n')
+      .concat('\n'),
+  );
+  write(
+    root,
+    'docs/plans/WAVE-06-admin-console-transport.md',
+    '# WAVE-06\n\n## The modules\n\n' +
+      '| [`page.ts`](../../apps/admin/src/page.ts) | the liability home assembled ' +
+      '([`buildLiabilityHome:391`](../../apps/admin/src/page.ts)), its line rendering ' +
+      '([`renderLiabilityHome:630`](../../apps/admin/src/page.ts)), and two assertions: ' +
+      '[`assertNamesNoSubject:219`](../../apps/admin/src/page.ts) and ' +
+      '[`assertFloatIsNotReserve:263`](../../apps/admin/src/page.ts) |\n',
+  );
   write(
     root,
     'docs/decisions/ALLOCATION.md',
@@ -133,7 +182,7 @@ function cleanTree(): string {
     '.github/workflows/ci.yml',
     'jobs:\n  x:\n    steps:\n      - node-version-file: .nvmrc\n',
   );
-  for (const pkg of ['rules-engine', 'db']) {
+  for (const pkg of FIXTURE_PACKAGES) {
     write(root, `packages/${pkg}/package.json`, JSON.stringify({ name: `@merit/${pkg}` }));
   }
   // RI-07's input: a module GRAPH, not a file. Two modules rather than one,
@@ -179,6 +228,59 @@ function cleanTree(): string {
     root,
     'eslint.config.js',
     "export default [{ rules: { 'merit/engine-purity': 'error' } }];\n",
+  );
+  // RI-15's REGISTER SHRINKS ONLY, so the fixture reproduces every one of its
+  // eight entries. An entry matching nothing here would be a finding on EVERY
+  // case in this file -- the guard working and the fixture wrong, which is the
+  // trap RI-14's three files and the six-file list this check used to carry set
+  // twice while they were being written. Each seed reproduces the REAL distance,
+  // so a case reads the register's own numbers back rather than some other ones.
+  write(root, 'apps/api/src/routes/admin-wallet.ts', linesNaming(700, { 601: 'principal' }));
+  write(
+    root,
+    'apps/api/src/admin-source/index.ts',
+    linesNaming(200, { 193: 'IMPLEMENTED_ADMIN_READS' }),
+  );
+  write(root, 'apps/api/src/routes/admin-reads.ts', linesNaming(900, { 853: 'handle' }));
+  write(
+    root,
+    'packages/db/src/scoped-db.ts',
+    linesNaming(800, { 543: 'update', 687: 'FilterTerm' }),
+  );
+  write(root, 'packages/ledger/src/posting.ts', linesNaming(300, { 232: 'entriesOf' }));
+  write(
+    root,
+    'apps/admin/src/index.ts',
+    '// [`IMPLEMENTED_ADMIN_READS:178`](../../api/src/admin-source/index.ts) is data.\n',
+  );
+  write(
+    root,
+    'apps/api/src/admin-source/flags.ts',
+    '// D-01, D-04 and D-05 write `copy_cluster`, `news_window` and `martingale`\n' +
+      '// (`detectors/fills.ts:505`, `:810`, `:1059`).\n',
+  );
+  for (const rel of ['apps/api/src/routes/admin-feed.ts', 'apps/api/test/admin-feed.test.ts']) {
+    write(
+      root,
+      rel,
+      '// `adminHandler` resolves `currentReadSource()` before it calls `spec.handle`\n' +
+        '// (`admin-reads.ts:856`).\n',
+    );
+  }
+  write(
+    root,
+    'apps/api/src/routes/webhooks-psp.ts',
+    '// `firmTx.update` (`scoped-db.ts:720`) hardcodes `undefined` for its WHERE clause.\n',
+  );
+  write(
+    root,
+    'apps/api/test/admin-payouts.test.ts',
+    '// A debit is positive, read off `entriesOf` at `packages/ledger/src/posting.ts:235`.\n',
+  );
+  write(
+    root,
+    'apps/api/test/db.test.ts',
+    '// `atMost(value)` mints a frozen `FilterTerm` (`scoped-db.ts:662`).\n',
   );
   // RI-18'S THREE INPUTS, AND THE FIXTURE DECLARES EACH SHAPE THREE TIMES ON
   // PURPOSE. The check compares COPIES, so a fixture with one declaration would
@@ -941,6 +1043,18 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   // for byte after. The cases below are the same seeds against the synthetic
   // fixture, which is what makes them fast and their targets legible.
 
+  /**
+   * The file these cases write their reason into.
+   *
+   * NOT `wiring.test.ts` AND NOT `detectors/fills.ts` ANY MORE, and the reason
+   * is the input set itself: RI-15 reads every source file this tree holds, so
+   * a seed needs no particular one, and the files the REGISTER's eight entries
+   * depend on then stay intact under every case below. A case that overwrote one
+   * of them would turn the register's shrinks-only guard red for a reason that
+   * has nothing to do with what the case is about.
+   */
+  const REASON = 'apps/api/src/reasons.ts';
+
   /** A file of `n` lines carrying `name` on line `at`, one-based. */
   const fileWithNameAt = (n: number, at: number, name: string): string =>
     Array.from({ length: n }, (_, i) =>
@@ -958,7 +1072,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       'const BLOCKED = {\n' +
         '  useWithdrawalBackend:\n' +
         "    'both statuses are in `OPEN_WITHDRAWAL_STATUSES`, so `gateNoInFlight` ' +\n" +
@@ -984,7 +1098,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       'const BLOCKED = {\n' +
         '  useWithdrawalBackend:\n' +
         "    'both statuses are in `OPEN_WITHDRAWAL_STATUSES`, so `gateNoInFlight` ' +\n" +
@@ -1006,7 +1120,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       'const BLOCKED = {\n' +
         '  useWithdrawalBackend:\n' +
         "    'NOTHING drives `requested --> approved` (`routes/wallet-withdrawals.ts:57-60`), ' +\n" +
@@ -1034,7 +1148,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       'const BLOCKED = {\n' +
         '  usePayoutBackend:\n' +
         "    'whose `state` is the engine`s own `RuleState`.',\n" +
@@ -1054,7 +1168,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       'const BLOCKED = {\n' +
         "  useWithdrawalBackend: 'AND `GATENOINFLIGHT` (`routes/wallet-withdrawals.ts:1233`) REFUSES.',\n" +
         '};\n',
@@ -1066,7 +1180,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     const root = cleanTree();
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       "const BLOCKED = { useRailBackend: 'the adapter (`routes/rail-vendor.ts:12`) is not shipped.' };\n",
     );
     expect(findings('RI-15', root).join('\n')).toContain(
@@ -1078,7 +1192,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     const root = cleanTree();
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       "const BLOCKED = { useStore: 'the store (`src/idempotency-store.ts:900`) exists.' };\n",
     );
     expect(findings('RI-15', root).join('\n')).toContain('has 2 lines');
@@ -1094,7 +1208,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
     write(
       root,
-      'apps/worker/src/detectors/fills.ts',
+      REASON,
       '// The identity edge is on the `accounts` row below, because `fills` HAS NO\n' +
         '// `identity_id` (`packages/db/src/schema.ts:20`), and a canary carrying a\n' +
         '// column the table does not have is one a detector could find.\n',
@@ -1106,7 +1220,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     // quiet direction is indistinguishable from a binding that never happened.
     write(
       root,
-      'apps/worker/src/detectors/fills.ts',
+      REASON,
       '// The identity edge is on the `accounts` row below, because `fills` carries\n' +
         '// `identity_id` (`packages/db/src/schema.ts:20`), and a canary carrying a\n' +
         '// column the table does not have is one a detector could find.\n',
@@ -1122,7 +1236,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'realizedPnlCents'));
     write(
       root,
-      'apps/worker/src/detectors/fills.ts',
+      REASON,
       "// `realized_pnl_cents` is `daily_marks`' (`packages/db/src/schema.ts:20`).\n",
     );
     expect(findings('RI-15', root)).toEqual([]);
@@ -1130,7 +1244,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     // AND THE SAME SENTENCE WITHOUT THE APOSTROPHE FIRES, for the reason above.
     write(
       root,
-      'apps/worker/src/detectors/fills.ts',
+      REASON,
       '// `realized_pnl_cents` is on `daily_marks` (`packages/db/src/schema.ts:20`).\n',
     );
     expect(findings('RI-15', root).join('\n')).toContain('for `daily_marks`');
@@ -1150,7 +1264,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     write(
       root,
-      'apps/api/test/wiring.test.ts',
+      REASON,
       'const BLOCKED = {\n' +
         "  useWithdrawalBackend: 'it serves the identity arm this route presents " +
         "(`routes/wallet-withdrawals.ts:1506`).',\n" +
@@ -1172,25 +1286,88 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
       `  useAdminWriteBackend: '\`principal(request)\` (\`routes/admin-writes.ts:${line}\`).',\n` +
       '};\n';
 
-    write(root, 'apps/api/test/wiring.test.ts', reason(267));
+    write(root, REASON, reason(267));
     expect(findings('RI-15', root)).toEqual([]);
 
-    write(root, 'apps/api/test/wiring.test.ts', reason(266));
+    write(root, REASON, reason(266));
     expect(findings('RI-15', root).join('\n')).toContain(
       'cites `routes/admin-writes.ts:266` for `principal` and `principal` is at ' +
         'apps/api/src/routes/admin-writes.ts:269, 3 lines away',
     );
   });
 
-  test('RI-15 fails loudly when a file it reads is renamed away', () => {
-    // The same failure RI-14 makes loud, for the same reason: a check that names
-    // the files it reads is emptied by a rename, silently, and then reports PASS
-    // forever.
+  test('RI-15 does not bind a name inside a token whose path it only GUESSED', () => {
+    // THE BOUNDARY THE IN-TOKEN BINDING STOPS AT, and it is a measurement rather
+    // than a preference. `detectors/fills.ts` writes ``the tier `M07:111` names``
+    // two lines under a citation of `0008_risk.sql`, and `M07` is a PLAN and a
+    // section line rather than a symbol in that migration. EVERY ONE OF THE
+    // SEVEN prefixed tokens in this check's input is that shape -- five `M07`
+    // and two `M20` -- and none is a symbol, so a name bound onto an INHERITED
+    // path would be the check guessing a file and then guessing a name in it.
     const root = cleanTree();
-    rmSync(join(root, 'apps/worker/src/detectors/fills.ts'));
-    expect(findings('RI-15', root).join('\n')).toContain(
-      'apps/worker/src/detectors/fills.ts does not exist',
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(
+      root,
+      'apps/api/src/idempotency.ts',
+      '// `packages/db/src/schema.ts:20` is the reader.\n// The tier `M07:23` names.\n',
     );
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // AND THE SAME INHERITED POINTER WITH THE NAME WRITTEN IN FRONT OF IT FIRES,
+    // which is what keeps the silence above from passing because the file went
+    // unread or the inheritance stopped resolving.
+    write(
+      root,
+      'apps/api/src/idempotency.ts',
+      '// `packages/db/src/schema.ts:20` is the reader.\n// The edge `fills` (`:23`) drifts.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('for `fills`');
+  });
+
+  test('RI-15 reads a token whose prefix is a PATH as naming nothing', () => {
+    // `admin-reads.ts:694` names the FILE it points into and no symbol in it, so
+    // there is nothing for a runner to look up. The in-token binding takes the
+    // prefix only where it is NOT a path, and this is that boundary.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(root, 'apps/api/src/idempotency.ts', '// The reader is `schema.ts:23`.\n');
+    expect(findings('RI-15', root)).toEqual([]);
+  });
+
+  test('RI-15 survives the rename that used to empty it, and follows the file', () => {
+    // THE DEFECT THAT MADE THIS INPUT SET DERIVED. A check that NAMES the files it
+    // reads is emptied by a rename, silently, and then reports PASS forever;
+    // session 351 found the softer half of the same thing, `routes/verify.ts`
+    // carrying the same two drifted pointers as the copies this check flagged and
+    // never read because nobody had typed its name. The set is the WALK now, so a
+    // renamed file is still read and the finding follows it to its new path.
+    const root = cleanTree();
+    renameSync(
+      join(root, 'apps/api/src/routes/webhooks-psp.ts'),
+      join(root, 'apps/api/src/routes/webhooks-provider.ts'),
+    );
+    const found = findings('RI-15', root).join('\n');
+    expect(found).toContain(
+      'apps/api/src/routes/webhooks-provider.ts:1: cites `scoped-db.ts:720` for `update`',
+    );
+    // AND THE REGISTER ENTRY THAT NAMED THE OLD PATH NOW NAMES NOTHING, which is
+    // the half that keeps a register from outliving its reason.
+    expect(found).toContain(
+      'apps/api/src/routes/webhooks-psp.ts: the register claims `scoped-db.ts:720`',
+    );
+  });
+
+  test('RI-15 throws when the walk reaches no source file at all', () => {
+    // THE DIRECTION A DERIVED SET FAILS IN, and it is RI-16's guard rather than a
+    // new idea. A list goes stale LOUDLY the day one of its names is wrong; a
+    // walk goes stale SILENTLY the day it stops reaching the tree, and then every
+    // drifted pointer in it passes for the wrong reason. Zero is an ERROR.
+    const root = cleanTree();
+    rmSync(join(root, 'apps'), { recursive: true });
+    rmSync(join(root, 'packages'), { recursive: true });
+    rmSync(join(root, 'vitest.config.ts'));
+    rmSync(join(root, 'eslint.config.js'));
+    expect(() => findings('RI-15', root)).toThrow(/NO source file/);
   });
 
   // ---------------------------------------------------------------------------
@@ -1357,6 +1534,50 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
       liveDoc('The store is [`:900`](../../apps/api/src/idempotency-store.ts).'),
     );
     expect(findings('RI-16', root).join('\n')).toContain('has 2 lines');
+  });
+
+  test('RI-16 binds the name a citation carries INSIDE its own backticks', () => {
+    // THE SHAPE MARKDOWN ACTUALLY WRITES, AND THE ONE THIS CHECK WAS BLIND TO.
+    // `WAVE-06` section 4.1 carried
+    // ``[`setAdminReadSource:706`](../../apps/api/src/routes/admin-reads.ts)``
+    // against a declaration at :739 and RI-16 was GREEN on it. Seeded with
+    // `:99999`, the same citation turned it RED, so the pointer WAS in scope and
+    // the RANGE half worked; what did not reach it is the NAME half, which bound
+    // only a backticked name written IN FRONT of the pointer. There is nothing in
+    // front of this one, because the name is inside the pointer's own backticks.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(root, LIVE_DOC, liveDoc('The edge is [`fills:23`](../../packages/db/src/schema.ts).'));
+    expect(findings('RI-16', root).join('\n')).toContain(
+      'cites `../../packages/db/src/schema.ts:23` for `fills` and `fills` is at ' +
+        'packages/db/src/schema.ts:20, 3 lines away',
+    );
+
+    // AND THE SAME CITATION REPOINTED IS SILENT, because a catch asserted alone
+    // is indistinguishable from a check that fires on every token it can parse.
+    write(root, LIVE_DOC, liveDoc('The edge is [`fills:20`](../../packages/db/src/schema.ts).'));
+    expect(findings('RI-16', root)).toEqual([]);
+  });
+
+  test('RI-16 reads a token that names its own FILE as naming nothing', () => {
+    // THE HALF THE IN-TOKEN BINDING MUST NOT TAKE. This corpus writes
+    // ``[`EVENTS:396`](../architecture/EVENTS.md)`` for a pointer into a
+    // DOCUMENT, and `EVENTS` there is the file rather than a symbol on line 396.
+    // Binding it would assert that the line says "EVENTS", which the document
+    // never claimed, and there are more pointers of that shape than of the other.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/architecture/EVENTS.md',
+      `# Events\n\n## Catalogue\n\n${'| a |\n'.repeat(40)}`,
+    );
+    write(root, LIVE_DOC, liveDoc('Section 11 opens at [`EVENTS:40`](./EVENTS.md).'));
+    expect(findings('RI-16', root)).toEqual([]);
+
+    // AND A PREFIX THAT IS NOT THAT FILE'S NAME BINDS, which is what keeps the
+    // silence above from passing for the reason that nothing binds at all.
+    write(root, LIVE_DOC, liveDoc('Section 11 opens at [`catalogueRow:40`](./EVENTS.md).'));
+    expect(findings('RI-16', root).join('\n')).toContain('for `catalogueRow`');
   });
 
   test('RI-16 catches a register entry that no longer names a finding', () => {
@@ -1578,7 +1799,12 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     // remainder, which is RI-04 reporting PASS about a deployable its literal
     // did not name, and RI-09 reporting PASS with no operator prefixes.
     const root = cleanTree();
-    const everybody = [...DEPLOYABLES.map((app) => `@merit/${app}`), '@merit/rules-engine'];
+    const everybody = [
+      ...DEPLOYABLES.map((app) => `@merit/${app}`),
+      // Every fixture package but the accessor itself, which is what `admitted`
+      // is a list of and therefore cannot be a member of.
+      ...FIXTURE_PACKAGES.filter((pkg) => pkg !== 'db').map((pkg) => `@merit/${pkg}`),
+    ];
     withDbAdmitted(everybody, () => {
       expect(() => findings('RI-08', root)).toThrow(/asserting nothing/);
     });
@@ -1595,11 +1821,15 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
   test('RI-16 throws when every citation falls out of scope', () => {
     // THE DIRECTION THAT FAILS SILENTLY, and it is the same shape as RI-09
     // reporting PASS with no operator prefixes. The record-heading rule holds
-    // 1,737 of 2,340 path-bearing citations out of scope on the real tree, so a
+    // 2,288 of 2,950 path-bearing citations out of scope on the real tree, so a
     // rule that widened by accident would empty this check while it kept saying
     // PASS. Zero in scope is an ERROR, not a clean result.
     const root = cleanTree();
-    for (const doc of ['docs/plans/FOLD-01-phone-identity.md', 'docs/decisions/ALLOCATION.md']) {
+    for (const doc of [
+      'docs/plans/FOLD-01-phone-identity.md',
+      'docs/decisions/ALLOCATION.md',
+      'docs/plans/WAVE-06-admin-console-transport.md',
+    ]) {
       write(
         root,
         doc,

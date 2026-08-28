@@ -55,6 +55,16 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
+// THE ONE IMPORT `src/events.ts` CANNOT HOLD, HELD HERE INSTEAD. That file names
+// no package, so "`events` is a real `TableKey`" and "a `SystemTx` satisfies
+// `EventInsertTx`" are claims it cannot check about itself. This is
+// `admin-source-events.test.ts`'s disposition three files over and its reason:
+// the binding lives where `@merit/db` is reachable. It takes no HANDLE, which is
+// the property `src/db.ts`'s header is actually about and `db.test.ts` asserts
+// over `src/` alone.
+import { TABLE_KEYS } from '@merit/db';
+import type { SystemTx, TableKey } from '@merit/db';
+
 import {
   ACTOR_KINDS,
   EVENT_CATALOGUE,
@@ -66,9 +76,12 @@ import {
   buildEvent,
   isUuid,
   makeEventSink,
+  EVENT_WRITE_TABLE,
+  TRANSACTION_EVENT_WRITER,
   type CatalogueRow,
   type EmitSpec,
   type EventEnvelope,
+  type EventInsertTx,
   type EventName,
   type EventSink,
   type EventWriter,
@@ -184,6 +197,20 @@ const at = (name: EventName): EventEnvelope => buildEvent({ name, payload: PAYLO
 
 /** The catalogue row for a name, as `src/events.ts` records it. */
 const rowOf = (name: EventName): CatalogueRow => EVENT_CATALOGUE[name];
+
+/**
+ * The names `buildEvent` can build today.
+ *
+ * DERIVED FROM THE ROW AND NOT NAMED. `assertTenanted` refuses a row reaching
+ * neither tenancy column, so the buildable set is a property of the catalogue;
+ * a case listing the one name it excludes would go stale in step with the thing
+ * it excludes, which is the trap this suite's own binds exist to avoid. A second
+ * row acquiring the shape leaves this set by itself, and the case that DERIVES
+ * the untenanted set is what makes that visible rather than quiet.
+ */
+const BUILDABLE = EVENT_NAMES.filter(
+  (name) => rowOf(name).identityField !== undefined || rowOf(name).accountField !== undefined,
+);
 
 // =============================================================================
 // 1. THE PRODUCER IS BOUND TO THE REGISTRY, WHICH IS ADR-159 CLAUSE 1 MADE
@@ -332,7 +359,7 @@ describe('the envelope is `events` as 0017 declares it', () => {
 
   test('schema_version is the column default and this producer carries no second number', () => {
     expect(body).toContain('DEFAULT 1');
-    for (const name of EVENT_NAMES) expect(at(name).schemaVersion).toBe(1);
+    for (const name of BUILDABLE) expect(at(name).schemaVersion).toBe(1);
   });
 
   test('every subject kind is the singular of a table `schema.ts` registers', () => {
@@ -476,16 +503,106 @@ describe('the tenancy columns come from the payload and from nowhere else', () =
     expect(catalogueText('wallet.withdrawal_halt_released')).not.toContain('account_id');
   });
 
-  test('`payout.freeze_expiring` reaches the table with NEITHER, which is the blocker in one row', () => {
-    const row = at('payout.freeze_expiring');
-    expect(row.identityId).toBeNull();
-    expect(row.accountId).toBeNull();
-    expect(rowOf('payout.freeze_expiring').identityField).toBeUndefined();
-    expect(rowOf('payout.freeze_expiring').accountField).toBeUndefined();
-    // Both columns are nullable, so this row is legal and unreachable by any
-    // rule naming either column. It is the counterexample a sixth scope class
-    // has to answer, and it is a catalogue row rather than this file's choice.
+  test('`payout.freeze_expiring` is the ONE catalogue row that reaches neither, derived', () => {
+    // DERIVED OVER THE EIGHT RATHER THAN ASSERTED ABOUT ONE, because the property
+    // this file's header is about is "how many rows reach neither leg", and a
+    // case naming one name cannot see the second one arrive.
+    const untenanted = EVENT_NAMES.filter(
+      (name) => rowOf(name).identityField === undefined && rowOf(name).accountField === undefined,
+    );
+    expect(untenanted).toStrictEqual(['payout.freeze_expiring']);
+    // And it is a CATALOGUE row rather than this file's choice: the payload
+    // EVENTS declares for it names neither column either.
     expect(catalogueText('payout.freeze_expiring')).not.toContain('identity_id');
+    expect(catalogueText('payout.freeze_expiring')).not.toContain('account_id');
+  });
+
+  test('building it REFUSES, because a producer that writes an untenanted row must not be quiet', () => {
+    // THE HALF ADR-191 SECTION 9 LEFT OPEN, AND IT IS THE SILENCE RATHER THAN THE
+    // CLASS. That entry ruled the row a PRODUCER defect and ruled the sixth class
+    // correct: a row reaching neither leg belongs to no identity and falls out of
+    // every scoped read of an append-only table, forever, with nothing raised and
+    // the absence indistinguishable from the event never having happened. NO
+    // CONSTRAINT ON THIS TABLE CAN CATCH IT -- both columns are nullable and
+    // migration `0058` was returned to the pool over exactly that -- so the write
+    // path is the only place it can be caught at all, and this is that place.
+    expect(() =>
+      buildEvent(
+        { name: 'payout.freeze_expiring', payload: PAYLOADS['payout.freeze_expiring'] },
+        CLOCK,
+      ),
+    ).toThrow(EventError);
+    expect(() =>
+      buildEvent(
+        { name: 'payout.freeze_expiring', payload: PAYLOADS['payout.freeze_expiring'] },
+        CLOCK,
+      ),
+    ).toThrow(/reaches neither `events.identity_id` nor `events.account_id`/);
+  });
+
+  test('the refusal is on the ROW and not on the NAME, so a dropped tenancy field refuses too', () => {
+    // THE CATALOGUE DECLARATION AND THE PAYLOAD ARE TWO WAYS TO REACH THE SAME
+    // ROW, and a check that read only the declaration would pass the second one.
+    // `wallet.withdrawal_halt_released` DECLARES `identity_id` and a payload
+    // reaching here without it writes the identical untenanted row.
+    const { identity_id: _dropped, ...withoutIdentity } =
+      PAYLOADS['wallet.withdrawal_halt_released'];
+    expect(() =>
+      buildEvent({ name: 'wallet.withdrawal_halt_released', payload: withoutIdentity }, CLOCK),
+    ).toThrow(/reaches neither/);
+  });
+
+  test('across the CATALOGUE exactly one untenanted row is read by a timeline, and it is not this one', () => {
+    // THE HEADER'S CATALOGUE-WIDE CLAIM, DERIVED HERE RATHER THAN TRUSTED,
+    // because it is the reason `assertTenanted` refuses TOTALLY rather than only
+    // for the names a timeline reads. If most untenanted rows were trader rows
+    // the refusal would be the obvious call; they are not, and the argument has
+    // to survive that. A row whose payload cell carries a REFERENCE rather than
+    // a shape is EXCLUDED rather than assumed, which is the discipline ADR-191's
+    // own 29-row count used on the same table.
+    //
+    // THESE CARDINALS ARE BOUND HERE AND NOT LEFT IN PROSE. A catalogue that
+    // gains a row turns this case red on purpose: the distribution is what the
+    // refusal's shape rests on, and somebody re-derives it rather than
+    // discovering later that it moved.
+    const rows = EVENTS_MD.split('\n')
+      .filter((line) => /^\| `[a-z_]+\.[a-z_]+`/.test(line))
+      .map((line) =>
+        line
+          .split(/(?<!\\)\|/)
+          .slice(1, -1)
+          .map((cell) => cell.trim()),
+      )
+      .filter((cells) => cells.length === 4);
+    expect(rows, 'catalogue rows').toHaveLength(105);
+
+    const readable = rows.filter((cells) => cells[2]?.startsWith('`{'));
+    expect(rows.length - readable.length, 'payload given by reference, excluded').toBe(3);
+
+    const untenanted = readable.filter(
+      (cells) => !cells[2]?.includes('identity_id') && !cells[2]?.includes('account_id'),
+    );
+    expect(untenanted, 'rows naming neither tenancy column').toHaveLength(34);
+
+    const timeline = untenanted.filter((cells) => /\bTL\b/.test(cells[3] ?? ''));
+    expect(timeline.map((cells) => cells[0])).toStrictEqual(['`payout.settled`']);
+
+    // AND THE COUNTEREXAMPLE THIS FILE WAS HANDED IS NOT ONE OF THEM, which is
+    // the thing ADR-191 section 9 does not say: its consumers are ALERT and
+    // FEED, so the sharpest form of the harm it describes -- the row never
+    // appearing in the trader's TIMELINE -- belongs to `payout.settled` and not
+    // to this name. What belongs to this name is that no trader-scoped read
+    // reaches the row at all.
+    expect(catalogueRow('payout.freeze_expiring')).not.toMatch(/\bTL\b/);
+    expect(catalogueRow('payout.settled')).toMatch(/\bTL\b/);
+  });
+
+  test('the other seven build, which is what keeps the refusal from being a blanket one', () => {
+    // A REFUSAL ASSERTED ONLY IN THE REFUSING DIRECTION is indistinguishable from
+    // a producer that refuses everything.
+    for (const name of BUILDABLE)
+      expect(() => buildEvent({ name, payload: PAYLOADS[name] }, CLOCK)).not.toThrow();
+    expect(BUILDABLE).toHaveLength(EVENT_NAMES.length - 1);
   });
 
   test('there is no way to pass a tenancy id beside a payload that disagrees with it', () => {
@@ -681,13 +798,32 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
     const sink: EventSink = makeEventSink({ writer, clock: () => CLOCK });
 
     await sink.emit(tx, {
-      name: 'payout.freeze_expiring',
-      payload: PAYLOADS['payout.freeze_expiring'],
+      name: 'payout.hold_enforced',
+      payload: PAYLOADS['payout.hold_enforced'],
+      actorId: 'operator:ana',
     });
 
     expect(seen).toStrictEqual([tx]);
-    expect(written[0]?.eventName).toBe('payout.freeze_expiring');
+    expect(written[0]?.eventName).toBe('payout.hold_enforced');
     expect(written[0]?.occurredAt).toStrictEqual(CLOCK);
+  });
+
+  test('an untenanted row never reaches the writer, so it cannot commit', async () => {
+    // THE REFUSAL WHERE IT MATTERS. `buildEvent` runs INSIDE `emit`, before the
+    // writer is called at all, so the transaction carrying the state change rolls
+    // back with the event rather than committing a fact no scoped read can see.
+    let calls = 0;
+    const sink = makeEventSink({
+      writer: { insert: () => ((calls += 1), Promise.resolve()) },
+      clock: () => CLOCK,
+    });
+    await expect(
+      sink.emit(
+        {},
+        { name: 'payout.freeze_expiring', payload: PAYLOADS['payout.freeze_expiring'] },
+      ),
+    ).rejects.toThrow(/reaches neither/);
+    expect(calls).toBe(0);
   });
 
   test('there is no buffer, no queue and no flush to forget', () => {
@@ -714,13 +850,17 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
     ).rejects.toThrow(EventSinkUnwired);
-    // THE REASON MOVED AND THE REFUSAL DID NOT, which is the whole of ADR-191's
-    // effect on this file. It read `/SIXTH class/` while the door was shut BY
-    // THE REGISTRY; the sixth class exists now, so the message names the writer
-    // instead and this assertion follows it rather than being deleted.
+    // THE REASON HAS MOVED TWICE AND THE REFUSAL HAS NOT, which is the whole of
+    // what ADR-191 and this slice did to this file. It read `/SIXTH class/`
+    // while the door was shut BY THE REGISTRY; it then read `/composed WRITER/`
+    // while the door was shut for want of an adapter; the adapter is
+    // `TRANSACTION_EVENT_WRITER` now, so the only thing left is the INSTALL and
+    // the message says so. The assertion follows the message each time rather
+    // than being deleted, because what is under test is that the default names
+    // its own reason and never that the reason is a particular one.
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
-    ).rejects.toThrow(/composed WRITER/);
+    ).rejects.toThrow(/What is missing is the INSTALL/);
   });
 
   test('`events` really is REGISTERED now, so the refusal above is about the writer and not the registry', () => {
@@ -734,5 +874,359 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
     expect(SCHEMA).toContain("pgTable('events'");
     expect(SCOPE).toContain("class: 'either'");
     expect(SCOPE).toContain('events: {');
+  });
+});
+
+// =============================================================================
+// 7. THE WRITER, AND THE DOOR THAT TURNS OUT TO BE NARROWER THAN THE READ
+// =============================================================================
+// `TRANSACTION_EVENT_WRITER` is the adapter section 6's default refuses for want
+// of. Everything here is one of two claims: that the two strings `src/events.ts`
+// retypes because it holds no import are the strings `packages/db` actually
+// carries, and that the handle the writer demands is the only handle in this
+// workspace whose `insert` reaches this table.
+
+const SCOPED_DB = read('../../../packages/db/src/scoped-db.ts');
+
+/**
+ * One writable spec, reused so every case below varies the HANDLE and not the event.
+ *
+ * IT CARRIES NO MONEY AND THE CHOICE IS SECTION 8's. `payout.held` was the first
+ * pick and it is one of the three names a `jsonb` column cannot take, so every
+ * case here would have been asserting on the wrong refusal. `payout.hold_released`
+ * carries both tenancy columns and no `_cents` field, so it reaches the insert.
+ */
+const SPEC_HELD: EmitSpec = {
+  name: 'payout.hold_released',
+  payload: PAYLOADS['payout.hold_released'],
+};
+
+/** A `SystemTx`-shaped double, recording what it was asked to write. */
+function recorder(returning: readonly unknown[] = [{ id: 1n }]): {
+  readonly tx: object;
+  readonly writes: { key: string; values: Readonly<Record<string, unknown>> }[];
+} {
+  const writes: { key: string; values: Readonly<Record<string, unknown>> }[] = [];
+  return {
+    writes,
+    tx: {
+      __brand: 'SystemTx',
+      insert: (key: string, values: Readonly<Record<string, unknown>>) => (
+        writes.push({ key, values }),
+        Promise.resolve([...returning])
+      ),
+    },
+  };
+}
+
+describe('the two strings the producer retypes are the strings the accessor carries', () => {
+  test('`events` is a real TableKey and the writer names exactly one table', () => {
+    // `admin-source/events.ts`'s `EVENT_READ_TABLES` binding, one direction over.
+    // A typo here is a `TS2345` at `tx.insert` in a file that has no `TableKey`
+    // to check against, so this is the check.
+    const keys: readonly string[] = TABLE_KEYS;
+    expect(keys).toContain(EVENT_WRITE_TABLE);
+    const witness: TableKey = 'events';
+    expect(witness).toBe(EVENT_WRITE_TABLE);
+  });
+
+  test('the brand the writer demands is the brand `scoped-db.ts` stamps', () => {
+    // THE ONLY THING ON THE VALUE THAT TELLS THE THREE HANDLES APART. The writer
+    // compares against the literal `'SystemTx'` and cannot import it; if
+    // `packages/db` renamed its brands, every handle would be refused at run time
+    // and nothing would be red. This is what makes that impossible.
+    expect(SCOPED_DB).toContain("__brand: 'SystemTx'");
+    expect(SCOPED_DB).toContain("__brand: 'ScopedTx'");
+    expect(SCOPED_DB).toContain("__brand: 'FirmTx'");
+  });
+
+  test('a SystemTx IS an EventInsertTx, which is the claim the run-time check stands on', () => {
+    // ADR-191's OWN DEVICE, one file over: that entry put
+    // `const EITHER_KEY_IS_SCOPED: ScopedTableKey = 'events'` in its suite as
+    // "the half vitest cannot see at all". This is the same half. If
+    // `SystemTx.insert` stopped accepting `'events'`, or stopped returning the
+    // rows it wrote, this line stops compiling and `typecheck` reports it where
+    // no assertion could.
+    const SYSTEM_TX_IS_AN_EVENT_INSERT_TX: (tx: SystemTx) => EventInsertTx = (tx) => tx;
+    expect(typeof SYSTEM_TX_IS_AN_EVENT_INSERT_TX).toBe('function');
+  });
+
+  test('the three inserts are generic over THREE different key sets, which is why the brand matters', () => {
+    // THE LOAD-BEARING FACT OF THIS WHOLE SECTION, READ OUT OF THE SOURCE RATHER
+    // THAN ASSERTED. ADR-191 clause 5 made `events` a `ScopedTableKey`, which is
+    // what `rows` and `rowsWhere` take; `insert` on that same handle takes
+    // `OwnedTableKey` and always did, because a scoped insert STAMPS the tenancy
+    // column and an `either` row has two and may carry neither.
+    expect(SCOPED_DB).toContain('insert<K extends OwnedTableKey>(key: K, values: WriteValues)');
+    expect(SCOPED_DB).toContain('insert<K extends FirmTableKey>(key: K, values: WriteValues)');
+    expect(SCOPED_DB).toContain('insert<K extends TableKey>(key: K, values: WriteValues)');
+  });
+
+  test('`insertUnder` is not a fourth door, and it is a closed list of one', () => {
+    // THE NEAR MISS, CHECKED RATHER THAN WAVED. A reader meeting the refusal
+    // above reaches for the scoped handle's other write, and `ParentedTableKey`
+    // is written as an `Extract` precisely so the registry polices it.
+    expect(SCOPED_DB).toContain(
+      "export type ParentedTableKey = Extract<DerivedTableKey, 'sessions'>",
+    );
+    // And the run-time half names this exact class in its own refusal.
+    expect(SCOPED_DB).toContain('an either row has one through a NULLABLE edge');
+  });
+});
+
+describe('the writer refuses every handle but the one that can carry the write', () => {
+  test('a ScopedTx is refused AT THE DOOR, before a statement is built', async () => {
+    // WITHOUT THIS IT STILL FAILS, SOMEWHERE USELESS. A `ScopedTx` has an
+    // `insert` method at run time, so duck-typing admits it and
+    // `refuseTenancyColumn` then throws a sentence about scoped writes at a
+    // caller who was never allowed to make one.
+    const scoped = { __brand: 'ScopedTx', insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(scoped, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(EventError);
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(scoped, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/branded "ScopedTx"/);
+  });
+
+  test('the refusal names the DOOR as the repair and never the payload', async () => {
+    const scoped = { __brand: 'ScopedTx', insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(scoped, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/THE REPAIR IS THE DOOR AND NOT THIS CHECK/);
+  });
+
+  test('a FirmTx is refused too, and this table is not firm', async () => {
+    const firm = { __brand: 'FirmTx', insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(firm, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/branded "FirmTx"/);
+  });
+
+  test('an UNBRANDED object with an insert method is refused, which keeps a recorder out of production', async () => {
+    // THE DIRECTION A PERMISSIVE GUARD FAILS IN. Admitting anything carrying an
+    // `insert` would admit the double at the top of this section, and the thing
+    // on the other side of this method is an append-only money record.
+    const anything = { insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(anything, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/branded undefined/);
+  });
+
+  test('a branded handle with no insert method reports a DRIFT rather than a caller error', async () => {
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert({ __brand: 'SystemTx' }, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/`packages\/db` and this file have drifted/);
+  });
+});
+
+describe('the row the writer writes', () => {
+  test('it names the one table and hands the envelope through unchanged', async () => {
+    const { tx, writes } = recorder();
+    const envelope = buildEvent(SPEC_HELD, CLOCK);
+    await TRANSACTION_EVENT_WRITER.insert(tx, envelope);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.key).toBe('events');
+    expect(writes[0]?.values).toStrictEqual({ ...envelope });
+  });
+
+  test('every field of the envelope is a column `schema.ts` declares, and the three it omits are the generated ones', () => {
+    // ADR-159 CLAUSE 1's SHAPE ONE LEVEL FURTHER DOWN. `EventEnvelope` is
+    // documented "by Drizzle property name" and the values object IS the
+    // envelope, so a field here that is not a property is a run-time drizzle
+    // error on the first real write, and a column added to the table with no
+    // field here is a column this producer silently never writes.
+    const block = SCHEMA.slice(SCHEMA.indexOf("export const events = pgTable('events', {"));
+    const declared = [...block.slice(0, block.indexOf('\n});')).matchAll(/^ {2}(\w+): /gm)].flatMap(
+      (match) => match[1] ?? [],
+    );
+    expect(declared).toHaveLength(14);
+
+    const written = Object.keys(buildEvent(SPEC_HELD, CLOCK));
+    expect(written.filter((field) => !declared.includes(field))).toStrictEqual([]);
+    // `id` is `bigint GENERATED ALWAYS AS IDENTITY` and REFUSES a supplied value;
+    // `recorded_at` and `created_at` are the DATABASE's clock and `occurredAt` is
+    // the application's. All three absences are argued at `EventEnvelope`.
+    expect(declared.filter((column) => !written.includes(column))).toStrictEqual([
+      'id',
+      'recordedAt',
+      'createdAt',
+    ]);
+  });
+
+  test('a write that did not write exactly one row THROWS rather than committing quietly', async () => {
+    // THE FAILURE THIS WHOLE FILE EXISTS TO MAKE IMPOSSIBLE, READ OFF THE RETURN
+    // VALUE. `unscopedInsertStatement(...).returning()` yields what it wrote, so
+    // a count that is not one means the fact is about to commit without its
+    // event.
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(recorder([]).tx, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/wrote 0 rows/);
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(recorder([{}, {}]).tx, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/wrote 2 rows/);
+  });
+});
+
+describe('composed, the sink writes where the unwired default rejects', () => {
+  test('one emit becomes one row on the transaction the caller opened', async () => {
+    // THE SENTENCE THIS SLICE WAS DISPATCHED FOR, AS A CASE.
+    // `UNWIRED_EVENT_SINK` rejects every emit; this composition writes.
+    const { tx, writes } = recorder();
+    const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock: () => CLOCK });
+
+    await sink.emit(tx, SPEC_HELD);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.values['eventName']).toBe('payout.hold_released');
+    expect(writes[0]?.values['occurredAt']).toStrictEqual(CLOCK);
+    expect(writes[0]?.values['identityId']).toBe(ID.identity);
+    expect(writes[0]?.values['accountId']).toBe(ID.account);
+  });
+
+  test('the untenanted name still does not reach the writer, which the composition cannot route around', async () => {
+    // `assertTenanted` IS NOT BYPASSED BY THE WRITER AND THAT IS THE POINT.
+    // Session 358 put it inside `emit`, and `emit` builds before it writes, so
+    // composing a writer cannot route around it. Which of the SEVEN buildable
+    // names then reach the insert is section 8's question and not this one.
+    const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock: () => CLOCK });
+
+    const { tx, writes } = recorder();
+    await expect(
+      sink.emit(tx, {
+        name: 'payout.freeze_expiring',
+        payload: PAYLOADS['payout.freeze_expiring'],
+      }),
+    ).rejects.toThrow(/reaches neither/);
+    expect(writes).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// 8. THE MONEY PAYLOAD NO `jsonb` COLUMN CAN TAKE
+// =============================================================================
+// FOUND BY WRITING A REAL ROW AND NOT BY READING. Against a live PostgreSQL with
+// every migration applied, four of the eight names write, `payout.freeze_expiring`
+// is refused by `assertTenanted`, and the other three fail at the DRIVER. Nothing
+// in any suite could see it, because every writer double records what it is handed
+// and none of them serialises. These cases are that gap closed.
+
+describe('the two rules that together make a money payload unwritable', () => {
+  test('`payload` is a `jsonb` column, which is the storage half of the contradiction', () => {
+    expect(SCHEMA).toContain("payload: jsonb('payload').notNull()");
+  });
+
+  test('`JSON.stringify` refuses a bigint outright, which is the serialiser half', () => {
+    // DRIZZLE'S JSONB MAPPING IS `JSON.stringify(value)`, so this language fact IS
+    // the driver's behaviour. Asserted here rather than cited, because the tree
+    // holds no copy of that file and a version bump would silently change it.
+    expect(() => JSON.stringify({ approved_cents: 150_000n })).toThrow(TypeError);
+    expect(() => JSON.stringify({ approved_cents: 150_000n })).toThrow(/BigInt/);
+  });
+
+  test('`assertPayloadRules` refuses a `_cents` value that is NOT a bigint, which is the producer half', () => {
+    // THE TWO HALVES MEET HERE AND THE MEETING IS THE FINDING: every possible
+    // `_cents` value is refused by one rule or the other.
+    expect(() => assertPayloadRules({ approved_cents: 150_000 })).toThrow(/rather than a bigint/);
+  });
+
+  test('the writer refuses the payload and NAMES the field, rather than throwing at the driver', async () => {
+    const { tx, writes } = recorder();
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent({ name: 'payout.approved', payload: PAYLOADS['payout.approved'] }, CLOCK),
+      ),
+    ).rejects.toThrow(/carries a bigint at `payload\.requested_cents`/);
+    expect(writes).toHaveLength(0);
+  });
+
+  test('it names the RULING it needs and never the caller', async () => {
+    const { tx } = recorder();
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent({ name: 'payout.held', payload: PAYLOADS['payout.held'] }, CLOCK),
+      ),
+    ).rejects.toThrow(
+      /THE REPAIR IS A RULING ON WHAT A `_cents` VALUE IS INSIDE A `jsonb` PAYLOAD/,
+    );
+  });
+
+  test('the walk is recursive, because the catalogue nests its money', async () => {
+    // `ledger.transaction_posted` carries an `entries` ARRAY of
+    // `{ ledger_account_code, amount_cents }`, so a check that stopped at the top
+    // level would pass the exact payload this rule exists for. The name is not one
+    // of the eight, so the shape is exercised on a payload that is.
+    const { tx } = recorder();
+    const envelope = buildEvent(
+      {
+        name: 'payout.blocked',
+        payload: {
+          ...PAYLOADS['payout.blocked'],
+          gate_results: { entries: [{ ledger_account_code: 'X', amount_cents: 1n }] },
+        },
+      },
+      CLOCK,
+    );
+    await expect(TRANSACTION_EVENT_WRITER.insert(tx, envelope)).rejects.toThrow(
+      /bigint at `payload\.gate_results\.entries\[0\]\.amount_cents`/,
+    );
+  });
+
+  test('the refusal is the WRITER`s and not the producer`s, so a non-jsonb sink is unaffected', async () => {
+    // THE LIMIT BELONGS TO THE STORAGE AND NOT TO THE EVENT. `buildEvent` still
+    // builds, and a sink over a writer that does not serialise still receives the
+    // envelope, which is why this check is here rather than in `assertPayloadRules`.
+    const written: EventEnvelope[] = [];
+    const sink = makeEventSink({
+      writer: { insert: (_tx, row) => (written.push(row), Promise.resolve()) },
+      clock: () => CLOCK,
+    });
+    await sink.emit({}, { name: 'payout.approved', payload: PAYLOADS['payout.approved'] });
+    expect(written[0]?.payload['approved_cents']).toBe(150_000n);
+  });
+
+  test('exactly three of the eight names carry money, and exactly those three are unwritable', async () => {
+    // DERIVED OVER THE CATALOGUE THIS FILE CARRIES rather than listed, so a name
+    // gaining a `_cents` field moves this count instead of slipping past it.
+    const carries = (name: EventName): boolean =>
+      Object.keys(PAYLOADS[name]).some((field) => field.endsWith('_cents'));
+    const money = EVENT_NAMES.filter(carries);
+    expect(money).toStrictEqual(['payout.requested', 'payout.approved', 'payout.held']);
+
+    for (const name of BUILDABLE) {
+      const { tx, writes } = recorder();
+      const attempt = TRANSACTION_EVENT_WRITER.insert(
+        tx,
+        buildEvent({ name, payload: PAYLOADS[name] }, CLOCK),
+      );
+      if (carries(name)) {
+        await expect(attempt, name).rejects.toThrow(/carries a bigint/);
+        expect(writes, name).toHaveLength(0);
+      } else {
+        await attempt;
+        expect(writes, name).toHaveLength(1);
+      }
+    }
+  });
+
+  test('across the CATALOGUE the same shape is 33 of the 102 readable rows', () => {
+    // THE SCALE OF THE FINDING, BOUND HERE RATHER THAN LEFT IN A PULL REQUEST
+    // BODY, beside the 34 that name no tenancy column. The two sets are different
+    // questions about the same 102 rows.
+    const rows = EVENTS_MD.split('\n')
+      .filter((line) => /^\| `[a-z_]+\.[a-z_]+`/.test(line))
+      .map((line) =>
+        line
+          .split(/(?<!\\)\|/)
+          .slice(1, -1)
+          .map((cell) => cell.trim()),
+      )
+      .filter((cells) => cells.length === 4);
+    const readable = rows.filter((cells) => cells[2]?.startsWith('`{'));
+    expect(readable).toHaveLength(102);
+    expect(readable.filter((cells) => /_cents\b/.test(cells[2] ?? ''))).toHaveLength(33);
   });
 });

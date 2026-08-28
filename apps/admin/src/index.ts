@@ -50,34 +50,34 @@
 //
 // The evidence pack is the ONE M06 surface this package does not contain, and
 // that sentence named three surfaces two sessions ago. THE ACCOUNT DRILL-DOWN
-// (3.2) IS NO LONGER AMONG THEM: `W6-j` landed `src/app/accounts/`, and it is
-// the screen whose route exists and whose adapter is blocked by the SAME
-// unregistered table as the feed. `GET /admin/accounts/:accountId` is
-// registered on the operator surface and `AdminReadSource` declares
-// `readAccount`; seven of the eight sections API_CONTRACT section 8 names read
-// tables `packages/db` registers and `events` does not, and the route refuses a
-// drill-down that omits a section, so seven of eight is a rejected response
-// rather than a smaller screen. IT IS ALSO THE ONE READ IN SECTION 8 THE
-// CONTRACT DOES NOT TYPE, so that screen renders the section roster and what
-// arrived in each and never a field of one. THE EVENT FEED (1.1) IS NO LONGER
-// AMONG THEM EITHER: `W6-h` landed `src/app/feed/`, and it was the ONE screen in
-// this package whose route exists and whose ADAPTER CANNOT BE WRITTEN YET until
-// the account drill-down joined it above, on the same table and for the same
-// reason. `GET
-// /admin/events` is registered on the operator surface and `AdminReadSource`
-// declares `listEvents`, but `events` is unregistered in `packages/db` and
-// therefore is not a `TableKey`, so the keyed accessor has no way to read it
-// and `IMPLEMENTED_ADMIN_READS` still holds two names. That screen states the
-// measurement as a named blocker rather than rendering an invented row. THE FLAGS QUEUE (3.3) AND THE IDENTITY DRILL-DOWN
-// (3.2a) ARE NO LONGER AMONG THEM, which is another sentence in this header
-// WAVE-06 has narrowed rather than left standing: `W6-f` landed
-// `src/app/flags/` and `W6-g` landed `src/app/identities/`. THEY ARE THE TWO
-// M06 SURFACES WHOSE BOTH HALVES EXIST, and that is why they came before the
-// others: `GET /admin/flags` and `GET /admin/identities/:identityId/graph` are
-// registered on the operator surface and `listFlags` and `readIdentityGraph`
-// are the two entries in `IMPLEMENTED_ADMIN_READS`
-// (`apps/api/src/admin-source/index.ts`), so each renders real rows the day an
-// operator session exists and neither waits on an adapter nobody wrote.
+// (3.2) IS NO LONGER AMONG THEM: `W6-j` landed `src/app/accounts/`. **THE TABLE
+// THAT BLOCKED IT AND THE FEED IS REGISTERED AND BOTH ADAPTERS ARE WRITTEN**,
+// which is [ADR-191](../../../docs/decisions/ADR-191.md) and session 356:
+// `events` is a `TableKey` today, `admin-source/events.ts` supplies `listEvents`
+// and `admin-source/account.ts` supplies `readAccount`, and
+// `IMPLEMENTED_ADMIN_READS` holds FOUR names where this sentence said two.
+// `GET /admin/accounts/:accountId` is registered on the operator surface,
+// `AdminReadSource` declares `readAccount`, and all eight sections API_CONTRACT
+// section 8 names now read registered tables. IT IS ALSO THE ONE READ IN
+// SECTION 8 THE CONTRACT DOES NOT TYPE, so that screen renders the section
+// roster and what arrived in each and never a field of one. THE EVENT FEED
+// (1.1) IS NO LONGER AMONG THEM EITHER: `W6-h` landed `src/app/feed/`, and it
+// was the ONE screen in this package whose route exists and whose adapter could
+// not be written until the account drill-down joined it above, on the same table
+// and for the same reason. **WHAT BLOCKS BOTH SCREENS NOW IS THE PORT AND NOT A
+// TABLE**: no deployment composes `AdminReadSource`, because three of its seven
+// methods -- `exportEvidence`, `readLiability` and `searchAccounts` -- have no
+// module, so `start.ts` calls no setter and `setAdminReadSource` stays in
+// `wiring.test.ts`'s BLOCKED list. Each screen states the measurement as a named
+// blocker rather than rendering an invented row. THE FLAGS QUEUE (3.3) AND THE
+// IDENTITY DRILL-DOWN (3.2a) ARE NO LONGER AMONG THEM, which is another sentence
+// in this header WAVE-06 has narrowed rather than left standing: `W6-f` landed
+// `src/app/flags/` and `W6-g` landed `src/app/identities/`. `GET /admin/flags`
+// and `GET /admin/identities/:identityId/graph` are registered on the operator
+// surface and `listFlags` and `readIdentityGraph` are two of the four entries in
+// `IMPLEMENTED_ADMIN_READS` (`apps/api/src/admin-source/index.ts`), so each
+// renders real rows the day an operator session exists and neither waits on an
+// adapter nobody wrote.
 //
 // AND THE TWO DRILL-DOWNS ARE THE SCREENS IN THIS PACKAGE THAT MAY RENDER A
 // SUBJECT, which is a sentence that named ONE of them until `W6-j`.

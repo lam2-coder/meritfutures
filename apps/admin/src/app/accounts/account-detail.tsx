@@ -169,17 +169,17 @@ export const WITHHELD_SECTIONS: readonly PendingPanel[] = [
   },
   {
     origin: 'WAVE-06 section 10 item 3',
-    title: 'The rows themselves: `AdminReadSource.readAccount` has no adapter',
+    title: 'The rows themselves: no deployment composes `AdminReadSource`',
     blockedBy:
-      'no module supplies it, and the reason is a compile error rather than an unwritten file. ' +
-      'Seven of the eight sections read tables `packages/db` registers; `events` does not. ' +
-      '`scope.ts` refuses to register that table in an argued paragraph and declares no drizzle ' +
-      'table for it, so `events` is not a `TableKey` and a handle naming it is not satisfied by ' +
-      '`SystemTx`. `apps/api/src/routes/admin-reads.ts` REFUSES a drill-down that omits a ' +
-      'section the contract names, so a partial adapter is not composable either: seven of ' +
-      'eight is a rejected response and not a smaller screen. This is the SECOND port method ' +
-      'that table blocks, after `listEvents`, and the sixth scope class it needs is a ' +
-      '`packages/db` ruling rather than an `apps/api` one',
+      'three of the port`s seven methods, and `readAccount` is no longer one of them. ADR-191 ' +
+      'gave `events` the sixth scope class it needed, so it is a `TableKey` today and a handle ' +
+      'naming it IS satisfied by `SystemTx`; `apps/api/src/admin-source/account.ts` supplies ' +
+      'all eight sections and `IMPLEMENTED_ADMIN_READS` holds four names where this panel once ' +
+      'read two. WHAT IS LEFT IS THE PORT AND NOT THE TABLE: `exportEvidence`, `readLiability` ' +
+      'and `searchAccounts` have no module, so no value satisfies `AdminReadSource`, ' +
+      '`apps/api/src/start.ts` calls no setter, and `setAdminReadSource` stays in ' +
+      '`wiring.test.ts`s BLOCKED list. Composing a partial port would answer this screen and ' +
+      'throw on the first request to one of the other three',
   },
   {
     origin: 'ADR-171',
