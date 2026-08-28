@@ -520,4 +520,136 @@ BEGIN
 END $$;
 ROLLBACK;
 
+-- ---------------------------------------------------------------------------
+-- ADDED BY ADR-193. LEDGER-C3, the clause 0009's CHECK could not carry.
+-- ---------------------------------------------------------------------------
+-- 0009:103-104 promised that a reversal "may not chain onto another reversal"
+-- and ledger_transactions_no_self_reversal enforces only reversal_of <> id,
+-- because a row-level CHECK cannot query another row. Session 354 wrote the
+-- three-deep chain against the 57-file schema and all three rows LANDED. These
+-- blocks are that construction, and the second half of it is now refused.
+--
+-- K6 CARRIES ITS OWN ACCEPTANCE RATHER THAN BORROWING K5b's. K5b posts LT-09 and
+-- would go red if LEDGER-C3 refused every reversal, so it does cover this arm --
+-- but a guard whose acceptance direction lives in another block is a guard whose
+-- acceptance direction moves when that block does. K6 posts the legitimate first
+-- reversal and THEN attempts the chain, in one transaction.
+
+-- K6. A REVERSAL MAY NOT CHAIN ONTO ANOTHER REVERSAL.
+-- The fixture identity is created HERE rather than relied on from a block
+-- above: every block in this file is its own transaction and every one of them
+-- ROLLBACKs. The INSERT fires 0054's provisioning trigger, which is what opens
+-- the trader_wallet position these entries post against.
+BEGIN;
+INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
+  ON CONFLICT DO NOTHING;
+INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
+                                idempotency_key, source_provenance_summary, earliest_credit_at)
+  VALUES ('22222222-0000-0000-0000-00000000000c','11111111-1111-1111-1111-111111111111',
+          25000,'probe-dest-4','transferring','probe-k6','{"payout":25000}'::jsonb, now());
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
+  VALUES ('eeeeeeee-0000-0000-0000-000000000001','wallet_withdrawal_approval','wallet_withdrawal',
+          '22222222-0000-0000-0000-00000000000c','probe-k6-lt06');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'eeeeeeee-0000-0000-0000-000000000001', a.id, v.amt, 'probe LT-06'
+  FROM (VALUES ('trader_wallet'::text,'identity'::text, 25000::bigint),
+               ('withdrawals_in_flight','firm', -25000)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+UPDATE wallet_withdrawals SET status = 'failed'
+  WHERE id = '22222222-0000-0000-0000-00000000000c';
+
+-- THE ACCEPTANCE. The legitimate first reversal, which LEDGER-C3 must admit.
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key, reversal_of)
+  VALUES ('eeeeeeee-0000-0000-0000-000000000002','wallet_withdrawal_failure','wallet_withdrawal',
+          '22222222-0000-0000-0000-00000000000c','wallet_withdrawal_failure probe-k6',
+          'eeeeeeee-0000-0000-0000-000000000001');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'eeeeeeee-0000-0000-0000-000000000002', a.id, v.amt, 'probe LT-09'
+  FROM (VALUES ('withdrawals_in_flight'::text,'firm'::text, 25000::bigint),
+               ('trader_wallet','identity', -25000)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+SET CONSTRAINTS ALL IMMEDIATE;
+
+-- THE REFUSAL. A third transaction reversing the reversal. On the 57-file
+-- schema this LANDED, and it drove withdrawals_in_flight back to -25000 cents
+-- on a withdrawal already terminal at `failed`, with the global sum still 0 and
+-- WD-C1 silent because the row it is armed on never moves again.
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id,
+                                     idempotency_key, reversal_of)
+      VALUES ('eeeeeeee-0000-0000-0000-000000000003','wallet_withdrawal_approval',
+              'wallet_withdrawal','22222222-0000-0000-0000-00000000000c',
+              'probe-k6-chain','eeeeeeee-0000-0000-0000-000000000002');
+    RAISE EXCEPTION
+      'PROBE FAILED: LEDGER-C3 admitted a reversal of a reversal. 0009:103-104 '
+      'says a reversal may not chain onto another reversal and its CHECK can '
+      'only say reversal_of <> id. The chained row is the ORIGINAL''s entries '
+      'again, so it re-strands the obligation on a withdrawal that is already '
+      'terminal, where nothing fires (ADR-193)';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'LEDGER-C3 fired as expected';
+  END;
+END $$;
+ROLLBACK;
+
+-- K6b. THE RETRO-LINK, WHICH IS WHY THE TRIGGER CARRIES `OR UPDATE`.
+-- 0026:88-107 revokes UPDATE on ledger_transactions from merit_app and PUBLIC,
+-- so this statement is unreachable for the application role and reachable for
+-- the owner, which is the role every migration runs as. An UPDATE that points a
+-- committed transaction at a reversal builds the same chain one verb over, and
+-- an INSERT-only trigger would not see it.
+BEGIN;
+INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
+  ON CONFLICT DO NOTHING;
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
+  VALUES ('eeeeeeee-0000-0000-0000-00000000000a','probe_original','wallet_withdrawal',
+          '11111111-1111-1111-1111-111111111111','probe-k6b-original');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'eeeeeeee-0000-0000-0000-00000000000a', a.id, v.amt, 'probe original'
+  FROM (VALUES ('trader_wallet'::text,'identity'::text, 100::bigint),
+               ('withdrawals_in_flight','firm', -100)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key, reversal_of)
+  VALUES ('eeeeeeee-0000-0000-0000-00000000000b','probe_reversal','wallet_withdrawal',
+          '11111111-1111-1111-1111-111111111111','probe-k6b-reversal',
+          'eeeeeeee-0000-0000-0000-00000000000a');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'eeeeeeee-0000-0000-0000-00000000000b', a.id, v.amt, 'probe reversal'
+  FROM (VALUES ('withdrawals_in_flight'::text,'firm'::text, 100::bigint),
+               ('trader_wallet','identity', -100)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+-- A third transaction that names NOTHING lands, because it is not a reversal.
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
+  VALUES ('eeeeeeee-0000-0000-0000-00000000000c','probe_third','wallet_withdrawal',
+          '11111111-1111-1111-1111-111111111111','probe-k6b-third');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'eeeeeeee-0000-0000-0000-00000000000c', a.id, v.amt, 'probe third'
+  FROM (VALUES ('trader_wallet'::text,'identity'::text, 100::bigint),
+               ('withdrawals_in_flight','firm', -100)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+SET CONSTRAINTS ALL IMMEDIATE;
+DO $$
+BEGIN
+  BEGIN
+    UPDATE ledger_transactions
+       SET reversal_of = 'eeeeeeee-0000-0000-0000-00000000000b'
+     WHERE id = 'eeeeeeee-0000-0000-0000-00000000000c';
+    RAISE EXCEPTION
+      'PROBE FAILED: LEDGER-C3 admitted a chain built by UPDATE. 0026 revokes '
+      'UPDATE on ledger_transactions from merit_app and PUBLIC and not from the '
+      'owner, and 0026:109-115 says single-column UPDATEs to append-only tables '
+      'are a shape this estate designs for (ADR-193)';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'LEDGER-C3 fired as expected on UPDATE';
+  END;
+END $$;
+ROLLBACK;
+
 \echo 'All ledger constraint probes fired as expected.'
