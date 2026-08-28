@@ -33,6 +33,18 @@ const LEDGER_SQL = read('packages', 'db', 'migrations', '0009_ledger.sql');
 const POSTING = read('packages', 'ledger', 'src', 'posting.ts');
 const RAIL_SRC = read('packages', 'rail', 'src', 'settlement.ts');
 const PROBE = read('scripts', 'db', 'probe_ledger_constraints.sql');
+/** `0052`, ADR-177's seed and the CHECK that ties four kinds to four codes. */
+const SEED_MIGRATION = read('packages', 'db', 'migrations', '0052_chart_of_accounts.sql');
+/**
+ * `0052` with its `--` comments removed.
+ *
+ * ITS HEADER ARGUES THE RULING AT LENGTH AND QUOTES ITS OWN STATEMENTS WHILE
+ * DOING SO, so counting `INSERT INTO ledger_accounts` over the raw file counts
+ * the argument as well as the statement. That is not a hypothetical: this case
+ * and `chart-of-accounts-kinds.test.ts` each read the prose as SQL on a first
+ * draft, in opposite directions, one counting two inserts and one counting none.
+ */
+const SEED_SQL = SEED_MIGRATION.replace(/--[^\n]*/g, '');
 
 describe('the sign convention, ASSERTED and not assumed', () => {
   test('posting.ts writes +amountCents on the debit and -amountCents on the credit', () => {
@@ -182,12 +194,19 @@ describe('finding C: firm_treasurys kind is written in no file in this tree', ()
     );
   });
 
-  test('the only INSERT into ledger_accounts anywhere seeds three codes, and not this one', () => {
+  test('no INSERT anywhere writes a kind for firm_treasury, which is the half still open', () => {
+    // THIS CASE USED TO ASSERT THAT THE PROBE WAS THE ONLY INSERT ANYWHERE, and
+    // ADR-177 answered that: 0052 seeds the chart and the probe now READS
+    // fees_revenue instead of seeding its own row. What survives unchanged is
+    // finding C's actual subject. The probe still seeds the two per-identity
+    // positions, because nothing in this tree creates one for an identity.
     expect(PROBE).toContain("'trader_withdrawable','liability'");
     expect(PROBE).toContain("'trader_wallet','liability'");
-    expect(PROBE).toContain("'fees_revenue','revenue'");
-    expect(PROBE).not.toContain("'firm_treasury','asset'");
-    expect(PROBE).not.toContain("'firm_treasury','liability'");
+    for (const source of [PROBE, SEED_SQL]) {
+      expect(source).not.toContain("'firm_treasury','asset'");
+      expect(source).not.toContain("'firm_treasury','liability'");
+      expect(source).not.toMatch(/'firm_treasury',\s*'\w+'/);
+    }
   });
 
   test('and this package infers no direction from that absence', () => {
@@ -273,9 +292,15 @@ describe('ADR-174: the measurement the ruling turns on, held against M05', () =>
     );
   });
 
-  test('no code is minted, so no 0052 exists and the vocabulary is still seven', () => {
+  test('0052 landed and STILL mints no code, so the vocabulary is seven', () => {
+    // ADR-174 returned 0052 to the pool and this case asserted it was unspent.
+    // ADR-177 took it. The clause that survives is the one that mattered: a
+    // ruling on the chart must not widen the vocabulary, and this one does not.
     const migrations = readdirSync(join(ROOT, 'packages', 'db', 'migrations'));
-    expect(migrations.filter((name) => name.startsWith('0052'))).toStrictEqual([]);
+    expect(migrations.filter((name) => name.startsWith('0052'))).toStrictEqual([
+      '0052_chart_of_accounts.sql',
+    ]);
+    expect(SEED_SQL).not.toMatch(/ledger_accounts_code_is_declared/);
     // The eighth-code refusal is stated in TWO merged migrations, and a ruling
     // that minted a code would have had to supersede both.
     // PARSED AND NOT MATCHED AS A PREFIX, and the reason is a seeded defect
@@ -312,23 +337,38 @@ describe('ADR-174: the measurement the ruling turns on, held against M05', () =>
 });
 
 describe('ADR-174 section 4: the absence is still an absence', () => {
-  test('nothing in any merged migration seeds the chart of accounts', () => {
-    // FINDING C's own claim says the only INSERT anywhere is the probe. This
-    // asserts the half that would change first: the day a migration seeds a
-    // ledger_accounts row it writes a `kind`, and the absence is over.
+  test('0052 is the only migration that seeds the chart, and it seeds one firm row', () => {
+    // THIS CASE ASSERTED AN EMPTY LIST AND ADR-177 FILLED IT, which is exactly
+    // what ADR-174 section 7 armed it to catch. It now names the seeder, so a
+    // SECOND migration seeding the chart is the thing that goes red.
     const dir = join(ROOT, 'packages', 'db', 'migrations');
     const seeding = readdirSync(dir)
       .filter((name) => name.endsWith('.sql'))
       .filter((name) =>
         /INSERT\s+INTO\s+ledger_accounts/i.test(readFileSync(join(dir, name), 'utf8')),
       );
-    expect(seeding).toStrictEqual([]);
+    expect(seeding).toStrictEqual(['0052_chart_of_accounts.sql']);
+    // One row, and it is firm-scoped: a migration has no identity to seed
+    // against, so the three per-identity classes still have no writer at all.
+    expect(SEED_SQL.match(/INSERT\s+INTO\s+ledger_accounts/gi)).toHaveLength(1);
+    expect(SEED_SQL).toContain("'fees_revenue', 'revenue', 'firm'");
   });
 
-  test('and no kind is tied to a code anywhere the schema can see', () => {
-    // The CHECK is on the ROW. A constraint tying the two would name both
-    // columns in one expression, and none does.
+  test('0009 still ties no kind to a code, and 0052 ties four and not firm_treasury', () => {
+    // 0009's CHECK is on the ROW and a constraint tying the two would name both
+    // columns in one expression. That is still true OF 0009, and 0052 is where
+    // the tie now lives, which is why this case reads both files.
     expect(LEDGER_SQL).not.toMatch(/CHECK\s*\([^)]*\bcode\b[^)]*\bkind\b/is);
+    const arms = [...SEED_SQL.matchAll(/WHEN\s+'([a-z_]+)'\s+THEN\s+kind\s*=/g)].flatMap((m) =>
+      m[1] === undefined ? [] : [m[1]],
+    );
+    expect([...arms].sort()).toStrictEqual([
+      'fees_revenue',
+      'promotional_credit',
+      'trader_wallet',
+      'trader_withdrawable',
+    ]);
+    expect(arms).not.toContain('firm_treasury');
   });
 });
 
