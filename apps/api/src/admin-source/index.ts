@@ -30,7 +30,7 @@
 // merge would still compile". It would. That is exactly why the `Pick` half is
 // kept alongside it rather than replaced by it. The `Partial` half earns its
 // place separately, by producing a WHOLE `AdminReadSource` a wiring slice can
-// hold, which the `Pick` cannot until all six methods exist.
+// hold, which the `Pick` cannot until all seven methods exist.
 //
 // SO THE TWO FUNCTIONS HAVE DIFFERENT NAMES AND DIFFERENT JOBS.
 // `composeImplementedAdminReads` composes the two backend-read methods under the
@@ -79,7 +79,8 @@
 //
 // `test/admin-source-flags.test.ts` closes the runtime half: it reads
 // `AdminReadSource`'s declaration out of `routes/admin-reads.ts` and asserts that
-// every composed name is one of its six, and that the composed object's own keys
+// every composed name is one of its seven, and that the composed object's own
+// keys
 // are exactly {@link IMPLEMENTED_ADMIN_READS}. A type is checked at build and a
 // key set is checked at run, and the merge that dropped a leg has to get past
 // both.
@@ -99,10 +100,16 @@
 // -----------------------------------------------------------------------------
 // THIS COMPOSES A PARTIAL PORT AND SAYS SO, WHICH IS WHY NOTHING WIRES IT
 // -----------------------------------------------------------------------------
-// `AdminReadSource` has six methods. This directory implements TWO. There is
-// therefore no value in this tree that satisfies the port, `start.ts` calls no
-// setter, and `setAdminReadSource` stays in `test/wiring.test.ts`'s `BLOCKED`
-// list with the triple unchanged.
+// `AdminReadSource` has SEVEN methods since ADR-184 ruling 1. This directory
+// implements TWO. There is therefore no value in this tree that satisfies the
+// port, `start.ts` calls no setter, and `setAdminReadSource` stays in
+// `test/wiring.test.ts`'s `BLOCKED` list with the triple unchanged.
+//
+// **A METHOD IS NOT A PORT, WHICH IS WHY THE TRIPLE DOES NOT MOVE.**
+// `wiring.test.ts` counts `^export function (use|set)X(` in `src/routes/`, and
+// ADR-184 ruling 1 puts the feed's read on the port that already has a setter
+// rather than on one of its own. `{ declared: 23, wired: 6, blocked: 17 }` is
+// unchanged and was re-run rather than predicted.
 //
 // **THAT ENTRY'S STATED REASON IS NARROWED BY THIS SLICE AND IS NOT RETIRED BY
 // IT, AND THE DIFFERENCE MATTERS.** The reason reads: "A READ SHAPE, and the door
@@ -114,6 +121,14 @@
 // remaining three are unwritten. **The entry is `wiring.test.ts`'s, session 316
 // holds that file this wave, and this slice reports the narrowing rather than
 // editing it.**
+//
+// **`listEvents` IS THE THIRD INSTANCE AND IT IS REPORTED THE SAME WAY.**
+// ADR-184 section 3 measures it: the feed is a keyed range read over ONE table,
+// so "none of the six methods is a projection of one table" is false for it too.
+// That entry now says `six` where the port declares seven, and BOTH halves of it
+// are the wiring slice's to repair, not this one's: the triple does not move,
+// so `test/wiring.test.ts` is outside this fence and reporting is the whole of
+// what the precedent allows.
 //
 // -----------------------------------------------------------------------------
 // THE DOOR IS A PORT AND NOT A CALL, AND THAT IS `src/db.ts`'s RULING NOT THIS
@@ -216,7 +231,7 @@ export function composeImplementedAdminReads(
 
 // THE COMPOSITION, AND IT IS A SEPARATE FILE FOR EXACTLY ONE REASON.
 //
-// `AdminReadSource` (`routes/admin-reads.ts`) declares SIX methods and three
+// `AdminReadSource` (`routes/admin-reads.ts`) declares SEVEN methods and three
 // slices in two phases implement different ones: `P7-i` takes `listFlags` and
 // `readIdentityGraph`, `P7-j` takes `exportEvidence`, and `P5-l` takes
 // `readLiability`. P7 section 9 rows the division as **SERIAL on the index and
@@ -295,6 +310,10 @@ export function composeAdminReadSource(parts: AdminReadParts): AdminReadSource {
     exportEvidence: (request) => {
       if (parts.exportEvidence === undefined) throw new AdminSourceNotComposed('exportEvidence');
       return parts.exportEvidence(request);
+    },
+    listEvents: (query) => {
+      if (parts.listEvents === undefined) throw new AdminSourceNotComposed('listEvents');
+      return parts.listEvents(query);
     },
   };
 }

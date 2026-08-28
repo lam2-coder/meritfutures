@@ -187,6 +187,10 @@ function sourceOf(overrides: Partial<AdminReadSource> = {}): AdminReadSource & {
       return Promise.resolve(LIABILITY);
     },
     exportEvidence: () => Promise.resolve(PACK),
+    // ADR-184 ruling 1's seventh method. AN EMPTY PAGE AND NOT A REJECTION: this
+    // stub is what the section 8 routes read through, none of them is the feed,
+    // and a throwing leg here would fail a test for a method it never called.
+    listEvents: () => Promise.resolve({ data: [], next_cursor: null }),
   };
   const merged = { ...base, ...overrides };
   return {
