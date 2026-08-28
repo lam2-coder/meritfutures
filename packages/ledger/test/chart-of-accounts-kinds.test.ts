@@ -148,6 +148,14 @@ const ARMS: readonly (readonly [string, string])[] = [
  * `source CHECK IN ('provider_api','manual_attestation')`: an equity
  * appropriation has no rail balance and no provider to report it.
  *
+ * `withdrawals_in_flight` came from ADR-187 and is the eighth. It is the only
+ * one of the eight whose kind was ruled in the SAME statement that declared its
+ * name, which is what ADR-186's `ELSE false` was installed to force: a code with
+ * a declared name and no ruled kind is a class half defined. Its kind is a
+ * DERIVATION, not a judgement -- `LT-06` credits the slot and `LT-07` debits it,
+ * so the account rises when the trader's claim is extinguished and falls when
+ * the cash leaves, which is a liability under the one sign convention.
+ *
  * THE MAP IS NOW TOTAL OVER THE VOCABULARY and the case below asserts that
  * rather than assuming it, which is what makes the deleted `REFUSED` list safe
  * to delete.
@@ -160,6 +168,7 @@ const RULED: Readonly<Record<string, string>> = {
   firm_treasury: 'asset',
   psp_clearing: 'asset',
   reserve: 'asset',
+  withdrawals_in_flight: 'liability',
 };
 
 describe('the constraint in force binds kind to code for exactly the ruled codes', () => {
@@ -167,11 +176,16 @@ describe('the constraint in force binds kind to code for exactly the ruled codes
     expect(Object.fromEntries(ARMS)).toEqual(RULED);
   });
 
-  test('every code the constraint names is one of 0009s seven', () => {
+  test('every code the constraint names is one the vocabulary in force declares', () => {
     for (const [code] of ARMS) expect(LEDGER_ACCOUNT_CODES).toContain(code);
   });
 
-  test('every kind the constraint names is one of 0009s five', () => {
+  test('every kind the constraint names is one of the five 0009 constrains kind to', () => {
+    // `0009`'s column CHECK on `kind` is read BY NAME here and that is correct:
+    // it is an inline column constraint inside `CREATE TABLE`, no migration
+    // supersedes it, and the five kinds have never moved. The vocabulary of
+    // CODES is the half that moves, and it is read out of the last migration
+    // that declares it rather than out of `0009`.
     const kinds = listAfter(read('0009_ledger.sql'), 'CHECK (kind IN');
     expect(kinds).toHaveLength(5);
     for (const [, kind] of ARMS) expect(kinds).toContain(kind);
@@ -208,19 +222,32 @@ describe('the hole is closed, and the closure is the ruling', () => {
     expect(CONSTRAINT).not.toMatch(/ELSE\s+true/);
   });
 
-  test('no firm code is a liability, which is ADR-181s elimination made total', () => {
-    // ADR-181 derived that the external leg's in-flight obligation is a
-    // FIRM-SCOPED `liability` and that none of the seven can hold one. Two of
-    // its four steps were "the code is ruled something else" and two were "the
-    // code is ruled nothing and falls through". After ADR-186 all four are the
-    // first kind, so ADR-174 section 3 shape (iii) is not merely refused in an
-    // entry: it is unrepresentable in the schema.
+  test('exactly one firm code is a liability, and it is the one minted for the role', () => {
+    // THIS CASE WENT RED WHEN `0056` LANDED AND THE SESSION CAME HERE TO SAY SO.
+    //
+    // It used to read "no firm code is a liability, which is ADR-181s
+    // elimination made total", and its comment said that after ADR-186 all four
+    // firm codes were ruled something other than `liability`, so ADR-174 section
+    // 3 shape (iii) was unrepresentable rather than merely refused.
+    //
+    // THAT PROPERTY WAS NEVER THE POINT AND IT SAID SO ITSELF: it was ADR-181's
+    // ELIMINATION, an argument that NONE OF THE SEVEN could hold the external
+    // leg's in-flight obligation. The elimination succeeded. ADR-187 mints the
+    // code the elimination proved was missing, so the same claim now has a
+    // witness instead of an empty set, and asserting the empty set after that
+    // would be asserting the absence of the thing the ruling exists to create.
+    //
+    // WHAT SURVIVES IS STRICTLY STRONGER AND IT IS WHAT SHAPE (iii) TURNED ON:
+    // no firm code OTHER than the minted one is a liability, so neither
+    // `psp_clearing` nor `reserve` can carry the role, and the chart has exactly
+    // one home for it rather than a choice of homes.
     const ruled = new Map(ARMS);
     const firm = LEDGER_ACCOUNT_CODES.filter((code) => LEDGER_ACCOUNT_SCOPE[code] === 'firm');
-    expect(firm).toHaveLength(4);
+    const firmLiabilities = firm.filter((code) => ruled.get(code) === 'liability');
+    expect(firmLiabilities).toStrictEqual(['withdrawals_in_flight']);
     for (const code of firm) {
       expect(ruled.get(code), code).toBeDefined();
-      expect(ruled.get(code), code).not.toBe('liability');
+      if (code !== 'withdrawals_in_flight') expect(ruled.get(code), code).not.toBe('liability');
     }
   });
 });
@@ -313,16 +340,25 @@ describe('the seeds write rows the constraint in force admits', () => {
       }
     }
     //
-    // ADR-186 RULES TWO MORE FIRM KINDS AND SEEDS NEITHER, so this list is
-    // UNCHANGED and the unchange is deliberate rather than an omission. `0052`
+    // ADR-186 RULES TWO MORE FIRM KINDS AND SEEDS NEITHER, so those two are
+    // still absent and the absence is deliberate rather than an omission. `0052`
     // header item 4's stated rule -- the seedable set is the firm codes with a
     // settled kind -- would now admit `psp_clearing` and `reserve`; its
     // ARGUMENT would not, because it seeded `fees_revenue` for a posting that
     // resolves against it and nothing posts against either of these two. A row
     // here would be a chart entry no posting resolves and a `readChart` cost
-    // with no reader. The list is the assertion: a later session that seeds one
-    // comes here and says why.
-    expect([...seeded].sort()).toEqual(['fees_revenue', 'firm_treasury']);
+    // with no reader.
+    //
+    // ADR-187 SEEDS `withdrawals_in_flight` AND THIS IS THE SESSION THE COMMENT
+    // ABOVE ASKED TO COME HERE AND SAY WHY. It passes 0052's rule (firm-scoped,
+    // and its kind is ruled in the same migration) and, unlike the two above, it
+    // passes 0052's ARGUMENT: `M05` section 2.1 states TWO postings that resolve
+    // against it, `LT-06`'s credit leg and `LT-07`'s debit leg, and both are
+    // UNPOSTABLE until the row exists. ADR-183 section 7 row 3 is the
+    // measurement that makes that concrete -- `chart.ts`'s `resolve` throws
+    // rather than opening an account, which is why `LT-01` and `LT-08` had never
+    // posted in this repository's history until `0054` wrote their rows.
+    expect([...seeded].sort()).toEqual(['fees_revenue', 'firm_treasury', 'withdrawals_in_flight']);
   });
 
   test('the partition is total, so a write cannot escape both sets', () => {

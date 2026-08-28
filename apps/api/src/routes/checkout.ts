@@ -1669,10 +1669,20 @@ export function velocityOf(args: {
  *    the purchase (M3's INV-M3-13)`
  *
  * `revenue` IS `fees_revenue`, WHICH IS A LOOKUP RATHER THAN A CHOICE.
- * `ledger_accounts_code_is_declared` closes the chart at seven codes and
- * `fees_revenue` is the only one of the seven whose `kind` is `revenue`; the
- * other three firm codes are `firm_treasury`, `psp_clearing` and `reserve`, and
- * none of them is where a product sale is recognized.
+ * `ledger_accounts_code_is_declared` closes the chart at eight codes and
+ * `fees_revenue` is the only one of the eight whose `kind` is `revenue`; the
+ * other four firm codes are `firm_treasury`, `psp_clearing`, `reserve` and
+ * `withdrawals_in_flight`, and none of them is where a product sale is
+ * recognized.
+ *
+ * THE COUNT MOVED FROM SEVEN TO EIGHT AND THE LOOKUP DID NOT (ADR-187, `0056`).
+ * The eighth code is a firm-scoped `liability` for the external leg's in-flight
+ * obligation, so it is eliminated here by the same step as the other three: a
+ * wallet purchase recognizes revenue, and an obligation to pay a withdrawal
+ * onward is not revenue. `ledger_accounts_kind_matches_code`'s `ELSE false`
+ * makes the elimination checkable rather than asserted -- every declared code
+ * has a ruled kind, so "the only one whose kind is revenue" is a fact the
+ * database enforces.
  *
  * `psp_clearing` IS DELIBERATELY NOT TOUCHED, and this is the leg most likely to
  * be written wrong by analogy with the card path. There is no processor in this

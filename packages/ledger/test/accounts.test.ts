@@ -3,15 +3,33 @@
 // =============================================================================
 // THE THIRD COPY OF THE VOCABULARY IS CHECKED AGAINST THE OTHER TWO.
 //
-// `0009` declares the seven codes as a CHECK constraint and `0027` declares
-// them again inside `LEDGER-C2`'s trigger body -- the migration set's own
-// two-statements-of-one-fact, accepted there because "a FK to a table whose own
-// CHECK could be dropped in a later migration is a guarantee with a dependency".
-// `accounts.ts` is a third. It earns its place only while these assertions hold,
-// and the day somebody adds an eighth class to one of the three this file names
-// which one disagrees.
+// The migration set declares the codes as a CHECK constraint and declares them
+// again inside `LEDGER-C2`'s trigger body -- its own two-statements-of-one-fact,
+// accepted there because "a FK to a table whose own CHECK could be dropped in a
+// later migration is a guarantee with a dependency". `accounts.ts` is a third.
+// It earns its place only while these assertions hold, and the day somebody adds
+// a class to one of the three this file names which one disagrees.
+//
+// -----------------------------------------------------------------------------
+// THIS FILE READ TWO MIGRATIONS BY NAME AND THAT WAS A DEFECT (ADR-187)
+// -----------------------------------------------------------------------------
+// It read `0009_ledger.sql` for the CHECK and `0027_triggers_invariants.sql` for
+// the trigger body. Neither guard can be extended in place: a CHECK moves by
+// DROP and re-ADD under one name and a function moves by CREATE OR REPLACE, so
+// THE STATEMENT THE DATABASE HAS IS THE LAST ONE INSTALLED, WHATEVER FILE
+// INSTALLED IT. `0056` supersedes both. Read by file name, this file would have
+// gone on asserting that `accounts.ts` equals a vocabulary the database no
+// longer enforces, and it would have stayed GREEN while doing it -- which is the
+// exact failure `packages/rail/test/lt-07.test.ts` records against itself ("a
+// watcher pinned to file names watches those files and not the claim") and which
+// `chart-of-accounts-kinds.test.ts` and `in-flight-obligation.test.ts` each
+// repaired for the KIND constraint and neither repaired for the CODE vocabulary.
+//
+// Both anchors are now resolved across the whole migration set, in application
+// order, and the LAST occurrence wins. A slice that finds nothing throws rather
+// than looping over an empty list, because a `for` over `[]` passes.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -29,8 +47,47 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS = join(HERE, '..', '..', 'db', 'migrations');
 const read = (file: string): string => readFileSync(join(MIGRATIONS, file), 'utf8');
 
-/** Every single-quoted literal inside the named parenthesised block, in order. */
-function quotedLiteralsAfter(sql: string, anchor: string): string[] {
+/** Every migration, in the order the runner applies them. */
+const FILES: readonly string[] = readdirSync(MIGRATIONS)
+  .filter((name) => name.endsWith('.sql'))
+  .sort();
+
+/**
+ * The LAST migration whose text carries `anchor`, which is the one that
+ * installed the statement the database is running.
+ *
+ * The file name is returned beside the text so a failure names the migration a
+ * reader has to open, rather than leaving them to find it.
+ */
+function inForce(anchor: string): readonly [string, string] {
+  const found = FILES.filter((file) =>
+    read(file)
+      .replace(/--[^\n]*/g, '')
+      .includes(anchor),
+  );
+  if (found.length === 0) throw new Error(`no migration carries ${anchor}`);
+  const last = found[found.length - 1] as string;
+  return [last, read(last)];
+}
+
+const [CODE_CHECK_FILE, CODE_CHECK_SQL] = inForce(
+  'ADD CONSTRAINT ledger_accounts_code_is_declared',
+);
+const [CLASS_TRIGGER_FILE, CLASS_TRIGGER_SQL] = inForce('IF acct_code NOT IN');
+
+/**
+ * Every single-quoted literal inside the named parenthesised block, in order.
+ *
+ * COMMENTS COME OFF FIRST AND NOT LAST, which is `chart-of-accounts-kinds.test.ts`'s
+ * documented rule and which this function did NOT follow. It stripped them from
+ * the SLICE and anchored on the RAW text, so a migration header that quotes its
+ * own anchor while explaining itself -- which `0056`'s does, in the sentence
+ * saying why the `NOT IN` shape is preserved -- anchored the slice in the prose
+ * and read the argument instead of the statement. Watched: the read returned an
+ * empty list and the case failed loudly rather than passing on nothing.
+ */
+function quotedLiteralsAfter(raw: string, anchor: string): string[] {
+  const sql = raw.replace(/--[^\n]*/g, '');
   const at = sql.indexOf(anchor);
   if (at < 0) throw new Error(`the migration no longer contains ${anchor}`);
   const open = sql.indexOf('(', at);
@@ -48,36 +105,52 @@ function quotedLiteralsAfter(sql: string, anchor: string): string[] {
     }
   }
   if (end < 0) throw new Error(`unbalanced parentheses after ${anchor}`);
-  const body = sql.slice(open, end);
-  // COMMENTS ARE STRIPPED FIRST. `0009`'s list carries a `-- per identity`
-  // comment on three of its seven lines, and a comment holding an apostrophe
+  // The comments are already gone: they came off the whole file above, before
+  // the anchor was looked for, which is the half this function used to get
+  // backwards. `0009`'s list carries a `-- per identity` comment on three of its
+  // lines and `0056`'s carries one on four, and a comment holding an apostrophe
   // would otherwise be read as a literal.
-  const withoutComments = body.replace(/--[^\n]*/g, '');
-  return [...withoutComments.matchAll(/'([a-z_]+)'/g)].map((m) => m[1] as string);
+  return [...sql.slice(open, end).matchAll(/'([a-z_]+)'/g)].map((m) => m[1] as string);
 }
 
-describe('the seven v1 classes, checked against both migrations that declare them', () => {
-  test('0009 CHECK, 0027 LEDGER-C2 and this package name the same seven codes', () => {
+describe('the v1 classes, checked against both migrations that declare them IN FORCE', () => {
+  test('the CHECK, LEDGER-C2 and this package name the same codes', () => {
     const inCheck = quotedLiteralsAfter(
-      read('0009_ledger.sql'),
-      'ledger_accounts_code_is_declared',
+      CODE_CHECK_SQL,
+      'ADD CONSTRAINT ledger_accounts_code_is_declared',
     );
-    const inTrigger = quotedLiteralsAfter(
-      read('0027_triggers_invariants.sql'),
-      'IF acct_code NOT IN',
-    );
+    const inTrigger = quotedLiteralsAfter(CLASS_TRIGGER_SQL, 'IF acct_code NOT IN');
 
-    expect(inCheck.length, '0009 declares seven codes').toBe(7);
+    // THE COUNT IS DERIVED FROM THE PACKAGE AND NOT TYPED. It used to read
+    // `.toBe(7)`, which is a number a reader has to keep true by hand in a file
+    // whose whole subject is that hand-kept copies drift. What the case is
+    // holding is that the three statements agree, and the cardinality is
+    // asserted once, in `in-flight-obligation.test.ts`'s count-claim registry.
+    expect(inCheck.length, `${CODE_CHECK_FILE} declares the whole vocabulary`).toBe(
+      LEDGER_ACCOUNT_CODES.length,
+    );
     expect([...inCheck].sort()).toEqual([...LEDGER_ACCOUNT_CODES].sort());
-    expect([...inTrigger].sort()).toEqual([...LEDGER_ACCOUNT_CODES].sort());
+    expect([...inTrigger].sort(), CLASS_TRIGGER_FILE).toEqual([...LEDGER_ACCOUNT_CODES].sort());
   });
 
-  test('the codes are declared in the order 0009 declares them, so a diff reads the same way', () => {
+  test('the codes are declared in the order the CHECK in force declares them, so a diff reads the same way', () => {
     const inCheck = quotedLiteralsAfter(
-      read('0009_ledger.sql'),
-      'ledger_accounts_code_is_declared',
+      CODE_CHECK_SQL,
+      'ADD CONSTRAINT ledger_accounts_code_is_declared',
     );
     expect(LEDGER_ACCOUNT_CODES).toEqual(inCheck);
+  });
+
+  // THE SUPERSESSION IS ASSERTED RATHER THAN ASSUMED. If `0056` is ever reverted
+  // or a later migration re-declares the vocabulary, these two names move, and a
+  // reader of a failure above needs to know which file the vocabulary came out
+  // of. This case is why the two `inForce` reads cannot silently resolve to a
+  // migration nobody expected.
+  test('the vocabulary in force comes from a migration that supersedes 0009 and 0027', () => {
+    expect(FILES).toContain(CODE_CHECK_FILE);
+    expect(FILES).toContain(CLASS_TRIGGER_FILE);
+    expect(CODE_CHECK_FILE >= '0009_ledger.sql').toBe(true);
+    expect(CLASS_TRIGGER_FILE >= '0027_triggers_invariants.sql').toBe(true);
   });
 
   // THE SCOPE PARTITION IS THIS PACKAGE'S OWN AND THE DDL DOES NOT CARRY IT.

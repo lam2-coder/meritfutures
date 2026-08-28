@@ -21,17 +21,18 @@
 // -----------------------------------------------------------------------------
 // WHAT IS HERE, AND THE ABSENCES ARE THIS SLICE'S FENCE
 // -----------------------------------------------------------------------------
-// `GET /admin/liability` and nothing else, which is API_CONTRACT section 8's
-// first heading and the data source for the liability home `W6-d` renders.
+// `GET /admin/liability`, the data source for the liability home `W6-d`
+// renders; `GET /admin/flags`, the data source for the flags queue `W6-f`
+// renders; and `GET /admin/identities/:identityId/graph`, the data source for
+// the identity drill-down `W6-g` renders. All three are API_CONTRACT section 8
+// headings.
 //
 // THE PARTITION IS THE WAVE'S AND IT IS WRITTEN DOWN. WAVE-06 section 9's row
 // for this file reads "FIVE SLICES, ONE TRANSCRIPTION ... each screen slice
-// adds the shapes its own contract rows carry", so the four other declared read
+// adds the shapes its own contract rows carry", so the other declared read
 // shapes in section 8 are deliberately absent and each has an owner:
 //
 //   `AdminAccountSearchItem`   `GET /admin/accounts?query=`         `W6-j`
-//   `FlagListItem`             `GET /admin/flags`                   `W6-f`
-//   `IdentityGraph`            `GET /admin/identities/:id/graph`    `W6-g`
 //   `EvidencePackResponse`     `GET /admin/evidence/:accountId`     wave 5,
 //                              blocked on ADR-171 (the export is an audited ACT
 //                              and therefore behind the actor)
@@ -216,5 +217,141 @@ export type LiabilityResponse = {
       readonly last_success_at: string;
       readonly last_duration_ms: number;
     };
+  };
+};
+
+/**
+ * `GET /admin/flags`. API_CONTRACT section 8, transcribed field for field.
+ *
+ * `corroboration_depth` IS THE FIRST SORT KEY AND IT IS ON THE WIRE BECAUSE
+ * THE ORDER IS OTHERWISE NEITHER CHECKABLE NOR READABLE. The contract says so
+ * at the point of declaration and gives both halves of the reason:
+ * `assertFlagOrder` "cannot enforce a key it cannot see, and an operator shown
+ * a severity 3 above a severity 5 has nothing on the row that says why".
+ * ADR-178 and `AS-M7-03` clause 3 are where the key itself is ruled: the queue
+ * sorts by the number of INDEPENDENT DETECTOR FAMILIES implicated on an
+ * identity, never by raw flag count, so that poisoning one detector does not
+ * move an identity up the queue.
+ *
+ * IT IS A COUNT AND NOT A FILTER, AND THE CONTRACT SAYS THAT TOO: "Computed per
+ * request and held in no column, so it is NOT a filter and NOT a cursor a
+ * client may compose." So this console renders it and composes nothing from it.
+ *
+ * THE ORDER IS THE SERVER'S AND THIS FILE IS NOT WHERE IT IS RE-DERIVED.
+ * `../app/flags/flags-queue.tsx` renders `rows` in the order the response
+ * carried them and its header argues why a second comparison here would be a
+ * second answer to a question `apps/api/src/routes/admin-reads.ts` already
+ * enforces, in a package `RI-04` forbids importing it from.
+ *
+ * `identity_id` AND `account_id` ARE ON THIS TYPE AND ARE NOT ON THE SCREEN.
+ * `INV-M6-10` renders trader-identifying data only when the query names a
+ * specific subject and a queue names none, so the shapes are transcribed
+ * because the contract carries them and the document renders neither. That is a
+ * rendering decision and it is argued where it is taken rather than by omitting
+ * a contracted field here, which would be this file believing in a response
+ * different from the one the server sends.
+ */
+export type FlagListItem = {
+  readonly flag_id: string;
+  readonly identity_id: string;
+  readonly account_id: string | null;
+  readonly flag_type: string;
+
+  /**
+   * The second sort key, descending within one corroboration band.
+   *
+   * A CLOSED SET OF FIVE AND NOT A `number`, which is the contract's own
+   * spelling. A severity outside it is a detector this console has no sentence
+   * for, and widening the type here would be the console agreeing to render one.
+   */
+  readonly severity: 1 | 2 | 3 | 4 | 5;
+
+  /**
+   * `STATE_MACHINES` section 7's four, as the contract spells them.
+   *
+   * NO AUTOMATIC TRANSITION INTO `enforced` (M06 section 3.3, binding), and
+   * this console takes none of them: `POST /admin/flags/:flagId/status` is a
+   * write and WAVE-06 wave 5 holds every mutating surface behind ADR-171.
+   */
+  readonly status: 'open' | 'investigating' | 'dismissed' | 'enforced';
+
+  /** The third sort key, oldest first within one band at one severity. */
+  readonly first_detected_on: string;
+  readonly detector: string;
+  readonly evidence_summary: string;
+
+  /** How many INDEPENDENT detector families are implicated on `identity_id`. */
+  readonly corroboration_depth: number;
+};
+
+/**
+ * `GET /admin/identities/:identityId/graph`. API_CONTRACT section 8,
+ * transcribed field for field.
+ *
+ * THE SCREEN THAT READS THIS IS REACHABLE ONLY BY NAMING A SUBJECT, which is
+ * M06 section 3.2a's own sentence and the property that separates this endpoint
+ * from the bulk PII surface `FM-M6-10` exists to refuse: "A screen that
+ * aggregates one human is a convenience; a screen that aggregates humans is the
+ * bulk PII surface FM-M6-10 exists to refuse, and the difference is one query
+ * parameter." The path parameter is that difference and it is the whole of the
+ * licence `INV-M6-10` grants: there is no list endpoint here, and this file
+ * carries no shape for one because the contract declares none.
+ *
+ * THE THREE `_cents` FIELDS ARE ON THIS TYPE AND ARE NOT ON THE SCREEN, AND
+ * THAT IS `INV-M6-04` RATHER THAN A RENDERING PREFERENCE. **This response
+ * carries no `as_of` and no source, for any of them.** `GET /admin/liability`
+ * declares `as_of` as its first field and the header on `LiabilityResponse`
+ * above says why: "a number without its as-of and its source is a number this
+ * console may not render". `../figure.ts` is where that obligation is a type,
+ * and it closes its origin roster at `P-M6-01` to `P-M6-10` and `AS-M6-04`
+ * (`ORIGIN_ID`), which are M06 section 3.1's panels, so a figure on section
+ * 3.2a's screen has no admissible origin either. `../app/identities/
+ * identity-graph.tsx` states all three as a named absence with its owner rather
+ * than rendering an undated figure, and the contract gap is REPORTED: both
+ * repairs are files outside `W6-g`'s fence.
+ */
+export type IdentityGraph = {
+  /**
+   * The human the query named.
+   *
+   * IT IS ALSO THE CHECK THE DRILL-DOWN RUNS FIRST. A response whose `root` is
+   * not the identity the path asked for is trader-identifying data about a
+   * human the query did not name, which is INV-M6-10 breached by a mismatch
+   * rather than by a rendering.
+   */
+  readonly root: {
+    readonly identity_id: string;
+    readonly status: string;
+    readonly accounts: number;
+  };
+  readonly nodes: readonly {
+    readonly identity_id: string;
+    readonly status: string;
+    readonly accounts: number;
+    readonly total_withdrawable_cents: number;
+  }[];
+
+  /**
+   * The resolved links, and `evidence` is the field the screen does not render.
+   *
+   * M06 section 3.2a names what the drill-down shows of an edge and it is two
+   * things: "the resolved graph edges with their KIND and CONFIDENCE". It does
+   * not name the evidence, and `Record<string, unknown>` is unbounded
+   * server-supplied content on the one screen in this console that holds a PII
+   * licence. The document's header argues the refusal and its suite asserts the
+   * module never reads the field.
+   */
+  readonly edges: readonly {
+    readonly a: string;
+    readonly b: string;
+    readonly link_kind: string;
+    readonly confidence_bp: number;
+    readonly evidence: Record<string, unknown>;
+  }[];
+  readonly aggregate: {
+    readonly identities: number;
+    readonly accounts: number;
+    readonly open_liability_cents: number;
+    readonly payouts_lifetime_cents: number;
   };
 };
