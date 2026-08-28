@@ -55,6 +55,16 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
+// THE ONE IMPORT `src/events.ts` CANNOT HOLD, HELD HERE INSTEAD. That file names
+// no package, so "`events` is a real `TableKey`" and "a `SystemTx` satisfies
+// `EventInsertTx`" are claims it cannot check about itself. This is
+// `admin-source-events.test.ts`'s disposition three files over and its reason:
+// the binding lives where `@merit/db` is reachable. It takes no HANDLE, which is
+// the property `src/db.ts`'s header is actually about and `db.test.ts` asserts
+// over `src/` alone.
+import { TABLE_KEYS } from '@merit/db';
+import type { SystemTx, TableKey } from '@merit/db';
+
 import {
   ACTOR_KINDS,
   EVENT_CATALOGUE,
@@ -66,9 +76,12 @@ import {
   buildEvent,
   isUuid,
   makeEventSink,
+  EVENT_WRITE_TABLE,
+  TRANSACTION_EVENT_WRITER,
   type CatalogueRow,
   type EmitSpec,
   type EventEnvelope,
+  type EventInsertTx,
   type EventName,
   type EventSink,
   type EventWriter,
@@ -837,13 +850,17 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
     ).rejects.toThrow(EventSinkUnwired);
-    // THE REASON MOVED AND THE REFUSAL DID NOT, which is the whole of ADR-191's
-    // effect on this file. It read `/SIXTH class/` while the door was shut BY
-    // THE REGISTRY; the sixth class exists now, so the message names the writer
-    // instead and this assertion follows it rather than being deleted.
+    // THE REASON HAS MOVED TWICE AND THE REFUSAL HAS NOT, which is the whole of
+    // what ADR-191 and this slice did to this file. It read `/SIXTH class/`
+    // while the door was shut BY THE REGISTRY; it then read `/composed WRITER/`
+    // while the door was shut for want of an adapter; the adapter is
+    // `TRANSACTION_EVENT_WRITER` now, so the only thing left is the INSTALL and
+    // the message says so. The assertion follows the message each time rather
+    // than being deleted, because what is under test is that the default names
+    // its own reason and never that the reason is a particular one.
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
-    ).rejects.toThrow(/composed WRITER/);
+    ).rejects.toThrow(/What is missing is the INSTALL/);
   });
 
   test('`events` really is REGISTERED now, so the refusal above is about the writer and not the registry', () => {
@@ -857,5 +874,225 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
     expect(SCHEMA).toContain("pgTable('events'");
     expect(SCOPE).toContain("class: 'either'");
     expect(SCOPE).toContain('events: {');
+  });
+});
+
+// =============================================================================
+// 7. THE WRITER, AND THE DOOR THAT TURNS OUT TO BE NARROWER THAN THE READ
+// =============================================================================
+// `TRANSACTION_EVENT_WRITER` is the adapter section 6's default refuses for want
+// of. Everything here is one of two claims: that the two strings `src/events.ts`
+// retypes because it holds no import are the strings `packages/db` actually
+// carries, and that the handle the writer demands is the only handle in this
+// workspace whose `insert` reaches this table.
+
+const SCOPED_DB = read('../../../packages/db/src/scoped-db.ts');
+
+/** One buildable spec, reused so every case below varies the HANDLE and not the event. */
+const SPEC_HELD: EmitSpec = { name: 'payout.held', payload: PAYLOADS['payout.held'] };
+
+/** A `SystemTx`-shaped double, recording what it was asked to write. */
+function recorder(returning: readonly unknown[] = [{ id: 1n }]): {
+  readonly tx: object;
+  readonly writes: { key: string; values: Readonly<Record<string, unknown>> }[];
+} {
+  const writes: { key: string; values: Readonly<Record<string, unknown>> }[] = [];
+  return {
+    writes,
+    tx: {
+      __brand: 'SystemTx',
+      insert: (key: string, values: Readonly<Record<string, unknown>>) => (
+        writes.push({ key, values }),
+        Promise.resolve([...returning])
+      ),
+    },
+  };
+}
+
+describe('the two strings the producer retypes are the strings the accessor carries', () => {
+  test('`events` is a real TableKey and the writer names exactly one table', () => {
+    // `admin-source/events.ts`'s `EVENT_READ_TABLES` binding, one direction over.
+    // A typo here is a `TS2345` at `tx.insert` in a file that has no `TableKey`
+    // to check against, so this is the check.
+    const keys: readonly string[] = TABLE_KEYS;
+    expect(keys).toContain(EVENT_WRITE_TABLE);
+    const witness: TableKey = 'events';
+    expect(witness).toBe(EVENT_WRITE_TABLE);
+  });
+
+  test('the brand the writer demands is the brand `scoped-db.ts` stamps', () => {
+    // THE ONLY THING ON THE VALUE THAT TELLS THE THREE HANDLES APART. The writer
+    // compares against the literal `'SystemTx'` and cannot import it; if
+    // `packages/db` renamed its brands, every handle would be refused at run time
+    // and nothing would be red. This is what makes that impossible.
+    expect(SCOPED_DB).toContain("__brand: 'SystemTx'");
+    expect(SCOPED_DB).toContain("__brand: 'ScopedTx'");
+    expect(SCOPED_DB).toContain("__brand: 'FirmTx'");
+  });
+
+  test('a SystemTx IS an EventInsertTx, which is the claim the run-time check stands on', () => {
+    // ADR-191's OWN DEVICE, one file over: that entry put
+    // `const EITHER_KEY_IS_SCOPED: ScopedTableKey = 'events'` in its suite as
+    // "the half vitest cannot see at all". This is the same half. If
+    // `SystemTx.insert` stopped accepting `'events'`, or stopped returning the
+    // rows it wrote, this line stops compiling and `typecheck` reports it where
+    // no assertion could.
+    const SYSTEM_TX_IS_AN_EVENT_INSERT_TX: (tx: SystemTx) => EventInsertTx = (tx) => tx;
+    expect(typeof SYSTEM_TX_IS_AN_EVENT_INSERT_TX).toBe('function');
+  });
+
+  test('the three inserts are generic over THREE different key sets, which is why the brand matters', () => {
+    // THE LOAD-BEARING FACT OF THIS WHOLE SECTION, READ OUT OF THE SOURCE RATHER
+    // THAN ASSERTED. ADR-191 clause 5 made `events` a `ScopedTableKey`, which is
+    // what `rows` and `rowsWhere` take; `insert` on that same handle takes
+    // `OwnedTableKey` and always did, because a scoped insert STAMPS the tenancy
+    // column and an `either` row has two and may carry neither.
+    expect(SCOPED_DB).toContain('insert<K extends OwnedTableKey>(key: K, values: WriteValues)');
+    expect(SCOPED_DB).toContain('insert<K extends FirmTableKey>(key: K, values: WriteValues)');
+    expect(SCOPED_DB).toContain('insert<K extends TableKey>(key: K, values: WriteValues)');
+  });
+
+  test('`insertUnder` is not a fourth door, and it is a closed list of one', () => {
+    // THE NEAR MISS, CHECKED RATHER THAN WAVED. A reader meeting the refusal
+    // above reaches for the scoped handle's other write, and `ParentedTableKey`
+    // is written as an `Extract` precisely so the registry polices it.
+    expect(SCOPED_DB).toContain(
+      "export type ParentedTableKey = Extract<DerivedTableKey, 'sessions'>",
+    );
+    // And the run-time half names this exact class in its own refusal.
+    expect(SCOPED_DB).toContain('an either row has one through a NULLABLE edge');
+  });
+});
+
+describe('the writer refuses every handle but the one that can carry the write', () => {
+  test('a ScopedTx is refused AT THE DOOR, before a statement is built', async () => {
+    // WITHOUT THIS IT STILL FAILS, SOMEWHERE USELESS. A `ScopedTx` has an
+    // `insert` method at run time, so duck-typing admits it and
+    // `refuseTenancyColumn` then throws a sentence about scoped writes at a
+    // caller who was never allowed to make one.
+    const scoped = { __brand: 'ScopedTx', insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(scoped, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(EventError);
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(scoped, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/branded "ScopedTx"/);
+  });
+
+  test('the refusal names the DOOR as the repair and never the payload', async () => {
+    const scoped = { __brand: 'ScopedTx', insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(scoped, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/THE REPAIR IS THE DOOR AND NOT THIS CHECK/);
+  });
+
+  test('a FirmTx is refused too, and this table is not firm', async () => {
+    const firm = { __brand: 'FirmTx', insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(firm, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/branded "FirmTx"/);
+  });
+
+  test('an UNBRANDED object with an insert method is refused, which keeps a recorder out of production', async () => {
+    // THE DIRECTION A PERMISSIVE GUARD FAILS IN. Admitting anything carrying an
+    // `insert` would admit the double at the top of this section, and the thing
+    // on the other side of this method is an append-only money record.
+    const anything = { insert: () => Promise.resolve([{}]) };
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(anything, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/branded undefined/);
+  });
+
+  test('a branded handle with no insert method reports a DRIFT rather than a caller error', async () => {
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert({ __brand: 'SystemTx' }, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/`packages\/db` and this file have drifted/);
+  });
+});
+
+describe('the row the writer writes', () => {
+  test('it names the one table and hands the envelope through unchanged', async () => {
+    const { tx, writes } = recorder();
+    const envelope = buildEvent(SPEC_HELD, CLOCK);
+    await TRANSACTION_EVENT_WRITER.insert(tx, envelope);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.key).toBe('events');
+    expect(writes[0]?.values).toStrictEqual({ ...envelope });
+  });
+
+  test('every field of the envelope is a column `schema.ts` declares, and the three it omits are the generated ones', () => {
+    // ADR-159 CLAUSE 1's SHAPE ONE LEVEL FURTHER DOWN. `EventEnvelope` is
+    // documented "by Drizzle property name" and the values object IS the
+    // envelope, so a field here that is not a property is a run-time drizzle
+    // error on the first real write, and a column added to the table with no
+    // field here is a column this producer silently never writes.
+    const block = SCHEMA.slice(SCHEMA.indexOf("export const events = pgTable('events', {"));
+    const declared = [...block.slice(0, block.indexOf('\n});')).matchAll(/^ {2}(\w+): /gm)].flatMap(
+      (match) => match[1] ?? [],
+    );
+    expect(declared).toHaveLength(14);
+
+    const written = Object.keys(buildEvent(SPEC_HELD, CLOCK));
+    expect(written.filter((field) => !declared.includes(field))).toStrictEqual([]);
+    // `id` is `bigint GENERATED ALWAYS AS IDENTITY` and REFUSES a supplied value;
+    // `recorded_at` and `created_at` are the DATABASE's clock and `occurredAt` is
+    // the application's. All three absences are argued at `EventEnvelope`.
+    expect(declared.filter((column) => !written.includes(column))).toStrictEqual([
+      'id',
+      'recordedAt',
+      'createdAt',
+    ]);
+  });
+
+  test('a write that did not write exactly one row THROWS rather than committing quietly', async () => {
+    // THE FAILURE THIS WHOLE FILE EXISTS TO MAKE IMPOSSIBLE, READ OFF THE RETURN
+    // VALUE. `unscopedInsertStatement(...).returning()` yields what it wrote, so
+    // a count that is not one means the fact is about to commit without its
+    // event.
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(recorder([]).tx, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/wrote 0 rows/);
+    await expect(
+      TRANSACTION_EVENT_WRITER.insert(recorder([{}, {}]).tx, buildEvent(SPEC_HELD, CLOCK)),
+    ).rejects.toThrow(/wrote 2 rows/);
+  });
+});
+
+describe('composed, the sink writes where the unwired default rejects', () => {
+  test('one emit becomes one row on the transaction the caller opened', async () => {
+    // THE SENTENCE THIS SLICE WAS DISPATCHED FOR, AS A CASE.
+    // `UNWIRED_EVENT_SINK` rejects every emit; this composition writes.
+    const { tx, writes } = recorder();
+    const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock: () => CLOCK });
+
+    await sink.emit(tx, SPEC_HELD);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.values['eventName']).toBe('payout.held');
+    expect(writes[0]?.values['occurredAt']).toStrictEqual(CLOCK);
+    expect(writes[0]?.values['identityId']).toBe(ID.identity);
+    expect(writes[0]?.values['accountId']).toBe(ID.account);
+  });
+
+  test('the seven buildable names all reach the writer, and the untenanted one still does not', async () => {
+    // `assertTenanted` IS NOT BYPASSED BY THE WRITER AND THAT IS THE POINT.
+    // Session 358 put it inside `emit`, and `emit` builds before it writes, so
+    // composing a writer cannot route around it.
+    const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock: () => CLOCK });
+    for (const name of BUILDABLE) {
+      const { tx, writes } = recorder();
+      await sink.emit(tx, { name, payload: PAYLOADS[name] });
+      expect(writes, name).toHaveLength(1);
+    }
+
+    const { tx, writes } = recorder();
+    await expect(
+      sink.emit(tx, {
+        name: 'payout.freeze_expiring',
+        payload: PAYLOADS['payout.freeze_expiring'],
+      }),
+    ).rejects.toThrow(/reaches neither/);
+    expect(writes).toHaveLength(0);
   });
 });
