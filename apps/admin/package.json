@@ -8,15 +8,23 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "next build",
+    "dev": "next dev",
     "typecheck": "tsc --noEmit",
-    "start": "node --experimental-strip-types src/index.ts"
+    "start": "next start"
   },
   "//": "IT DEPENDS ON THE ENGINE FOR ONE TYPE AND FOR NOTHING ELSE. `Cents` is `bigint` and M01 section 2.1's INV-02 is where that is decided, so a second spelling of it here would be a second answer to \"what is money\" in the one application whose subject is how much of it Merit owes. The import is TYPE-ONLY and `verbatimModuleSyntax` erases it, so no engine code is reachable at runtime from this deployable and M06 section 1.2 holds unchanged: \"M6 aggregates numbers other modules computed. It has no arithmetic on a rule\". RI-04's constraint is that no APP depends on another app; the arrow to a package is the one packages/harness already draws.",
+  "//next": "THE FRAMEWORK IS ADR-182's, AND IT IS THE RULING ADR-095 RULING 2 DECLINED TO MAKE. That entry wrote `apps/admin` gets none by this entry`, because the admin console is M06's and is in no P4 slice, so an entry whose fence was `P4-c` could not decide it; its foreclosure F1 then named the consequence, that a second framework means a second toolchain, a second slop-score harness and a second set of design tokens. ADR-182 takes the signature ADR-095 withheld and the answer is the SAME framework on the SAME catalog lines, so `pnpm-workspace.yaml` takes no diff and no package enters the closure: 427 package keys in `pnpm-lock.yaml` before this commit and 427 after, diffed rather than recalled. What the lockfile gains is one IMPORTER block. THIS CONSOLE SERVES HTTP AND IT NEVER SERVES `/api/v1`. INFRA:43 rows the `admin` service, codebase `apps/admin`, `MERIT_API_SURFACE` not set, origin `ADMIN_ORIGIN`; INFRA:44 rows `api-admin`, codebase `apps/api` at `operator`, on the SAME origin under `/api/v1`; INFRA:53 is the routing rule that separates them by path. The operator surface's 27 registered routes, produced over a real `compose()` rather than grepped, are therefore this console's DATA SOURCE and not its alternative. THE `build` SCRIPT HAS NOTHING TO BUILD YET, which is the honest state ADR-095 ruling 5 landed in the other two manifests: `next build` here exits 1 on \"Couldn't find any `pages` or `app` directory\". No gate reads this key any more. `INVENTORY_PROBES` in `scripts/corpus/gates.mjs` is an empty Map and CI-07's artifact moved to a `page`, `layout` or `route` file under `apps/*/src/app/` under ADR-095 section 6, so the `build`-script probe that once required this key ABSENT is retired rather than satisfied. THE `start` SCRIPT CHANGES TOO AND THAT IS NOT INCIDENTAL. It read `node --experimental-strip-types src/index.ts`, which starts a module that prints one line and returns; a Railway service whose start command runs an export surface is a manifest that is wrong in the direction that looks like it works. `next start` is wrong in the honest direction until a page exists. NO PAGE, NO LAYOUT, NO ROUTE, NO `next.config` AND NO `tsconfig` CHANGE. ADR-095 ruling 6 is the precedent for the first four and F7 is the reason for the fifth: the `jsx` keys and the `dom` lib belong with the first page, which is W6-d's slice, and W6-d's fence in WAVE-06 gains this app's `tsconfig.json` rather than this slice taking a key nothing reads. NO `@playwright/test` HERE, MEASURED RATHER THAN OMITTED: `e2e/pass.ts:17` is the only file in this repository that imports it and no spec under `apps/*/e2e` names it, so the two other UI manifests' declaration is not what makes CI-08 resolve and W6-i needs no line here. AND NO `NEXT_PUBLIC_` VARIABLE, EVER. ADR-012 keeps the admin domain out of the corpus, the repository and any artifact, and a build-time inlined environment value is the one way a framework writes a hostname into a client bundle. The API base URL is a RELATIVE path, same origin per INFRA:53, and `ADMIN_ORIGIN` is read at request time through `resolveAdminOrigin` at `apps/admin/src/origin.ts:104`, which has no default and throws when unset.",
   "dependencies": {
-    "@merit/rules-engine": "workspace:*"
+    "@merit/rules-engine": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
