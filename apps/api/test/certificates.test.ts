@@ -966,14 +966,20 @@ describe('the slice builds two rows and no third', () => {
     expect(declared.filter((e) => e.includes('/admin/'))).toEqual([]);
     expect(declared).toEqual(['GET /certificates', 'GET /certificates/:code/image.png']);
 
-    // And on the surface, `/certificates` is still exactly these two. The verify
-    // row is a `/verify/` path and does not appear under this prefix.
+    // And on the surface, the TRADER-FACING `/certificates` prefix is still
+    // exactly these two. The verify row is a `/verify/` path and does not appear
+    // here at all; the revoke row is `/admin/certificates/:id/revoke` and is
+    // excluded by the `/admin/` term rather than by the filter happening to miss
+    // it, because a bare `/certificates` substring matches it too.
     const report = buildServer({ surface: 'public', modules: onDisk }).report;
     const all = [...report.registered, ...report.withheld];
-    expect(all.filter((e) => e.includes('/certificates'))).toEqual([
+    expect(all.filter((e) => e.includes('/certificates') && !e.includes('/admin/'))).toEqual([
       'GET /certificates',
       'GET /certificates/:code/image.png',
     ]);
+    // The revoke row exists, is somebody else's, and is withheld from this
+    // surface. ADR-170 clause 2 and ADR-083 section 4.
+    expect(report.withheld).toContain('POST /admin/certificates/:id/revoke');
   });
 
   test('the ordering is total at one instant, which is what a cursor needs', () => {

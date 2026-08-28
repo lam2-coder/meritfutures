@@ -287,6 +287,25 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'a door neither of the two serves. The row is read UNAUTHENTICATED, so `scoped` has no ' +
     'identity to open with, and `certificates` is scope class `owned`, so `firm` refuses the key ' +
     'AT COMPILE TIME. The port states this itself at `routes/certificates.ts:944-948`.',
+  useCertificateRevokeBackend:
+    'TWO OBSTRUCTIONS, AND THE SECOND IS A CIRCULARITY RATHER THAN A MISSING DOOR. ' +
+    '`principal(request)` (`routes/admin-certificates.ts:353`) resolves only through ' +
+    '`AdminSessionSource`, so it is blocked on `setAdminSessionSource` above, which ADR-171 ' +
+    'rules no door onto this database could ever serve. SECOND AND INDEPENDENT: ' +
+    '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
+    '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:568`). `db.firm` refuses that key ' +
+    'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
+    '(`packages/db/src/scope.ts:1131-1133`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
+    'the row the door would be opened to read. `adminActions` is `firm` ' +
+    '(`packages/db/src/scope.ts:718`), so the audit half alone has a door and the subject half ' +
+    'does not, which is the same one-live-arm shape `useVerifySource` below refuses. THIRD, AND ' +
+    'it is configuration rather than a door: `presentation()` ' +
+    "(`routes/admin-certificates.ts:363`) is `GET /verify/:code`'s copy, and the " +
+    "`account_enforced` sentence is `OQ-M11-02`, still open. THIS ROUTE REVOKES A TRADER'S " +
+    'PUBLIC PROOF; a backend that answered plausibly would be a fixture doing that to real ' +
+    'people.',
   useVerifySource:
     'ONE ARM OF THREE, AND THE OTHER TWO ARE CONSTRUCTIBLE TODAY, WHICH IS WHY THIS ENTRY EXISTS ' +
     'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:591`) reads `certificates`, ' +
@@ -435,5 +454,5 @@ test('the wired count is reported, so a regression is a number and not a paragra
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 22, wired: 6, blocked: 16 });
+  }).toStrictEqual({ declared: 23, wired: 6, blocked: 17 });
 });
