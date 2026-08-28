@@ -36,6 +36,7 @@ import {
   scopePredicate,
   scopedDb,
   systemDb,
+  type FirmTableKey,
   type IdentityId,
   type ScopedTableKey,
   type TableKey,
@@ -183,6 +184,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   paymentDisputes: 'payment_disputes',
   payoutDestinations: 'payout_destinations',
   events: 'events',
+  reserveCoverageSnapshots: 'reserve_coverage_snapshots',
 };
 
 /**
@@ -384,21 +386,24 @@ describe('the registry is total', () => {
   // ADR number, and session 349 then measured the same wall from downstream: a
   // `Tx` naming `'events'` failed `tsc` with `TS2322` against `TABLE_KEYS`. The
   // adapter that unblocks is a LATER SLICE and this registration is not it.
-  test('107 declared tables, 107 scope rules, 0 reachable without one', () => {
+  test('108 declared tables, 108 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(107);
-    expect(rules).toBe(107);
+    expect(declared).toBe(108);
+    expect(rules).toBe(108);
     expect(withoutRule).toEqual([]);
 
-    // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, and it is
-    // NOT registered here. ADR-092's rule, quoted above, is that the first
-    // session that NEEDS a table registers it, and no producer exists yet (M06
-    // is unbuilt). It is also FIRM by construction for `liability_snapshots`'
-    // reason on a different surface: a per-identity slice of the firm's reserve
-    // coverage is not a smaller version of it.
+    // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, AND IT IS
+    // NOW REGISTERED (ADR-199), which is why the two counts above moved. This
+    // comment used to read "NOT registered here ... no producer exists yet",
+    // and ADR-092's rule is about a READER rather than a producer: session 363
+    // measured `readLiability`'s `reserve` group as a `TS2322` against
+    // `TABLE_KEYS`, which is the first session that NEEDED it. The class is
+    // FIRM and the DDL settles it: no column of the row is declared against
+    // `identities(id)`, and its one foreign key is a COMPOSITE edge to
+    // `treasury_balances`, which is itself firm.
     //
     // 113 SINCE ADR-164: `0050` creates `live_account_state`, ADR-020 tier 2's
     // live cache, and it is NOT registered here either, on the SAME rule and
@@ -415,12 +420,12 @@ describe('the registry is total', () => {
     // verbs from `merit_app`, so a correctly scoped read still fails unless the
     // process connects as `merit_live`.
     //
-    // 114 SINCE ADR-169, AND THIS ONE IS REGISTERED, WHICH IS WHY THE TWO
-    // COUNTS ABOVE MOVED WITH IT. `0051` creates `payout_destinations`,
-    // OI-06's registry, and P5-e both wrote the DDL and registered it -- so
-    // ADR-092's "the first session that needs it" and "the session that
-    // created it" are the same session here, which they are not for the two
-    // tables above.
+    // 114 SINCE ADR-169. `0051` creates `payout_destinations`, OI-06's
+    // registry, and P5-e both wrote the DDL and registered it -- so ADR-092's
+    // "the first session that needs it" and "the session that created it" are
+    // the same session here, which they are not for either table above.
+    // `live_account_state` IS NOW THE ONLY ONE OF THE THREE STILL
+    // UNREGISTERED, and its paragraph is two above this one.
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
     expect(createdTables).toBe(114);
   });
@@ -1697,6 +1702,133 @@ describe('a row that reaches an identity two ways is scoped by BOTH', () => {
       }
       expect(() => scopePredicate(key, IDENTITY), key).not.toThrow();
     }
+  });
+});
+
+/**
+ * ADR-199. THE TABLE `0049` CREATED AND NOTHING COULD READ, and the class
+ * argument that registering it needed.
+ *
+ * THE CONTRAST WITH THE BLOCK ABOVE IS THE POINT. `events` needed a SIXTH class
+ * because five could not describe it; this table needed none of that, because
+ * the DDL answers the question by itself -- and the reason it still took an
+ * entry is session 349's, restated by session 363 from the other end: a `Tx`
+ * naming an unregistered table is `TS2322` against `TABLE_KEYS`, so the
+ * `reserve` group of `readLiability` could not be written at all.
+ *
+ * WHAT IS ASSERTED HERE IS THE PREDICATE AND NEVER THE NAME. A reader could
+ * conclude `firm` from the words "reserve coverage" and be right by accident;
+ * these cases read the migration and refuse each of the other five members on a
+ * fact of the DDL.
+ */
+const RESERVE_KEY_IS_FIRM: FirmTableKey = 'reserveCoverageSnapshots';
+
+describe('the firm class is the DDL"s answer here and not a reading of the name', () => {
+  const RESERVE = 'reserve_coverage_snapshots';
+
+  // NON-VACUITY FIRST, on this file's own rule. Every absence below is read
+  // through `foldTableDefs`, and a parse that found nothing would make all of
+  // them pass for the wrong reason.
+  test('the folded row is the eight columns 0049 declares, generated column included', () => {
+    const columns = sqlNames('reserveCoverageSnapshots');
+    expect(columns).toStrictEqual([
+      'as_of',
+      'created_at',
+      'cvar99_cents',
+      'id',
+      'rcr_bp',
+      'reserve_cents',
+      'treasury_account_code',
+      'treasury_as_of',
+    ]);
+    // `rcr_bp` IS THE ONE THE PARSER COULD HAVE LOST. Its definition carries a
+    // comma inside `NULLIF(cvar99_cents, 0)`, and a splitter that did not track
+    // parenthesis depth would report `0)` as a ninth column and `rcr_bp` as a
+    // column whose type is an expression. Reading it back is what says the
+    // depth-tracking split is doing its job on a GENERATED column.
+    expect(columns).toContain('rcr_bp');
+  });
+
+  // `root`, `owned`, `pair` AND `either` ALL NEED AN IDENTITY COLUMN AND THERE
+  // IS NOT ONE. This is the same fact the estate-wide firm assertion reads, and
+  // it is repeated here against the folded definitions so the argument for THIS
+  // registration stands on its own rather than inside a loop over 42 tables.
+  test('no column of the row is declared against identities, so four members have nothing to name', () => {
+    expect(identityColumnsOf(RESERVE)).toStrictEqual([]);
+    // AND NO ACCOUNT COLUMN EITHER, which is what forecloses `either`
+    // specifically: that class is one identity column beside one account
+    // column, and this row carries neither leg.
+    expect(accountColumnsOf(RESERVE)).toStrictEqual([]);
+    expect(eitherShaped(RESERVE)).toBe(false);
+  });
+
+  // `derived` IS THE ONLY MEMBER WITH A CANDIDATE EDGE, AND IT IS REFUSED THREE
+  // TIMES. The rule cannot be WRITTEN, because the edge is composite and
+  // `DerivedRule` names one column against one column; the one-column version
+  // would MULTIPLY ROWS, because `account_code` is half of the anchor's key;
+  // and it would terminate nowhere, because `treasury_balances` is firm.
+  test('the one foreign key is COMPOSITE, so a derived rule cannot even be expressed', () => {
+    const ddl = readFileSync(join(MIGRATIONS, '0049_reserve_coverage_snapshots.sql'), 'utf8');
+    const fk =
+      /CONSTRAINT reserve_coverage_snapshots_anchor_fk\s+FOREIGN KEY \(([^)]*)\)\s+REFERENCES treasury_balances \(([^)]*)\)/i.exec(
+        ddl,
+      );
+    expect(fk, 'the anchor foreign key is in 0049').not.toBeNull();
+    const local = (fk?.[1] ?? '').split(',').map((part) => part.trim());
+    const foreign = (fk?.[2] ?? '').split(',').map((part) => part.trim());
+    expect(local).toStrictEqual(['treasury_account_code', 'treasury_as_of']);
+    expect(foreign).toStrictEqual(['account_code', 'as_of']);
+    // A `DerivedRule` carries ONE `localColumn` and ONE `foreignColumn`, so a
+    // two-column edge has no expression in this vocabulary at all.
+    expect(local.length).toBeGreaterThan(1);
+  });
+
+  test('and the table that edge reaches is itself firm, so the chain would terminate nowhere', () => {
+    expect(SCOPE_RULES.treasuryBalances.class).toBe('firm');
+    // `account_code` ALONE IS THE AVAILABLE MISTAKE AND IT IS NOT UNIQUE THERE.
+    // `treasury_balances` is keyed `(account_code, as_of)`, one row per
+    // attestation instant, so a one-column hop returns this snapshot once per
+    // attestation ever recorded for the account -- `ledger_transactions`'
+    // row-multiplication problem, arriving on a table where nothing needs the
+    // join at all.
+    const treasury = readFileSync(join(MIGRATIONS, '0009_ledger.sql'), 'utf8');
+    expect(treasury).toMatch(/PRIMARY KEY \(account_code, as_of\)/i);
+  });
+
+  // THE DOOR, and the runtime half of the type fact above it.
+  test('a scoped read of it is refused, and the refusal names the accessor that serves it', () => {
+    expect(() => scopePredicate('reserveCoverageSnapshots', IDENTITY)).toThrow(
+      /belongs to no identity/,
+    );
+    expect(() => scopePredicate('reserveCoverageSnapshots', IDENTITY)).toThrow(/systemDb/);
+    expect(SCOPE_RULES.reserveCoverageSnapshots.class).toBe('firm');
+    // Read so the type-level witness above is not dead code. `tsc` is what
+    // enforces it: the annotation is `TS2322` the moment the rule stops being
+    // `firm`.
+    expect(TABLE_KEYS as string[]).toContain(RESERVE_KEY_IS_FIRM);
+  });
+
+  // ADR-199's OTHER HALF, PINNED WHERE IT CAN GO RED. The entry rules
+  // `per_plan[].cusum`, `integrations.batch` and `eligible_next_7d` DERIVABLE
+  // rather than owed a column, and `integrations.batch` is the one whose
+  // derivation is a landed column of a REGISTERED table: `batch.completed` is
+  // an approved event carrying `duration_ms` in its payload, and `events` has
+  // been readable since ADR-191. A migration that added a batch-run column
+  // would be a SECOND record of a fact this schema already holds, which is
+  // `0049` header item 1's own objection.
+  test('the batch figures resolve to a registered table rather than to a missing column', () => {
+    expect(TABLE_KEYS).toContain('events');
+    const eventsCatalogue = readFileSync(
+      join(MIGRATIONS, '..', '..', '..', 'docs/architecture/EVENTS.md'),
+      'utf8',
+    );
+    expect(eventsCatalogue).toMatch(/`batch\.started` \/ `batch\.completed`/);
+    expect(eventsCatalogue).toMatch(/duration_ms/);
+    // The columns the derivation reads, on the row rather than in prose.
+    const columns = sqlNames('events');
+    expect(columns).toContain('event_name');
+    expect(columns).toContain('occurred_at');
+    expect(columns).toContain('payload');
   });
 });
 

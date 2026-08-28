@@ -115,6 +115,7 @@ import {
   reconciliations,
   reportDeliveries,
   reportSchedules,
+  reserveCoverageSnapshots,
   reviewRequests,
   riskFlags,
   roundTrips,
@@ -139,7 +140,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * ONE HUNDRED AND SEVEN OF 114, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
+ * ONE HUNDRED AND EIGHT OF 114, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
  * owner the TABLE: a table is registered ONCE by the first session that needs
  * it, the registration is never re-argued, and a session computes its own slice
  * from `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -247,6 +248,30 @@ import {
  * downstream: a `Tx` naming `'events'` fails `tsc` with `TS2322` against
  * `TABLE_KEYS`, so the admin event feed could not be adapted. Registering the
  * table is what unblocks that adapter, and the adapter is a LATER SLICE.
+ *
+ * `reserve_coverage_snapshots` IS REGISTERED AND IT IS THE SIXTH CLASS'S
+ * OPPOSITE: `events` needed a NEW member because five could not describe it, and
+ * this table needed no argument at all because the DDL answers the question on
+ * its own (ADR-199). It declares NO column against `identities(id)`, so `owned`,
+ * `pair` and `either` have nothing to name, and `root` is `identities`' alone.
+ * WHAT MAKES IT WORTH A PARAGRAPH IS THE ONE EDGE IT DOES CARRY, because a
+ * session reaching for it would be reaching for the shape this file exists to
+ * refuse: `reserve_coverage_snapshots_anchor_fk` is a COMPOSITE foreign key to
+ * `treasury_balances(account_code, as_of)`, and `DerivedRule` names ONE
+ * `localColumn` against ONE `foreignColumn`, so the rule cannot be written --
+ * and naming the account code alone would compile, MULTIPLY ROWS, and terminate
+ * at a `firm` table besides. `treasury_balances` is the table this registry's
+ * own opening paragraph uses to show that auto-derivation is confidently wrong,
+ * and its only dependent arrives one class away from the same mistake.
+ *
+ * SO THE SCOPE CLASS WAS THE CHEAP HALF AND THE COLUMN CENSUS WAS THE WORK.
+ * ADR-199's subject is `readLiability`, which projects three further figures --
+ * `per_plan[].cusum`, `integrations.batch` and `eligible_next_7d` -- and the
+ * entry rules ALL THREE DERIVABLE from columns that already exist, so it takes
+ * no migration number. That belongs here rather than only in the entry because
+ * the next session to open this file for that read path would otherwise start
+ * by re-measuring what it needs: registering this table is the whole of what
+ * `packages/db` owed `readLiability`.
  */
 export const TABLES = {
   identities,
@@ -372,6 +397,12 @@ export const TABLES = {
   // reaches an identity through the first, or through the second, or through
   // neither. See the class docblock and this table's `why`.
   events,
+  // ADR-199. THE TABLE `0049` CREATED AND NOTHING COULD READ. It is `firm`, and
+  // the class was settled by the DDL rather than argued: the row declares NO
+  // column against `identities(id)`, and its one foreign key is a COMPOSITE
+  // edge to `treasury_balances`, which is itself `firm`. Registering it makes
+  // `readLiability`'s `reserve` group a keyed read instead of a `TS2322`.
+  reserveCoverageSnapshots,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -1267,6 +1298,10 @@ export const SCOPE_RULES = {
     foreignColumn: 'id',
     traversal: 'hop',
     why: "THE ROW REACHES AN IDENTITY TWO DIFFERENT WAYS AND WHICH WAY IS A FACT ABOUT THE ROW (ADR-191). `identity_id uuid NULL REFERENCES identities(id) ON DELETE RESTRICT` and `account_id uuid NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0017_events_and_audit.sql), with NO CHECK tying them and neither one required, so one row is reached the `owned` way, the next the `derived` way, and a third by neither. BOTH HALVES ARE READ ON ONE SCREEN, which is what makes the disjunction the ruling rather than a convenience: EVENTS.md section 2 rows the `TL` consumer as a PER-ACCOUNT chronological view and M04 section 5 consumes `phone.verified` and `phone.change_requested`, which carry no account at all. An `owned` rule on `identity_id` COMPILES and drops every account-level row; a `derived` hop through `account_id` is refused twice by ADR-101, by clause 1 because this row carries its own identity column and by clause 2 because the edge is nullable, and would drop every identity-level row if it were written. `hop` RATHER THAN `semi-join`: an event names ONE account and `accounts.id` is that table's primary key, so the traversal cannot multiply this row. THE CHAIN TERMINATES ONE HOP OUT: `accounts` is `owned` on `identity_id`, `nullable: false`. `subject_kind`/`subject_id` ARE THE AVAILABLE MISTAKE AND ARE REFUSED HERE RATHER THAN IN REVIEW: 0017 calls the pair a polymorphic subject and not a foreign key, `subject_id uuid NOT NULL` is on every row including the firm ones, and a plan version and a payout request are subjects, so a rule reading it hands every event ever written to whoever's uuid happens to match. THE PAYLOAD IS NOT THIS RULE'S BUSINESS AND THE DISTINCTION IS RULED RATHER THAN WAVED: `idempotency_keys`, out of this same migration set, says a scope rule states which ROWS reach an identity and nothing about what is inside one; what is different here is that `kyc.dedupe_hit` and `identity.merged` carry a THIRD PARTY's uuid in `jsonb`, and ADR-191 section 6 rules that registering the table makes it readable and nothing else, exactly as `evidence_packs` says about its own redaction profile. WHAT A SCOPED READ RETURNS IS THIS PERSON'S EVENTS BY EITHER PATH AND THE FIRM ROWS BY NEITHER, and what it still cannot return is a MERGED identity's identity-level history: this table is APPEND-ONLY so `identity_id` is never repointed into the survivor, `identity_merges` is not registered, and ADR-191 section 8 registers the gap rather than closing it with a rule no class can write.",
+  },
+  reserveCoverageSnapshots: {
+    class: 'firm',
+    why: "THE FIRM'S RESERVE AGAINST THE FIRM'S OWN FLOOR (0049_reserve_coverage_snapshots.sql, ADR-128, ADR-199). `reserve / CVaR99 at rho = 0.30`, the ratio that pauses NEW SALES below 1.0 and never pauses payouts, and it is `liability_snapshots`' reason arriving on a different surface: a per-identity slice of a firm-wide coverage RATIO is not a smaller version of it, because the denominator is one CVaR99 computed over the whole book and dividing a person's share by it produces a number nothing in the corpus defines. THE CLASS IS SETTLED BY THE DDL RATHER THAN BY THAT ARGUMENT: the row declares NO column against `identities(id)` at all, which is what the suite's own firm assertion reads, so `owned`, `pair` and `either` have no column to name and `root` is `identities`' alone. `treasury_account_code`/`treasury_as_of` ARE THE AVAILABLE MISTAKE AND THEY ARE REFUSED THREE TIMES OVER. They are the only edge off this row, and a `derived` rule through them CANNOT BE WRITTEN, because `reserve_coverage_snapshots_anchor_fk` is COMPOSITE -- `(treasury_account_code, treasury_as_of)` against `treasury_balances(account_code, as_of)` -- and `DerivedRule` names ONE `localColumn` against ONE `foreignColumn`, which is `correlation_groups`' `uuid[]` objection arriving from the other direction. Naming the code alone would compile and MULTIPLY ROWS, since `account_code` is one half of that table's key and repeats once per attestation instant. And it would terminate nowhere in any case: `treasury_balances` is itself `firm`, so the chain ends at a table with no identity, which is `affiliate_commissions`' refusal in a second dress. REGISTERING THE TABLE MAKES IT READABLE AND NOTHING ELSE, which is `events`' sentence on the first table whose content is a DISCLOSURE hazard rather than a tenancy one: M12's `AS-M12-04` rules the coverage ratio unpublishable because a falling RCR is a bank-run mechanic, and that is a PROJECTION and never this rule, exactly as ADR-191 section 6 divides them. WHAT `firmDb()` READS IT WITH IS NARROWER THAN THE RULE, and 0050's lesson applies to a table that IS readable: `0049` REVOKEs UPDATE and DELETE from `merit_app` and PUBLIC, so the role holds SELECT and INSERT and a correctly classed DELETE still fails at the database; `merit_analytics` is deliberately granted nothing, so the firm's reserve position is off M13's surface until a consumer names itself.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 

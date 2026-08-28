@@ -1,8 +1,8 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// ONE HUNDRED AND SEVEN TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
-// UP. The other 7 are not reachable through ANY accessor: `SCOPE_RULES` is total
+// ONE HUNDRED AND EIGHT TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
+// UP. The other 6 are not reachable through ANY accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
@@ -14,9 +14,9 @@
 // `packages/db/migrations` for the second. `test/scoped-db.test.ts` asserts
 // both, which is why the staleness could survive here and not there.
 //
-// NOT ALL 107 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
-// RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 63 of
-// the 107 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// NOT ALL 108 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
+// RATHER THAN ONE. 42 are `firm` and 3 are `pair` (ADR-106), so 63 of
+// the 108 are served by `scopedDb`. A `pair` table belongs to TWO identities and
 // is scoped to neither: it is excluded from `ScopedTableKey` because returning
 // the row to either party hands them the other party's identity uuid, and from
 // `FirmTableKey` because `firmDb()` takes no reason on the ground that no
@@ -33,7 +33,7 @@
 // declares its identity column NOT NULL, which makes them `owned` with no
 // disjunction to write.
 //
-// THE ONE HUNDRED AND SEVEN ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE ONE HUNDRED AND EIGHT ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -62,7 +62,7 @@
 // stale CREATE. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN OFFENDER" UNTIL
 // ADR-106, WHICH IS FALSE ABOUT THIS TREE AND WOULD HAVE TOLD A READER THAT
 // `otp_challenges` COULD NOT BE REGISTERED; ADR-094's clause was superseded by
-// ADR-103 and the sentence outlived it by one session. ELEVEN of the 107 below
+// ADR-103 and the sentence outlived it by one session. ELEVEN of the 108 below
 // carry later columns -- `sessions`, `plan_versions`, `rule_states`,
 // `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests`,
@@ -73,6 +73,12 @@
 // fold's second member ran on no registered table at all. `events` IS NOT ONE OF
 // THE ELEVEN: `0017` is the whole of its DDL and no later migration touches it,
 // so the fold replays nothing onto it and the CREATE body is the column set.
+// `reserve_coverage_snapshots` IS NOT ONE OF THEM EITHER, and it is the table
+// that makes the distinction worth stating twice: `0049` both CREATEs it and
+// ALTERs `liability_snapshots` in the same file, so the fold replays a column
+// onto a NEIGHBOUR out of the migration that created this one and nothing onto
+// this one. `grep 'ALTER TABLE reserve_coverage_snapshots'` over
+// `packages/db/migrations` is empty (ADR-199).
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -635,6 +641,72 @@ export const liabilitySnapshots = pgTable('liability_snapshots', {
   // nobody counted. P-M6-01 is a sum "across funded accounts" and this is the
   // count that says whether that sum is one account or a thousand.
   fundedAccounts: integer('funded_accounts').notNull(),
+});
+
+// -----------------------------------------------------------------------------
+// reserve_coverage_snapshots -- 0049_reserve_coverage_snapshots.sql. FIRM, and
+// the class is the DDL's rather than a judgement.
+// -----------------------------------------------------------------------------
+// ADR-199. THE NUMBER THAT DECIDES WHETHER SALES PAUSE, and it is the firm's
+// against the firm's own floor: `reserve / CVaR99 at rho = 0.30`, below 1.0 the
+// circuit breaker pauses new sales and never pauses payouts (GLOSSARY). This is
+// `liability_snapshots`' reason on a different surface -- a per-identity slice
+// of a firm-wide coverage RATIO is not a smaller version of it -- and the row
+// declares no column against `identities(id)` for the assertion to find.
+//
+// ITS ONE FOREIGN KEY REACHES `treasury_balances`, WHICH IS FIRM, so a `derived`
+// rule through it would be `affiliate_commissions`' refusal in a second dress: a
+// derivation chain terminates at `owned` or at `root`. It could not be written
+// in any case, because the edge is COMPOSITE -- `(treasury_account_code,
+// treasury_as_of)` against `treasury_balances(account_code, as_of)` -- and
+// `DerivedRule` names ONE `localColumn` against ONE `foreignColumn`.
+//
+// THE ANCHOR COLUMNS CARRY NO `.references()` AND THAT IS THIS FILE'S OWN RULE.
+// The header admits `.references()` only where the `CREATE TABLE` body declares
+// the FK INLINE; `reserve_coverage_snapshots_anchor_fk` is a table-level
+// CONSTRAINT, so the constraint is left to the database and the COLUMNS alone
+// are transcribed. `0049`'s foreign key is verified in `scoped-db.test.ts`
+// against the migration text rather than claimed here.
+//
+// `rcr_bp` IS GENERATED AND IS THEREFORE NULLABLE, which is `0049` header item 2
+// rather than an omission: `NULLIF(cvar99_cents, 0)` is load-bearing, because a
+// generated column is computed BEFORE the row's CHECK constraints run, so
+// without it a zero denominator raises a bare `division by zero` and
+// `reserve_coverage_snapshots_cvar99_is_positive` never fires at all. The
+// expression is INTEGER ARITHMETIC on bigint cents: no float enters the reserve
+// path.
+//
+// `breaker_armed` IS NOT A COLUMN AND NEVER WILL BE. Armed is `rcr_bp < 10000`,
+// a rendering against a threshold the GLOSSARY fixes at 1.0, and storing it
+// would recreate in one column exactly the drift the generated ratio removes
+// from another.
+export const reserveCoverageSnapshots = pgTable('reserve_coverage_snapshots', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  // THE RAIL'S CLOCK, and the second of the three reasons `0049` gives for this
+  // being a table rather than a column set on `liability_snapshots`: one row
+  // would force one `as_of` onto two sources that do not move together.
+  asOf: timestamp('as_of', { withTimezone: true }).notNull(),
+  // THE NUMERATOR. The rail's reported balance, copied from the row named below
+  // and asserted equal to it at write time by `RESERVE-C1`, which is a trigger
+  // and therefore not expressible here. INV-M5-11: reported against a LIVE
+  // balance, never one derived from our own ledger.
+  reserveCents: bigint('reserve_cents', { mode: 'bigint' }).notNull(),
+  // THE ANCHOR, as a reference rather than a restatement. `treasury_balances` is
+  // keyed `(account_code, as_of)`, and naming the row is what makes P-M6-07's
+  // attestation staleness a join instead of two more columns that can disagree
+  // with their source (ADR-047).
+  treasuryAccountCode: text('treasury_account_code').notNull(),
+  treasuryAsOf: timestamp('treasury_as_of', { withTimezone: true }).notNull(),
+  // THE DENOMINATOR, AND IT IS THE FLOOR RATHER THAN THE ESTIMATE. P-M6-07's
+  // CVaR99 at rho = 0.30, never the simulation harness's central estimate, and
+  // ADR-019 put wallet balances inside it (GS-130).
+  cvar99Cents: bigint('cvar99_cents', { mode: 'bigint' }).notNull(),
+  // GENERATED, and NULLABLE for the reason the block above gives. Integer basis
+  // points, so a stored ratio cannot disagree with the two numbers beside it.
+  rcrBp: integer('rcr_bp').generatedAlwaysAs(
+    sql`(reserve_cents * 10000) / NULLIF(cvar99_cents, 0)`,
+  ),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // -----------------------------------------------------------------------------
