@@ -918,7 +918,19 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     './detectors/identity.ts',
     './breaker/ports.ts',
     './breaker/evaluate.ts',
+    // P7-l, session 323. THIS COUNT IS WHY THE BARREL NOW CARRIES ITS LEGS AS
+    // DATA: every barrel slice after this one must edit a literal in a file it
+    // does not own, which is the hand-maintained count in a different costume
+    // that RI-05's own header warns about. `WORKER_BARREL_LEGS` in
+    // `src/index.ts` is the same list as data and `test/digests.test.ts` checks
+    // it in both directions and sweeps `src/` for a module in neither. This
+    // enumeration is kept because two independent lists that must agree is a
+    // stronger check than one, not because it is the only one.
+    './digests/ports.ts',
+    './digests/rows.ts',
+    './digests/alarm.ts',
+    './digests/produce.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  expect(new Set(legs).size).toBe(17);
+  expect(new Set(legs).size).toBe(21);
 });
