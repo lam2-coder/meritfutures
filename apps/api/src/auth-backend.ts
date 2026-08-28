@@ -2,8 +2,8 @@
 // apps/api/src/auth-backend.ts
 // =============================================================================
 // `AuthBackend` AGAINST THE REAL ACCESSOR. ADR-120, and the count is reported
-// honestly at the top rather than discovered at the bottom: FOUR of the port's
-// sixteen methods are implemented here and TWELVE raise, each naming its own
+// honestly at the top rather than discovered at the bottom: FIVE of the port's
+// sixteen methods are implemented here and ELEVEN raise, each naming its own
 // blocker.
 //
 // -----------------------------------------------------------------------------
@@ -40,9 +40,18 @@
 // stale refusal takes when it is nobody's fence to repair -- it stops being
 // checkable rather than becoming wrong.
 //
-// So `POST /auth/verify` still answers 503 on a tree where `POST /auth/logout`
-// answers 204, and the reason is now that nobody has written the handler:
-// ADR-196 section 7 item 4, the smallest of that entry's four and the last.
+// AND `POST /auth/verify` NOW ANSWERS. ADR-196 section 7 item 4 -- "the smallest
+// of that entry's four and the last" -- is `verifyOtp` below, and ADR-200 is the
+// entry that rules the four things that item did not: which challenge row a
+// verification selects, what a wrong code does to `attempts`, that consumption
+// precedes establishment, and how long the session it mints lives.
+//
+// WHAT STILL DOES NOT WORK, SAID HERE RATHER THAN LEFT TO BE INFERRED FROM A
+// GREEN SUITE. `requestOtp` is blocked on DELIVERY, so nothing in this
+// deployable can write the `otp_challenges` row `verifyOtp` reads: a trader
+// cannot sign up today, because nobody can send them a code. What has changed is
+// that a code which DOES verify now creates the identity, in the shape ADR-196
+// ruled, rather than answering 503.
 //
 // -----------------------------------------------------------------------------
 // THE SESSION TOKEN CARRIES ITS OWN IDENTITY, AND THAT IS A RULING
@@ -66,16 +75,16 @@
 // `VerifyResponse` and in `Me`, so the client already holds the value the cookie
 // now also carries.
 //
-// **THERE IS NO MINTER IN THIS FILE AND ITS ABSENCE IS NO LONGER B2.** The rule
-// that kept it out is `job-queue.ts`'s -- a primitive admitted before a caller
-// exists is a primitive nobody can remove -- and the sentence under it was
-// "nothing can insert the row it would be minted for". THAT SENTENCE IS FALSE
-// SINCE ADR-126: `insertUnder` inserts a `sessions` row at a scoped handle by
-// proving its parent. What is missing now is the CALLER rather than the
-// capability, and the caller is the handler ADR-196 section 7 item 4 names. What
-// IS written is the parser and the digest, and a minter that ever lands must
-// produce its token through {@link sessionTokenHash} and
-// {@link SESSION_TOKEN_SEPARATOR} rather than by respelling the format.
+// **THE MINTER IS IN THIS FILE NOW, AND THE RULE THAT KEPT IT OUT IS THE RULE
+// THAT ADMITS IT.** `job-queue.ts`'s rule is that a primitive admitted before a
+// caller exists is a primitive nobody can remove; {@link mintSessionToken} and
+// {@link mintSession} have exactly one caller, `verifyOtp`, in the same file.
+// The paragraph that stood here said "nothing can insert the row it would be
+// minted for", which stopped being true when ADR-126 landed `insertUnder`, and
+// then said the caller was missing, which stopped being true here. The token is
+// produced through {@link sessionTokenHash} and {@link SESSION_TOKEN_SEPARATOR}
+// rather than by respelling the format, which is what that paragraph asked of
+// whatever minter eventually landed.
 //
 // -----------------------------------------------------------------------------
 // EVERY REFUSAL RAISES `AuthBackendUnwired` AND CARRIES ITS OWN REASON
@@ -88,7 +97,9 @@
 // `POST /auth/passkey/login/options`.
 // =============================================================================
 
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+
+import { IdentityAlreadyEstablished, atLeast, atMost, isNull, normalizedEmail } from '@merit/db';
 
 import type { ApiDb } from './db.ts';
 import { isIdentityId } from './db.ts';
@@ -98,7 +109,11 @@ import type {
   AuthFactor,
   AuthSession,
   ElevationFactor,
+  Established,
+  RequestContext,
   SessionRow,
+  VerifyRequest,
+  VerifyResponse,
 } from './routes/auth.ts';
 import type { Environment } from './surface.ts';
 
@@ -498,6 +513,205 @@ function liveSession(row: unknown, identityId: string, now: Date): AuthSession |
 }
 
 // -----------------------------------------------------------------------------
+// THE CHALLENGE, AND THE FOUR THINGS ADR-200 RULES ABOUT READING ONE
+// -----------------------------------------------------------------------------
+// ADR-196 ruled WHERE an identity comes from and ADR-197 built the digest and
+// the door. Neither says which `otp_challenges` row a verification answers, what
+// a wrong code costs, or when the row is spent. ADR-197's own approval line says
+// so: "It rules the digest and leaves the CONSUMPTION unruled."
+
+/** `otp_challenges`, as `scope.ts` and `schema.ts` key it. */
+const OTP_CHALLENGES = 'otpChallenges';
+
+/**
+ * The per-challenge attempt ceiling.
+ *
+ * FIVE, AND IT IS THE SAME FIVE IN TWO PLACES RATHER THAN A NUMBER THIS FILE
+ * CHOSE. `API_CONTRACT` section 11 rows `POST /auth/verify` as "10/hour/IP,
+ * 5 attempts/challenge", and `0002_identity.sql:319` declares
+ * `attempts smallint NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5)`.
+ *
+ * THE READ BELOW EXCLUDES AN EXHAUSTED CHALLENGE RATHER THAN LETTING THE CHECK
+ * ANSWER, and that ordering is the whole of why this constant is here. A handler
+ * that selected a challenge at the ceiling and then incremented would hand the
+ * caller a `23514` from a merged migration, which `endpointHandler` has no arm
+ * for: a person who typed a sixth wrong code would get a 500 where the contract
+ * says the lockout is a refusal. So the ceiling bounds the SELECT and the CHECK
+ * is left as the thing that would catch this file being wrong.
+ */
+export const OTP_MAX_ATTEMPTS = 5;
+
+/**
+ * One `otp_challenges` row, as this surface reads it.
+ *
+ * `codeHash` IS COMPARED AND NEVER LOGGED. It is the MAC of a live code, so a
+ * copy of it in a log line is the offline search ADR-197 section 2 exists to
+ * make useless.
+ */
+interface OtpChallenge {
+  readonly id: string;
+  readonly codeHash: Uint8Array;
+  readonly attempts: number;
+  readonly expiresAt: Date;
+  readonly createdAt: Date;
+}
+
+/** A `bytea`, which the driver hands back as a `Buffer`. */
+function bytes(row: Record<string, unknown>, column: string, what: string): Uint8Array {
+  const value = row[column];
+  if (!(value instanceof Uint8Array))
+    throw new AuthRowError(`${what}.${column} did not read back as bytes`);
+  return value;
+}
+
+/** A `smallint`, which must be a whole number and never a float. */
+function count(row: Record<string, unknown>, column: string, what: string): number {
+  const value = row[column];
+  if (typeof value !== 'number' || !Number.isInteger(value))
+    throw new AuthRowError(`${what}.${column} did not read back as a whole number`);
+  return value;
+}
+
+function instantOf(row: Record<string, unknown>, column: string, what: string): Date {
+  const value = row[column];
+  if (!(value instanceof Date))
+    throw new AuthRowError(`${what}.${column} did not read back as a timestamp`);
+  return value;
+}
+
+/**
+ * The challenge a verification answers: the NEWEST live one for this address.
+ *
+ * ONE ROW AND NOT EVERY UNCONSUMED ROW, WHICH IS A RULING RATHER THAN AN
+ * OPTIMISATION. `attempts` is on the CHALLENGE (`0002:315-319`, so that "a
+ * locked-out attacker learns nothing about whether the address exists"), so a
+ * handler that walked every live challenge for one address would give an
+ * attacker five guesses PER OUTSTANDING CODE. `POST /auth/otp` is rate limited
+ * and not forbidden, so the number of outstanding codes is something a caller
+ * chooses: walking them multiplies the lockout budget by a number the attacker
+ * sets. Answering only the newest keeps the budget at five whatever they do.
+ *
+ * `otp_challenges_email_created_idx (email_normalized, created_at DESC)` is the
+ * merged index built for exactly this read, which is the corroboration rather
+ * than the argument.
+ *
+ * THE STRICT EXPIRY BOUNDARY IS APPLIED HERE AND THE SELECT'S IS INCLUSIVE, on
+ * `liveSession`'s own precedent one section up. `atLeast` renders `>=` and a
+ * challenge expiring at exactly `now` is expired, so the narrowing happens in
+ * SQL and the boundary happens here.
+ */
+function newestLiveChallenge(rows: readonly unknown[], now: Date): OtpChallenge | null {
+  let newest: OtpChallenge | null = null;
+  for (const raw of rows) {
+    const r = asRow(raw, 'otp_challenges');
+    const expiresAt = instantOf(r, 'expiresAt', 'otp_challenges');
+    if (expiresAt.getTime() <= now.getTime()) continue;
+    const attempts = count(r, 'attempts', 'otp_challenges');
+    if (attempts >= OTP_MAX_ATTEMPTS) continue;
+    const candidate: OtpChallenge = {
+      id: str(r, 'id', 'otp_challenges'),
+      codeHash: bytes(r, 'codeHash', 'otp_challenges'),
+      attempts,
+      expiresAt,
+      createdAt: instantOf(r, 'createdAt', 'otp_challenges'),
+    };
+    if (newest === null || candidate.createdAt.getTime() > newest.createdAt.getTime())
+      newest = candidate;
+  }
+  return newest;
+}
+
+/**
+ * Whether an error is `0063`'s trigger saying the code was spent while we read.
+ *
+ * THE `cause` CHAIN IS WALKED FOR `isEmailAlreadyTaken`'s REASON, measured one
+ * package over: Drizzle does not re-raise the driver's error, it throws its own
+ * carrying `code` and `constraint` a level down. A version reading only the top
+ * level matches nothing and turns a lost race into a 500.
+ *
+ * THE CONSTRAINT NAME IS MATCHED AND NOT ONLY THE SQLSTATE, because
+ * `check_violation` is what every CHECK in this schema raises and translating
+ * all of them into "bad code" would answer 401 to a row that violated something
+ * else entirely.
+ */
+export function isChallengeAlreadyConsumed(cause: unknown): boolean {
+  let at: unknown = cause;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (typeof at !== 'object' || at === null) return false;
+    const err = at as {
+      readonly code?: unknown;
+      readonly constraint?: unknown;
+      readonly cause?: unknown;
+    };
+    if (err.code === '23514' && err.constraint === CONSUMPTION_IS_WRITE_ONCE) return true;
+    at = err.cause;
+  }
+  return false;
+}
+
+/** `0063`'s trigger, by the name it raises under. Spelled once. */
+const CONSUMPTION_IS_WRITE_ONCE = 'otp_challenges_consumption_is_write_once';
+
+// -----------------------------------------------------------------------------
+// THE MINTER (ADR-200)
+// -----------------------------------------------------------------------------
+
+/**
+ * The session secret's length in bytes.
+ *
+ * THIRTY-TWO, BECAUSE THE DIGEST IS SHA-256 AND A SECRET SHORTER THAN ITS DIGEST
+ * IS THE WEAK LINK. `refuseWeakKey` makes the same argument about the OTP MAC
+ * key in the same file, and this is that argument applied to the value the token
+ * is made of rather than to the key a digest is taken under.
+ */
+export const SESSION_SECRET_BYTES = 32;
+
+/**
+ * How long a minted session lives.
+ *
+ * THIS IS A LAUNCH PARAMETER AND IT IS RULED HERE BECAUSE THIS IS ITS ONLY
+ * WRITER, on `expiry.ts`'s `FREEZE_EXPIRING_LEAD_HOURS` precedent -- a value the
+ * corpus states nowhere, set at the site that writes it, with the reasoning
+ * beside it rather than in a session log. ADR-200 section 6, and a founder read
+ * is owed on the NUMBER specifically.
+ *
+ * WHY IT IS NOT SHORT, WHICH IS THE PART A READER WILL QUESTION. The
+ * `sessions` design record calls `expires_at` "short-lived access, rotating
+ * refresh", and `refresh_token_hash`'s own comment says "rotation on every
+ * refresh" -- but `API_CONTRACT` section 3 declares NO REFRESH ENDPOINT. There
+ * is no `POST /auth/refresh` in the contract and none in `AUTH_ENDPOINTS`, so
+ * nothing can rotate a session and `expires_at` is the whole login lifetime
+ * rather than the access half of a pair. A short value would therefore log
+ * every trader out with no mechanism to keep them in, on a product whose only
+ * other door is another emailed code.
+ *
+ * WHAT BOUNDS A LONG SESSION IS C-27 RATHER THAN THE CLOCK. An `email_otp`
+ * session is a READ session: `sessions.elevated_by_factor`'s CHECK list admits
+ * `passkey` and `dual_channel` and neither is a single factor, so a session
+ * this minter writes "can see everything and change nothing" until it is
+ * elevated. The trader-visible list and single-session revocation
+ * (`listSessions`, `revokeSession`, both wired above) are the controls that make
+ * a 30 day session revocable by the person who owns it.
+ */
+export const SESSION_LIFETIME_DAYS = 30;
+
+/** {@link SESSION_LIFETIME_DAYS} in milliseconds. Integer arithmetic, no floats. */
+export const SESSION_LIFETIME_MS = SESSION_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * A session token: the identity it claims, then a secret.
+ *
+ * `base64url` CARRIES NO `.`, so {@link SESSION_TOKEN_SEPARATOR} splits the
+ * token at the one occurrence it has. That is a property of the alphabet rather
+ * than of this function, and {@link parseSessionToken} splits at the FIRST
+ * occurrence anyway, so a later encoding that did carry one costs nothing.
+ */
+export function mintSessionToken(identityId: string): string {
+  const secret = randomBytes(SESSION_SECRET_BYTES).toString('base64url');
+  return `${identityId}${SESSION_TOKEN_SEPARATOR}${secret}`;
+}
+
+// -----------------------------------------------------------------------------
 // The user-agent family, which the contract requires and the row does not carry
 // -----------------------------------------------------------------------------
 
@@ -548,16 +762,20 @@ export function userAgentFamily(raw: string | null): string {
 // now is that nobody has written it, which is a different fact and is the one
 // below.
 
-const NO_VERIFY_HANDLER =
-  'every construction `POST /auth/verify` needs now exists and the handler that composes them ' +
-  'does not. ADR-196 priced the build at four rulings and named this one last: resolve the ' +
-  'address through `resolutionDb`, branch on whether it answered, establish through ' +
-  '`establishmentDb` when it did not, and mint a session through `ScopedTx.insertUnder`. What ' +
-  'is genuinely absent is the MINTER: this file deliberately ships the token parser and the ' +
-  "token digest and no producer, on `job-queue.ts`'s rule, and the sentence that justified the " +
-  'absence -- "nothing can insert the row it would be minted for" -- stopped being true when ' +
-  'ADR-126 landed `insertUnder`. A minter that lands must produce its token through ' +
-  '`sessionTokenHash` and `SESSION_TOKEN_SEPARATOR` rather than by respelling the format';
+// `NO_VERIFY_HANDLER` STOOD HERE AND ADR-200 WROTE THE HANDLER. Leaving a
+// softened version of it beside a method that answers would be the third stale
+// refusal in this file's history, which is the defect ADR-197 section 7 repaired
+// twice over. What replaces it is the ONE thing `POST /auth/verify` still cannot
+// do, and it is about a channel rather than about a construction.
+const NO_PHONE_RESOLUTION =
+  'a verification on the `sms` channel cannot be answered, and the blocker is a VOCABULARY ' +
+  'rather than a missing handler. `sms` is a LOGIN channel and never a registration one -- ' +
+  '`users.email` is `citext NOT NULL UNIQUE` (`0002:248`), so an SMS verification for an ' +
+  'unknown number has no value to write and `is_new` is always false there (ADR-196 clause 5). ' +
+  'Logging IN on it needs a phone resolved to an identity through `identity_phones`, and the ' +
+  "pre-identity reader's `RESOLUTION_ADDRESS` is `{ users: ['email'] }`: there is no address " +
+  'in that vocabulary a phone can be presented at. Widening it is a `packages/db` ruling with ' +
+  'a hashed-column read behind it, and ADR-200 reports it rather than taking it';
 
 const NO_WEBAUTHN =
   'no WebAuthn verifier is admitted in this workspace. A registration or assertion ceremony needs ' +
@@ -565,18 +783,19 @@ const NO_WEBAUTHN =
   'hand-rollable on the money path and none of which any dependency here provides. Admitting one ' +
   'is a VG-12 decision with an entry of its own, not a line in a wiring slice';
 
-// `NO_OTP_DIGEST` STOOD HERE AND ADR-197 RULED IT. The digest is
-// `otpCodeDigest` above, the key is a deployment secret rather than a row, and
-// `otp_challenges` needs no `key_id` because a challenge older than its TTL
-// cannot verify under any key. What is left of that blocker is the WIRING: this
-// backend is constructed with a database and a clock and holds no key, because
-// the only methods that would use one are blocked on something else anyway.
-const NO_OTP_KEY_WIRED =
-  'this backend holds no OTP MAC key. ADR-197 ruled the digest and the key surface -- ' +
-  '`otpCodeDigest` and `resolveOtpMacKeys` in this file, read from `MERIT_OTP_MAC_KEY` per INFRA ' +
-  'section 7 -- and deliberately did not wire them, because every method that would use a key is ' +
-  'blocked on delivery or on a handler and a key admitted before its caller is a key nobody can ' +
-  'rotate out. `start.ts` is where it lands, with the handler';
+// `NO_OTP_DIGEST` STOOD HERE AND ADR-197 RULED IT; `NO_OTP_KEY_WIRED` REPLACED
+// IT AND ADR-200 WIRES THE KEY, so neither survives. The key is read from the
+// environment at the moment a verification needs it, by {@link resolveOtpMacKeys},
+// and a deployment that has not been given one BOOTS and answers 503 on
+// `POST /auth/verify` alone. That is the shape the absence has to take: a key
+// resolved in `start.ts` would make a missing secret a process that will not
+// start, which turns a config omission on one route into an outage on all of
+// them. {@link OTP_KEY_UNRESOLVED} is what an operator reads in that 503.
+const OTP_KEY_UNRESOLVED =
+  'this deployment holds no usable OTP MAC key, so a code cannot be checked against the digest ' +
+  '`otp_challenges.code_hash` stores. ADR-197 ruled the key a deployment secret rather than a ' +
+  'row, read from `MERIT_OTP_MAC_KEY` per INFRA section 7, and there is deliberately no ' +
+  'fallback: a baked-in default would be a published key. The underlying failure is';
 
 const NO_DELIVERY =
   'nothing in this deployable delivers a code. A handler that writes an `otp_challenges` row and ' +
@@ -599,14 +818,84 @@ const SESSIONS = 'sessions';
 /**
  * `AuthBackend` over the trader database.
  *
- * @param db     the two doors. Injected so the suite can watch which one each
+ * @param db     the four doors. Injected so the suite can watch which one each
  *               method opens and with whose identity, which is the property that
  *               is this package's rather than `packages/db`'s.
  * @param clock  read once per call. `INV-01` keeps a clock out of the engine and
  *               this is not the engine, but a backend that reads `Date.now()`
  *               inline is a backend whose expiry behaviour cannot be asserted.
+ * @param env    where the OTP MAC key comes from. A parameter for the same
+ *               reason `clock` is one: `resolveOtpMacKeys` refuses a key that is
+ *               absent, short or not standard base64, and a suite that could not
+ *               vary the environment could assert none of it.
  */
-export function databaseAuthBackend(db: ApiDb, clock: () => Date = () => new Date()): AuthBackend {
+export function databaseAuthBackend(
+  db: ApiDb,
+  clock: () => Date = () => new Date(),
+  env: Environment = process.env,
+): AuthBackend {
+  /**
+   * The admitted keys, or a 503 naming the config that is missing.
+   *
+   * READ PER CALL AND NOT MEMOISED. The decode is one base64 round trip over 32
+   * bytes and the alternative is a process that caches the absence of a key it
+   * was started without, which is a deployment that cannot be repaired by
+   * setting the variable and restarting the one thing that reads it.
+   */
+  const otpKeys = (method: string): readonly Uint8Array[] => {
+    try {
+      return resolveOtpMacKeys(env);
+    } catch (cause) {
+      if (cause instanceof OtpKeyError)
+        throw new AuthBackendUnwired(method, `${OTP_KEY_UNRESOLVED}: ${cause.message}`);
+      throw cause;
+    }
+  };
+
+  /**
+   * `sessions`, minted under the identity the caller just proved.
+   *
+   * THE TOKEN IS RETURNED AND THE DIGEST IS STORED, which is the one direction
+   * that matters: `refresh_token_hash` is `bytea NOT NULL UNIQUE` and this
+   * function is the only producer in the tree. It goes through `insertUnder`,
+   * so `packages/db` PROVES `user_id` belongs to this identity inside the same
+   * transaction rather than trusting the value this file passes.
+   */
+  const mintSession = async (
+    who: { readonly identityId: string; readonly userId: string },
+    factor: AuthFactor,
+    context: RequestContext,
+    now: Date,
+  ): Promise<string> => {
+    const token = mintSessionToken(who.identityId);
+    await db.scoped(who.identityId, (tx) =>
+      tx.insertUnder(SESSIONS, {
+        userId: who.userId,
+        refreshTokenHash: Buffer.from(sessionTokenHash(token)),
+        expiresAt: new Date(now.getTime() + SESSION_LIFETIME_MS),
+        authFactor: factor,
+        // SD-M4-03's CREATION half. `ip` and `user_agent` -- 0002's original
+        // pair -- are deliberately left NULL: writing both pairs would be two
+        // copies of one fact, and `listSessions` already reads
+        // `createdUserAgent ?? userAgent`, so the newer column is the one a
+        // reader prefers.
+        createdIp: context.requestIp,
+        createdUserAgent: context.userAgent,
+      }),
+    );
+    return token;
+  };
+
+  /** `users`, read at an authority holding no identity. One row or none. */
+  const resolveEmail = (email: string): Promise<unknown> =>
+    db.resolution((rx) => rx.rowAt('users', { email }));
+
+  /** Both ids off a `users` row, which is what `VerifyResponse` carries. */
+  const whoIs = (row: unknown): { readonly identityId: string; readonly userId: string } => {
+    const r = asRow(row, 'users');
+    return { identityId: str(r, 'identityId', 'users'), userId: str(r, 'id', 'users') };
+  };
+
   return {
     async sessionByToken(token: string): Promise<AuthSession | null> {
       const parsed = parseSessionToken(token);
@@ -694,16 +983,143 @@ export function databaseAuthBackend(db: ApiDb, clock: () => Date = () => new Dat
     // The twelve, each with its own reason
     // -------------------------------------------------------------------------
 
-    // THREE INDEPENDENT BLOCKERS ON ONE METHOD, which is why the corpus's most
-    // load-bearing endpoint is the one furthest from working.
-    // THIS METHOD CARRIED THREE INDEPENDENT BLOCKERS AND CARRIES ONE. ADR-126
-    // discharged two of them and this file did not notice for as long as
-    // ADR-196 measured; ADR-197 discharged the third. The remaining one is that
-    // nobody has written the handler, which is the honest state and is a
-    // smaller sentence than the three it replaces.
-    verifyOtp: blocked('verifyOtp', `${NO_VERIFY_HANDLER}. And ${NO_OTP_KEY_WIRED}`),
+    /**
+     * `POST /auth/verify`. ADR-196's ruling, executed.
+     *
+     * THE ORDER IS THE RULING AND NOT A CONVENIENCE, and every step is a clause
+     * somebody else already wrote:
+     *
+     *   1. READ the newest live challenge for the address, and MATCH the code
+     *      under every admitted key. One firm transaction, because `attempts`
+     *      and `consumed_at` are both written from what that read returned.
+     *   2. CONSUME it. This happens BEFORE the identity exists, which is the
+     *      only ordering that fails safe: ADR-126 already priced the two units
+     *      of work -- "a crash between them leaves a consumed challenge and no
+     *      session and the person asks for another code ... paid in an
+     *      inconvenience rather than in a row". Consuming LAST would leave a
+     *      code that had already minted a session still answerable.
+     *   3. RESOLVE the address through the pre-identity door.
+     *   4. ESTABLISH when it answered nobody. ADR-196 clause 1, and `is_new` is
+     *      true on exactly this branch (clause 4).
+     *   5. MINT the session.
+     *
+     * EVERY REFUSAL ANSWERS `null` AND THE ROUTE TURNS THAT INTO ONE 401. A bad
+     * code, an expired code, a spent code, a code for an address that has no
+     * live challenge and a challenge at its attempt ceiling are one answer,
+     * which is `API_CONTRACT` section 3's "deliberately indistinguishable" and
+     * is also what keeps `POST /auth/otp`'s promise that the surface "does not
+     * reveal whether the destination exists": a verification that answered
+     * differently for a known address would disclose through this route what
+     * the other route withholds.
+     *
+     * THE `sms` ARM IS A 503 AND NOT A `null`, AND THE DIFFERENCE DISCLOSES
+     * NOTHING. A `null` there would say "your code was wrong" about a channel
+     * this deployment cannot answer at all; the 503 says the channel is not
+     * served. The caller chose the channel, so the distinction is about their
+     * own request rather than about whether some address exists.
+     */
+    async verifyOtp(
+      input: VerifyRequest,
+      context: RequestContext,
+    ): Promise<Established<VerifyResponse> | null> {
+      if (input.channel === 'sms') throw new AuthBackendUnwired('verifyOtp', NO_PHONE_RESOLUTION);
+      const email = input.email;
+      // THE VALIDATOR ALREADY REFUSED THIS AND THIS IS NOT A SECOND VALIDATOR.
+      // `VerifyRequest` types `email` as optional because one shape carries two
+      // channels, so the narrowing is a type obligation; answering `null`
+      // rather than throwing keeps a request that reached here past the
+      // validator indistinguishable from a wrong code.
+      if (email === undefined || email.trim() === '') return null;
+      const keys = otpKeys('verifyOtp');
+      const now = clock();
+      const subject = { channel: 'email', destination: email, code: input.code } as const;
 
-    requestOtp: blocked('requestOtp', `${NO_DELIVERY}. And ${NO_OTP_KEY_WIRED}`),
+      let matched: boolean;
+      try {
+        matched = await db.firm(async (tx) => {
+          // NARROWED IN SQL AND BOUNDED AGAIN IN `newestLiveChallenge`. The
+          // terms are ADR-157's read-path admissions and every one of them is
+          // the reason a row is NOT a candidate: spent, expired, exhausted.
+          const rows = await tx.rowsWhere(OTP_CHALLENGES, {
+            channel: 'email',
+            emailNormalized: normalizedEmail(email),
+            consumedAt: isNull(),
+            expiresAt: atLeast(now),
+            attempts: atMost(OTP_MAX_ATTEMPTS - 1),
+          });
+          const live = newestLiveChallenge(rows, now);
+          if (live === null) return false;
+          if (!otpCodeMatches(keys, subject, live.codeHash)) {
+            // THE LOCKOUT IS SPENT ON A WRONG CODE AND NOT ON A MISSING ONE. A
+            // caller who can drive `attempts` up without holding a challenge id
+            // could lock out an address they do not own, and there is no
+            // challenge here to charge.
+            await tx.updateAt(OTP_CHALLENGES, { id: live.id }, { attempts: live.attempts + 1 });
+            return false;
+          }
+          await tx.updateAt(OTP_CHALLENGES, { id: live.id }, { consumedAt: now });
+          return true;
+        });
+      } catch (cause) {
+        // `0063` SAYING SOMEBODY ELSE SPENT THIS CODE WHILE WE READ IT. The
+        // transaction is already rolled back, so the attempt counter is
+        // unmoved and the answer is the same 401 every other refusal gives.
+        if (isChallengeAlreadyConsumed(cause)) return null;
+        throw cause;
+      }
+      if (!matched) return null;
+
+      const existing = await resolveEmail(email);
+      let who: { readonly identityId: string; readonly userId: string };
+      let isNew: boolean;
+      if (existing !== undefined && existing !== null) {
+        who = whoIs(existing);
+        isNew = false;
+      } else {
+        try {
+          who = await db.establishment((tx) => tx.establish({ email }));
+          isNew = true;
+        } catch (cause) {
+          // THE RACE, AND `users_email_key` IS THE ARBITER. ADR-197 ruling 4:
+          // the unique violation is allowed to RAISE, so the rollback takes the
+          // identity row and the three `ledger_accounts` rows `0054`'s trigger
+          // wrote with it and the loser pays zero permanent rows. What it does
+          // NOT do is answer the caller, so the loser resolves the address the
+          // winner just created and answers `is_new: false` -- ADR-196 clause 4
+          // says true on exactly the call that performed clause 1, and this
+          // call did not perform it.
+          if (!(cause instanceof IdentityAlreadyEstablished)) throw cause;
+          const raced = await resolveEmail(email);
+          if (raced === undefined || raced === null)
+            throw new AuthRowError(
+              'the establishment door reported this address already had a `users` row and the ' +
+                'pre-identity read then found none. Those two statements cannot both be true of ' +
+                'a committed database, and answering a session here would be minting one for ' +
+                'an identity this handler never resolved',
+            );
+          who = whoIs(raced);
+          isNew = false;
+        }
+      }
+
+      const sessionToken = await mintSession(who, 'email_otp', context, now);
+      return {
+        response: {
+          identity_id: who.identityId,
+          user_id: who.userId,
+          is_new: isNew,
+          auth_factor: 'email_otp',
+        },
+        sessionToken,
+      };
+    },
+
+    // THE KEY IS WIRED AND DELIVERY IS NOT, so this method's blocker is one
+    // sentence where it used to be two. ADR-197 left the key unwired because
+    // "every method that would use a key is blocked on delivery or on a
+    // handler"; the handler landed, the key came with it, and what is left here
+    // is that nothing in this deployable sends anything.
+    requestOtp: blocked('requestOtp', NO_DELIVERY),
 
     // BOTH ARMS ARE BLOCKED AND FOR DIFFERENT REASONS, which is worth stating
     // because the union is C-27 and a reader will ask whether the refusal is the
@@ -711,8 +1127,7 @@ export function databaseAuthBackend(db: ApiDb, clock: () => Date = () => new Dat
     // COMPILE time and always did, and these two are the two members it admits.
     elevate: blocked(
       'elevate',
-      `the passkey arm: ${NO_WEBAUTHN}. The dual_channel arm: ${NO_DELIVERY}. And ` +
-        NO_OTP_KEY_WIRED,
+      `the passkey arm: ${NO_WEBAUTHN}. The dual_channel arm: ${NO_DELIVERY}`,
     ),
 
     passkeyRegisterOptions: blocked('passkeyRegisterOptions', NO_WEBAUTHN),

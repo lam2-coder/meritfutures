@@ -25,12 +25,27 @@
 
 import type { ApiDb } from '../src/db.ts';
 
+/** Which door one call was made through. ADR-200 added the last two. */
+export type DbDoor = 'scoped' | 'firm' | 'resolution' | 'establishment';
+
 /** One accessor call, as this file records it. */
 export interface DbCall {
-  readonly door: 'scoped' | 'firm';
-  /** The identity the SCOPED door was opened with. Absent on the firm door. */
+  readonly door: DbDoor;
+  /** The identity the SCOPED door was opened with. Absent on every other door. */
   readonly identityId?: string;
-  readonly verb: 'rows' | 'rowsWhere' | 'rowAt' | 'updateAt' | 'deleteAt' | 'insert';
+  readonly verb:
+    | 'rows'
+    | 'rowsWhere'
+    | 'rowAt'
+    | 'updateAt'
+    | 'deleteAt'
+    | 'insert'
+    | 'insertUnder'
+    | 'establish';
+  /**
+   * The table named. `establish` names none: the door's whole point is that a
+   * caller cannot choose, so the recorder writes the ACT rather than a key.
+   */
   readonly key: string;
   readonly address?: unknown;
   readonly values?: unknown;
@@ -45,6 +60,14 @@ export interface Replies {
   readonly deleteAt?: unknown[];
   readonly insert?: unknown[];
   readonly insertThrows?: unknown;
+  readonly insertUnder?: unknown[];
+  /** What the RESOLUTION door answers. `undefined` is "nobody holds this address". */
+  readonly resolvesTo?: unknown;
+  /** What `establish` answers, and what it throws instead. */
+  readonly establishes?: unknown;
+  readonly establishThrows?: unknown;
+  /** Called before `establish` answers, so a suite can watch an interleaving. */
+  readonly onEstablish?: () => void;
 }
 
 export interface Recorder {
@@ -62,10 +85,30 @@ export interface Recorder {
  * is the boundary between "what apps/api did" and "what packages/db would have
  * done with it", and the second half is not this file's to simulate.
  */
+/**
+ * The two ADR-200 doors, for a fixture whose subject cannot reach them.
+ *
+ * THEY REJECT RATHER THAN RETURNING SOMETHING EMPTY. Every adapter but
+ * `databaseAuthBackend` takes an `ApiDb` and opens two of its four doors, and a
+ * fixture that answered `undefined` from the pre-identity read would let a
+ * wallet or catalogue adapter quietly acquire a capability its own suite is
+ * asserting it does not use. A rejection names the file and the door.
+ */
+export const NO_PRE_IDENTITY_DOORS: Pick<ApiDb, 'resolution' | 'establishment'> = {
+  resolution: () =>
+    Promise.reject(
+      new Error('this fixture opens no resolution door: its subject resolves no address'),
+    ),
+  establishment: () =>
+    Promise.reject(
+      new Error('this fixture opens no establishment door: its subject creates no identity'),
+    ),
+};
+
 export function recordingDb(replies: Replies = {}): Recorder {
   const calls: DbCall[] = [];
 
-  const handle = (door: 'scoped' | 'firm', identityId?: string): unknown => {
+  const handle = (door: DbDoor, identityId?: string): unknown => {
     const note = (call: DbCall): void => {
       calls.push(identityId === undefined ? call : { ...call, identityId });
     };
@@ -100,6 +143,21 @@ export function recordingDb(replies: Replies = {}): Recorder {
         if (replies.insertThrows !== undefined) return Promise.reject(replies.insertThrows);
         return Promise.resolve(replies.insert ?? []);
       },
+      insertUnder: (key: string, values: unknown) => {
+        note({ door, verb: 'insertUnder', key, values });
+        return Promise.resolve(replies.insertUnder ?? []);
+      },
+      // THE ESTABLISHMENT DOOR'S ONE VERB. It takes an ADDRESS and no values,
+      // which is ADR-196 clause 3 made structural in `packages/db`, so this
+      // records the address under `address` and leaves `values` absent: a
+      // recorder that offered a values slot here would be inviting a suite to
+      // assert on a parameter the real door does not have.
+      establish: (at: unknown) => {
+        note({ door, verb: 'establish', key: 'identities+users', address: at });
+        replies.onEstablish?.();
+        if (replies.establishThrows !== undefined) return Promise.reject(replies.establishThrows);
+        return Promise.resolve(replies.establishes);
+      },
     };
   };
 
@@ -107,6 +165,22 @@ export function recordingDb(replies: Replies = {}): Recorder {
     scoped: <T>(identityId: string, fn: (tx: never) => Promise<T>): Promise<T> =>
       fn(handle('scoped', identityId) as never),
     firm: <T>(fn: (tx: never) => Promise<T>): Promise<T> => fn(handle('firm') as never),
+    // THE RESOLUTION HANDLE ANSWERS `rowAt` AND NOTHING ELSE, which is the whole
+    // of `ResolutionDb`. A suite asserting that the address named was `email`
+    // and the table `users` is asserting an `apps/api` property; that the
+    // predicate reaches one row is `packages/db`'s and is not simulated here.
+    resolution: <T>(fn: (rx: never) => Promise<T>): Promise<T> => {
+      const rx = {
+        __brand: 'ResolutionDb',
+        rowAt: (key: string, at: unknown) => {
+          calls.push({ door: 'resolution', verb: 'rowAt', key, address: at });
+          return Promise.resolve(replies.resolvesTo);
+        },
+      };
+      return fn(rx as never);
+    },
+    establishment: <T>(fn: (tx: never) => Promise<T>): Promise<T> =>
+      fn(handle('establishment') as never),
   };
 
   return { db, calls };

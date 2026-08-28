@@ -169,16 +169,26 @@ function namedBindings(clause: string): string[] {
 // 1. The door count, which is the diff ADR-171 refuses
 // -----------------------------------------------------------------------------
 
-test('there are exactly two doors, they are named scoped and firm, and there is no third', () => {
+test('there are exactly four doors, and the one ADR-171 refused is still not one of them', () => {
   // `LIVE_DB` IS TYPED `ApiDb`, SO THE INTERFACE IS CHECKED THROUGH ITS ONE
   // IMPLEMENTATION. A method added to the interface and not to this value does
   // not compile, and a method added to both lands here. That is why the case
   // reads a runtime object rather than parsing a type: the type has a witness.
-  expect(Object.keys(LIVE_DB)).toEqual(['scoped', 'firm']);
+  // FOUR SINCE ADR-200, AND THE ORDER IS THE DECLARATION'S. `resolution` is
+  // ADR-126's pre-identity read and `establishment` is ADR-197's one-verb write,
+  // both narrowed AT THE DOOR by a type in `packages/db` rather than by a
+  // convention here: `ResolutionDb` reads one row of one table at one address
+  // and has no `transaction` overload at all, and `EstablishmentTx` carries
+  // `establish` and no other verb, no key vocabulary and no `sqlExecutor`.
+  expect(Object.keys(LIVE_DB)).toEqual(['scoped', 'firm', 'resolution', 'establishment']);
 
   // NOT `operator`, written as its own expectation rather than left implied by
   // the line above, because a reader of a failing suite should see the word
-  // ADR-171 refused.
+  // ADR-171 refused. THAT REFUSAL IS UNMOVED BY THE TWO DOORS ABOVE and the
+  // distinction is the whole of ADR-200 section 3: `operator(fn)` would hand
+  // `databaseAuthBackend` a `SystemTx` over every table at the reason word
+  // `'operator-console'`, which is ADR-120's B1 answered by accident. These two
+  // answer B1 on purpose, at a vocabulary of one table and one verb.
   expect(Object.keys(LIVE_DB)).not.toContain('operator');
   expect(Object.keys(LIVE_DB)).not.toContain('system');
 
@@ -190,6 +200,12 @@ test('there are exactly two doors, they are named scoped and firm, and there is 
   // rest, which is exactly the shape being pinned.
   expect(LIVE_DB.scoped.length).toBe(2);
   expect(LIVE_DB.firm.length).toBe(1);
+  // BOTH NEW DOORS TAKE THE UNIT OF WORK AND NOTHING ELSE. A `resolution(email,
+  // fn)` or an `establishment(reason, fn)` would be a door whose first argument
+  // is a value a caller chooses, which is the shape `firm` deliberately does not
+  // have and `system` was refused for having.
+  expect(LIVE_DB.resolution.length).toBe(1);
+  expect(LIVE_DB.establishment.length).toBe(1);
 });
 
 // -----------------------------------------------------------------------------
@@ -197,7 +213,7 @@ test('there are exactly two doors, they are named scoped and firm, and there is 
 //    would become reachable
 // -----------------------------------------------------------------------------
 
-test('src/db.ts imports three values from the accessor and systemDb is not one of them', () => {
+test('src/db.ts imports five values from the accessor and systemDb is not one of them', () => {
   const accessor = accessorPackageName();
   const values = importsIn(join(APP, 'src', 'db.ts'))
     .filter((entry) => entry.specifier === accessor && !entry.typeOnly)
@@ -210,7 +226,12 @@ test('src/db.ts imports three values from the accessor and systemDb is not one o
   // obstacle and this list is: with case 3 below making this the only file that
   // may import the accessor at all, the two together are the mechanical form of
   // "this deployable cannot open a door at the operator reason".
-  expect(values).toEqual(['firmDb', 'scopedDb', 'transaction']);
+  // FIVE SINCE ADR-200. The two added are CONSTRUCTORS FOR THE TWO DOORS ABOVE
+  // and neither widens what this file can reach: `resolutionDb()` yields a
+  // reader over `users` by `email`, and `establishmentDb()` yields a handle
+  // whose transaction has one verb. `systemDb` is still absent and that is the
+  // name this case exists for.
+  expect(values).toEqual(['establishmentDb', 'firmDb', 'resolutionDb', 'scopedDb', 'transaction']);
 });
 
 // -----------------------------------------------------------------------------
@@ -220,12 +241,26 @@ test('src/db.ts imports three values from the accessor and systemDb is not one o
 /**
  * Every export of `packages/db` that YIELDS A HANDLE.
  *
- * The three constructors plus the function that turns one into a transaction
- * with the write methods attached. Nothing else in that package can reach a
- * connection: `atMost` and its sibling terms mint frozen values, and the rest of
- * the surface is types.
+ * The FIVE constructors plus the function that turns one into a transaction with
+ * the write methods attached. Nothing else in that package can reach a
+ * connection: `atMost` and its sibling terms mint frozen values,
+ * `normalizedEmail` is a pure function over a string, `IdentityAlreadyEstablished`
+ * is an error class, and the rest of the surface is types.
+ *
+ * `resolutionDb` AND `establishmentDb` ARE ON THIS LIST RATHER THAN EXEMPT FROM
+ * IT. They are narrow, and narrow is not the same as harmless: each opens a real
+ * connection at an authority holding no identity, so the property this case
+ * asserts -- that `src/db.ts` is the only file that can obtain one -- is the
+ * property that matters most about them.
  */
-const HANDLE_NAMES = ['firmDb', 'scopedDb', 'systemDb', 'transaction'] as const;
+const HANDLE_NAMES = [
+  'establishmentDb',
+  'firmDb',
+  'resolutionDb',
+  'scopedDb',
+  'systemDb',
+  'transaction',
+] as const;
 
 test('only src/db.ts takes a handle off the accessor, and the other importer takes a term', () => {
   const accessor = accessorPackageName();
@@ -259,8 +294,23 @@ test('only src/db.ts takes a handle off the accessor, and the other importer tak
   // THE MAP, PINNED, AS THE BROADER NET. A new importer, or a new name at an
   // existing one, is a decision a reviewer sees rather than a line that lands
   // with a feature -- benign or not.
+  // `src/auth-backend.ts` IS THE THIRD IMPORTER AND IT TAKES NO HANDLE. Every
+  // name it takes is inert on its own: three ADR-157 filter terms, the
+  // normalizer `otp_challenges.email_normalized` is keyed on -- exported by
+  // `packages/db` for exactly this caller, so that one entity-resolution key has
+  // one spelling -- and the error class the establishment door raises when
+  // `users_email_key` arbitrates a race. None of them opens anything, which is
+  // why the `elsewhere` assertion above is empty on this diff and this map
+  // records it as a decision rather than as a violation.
   expect(taken).toEqual({
-    'src/db.ts': ['firmDb', 'scopedDb', 'transaction'],
+    'src/auth-backend.ts': [
+      'IdentityAlreadyEstablished',
+      'atLeast',
+      'atMost',
+      'isNull',
+      'normalizedEmail',
+    ],
+    'src/db.ts': ['establishmentDb', 'firmDb', 'resolutionDb', 'scopedDb', 'transaction'],
     'src/routes/account-reads.ts': ['atMost'],
   });
 });

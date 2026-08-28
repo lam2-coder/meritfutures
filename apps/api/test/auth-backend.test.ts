@@ -2,14 +2,19 @@ import { createHash } from 'node:crypto';
 
 import { expect, test } from 'vitest';
 
-import { normalizedEmail } from '@merit/db';
+import { IdentityAlreadyEstablished, normalizedEmail } from '@merit/db';
 import {
   AuthRowError,
   OTP_MAC_KEY_RETIRING_VAR,
   OTP_MAC_KEY_VAR,
+  OTP_MAX_ATTEMPTS,
   OtpKeyError,
+  SESSION_LIFETIME_MS,
+  SESSION_SECRET_BYTES,
   SESSION_TOKEN_SEPARATOR,
   databaseAuthBackend,
+  isChallengeAlreadyConsumed,
+  mintSessionToken,
   otpCodeDigest,
   otpCodeMatches,
   parseSessionToken,
@@ -330,8 +335,15 @@ test('the agent vocabulary is closed and its ORDER is the trap', () => {
 // The twelve refusals
 // -----------------------------------------------------------------------------
 
-/** The four this session wired, named once so the partition below is checkable. */
-const WIRED = ['sessionByToken', 'logout', 'listSessions', 'revokeSession'] as const;
+/**
+ * The five wired, named once so the partition below is checkable.
+ *
+ * `verifyOtp` IS THE FIFTH AND IT ARRIVED WITH ADR-200. The four before it are
+ * ADR-120's, and the difference between them is worth a sentence: those four
+ * ADDRESS rows through one door, and this one composes all four doors in a ruled
+ * order and is the only method in the file that WRITES a row nobody owned.
+ */
+const WIRED = ['sessionByToken', 'logout', 'listSessions', 'revokeSession', 'verifyOtp'] as const;
 
 test('every method of the port is either wired or refused, and none is forgotten', () => {
   // THE ASSERTION THAT SURVIVES A NEW METHOD. `AuthBackend` gaining a
@@ -345,7 +357,7 @@ test('every method of the port is either wired or refused, and none is forgotten
   for (const wired of WIRED) expect(names).toContain(wired);
 });
 
-test('the twelve refuse as AuthBackendUnwired, each with its own reason, opening no door', async () => {
+test('the eleven refuse as AuthBackendUnwired, each with its own reason, opening no door', async () => {
   const { db, calls } = recordingDb();
   const backend = databaseAuthBackend(db, clock) as unknown as Record<
     string,
@@ -354,7 +366,7 @@ test('the twelve refuse as AuthBackendUnwired, each with its own reason, opening
   const blocked = Object.keys(databaseAuthBackend(db, clock)).filter(
     (name) => !(WIRED as readonly string[]).includes(name),
   );
-  expect(blocked).toHaveLength(12);
+  expect(blocked).toHaveLength(11);
 
   const reasons = new Set<string>();
   for (const name of blocked) {
@@ -371,11 +383,11 @@ test('the twelve refuse as AuthBackendUnwired, each with its own reason, opening
     expect(unwired.reason.length, name).toBeGreaterThan(40);
     reasons.add(unwired.reason);
   }
-  // TWELVE METHODS AND NINE DISTINCT REASONS: the phone-change trio shares a
-  // schema gap with three different tails, and the two passkey ceremonies that
-  // need nothing but a verifier share one exactly. Asserted as "more than one
-  // reason per blocker class" rather than as a count, because a count here would
-  // drift the first time two of them merged.
+  // ELEVEN METHODS AND EIGHT OR MORE DISTINCT REASONS: the phone-change trio
+  // shares a schema gap with three different tails, and the two passkey
+  // ceremonies that need nothing but a verifier share one exactly. Asserted as
+  // "more than one reason per blocker class" rather than as a count, because a
+  // count here would drift the first time two of them merged.
   expect(reasons.size).toBeGreaterThanOrEqual(8);
   // AND NOT ONE OF THEM TOUCHED THE DATABASE. A refusal that opened a
   // transaction first would be a 503 that had already spent a connection.
@@ -394,14 +406,23 @@ test('the refusals name what is actually missing rather than saying "not impleme
   // It asserted the words "pre-identity read" and "OwnedTableKey", which is a
   // suite holding a refusal in place after ADR-126 built the two constructions
   // it named -- so the suite was GREEN over a live 503 whose log line was
-  // false. ADR-197 repairs the strings and this case with them, and it now
-  // pins the property that made the drift possible rather than the sentence:
-  // a refusal must not cite a construction that exists.
+  // false. ADR-197 repaired the strings; ADR-200 wrote the handler, so the
+  // sentence THAT entry left ("the handler that composes them does not") is
+  // itself now the stale one and this case reads the SMS arm, which is the one
+  // thing `POST /auth/verify` still cannot do. The property is unchanged: a
+  // refusal must not cite a construction that exists.
   const verify = await reasonOf(
-    backend.verifyOtp({ channel: 'email', email: 'a@b.test', code: '000000' }),
+    backend.verifyOtp(
+      { channel: 'sms', phone: '+15550000000', code: '000000' },
+      { requestIp: null, userAgent: null },
+    ),
   );
-  expect(verify).toContain('the handler that composes them does not');
-  for (const discharged of ['a pre-identity read has no door', 'takes `OwnedTableKey`'])
+  expect(verify).toContain('RESOLUTION_ADDRESS');
+  for (const discharged of [
+    'a pre-identity read has no door',
+    'takes `OwnedTableKey`',
+    'the handler that composes them does not',
+  ])
     expect(verify, `verifyOtp still cites ${discharged}`).not.toContain(discharged);
   // The schema gap session 218 found rather than went looking for.
   expect(await reasonOf(backend.readPhoneChange(session()))).toContain('no preview column');
@@ -415,7 +436,14 @@ test('no refusal in this file cites the OTP digest as unspecified', async () => 
   // one of the twelve is read, not just the ones that used to cite it.
   const backend = databaseAuthBackend(recordingDb().db, clock);
   const methods: Array<[string, () => Promise<unknown>]> = [
-    ['verifyOtp', () => backend.verifyOtp({ channel: 'email', email: 'a@b.test', code: '0' })],
+    [
+      'verifyOtp',
+      () =>
+        backend.verifyOtp(
+          { channel: 'sms', phone: '+15550000000', code: '0' },
+          { requestIp: null, userAgent: null },
+        ),
+    ],
     ['requestOtp', () => backend.requestOtp({ channel: 'email', turnstile_token: 't' }, null)],
     ['elevate', () => backend.elevate(session(), { factor: 'passkey', credential: {} })],
     ['verifyPhone', () => backend.verifyPhone(session(), { challenge_id: 'c', code: '0' })],
@@ -601,4 +629,373 @@ test('the base64 decode is STRICT, because a lenient one shortens a key silently
   expect(() =>
     resolveOtpMacKeys({ [OTP_MAC_KEY_VAR]: Buffer.alloc(31, 1).toString('base64') }),
   ).toThrow(/floor is 32/);
+});
+
+// -----------------------------------------------------------------------------
+// `POST /auth/verify`: the handler ADR-196 priced and ADR-200 wrote
+// -----------------------------------------------------------------------------
+// WHAT THESE CASES ASSERT AND WHAT THEY DELIBERATELY DO NOT, on `db-recorder.ts`'s
+// own limit. Every case below is a property of `apps/api`: WHICH DOOR was
+// opened, IN WHAT ORDER, WITH WHOSE IDENTITY, WHAT ADDRESS was named and WHAT
+// VALUES were written. That the establishment door's two inserts are ONE unit of
+// work, and that the loser of a race pays zero rows, is `packages/db`'s and is
+// asserted in `packages/db/test/establishment.test.ts` and executed against a
+// real PostgreSQL by ADR-197 section 6 and ADR-200 section 8. A case here
+// claiming it would be agreeing with the recorder.
+
+const CHALLENGE = 'dddddddd-4444-4444-8444-dddddddddddd';
+const USER = 'cccccccc-3333-4333-8333-cccccccccccc';
+
+/**
+ * A 32 byte key, BUILT rather than written.
+ *
+ * `CI-05` runs `gitleaks`, whose `generic-api-key` rule fires on a high-entropy
+ * literal, and a base64 blob in a test file is that rule's exact shape even when
+ * the value is a fake. `Buffer.alloc` produces a key of the right LENGTH, which
+ * is the only property `refuseWeakKey` reads.
+ */
+const MAC_KEY = Buffer.alloc(32, 7);
+const KEYED = { [OTP_MAC_KEY_VAR]: MAC_KEY.toString('base64') };
+
+/**
+ * The address AS TYPED, which normalizes to something else.
+ *
+ * The dot and the plus-tag both survive in `users.email` and both disappear from
+ * `users.email_normalized`, so every case below that names one form and gets the
+ * other back is reading a real distinction rather than a spelling.
+ */
+const TYPED = 'Bob.Smith+merit@example.test';
+const CODE = '123456';
+
+function digestOf(destination: string, code: string): Buffer {
+  return Buffer.from(otpCodeDigest(MAC_KEY, { channel: 'email', destination, code }));
+}
+
+/** One `otp_challenges` row as the accessor hands one back: property-keyed. */
+function challengeRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: CHALLENGE,
+    emailNormalized: normalizedEmail(TYPED),
+    codeHash: digestOf(TYPED, CODE),
+    expiresAt: LATER,
+    consumedAt: null,
+    attempts: 0,
+    requestIp: null,
+    createdAt: EARLIER,
+    channel: 'email',
+    destinationHash: null,
+    ...over,
+  };
+}
+
+/** A `users` row as the pre-identity read hands one back. */
+const USER_ROW = { id: USER, identityId: ALICE, email: TYPED };
+
+const VERIFY = { channel: 'email', email: TYPED, code: CODE } as const;
+const FROM = { requestIp: '203.0.113.7', userAgent: 'Mozilla/5.0 (X11) Firefox/140.0' } as const;
+
+test('a verified code for an address nobody holds creates the identity, and is_new is true', async () => {
+  const { db, calls } = recordingDb({
+    rowsWhere: [challengeRow()],
+    // THE PRE-IDENTITY READ ANSWERS NOBODY, which is ADR-196 clause 1's
+    // condition stated as data rather than as a branch in the test.
+    resolvesTo: undefined,
+    establishes: { identityId: ALICE, userId: USER },
+  });
+  const established = await databaseAuthBackend(db, clock, KEYED).verifyOtp(VERIFY, FROM);
+
+  expect(established?.response).toEqual({
+    identity_id: ALICE,
+    user_id: USER,
+    is_new: true,
+    auth_factor: 'email_otp',
+  });
+
+  // THE FOUR DOORS IN THE RULED ORDER, WHICH IS THE RULING ITSELF. Read and
+  // consume on the firm door; resolve; establish; mint. A diff that established
+  // before consuming, or minted before establishing, changes this list.
+  expect(calls.map((c) => `${c.door}:${c.verb}:${c.key}`)).toEqual([
+    'firm:rowsWhere:otpChallenges',
+    'firm:updateAt:otpChallenges',
+    'resolution:rowAt:users',
+    'establishment:establish:identities+users',
+    'scoped:insertUnder:sessions',
+  ]);
+
+  // THE ESTABLISHMENT IS AT THE ADDRESS THE RESOLUTION NAMED, both of them the
+  // address AS TYPED. `packages/db` shares one `RESOLUTION_ADDRESS` between the
+  // two doors for this reason and this asserts the handler does not spell it
+  // twice: `users.email` is UNIQUE and `users.email_normalized` deliberately is
+  // not, so establishing at the normalized form would create a second person.
+  expect(calls[2]?.address).toEqual({ email: TYPED });
+  expect(calls[3]?.address).toEqual({ email: TYPED });
+});
+
+test('the mint carries the resolved identity, the whole-token digest and SD-M4-03s pair', async () => {
+  const { db, calls } = recordingDb({
+    rowsWhere: [challengeRow()],
+    resolvesTo: USER_ROW,
+  });
+  const established = await databaseAuthBackend(db, clock, KEYED).verifyOtp(VERIFY, FROM);
+  const token = established?.sessionToken ?? '';
+
+  // THE IDENTITY THE SCOPED DOOR WAS OPENED WITH IS THE ONE THE ADDRESS
+  // RESOLVED TO, never one off the request. There is no request-supplied
+  // identity on this route at all, which is what makes the property worth
+  // pinning here: the day one arrives, this case is what notices.
+  const mint = calls.find((c) => c.verb === 'insertUnder');
+  expect(mint?.identityId).toBe(ALICE);
+  expect(parseSessionToken(token)?.identityId).toBe(ALICE);
+
+  const values = mint?.values as Record<string, unknown>;
+  // THE DIGEST IS OVER THE WHOLE TOKEN, which is `sessionByToken`'s first of two
+  // independent refusals read from the other end: the minter and the reader have
+  // to agree, and nothing but a case can make them.
+  expect(values['refreshTokenHash']).toEqual(Buffer.from(sessionTokenHash(token)));
+  expect(values['userId']).toBe(USER);
+  expect(values['authFactor']).toBe('email_otp');
+  expect(values['expiresAt']).toEqual(new Date(NOW.getTime() + SESSION_LIFETIME_MS));
+  // SD-M4-03's CREATION HALF, and the older pair left NULL rather than written
+  // twice. `AS-M4-05` needs the creation values separate from the last-seen
+  // ones, and a minter that wrote `ip` as well would be two copies of one fact.
+  expect(values['createdIp']).toBe(FROM.requestIp);
+  expect(values['createdUserAgent']).toBe(FROM.userAgent);
+  expect(values['ip']).toBeUndefined();
+  expect(values['userAgent']).toBeUndefined();
+});
+
+test('a code for an address that already resolves answers is_new false and establishes nothing', async () => {
+  const { db, calls } = recordingDb({ rowsWhere: [challengeRow()], resolvesTo: USER_ROW });
+  const established = await databaseAuthBackend(db, clock, KEYED).verifyOtp(VERIFY, FROM);
+  expect(established?.response.is_new).toBe(false);
+  expect(established?.response.identity_id).toBe(ALICE);
+  // ADR-196 clause 4: true on exactly the call that performed clause 1. A
+  // returning trader performs it on no call, and the door that would is not
+  // opened at all rather than opened and rolled back.
+  expect(calls.some((c) => c.door === 'establishment')).toBe(false);
+});
+
+test('the read names every reason a row is not a candidate, and the newest live one wins', async () => {
+  const newest = challengeRow({
+    id: 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee',
+    createdAt: new Date(NOW.getTime() - 60_000),
+    codeHash: digestOf(TYPED, '654321'),
+  });
+  const { db, calls } = recordingDb({
+    // THE ACCESSOR IS A RECORDER, so both rows come back whatever the filter
+    // said. That is what makes this case worth having: it asserts the handler
+    // picks the newest ITSELF rather than trusting an ORDER BY it cannot write.
+    rowsWhere: [challengeRow(), newest],
+    resolvesTo: USER_ROW,
+  });
+  const backend = databaseAuthBackend(db, clock, KEYED);
+
+  // The OLDER challenge's code no longer answers, because the newer one is the
+  // only candidate. A handler that walked every live row would accept it, and
+  // would thereby give an attacker five attempts per outstanding code.
+  expect(await backend.verifyOtp(VERIFY, FROM)).toBeNull();
+  expect(await backend.verifyOtp({ ...VERIFY, code: '654321' }, FROM)).not.toBeNull();
+
+  const filter = calls[0]?.address as Record<string, unknown>;
+  expect(Object.keys(filter).sort()).toEqual([
+    'attempts',
+    'channel',
+    'consumedAt',
+    'emailNormalized',
+    'expiresAt',
+  ]);
+  // KEYED ON THE NORMALIZED FORM, because `otp_challenges` is: "Issued before a
+  // user may exist, so this keys off the normalized email rather than a user_id"
+  // (`0002:306-308`). The DIGEST is bound to the typed form, which is the
+  // separation those two columns cannot make between themselves.
+  expect(filter['emailNormalized']).toBe(normalizedEmail(TYPED));
+  expect(filter['emailNormalized']).not.toBe(TYPED);
+});
+
+test('a wrong code spends one attempt, consumes nothing and resolves nobody', async () => {
+  const { db, calls } = recordingDb({ rowsWhere: [challengeRow({ attempts: 2 })] });
+  const backend = databaseAuthBackend(db, clock, KEYED);
+  expect(await backend.verifyOtp({ ...VERIFY, code: '000000' }, FROM)).toBeNull();
+
+  const written = calls.filter((c) => c.verb === 'updateAt');
+  expect(written).toHaveLength(1);
+  expect(written[0]?.address).toEqual({ id: CHALLENGE });
+  expect(written[0]?.values).toEqual({ attempts: 3 });
+  // NOTHING PAST THE FIRM DOOR. A wrong code must not reach the pre-identity
+  // read, because a handler that resolved first and matched second would take a
+  // measurably different amount of work for an address that exists.
+  expect(calls.some((c) => c.door === 'resolution' || c.door === 'establishment')).toBe(false);
+});
+
+test('the increment cannot reach 0002s CHECK ceiling, because an exhausted row is not a candidate', async () => {
+  // THE LAST ATTEMPT IS SPENT AND THE COUNTER LANDS EXACTLY ON THE CEILING.
+  const spending = recordingDb({ rowsWhere: [challengeRow({ attempts: OTP_MAX_ATTEMPTS - 1 })] });
+  expect(
+    await databaseAuthBackend(spending.db, clock, KEYED).verifyOtp(
+      { ...VERIFY, code: '000000' },
+      FROM,
+    ),
+  ).toBeNull();
+  expect(spending.calls.find((c) => c.verb === 'updateAt')?.values).toEqual({
+    attempts: OTP_MAX_ATTEMPTS,
+  });
+
+  // AND THE SIXTH ATTEMPT FINDS NO CANDIDATE AT ALL, so nothing is written and
+  // `attempts BETWEEN 0 AND 5` is never the thing that answers a person. A
+  // handler that let the CHECK refuse would turn a lockout into a 500.
+  const locked = recordingDb({ rowsWhere: [challengeRow({ attempts: OTP_MAX_ATTEMPTS })] });
+  const backend = databaseAuthBackend(locked.db, clock, KEYED);
+  expect(await backend.verifyOtp(VERIFY, FROM)).toBeNull();
+  expect(locked.calls.filter((c) => c.verb === 'updateAt')).toEqual([]);
+  // AND THE CORRECT CODE IS REFUSED TOO. The lockout is on the challenge, so it
+  // binds the person who holds the code as much as the person guessing at it.
+});
+
+test('an expired challenge is refused at the boundary the SELECT cannot express', async () => {
+  // `atLeast` RENDERS `>=`, so a challenge expiring at exactly `now` comes back
+  // from a real accessor. The strict boundary is applied in the handler, which
+  // is `liveSession`'s own division of labour one section up.
+  const { db, calls } = recordingDb({ rowsWhere: [challengeRow({ expiresAt: NOW })] });
+  expect(await databaseAuthBackend(db, clock, KEYED).verifyOtp(VERIFY, FROM)).toBeNull();
+  expect(calls.filter((c) => c.verb === 'updateAt')).toEqual([]);
+});
+
+test('consuming happens BEFORE the identity exists, and it is the ruled ordering', async () => {
+  const { db, calls } = recordingDb({ rowsWhere: [challengeRow()], resolvesTo: USER_ROW });
+  await databaseAuthBackend(db, clock, KEYED).verifyOtp(VERIFY, FROM);
+  const consume = calls.findIndex((c) => c.verb === 'updateAt');
+  const resolve = calls.findIndex((c) => c.door === 'resolution');
+  const mint = calls.findIndex((c) => c.verb === 'insertUnder');
+  expect(consume).toBeLessThan(resolve);
+  expect(resolve).toBeLessThan(mint);
+  expect(calls[consume]?.values).toEqual({ consumedAt: NOW });
+  // ADR-126 priced this ordering: consuming first can leave "a consumed
+  // challenge and no session and the person asks for another code", which is
+  // paid in an inconvenience. Consuming LAST leaves a code that has already
+  // minted a session still answerable, which is paid in a session.
+});
+
+test('the loser of an establishment race answers is_new false rather than 500', async () => {
+  const { db, calls } = recordingDb({
+    rowsWhere: [challengeRow()],
+    establishThrows: new IdentityAlreadyEstablished(TYPED),
+  });
+  // THE FIRST READ ANSWERS NOBODY AND THE SECOND ANSWERS THE WINNER'S ROW,
+  // which is the interleaving the race produces: this handler resolved before
+  // the other transaction committed and reads again after `users_email_key`
+  // arbitrated.
+  let seen = 0;
+  const racing = {
+    ...db,
+    resolution: <T>(fn: (rx: never) => Promise<T>): Promise<T> => {
+      seen += 1;
+      const answer = seen === 1 ? undefined : USER_ROW;
+      return fn({
+        rowAt: (key: string, at: unknown) => {
+          calls.push({ door: 'resolution', verb: 'rowAt', key, address: at });
+          return Promise.resolve(answer);
+        },
+      } as never);
+    },
+  };
+
+  const established = await databaseAuthBackend(racing, clock, KEYED).verifyOtp(VERIFY, FROM);
+  expect(established?.response.is_new).toBe(false);
+  expect(established?.response.identity_id).toBe(ALICE);
+  // AND THE SESSION IS STILL MINTED. Losing the race is not losing the login:
+  // the code was correct and it was this caller's, so a 401 here would refuse
+  // the right person for being second by a millisecond.
+  expect(calls.some((c) => c.verb === 'insertUnder')).toBe(true);
+  expect(seen).toBe(2);
+});
+
+test('the establishment doors own error is the only one translated, and the rest are not swallowed', async () => {
+  const { db } = recordingDb({
+    rowsWhere: [challengeRow()],
+    establishThrows: new Error('the connection went away'),
+  });
+  await expect(databaseAuthBackend(db, clock, KEYED).verifyOtp(VERIFY, FROM)).rejects.toThrow(
+    'the connection went away',
+  );
+});
+
+test('0063 saying the code was already spent is a 401 and never a 500', async () => {
+  // WHAT DRIZZLE THROWS, WRAPPED. The driver's error is one level down in
+  // `cause`, which is the defect ADR-197 measured on the establishment door: a
+  // translator reading only the top level matches nothing and turns a lost race
+  // into a 500 on the money path.
+  const raised = new Error('failed query', {
+    cause: { code: '23514', constraint: 'otp_challenges_consumption_is_write_once' },
+  });
+  expect(isChallengeAlreadyConsumed(raised)).toBe(true);
+  // ANOTHER CHECK ON THE SAME TABLE IS NOT THIS ONE. `check_violation` is what
+  // every CHECK in the schema raises, so the SQLSTATE alone would answer "bad
+  // code" to a row that violated something else entirely.
+  expect(isChallengeAlreadyConsumed(new Error('x', { cause: { code: '23514' } }))).toBe(false);
+  expect(isChallengeAlreadyConsumed(null)).toBe(false);
+
+  const { db, calls } = recordingDb({ rowsWhere: [challengeRow()] });
+  const guarded = {
+    ...db,
+    firm: <T>(fn: (tx: never) => Promise<T>): Promise<T> =>
+      db.firm((tx) => {
+        const handle = tx as unknown as Record<string, unknown>;
+        return fn({
+          ...handle,
+          updateAt: (key: string, at: unknown, values: unknown) => {
+            calls.push({ door: 'firm', verb: 'updateAt', key, address: at, values });
+            return Promise.reject(raised);
+          },
+        } as never);
+      }),
+  };
+  expect(await databaseAuthBackend(guarded, clock, KEYED).verifyOtp(VERIFY, FROM)).toBeNull();
+  // AND NOTHING PAST IT. A code somebody else spent must not mint a session.
+  expect(calls.some((c) => c.door === 'resolution' || c.verb === 'insertUnder')).toBe(false);
+});
+
+test('a deployment with no OTP key answers 503 on verify alone, and opens no door', async () => {
+  const { db, calls } = recordingDb({ rowsWhere: [challengeRow()] });
+  const err: unknown = await databaseAuthBackend(db, clock, {})
+    .verifyOtp(VERIFY, FROM)
+    .then(
+      () => null,
+      (e: unknown) => e,
+    );
+  expect(err).toBeInstanceOf(AuthBackendUnwired);
+  expect((err as AuthBackendUnwired).reason).toContain(OTP_MAC_KEY_VAR);
+  // THE REFUSAL COMES BEFORE THE DATABASE. A 503 that had already read the
+  // challenge would have spent a connection to say "this deployment is not
+  // configured", and would have done it on an unauthenticated route.
+  expect(calls).toEqual([]);
+});
+
+test('the sms channel is refused as a channel and never as a wrong code', async () => {
+  const { db, calls } = recordingDb({ rowsWhere: [challengeRow()], resolvesTo: USER_ROW });
+  const err: unknown = await databaseAuthBackend(db, clock, KEYED)
+    .verifyOtp({ channel: 'sms', phone: '+15550000000', code: CODE }, FROM)
+    .then(
+      () => null,
+      (e: unknown) => e,
+    );
+  expect(err).toBeInstanceOf(AuthBackendUnwired);
+  // ADR-196 clause 5 IS THE REASON AND IT IS DERIVED FROM A `NOT NULL`. An SMS
+  // verification for an unknown number has no value to write into
+  // `users.email`, and logging IN on it needs a phone resolved through
+  // `identity_phones`, which is not an address the resolution vocabulary carries.
+  expect((err as AuthBackendUnwired).reason).toContain('identity_phones');
+  expect(calls).toEqual([]);
+});
+
+test('the minted token is the format the reader parses, and the secret is 32 bytes', () => {
+  const token = mintSessionToken(ALICE);
+  expect(parseSessionToken(token)?.identityId).toBe(ALICE);
+  const secret = token.slice(ALICE.length + SESSION_TOKEN_SEPARATOR.length);
+  // `base64url` OF 32 BYTES IS 43 CHARACTERS UNPADDED, and the assertion is on
+  // the DECODED length because that is the property that matters: a secret
+  // shorter than the digest it is hashed into is the weak link.
+  expect(Buffer.from(secret, 'base64url')).toHaveLength(SESSION_SECRET_BYTES);
+  // AND TWO MINTS DO NOT COLLIDE, which `refresh_token_hash bytea NOT NULL
+  // UNIQUE` would otherwise arbitrate by refusing somebody's login.
+  expect(mintSessionToken(ALICE)).not.toBe(token);
 });

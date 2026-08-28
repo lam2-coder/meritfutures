@@ -65,6 +65,7 @@ import {
 } from '../src/routes/auth.ts';
 import { RESET_PATH } from '../src/routes/checkout.ts';
 import { defineRoutes } from '../src/registry.ts';
+import { NO_PRE_IDENTITY_DOORS } from './db-recorder.ts';
 
 // -----------------------------------------------------------------------------
 // Two identities, and every id below is a uuid because `db.ts` refuses anything
@@ -183,6 +184,7 @@ function storeDb(world: World): { db: ApiDb; calls: Call[] } {
     scoped: <T>(identityId: string, fn: (tx: never) => Promise<T>): Promise<T> =>
       fn(handle('scoped', identityId) as never),
     firm: <T>(fn: (tx: never) => Promise<T>): Promise<T> => fn(handle('firm') as never),
+    ...NO_PRE_IDENTITY_DOORS,
   };
   return { db, calls };
 }

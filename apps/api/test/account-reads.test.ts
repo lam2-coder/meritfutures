@@ -67,6 +67,7 @@ import {
   useAuthBackend,
   type AuthSession,
 } from '../src/routes/auth.ts';
+import { NO_PRE_IDENTITY_DOORS } from './db-recorder.ts';
 
 // -----------------------------------------------------------------------------
 // Two identities. Every id is a uuid because `db.ts` refuses anything else
@@ -177,6 +178,7 @@ function storeDb(world: World): { db: ApiDb; calls: Call[] } {
     scoped: <T>(identityId: string, fn: (tx: never) => Promise<T>): Promise<T> =>
       fn(handle('scoped', identityId) as never),
     firm: <T>(fn: (tx: never) => Promise<T>): Promise<T> => fn(handle('firm') as never),
+    ...NO_PRE_IDENTITY_DOORS,
   };
   return { db, calls };
 }
