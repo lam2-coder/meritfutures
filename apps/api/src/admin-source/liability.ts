@@ -6,8 +6,14 @@
 // THE DISTINCTION IS THE WHOLE POINT OF THIS FILE AND IT IS STATED FIRST.
 // `LiabilityResponse` projects 40 leaf paths under 10 containers. This module
 // produces 27 of the 40 from live rows through ADR-112's keyed accessor. The
-// other 13 are FOUR SEPARATE BLOCKERS, none of which is a missing column and
-// none of which this fence can clear. So the method is NOT composed, the array
+// other 13 are FIVE SEPARATE BLOCKERS, none of which is a missing column and
+// none of which this fence can clear. **B1 IS LIFTED AND THE COUNT DID NOT MOVE**,
+// which is the finding session 380 landed: it was one of TWO blockers on the same
+// five leaves and only the second had ever been looked for. **B2 IS LIFTED TOO,
+// BY ADR-201, AND THE COUNT DID NOT MOVE THERE EITHER**, for the same reason and
+// not for a new one: a ruling clears a blocker and leaves the fold unwritten.
+// **THE BLOCKED-LEAF COUNT IS WHAT IS PRODUCED AND NEVER WHAT IS PERMITTED**, and
+// the suite derives it from API_CONTRACT rather than from this comment. So the method is NOT composed, the array
 // `IMPLEMENTED_ADMIN_READS` does not name it, and `composeAdminReadSource` still
 // fills the gap with `AdminSourceNotComposed('readLiability')`.
 //
@@ -32,28 +38,25 @@
 // is `LiabilityResponse` minus exactly the blocked paths, written as a mechanical
 // subtraction rather than as a hand-copied shape, so the day a blocker lifts the
 // widening is a type error and never a judgement call. `test/admin-source-liability.test.ts`
-// asserts the arithmetic: the book's leaves plus the four blockers' leaves are
-// the response's leaves, counted from the CONTRACT rather than from either type.
+// asserts the arithmetic: the book's leaves plus the blocked leaves are the
+// response's leaves, counted from the CONTRACT rather than from either type.
 //
 // -----------------------------------------------------------------------------
-// THE FOUR BLOCKERS, EACH AT ITS PRIMARY SOURCE, AND NOT ONE OF THEM IS A COLUMN
+// THE FIVE BLOCKERS, EACH AT ITS PRIMARY SOURCE, AND NOT ONE OF THEM IS A COLUMN
 // -----------------------------------------------------------------------------
 // ADR-199 ruled `per_plan[].cusum`, `integrations.batch` and `eligible_next_7d`
 // DERIVABLE rather than owed a migration, and it is right about all three. It
 // did not rule them READABLE, and for two of the three it says so in its own
 // words. What follows is what stands between a derivation and a row.
 //
-//   B1. `eligible_next_7d` (5 leaves). The fold needs the NEXT SEVEN TRADING
-//       DAYS and `trading_calendar` is not a `TableKey`: `packages/db/src/scope.ts`
-//       registers `tradingCalendarLoads` and `tradingCalendarRevisions` and not
-//       the calendar itself. A `Tx` naming it is `TS2322`, which is session
-//       349's wall on `events` and session 363's on `reserve_coverage_snapshots`,
-//       for the third time. ADR-199 section 6: "ONE INPUT IS NOT YET A `TableKey`
-//       AND IT IS NAMED RATHER THAN TAKEN ... the session that NEEDS it registers
-//       it, and this one does not read it." This session needs it and cannot take
-//       it: the registration is `packages/db`, which is not this fence, and it is
-//       an ADR-092-shaped entry, which is a number this session does not hold.
-//       CLEARING CONDITION: `TABLE_KEYS` contains `tradingCalendar`.
+//   B1. `eligible_next_7d` (5 leaves). **LIFTED, AND THE HALF IT BLOCKED IS
+//       BUILT.** `trading_calendar` was not a `TableKey`, so a `Tx` naming it was
+//       `TS2322` and the fold's fourth input could not be named. Session 377
+//       registered it `firm` under ADR-103 clause 2 and
+//       {@link readTradingHorizon} below is the read that spends it: the next
+//       seven TRADING days off `trading_calendar`, bounded by
+//       `trading_calendar_loads`, executed against a live database. **THE GROUP
+//       IS STILL NOT PRODUCED, AND THE REASON IS B5 RATHER THAN B1.**
 //
 //   B2. `payout_velocity` (4 leaves, and the group goes whole). The NUMERATOR is
 //       producible on its own --
@@ -69,8 +72,17 @@
 //       1.0 and the same threshold means what the constitution says. FM-M6-07's
 //       words for the CUSUM ("either constant alarms or none, which is the same
 //       as no chart") are the exact failure, on a control that pages.
-//       CLEARING CONDITION: a ruling fixes the window. Choosing one here would be
-//       calibrating a firm-wide pager inside an adapter.
+//       **LIFTED BY ADR-201 WHILE THIS BRANCH WAS OPEN, AND THE PARAGRAPH ABOVE
+//       IS KEPT RATHER THAN DELETED** because the reading it records is what the
+//       ruling was written against. ADR-201 ruling 2: `avg_30d_cents` is "the
+//       trailing thirty-day settled total scaled to seven days", which is the
+//       third of the three readings above and the only one that leaves 2.5x
+//       meaning what four documents say it means; ruling 6 answers the empty
+//       denominator with `ratio_bp` 0 and `alarm` false. The entry is
+//       `status: proposed` with an UNSIGNED approval line, which is what an ADR
+//       ships as. **THE FOUR LEAVES ARE STILL BLOCKED AND THAT IS NOT A
+//       CONTRADICTION**: the ruling landed and the fold is unwritten, which is
+//       B1's shape exactly. A lifted blocker is a session's work, not a field.
 //
 //   B3. `per_plan[].cusum` (3 leaves). ADR-167 clause 1 folds `S_t` at read time
 //       from a landed series, and clause 5 rules that the field is rendered
@@ -103,6 +115,64 @@
 //       wrote it down. `mismatches_open` is a COUNT of a state rather than a
 //       clock and is produced.
 //       CLEARING CONDITION: a `recon.completed` event or a run record.
+//
+//   B5. `eligible_next_7d` AGAIN (the same 5 leaves), AND IT IS THE HALF NOBODY
+//       HAD LOOKED AT. The group is a FORECAST: "which accounts clear their
+//       payout gates on each of the next seven trading days, and for how much"
+//       (ADR-199 section 6), which EC-074 and P-M6-02 both phrase as "eligible
+//       now or inside 7 trading days". The horizon is producible and the
+//       PER-ACCOUNT half is not, on two INDEPENDENT legs, either of which alone
+//       blocks the group.
+//
+//       LEG 1, THE ENGINE'S OWN FORECAST IS UNWRITTEN AND UNSPECIFIED. Six gate
+//       groups decide eligibility (`tradedDays`, `winDays`, `buffer`,
+//       `consistency`, `cadenceGap`, `minimumAmount`) and exactly ONE of them
+//       carries a forward-looking date: `cadenceGap.nextEligibleTradingDay`,
+//       which AS-06 requires be published as a resolved date. Every other gate
+//       clears only when the trader TRADES, so no stored row says when. That one
+//       date lives in `rule_states.engine_gates`, a `jsonb NOT NULL` bag, and
+//       **NOTHING IN THIS TREE WRITES IT**: `writeRuleState` is a port
+//       (`apps/worker/src/batch/ports.ts`) whose only implementations are test
+//       doubles and `scripts/demo/world.ts`, which REFUSES. Its JSON encoding is
+//       fixed by no document either -- `EngineGateResults` types every cents
+//       member `bigint`, which JSON cannot carry, and `0015`'s own column comment
+//       names EIGHT gates ("profit target, drawdown, win days, minimum days,
+//       consistency, cadence, cap, minimum payout") where the engine produces
+//       six. So the path `engine_gates.cadenceGap.nextEligibleTradingDay` is one
+//       no primary source declares and no producer writes. **THIS IS NOT
+//       `integrations.batch`'s CASE AND THE CONTRAST IS THE POINT**: EVENTS
+//       section 5 DECLARES the `batch.completed` body in the approved catalogue,
+//       which is why ADR-199 clause 4 could rule those two figures readable off
+//       an event nothing has emitted yet.
+//
+//       LEG 2, RECOMPUTING THE GATE NEEDS A COLUMN THAT DOES NOT EXIST. ADR-199
+//       section 6's own input table offers the other route: `plan_versions.rules`
+//       for `cadence_gap_trading_days` and the ladder caps, `accounts` for the
+//       pinned version, `rule_states` for the anchors. Every one of those is a
+//       real column and a registered `TableKey`. **`CalendarDay.sequence` IS
+//       NOT.** R-37 counts the gap by `sequence` subtraction and R-02 fixes that
+//       "gap counting is `calendar.sequence` subtraction, NEVER date arithmetic";
+//       `trading_calendar` declares no such column in `0004` or in any of the 59
+//       migrations, and `packages/db/src/seed/calendars/` assigns none. The
+//       engine gets its slice from a PORT (`BatchPorts.read.calendarSlice`) that
+//       the caller supplies, never from a table. So the substitute available here
+//       is date arithmetic, which is the one thing AS-06 says publishes "a rule
+//       its own traders cannot evaluate".
+//
+//       **AND RECOMPUTING IT WOULD BE THE WRONG SHAPE EVEN IF THE COLUMN
+//       EXISTED.** `admin-source/account.ts` states this directory's rule for the
+//       same column: "Nothing in this module derives an eligibility, recomputes a
+//       gate or summarises one". A second evaluator of a money gate living in an
+//       admin read adapter is FM-M6-07's shape on the pager one field over.
+//
+//       **THE GROUP GOES WHOLE OR NOT AT ALL**, on B2's stated reason. Producing
+//       only the accounts eligible TODAY would understate `total_cents`, and that
+//       figure is the one the payout wallet is funded against (EC-074, P-M6-02,
+//       ADR-011's top-up trigger). EC-074's own words for understating it:
+//       "Funding the wallet against the overstatement starves operations".
+//       CLEARING CONDITION: a `rule_states` writer lands and a primary source
+//       declares the stored `engine_gates` shape, or a ruling defines the
+//       forecast over columns that exist.
 //
 // **`withdrawals_in_flight_cents` IS ABSENT AND IS NOT A FIFTH BLOCKER**, because
 // it is not on the response. ADR-195 section 6 row 1 owes the column, no migration
@@ -167,9 +237,19 @@ import type { AdminRowFilter } from './flags.ts';
  * which is the half this module cannot make about itself because it holds no
  * import of that package.
  *
- * `tradingCalendar` IS NOT HERE AND COULD NOT BE. It is blocker B1 and it is
- * the reason `eligible_next_7d` is not on {@link LiabilityBook}: the name is not
- * a `TableKey`, so this array could not carry it even to try.
+ * `tradingCalendar` AND `tradingCalendarLoads` ARE HERE AS OF SESSION 380, AND
+ * THE FIRST OF THEM IS WHAT B1 BOUGHT. While `trading_calendar` was not a
+ * `TableKey` this array could not carry it even to try, which is what made B1 a
+ * registration rather than a design gap; session 377 registered it `firm` under
+ * `ADR-103` clause 2 and {@link readTradingHorizon} is the read that spends it.
+ * **BOTH ARE NEEDED AND ONE IS NOT ENOUGH**: `ADR-042` F-4 puts coverage in
+ * `trading_calendar_loads`, so a day outside it is UNKNOWN rather than a
+ * holiday.
+ *
+ * THEY ARE READ BY {@link readTradingHorizon} AND NOT BY {@link readLiabilityBook},
+ * which is stated here because the array would otherwise imply the second. The
+ * book carries no `eligible_next_7d` (blocker B5), so paying two whole-table
+ * reads inside it would buy a group it cannot return.
  */
 export const LIABILITY_READ_TABLES = [
   'events',
@@ -179,6 +259,8 @@ export const LIABILITY_READ_TABLES = [
   'plans',
   'reconciliations',
   'reserveCoverageSnapshots',
+  'tradingCalendar',
+  'tradingCalendarLoads',
   'treasuryBalances',
 ] as const;
 
@@ -304,6 +386,25 @@ function cents(value: unknown, at: string): number {
         'member as a JSON integer and a rounded one is wrong where it is hardest to notice',
     );
   return asNumber;
+}
+
+/**
+ * A `boolean NOT NULL` column.
+ *
+ * `drizzle-orm` hands a `boolean` back for a `boolean` column and anything else
+ * is the transcription disagreeing with the database. It is checked rather than
+ * coerced because the three calendar booleans decide whether a day is IN the
+ * horizon at all, and a truthy string would put a holiday in it.
+ */
+function flag(row: unknown, name: string, at: string): boolean {
+  const value = field(row, name, at);
+  if (typeof value !== 'boolean')
+    throw new AdminReadError(
+      `${at} carries \`${name}\` as ${JSON.stringify(value)}, and the column is a ` +
+        '`boolean NOT NULL`. A day whose holiday flag is not a boolean is a day nothing can ' +
+        'decide is a session',
+    );
+  return value;
 }
 
 /** An `integer NOT NULL` count or basis-point column. */
@@ -741,5 +842,428 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
       openMismatchesScanned: openMismatches.length,
       batchCompletedScanned: batchRows.length,
     },
+  };
+}
+
+// -----------------------------------------------------------------------------
+// The trading-day horizon, which is the half of `eligible_next_7d` B1 unblocked
+// -----------------------------------------------------------------------------
+// `eligible_next_7d` IS TWO FOLDS AND B1 CLEARED ONE OF THEM. The group is
+// `{ total_cents, account_count, by_day: [{ trading_day, cents, accounts }] }`,
+// and producing it needs the NEXT SEVEN TRADING DAYS (this section) and then a
+// PER-ACCOUNT ELIGIBILITY FORECAST over them (blocker B5, in the header). The
+// first is ordinary code the moment `trading_calendar` is a `TableKey`, which
+// session 377 made it. The second is not, and the two are separated here so the
+// session that clears B5 inherits the calendar work already done and executed.
+//
+// "NEXT 7 DAYS" OVER CALENDAR DAYS AND OVER TRADING DAYS ARE DIFFERENT ANSWERS
+// AND THE DIFFERENCE IS EVERY WEEKEND AND EVERY HOLIDAY. `M01` R-02 fixes which
+// one this corpus means: gap counting is calendar subtraction, "never date
+// arithmetic", and `AS-06` records what date arithmetic costs, that five trading
+// days is 7 calendar days in June and 9 to 10 across the year-end cluster. So
+// nothing below adds a day to a date. Every day of the horizon is a ROW of
+// `trading_calendar`, read in order.
+//
+// -----------------------------------------------------------------------------
+// AN EXHAUSTED CALENDAR MUST SAY SO, WHICH IS THE WHOLE OF ADR-042 F-4
+// -----------------------------------------------------------------------------
+// F-4 is the finding this section is shaped by, and it is worth quoting because
+// the failure it names is the one a careless horizon walk reproduces exactly:
+// coverage had no storage, so "an exhausted calendar is indistinguishable from
+// an unbroken holiday: every counter quietly stops advancing, no rule fires,
+// nothing breaches, nothing becomes eligible, and NOTHING RAISES".
+//
+// `0032` answered it with `trading_calendar_loads`, whose `coverage_start_day`
+// and `coverage_end_day` are the interval a load is entitled to answer for. So
+// THE TWO TABLES ARE READ TOGETHER AND NEITHER IS SUFFICIENT: `trading_calendar`
+// says which days are sessions, `trading_calendar_loads` says which days the
+// estate has an opinion about at all, and a day outside the second is UNKNOWN
+// rather than a holiday. `packages/rules-engine/src/calendar.ts` states the same
+// separation one layer up as `not_a_session` against `outside_coverage`, and its
+// own words are that they "differ and only one of them is safe to act on".
+//
+// **RUNNING OUT IS A VALUE HERE AND NEVER A SHORT ARRAY.** {@link TradingHorizon}
+// is a discriminated union whose `exhausted` arm carries the days it did find,
+// the day coverage runs through, and how many short it is. A `by_day` of four
+// entries where seven were asked for is a liability panel that understates the
+// figure the payout wallet is funded against (`EC-074`, `P-M6-02`) and looks
+// exactly like a quiet week.
+//
+// **AND A SESSION ROW PAST THE COVERAGE EDGE IS NOT TAKEN**, which is the one
+// case where the two tables disagree and the ruling has to be stated rather than
+// implied. `nextTradingDayAfter` rules it one layer up in terms: "THE LAST DAY
+// IN `days` IS A MISS EVEN WHEN COVERAGE EXTENDS PAST IT", because coverage says
+// the slice can answer "is this day a session", not "is there another session
+// after this one". The mirror case is this one, and it takes the same answer:
+// coverage is the authority on what may be answered, so the walk stops at
+// `coveredThroughDay` whatever rows happen to sit past it.
+// -----------------------------------------------------------------------------
+
+/**
+ * The tables the horizon reads, both of them, and NEITHER ALONE IS ENOUGH.
+ *
+ * Both are `firm` in `packages/db/src/scope.ts` and both arrived at the same
+ * moment for this module's purposes: `tradingCalendarLoads` has been registered
+ * since `ADR-092`, and `tradingCalendar` is session 377's registration under
+ * `ADR-103` clause 2. `LIABILITY_READ_TABLES` carries both.
+ */
+export const TRADING_CALENDAR_TABLES = ['tradingCalendar', 'tradingCalendarLoads'] as const;
+
+/**
+ * Seven, and it is `EC-074`'s number rather than this module's.
+ *
+ * `EC-074` defines bounded near-term liability over "accounts eligible now or
+ * inside 7 trading days" and `P-M6-02` restates it as "currently eligible or
+ * become eligible inside 7 trading days". `0009`'s own column comment on
+ * `bounded_near_term_cents` says the same thing a third time. The field name
+ * `eligible_next_7d` is the fourth.
+ */
+export const ELIGIBLE_HORIZON_TRADING_DAYS = 7;
+
+/**
+ * One day of the horizon, as the calendar stores it.
+ *
+ * `is_half_day` AND `halted` ARE CARRIED AND NEITHER EXCLUDES A DAY, which is
+ * the pair a reader is most likely to filter on by mistake. `0004`: a half day
+ * "counts as a FULL DAY (B4 #3)", because "a half day that counted as half a day
+ * would make the minimum-trading-days gate a different promise in November"; and
+ * on a halted session "day counters advance and win days do NOT (B4 #2)", so a
+ * halted day is a trading day that a trader cannot earn a win day on. ONLY
+ * `is_holiday` REMOVES A DAY FROM THE CALENDAR, and after `0032` a holiday is a
+ * positive fact rather than an absence.
+ */
+export interface HorizonDay {
+  readonly trading_day: string;
+  readonly is_half_day: boolean;
+  readonly halted: boolean;
+}
+
+/**
+ * What a horizon walk can answer, and the three answers are genuinely different.
+ *
+ * `calendar.ts`'s `CalendarLookup` is the shape and its reason applies here
+ * unchanged: collapsing "there are no more sessions" into "here are the four I
+ * found" is `ADR-042` F-4's silent failure with a number attached to it.
+ *
+ *   `resolved`   exactly `span` sessions, every one inside coverage
+ *   `exhausted`  fewer than `span`, and it says how many and through what day
+ *   `uncovered`  the estate has no opinion about the anchor day at all
+ */
+export type TradingHorizon =
+  | {
+      readonly kind: 'resolved';
+      readonly anchor_day: string;
+      readonly covered_through_day: string;
+      readonly days: readonly HorizonDay[];
+    }
+  | {
+      readonly kind: 'exhausted';
+      readonly anchor_day: string;
+      readonly covered_through_day: string;
+      readonly days: readonly HorizonDay[];
+      readonly short_by: number;
+      readonly detail: string;
+    }
+  | { readonly kind: 'uncovered'; readonly anchor_day: string | null; readonly detail: string };
+
+/** What the horizon read cost, in rows. `LiabilityReadCost`'s idiom. */
+export interface TradingHorizonCost {
+  readonly calendarRowsScanned: number;
+  readonly calendarLoadsScanned: number;
+  readonly coveredIntervals: number;
+}
+
+/** {@link readTradingHorizon}'s answer. */
+export interface TradingHorizonResult {
+  readonly horizon: TradingHorizon;
+  readonly cost: TradingHorizonCost;
+}
+
+/** ADR-112's keyed accessor over the two calendar tables, READ HALF ONLY. */
+export interface TradingCalendarTx {
+  rows(key: (typeof TRADING_CALENDAR_TABLES)[number]): Promise<unknown[]>;
+}
+
+/**
+ * One `trading_calendar` row, with `0032`'s CHECK asserted in BOTH directions.
+ *
+ * `trading_calendar_holiday_has_no_session` is `CHECK (is_holiday = (session_open_at
+ * IS NULL))`, an equality between two booleans and therefore a constraint in both
+ * directions at once. It is re-asserted here rather than trusted, and the reason
+ * is `0032` itself: the constraint was ADDED by that migration to a table `0004`
+ * created without it, so rows predating it are exactly what it was written to
+ * make impossible, and a merged migration is never edited (constitution E2), only
+ * superseded. A holiday carrying a fabricated session interval is `F-1`'s defect,
+ * and `R-01` is a CONTAINMENT lookup, so a fabricated interval is an interval a
+ * fill can fall inside.
+ */
+function horizonRow(row: unknown): {
+  readonly day: string;
+  readonly isHoliday: boolean;
+  readonly closeMs: number | null;
+  readonly openMs: number | null;
+  readonly entry: HorizonDay;
+} {
+  const at = 'a trading calendar row';
+  const tradingDay = day(row, 'tradingDay', at);
+  const isHoliday = flag(row, 'isHoliday', at);
+  const openAt = field(row, 'sessionOpenAt', at);
+  const closeAt = field(row, 'sessionCloseAt', at);
+  const sessionless = openAt === null || openAt === undefined;
+  const closeless = closeAt === null || closeAt === undefined;
+
+  if (isHoliday !== sessionless || isHoliday !== closeless)
+    throw new AdminReadError(
+      `the trading calendar carries ${tradingDay} with \`is_holiday\` ${String(isHoliday)} and a ` +
+        `session interval that is ${sessionless && closeless ? 'absent' : 'present'}. 0032's ` +
+        '`trading_calendar_holiday_has_no_session` makes those the same fact in both directions, ' +
+        'and R-01 is a containment lookup, so a holiday carrying a fabricated session is an ' +
+        'interval a fill can fall inside',
+    );
+
+  if (isHoliday)
+    return {
+      day: tradingDay,
+      isHoliday: true,
+      closeMs: null,
+      openMs: null,
+      entry: { trading_day: tradingDay, is_half_day: false, halted: false },
+    };
+
+  const openMs = instantMs(row, 'sessionOpenAt', `the trading calendar row for ${tradingDay}`);
+  const closeMs = instantMs(row, 'sessionCloseAt', `the trading calendar row for ${tradingDay}`);
+  if (!(closeMs > openMs))
+    throw new AdminReadError(
+      `the trading calendar carries ${tradingDay} with a session that closes at or before it ` +
+        "opens. 0032's `trading_calendar_session_ordered` forbids that, and the anchor below is " +
+        'the latest session that has CLOSED, so an inverted interval moves the day the horizon ' +
+        'starts from',
+    );
+
+  return {
+    day: tradingDay,
+    isHoliday: false,
+    closeMs,
+    openMs,
+    entry: {
+      trading_day: tradingDay,
+      is_half_day: flag(row, 'isHalfDay', at),
+      halted: flag(row, 'halted', at),
+    },
+  };
+}
+
+/**
+ * The covered intervals of `trading_calendar_loads`, MERGED and sorted.
+ *
+ * MERGED RATHER THAN UNIONED FLAT, because two loads that abut or overlap cover
+ * the days between them and two loads with a gap DO NOT. `0032` puts one row per
+ * load with its own `coverage_start_day` and `coverage_end_day` and declares no
+ * supersession column, so a load is a positive statement that this range was
+ * loaded and never a statement that another range was not. The gap between two
+ * disjoint loads is therefore UNKNOWN, which is `F-4`'s answer and not an
+ * interpolation this function is entitled to make.
+ */
+function coveredIntervals(rows: readonly unknown[]): readonly { from: string; to: string }[] {
+  const at = 'a trading calendar load';
+  const spans = rows
+    .map((row) => ({
+      from: day(row, 'coverageStartDay', at),
+      to: day(row, 'coverageEndDay', at),
+    }))
+    .sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+
+  const merged: { from: string; to: string }[] = [];
+  for (const span of spans) {
+    if (span.to < span.from)
+      throw new AdminReadError(
+        `a trading calendar load declares coverage ${span.from}..${span.to}, which ends before ` +
+          'it starts. A backwards coverage interval covers no day at all and would silently ' +
+          'make every day of the horizon UNKNOWN',
+      );
+    const last = merged[merged.length - 1];
+    // ADJACENT IS NOT OVERLAPPING AND IS NOT MERGED. `2026-01-01..2026-06-30`
+    // and `2026-07-01..2026-12-31` are two loads with no day between them, and
+    // merging them on a date successor would be the date arithmetic R-02
+    // forbids. They stay two intervals; the walk below crosses neither, because
+    // it stops at the end of the interval holding the anchor. A load that means
+    // to extend coverage overlaps by a day, which is a fact its own row states.
+    if (last !== undefined && span.from <= last.to) {
+      if (span.to > last.to) last.to = span.to;
+      continue;
+    }
+    merged.push({ from: span.from, to: span.to });
+  }
+  return merged;
+}
+
+/**
+ * The greatest `trading_day` whose session has CLOSED at or before the instant.
+ *
+ * A TIE IS IMPOSSIBLE AND IS BROKEN ANYWAY. `trading_day` is the PRIMARY KEY of
+ * `trading_calendar` and `session_close_at` moves with it, so two days cannot
+ * share a close; the later day wins if they ever do, because the anchor is a DAY
+ * and the later one is the one a horizon must start after. `latestBy` above
+ * refuses its tie instead, and the difference is which fact a unique index
+ * carries: there it is an index on the folded column itself.
+ */
+function lastClosedDay(
+  parsed: readonly { readonly day: string; readonly closeMs: number | null }[],
+  asOfMs: number,
+): string | null {
+  let anchor: string | null = null;
+  let anchorCloseMs = Number.NEGATIVE_INFINITY;
+  for (const row of parsed) {
+    if (row.closeMs === null || row.closeMs > asOfMs) continue;
+    if (row.closeMs < anchorCloseMs) continue;
+    if (row.closeMs === anchorCloseMs && anchor !== null && row.day <= anchor) continue;
+    anchorCloseMs = row.closeMs;
+    anchor = row.day;
+  }
+  return anchor;
+}
+
+/**
+ * The next `span` TRADING DAYS after the last closed session, or the reason there
+ * are not that many.
+ *
+ * THE ANCHOR IS THE LATEST SESSION THAT HAS CLOSED, AND THAT IS `P-M6-01`'s OWN
+ * PHRASE. `liability_snapshots` carries `as_of timestamptz` and NO `trading_day`
+ * column, so the instant has to be resolved to a day through the calendar rather
+ * than by taking its UTC date, which is the error `day()` above refuses one
+ * value at a time: the exchange trading day is a CT session and never a UTC
+ * calendar date. `P-M6-01` fixes the figure "as of the last closed day"
+ * (`INV-M6-11`), so the anchor is the greatest `trading_day` whose
+ * `session_close_at` is at or before `asOfMs`. A session still OPEN is not a
+ * closed day and is not the anchor; it is the first day of the horizon.
+ *
+ * THE WALK IS STRICTLY AFTER THE ANCHOR, on `AS-12`'s reason applied one field
+ * over. `nextTradingDayAfter`'s docblock records what including the anchor costs
+ * on the consistency period: "the very day that funded a payout counts against
+ * the next cycle ... it looks like the consistency rule working rather than a
+ * bug". Here it would put a day the snapshot already accounts for into the
+ * forecast of what has not happened yet.
+ *
+ * NO DAY IS COMPUTED. Every returned day is a row this function read, filtered
+ * to `is_holiday = false` and taken in ascending order. The accessor offers no
+ * `ORDER BY` and no `LIMIT` (`ADR-112`, `ADR-157`), so the sort is here, on the
+ * same reading as `latestBy` above.
+ */
+export async function readTradingHorizon(
+  tx: TradingCalendarTx,
+  asOf: string,
+  span: number = ELIGIBLE_HORIZON_TRADING_DAYS,
+): Promise<TradingHorizonResult> {
+  if (!Number.isSafeInteger(span) || span < 1)
+    throw new AdminReadError(
+      `a horizon of ${JSON.stringify(span)} trading days was asked for, and EC-074 fixes it at ` +
+        '7. A span that is not a positive whole number of trading days is not a horizon',
+    );
+
+  const asOfMs = Date.parse(asOf);
+  if (!Number.isFinite(asOfMs))
+    throw new AdminReadError(
+      `the horizon was anchored at ${JSON.stringify(asOf)}, which is not an instant. INV-M6-04 ` +
+        'makes every number on this page name its as-of moment, and a horizon whose own start is ' +
+        'unstated is seven days measured from nothing',
+    );
+
+  const calendarRows = await tx.rows('tradingCalendar');
+  const loadRows = await tx.rows('tradingCalendarLoads');
+  const intervals = coveredIntervals(loadRows);
+  const cost: TradingHorizonCost = {
+    calendarRowsScanned: calendarRows.length,
+    calendarLoadsScanned: loadRows.length,
+    coveredIntervals: intervals.length,
+  };
+
+  // NO LOAD IS NOT AN EMPTY CALENDAR, AND THIS IS THE BRANCH F-4 EXISTS FOR. A
+  // `trading_calendar` full of rows and a `trading_calendar_loads` with none is
+  // an estate that has days and no record of having loaded them, so it is
+  // entitled to answer for none of them.
+  if (intervals.length === 0)
+    return {
+      horizon: {
+        kind: 'uncovered',
+        anchor_day: null,
+        detail:
+          `${String(calendarRows.length)} trading calendar rows are present and no ` +
+          '`trading_calendar_loads` row declares coverage for any of them. ADR-042 F-4 makes ' +
+          'coverage a stored fact precisely so this is a positive answer rather than an ' +
+          'unbroken run of non-holidays',
+      },
+      cost,
+    };
+
+  const parsed = calendarRows.map(horizonRow);
+  // `const`, so the narrowing below survives into the closure that reads it.
+  const anchorDay = lastClosedDay(parsed, asOfMs);
+
+  if (anchorDay === null)
+    return {
+      horizon: {
+        kind: 'uncovered',
+        anchor_day: null,
+        detail:
+          `no trading calendar session has closed at or before ${asOf}, so there is no last ` +
+          'closed day to measure a horizon from. P-M6-01 dates this figure at "the last closed ' +
+          'day" (INV-M6-11) and the calendar holds no such day',
+      },
+      cost,
+    };
+
+  const covering = intervals.find(
+    (interval) => anchorDay >= interval.from && anchorDay <= interval.to,
+  );
+  if (covering === undefined)
+    return {
+      horizon: {
+        kind: 'uncovered',
+        anchor_day: anchorDay,
+        detail:
+          `the last closed trading day is ${anchorDay} and no \`trading_calendar_loads\` row ` +
+          `covers it. The ${String(intervals.length)} covered interval(s) are ` +
+          `${intervals.map((i) => `${i.from}..${i.to}`).join(', ')}. A day outside coverage is ` +
+          'UNKNOWN and never a holiday (ADR-042 F-4)',
+      },
+      cost,
+    };
+
+  // THE WALK. Sessions strictly after the anchor and no later than the day
+  // coverage runs through, ascending, and at most `span` of them. Every bound
+  // here is a comparison between two `YYYY-MM-DD` strings, which is
+  // chronological order with no arithmetic (`calendar.ts`: "every day comparison
+  // in the engine is lexicographic on a zero-padded ISO day").
+  const days = parsed
+    .filter((row) => !row.isHoliday && row.day > anchorDay && row.day <= covering.to)
+    .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+    .slice(0, span)
+    .map((row) => row.entry);
+
+  if (days.length < span)
+    return {
+      horizon: {
+        kind: 'exhausted',
+        anchor_day: anchorDay,
+        covered_through_day: covering.to,
+        days,
+        short_by: span - days.length,
+        detail:
+          `${String(span)} trading days were asked for after ${anchorDay} and the calendar holds ` +
+          `${String(days.length)} inside coverage, which runs through ${covering.to}. ADR-042 ` +
+          'F-4: an exhausted calendar is otherwise indistinguishable from an unbroken holiday, ' +
+          'and OQ-SE-02 puts the horizon alarm at six months for this reason',
+      },
+      cost,
+    };
+
+  return {
+    horizon: {
+      kind: 'resolved',
+      anchor_day: anchorDay,
+      covered_through_day: covering.to,
+      days,
+    },
+    cost,
   };
 }
