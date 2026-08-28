@@ -1142,20 +1142,22 @@ describe('the composition file', () => {
 
   it('composes a PARTIAL port, which is why nothing wires it', () => {
     expect(IMPLEMENTED_ADMIN_READS.length).toBeLessThan(declared.length);
-    // The four this directory does not implement, named so a later slice knows
-    // what is left rather than counting. `listEvents` LEFT THIS LIST when
-    // `events.ts` landed, and it left it by turning this case red rather than
-    // by anyone remembering: `IMPLEMENTED_ADMIN_READS` is about what THIS
-    // DIRECTORY supplies and it now supplies a feed module.
+    // The three this directory does not implement, named so a later slice knows
+    // what is left rather than counting. `listEvents` and `readAccount` both
+    // LEFT THIS LIST when their modules landed, and both left it by turning
+    // this case red rather than by anyone remembering.
+    //
+    // `searchAccounts` IS THE ONE LEFT THAT NO TABLE REGISTRATION UNBLOCKS.
+    // API_CONTRACT section 8 makes its term "account id, platform ref, email,
+    // identity id, NAME FRAGMENT, coupon, or payout id"; a fragment is a
+    // SUBSTRING predicate, ADR-112's vocabulary is a typed equality and ADR-157
+    // admits a range term and an `IS NULL` and refuses the rest. Six of the
+    // seven terms are keyed reads and the seventh is not, so an adapter serving
+    // six would narrow a contract behaviour behind a green suite.
     const missing = declared.filter(
       (name) => !(IMPLEMENTED_ADMIN_READS as readonly string[]).includes(name),
     );
-    expect(missing).toStrictEqual([
-      'exportEvidence',
-      'readAccount',
-      'readLiability',
-      'searchAccounts',
-    ]);
+    expect(missing).toStrictEqual(['exportEvidence', 'readLiability', 'searchAccounts']);
   });
 
   it('returns the page from listFlags and drops the cost', async () => {

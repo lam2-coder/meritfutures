@@ -101,7 +101,7 @@
 // THIS COMPOSES A PARTIAL PORT AND SAYS SO, WHICH IS WHY NOTHING WIRES IT
 // -----------------------------------------------------------------------------
 // `AdminReadSource` has SEVEN methods since ADR-184 ruling 1 and this directory
-// implements THREE, which {@link IMPLEMENTED_ADMIN_READS} states as data rather
+// implements FOUR, which {@link IMPLEMENTED_ADMIN_READS} states as data rather
 // than this sentence stating it as prose. There is still no value in this tree
 // that satisfies the port, `start.ts` calls no setter, and `setAdminReadSource`
 // stays in `test/wiring.test.ts`'s `BLOCKED` list with the triple unchanged.
@@ -147,9 +147,11 @@
 // accessor and this directory takes none.
 // =============================================================================
 
+import { readAccountDetail } from './account.ts';
 import { readEventFeed } from './events.ts';
 import { readFlagQueue } from './flags.ts';
 import { DEFAULT_GRAPH_LIMITS, readIdentityGraph } from './graph.ts';
+import type { AccountTx } from './account.ts';
 import type { EventsTx } from './events.ts';
 import type { FlagsTx } from './flags.ts';
 import type { GraphLimits, GraphTx } from './graph.ts';
@@ -163,7 +165,7 @@ import type { AdminReadSource } from '../routes/admin-reads.ts';
  * satisfies it structurally, and because every arm of the intersection is
  * read-only, so is this.
  */
-export type AdminSourceTx = EventsTx & FlagsTx & GraphTx;
+export type AdminSourceTx = AccountTx & EventsTx & FlagsTx & GraphTx;
 
 /**
  * The unit of work this directory cannot open for itself.
@@ -193,7 +195,12 @@ export interface AdminSourceOptions {
  * SORTED, AND APPEND-ONLY. See the header: this array and the object below are
  * two halves of one declaration and the type checker refuses either alone.
  */
-export const IMPLEMENTED_ADMIN_READS = ['listEvents', 'listFlags', 'readIdentityGraph'] as const;
+export const IMPLEMENTED_ADMIN_READS = [
+  'listEvents',
+  'listFlags',
+  'readAccount',
+  'readIdentityGraph',
+] as const;
 
 /** One of {@link IMPLEMENTED_ADMIN_READS}. */
 export type ImplementedAdminRead = (typeof IMPLEMENTED_ADMIN_READS)[number];
@@ -227,6 +234,8 @@ export function composeImplementedAdminReads(
   return {
     listEvents: async (query) => (await backend.operator((tx) => readEventFeed(tx, query))).page,
     listFlags: async (query) => (await backend.operator((tx) => readFlagQueue(tx, query))).page,
+    readAccount: async (accountId) =>
+      (await backend.operator((tx) => readAccountDetail(tx, accountId)))?.detail ?? null,
     readIdentityGraph: async (identityId) =>
       (await backend.operator((tx) => readIdentityGraph(tx, identityId, graphLimits)))?.graph ??
       null,
