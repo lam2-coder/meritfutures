@@ -179,7 +179,26 @@
 // object is an accusation with a wrong figure in it.
 //
 // -----------------------------------------------------------------------------
-// 5. NO DETECTOR HERE WRITES A `risk_flags.status`, AND IT IS NOT BECAUSE THIS
+// 5. NO COUNT OVER A DETECTOR'S OWN INPUT REACHES A FLAG, AND THAT IS `AS-M7-05`
+//    NOTE 1 RATHER THAN AN OMISSION
+// -----------------------------------------------------------------------------
+// *"A synthetic subject is excluded from every aggregate, statistic and
+// published number."* A detector is deliberately BLIND to which of its rows the
+// runner merged in, which is the property the whole canary design turns on, so
+// **any figure a detector computes over its own input counts canaries and cannot
+// be corrected from inside `scan`.** This was measured rather than reasoned
+// about: an early draft reported `accounts_in_window` on every `D-02` flag and
+// the suite read 62 against a population of 60, the two extra being the canary
+// pair.
+//
+// So no `pairs_compared`, no `accounts_in_window`, no
+// `candidate_groups_considered` appears in any evidence object here. **The
+// runner's `rows_scanned` and `rowsByStream` ARE canary free** -- it takes them
+// before the battery is merged -- and they carry the same information to the
+// same reader.
+//
+// -----------------------------------------------------------------------------
+// 6. NO DETECTOR HERE WRITES A `risk_flags.status`, AND IT IS NOT BECAUSE THIS
 //    FILE IS CAREFUL
 // -----------------------------------------------------------------------------
 // `ADR-155`, `INV-M7-02`, `P7` section 11 rule 11. `DetectorFinding` has no
@@ -1178,7 +1197,6 @@ export function inversePairDetector(): Detector {
         .sort();
 
       const findings: DetectorFinding[] = [];
-      let pairsCompared = 0;
       for (let left = 0; left < eligible.length; left += 1) {
         for (let right = left + 1; right < eligible.length; right += 1) {
           const aId = eligible[left] ?? '';
@@ -1192,7 +1210,6 @@ export function inversePairDetector(): Detector {
           if (days === undefined) {
             continue;
           }
-          pairsCompared += 1;
           const parts = pearsonParts(seriesOver(days, aMarks), seriesOver(days, bMarks));
           if (!correlationAtOrBelow(parts, floorBp)) {
             continue;
@@ -1223,6 +1240,15 @@ export function inversePairDetector(): Detector {
               // unevaluable and SD-M7-02's clock has no stated duration, and
               // either one alone would forbid the money band.
               severity: CAPPED_SEVERITY,
+              // NO COUNT OVER THE INPUT REACHES THE EVIDENCE, AND THE REASON IS
+              // `AS-M7-05` NOTE 1 RATHER THAN BREVITY. A synthetic subject is
+              // "excluded from every aggregate, statistic and published number",
+              // and a detector is deliberately BLIND to which of its rows are
+              // synthetic, so any figure it computes over its own input --
+              // "accounts in the window", "pairs compared", "candidate groups
+              // considered" -- counts canaries and cannot be corrected from
+              // inside `scan`. The only canary-free counts are the runner's, and
+              // it takes them before the battery is merged.
               evidence: {
                 detector: D02,
                 second_cycle_detector: secondCycle,
@@ -1246,8 +1272,6 @@ export function inversePairDetector(): Detector {
                   "The floor here is the correlation half of M07:109's statistic only, because " +
                   'comparable_size_tolerance_bp is unstated, and severity 4 additionally requires ' +
                   'an sla_due_at whose duration SD-M7-02 asks for and no document states.',
-                pairs_compared: pairsCompared,
-                accounts_in_window: eligible.length,
               },
             });
           }
@@ -1459,7 +1483,6 @@ export function groupInverseExposureDetector(): Detector {
           max_variance_ratio_bp: maxRatioBp,
           summed_variance_scaled: asJsonNumber(parts.numerator),
           member_variance_sum_scaled: asJsonNumber(parts.denominator),
-          candidate_groups_considered: clusters.length,
         };
         groups.push({
           subjects: [...members],
