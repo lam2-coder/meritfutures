@@ -45,11 +45,22 @@ import { postTransaction } from '../src/post.ts';
 import { entriesOf, netCents, posting, transfer, type NonEmptyTransfers } from '../src/posting.ts';
 import { RecordingTx, accountRow } from './recording-tx.ts';
 
+// THESE TWO LISTS ARE HAND-KEPT AND `tsc` CANNOT SEE A GAP IN EITHER. They are
+// typed `readonly FirmAccountCode[]` and `readonly IdentityAccountCode[]`, and a
+// list missing a member of its union is a perfectly well typed shorter list. A
+// code absent from here is a code this property test NEVER GENERATES, and
+// nothing else in the tree would say so -- which is why
+// `in-flight-obligation.test.ts` registers this file as a normative site and
+// scans for it, and why ADR-187 measured the mint's price with `vitest` and
+// `tsc` together and found `tsc` reported ZERO errors for the whole widening.
+//
+// `withdrawals_in_flight` is ADR-187's eighth code and the fifth firm one.
 const FIRM_CODES: readonly FirmAccountCode[] = [
   'firm_treasury',
   'psp_clearing',
   'fees_revenue',
   'reserve',
+  'withdrawals_in_flight',
 ];
 const IDENTITY_CODES: readonly IdentityAccountCode[] = [
   'trader_withdrawable',

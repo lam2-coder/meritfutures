@@ -1,18 +1,24 @@
 // =============================================================================
 // packages/ledger/src/accounts.ts
 // =============================================================================
-// THE SEVEN v1 CLASSES, AND WHICH OF THEM BELONG TO A PERSON.
+// THE EIGHT v1 CLASSES, AND WHICH OF THEM BELONG TO A PERSON.
 //
-// `0009_ledger.sql` declares the vocabulary twice -- once as
-// `ledger_accounts_code_is_declared` and once, in `0027`, as `LEDGER-C2`'s
-// trigger -- and it says in its own comment why: "a class that appears first in
-// a migration is a class nobody defined", after a first draft of ADR-027
-// invented `firm_payable` and reached a committed document. This file is a
-// THIRD statement of that list and it earns its place only because it is
-// CHECKED against both of the others: `accounts.test.ts` reads the CHECK
-// constraint out of `0009` and the class list out of `0027` and asserts all
-// three sets are equal. A third hand-kept copy would be ADR-092 section 5's
-// two-statements-of-one-fact hazard with an extra statement.
+// The migration set declares the vocabulary twice -- once as
+// `ledger_accounts_code_is_declared` and once inside `LEDGER-C2`'s trigger body
+// -- and it says in its own comment why: "a class that appears first in a
+// migration is a class nobody defined", after a first draft of ADR-027 invented
+// `firm_payable` and reached a committed document. This file is a THIRD
+// statement of that list and it earns its place only because it is CHECKED
+// against both of the others: `accounts.test.ts` reads the CHECK constraint and
+// the trigger's class list OUT OF THE MIGRATION THAT INSTALLS EACH IN FORCE and
+// asserts all three sets are equal. A third hand-kept copy would be ADR-092
+// section 5's two-statements-of-one-fact hazard with an extra statement.
+//
+// `0009` AND `0027` ARE NO LONGER THOSE MIGRATIONS AND NAMING THEM HERE WOULD BE
+// WRONG. `0056` supersedes both, by DROP and re-ADD for the CHECK and by
+// `CREATE OR REPLACE FUNCTION` for the trigger body, because a merged migration
+// is never edited. A reader who wants the vocabulary in force reads the LAST
+// migration that declares it, which is what `accounts.test.ts` now does.
 //
 // WHAT THIS FILE STATES THAT NO MIGRATION DOES is which codes are firm-scoped
 // and which are per identity. The DDL constrains `scope` to `('firm',
@@ -33,7 +39,8 @@ export type LedgerAccountCode =
   | 'reserve'
   | 'trader_withdrawable'
   | 'trader_wallet'
-  | 'promotional_credit';
+  | 'promotional_credit'
+  | 'withdrawals_in_flight';
 
 /**
  * Whose position each class is.
@@ -47,6 +54,15 @@ export type LedgerAccountCode =
  *
  * `promotional_credit` is per identity and is NEVER WITHDRAWABLE
  * (`OQ-FREEZE-01`, which overruled ADR-025's literal wording).
+ *
+ * `withdrawals_in_flight` IS FIRM-SCOPED AND IT IS THE ONLY FIRM-SCOPED
+ * `liability` IN THE CHART (ADR-187, `0056`). It carries the external leg's
+ * in-flight obligation: `LT-06` credits it when a wallet withdrawal is approved
+ * and the trader's wallet claim is extinguished, and `LT-07` debits it when the
+ * cash leaves, so it stands at a credit balance for exactly the interval
+ * STATE_MACHINES section 3.2 draws as `transferring`. It is FIRM-scoped because
+ * ADR-174 clause 3 rules that `LT-07` stays firm-only; no identity opens a
+ * position in it and `0054`'s provisioning trigger does not write one.
  */
 export const LEDGER_ACCOUNT_SCOPE = {
   firm_treasury: 'firm',
@@ -56,6 +72,7 @@ export const LEDGER_ACCOUNT_SCOPE = {
   trader_withdrawable: 'identity',
   trader_wallet: 'identity',
   promotional_credit: 'identity',
+  withdrawals_in_flight: 'firm',
 } as const satisfies Readonly<Record<LedgerAccountCode, 'firm' | 'identity'>>;
 
 /** Every declared code, in the order `0009` declares them. */
