@@ -109,6 +109,7 @@ export type {
   AccountDetail,
   AccountListItem,
   AffiliateStats,
+  AuthFactor,
   CertificateResponse,
   CursorPage,
   EconomicCalendarFreshness,
@@ -124,7 +125,18 @@ export type {
   PlanSize,
   PlanVersionResponse,
   PurchaseListItem,
+  SessionRow,
   TimelineItem,
+  WalletCredit,
+  WalletDebit,
+  WalletDirection,
+  WalletEntriesResponse,
+  WalletEntry,
+  WalletEntryBase,
+  WalletHold,
+  WalletHoldRule,
+  WalletProvenance,
+  WalletResponse,
 } from './api/types.ts';
 export { PAGE_LIMIT_DEFAULT, PAGE_LIMIT_MAX } from './api/types.ts';
 
@@ -246,6 +258,37 @@ export type {
   ReferralEarningsView,
   ReferralPanelView,
 } from './view/referrals.ts';
+
+// -----------------------------------------------------------------------------
+// SC-M4-10 and SC-M4-11, the two screens section 3.1 named and this app did not
+// serve. Measured from the build rather than from the plan: `pnpm --filter
+// @merit/portal build` printed twelve routes covering SC-M4-02 to SC-M4-09 and
+// neither of these, and all four endpoints they read were confirmed through
+// `CompositionReport.registered` over a real `compose()`.
+//
+// NOTHING RE-EXPORTED HERE PERFORMS OR PREPARES A WRITE, which is the fence
+// `test/surface.test.ts`'s third test asserts and which this pair of screens is
+// the closest any read surface has come to. Both of them RENDER a control for a
+// C-27 sensitive action and neither of them has a route to submit it to: every
+// such control carries a `submits_to`/`revokes_at` typed as the literal `null`,
+// because ../http/client.ts's `ApiClient` declares `get` and nothing else.
+// -----------------------------------------------------------------------------
+
+export { toWalletView, walletFraming } from './view/wallet.ts';
+export type {
+  WalletBalanceView,
+  WalletCopy,
+  WalletEntryView,
+  WalletExitId,
+  WalletExitView,
+  WalletExitsView,
+  WalletHoldView,
+  WalletStatementView,
+  WalletView,
+} from './view/wallet.ts';
+
+export { factorLabel, isRevocable, toSecurityView } from './view/sessions.ts';
+export type { ActiveSessionView, SecurityGap, SecurityView } from './view/sessions.ts';
 
 // -----------------------------------------------------------------------------
 // The shell every screen renders inside. ADR-068 requirement 4, INV-M4-09.
