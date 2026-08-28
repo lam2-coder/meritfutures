@@ -9,7 +9,11 @@
 // other 13 are FIVE SEPARATE BLOCKERS, none of which is a missing column and
 // none of which this fence can clear. **B1 IS LIFTED AND THE COUNT DID NOT MOVE**,
 // which is the finding session 380 landed: it was one of TWO blockers on the same
-// five leaves and only the second had ever been looked for. So the method is NOT composed, the array
+// five leaves and only the second had ever been looked for. **B2 IS LIFTED TOO,
+// BY ADR-201, AND THE COUNT DID NOT MOVE THERE EITHER**, for the same reason and
+// not for a new one: a ruling clears a blocker and leaves the fold unwritten.
+// **THE BLOCKED-LEAF COUNT IS WHAT IS PRODUCED AND NEVER WHAT IS PERMITTED**, and
+// the suite derives it from API_CONTRACT rather than from this comment. So the method is NOT composed, the array
 // `IMPLEMENTED_ADMIN_READS` does not name it, and `composeAdminReadSource` still
 // fills the gap with `AdminSourceNotComposed('readLiability')`.
 //
@@ -68,8 +72,17 @@
 //       1.0 and the same threshold means what the constitution says. FM-M6-07's
 //       words for the CUSUM ("either constant alarms or none, which is the same
 //       as no chart") are the exact failure, on a control that pages.
-//       CLEARING CONDITION: a ruling fixes the window. Choosing one here would be
-//       calibrating a firm-wide pager inside an adapter.
+//       **LIFTED BY ADR-201 WHILE THIS BRANCH WAS OPEN, AND THE PARAGRAPH ABOVE
+//       IS KEPT RATHER THAN DELETED** because the reading it records is what the
+//       ruling was written against. ADR-201 ruling 2: `avg_30d_cents` is "the
+//       trailing thirty-day settled total scaled to seven days", which is the
+//       third of the three readings above and the only one that leaves 2.5x
+//       meaning what four documents say it means; ruling 6 answers the empty
+//       denominator with `ratio_bp` 0 and `alarm` false. The entry is
+//       `status: proposed` with an UNSIGNED approval line, which is what an ADR
+//       ships as. **THE FOUR LEAVES ARE STILL BLOCKED AND THAT IS NOT A
+//       CONTRADICTION**: the ruling landed and the fold is unwritten, which is
+//       B1's shape exactly. A lifted blocker is a session's work, not a field.
 //
 //   B3. `per_plan[].cusum` (3 leaves). ADR-167 clause 1 folds `S_t` at read time
 //       from a landed series, and clause 5 rules that the field is rendered

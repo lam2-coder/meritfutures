@@ -623,7 +623,7 @@ describe('blocker B2: payout_velocity, whose threshold is fixed and whose window
     );
   });
 
-  it('has NO document defining avg_30d_cents, which the field name does not settle', () => {
+  it('has avg_30d_cents DEFINED by ADR-201, which is this case cleared rather than broken', () => {
     // THE THREE READINGS ARE NOT A ROUNDING DIFFERENCE. Against a 30-day DAILY
     // mean a seven-day total sits near 7.0 in steady state and the 2.5x pager
     // fires every day forever; against that mean scaled to seven days it sits
@@ -631,9 +631,18 @@ describe('blocker B2: payout_velocity, whose threshold is fixed and whose window
     // words for the CUSUM -- "either constant alarms or none, which is the same
     // as no chart" -- are the exact failure, on a control that pages.
     //
-    // THE CENSUS IS OVER THE FOUR REGISTERS A RULING WOULD LAND IN, and the
-    // token appears in exactly one file of them: API_CONTRACT, where it is the
-    // TYPE and not a definition. THE CLEARING CONDITION IS A SECOND FILE.
+    // THE CENSUS IS OVER THE FOUR REGISTERS A RULING WOULD LAND IN. When this
+    // case was written the token appeared in exactly ONE of them, API_CONTRACT,
+    // where it is the TYPE and not a definition, and the case stated its own
+    // clearing condition in one line: A SECOND FILE.
+    //
+    // THAT CONDITION IS MET. ADR-201 ruled the averaging basis on 2026-08-28
+    // and the census now returns FOUR files. The case is INVERTED rather than
+    // deleted, because the property worth holding is no longer "nobody has
+    // ruled" but "the ruling is where a reader will find it": API_CONTRACT
+    // still carries the TYPE and only the type, and ADR-201 carries the
+    // DEFINITION. A future edit that moves the definition out of the ADR, or
+    // that quietly adds a second competing one, fails here.
     const bearing = new Map<string, string[]>();
     for (const dir of ['docs/architecture', 'docs/plans', 'docs/decisions', 'docs/edge-cases']) {
       for (const name of readdirSync(join(ROOT, dir))) {
@@ -642,7 +651,10 @@ describe('blocker B2: payout_velocity, whose threshold is fixed and whose window
         if (body.includes('avg_30d')) bearing.set(`${dir}/${name}`, body.split('\n'));
       }
     }
-    expect([...bearing.keys()]).toStrictEqual(['docs/architecture/API_CONTRACT.md']);
+    expect([...bearing.keys()]).toContain('docs/architecture/API_CONTRACT.md');
+    expect([...bearing.keys()]).toContain('docs/decisions/ADR-201.md');
+
+    // API_CONTRACT still carries the TYPE and nothing but the type.
     const lines = (bearing.get('docs/architecture/API_CONTRACT.md') ?? []).filter((line) =>
       line.includes('avg_30d'),
     );

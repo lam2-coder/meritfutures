@@ -622,7 +622,11 @@ const BLOCKED_LEAVES = [
   'eligible_next_7d.by_day[].trading_day',
   'eligible_next_7d.by_day[].cents',
   'eligible_next_7d.by_day[].accounts',
-  // B2: no document fixes the 30-day denominator's window.
+  // B2, LIFTED BY ADR-201 WHILE THIS BRANCH WAS OPEN AND STILL BLOCKED HERE.
+  // Ruling 2 defines `avg_30d_cents` as the trailing thirty-day settled total
+  // scaled to seven days and ruling 6 answers the empty denominator, so the
+  // blocker is gone and the FOLD IS UNWRITTEN. That is B1's shape exactly, and
+  // it is why this list is what is PRODUCED and never what is PERMITTED.
   'payout_velocity.last_7d_cents',
   'payout_velocity.avg_30d_cents',
   'payout_velocity.ratio_bp',
