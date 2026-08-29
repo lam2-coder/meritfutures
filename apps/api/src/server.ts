@@ -38,19 +38,33 @@
 // tree can produce either one.
 //
 // -----------------------------------------------------------------------------
-// THE ONE CHECK THIS FILE RUNS, AND WHY IT IS HERE RATHER THAN IN A HANDLER
+// THE TWO D2 CONTROLS THIS FILE WIRES, AND WHY THEY ARE HERE RATHER THAN IN A
+// HANDLER
 // -----------------------------------------------------------------------------
-// `csrf.ts` decides the constitution's D2 control and this file wires it. It is
-// the transport's for the reason the 404 above is the transport's: it reads
+// `security-headers.ts` decides D2's `strict CSP/HSTS/frame-deny` and `csrf.ts`
+// decides D2's `CSRF on cookie mutations`. Neither file is reached from a route
+// and neither reads a route; this file is where both meet the request, in that
+// order, because the second can END a request and the first is what its refusal
+// has to carry. ADR-223 section 3 is the ordering argument.
+//
+// THE CSRF CHECK IS THE TRANSPORT'S FOR THE REASON THE 404 ABOVE IS: it reads
 // three HEADERS, it reads no identity and no resource, and it must answer
 // before a body is parsed and before any route is reached. A handler-by-handler
 // copy would be a control whose coverage is a count nobody maintains.
 //
-// IT IS AN `onRequest` HOOK ON THE ROOT INSTANCE, so it covers every registered
-// route on both surfaces AND the not-found path, with no list of what it covers
-// anywhere. The refusal is this file's problem document rather than a thrown
-// error, because a throw would route through the error handler above and arrive
-// as the same `403 forbidden` by a longer path.
+// THE HEADER SET IS THE TRANSPORT'S FOR A DIFFERENT REASON, and it is the
+// stronger one: it is a property of every RESPONSE this deployable produces
+// rather than of any answer a handler computes. A per-route copy would be
+// eleven copies today and a count nobody maintains tomorrow, and it would miss
+// the two responses no route produces at all, which are the 404 for a path
+// nothing registered and the CSRF refusal.
+//
+// BOTH ARE `onRequest` HOOKS ON THE ROOT INSTANCE, so their coverage is the
+// Fastify instance's rather than a list somebody maintains: every registered
+// route on both surfaces AND the not-found path, with no list of what they
+// cover anywhere. The CSRF refusal is this file's problem document rather than
+// a thrown error, because a throw would route through the error handler above
+// and arrive as the same `403 forbidden` by a longer path.
 // =============================================================================
 
 import Fastify from 'fastify';
@@ -58,6 +72,7 @@ import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from
 
 import { csrfVerdict } from './csrf.ts';
 import { compose } from './registry.ts';
+import { securityHeaderEntries } from './security-headers.ts';
 import type { CompositionReport, RouteModule } from './registry.ts';
 import type { ApiSurface } from './surface.ts';
 
@@ -154,8 +169,29 @@ export interface BuiltServer {
 export function buildServer(options: ServerOptions): BuiltServer {
   const app = Fastify({ logger: options.logger ?? false });
 
-  // D2's `CSRF on cookie mutations`. FIRST, because everything after it costs
-  // more than it does and none of it should run for a forged write.
+  // D2's `strict CSP/HSTS/frame-deny`, ADR-223. BEFORE the CSRF hook, and the
+  // order is the whole reason this is a hook rather than a line in a handler:
+  // the next hook can END the request with a 403, and a control that is absent
+  // from exactly the responses a forged request receives is a control with a
+  // hole shaped like the attack. Setting the headers first puts them on every
+  // response this instance produces, the CSRF refusal, the not-found and the
+  // error handler included, with no list of what it covers anywhere.
+  //
+  // `onRequest` AND NOT `onSend`, on ADR-221's shape. Both would cover the same
+  // set; `onRequest` runs before a body is parsed, so a request refused by the
+  // parser has already been answered under the policy.
+  const headers = securityHeaderEntries();
+  app.addHook('onRequest', async (_request: FastifyRequest, reply: FastifyReply) => {
+    for (const [name, value] of headers) reply.header(name, value);
+  });
+
+  // D2's `CSRF on cookie mutations`. SECOND, and second only to a hook that
+  // writes three response headers and decides nothing. Everything AFTER it
+  // costs more than it does and none of that should run for a forged write;
+  // what runs before it is the header set that forged write's refusal must
+  // itself carry, which is why ADR-223's hook is registered above rather than
+  // below. It read "FIRST" until ADR-223, and the ordering claim moved with the
+  // hook rather than being left behind as a sentence about a shape that changed.
   //
   // THE REFUSAL IS `403 forbidden` AND CARRIES NO `required_factor`. Section
   // 2's canonical code table is closed and ADR-111 clause 4 is the precedent

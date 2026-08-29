@@ -53,12 +53,15 @@
 // decides whether the slices behind this one can run at once, and its header is
 // where that argument lives.
 //
-// `csrf.ts` IS THE ONE SECURITY CONTROL THIS DEPLOYABLE OWNS OUTSIDE A HANDLER
-// (ADR-221). The constitution's Appendix D section D2 rules "CSRF on cookie
-// mutations" and nothing in this tree implemented it until that entry; it is an
-// `Origin` check rather than a token, it is wired as a hook in `server.ts` so
-// its coverage is the instance's rather than a list, and its own header carries
-// why `SameSite=Lax` was never the control the corpus took it for.
+// `csrf.ts` AND `security-headers.ts` ARE THE TWO SECURITY CONTROLS THIS
+// DEPLOYABLE OWNS OUTSIDE A HANDLER, AND THEY ARE TWO CLAUSES OF ONE SENTENCE.
+// The constitution's Appendix D section D2 rules "strict CSP/HSTS/frame-deny"
+// and, one semicolon later, "CSRF on cookie mutations"; nothing in this tree
+// implemented either until ADR-221 and ADR-223. The CSRF control is an `Origin`
+// check rather than a token, and its own header carries why `SameSite=Lax` was
+// never the control the corpus took it for. The header set is three constants
+// and decides nothing. BOTH ARE WIRED AS HOOKS IN `server.ts`, so the coverage
+// of each is the Fastify instance's rather than a list somebody maintains.
 // =============================================================================
 
 export { CSRF_SAFE_METHODS, csrfVerdict } from './csrf.ts';
@@ -84,6 +87,13 @@ export type {
   RouteHandler,
   RouteModule,
 } from './registry.ts';
+export {
+  CONTENT_SECURITY_POLICY,
+  CONTENT_TYPE_OPTIONS,
+  SECURITY_HEADERS,
+  securityHeaderEntries,
+  STRICT_TRANSPORT_SECURITY,
+} from './security-headers.ts';
 export { buildServer, problem, PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX } from './server.ts';
 export type { BuiltServer, Problem, ServerOptions } from './server.ts';
 export {
