@@ -64,13 +64,13 @@
 // type fact rather than a preference. `postTransaction` takes a `LedgerTx`,
 // whose `insert` names the two members of `LedgerWriteKey`
 // (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`:
-// `ledgerTransactions` (`packages/db/src/scope.ts:742`) and `ledgerEntries`
-// (`packages/db/src/scope.ts:733`); `ScopedTx.insert` takes
-// `OwnedTableKey` (`scoped-db.ts:2316`) and `insertUnder` takes
+// `ledgerTransactions` (`packages/db/src/scope.ts:812`) and `ledgerEntries`
+// (`packages/db/src/scope.ts:803`); `ScopedTx.insert` takes
+// `OwnedTableKey` (`scoped-db.ts:2521`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
-// (`scoped-db.ts:1903`), a closed list of ONE. So the ONLY handle that
+// (`scoped-db.ts:2134`), a closed list of ONE. So the ONLY handle that
 // satisfies `LedgerTx` is `SystemTx.insert<K extends TableKey>`
-// (`scoped-db.ts:2167`), which is generic over EVERY TABLE IN THE ESTATE.
+// (`scoped-db.ts:2601`), which is generic over EVERY TABLE IN THE ESTATE.
 //
 // A DOOR IN `apps/api/src/db.ts` RETURNING SUCH A HANDLE WOULD BE `systemDb`
 // UNDER ANOTHER NAME, and ADR-172 clause 2 refuses it: admitting it to a

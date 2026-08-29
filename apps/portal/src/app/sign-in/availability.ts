@@ -26,9 +26,8 @@
 // DIFFERENCE IS THE WHOLE ANSWER
 // -----------------------------------------------------------------------------
 // `app/security/source.ts` made this split one screen over and it is sharper
-// here: all four routes behind SC-M4-01 are REGISTERED, and EXACTLY ONE of the
-// four is wired. A grep, or a route table, would report this screen as fully
-// served.
+// here: all four routes behind SC-M4-01 are REGISTERED, and TWO of the four are
+// wired. A grep, or a route table, would report this screen as fully served.
 //
 // THE SENTENCE ABOVE USED TO READ "NOT ONE of them is wired" AND THAT WAS FALSE
 // AGAINST THE MEASUREMENT SIX LINES BELOW IT IN THIS SAME FILE. `verifyOtp` has
@@ -36,13 +35,17 @@
 // summary above it did not. Session 408 derived the split at the backend rather
 // than reading this paragraph, which is the only reason it was caught: a
 // summary and the measurement it summarises drifted apart inside one file, and
-// the summary is the half a reader trusts.
+// the summary is the half a reader trusts. IT THEN READ "EXACTLY ONE" UNTIL
+// ADR-229 WIRED `requestOtp`, and the cross-check below is what caught THAT one,
+// which is the same drift stopped by a runner instead of by a reader.
 //
-// AND THE WIRED ONE IS NOT THE ONE A READER GUESSES. The four fall into two
-// obvious pairs, an OTP pair and a passkey pair, and the guess that follows
-// from the shape -- OTP served, passkey not -- IS WRONG IN BOTH HALVES. The OTP
-// pair is SPLIT down the middle: the route that ISSUES a code is blocked and
-// the route that CONSUMES one is wired. See {@link ENDPOINT_WIRING}.
+// AND THE TWO ARE NOW THE PAIR A READER GUESSES, WHICH THEY WERE NOT BEFORE. The
+// four fall into two obvious pairs, an OTP pair and a passkey pair. Until
+// ADR-229 the OTP pair was SPLIT down the middle -- the route that ISSUES a code
+// blocked and the route that CONSUMES one wired -- and the guess that follows
+// from the shape was wrong in both halves. The issuing half is wired now, so the
+// OTP pair is whole and the passkey pair is still both blocked. See
+// {@link ENDPOINT_WIRING}.
 //
 // REGISTRATION, measured through `CompositionReport.registered` over a real
 // `compose()` (dispatch protocol section 5, "a grep over route files has been
@@ -58,44 +61,48 @@
 // `AuthBackendUnwired` and `endpointHandler` in `apps/api/src/routes/auth.ts`
 // turns that into `503 service_unavailable` in one place:
 //
-//   requestOtp            BLOCKED on `NO_DELIVERY`
 //   passkeyLoginOptions   BLOCKED on `NO_WEBAUTHN`
 //   passkeyLoginVerify    BLOCKED on `NO_WEBAUTHN`
+//   requestOtp            WIRED (ADR-229), and the `sms` arm raises anyway
 //   verifyOtp             WIRED, and the `sms` arm raises anyway; see below
 //
-// `apps/api/test/auth-backend.test.ts` asserts that eleven of the sixteen
-// methods refuse this way, each with its own reason, so the measurement above is
-// a property that suite already holds rather than one this file claims.
+// `apps/api/test/auth-backend.test.ts` asserts that ten of the sixteen methods
+// refuse this way, each with its own reason, so the measurement above is a
+// property that suite already holds rather than one this file claims.
 //
 // -----------------------------------------------------------------------------
-// THE SERVED SET ADMITS NO COMPLETE SIGN-IN, AND THAT IS THE FINDING
+// THE SERVED SET ADMITS A COMPLETE SIGN-IN AT THE API, AND THIS SCREEN STILL
+// CANNOT PERFORM ONE
 // -----------------------------------------------------------------------------
-// ONE OF THE FOUR IS SERVED AND IT CANNOT BE REACHED. `POST /auth/verify`
-// consumes an `otp_challenges` row. The only thing in the port that WRITES one
-// is `requestOtp`, and `requestOtp` is blocked on `NO_DELIVERY`. So the wired
-// half of the OTP pair is the half that reads a row nothing in this deployable
-// can create, and `auth-backend.ts`'s own header says it in one sentence: "a
-// trader cannot sign up today, because nobody can send them a code."
+// THE PARAGRAPH THAT STOOD HERE IS QUOTED RATHER THAN DELETED, because it was
+// the whole reason this screen exists in the shape it does and ADR-229 has made
+// exactly one of its two halves false:
 //
-// AND THERE IS NO THIRD DOOR TO FALL BACK TO, WHICH IS WHAT MAKES THIS TOTAL
-// RATHER THAN PARTIAL. Merit is PASSWORDLESS (ADR-039), and `0002_identity.sql`
+//   "ONE OF THE FOUR IS SERVED AND IT CANNOT BE REACHED. `POST /auth/verify`
+//   consumes an `otp_challenges` row. The only thing in the port that WRITES one
+//   is `requestOtp`, and `requestOtp` is blocked on `NO_DELIVERY`."
+//
+// THAT IS NO LONGER TRUE. `requestOtp` writes the row and hands the code to
+// `apps/api/src/otp-delivery.ts`, so the OTP pair is whole at the API and an
+// `api` service holding the mail vendor's token signs an email trader in end to
+// end. WHAT IS OWED THERE IS A CREDENTIAL AND NOT A CONSTRUCTION, which is a
+// different kind of missing: an unconfigured deployment answers 503 rather than
+// pretending, so the route is honest in both states.
+//
+// AND THIS SCREEN IS STILL NOT WIRED, ON THE OTHER REFUSAL AND NOT ON THIS ONE.
+// The two refusals were always independent and the file said so before either
+// lifted: `next@16.3.2` permits a cookie write only in a Server Action or a
+// Route Handler, `ADR-138` section 3 refuses the first outright, and all three
+// registered POSTs that establish a session answer with a `Set-Cookie` this
+// application cannot deliver (ADR-219 section 6.2). So the sentence "a button
+// whose only reachable outcome is a failure" survives its own premise changing,
+// and it survives for a reason that has nothing to do with delivery.
+//
+// PASSKEYS ARE UNMOVED AND MERIT IS STILL PASSWORDLESS. `0002_identity.sql`
 // records it on the table where a password would have to live: "Merit is
 // passwordless only, so THERE IS NO PASSWORD TABLE ANYWHERE IN THIS SCHEMA, by
-// design." OTP and passkeys are therefore the WHOLE of trader authentication,
-// both passkey ceremonies are blocked on `NO_WEBAUTHN`, and nothing else in the
-// contract signs a person in. So:
-//
-//   NOBODY CAN SIGN IN TO THIS DEPLOYMENT BY ANY ROUTE, AND THE SCREEN SAYS SO
-//   ON ALL THREE FACTORS RATHER THAN ON THE NEAREST ONE.
-//
-// THAT IS WHY NOTHING HERE IS WIRED, AND IT IS A DERIVATION RATHER THAN A
-// DEFERRAL. "Call what is served" resolves, on this screen, to a single route
-// that would answer a code no trader could have been sent. A button that posts
-// to it is a button whose only reachable outcome is the deliberately
-// indistinguishable failure `verifyOtp` returns for a bad code -- which is a
-// WRONG ANSWER dressed as a working control, and ADR-190's distinction is that
-// a wrong answer is worse than an honest refusal. On the surface a trader meets
-// FIRST, the honest refusal is the whole product of this file.
+// design." Both passkey ceremonies are blocked on `NO_WEBAUTHN`, so OTP is the
+// whole of what this deployment could serve and email is the whole of OTP.
 //
 // A SECOND REFUSAL STOOD HERE INDEPENDENTLY AND ADR-219 HAS LIFTED HALF OF IT.
 // All four routes are POST and ../../http/client.ts declared an `ApiClient` with
@@ -114,7 +121,8 @@
 // -----------------------------------------------------------------------------
 // THE THREE BLOCKERS, QUOTED, AND WHAT EACH ONE MEANS ON A SCREEN
 // -----------------------------------------------------------------------------
-// `NO_DELIVERY`, which is the one that decides this whole screen:
+// `NO_DELIVERY` STOOD HERE AND IT IS RETIRED. It read, and the sentence is kept
+// because it decided this whole screen for twenty-six waves:
 //
 //   "nothing in this deployable delivers a code. A handler that writes an
 //   `otp_challenges` row and answers `sent: true` having sent nothing is a worse
@@ -122,11 +130,13 @@
 //   against `otp_send_budget.spend_cents`, which is config that has no source in
 //   this tree"
 //
-// SO THE HONEST STATE OF THIS SCREEN IS "THE CODE CANNOT BE SENT YET" AND THE
-// SCREEN SAYS THAT. ADR-200's own opening states the same fact from the API
-// side and puts it first rather than last: "A TRADER STILL CANNOT SIGN UP ...
-// nothing in this deployable writes the `otp_challenges` row this handler
-// reads." Delivery is a vendor integration in nobody's fence.
+// WHAT REPLACES IT IS `NO_SMS_DELIVERY` AND IT IS NARROWER IN THE ONE DIRECTION
+// THAT MATTERS: the email branch is wired, and what survives is the SMS branch,
+// where a code cannot be verified even if it were sent and the per-send price
+// still has a name and no value. ADR-229. So the honest state of this screen is
+// no longer "the code cannot be sent"; it is that this application cannot
+// deliver the cookie a sign-in answers with, which is ADR-219 section 6.2 and is
+// quoted above.
 //
 // `NO_WEBAUTHN`:
 //
@@ -219,28 +229,33 @@ export type EndpointWiring = {
 /**
  * Every route SC-M4-01 would call, and which of them this deployment serves.
  *
- * ALL FOUR ARE REGISTERED. **EXACTLY ONE IS WIRED, AND IT IS NOT THE PAIR THE
- * SHAPE SUGGESTS.** The four look like an OTP pair and a passkey pair, so the
- * reading that comes for free is "OTP works, passkeys do not". That reading is
- * wrong in both halves: the passkey pair is indeed both blocked, and the OTP
- * pair is SPLIT, with the route that ISSUES a code blocked and the route that
- * CONSUMES one wired.
+ * ALL FOUR ARE REGISTERED AND TWO ARE WIRED, WHICH IS THE OTP PAIR WHOLE. It
+ * read "EXACTLY ONE IS WIRED, AND IT IS NOT THE PAIR THE SHAPE SUGGESTS" until
+ * ADR-229: the OTP pair was SPLIT, with the route that ISSUES a code blocked and
+ * the route that CONSUMES one wired. The issuing half is wired now, so the free
+ * reading -- "OTP works, passkeys do not" -- is correct for the first time, and
+ * the passkey pair is still both blocked on `NO_WEBAUTHN`.
  *
- * WHICH LEAVES THE SCREEN EXACTLY WHERE THIS FILE'S HEADER SAYS: the one served
- * route reads a row the blocked one is the only writer of, so the served set
- * admits no complete sign-in at all. `served: true` on a row is therefore a
- * statement about `apps/api` and never a licence for this screen to call it.
+ * WHICH DOES NOT MOVE THE SCREEN, AND THE HEADER SAYS WHY: `served: true` on a
+ * row is a statement about `apps/api` and never a licence for this screen to
+ * call it. What holds this one closed is ADR-219 section 6.2's cookie refusal,
+ * which was always the second and independent half.
  *
- * CARRIED AS DATA SO IT IS CHECKABLE. `test/sign-in.test.ts` matches every row
- * against `apps/api/src/auth-backend.ts`'s own text and fails when the two
- * disagree in either direction, so a session that wires `requestOtp` over there
- * cannot leave this screen quietly claiming it is still blocked.
+ * CARRIED AS DATA SO IT IS CHECKABLE, AND THE CHECK IS WHAT CAUGHT THIS EDIT.
+ * `test/sign-in.test.ts` matches every row against
+ * `apps/api/src/auth-backend.ts`'s own text and fails when the two disagree in
+ * either direction. This docblock predicted the case exactly -- "a session that
+ * wires `requestOtp` over there cannot leave this screen quietly claiming it is
+ * still blocked" -- and that session is ADR-229's, which arrived to a red suite
+ * rather than to a stale comment.
  */
 export const ENDPOINT_WIRING: readonly EndpointWiring[] = [
-  // The half of the OTP pair that puts a code in front of a person, and the
-  // reason the other half is unreachable. `NO_DELIVERY`: "nothing in this
-  // deployable delivers a code."
-  { endpoint: 'POST /auth/otp', method: 'requestOtp', served: false, blocker: 'NO_DELIVERY' },
+  // THE HALF THAT PUTS A CODE IN FRONT OF A PERSON, WIRED BY ADR-229 AFTER
+  // TWENTY-SIX WAVES. Its `sms` arm still raises `NO_SMS_DELIVERY`, which is a
+  // per-FACTOR fact and lands in {@link AVAILABILITY}.sms_otp rather than here,
+  // exactly as `verifyOtp`'s `sms` arm does one row down: the ROUTE answers, and
+  // it is the email channel that it answers for.
+  { endpoint: 'POST /auth/otp', method: 'requestOtp', served: true, blocker: null },
 
   // THE ONE THAT ANSWERS. ADR-200 wired it, and `auth-backend.ts` implements it
   // as `async verifyOtp`. Its `sms` arm still raises `NO_PHONE_RESOLUTION`
@@ -295,19 +310,35 @@ export const AVAILABILITY: Readonly<Record<AuthFactor, FactorAvailability>> = {
     because: 'Merit cannot check a passkey yet.',
   },
 
-  // `requestOtp` raises on `NO_DELIVERY`. `verifyOtp`'s email arm IS wired
-  // (ADR-200), so the half of this factor that is missing is precisely the half
-  // that puts a code in front of a person.
+  // THIS ENTRY READ "Merit cannot send a code to an email address yet." AND
+  // ADR-229 HAS MADE THAT FALSE. Both halves of the factor are wired at the API:
+  // `requestOtp` issues and delivers, `verifyOtp`'s email arm consumes.
+  //
+  // IT STAYS `served: false` AND THE REASON IS THIS APPLICATION'S RATHER THAN
+  // THE API'S, which is the distinction `served` on an {@link ENDPOINT_WIRING}
+  // row and `served` here have always carried separately. Two facts hold it
+  // closed and neither is delivery: this deployable cannot deliver the
+  // `Set-Cookie` a sign-in answers with (ADR-219 section 6.2), so nothing here
+  // can complete one; and no environment in this repository holds the mail
+  // vendor's token, so a deployment would answer 503 today anyway. A factor
+  // rendered available that cannot complete is ADR-190's wrong answer dressed as
+  // a working control, which is the thing this file exists to refuse.
+  //
+  // THE SENTENCE NAMES NEITHER, ON THE RULE THREE SECTIONS UP: the trader-facing
+  // copy says what a person cannot do, and cookies and vendor tokens are the
+  // operator's version.
   email_otp: {
     served: false,
-    because: 'Merit cannot send a code to an email address yet.',
+    because: 'Merit cannot complete a sign-in yet.',
   },
 
-  // TWO BLOCKERS, AND THE SECOND OUTLIVES THE FIRST. `requestOtp` raises on
-  // `NO_DELIVERY` like the email arm, and `verifyOtp`'s `sms` arm raises
-  // separately because a phone has no address in `RESOLUTION_ADDRESS`
-  // (ADR-200 section 4.4). Delivery landing would leave this factor still
-  // unable to complete, so the sentence names both and not just the code.
+  // TWO BLOCKERS, AND THE SECOND OUTLIVING THE FIRST IS NOW A MEASUREMENT AND
+  // NOT A PREDICTION. Delivery landed for email and this factor did not move:
+  // `requestOtp`'s `sms` arm raises `NO_SMS_DELIVERY`, and `verifyOtp`'s `sms`
+  // arm raises separately because a phone has no address in `RESOLUTION_ADDRESS`
+  // (ADR-200 section 4.4). ADR-229 declined to take an SMS vendor on exactly
+  // that ground: a code sent to a phone could not be verified by anything here,
+  // so the send would be money spent for nothing.
   sms_otp: {
     served: false,
     because: 'Merit cannot send a code to a phone yet, and cannot yet match a phone to an account.',

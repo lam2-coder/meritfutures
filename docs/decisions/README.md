@@ -241,7 +241,10 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-225](ADR-225.md) | `zod at every boundary` names a mechanism this workspace has never had, so the six citations are separated from the control they claim, and the one thing zod uniquely supplies turns out not to be validation at all  (2026-08-29, status: proposed) |
 | [ADR-226](ADR-226.md) | the Turnstile token is verified, because a required field that is never checked teaches every caller that any string works  (2026-08-29, status: proposed) |
 | [ADR-228](ADR-228.md) | The dual-control threshold is `500000` integer cents, it needed a ceiling before it needed a value, and it is undischarged on the path the question named  (2026-08-29, status: proposed) |
+| [ADR-229](ADR-229.md) | a code is delivered, because a product nobody can sign in to is a product with one defect and it is this one (2026-08-29, status: proposed) |
+| [ADR-230](ADR-230.md) | The `pair` class gets a WRITE door and keeps its read refusal, the narrowness is a stamp rather than a check, and the route it was built for still does not serve  (2026-08-29, status: proposed) |
 | [ADR-231](ADR-231.md) | The public lookup door, and the enumeration control it rests on is asserted by the corpus and enforced by nothing  (2026-08-29, status: proposed) |
+| [ADR-232](ADR-232.md) | The approval edge exists and is dual controlled above `500000` cents on an operator's hand alone, and it is not what ends a per-trader lockout  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

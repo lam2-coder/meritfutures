@@ -27,15 +27,26 @@
 // than a boolean or a comment, so the legitimate unscoped readers are a list
 // somebody has to join.
 //
-// THIS FILE HAS BEEN WIDENED THREE TIMES AND NARROWED ONCE, AND ADR-157 IS THE
-// THIRD WIDENING. ADR-084 built the two read doors; ADR-102 added the write
+// THIS FILE HAS BEEN WIDENED FOUR TIMES AND NARROWED ONCE, AND ADR-230 IS THE
+// FOURTH WIDENING. ADR-084 built the two read doors; ADR-102 added the write
 // path; ADR-112 NARROWED it, deleting six writes that could not name a row;
 // ADR-126 added the resolution door and `insertUnder`. ADR-157 adds a filter
-// TERM (a range and an `IS NULL`, on reads only), and a ROW LOCK. What it does
-// NOT add is an aggregate, a join, a `SqlExecutorReason` member or a
+// TERM (a range and an `IS NULL`, on reads only), and a ROW LOCK. What ADR-157
+// does NOT add is an aggregate, a join, a `SqlExecutorReason` member or a
 // `SystemReason` member, and P7 section 10 item 1 asked for the first of those
 // by name: that entry's section 5 is the argument and it is a refusal on
 // evidence rather than on scope.
+//
+// ADR-230 ADDS `insertAsParty`, AND WHAT MAKES IT THE NARROWEST WIDENING IN THIS
+// LIST IS WHAT IT DOES NOT ADD. No key joins `ScopedTableKey`. No key leaves
+// `PairTableKey`. `scopePredicate` still throws on every `pair` key, so NOTHING
+// BECOMES READABLE. The method INSERTS one row of one class, into the one table
+// whose registry rule declares `writer.by === 'party'`, with the writer's own
+// identity STAMPED into the column that rule names and refused to the caller --
+// so a handler party to one pair cannot write a row for another, and it cannot
+// because there is no parameter through which it could. It builds no
+// `RETURNING` clause, which is why ADR-106's disclosure ground is absent rather
+// than outweighed: the transaction hands the caller back no column at all.
 
 import {
   and,
@@ -66,6 +77,7 @@ import {
   SCOPE_RULES,
   TABLES,
   type FirmTableKey,
+  type PairTableKey,
   type ScopeRule,
   type ScopedTableKey,
   type TableKey,
@@ -202,8 +214,15 @@ export function scopePredicate(key: TableKey, identityId: IdentityId): SQL {
     }
 
     case 'pair':
-      // UNREACHABLE THROUGH THE SCOPED ACCESSOR, AND NOT FOR `firm`'s REASON
-      // (ADR-106). A predicate EXISTS here and is deliberately not built:
+      // UNREADABLE THROUGH THE SCOPED ACCESSOR, AND NOT FOR `firm`'s REASON
+      // (ADR-106). THIS COMMENT SAID "UNREACHABLE" AND ADR-230 MOVED THE WORD
+      // RATHER THAN THE BEHAVIOUR: `insertAsParty` can WRITE one row of a `pair`
+      // table whose rule declares `writer.by === 'party'`, and it reaches this
+      // function never, because an INSERT has no `WHERE` clause to carry a
+      // predicate into. Every path that READS a pair row still arrives here and
+      // still throws.
+      //
+      // A predicate EXISTS here and is deliberately not built:
       // `columnA = $1 OR columnB = $1` returns precisely the rows that are this
       // person's, and every one of them carries the OTHER party's identity uuid
       // out of a NOT NULL column. That is the cross-identity read
@@ -2248,6 +2267,192 @@ export async function insertUnderStatement(
   return (await source.insert(table).values(values).returning()) as unknown[];
 }
 
+// =============================================================================
+// WRITING A ROW THAT BELONGS TO TWO PEOPLE, AS ONE OF THEM (ADR-230)
+// =============================================================================
+// ADR-106 RULED THAT A `pair` ROW IS SCOPED TO NEITHER PARTY AND THAT RULING IS
+// UNTOUCHED. It is a ruling about a READ, and its whole ground is disclosure:
+// `columnA = $1 OR columnB = $1` returns precisely this person's rows and every
+// one of them carries the other party's identity uuid out of a `NOT NULL`
+// column. Nothing below returns a row.
+//
+// SO THE QUESTION THIS SECTION ANSWERS IS A DIFFERENT ONE, AND IT HAD NO ANSWER
+// AT ALL. `apps/api/src/routes/checkout.ts` must write one `attributions` row
+// inside the buyer's checkout transaction (M08 section 3.1: resolution "HAPPENS
+// AT CHECKOUT START ... AND IT HAPPENS ONCE"), and before this section the only
+// door that could reach the table was `systemDb(reason)`, whose vocabulary is
+// `'nightly-batch' | 'operator-console'`. A request handler is neither, which is
+// ADR-102 clause 3's finding arriving on the write side, and the route has
+// answered 503 for it since the file was written.
+//
+// -----------------------------------------------------------------------------
+// THE NARROWNESS IS STRUCTURAL AND NOT CHECKED, WHICH IS THE ONLY KIND WORTH
+// HAVING
+// -----------------------------------------------------------------------------
+// The rule names WHICH of the two identity columns the writer is, and this
+// builder STAMPS the handle's own identity into it -- `scopedInsertStatement`'s
+// construction exactly, on the one class that has a second identity column
+// sitting beside the stamped one. A caller naming that column, in either
+// spelling, is REFUSED rather than overwritten, on that function's own stated
+// ground that silently overwriting a value somebody wrote is how a wrong belief
+// survives a code review.
+//
+// SO "A HANDLER PARTY TO PAIR A CANNOT WRITE A ROW FOR PAIR B" IS NOT A
+// VALIDATION. There is no parameter through which the writer's own column could
+// be supplied, so every row this door can write names the handle's identity as a
+// party. The suite asserts it from both sides: the stamped bind is the handle's
+// identity on every rendered statement, and the two spellings that would set it
+// otherwise both throw.
+//
+// WHAT IT DOES NOT PROVE IS WHO THE COUNTERPARTY IS, AND THAT IS STATED RATHER
+// THAN LEFT TO BE ASSUMED. The counterparty is the caller's value and this file
+// validates nothing about it beyond its presence. Two reasons it is not
+// tightened here: the identity it names is one the caller already held (on
+// `attributions` it comes out of a coupon the buyer typed or a click token the
+// buyer presented), and a guard refusing a counterparty EQUAL to the writer
+// would make `attributions`' literal self-deal row unwritable --
+// `attributions_literal_self_deal_is_void` permits exactly that row, voided, and
+// SD-M8-05's whole argument is that "the self-deal check must record WHAT IT
+// FOUND, not only its verdict".
+//
+// NO `RETURNING`, AND IT IS THE REASON THE DISCLOSURE GROUND IS ABSENT RATHER
+// THAN OUTWEIGHED. `insertUnderStatement` returns its rows and `insert` returns
+// its rows; this returns `void`. A caller that needs the generated `id` is
+// asking for something this door does not grant, and the one caller the door
+// was built for does not: `CheckoutTx.insertAttribution` is
+// `Promise<void>` in its own port.
+
+/**
+ * The `pair` tables a party to the row may INSERT into.
+ *
+ * DERIVED FROM THE REGISTRY RATHER THAN LISTED, WHICH IS THE OPPOSITE CHOICE
+ * FROM `ParentedTableKey` AND IS MADE ON THE SAME REASONING. That type is an
+ * `Extract` down to one member because `DerivedTableKey` contains
+ * `ledger_entries`: the CLASS is not the ruling there, so the list has to be.
+ * Here the ruling IS per table and it is in the registry -- `PairRule.writer` is
+ * required, carries its own `why`, and defaults to nothing -- so an `Extract`
+ * would be a second statement of a decision already written once, which is the
+ * drift `packages/db` exists to keep to one. A `pair` table added later reaches
+ * this door only by an author writing `by: 'party'` and a reason beside it.
+ */
+export type PartyWritableTableKey = {
+  [K in PairTableKey]: (typeof SCOPE_RULES)[K]['writer'] extends { readonly by: 'party' }
+    ? K
+    : never;
+}[PairTableKey];
+
+/**
+ * INSERT one row of a `pair` table, AS ONE OF ITS TWO PARTIES.
+ *
+ * Every refusal below is a throw and not a type, on `refuseTenancyColumn`'s
+ * stated ground: the offending key is a string at the moment it is passed, so a
+ * runtime can see it perfectly well, and making it a compile error would mean a
+ * conditional type over every column of every table at every call site.
+ *
+ * IT RETURNS `void` AND BUILDS NO `RETURNING`. See this section's header.
+ */
+export async function pairInsertStatement(
+  source: StatementSource,
+  key: PartyWritableTableKey,
+  identityId: IdentityId,
+  values: WriteValues,
+): Promise<void> {
+  // WIDENED DELIBERATELY, for `insertUnderStatement`'s stated reason: indexing
+  // at a literal key narrows this to the one rule `attributions` carries and
+  // makes both guards below unreachable branches, which the compiler reports
+  // from inside their own error messages. Widening restores the union, so the
+  // guards are written against the REGISTRY rather than against the type.
+  const rule: ScopeRule = SCOPE_RULES[key as TableKey];
+  if (rule.class !== 'pair') {
+    throw new Error(
+      `${key} is registered "${rule.class}" and insertAsParty writes a row that belongs to TWO ` +
+        'identities. An owned or root row carries one tenancy column, which `insert` stamps; a ' +
+        'derived row proves a parent; a firm row belongs to nobody. The registry moved and this ' +
+        'door did not follow it.',
+    );
+  }
+  if (rule.writer.by !== 'party') {
+    throw new Error(
+      `${key} is registered "pair" with writer.by === "${rule.writer.by}" (${rule.writer.why}), ` +
+        'so no party to one of its rows may author one. ADR-230 makes that the DEFAULT answer ' +
+        'and this door serves only the tables whose rule says otherwise.',
+    );
+  }
+
+  const writerColumn = rule.writer.column;
+  if (writerColumn !== rule.columnA && writerColumn !== rule.columnB) {
+    // REGISTRY DRIFT AND NOT A CALLER ERROR. A writer column that is neither of
+    // the two identity columns would be a stamp into a column no identity is
+    // declared on, which is an unscoped write wearing this door's clothes.
+    throw new Error(
+      `${key}'s writer column "${writerColumn}" is neither "${rule.columnA}" nor ` +
+        `"${rule.columnB}", so stamping it would write an identity into a column the registry ` +
+        'does not call an identity column. The rule and its own writer have drifted.',
+    );
+  }
+  const counterpartyColumn = writerColumn === rule.columnA ? rule.columnB : rule.columnA;
+
+  refuseTermInValues(key, values);
+
+  const table = TABLES[key] as PgTable;
+  const writerProperty = propertyForColumn(table, writerColumn);
+  const counterpartyProperty = propertyForColumn(table, counterpartyColumn);
+  if (writerProperty === undefined || counterpartyProperty === undefined) {
+    throw new Error(
+      `scope registry names columns "${writerColumn}" and "${counterpartyColumn}" on ${key}, and ` +
+        'at least one does not exist on this table. The registry and the schema have drifted.',
+    );
+  }
+
+  // THE WRITER'S COLUMN IS REFUSED IN BOTH SPELLINGS, and this is the whole of
+  // the narrowness. `refuseTenancyColumn` is NOT reused: it refuses BOTH of a
+  // pair row's columns, and the counterparty is the one value this door genuinely
+  // needs from the caller.
+  for (const named of Object.keys(values)) {
+    if (named !== writerColumn && named !== writerProperty) continue;
+    throw new Error(
+      `"${named}" is ${key}'s WRITER column and insertAsParty never takes it from the caller. ` +
+        'The handle stamps its own identity there, which is what makes a row for a pair this ' +
+        'caller is not party to unwritable rather than merely refused.',
+    );
+  }
+
+  // AND THE COUNTERPARTY IS REQUIRED IN EXACTLY ONE SPELLING, which is
+  // `insertUnderStatement`'s guard for its own reason: Drizzle keys a values
+  // object by PROPERTY name, so a caller writing the SQL spelling would have the
+  // column silently dropped and the row would fail at a `NOT NULL` it thought it
+  // had satisfied -- or, worse, on a nullable column, commit a pair row with one
+  // party.
+  if (
+    counterpartyProperty !== counterpartyColumn &&
+    Object.prototype.hasOwnProperty.call(values, counterpartyColumn)
+  ) {
+    throw new Error(
+      `"${counterpartyColumn}" is ${key}'s SQL column name and a values object is keyed by ` +
+        `Drizzle property name. Name "${counterpartyProperty}" instead: written this way the ` +
+        'column is dropped from the INSERT and the row records one party rather than two.',
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(values, counterpartyProperty)) {
+    throw new Error(
+      `an insert into ${key} as a party must name "${counterpartyProperty}". A pair row is a ` +
+        'statement about TWO identities and the handle can stamp only the one it is bound to.',
+    );
+  }
+  const counterparty = values[counterpartyProperty];
+  if (counterparty === null || counterparty === undefined) {
+    throw new Error(
+      `"${counterpartyProperty}" is ${counterparty === null ? 'null' : 'undefined'} in an insert ` +
+        `into ${key} as a party. A pair row with one identity is not a pair, and both of this ` +
+        "table's identity columns are declared NOT NULL.",
+    );
+  }
+
+  // THE STAMP IS THE LAST WORD AND THE CALLER WAS ALREADY REFUSED ABOVE, which
+  // is `scopedInsertStatement`'s order and its reason.
+  await source.insert(table).values({ ...values, [writerProperty]: identityId });
+}
+
 // -----------------------------------------------------------------------------
 // THE TRANSACTION, AND THE `JobTransaction` NOTHING IN THIS WORKSPACE COULD
 // PRODUCE (ADR-102 clause 2)
@@ -2323,6 +2528,23 @@ export interface ScopedTx extends TxCommon {
    * double-entry posting.
    */
   insertUnder<K extends ParentedTableKey>(key: K, values: WriteValues): Promise<unknown[]>;
+  /**
+   * INSERT one row of a `pair` table, AS ONE OF ITS TWO PARTIES (ADR-230).
+   *
+   * `PartyWritableTableKey` is derived from `PairRule.writer`, so the set of
+   * tables reachable here is exactly the set whose registry rule says a party
+   * may author the row, each with its own reason.
+   *
+   * THE WRITER'S OWN IDENTITY COLUMN IS STAMPED AND CANNOT BE SUPPLIED, so a
+   * handler party to one pair cannot write a row for another. The counterparty
+   * is required and is the caller's.
+   *
+   * IT RETURNS NOTHING. `insert` and `insertUnder` return their rows; this
+   * builds no `RETURNING` clause, which is why ADR-106's disclosure ground is
+   * absent here rather than outweighed. Reading a `pair` row is still refused at
+   * every authority below `systemDb(reason)`.
+   */
+  insertAsParty<K extends PartyWritableTableKey>(key: K, values: WriteValues): Promise<void>;
   /** Rows matching a filter, ANDed with this identity's scope. Many rows. */
   rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
     key: K,
@@ -2464,6 +2686,15 @@ export function scopedTx(
       // handle. Proving the parent on `client()` would prove it against
       // committed state and leave the window ADR-102 section 4 calls a race.
       return await insertUnderStatement(source, key, identityId, values);
+    },
+    async insertAsParty<K extends PartyWritableTableKey>(
+      key: K,
+      values: WriteValues,
+    ): Promise<void> {
+      // THE IDENTITY IS THE HANDLE'S AND THERE IS NO SECOND PLACE IT COULD COME
+      // FROM. This method takes a key and a row, exactly like `insert`, and the
+      // stamped column is the registry's answer rather than this call site's.
+      await pairInsertStatement(source, key, identityId, values);
     },
     async rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
       key: K,
