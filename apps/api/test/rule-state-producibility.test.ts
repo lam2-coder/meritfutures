@@ -219,11 +219,17 @@ describe('link 2: a `BatchPorts` value IS constructed under `src/`, and it serve
         `new BatchPortUnwired('${port}'`,
       );
 
-    // AND THE WRITE PORT IS COMPOSED ON THE UNWIRED ENCODER, which is link 3's
-    // subject seen from the adapter: the door is real and the codec is not, and
-    // the two arrive on one `RuleStateWriterIo` so that a deployment installs
-    // both or neither.
-    expect(adapter).toContain('UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates');
+    // **AND THE WRITE PORT IS COMPOSED ON A REAL ENCODER NOW.** This assertion
+    // read that the adapter took `UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates`,
+    // which was link 3's subject seen from the adapter: the door was real and the
+    // codec was not. ADR-250 landed the codec, so the assertion is REPOINTED at
+    // the fact that replaced it rather than deleted, and it is repointed at BOTH
+    // halves, because an installed encoder written in this deployable would be
+    // the `FM-16` ADR-239 slice A ruled against: `apps/api` decodes the same
+    // column and cannot import `apps/worker`.
+    expect(adapter).toContain("from '@merit/rules-engine'");
+    expect(adapter).toContain('encodeEngineGates');
+    expect(adapter).not.toContain('UNWIRED_RULE_STATE_WRITER_IO');
   });
 });
 
@@ -244,11 +250,20 @@ describe('link 3: the `engine_gates` encoding is RULED and is UNIMPLEMENTED, and
     expect(record).toContain('every cents leaf a base-10 string');
   });
 
-  test('and no implementation of it ships, so a wired adapter would still refuse by name', () => {
+  test('and no implementation of it is WRITTEN in a deployable, which is ADR-239 A', () => {
+    // **THIS TITLE READ "no implementation of it ships" AND ADR-250 MADE THAT
+    // FALSE.** The predicate did not move and never needed to: it counts
+    // `RuleStateWriterIo` VALUES declared under a deployable's `src/`, and the
+    // encoder the adapter now installs is an IMPORT from `@merit/rules-engine`
+    // rather than a value declared here. What this case still catches is the
+    // defect it was written for: a second transcription of ADR-206 appearing in
+    // a deployable, which is `FM-16` because two deployables read this column.
+    //
     // The only `RuleStateWriterIo` value under `src/` is the unwired default,
     // and it THROWS rather than returning, because a writer that silently did
     // nothing produces a report saying 5,000 rows were written on a night the
-    // book gained none.
+    // book gained none. It stays, because a deployment that installs a door and
+    // no encoding must still refuse.
     const declarations = deployableSources().flatMap((path) =>
       [...codeOf(path).matchAll(/export const (\w+): RuleStateWriterIo =/g)].map(
         (match) => match[1] ?? '',

@@ -107,6 +107,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'CalendarSliceError',
     'ENGINE_GATE_LEAVES',
     'EXCLUDED_COLUMNS',
+    'EngineGatesCodecError',
     'EngineInvariantError',
     'HASHED_COLUMNS',
     'IMPLEMENTED_RULES',
@@ -118,6 +119,8 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'applySettlement',
     'buildCalendarSlice',
     'canonicalStateSerialization',
+    'decodeEngineGates',
+    'encodeEngineGates',
     'evaluatePayout',
     'initialState',
     'lookupCalendarDay',
@@ -145,7 +148,16 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // three new names only `projectPayout` computes anything; `PROJECTION_ASSUMPTIONS`
 // and `PROJECTION_CAVEAT` are frozen tables in the class `HASHED_COLUMNS` and
 // `ENGINE_GATE_LEAVES` are in. TWELVE FUNCTIONS BECOME THIRTEEN.
-test('of the twenty-three names, exactly thirteen are functions and ADR-204 added one', () => {
+//
+// ADR-250 IS THE FOURTH AND IT IS THE FIRST TO ADD TWO FUNCTIONS AT ONCE:
+// twenty-three names to TWENTY-SIX, gaining `encodeEngineGates`,
+// `decodeEngineGates` and the class `EngineGatesCodecError`. Section 1.3's
+// rationale is what admits them and ADR-239 slice A is where it was applied:
+// TWO deployables need this one predicate and neither can import the other, so
+// a withheld codec is not a codec nobody writes, it is TWO codecs, which is the
+// `FM-16` that ADR-206 exists to close. THIRTEEN FUNCTIONS BECOME FIFTEEN and
+// the error classes go from four to FIVE.
+test('of the twenty-six names, exactly fifteen are functions and ADR-250 added two', () => {
   const functions = Object.keys(engine)
     .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
     .sort();
@@ -155,6 +167,7 @@ test('of the twenty-three names, exactly thirteen are functions and ADR-204 adde
   // the difference. `IMPLEMENTED_RULES` and the three tables are values.
   const classes = [
     'CalendarSliceError',
+    'EngineGatesCodecError',
     'EngineInvariantError',
     'ReplayAssertionError',
     'StateHashError',
@@ -164,6 +177,8 @@ test('of the twenty-three names, exactly thirteen are functions and ADR-204 adde
     'applySettlement',
     'buildCalendarSlice',
     'canonicalStateSerialization',
+    'decodeEngineGates',
+    'encodeEngineGates',
     'evaluatePayout',
     'initialState',
     'lookupCalendarDay',

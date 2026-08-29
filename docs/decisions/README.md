@@ -261,6 +261,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-245](ADR-245.md) | the worker landing closed two of the payout port's four links and moved neither of the other two, so the port still refuses, and `PayoutSubject`'s third field has never had a clause  (2026-08-29, status: proposed) |
 | [ADR-246](ADR-246.md) | three certificate ports are two questions, the card is one deliverable and not three, and a port whose own message promised a 503 was answering 500 (2026-08-29, status: proposed) |
 | [ADR-248](ADR-248.md) | `ExternalGates` is external to the REPLAYED STATE and not to this estate, three of its five facts resolve off registered tables, and the in-flight leg has no predicate to read because M01 states R-38's grain both ways  (2026-08-29, status: proposed) |
+| [ADR-250](ADR-250.md) | the `engine_gates` codec is a transcription of a ruling that already existed, it is a ROUND TRIP because the port that waits on the column reads it, and the wire shape that was nearest to hand would have lost three leaves into the replay hash  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
