@@ -1668,6 +1668,25 @@ const ci06h = {
       // apart on real rows. SUCCESS 2 is the acceptance case for a table that is
       // deliberately NOT append-only: delete this step and nothing says the
       // producer can still close a sweep it started.
+      // 0066, ADR-213. MONEY PATH. The grid every cents value of a payout
+      // approval is read from, and the guard that did not exist while the
+      // design record said it did.
+      //
+      // Deleting this step deletes the only assertion that session 401's
+      // measured mutation stays refused, and it takes SIX ACCEPTANCE CASES with
+      // it. Those are the half that matter here: the failure mode of an
+      // over-corrected fix on this table is a guard that refuses EVERY write,
+      // which passes all eleven refusals and makes plan authoring impossible.
+      // Nothing in apps/ writes this table today, so nobody would find out.
+      [
+        'probe_published_size_grid_immutable.sql',
+        "0066's published size grid guard is no longer probed, so nothing " +
+          "asserts that session 401's measured mutation stays refused, that " +
+          'an INSERT into a published version is refused as well as an UPDATE ' +
+          'and a DELETE, that a row cannot be moved onto or off a published ' +
+          'version, or that a draft grid, the publish transition and the one ' +
+          'permitted retirement all still work (ADR-213)',
+      ],
       [
         'probe_reconciliation_run.sql',
         'the reconciliation run record is no longer probed, so nothing asserts ' +

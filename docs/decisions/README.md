@@ -230,6 +230,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-209](ADR-209.md) | a `TableKey` may name a VIEW, its scope class is the class of the relation it PROJECTS, and it is never addressable -- so `economic_calendar_current` is registered and `affiliate_statements` needed no ruling at all  (2026-08-29, status: proposed) |
 | [ADR-211](ADR-211.md) | one transaction does not make two reads consistent, so the crossing is two transactions keyed by the scoped result -- and the payout port stays blocked anyway, because nothing in this database pins the numbers `ResolvedPlan` is built from  (2026-08-29, status: proposed) |
 | [ADR-212](ADR-212.md) | a citation proves the cited line is PART OF WHAT THE SENTENCE NAMES, so `RI-15` gains an anchor, a vacancy rule and the comma list -- and the window it was built on turns out to move nothing at all  (2026-08-29, status: proposed) |
+| [ADR-213](ADR-213.md) | a published plan version's size grid is immutable, and the `INSERT` is refused on the same evidence as the `UPDATE` -- because `validatePlan` runs at the publish transition and takes the whole grid  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

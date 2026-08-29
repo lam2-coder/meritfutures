@@ -646,6 +646,31 @@ jobs:
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_reconciliation_run.sql
 
+      # 0066, ADR-213. THE GUARD 0028's GUARANTEE READ AS ALREADY HAVING, and
+      # the design record for plan_version_sizes has claimed it since 0004
+      # landed: "Immutable once the parent version is published (same trigger)."
+      # There was no such trigger. 0028 pins a published plan_versions row to
+      # the byte and plan_version_sizes carried ZERO triggers, so the grid every
+      # cents value of a payout approval is read from could be moved or deleted
+      # after publication by the role the API runs as.
+      #
+      # SIX OF THE SEVENTEEN CASES ARE ACCEPTANCES AND THEY LEAD. The dangerous
+      # over-correction here is not a missing guard, it is a TOTAL one: a guard
+      # that refused every write to this table would pass all eleven refusals
+      # and silently destroy plan authoring, which nothing in apps/ exercises
+      # yet and which nobody would notice was broken. ACCEPTANCE 4 is the
+      # publish transition itself and ACCEPTANCE 6 is 0028's one permitted move,
+      # both on a version that carries a grid; ACCEPTANCE 5 is the only case
+      # that proves the guard is per VERSION rather than per table.
+      #
+      # Deleting this step deletes the only assertion that session 401's
+      # measured mutation stays refused: buffer_cents 100000 -> 777777 on a
+      # published version, and that version's whole size grid DELETEd.
+      - name: Probe the published size grid's immutability (0066)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_published_size_grid_immutable.sql
+
       # OI-03, ADR-128. THE APPEND-ONLY SET, ASSERTED AGAINST THE DOCUMENT.
       #
       # OI-03 is not a prediction and it had already happened three times when
