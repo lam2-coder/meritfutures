@@ -8215,11 +8215,14 @@ section 10 finding 1 says of `B5`'s LEG 2 case *"Every assertion in it is still 
 wrong is its prose"* and *"Reported: `apps/api/**` is not this fence's"*. Every assertion is unchanged.
 
 **`B5`'s CONDITION IS RESTATED BECAUSE ITS RULING HALF FIRED AND ITS PRODUCER HALF DID NOT.** `ADR-204`
-defines the projection completely, and **a definition is not a producer**. Two things are owed and
-neither is this fence's: a `writeRuleState` IMPLEMENTATION, and the `| null` `ADR-203` ruling 8 rules
-onto `eligible_next_7d` and deliberately did not transcribe, because one of the two type errors that
-edit produces is in `EligibleForecastResponse`, a second response whose empty-horizon body is an open
-ruling.
+defines the projection completely, and **a definition is not a producer**. **AND THE ENGINE PRODUCER
+LANDED WHILE THIS BRANCH WAS OPEN AND MOVED IT NO FURTHER**: session 389 built `projectPayout`, which
+takes a `RuleState`, and a `RuleState` comes from `rule_states`, which nothing writes. **A producer
+with no input is the same blocker with a longer chain**, and that session reported the repair of this
+case's title to this fence in terms. Two things are owed and neither is this fence's: a
+`writeRuleState` IMPLEMENTATION, and the `\| null` `ADR-203` ruling 8 rules onto `eligible_next_7d` and
+deliberately did not transcribe, because one of the two type errors that edit produces is in
+`EligibleForecastResponse`, a second response whose empty-horizon body is an open ruling.
 
 **EXECUTED AGAINST POSTGRESQL 16 WITH ALL 60 MIGRATIONS AND 115 TABLES, THROUGH THE REAL ACCESSOR.**
 Over a seeded estate of 64 sessions, 64 settled transfers and four runs: `last_run_at` reads

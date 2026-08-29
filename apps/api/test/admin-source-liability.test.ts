@@ -647,6 +647,16 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   // `ADR-201` defined `avg_30d_cents` in August and the figure took two more
   // sessions to reach a body.
   //
+  // **AND THE ENGINE PRODUCER LANDED WHILE THIS BRANCH WAS OPEN, WHICH IS THE
+  // THIRD ARM AND MOVED IT NO FURTHER.** Session 389 built `projectPayout` in
+  // `packages/rules-engine`: `ADR-204`'s projection, executed, with the five
+  // assumptions carried as data rather than as arithmetic. **A PRODUCER WITH NO
+  // INPUT IS THE SAME BLOCKER WITH A LONGER CHAIN**, because that function takes
+  // a `RuleState` and a `RuleState` comes from `rule_states`, which is leg 1.
+  // That session reported the repair of this case's title to this fence in
+  // terms, and the title above is that repair: the ruling arm and the engine arm
+  // are both spent and neither was ever the blocker.
+  //
   // **TWO THINGS ARE OWED AND NEITHER IS THIS FENCE'S TO TAKE ALONE.**
   //   1. A `rule_states` writer. `ADR-204` section 8 refines session 380's
   //      finding: the CALL SITE is real (`nightly.ts` calls `writeRuleState`)
@@ -667,6 +677,11 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
     );
+    // NON-VACUITY ON THE ARM THAT DID LAND, so this case cannot be read as
+    // saying the projection is unbuilt. It is built and it has no input.
+    expect(
+      readFileSync(join(ROOT, 'packages/rules-engine/src/payout/project.ts'), 'utf8'),
+    ).toContain('export function projectPayout');
     // THE DECLARATION HALF, READ AT THE CONTRACT. `ADR-203` ruling 8 names this
     // exact edit and does not make it, so a reader of that entry alone would
     // conclude the shape had landed.
