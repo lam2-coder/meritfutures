@@ -73,6 +73,30 @@ import * as engine from '../src/index.ts';
 //                              export reaches the whole-life fold and
 //                              `apps/worker` had already written its own
 //
+//   projectPayout              ADR-204, and ADR-078's test a third time. M01
+//   PROJECTION_ASSUMPTIONS     section 4 names `evaluatePayout` "projected
+//   PROJECTION_CAVEAT          forward over the calendar" as the producer behind
+//                              `GET /admin/eligible-forecast`, and that entry
+//                              proves the sentence uncallable as written: the
+//                              call's argument is the future. What IS callable
+//                              is a forward BASIS DAY for R-37, the one of
+//                              eleven conditions a stored row already fixes for
+//                              the whole horizon. THREE NAMES, GAINING EXACTLY
+//                              ONE FUNCTION. Withholding it DEFEATS 1.3's
+//                              rationale for `replay`'s reason: nothing
+//                              exported reaches a forward basis day, so the
+//                              caller that needs one -- `eligible_next_7d` in
+//                              `apps/api/src/admin-source/` -- writes its own
+//                              six-gate conjunction in the API layer, which is
+//                              FM-16 by name. The two tables are frozen data
+//                              and reimplement no rule: ADR-204 ruling 6 says a
+//                              producer MAY NOT CHOOSE the five assumptions and
+//                              ruling 7 says both halves of the figure are
+//                              stated wherever it is shown, so a caller that
+//                              had to retype them could retype them wrongly.
+//                              `projectEngineGates` is NOT here and that is the
+//                              CLAMP's ruling: `projectPayout` reaches it
+//
 // `evaluate` WAS HERE AND IS GONE (ADR-078). It was the scaffold's identity
 // stub and was never among 1.3's six. The line that used to sit here said the
 // polarity probe folds it; `engineIsIdentityStub` in `golden-loader/src/run.ts`
@@ -86,6 +110,8 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'EngineInvariantError',
     'HASHED_COLUMNS',
     'IMPLEMENTED_RULES',
+    'PROJECTION_ASSUMPTIONS',
+    'PROJECTION_CAVEAT',
     'ReplayAssertionError',
     'StateHashError',
     'advanceDay',
@@ -96,6 +122,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'initialState',
     'lookupCalendarDay',
     'nextTradingDayAfter',
+    'projectPayout',
     'replay',
     'resolvePlan',
     'stateHash',
@@ -112,7 +139,13 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // COMPUTE anything. The other four are a class and three frozen tables, none of
 // which a caller can reimplement a rule slightly differently with. Ten
 // functions become TWELVE; the other four new names are not functions.
-test('of the twenty names, exactly twelve are functions and ADR-081 added two', () => {
+//
+// ADR-204 IS THE SAME SENTENCE A THIRD TIME AND IT IS THE SMALLEST OF THE
+// THREE: twenty names to TWENTY-THREE, gaining exactly ONE function. Of the
+// three new names only `projectPayout` computes anything; `PROJECTION_ASSUMPTIONS`
+// and `PROJECTION_CAVEAT` are frozen tables in the class `HASHED_COLUMNS` and
+// `ENGINE_GATE_LEAVES` are in. TWELVE FUNCTIONS BECOME THIRTEEN.
+test('of the twenty-three names, exactly thirteen are functions and ADR-204 added one', () => {
   const functions = Object.keys(engine)
     .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
     .sort();
@@ -135,6 +168,7 @@ test('of the twenty names, exactly twelve are functions and ADR-081 added two', 
     'initialState',
     'lookupCalendarDay',
     'nextTradingDayAfter',
+    'projectPayout',
     'replay',
     'resolvePlan',
     'stateHash',
