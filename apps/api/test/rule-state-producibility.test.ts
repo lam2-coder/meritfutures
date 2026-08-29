@@ -394,4 +394,127 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
     // admit the seventh would be a route deciding what a provisioning account is
     // worth to the rules.
   });
+
+  test("and `hasPayoutInFlight` has NO single ruled predicate, because M01 states R-38's grain both ways", () => {
+    // **THE THIRD FIELD'S SECOND LEG IS NOT A MISSING FUNCTION. IT IS A
+    // CONTRADICTED ONE.** ADR-245 sized this leg as four column reads and one
+    // refusal, and ADR-248 re-derived it and found that the in-flight leg has no
+    // predicate to read: `M01` says R-38 counts an outstanding leg FOR THIS
+    // ACCOUNT where it declares the field, and FOR THIS IDENTITY where it states
+    // the rule. The two readings differ by exactly the population of identities
+    // holding more than one account, which is every copy trader on the plan
+    // maximum, and they differ ON THE DOOR WHERE MERIT PAYS.
+    //
+    // BOTH SIDES ARE SLICED OUT OF THE DOCUMENT RATHER THAN TYPED HERE, so the
+    // day an ADR rules the grain one of these slices stops matching and this
+    // case names it instead of going quietly stale.
+    const m01 = readFileSync(join(REPO_ROOT, 'docs/plans/M01-rules-engine.md'), 'utf8');
+
+    // Section 2.1's `ExternalGates` block, where the field is DECLARED.
+    const block = m01.slice(m01.indexOf('interface ExternalGates {'));
+    const declared = block.slice(0, block.indexOf('\n}')).split('\n');
+    const field = declared.filter((line) => line.includes('hasPayoutInFlight:'));
+    expect(field, 'section 2.1 no longer declares `hasPayoutInFlight` exactly once').toHaveLength(
+      1,
+    );
+    expect(field[0]).toContain('exists for this account');
+
+    // Group F's R-38 row, where the rule is STATED. It appears twice, because
+    // M01 carries the rule table and its context-gate restatement, and both
+    // copies say the same thing: naming the count keeps a future edit to one of
+    // two visible, which is `0031`'s own reason for writing its two SD-09
+    // predicates adjacent.
+    const stated = m01
+      .split('\n')
+      .filter((line) => line.startsWith('| R-38 ') && line.includes('wallet-to-rail withdrawal'));
+    expect(stated).toHaveLength(2);
+    for (const row of stated) expect(row).toContain('withdrawal for this identity in');
+
+    // AND THE ENGINE'S OWN CONTRACT MAY NOT PICK ONE EITHER. `types.ts` claimed
+    // to reproduce section 2.1 verbatim and then wrote the identity reading
+    // twice, which is the claim ADR-248 repaired: a caller reading the interface
+    // to learn what to supply was being told a settled answer to an open
+    // question. The repaired comment names both and rules neither, and this
+    // assertion is what stops the next edit from quietly resolving it.
+    const engine = readFileSync(join(REPO_ROOT, 'packages/rules-engine/src/types.ts'), 'utf8');
+    const contract = engine.slice(
+      engine.lastIndexOf('/**', engine.indexOf('export interface ExternalGates {')),
+      engine.indexOf('/** R-40. Account `active` AND phase `funded`. */'),
+    );
+    expect(contract).toContain('for this account');
+    expect(contract).toContain('for this identity');
+    expect(contract).toContain('rules NEITHER');
+  });
+
+  test('and SD-09, the second line of defence for the same rule, is ACCOUNT grained', () => {
+    // **THE INDEX IS THE ONE PLACE R-38 IS ENFORCED TODAY AND IT AGREES WITH THE
+    // DECLARATION RATHER THAN WITH THE RULE ROW.** M01's AS-01 residual says the
+    // same thing in prose ("None at account level. At identity level, ten
+    // accounts can each hold one in-flight payout, which is AS-09") and AS-09 is
+    // RULED at the gate as visibility rather than a rule, so a resolver taking
+    // the identity reading would refuse nine of a copy trader's ten accounts
+    // under a ceiling the corpus declined to impose.
+    //
+    // THAT IS WHY THIS LEG IS NOT A DEFAULT ANYBODY MAY PICK. One reading
+    // refuses payouts the corpus permits; the other permits a stack the rule row
+    // forbids. A resolver written today would be a route or a worker ruling a
+    // contradiction inside a FROZEN plan, in a line nobody would read again.
+    const migrations = join(REPO_ROOT, 'packages/db/migrations');
+    const files = readdirSync(migrations)
+      .filter((name) => name.endsWith('.sql'))
+      .sort();
+
+    // The LAST migration to create the index is the live one, derived rather
+    // than named: `0010` wrote it, `0031` dropped and rewrote it, and a `0074`
+    // that rewrote it again would be found here instead of being missed.
+    const creators = files.filter((name) =>
+      readFileSync(join(migrations, name), 'utf8').includes(
+        'CREATE UNIQUE INDEX payout_requests_no_in_flight_uq',
+      ),
+    );
+    expect(creators).toEqual(['0010_payouts.sql', '0031_payout_hold_and_identity_restriction.sql']);
+
+    const statement = (name: string): string => {
+      const sql = readFileSync(join(migrations, name), 'utf8');
+      const at = sql.indexOf('CREATE UNIQUE INDEX payout_requests_no_in_flight_uq');
+      return sql.slice(at, sql.indexOf(';', at));
+    };
+
+    const live = statement(creators[creators.length - 1] ?? '');
+    const outstanding = [...live.matchAll(/'(\w+)'/g)].map((match) => match[1] ?? '');
+
+    // THE GRAIN, ASSERTED ON THE COLUMN AND NOT ON THE COMMENT ABOVE IT.
+    expect(live).toContain('ON payout_requests (account_id)');
+    expect(outstanding).toEqual(['approved', 'frozen', 'held_pending_review']);
+
+    // AND THE STATUS SET HAS MOVED TWICE SINCE M01 WAS FROZEN, WHICH IS THE
+    // SECOND HALF OF WHY THE LEG HAS NO PREDICATE. `evaluate.ts` records it:
+    // ADR-028 retired `transferring` from this table and ADR-040 added
+    // `held_pending_review`. The engine reads a resolved boolean so the drift
+    // cannot reach the arithmetic, and the resolver is exactly where it lands.
+    const m01 = readFileSync(join(REPO_ROOT, 'docs/plans/M01-rules-engine.md'), 'utf8');
+    const block = m01.slice(m01.indexOf('interface ExternalGates {'));
+    const line = block
+      .slice(0, block.indexOf('\n}'))
+      .split('\n')
+      .find((row) => row.includes('hasPayoutInFlight:'));
+    const note = (line ?? '').slice((line ?? '').indexOf('//') + 2);
+    const frozen = note
+      .slice(0, note.indexOf('exists for'))
+      .split('|')
+      .map((word) => word.trim());
+    expect(frozen).toEqual(['approved', 'transferring', 'frozen']);
+    expect(frozen.filter((member) => !outstanding.includes(member))).toEqual(['transferring']);
+    expect(outstanding.filter((member) => !frozen.includes(member))).toEqual([
+      'held_pending_review',
+    ]);
+
+    // NON-VACUITY, on this file's own standard: the identical parser is shown
+    // reading the SUPERSEDED predicate, which carries two members rather than
+    // three, so a parser that silently matched nothing would fail here.
+    const superseded = [...statement('0010_payouts.sql').matchAll(/'(\w+)'/g)].map(
+      (match) => match[1] ?? '',
+    );
+    expect(superseded).toEqual(['approved', 'frozen']);
+  });
 });
