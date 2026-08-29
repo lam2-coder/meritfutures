@@ -527,7 +527,7 @@ export function createApiClient(input: {
 // BROWSER-REACHABLE WRITE ENDPOINT FOR A FORGED FORM TO TARGET.
 //
 // THREE. FOR THE CROSS-SITE CASE, THE COOKIE IS ALREADY THE CONTROL AND A TOKEN
-// WOULD BE A SECOND COPY OF IT. `apps/api/src/routes/auth.ts:589` sets
+// WOULD BE A SECOND COPY OF IT. `apps/api/src/routes/auth.ts:613` sets
 // `merit_session` with `HttpOnly; Secure; SameSite=Lax`, which is API_CONTRACT
 // line 19's attribute list, and a `Lax` cookie is not attached to a cross-site
 // `POST` at all. An attacker page on `evil.com` posting to `/api/v1/checkout`
@@ -579,13 +579,13 @@ export function createApiClient(input: {
 //
 // C-02 IS ALSO WEAKER THAN THE DISPATCH THAT CITED IT, AND THE DIFFERENCE IS
 // WORTH ONE LINE. C-02 says "SameSite" and names NO MODE. `Lax` appears in
-// API_CONTRACT line 19 and in `auth.ts:589`, and nowhere in `SECURITY.md`. The
+// API_CONTRACT line 19 and in `auth.ts:613`, and nowhere in `SECURITY.md`. The
 // mode is the contract's and the code's, and reading it back out of C-02 is
 // reading a document for a word it does not contain.
 //
 // INBOUND IS THE HALF ONLY A WRITE HAS, AND IT IS A DEAD END THAT MUST BE SAID
 // OUT LOUD. THREE REGISTERED `POST`s ANSWER WITH A `Set-Cookie`:
-// `auth.ts:1033` and `auth.ts:1088` establish a session and `auth.ts:1098`
+// `auth.ts:1057` and `auth.ts:1112` establish a session and `auth.ts:1122`
 // clears one. This client receives all three on a server-side `Response` and
 // DELIVERS NONE OF THEM. That is not a gap this file can close:
 // `next@16.3.2` raises `ReadonlyRequestCookiesError`, "Cookies can only be
@@ -646,7 +646,7 @@ export function createApiClient(input: {
 // is refused by name rather than sent as an empty body.
 //
 // A `204` IS A SUCCESS WITH `body: null`. RFC 9110 gives 204 no content, two
-// registered routes use it (`auth.ts:1100` and `auth.ts:1176`), and
+// registered routes use it (`auth.ts:1124` and `auth.ts:1200`), and
 // `response.ok` is true for it, so without this arm a successful logout parses
 // an empty stream and renders as `server_error`. It is keyed on the STATUS and
 // never on an empty payload: a status is a statement the server made, while an
