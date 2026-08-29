@@ -190,6 +190,55 @@ export type {
   StateHashSubject,
 } from './batch/state-hash.ts';
 
+// -----------------------------------------------------------------------------
+// `B5` TERM 1: `writeRuleState`, IMPLEMENTED (session 395)
+// -----------------------------------------------------------------------------
+// **THE FIRST DATABASE IMPLEMENTATION OF ANY `BatchWritePort` MEMBER.** Until
+// this leg, `writeRuleState`'s only satisfiers were test doubles and
+// `scripts/demo/world.ts`, which refuses, and `rule_states` therefore held zero
+// rows -- measured live over all 60 migrations by session 392 and again by 395.
+// `apps/api/src/admin-source/liability.ts`'s `B5` block names that absence as
+// term 1 of a three-term clearing condition.
+//
+// **THE DOOR WAS ALREADY OPEN AND THAT IS WHY THIS LEG IS SHORT.** `rule_states`
+// is `derived` in `packages/db/src/scope.ts`, so it is a `TableKey` and not a
+// `FirmTableKey`: `apps/api/src/db.ts`'s `firm` door cannot name it and its
+// `scoped` door wants an identity a fold across every account does not have.
+// `src/db.ts`'s `LIVE_DB.batch` yields a `SystemTx` whose `insert` is generic
+// over `TableKey`. Nothing here widens a manifest, adds a `SystemReason` member
+// or reaches a second door.
+//
+// **AND THE OTHER TWO `BatchWritePort` MEMBERS ARE NOT HERE.**
+// `raiseReconciliation` and `raiseDivergence` expand a finding into events, and
+// `test/event-sink.test.ts` establishes that no event producer is reachable from
+// this deployable at all. A `BatchWritePort` composed from this leg plus two
+// silent stubs would be a batch whose audit channel is a no-op, so no such
+// composition exists and this leg exports the one method it can serve.
+//
+// **TERM 2 IS UNCLEARED AND THE SEAM IS ITS SHAPE.** No primary source declares
+// what `rule_states.engine_gates` holds: `EngineGateResults` types four leaves
+// `bigint`, which JSON cannot carry, and `state-hash.ts` says in terms that its
+// canonical serialization is NOT the column. So `RuleStateWriterIo` takes the
+// encoding as a parameter and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name.
+export {
+  RULE_STATE_WRITE_COLUMNS,
+  RULE_STATE_WRITE_TABLES,
+  RuleStateAlreadyWritten,
+  RuleStateEncodingRefusal,
+  RuleStateWriterUnwired,
+  UNWIRED_RULE_STATE_WRITER_IO,
+  refuseUnstorableJson,
+  ruleStateValues,
+  writeRuleStateVia,
+} from './batch/state-writer.ts';
+export type {
+  RuleStateTx,
+  RuleStateValues,
+  RuleStateWriteColumn,
+  RuleStateWriteTable,
+  RuleStateWriterIo,
+} from './batch/state-writer.ts';
+
 // INV-04's comparison. `ENGINE_GATE_LEAVES` is exported above beside it because
 // a divergence names a gate by its dotted path, which is what the list carries
 // them for, and a consumer that cannot read the list cannot interpret the name.
@@ -1121,6 +1170,7 @@ export const WORKER_BARREL_LEGS = [
   './batch/ports.ts',
   './batch/replay.ts',
   './batch/state-hash.ts',
+  './batch/state-writer.ts',
   './breaker/evaluate.ts',
   './breaker/ports.ts',
   './detectors/canary.ts',

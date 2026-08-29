@@ -943,10 +943,16 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // weaker artifact to avoid a two-line edit, which is the move `P7` section
     // 11 rule 16 puts beside weakening a gate.
     './integrations/loops.ts',
+    // `B5` term 1, session 395, AND THE PARAGRAPH TWENTY LINES UP PREDICTED THIS
+    // EDIT FOR THE THIRD TIME. That slice's fence is `apps/worker/**` and its
+    // suites, so this file is inside it and the line is assigned rather than
+    // reached for; the count below is the whole of the rest of the change.
+    './batch/state-writer.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  // 24 SINCE SESSION 387, WHICH ADDED `./recon/ports.ts` AND `./recon/sweep.ts`.
-  // The number is here rather than derived so that a leg DISAPPEARING is a
-  // failure and not a smaller list nobody counted.
-  expect(new Set(legs).size).toBe(24);
+  // 25 SINCE SESSION 395, WHICH ADDED `./batch/state-writer.ts`. It was 24 from
+  // session 387, which added `./recon/ports.ts` and `./recon/sweep.ts`. The
+  // number is here rather than derived so that a leg DISAPPEARING is a failure
+  // and not a smaller list nobody counted.
+  expect(new Set(legs).size).toBe(25);
 });
