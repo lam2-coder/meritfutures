@@ -41,6 +41,8 @@
 // the configured value is the right one is the deployment's.
 // =============================================================================
 
+import { createHash } from 'node:crypto';
+
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { afterEach, describe, expect, test } from 'vitest';
 
@@ -58,6 +60,7 @@ import {
   type CertificateObservation,
 } from '../src/routes/certificates.ts';
 import verifyModule, {
+  databaseVerifySource,
   elapsedMs,
   logResult,
   readPresentation,
@@ -69,7 +72,10 @@ import verifyModule, {
   UNKNOWN_STATEMENT,
   useVerifySource,
   VERIFY_CACHE_CONTROL,
+  VERIFY_DISCLOSURE_VAR,
+  VERIFY_FLOOR_MS_VAR,
   VERIFY_PATH,
+  VERIFY_PRESENTATION_VARS,
   VERIFY_REQUIRED_FACTORS,
   VERIFY_RESULTS,
   VerifyPresentationError,
@@ -78,6 +84,7 @@ import verifyModule, {
   type VerifyPresentation,
   type VerifyResponse,
 } from '../src/routes/verify.ts';
+import { recordingDb } from './db-recorder.ts';
 
 // -----------------------------------------------------------------------------
 // THE EIGHT THINGS THIS SURFACE MUST NEVER NAME, seeded so that a careless
@@ -222,6 +229,25 @@ const FLOOR_MS = 4;
 function presentation(over: Partial<VerifyPresentation> = {}): VerifyPresentation {
   return { statements: { ...STATEMENTS }, disclosure: DISCLOSURE, floor_ms: FLOOR_MS, ...over };
 }
+
+/**
+ * The same copy, as the environment a deployment sets (ADR-231).
+ *
+ * IT IS BUILT FROM `VERIFY_PRESENTATION_VARS` RATHER THAN FROM SEVEN LITERALS,
+ * so a variable renamed in the module is a variable renamed here, and a case
+ * asserting a refusal by name cannot pass because it deleted a key nothing
+ * reads.
+ */
+const ENV: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(VERIFY_PRESENTATION_VARS).map(([key, variable]) => [
+      variable,
+      STATEMENTS[key as keyof typeof STATEMENTS],
+    ]),
+  ),
+  [VERIFY_DISCLOSURE_VAR]: DISCLOSURE,
+  [VERIFY_FLOOR_MS_VAR]: String(FLOOR_MS),
+};
 
 // -----------------------------------------------------------------------------
 // The harness
@@ -994,5 +1020,227 @@ describe('no-store on every response', () => {
     // fails at the one surface that was supposed to be authoritative.
     expect(VERIFY_CACHE_CONTROL).toBe('no-store');
     expect(VERIFY_CACHE_CONTROL).not.toContain('max-age');
+  });
+});
+
+// =============================================================================
+// THE ADAPTER, AND THE DOOR IT WAS BUILT ON (ADR-231)
+// =============================================================================
+// The three arms above were exercised against a fake source. These cases are
+// about the REAL one: which door each arm opens, what it names there, and what
+// it hands the sink. A recorder proves exactly those things and nothing about
+// what a database does with them, which is `db.ts`'s own sentence about this
+// seam.
+
+describe('databaseVerifySource opens the public door for the read and the firm door for the log', () => {
+  test('the lookup is `certificates` by `code`, through publicLookup and nowhere else', async () => {
+    const { db, calls } = recordingDb({ publiclyLooksUpTo: certRow() });
+    const row = await databaseVerifySource(db, ENV).lookup('CODE-AAAA');
+
+    expect(calls).toEqual([
+      { door: 'publicLookup', verb: 'rowAt', key: 'certificates', address: { code: 'CODE-AAAA' } },
+    ]);
+    // NO SCOPED DOOR, ASSERTED SEPARATELY FROM THE LINE ABOVE so that a failure
+    // names the thing ADR-231 section 4 refused. Resolving the identity from the
+    // code and opening `db.scoped` with it would appear here as a second call
+    // carrying an `identityId`, and it would be an authority over that trader's
+    // payouts, accounts and wallet held by an unauthenticated request.
+    expect(calls.map((call) => call.door)).not.toContain('scoped');
+    expect(calls.some((call) => call.identityId !== undefined)).toBe(false);
+
+    expect(row?.code).toBe('CODE-AAAA');
+  });
+
+  test('a code that names no row answers null, which is the port shape and not the accessor', async () => {
+    // `undefined` IS THE ACCESSOR'S "NO ROW" AND `null` IS THE PORT'S. The
+    // handler's `null` is `INV-M11-03`'s claim about Merit's book, so the
+    // translation belongs at the adapter and this case is where it is watched.
+    const { db } = recordingDb({ publiclyLooksUpTo: undefined });
+    await expect(databaseVerifySource(db, ENV).lookup('CODE-ZZZZ')).resolves.toBeNull();
+  });
+
+  test('the row the door returns is narrowed by toVerifyRow, so the internal columns do not ride out', async () => {
+    // THE DOOR CANNOT PROJECT AND THIS IS WHERE THAT IS PAID FOR. `rowAt`
+    // answers every column of `certificates`, `revoked_reason` and `identity_id`
+    // included, and the narrowing is structural rather than a delete: the fields
+    // have no home on `VerifyRow`.
+    const { db } = recordingDb({ publiclyLooksUpTo: revokedRow('fact_untrue') });
+    const row = await databaseVerifySource(db, ENV).lookup('CODE-AAAA');
+    expect(row).not.toBeNull();
+    expect(JSON.stringify(row)).not.toContain(POISON.internalReason);
+    expect(JSON.stringify(row)).not.toContain(IDENTITY);
+    expect(JSON.stringify(row)).not.toContain(CERT_ID);
+  });
+
+  test('the record arm inserts one certificate_verifications row through the firm door', async () => {
+    const { db, calls } = recordingDb();
+    const observation: CertificateObservation = {
+      code: 'CODE-AAAA',
+      result: 'valid',
+      ip: '203.0.113.7',
+    };
+    await databaseVerifySource(db, ENV).record(observation);
+
+    expect(calls).toHaveLength(1);
+    const written = calls[0];
+    expect(written?.door).toBe('firm');
+    expect(written?.verb).toBe('insert');
+    expect(written?.key).toBe('certificateVerifications');
+  });
+
+  test('the log holds a digest and never the code, which is 0025s own reason for the column', async () => {
+    const { db, calls } = recordingDb();
+    await databaseVerifySource(db, ENV).record({ code: 'CODE-AAAA', result: 'unknown', ip: null });
+
+    const values = calls[0]?.values as Record<string, unknown>;
+    expect(values['codeHash']).toStrictEqual(
+      new Uint8Array(createHash('sha256').update('CODE-AAAA', 'utf8').digest()),
+    );
+    expect(JSON.stringify([...(values['codeHash'] as Uint8Array)])).not.toContain('CODE');
+    expect(values['result']).toBe('unknown');
+    // A CALLER WHOSE ADDRESS WAS NOT OBSERVED WRITES NULL AND NOT A DIGEST OF
+    // THE EMPTY STRING, which would be one shared bucket every such row collided
+    // in, and the signal this table carries is a rate across sources.
+    expect(values['ipHash']).toBeNull();
+    // `user_agent_class` IS NOT SENT. The column's comment is "a class, never
+    // the string" and no approved document enumerates the classes.
+    expect(Object.keys(values)).toEqual(['codeHash', 'result', 'ipHash']);
+  });
+
+  test('an address that WAS observed is hashed too, and the two digests differ', async () => {
+    const { db, calls } = recordingDb();
+    await databaseVerifySource(db, ENV).record({
+      code: 'CODE-AAAA',
+      result: 'valid',
+      ip: '203.0.113.7',
+    });
+    const values = calls[0]?.values as Record<string, unknown>;
+    expect(values['ipHash']).toStrictEqual(
+      new Uint8Array(createHash('sha256').update('203.0.113.7', 'utf8').digest()),
+    );
+    expect(values['ipHash']).not.toStrictEqual(values['codeHash']);
+  });
+});
+
+describe('the presentation arm is deployment configuration and nothing is defaulted', () => {
+  test('a complete environment yields the configured copy and floor', () => {
+    const { db } = recordingDb();
+    const read = databaseVerifySource(db, ENV).presentation();
+    expect(read.statements.valid).toBe(STATEMENTS.valid);
+    expect(read.statements.account_enforced).toBe(STATEMENTS.account_enforced);
+    expect(read.disclosure).toBe(DISCLOSURE);
+    expect(read.floor_ms).toBe(FLOOR_MS);
+  });
+
+  test('an empty environment refuses, and the refusal is the 503 every code gets alike', () => {
+    // THE SHAPE ADR-226 RULED FOR AN ABSENT SECRET: an unconfigured control
+    // refuses rather than passing. It is read BEFORE the lookup, so it is the
+    // same refusal for every code and holds no information about any of them.
+    const { db } = recordingDb();
+    expect(() => databaseVerifySource(db, {}).presentation()).toThrow(VerifyPresentationError);
+  });
+
+  test('each missing sentence is refused BY NAME, so a deployment is told which one it forgot', () => {
+    const { db } = recordingDb();
+    for (const [key, variable] of Object.entries(VERIFY_PRESENTATION_VARS)) {
+      const short = { ...ENV };
+      delete short[variable];
+      expect(() => databaseVerifySource(db, short).presentation()).toThrow(
+        new RegExp(`presentation.statements.${key}`),
+      );
+    }
+  });
+
+  test('an absent floor and a nonsense floor arrive as the same refusal', () => {
+    // `Number('')` IS `0` AND `Number(undefined)` IS `NaN`, and both would reach
+    // `readPresentation` as "not a positive whole number". The parse is written
+    // so that an unset variable, a blank one and a word all refuse identically
+    // rather than one of them arriving as a floor of zero, which is the clause
+    // unhonoured while looking configured.
+    const { db } = recordingDb();
+    for (const value of [undefined, '', '   ', 'soon', '0', '-1', '1.5']) {
+      const env = { ...ENV };
+      if (value === undefined) delete env[VERIFY_FLOOR_MS_VAR];
+      else env[VERIFY_FLOOR_MS_VAR] = value;
+      expect(() => databaseVerifySource(db, env).presentation(), `floor ${String(value)}`).toThrow(
+        /floor_ms/,
+      );
+    }
+  });
+
+  test('no upper bound is invented, because no approved document gives one', () => {
+    // ADR-170 section 4.2 rules the floor is a MEASURED p99 the deployment owes.
+    // A ceiling written here would be this route choosing a latency budget the
+    // corpus has not chosen, so a large floor is accepted and the gap is
+    // reported rather than filled.
+    const { db } = recordingDb();
+    const env = { ...ENV, [VERIFY_FLOOR_MS_VAR]: '60000' };
+    expect(databaseVerifySource(db, env).presentation().floor_ms).toBe(60_000);
+  });
+
+  test('the unknown sentence is not among the variables and cannot be configured', () => {
+    // `INV-M11-03` FIXES IT VERBATIM, so no deployment can override "no
+    // certificate with this code" into "this is fake". The honest claim is the
+    // defensible one, and Merit cannot know that a card it did not issue is a
+    // forgery rather than a typo.
+    expect(Object.keys(VERIFY_PRESENTATION_VARS)).not.toContain('unknown');
+    const named = Object.values(VERIFY_PRESENTATION_VARS as Record<string, string>);
+    expect(named.concat(VERIFY_DISCLOSURE_VAR, VERIFY_FLOOR_MS_VAR)).not.toContain(
+      'MERIT_VERIFY_STATEMENT_UNKNOWN',
+    );
+    expect(UNKNOWN_STATEMENT).toBe('no certificate with this code');
+  });
+});
+
+describe('the route serves a real row end to end, over the recorded doors', () => {
+  test('a wired deployment answers 200 with the signed claims and writes the log row', async () => {
+    // THE STOP CONDITION, AS A CASE. Nothing here installs a fake source: the
+    // real adapter is installed over a recorder, so what is asserted is the
+    // whole path from the request through `db.publicLookup` and `db.firm` to
+    // the wire.
+    const { db, calls } = recordingDb({ publiclyLooksUpTo: certRow() });
+    useVerifySource(databaseVerifySource(db, ENV));
+
+    const res = await call({ code: 'CODE-AAAA' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<VerifyResponse>();
+    expect(body.result).toBe('valid');
+    expect(body.certificate?.code).toBe('CODE-AAAA');
+    expect(body.certificate?.signing_key_id).toBe('key-2026-08');
+    expect(body.statement).toBe(STATEMENTS.valid);
+    expect(body.certificate?.disclosure).toBe(DISCLOSURE);
+
+    expect(calls.map((c) => `${c.door}:${String(c.key)}`)).toEqual([
+      'publicLookup:certificates',
+      'firm:certificateVerifications',
+    ]);
+    // THE LOG IS WRITTEN BEFORE THE RESPONSE IS COMPOSED, which is the order the
+    // handler owns and the recorder is what can see it.
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  test('a code that names no row still writes its log row, and answers INV-M11-03s wording', async () => {
+    const { db, calls } = recordingDb({ publiclyLooksUpTo: undefined });
+    useVerifySource(databaseVerifySource(db, ENV));
+
+    const res = await call({ code: 'CODE-ZZZZ' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<VerifyResponse>();
+    expect(body.result).toBe('unknown');
+    expect(body.statement).toBe(UNKNOWN_STATEMENT);
+    expect(body.certificate).toBeNull();
+    expect(calls.map((c) => c.door)).toEqual(['publicLookup', 'firm']);
+  });
+
+  test('an unconfigured deployment answers 503 and never an answer about a code', async () => {
+    const { db, calls } = recordingDb({ publiclyLooksUpTo: certRow() });
+    useVerifySource(databaseVerifySource(db, {}));
+
+    const res = await call({ code: 'CODE-AAAA' });
+    expect(res.statusCode).toBe(503);
+    // AND IT NEVER OPENED A DOOR. The copy table is read first for exactly this
+    // reason: a deployment with a wired source and missing copy would otherwise
+    // answer `unknown` in milliseconds and `valid` in a refusal.
+    expect(calls).toEqual([]);
   });
 });

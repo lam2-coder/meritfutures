@@ -482,3 +482,38 @@ behaviour of writing a gap down outside your own fence rather than acting on it.
 afternoon while nobody read any of it, and **it will keep growing at roughly the rate the build ships**.
 That is the argument for [ADR-227](../decisions/ADR-227.md)'s class B stated as a measurement rather
 than as a prediction: a queue drained only by reading loses ground to a queue filled by building.
+
+## 10. Re-derived against `6613b8f9`, and every number below was taken at the moment it was written
+
+**`main` moved a fourth time**, carrying [ADR-231](../decisions/ADR-231.md) (`db.publicLookup` and
+the verify door). Merged in, not rebased. **`docs/STATE.md` was the only conflict and it was resolved
+ADDITIVELY**: this session's merge note and session 421's record are disjoint, neither supersedes the
+other, and both were kept. **`RI-12` was checked immediately afterward and passes**: the
+`gen:adr_count` line stands at **3** sites, not twelve, and no substantial line under `docs/` repeats
+more than eight times.
+
+| | `21afc5d8` | `dddb3860` | `a86971c6` | `bfe690fb` | **`6613b8f9`** |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| entry files | 212 | 214 | 216 | 218 | **219** |
+| `status: proposed` | 108 | 110 | 112 | 114 | **115** |
+| `status: accepted` | 104 | 104 | 104 | 104 | **104** |
+| money-path entries | 42 | 42 | 44 | 46 | **47** |
+| money-path files | 62 | 64 | 65 | 66 | **66** |
+| the residue, corrected classifier | 34 | 34 | 36 | 38 | **39** |
+
+Also derived at `6613b8f9`, replacing the earlier figures rather than carrying them:
+
+| | Count |
+| --- | ---: |
+| `proposed` entries containing `read is owed` | **67** |
+| merged migrations carrying `E2 READ: MONEY PATH`, of 65 | **51** |
+| migrations landed under an entry still `proposed` | **17** |
+
+**`ADR-231` is tier 1**: it lands [`payouts.ts`](../../apps/api/src/routes/payouts.ts) alongside
+`db.ts` and `scoped-db.ts`. So **tier 1 becomes 14** and the table is **14 / 4 / 4 / 5 / 8 / 4**.
+
+**THE TREND HELD FOR A FOURTH READING AND IT IS THE MEASUREMENT THAT MATTERS MOST HERE.** In one
+afternoon the money-path queue went **42, 44, 46, 47**, the residue **34, 36, 38, 39**, and the
+migrations owed under an unsigned entry **15, then 17**. **Nobody read any of it in that time.** The
+queue is not merely undrained; it is filling faster than any reader could drain it, and that is a
+fact about this repository rather than an argument about it.
