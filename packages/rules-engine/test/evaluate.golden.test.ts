@@ -97,6 +97,35 @@ import * as engine from '../src/index.ts';
 //                              `projectEngineGates` is NOT here and that is the
 //                              CLAMP's ruling: `projectPayout` reaches it
 //
+//   buildSessionCalendar       ADR-251, and it is ADR-078's test a FOURTH time
+//   tradingDayAt               with the largest evidence any of the four has
+//                              had. The question is always whether withholding
+//                              SERVES or DEFEATS 1.3's "every additional export
+//                              is a way for a caller to reimplement a rule
+//                              slightly differently". Here it DEFEATS it, and
+//                              the reimplementations were already written
+//                              before the export existed: THREE ports declare
+//                              their own instant-to-day method and every one
+//                              throws (`admin-writes.ts`, `digests/ports.ts`,
+//                              `breaker/ports.ts`), and TWO private functions
+//                              already do the mapping in two deployables
+//                              (`readLastClosedTradingDay`, `anchorCalendar`).
+//                              That is `replay`'s situation exactly, where
+//                              `apps/worker` "had already written its own", at
+//                              five sites instead of one. TWO NAMES, GAINING
+//                              EXACTLY TWO FUNCTIONS, and both compute: there
+//                              is no frozen table and no class here.
+//
+//                              AND THE COST OF WITHHOLDING IS NOT A DUPLICATE
+//                              FUNCTION, IT IS A WRONG ONE. A caller that
+//                              cannot reach this reimplements it from an
+//                              instant's UTC date, which ADR-146 clause 1
+//                              forbids and which is right all afternoon and
+//                              wrong every evening. `merit/engine-purity`
+//                              refuses that spelling INSIDE this package and
+//                              nowhere else, so the export is also what puts
+//                              the answer where the lint rule guards it
+//
 // `evaluate` WAS HERE AND IS GONE (ADR-078). It was the scaffold's identity
 // stub and was never among 1.3's six. The line that used to sit here said the
 // polarity probe folds it; `engineIsIdentityStub` in `golden-loader/src/run.ts`
@@ -117,6 +146,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'advanceDay',
     'applySettlement',
     'buildCalendarSlice',
+    'buildSessionCalendar',
     'canonicalStateSerialization',
     'evaluatePayout',
     'initialState',
@@ -126,6 +156,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'replay',
     'resolvePlan',
     'stateHash',
+    'tradingDayAt',
     'validatePlan',
   ]);
   expect(typeof engine.replay).toBe('function');
@@ -145,7 +176,13 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // three new names only `projectPayout` computes anything; `PROJECTION_ASSUMPTIONS`
 // and `PROJECTION_CAVEAT` are frozen tables in the class `HASHED_COLUMNS` and
 // `ENGINE_GATE_LEAVES` are in. TWELVE FUNCTIONS BECOME THIRTEEN.
-test('of the twenty-three names, exactly thirteen are functions and ADR-204 added one', () => {
+//
+// ADR-251 IS THE FOURTH AND IT IS THE ONLY ONE WHOSE TWO NEW NAMES ARE BOTH
+// FUNCTIONS: twenty-three names to TWENTY-FIVE, thirteen functions to FIFTEEN.
+// The types travel with them and are erased, so they add no name here. THIS
+// GATE CAUGHT THE ADDITION rather than being updated alongside it, which is
+// what it is for: the export surface is a ruling and not a consequence.
+test('of the twenty-five names, exactly fifteen are functions and ADR-251 added two', () => {
   const functions = Object.keys(engine)
     .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
     .sort();
@@ -163,6 +200,7 @@ test('of the twenty-three names, exactly thirteen are functions and ADR-204 adde
     'advanceDay',
     'applySettlement',
     'buildCalendarSlice',
+    'buildSessionCalendar',
     'canonicalStateSerialization',
     'evaluatePayout',
     'initialState',
@@ -172,6 +210,7 @@ test('of the twenty-three names, exactly thirteen are functions and ADR-204 adde
     'replay',
     'resolvePlan',
     'stateHash',
+    'tradingDayAt',
     'validatePlan',
   ]);
 });

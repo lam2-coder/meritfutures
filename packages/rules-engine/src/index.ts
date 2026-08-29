@@ -148,11 +148,33 @@ export type {
 
 export {
   buildCalendarSlice,
+  buildSessionCalendar,
   CalendarSliceError,
   lookupCalendarDay,
   nextTradingDayAfter,
+  tradingDayAt,
 } from './calendar.ts';
 export type { CalendarLookup, CalendarSource } from './calendar.ts';
+
+// `buildSessionCalendar` AND `tradingDayAt` ARE EXPORTED BECAUSE THIS FILE IS
+// THE PACKAGE'S ONLY DOOR. `package.json` declares `"exports": { ".":
+// "./src/index.ts" }` and no subpath, so a function added to `calendar.ts` and
+// not named here is a function no workspace caller can reach: dead code with a
+// docblock. The pair answers ONE question, "which exchange trading day contains
+// this instant", and it is the question `ADR-145` finding 10 recorded as having
+// no answer anywhere in this workspace.
+//
+// NO RULE FOLDS OVER A `SessionCalendar` AND THAT IS THE POINT OF THE SEPARATE
+// VALUE. `CalendarSlice` stays the fold's calendar and carries no instants, so
+// nothing that counts in trading days can reach a session bound.
+export type {
+  CoverageInterval,
+  CoveredSpan,
+  SessionCalendar,
+  SessionCalendarSource,
+  SessionDay,
+  TradingDayAt,
+} from './calendar.ts';
 
 export { EngineInvariantError } from './errors.ts';
 
