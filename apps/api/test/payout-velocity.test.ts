@@ -42,6 +42,7 @@ import {
   PAYOUT_VELOCITY_POLICY,
   PAYOUT_VELOCITY_TABLES,
 } from '../src/admin-source/payout-velocity.ts';
+import { IMPLEMENTED_ADMIN_READS } from '../src/admin-source/index.ts';
 import { AdminReadError } from '../src/routes/admin-reads.ts';
 import type {
   PayoutVelocityTable,
@@ -810,25 +811,33 @@ describe('the ONE-DIRECTIONAL CHECK in 0010 decides which rows are money that le
 // -----------------------------------------------------------------------------
 
 describe('the evaluator is not composed, and the reason has MOVED off the wire', () => {
-  it('has the wire shape this case named as its clearing condition, and the leaves stay off the book', async () => {
+  it('has the wire shape, and the leaves are ON the book while the METHOD stays uncomposed', async () => {
     // **THE CLEARING CONDITION FIRED AND THIS CASE IS INVERTED IN THE DIFF THAT
     // FIRED IT**, which is B1's precedent and session 381's on the sibling case.
     // It read: "the wire gains a shape for 'there is no window', which is a
     // change to a response `RI-18` binds in three copies and is another entry's."
     // `ADR-203` is that entry. The three copies moved together.
     //
-    // WHAT THE CASE HOLDS NOW IS THE OTHER HALF OF THE OLD SENTENCE. The wire
-    // could not say "there is no window"; it can, so the reason this evaluator is
-    // not composed is no longer the SHAPE and it is worth saying which reason
-    // replaced it. `readLiability` reads eight tables and this evaluator reads
-    // three, two of which (`tradingCalendar`, `tradingCalendarLoads`) the book's
-    // read does not touch, and B4 and B5 hold four other leaves besides. So the
-    // group stays in the `Omit`: composing against a source that cannot fully
-    // serve the shape turns an honest 500 into a wrong answer, and that is
-    // session 374's judgement rather than a fact about `ratio_bp`.
+    // **AND A SECOND CLEARING CONDITION FIRED, WHICH IS THIS TITLE'S OTHER
+    // HALF.** The case went on to assert "the leaves stay off the book", over
+    // this reasoning: "`readLiability` reads eight tables and this evaluator
+    // reads three, two of which (`tradingCalendar`, `tradingCalendarLoads`) the
+    // book's read does not touch, and B4 and B5 hold four other leaves besides.
+    // So the group stays in the `Omit`." **B4 IS LIFTED AND THE OMIT IS ONE
+    // ENTRY LONG.** `readLiabilityBook` takes this evaluator as a port, pays for
+    // the two calendar tables through `readTradingLookback`, and carries the
+    // panel or a `null` with a paired gap.
+    //
+    // **THE METHOD IS STILL NOT COMPOSED AND THE REASON IS `B5` ALONE**, which
+    // is worth separating from the leaves because the two used to travel
+    // together. `eligible_next_7d` has no per-account source (`ADR-204` section
+    // 8, leg 1) and its declaration carries no `| null` for `ADR-203` to hang a
+    // gap on. Composing against a source that cannot fully serve the shape turns
+    // an honest 500 into a wrong answer, which is session 374's judgement and
+    // not a fact about `ratio_bp`.
     //
     // CLEARING CONDITION, RESTATED: `IMPLEMENTED_ADMIN_READS` contains
-    // `readLiability`, which needs B4 and B5 and not this entry.
+    // `readLiability`, which needs `B5` and not this entry.
     const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
     expect(contract).toContain(
       'payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean } | null',
@@ -840,9 +849,10 @@ describe('the evaluator is not composed, and the reason has MOVED off the wire',
     for (const leaf of ['last_7d_cents', 'avg_30d_cents', 'ratio_bp'])
       expect(contract.split(`${leaf}: number | null`)).toHaveLength(1);
     const liability = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
-    expect(liability).toContain(
-      "'eligible_next_7d' | 'payout_velocity' | 'per_plan' | 'integrations'",
-    );
+    expect(liability).toContain("Omit<LiabilityResponse, 'eligible_next_7d'>");
+    expect(liability).not.toContain("'eligible_next_7d' | 'payout_velocity'");
+    // AND THE METHOD IS STILL ABSENT, which is the half that did NOT move.
+    expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');
   });
 
   it('holds no write verb, because ruling 7 refuses this control a column', async () => {

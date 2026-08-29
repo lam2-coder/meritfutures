@@ -86,9 +86,20 @@
 //       meaning what four documents say it means; ruling 6 answers the empty
 //       denominator with `ratio_bp` 0 and `alarm` false. The entry is
 //       `status: proposed` with an UNSIGNED approval line, which is what an ADR
-//       ships as. **THE FOUR LEAVES ARE STILL BLOCKED AND THAT IS NOT A
-//       CONTRADICTION**: the ruling landed and the fold is unwritten, which is
-//       B1's shape exactly. A lifted blocker is a session's work, not a field.
+//       ships as.
+//       **AND THE GROUP IS PRODUCED NOW, WHICH TOOK THREE THINGS AND NOT ONE.**
+//       ADR-201 supplied the definition, session 383 built
+//       `evaluatePayoutVelocity` beside this file, and ADR-203 gave the wire a
+//       way to DECLINE. The third was load bearing rather than tidy: the
+//       evaluator answers three ways -- `evaluated`, `exhausted`, `uncovered` --
+//       and a wire carrying one object had to render an uncovered calendar as
+//       `0 / false`, which reads exactly like a quiet week on a control that
+//       PAGES. {@link readGaps} maps the two absences onto ADR-203 section 6's
+//       two causes and keeps them apart, because one says WAIT and the other
+//       says LOAD A CALENDAR TODAY.
+//       **THE BOOK PAYS FOR THE CALENDAR NOW.** `readTradingLookback` walks the
+//       same two tables backwards, so `LIABILITY_READ_TABLES` gained
+//       `payoutTransfers` and the book reads every member of it.
 //
 //   B3. `per_plan[].cusum` (3 leaves). ADR-167 clause 1 folds `S_t` at read time
 //       from a landed series, and clause 5 rules that the field is rendered
@@ -249,6 +260,12 @@
 import { AdminReadError } from '../routes/admin-reads.ts';
 import type { LiabilityResponse } from '../routes/admin-reads.ts';
 import type { AdminRowFilter } from './flags.ts';
+import type {
+  PayoutVelocityCost,
+  PayoutVelocityResult,
+  PayoutVelocityTx,
+  PayoutVelocityVerdict,
+} from './payout-velocity.ts';
 
 // -----------------------------------------------------------------------------
 // The port onto the database
@@ -272,15 +289,21 @@ import type { AdminRowFilter } from './flags.ts';
  * `trading_calendar_loads`, so a day outside it is UNKNOWN rather than a
  * holiday.
  *
- * THEY ARE READ BY {@link readTradingHorizon} AND NOT BY {@link readLiabilityBook},
- * which is stated here because the array would otherwise imply the second. The
- * book carries no `eligible_next_7d` (blocker B5), so paying two whole-table
- * reads inside it would buy a group it cannot return.
+ * **THAT PARAGRAPH USED TO SAY THE BOOK DOES NOT READ THEM AND IT IS REPAIRED
+ * RATHER THAN DELETED.** It read: "THEY ARE READ BY {@link readTradingHorizon}
+ * AND NOT BY {@link readLiabilityBook} ... the book carries no
+ * `eligible_next_7d` (blocker B5), so paying two whole-table reads inside it
+ * would buy a group it cannot return." **The premise held and the conclusion
+ * stopped following the moment `payout_velocity` entered the book**:
+ * `evaluatePayoutVelocity` walks the SAME two tables BACKWARDS through
+ * `readTradingLookback`, so the book pays for them and buys a different group
+ * with them. `eligible_next_7d` is still not returned and still not why.
  */
 export const LIABILITY_READ_TABLES = [
   'events',
   'liabilitySnapshots',
   'midHealth',
+  'payoutTransfers',
   'planBreakerState',
   'plans',
   'reconciliationRuns',
@@ -336,7 +359,7 @@ export type LiabilityBookGap = LiabilityResponse['gaps'][number];
  * type by the rule, and a blocker that lifts is removed from this type by
  * deleting one `Omit`.
  */
-export type LiabilityBook = Omit<LiabilityResponse, 'eligible_next_7d' | 'payout_velocity'>;
+export type LiabilityBook = Omit<LiabilityResponse, 'eligible_next_7d'>;
 
 /**
  * What the read cost, in rows handed to this module.
@@ -354,7 +377,49 @@ export interface LiabilityReadCost {
   readonly openMismatchesScanned: number;
   readonly completedReconRunsScanned: number;
   readonly batchCompletedScanned: number;
+
+  /**
+   * What the velocity arm cost, CARRIED WHOLE AND NOT FLATTENED.
+   *
+   * `PayoutVelocityCost`'s nine counters include the identity a suite asserts
+   * ruling 4 dropped nothing with -- before plus after plus attributed is every
+   * settled transfer read -- and folding them into this object one prefix at a
+   * time would break that identity into nine unrelated numbers.
+   */
+  readonly velocity: PayoutVelocityCost;
 }
+
+/**
+ * The velocity arm, SUPPLIED RATHER THAN IMPORTED, and the reason is a module
+ * cycle rather than a taste for injection.
+ *
+ * **`payout-velocity.ts` IMPORTS THIS MODULE AND CANNOT STOP**: its window is
+ * thirty TRADING days, so it reads the calendar through {@link readTradingLookback}
+ * and spreads {@link TRADING_CALENDAR_TABLES} into its own roster AT MODULE
+ * INITIALISATION. A value import in the other direction closes that loop, and
+ * under ESM the loser is whichever module is entered second: `PAYOUT_VELOCITY_TABLES`
+ * evaluates against a `TRADING_CALENDAR_TABLES` still in its temporal dead zone
+ * and the whole suite dies at import with `TRADING_CALENDAR_TABLES is not
+ * iterable`. **That is measured rather than feared: it is what this session got
+ * on the first run of the wired book.**
+ *
+ * **A TYPE IMPORT IS ERASED AND A PORT IS THE REST OF THE ANSWER.** Everything
+ * this module needs from that one is a type, so the loop does not exist at run
+ * time, and the one value it needs arrives as an argument. `AdminReadSource` is
+ * the same shape one layer up.
+ *
+ * **THE ALTERNATIVE IS NAMED AND NOT TAKEN.** Extracting the calendar section of
+ * this file into its own module would break the cycle at its real joint and both
+ * consumers would import that. It is the better end state and it moves roughly
+ * six hundred lines of a money-path file, including five row readers this module
+ * shares with it, on a branch whose subject is the leaves rather than the
+ * layout. **REGISTERED, NOT REPAIRED**, and it is `apps/api/src/admin-source/**`
+ * so a later session in this fence can take it without a ruling.
+ */
+export type PayoutVelocityReader = (
+  tx: PayoutVelocityTx,
+  asOf: string,
+) => Promise<PayoutVelocityResult>;
 
 /** {@link readLiabilityBook}'s answer, or `null` when no snapshot has been written. */
 export interface LiabilityBookResult {
@@ -548,7 +613,7 @@ function latestInstant(rows: readonly unknown[], column: string, at: string): st
 /** ADR-188 clause 1: the top-level fields are one `liability_snapshots` row, column for column. */
 function readSnapshot(
   row: unknown,
-): Omit<LiabilityBook, 'reserve' | 'per_plan' | 'integrations' | 'gaps'> {
+): Omit<LiabilityBook, 'reserve' | 'per_plan' | 'integrations' | 'gaps' | 'payout_velocity'> {
   const at = 'the liability snapshot';
   return {
     as_of: instant(row, 'asOf', at),
@@ -928,8 +993,40 @@ function readBatch(rows: readonly unknown[]): LiabilityBook['integrations']['bat
  * reason, so a per-plan entry would put the identical sentence on the body once
  * per plan and give an operator a list to read instead of a fact.
  */
-function readGaps(perPlan: readonly LiabilityPlanRow[]): readonly LiabilityBookGap[] {
+function readGaps(
+  perPlan: readonly LiabilityPlanRow[],
+  velocity: PayoutVelocityVerdict,
+): readonly LiabilityBookGap[] {
   const gaps: LiabilityBookGap[] = [];
+
+  // **THE TWO ABSENCES ARE TWO CAUSES AND KEEPING THEM APART IS THE RULING
+  // RATHER THAN A REFINEMENT.** `evaluatePayoutVelocity` answers three ways and
+  // the wire carries one object, so `exhausted` and `uncovered` both arrive here
+  // as a `null`. `ADR-042` F-4 is the corpus's rule that an uncovered day is
+  // UNKNOWN rather than a not-holiday, and `ADR-203` section 6 maps the pair:
+  // `insufficient_history` is the estate being correct and young, and the reader
+  // WAITS; `estate_uncovered` is the estate holding no opinion at all, and the
+  // reader LOADS A CALENDAR TODAY. A bare null makes those one act.
+  //
+  // `detail` CARRIES THE VERDICT'S OWN SENTENCE and is not restated here. The
+  // evaluator knows how many trading days short it was and which anchor day
+  // nothing covers, which is exactly the quantity `ADR-203` ruling 4 keeps
+  // `detail` free text for.
+  if (velocity.kind === 'exhausted')
+    gaps.push({
+      field: 'payout_velocity',
+      cause: 'insufficient_history',
+      awaiting: null,
+      detail: velocity.detail,
+    });
+
+  if (velocity.kind === 'uncovered')
+    gaps.push({
+      field: 'payout_velocity',
+      cause: 'estate_uncovered',
+      awaiting: null,
+      detail: velocity.detail,
+    });
 
   if (perPlan.some((plan) => plan.cusum === null))
     gaps.push({
@@ -974,7 +1071,10 @@ function readGaps(perPlan: readonly LiabilityPlanRow[]): readonly LiabilityBookG
  * forces one `as_of` on two sources that do not move together"), so the reserve
  * row is the latest reserve row and never the one nearest the book's instant.
  */
-export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookResult | null> {
+export async function readLiabilityBook(
+  tx: LiabilityTx,
+  evaluateVelocity: PayoutVelocityReader,
+): Promise<LiabilityBookResult | null> {
   const snapshots = await tx.rows('liabilitySnapshots');
   if (snapshots.length === 0) return null;
   const snapshot = latestBy(snapshots, 'asOf', 'liability snapshot');
@@ -1025,9 +1125,22 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
 
   const perPlan = readPerPlan(breakerRows, planRows);
 
+  // THE VELOCITY IS ANCHORED ON THE BOOK'S OWN `as_of` AND NOT ON THE CLOCK.
+  // `INV-M6-04` makes every number on this page name its as-of moment, and a
+  // ratio computed to `now` beside a book computed to the snapshot would be two
+  // moments under one heading. `ADR-201`'s window is trailing trading days from
+  // the anchor, so the anchor is the instant the rest of this body is dated at.
+  const snapshotAsOf = instant(snapshot, 'asOf', 'the liability snapshot');
+  const velocity = await evaluateVelocity(tx, snapshotAsOf);
+
   return {
     book: {
       ...readSnapshot(snapshot),
+      // `null` WHEN THE ESTATE CANNOT SUPPLY THE WINDOW, AND `gaps` SAYS WHICH
+      // WAY. `ADR-201` ruling 6 answers an empty DENOMINATOR with a ratio of
+      // zero and no alarm, which is a real reading over a real window; it cannot
+      // answer an ABSENT window, and `ADR-203` is the shape that can.
+      payout_velocity: velocity.verdict.kind === 'evaluated' ? velocity.verdict.panel : null,
       reserve: readReserve(reserve, anchors[0]),
       per_plan: perPlan,
       integrations: {
@@ -1046,7 +1159,7 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
       // spellings of one fact and only one of them can be served. The `Omit`
       // list is one entry long now and every absence below it is a `null` with
       // a reason, which is what `assertLiabilityGapsPaired` reads.
-      gaps: readGaps(perPlan),
+      gaps: readGaps(perPlan, velocity.verdict),
     },
     cost: {
       liabilitySnapshotsScanned: snapshots.length,
@@ -1058,6 +1171,7 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
       openMismatchesScanned: openMismatches.length,
       completedReconRunsScanned: completedRuns.length,
       batchCompletedScanned: batchRows.length,
+      velocity: velocity.cost,
     },
   };
 }

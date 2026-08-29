@@ -47,12 +47,15 @@ import {
   readLiabilityBook,
   readTradingHorizon,
 } from '../src/admin-source/liability.ts';
-import { AdminReadError } from '../src/routes/admin-reads.ts';
+import { evaluatePayoutVelocity } from '../src/admin-source/payout-velocity.ts';
+import { AdminReadError, assertLiabilityGapsPaired } from '../src/routes/admin-reads.ts';
 import type {
+  LiabilityBook,
   LiabilityReadTable,
   LiabilityTx,
   TradingHorizon,
 } from '../src/admin-source/liability.ts';
+import type { LiabilityResponse } from '../src/routes/admin-reads.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 
@@ -296,9 +299,74 @@ function estate(overrides: Rows = {}): Rows {
   };
 }
 
+/**
+ * Every weekday between two days inclusive, as `YYYY-MM-DD`.
+ *
+ * A WEEKEND EVERY FIVE DAYS IS THE POINT AND NOT A CONVENIENCE. `ADR-201`'s
+ * window is thirty TRADING days and `M01` R-02 forbids date arithmetic, so a
+ * fixture of consecutive calendar dates would let a walk that added days pass
+ * every case below.
+ */
+function weekdays(from: string, to: string): readonly string[] {
+  const days: string[] = [];
+  const last = Date.parse(`${to}T00:00:00.000Z`);
+  for (let at = Date.parse(`${from}T00:00:00.000Z`); at <= last; at += 86_400_000) {
+    const date = new Date(at);
+    if (date.getUTCDay() !== 0 && date.getUTCDay() !== 6)
+      days.push(date.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+/**
+ * Every weekday from June through the BOOK'S OWN ANCHOR DAY, which is what makes
+ * `payout_velocity` answerable at all on this estate.
+ *
+ * THE ANCHOR IS THE SNAPSHOT'S `as_of` AND NOT `now`. {@link AS_OF} is 23:00Z on
+ * `2026-08-27` and every session here closes at 22:00Z, so `2026-08-27` is the
+ * last CLOSED day and the thirty-day window is the thirty weekdays before it.
+ * `INV-M6-04` is why the book anchors there: a ratio computed to a different
+ * moment from the book beside it is two clocks under one heading.
+ */
+const VELOCITY_DAYS = weekdays('2026-06-01', '2026-08-27');
+
+/**
+ * A covered calendar and one settled transfer of the SAME cents on every day of
+ * it, which is `ADR-201`'s steady state by construction.
+ *
+ * THE ARITHMETIC'S HOME IS `payout-velocity.test.ts` AND NOT THIS FILE. What is
+ * asserted here is that the evaluator's answer reaches the BOOK: the panel where
+ * a verdict exists, a `null` and a paired gap where one does not. The one number
+ * this file pins is the steady-state ratio, because a book that wired the arms
+ * up backwards would still produce four integers.
+ */
+const COVERED_CALENDAR: Rows = {
+  tradingCalendar: VELOCITY_DAYS.map((day) => session(day)),
+  tradingCalendarLoads: [
+    {
+      id: 9n,
+      sourceId: 'cme-2026-q3',
+      coverageStartDay: '2026-06-01',
+      coverageEndDay: '2026-09-30',
+      sourceDigest: Buffer.alloc(32, 9),
+      actor: 'session-390',
+    },
+  ],
+  payoutTransfers: VELOCITY_DAYS.map((day) => ({
+    amountCents: 100_000_00n,
+    status: 'settled',
+    settledAt: new Date(`${day}T18:00:00.000Z`),
+  })),
+};
+
 async function read(overrides: Rows = {}) {
   const { tx, calls } = handle(estate(overrides));
-  const result = await readLiabilityBook(tx);
+  // THE REAL EVALUATOR AND NEVER A DOUBLE. `readLiabilityBook` takes the
+  // velocity arm as a port because a value import of that module closes an ESM
+  // cycle, and a suite that passed a stub here would be measuring the port
+  // rather than the book: the arms this file exists to check are the evaluator's
+  // three answers reaching the body.
+  const result = await readLiabilityBook(tx, evaluatePayoutVelocity);
   return { result, calls };
 }
 
@@ -307,10 +375,14 @@ async function read(overrides: Rows = {}) {
 // -----------------------------------------------------------------------------
 
 describe('the tables this module may reach', () => {
-  it('names eleven real TableKeys, sorted, and no others', () => {
+  it('names twelve real TableKeys, sorted, and no others', () => {
     for (const key of LIABILITY_READ_TABLES) expect(TABLE_KEYS).toContain(key);
     expect([...LIABILITY_READ_TABLES]).toStrictEqual([...LIABILITY_READ_TABLES].sort());
-    expect(LIABILITY_READ_TABLES).toHaveLength(11);
+    expect(LIABILITY_READ_TABLES).toHaveLength(12);
+    // `payoutTransfers` IS THE OTHER ONE THIS SESSION ADDED, and `B2` is why:
+    // `evaluatePayoutVelocity` is the book's arm now, and its unbounded scan is
+    // this table.
+    expect([...LIABILITY_READ_TABLES]).toContain('payoutTransfers');
     // `reconciliationRuns` IS THE ONE THIS SESSION ADDED AND `B4` IS WHY. It is
     // `0064`'s table, registered `firm`, and it is a DIFFERENT key from
     // `reconciliations`: the count of open mismatches and the clock of the last
@@ -347,7 +419,7 @@ describe('the tables this module may reach', () => {
 describe('the seven top-level fields, which are one liability_snapshots row', () => {
   it('answers null when no snapshot has been written, rather than a book of zeros', async () => {
     const { tx } = handle(estate({ liabilitySnapshots: [] }));
-    expect(await readLiabilityBook(tx)).toBeNull();
+    expect(await readLiabilityBook(tx, evaluatePayoutVelocity)).toBeNull();
   });
 
   it('projects the row column for column, carrying the signed field NEGATIVE', async () => {
@@ -509,9 +581,11 @@ describe('per_plan, which is the loss-ratio breaker and an ABSENT CUSUM', () => 
 
   it('pairs that null with ONE gap naming the path with the index elided', async () => {
     // ADR-203 ruling 2: one entry per absent FIGURE and not one per null value.
-    // Two plans are null above and the body carries one entry, because the
-    // absence is a property of the CALIBRATION rather than of a plan.
-    const { result } = await read();
+    // Two plans are null above and the body carries ONE entry for them, because
+    // the absence is a property of the CALIBRATION rather than of a plan. The
+    // estate is COVERED here so `payout_velocity` is produced and writes no
+    // entry of its own, which is what makes this a count of one.
+    const { result } = await read(COVERED_CALENDAR);
     expect(result?.book.gaps).toStrictEqual([
       {
         field: 'per_plan[].cusum',
@@ -554,12 +628,90 @@ describe('per_plan, which is the loss-ratio breaker and an ABSENT CUSUM', () => 
     // null and an entry naming `per_plan[].cusum` is a gap over a figure this
     // response is NOT withholding. That is ADR-203 ruling 2's second direction,
     // which the entry itself calls the worse failure, firing on the first read.
-    const { result } = await read({ planBreakerState: [] });
+    const { result } = await read({ ...COVERED_CALENDAR, planBreakerState: [] });
     expect(result?.book.gaps).toStrictEqual([]);
   });
 
   it('refuses a breaker row naming a plan no plans row carries', async () => {
     await expect(read({ plans: [PLANS[0]] })).rejects.toThrow(/REFERENCES plans\(id\)/);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// payout_velocity, which is B2 and is the evaluator's THREE answers on a wire
+// that carries them
+// -----------------------------------------------------------------------------
+
+describe('payout_velocity, produced when the estate can supply the window', () => {
+  it('carries the panel and NO gap when the calendar covers thirty trading days', async () => {
+    const { result } = await read(COVERED_CALENDAR);
+    const panel = result?.book.payout_velocity;
+    expect(panel).not.toBeNull();
+    // STEADY STATE IS EXACTLY 10000 BASIS POINTS, which is ADR-201 ruling 2's
+    // whole claim: the seven-day total against the thirty-day total SCALED to
+    // seven days sits at 1.0 when nothing is happening. Against an unscaled
+    // thirty-day total it would sit near 2857 and the 2.5x pager would never
+    // fire; against a thirty-day DAILY mean it would sit near 70000 and the
+    // pager would fire every day forever. The number discriminates all three.
+    expect(panel?.ratio_bp).toBe(10_000);
+    expect(panel?.alarm).toBe(false);
+    expect(panel?.last_7d_cents).toBe(7 * 100_000_00);
+    expect(Number.isSafeInteger(panel?.avg_30d_cents)).toBe(true);
+    // AND NOTHING IN `gaps` NAMES IT, which is the direction ADR-203 ruling 2
+    // calls the worse failure: a gap over a figure an operator is looking at.
+    expect(result?.book.gaps.map((gap) => gap.field)).not.toContain('payout_velocity');
+  });
+
+  it('declines with `estate_uncovered` when no load covers the anchor day', async () => {
+    // THE DEFAULT ESTATE. `trading_calendar_loads` is empty, so ADR-042 F-4's
+    // UNKNOWN is the answer rather than a zero: the reader's act is to load a
+    // calendar today, which is a different act from waiting.
+    const { result } = await read();
+    expect(result?.book.payout_velocity).toBeNull();
+    const gap = result?.book.gaps.find((entry) => entry.field === 'payout_velocity');
+    expect(gap?.cause).toBe('estate_uncovered');
+    expect(gap?.awaiting).toBeNull();
+    expect(gap?.detail.trim()).not.toBe('');
+  });
+
+  it('declines with `insufficient_history` when the calendar is short of the window', async () => {
+    // A COVERED CALENDAR THAT DOES NOT REACH BACK FAR ENOUGH, which is the OTHER
+    // absence and is a different act by the reader: the estate is correct and
+    // young, so waiting is the whole remedy. ADR-203 section 6 keeps the two
+    // apart for exactly that reason, and the count of days is in `detail`
+    // because a closed vocabulary cannot hold a quantity.
+    const short = VELOCITY_DAYS.slice(-12);
+    const from = short[0];
+    const { result } = await read({
+      ...COVERED_CALENDAR,
+      tradingCalendar: short.map((day) => session(day)),
+      tradingCalendarLoads: [
+        {
+          id: 9n,
+          sourceId: 'cme-2026-short',
+          coverageStartDay: from,
+          coverageEndDay: '2026-09-30',
+          sourceDigest: Buffer.alloc(32, 9),
+          actor: 'session-390',
+        },
+      ],
+    });
+    expect(result?.book.payout_velocity).toBeNull();
+    const gap = result?.book.gaps.find((entry) => entry.field === 'payout_velocity');
+    expect(gap?.cause).toBe('insufficient_history');
+    expect(gap?.awaiting).toBeNull();
+    expect(gap?.detail).toContain('trading days were asked for');
+  });
+
+  it('is anchored on the SNAPSHOT clock and not on the wall clock', async () => {
+    // A BOOK DATED 2026-08-27 AND A RATIO DATED TODAY WOULD BE TWO MOMENTS UNDER
+    // ONE HEADING, which is what INV-M6-04 is written about. The calendar here
+    // stops at the snapshot's own day, so a reader anchoring on `now` finds no
+    // covered day at all and cannot answer, and one anchoring on the snapshot
+    // answers. That difference is the assertion.
+    const { result } = await read(COVERED_CALENDAR);
+    expect(result?.book.as_of).toBe('2026-08-27T23:00:00.000Z');
+    expect(result?.book.payout_velocity).not.toBeNull();
   });
 });
 
@@ -710,22 +862,48 @@ describe('what the read costs, which the composition would drop', () => {
       openMismatchesScanned: 2,
       completedReconRunsScanned: 2,
       batchCompletedScanned: 2,
+      // THE VELOCITY ARM'S NINE COUNTERS, CARRIED WHOLE. This estate holds no
+      // calendar, so the evaluator returns `uncovered` before the unbounded
+      // transfer scan and every transfer counter is zero, which is that
+      // module's own stated ordering asserted from the book's side.
+      velocity: {
+        transferRowsScanned: 0,
+        settledTransfersRead: 0,
+        settledInstantsOnUnsettledRows: 0,
+        settlementsAttributedInWindow: 0,
+        settlementsBeforeWindow: 0,
+        settlementsAfterAnchor: 0,
+        calendarRowsScanned: 0,
+        calendarLoadsScanned: 0,
+        coveredIntervals: 0,
+      },
     });
   });
 
-  it('reads nine of the eleven tables, and the other two are the horizon`s', async () => {
-    // THE ARRAY IS THE MODULE'S AND THE READ IS THE BOOK'S, and they stopped
-    // being the same list the moment the calendar arrived. `readLiabilityBook`
-    // reads nine as of B4; `readTradingHorizon` reads the two the book does not,
-    // which its own case above asserts from the other side.
-    const { calls } = await read();
+  it('reads every one of the twelve, which the two calendar tables were the exception to', async () => {
+    // **INVERTED, AND THE PREVIOUS READING IS WHY IT IS WORTH A CASE.** This
+    // read "reads eight of the ten tables, and the other two are the horizon's",
+    // then nine of eleven when `B4` landed `reconciliationRuns`. The array and
+    // the read stopped being the same list when the calendar arrived for
+    // `readTradingHorizon`, which the book does not call, and they are the same
+    // list again for a reason that is not the horizon: `evaluatePayoutVelocity`
+    // walks the SAME two tables BACKWARDS through `readTradingLookback`.
+    //
+    // `payoutTransfers` IS READ ONLY WHEN A VERDICT IS POSSIBLE, which is that
+    // evaluator's own stated design and is asserted on the estate below rather
+    // than here: this fixture covers the calendar, so every table is touched.
+    const { calls } = await read(COVERED_CALENDAR);
     const readByBook = [...new Set(calls.map((call) => call.key))].sort();
-    expect(readByBook).toStrictEqual(
-      [...LIABILITY_READ_TABLES].filter(
-        (key) => key !== 'tradingCalendar' && key !== 'tradingCalendarLoads',
-      ),
-    );
-    expect(readByBook).toHaveLength(9);
+    expect(readByBook).toStrictEqual([...LIABILITY_READ_TABLES]);
+    expect(readByBook).toHaveLength(12);
+  });
+
+  it('pays for NO transfer scan when the calendar cannot supply a window', async () => {
+    // The evaluator returns before the unbounded scan on `uncovered` and
+    // `exhausted`, and the default estate holds no calendar at all.
+    const { calls, result } = await read();
+    expect(calls.some((call) => call.key === 'payoutTransfers')).toBe(false);
+    expect(result?.cost.velocity.transferRowsScanned).toBe(0);
   });
 });
 
@@ -797,15 +975,6 @@ const BLOCKED_LEAVES = [
   'eligible_next_7d.by_day[].trading_day',
   'eligible_next_7d.by_day[].cents',
   'eligible_next_7d.by_day[].accounts',
-  // B2, AND IT IS ONE LEAF NOW BECAUSE `ADR-203` MADE THE GROUP NULLABLE.
-  // ADR-201 ruling 2 defined `avg_30d_cents` and session 383 built
-  // `evaluatePayoutVelocity`, so all four numbers are producible; what held the
-  // group was that the evaluator answers THREE ways and the wire carried ONE.
-  // The wire carries three now. What is still unwritten is the composition:
-  // `readLiability` does not call the evaluator, which is B4 and B5's business
-  // rather than this ruling's, so the group is PRODUCED BY NOTHING and stays
-  // here. This list is what is produced and never what is permitted.
-  'payout_velocity',
 ] as const;
 
 /**
@@ -843,27 +1012,44 @@ describe('the subtraction this whole slice measures', () => {
     );
   });
 
-  it('holds 6 blocked leaves against 39 declared, so 33 are produced', async () => {
+  it('holds 5 blocked leaves against 39 declared, so 34 are produced', async () => {
     // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY, and this
     // is the first session in four in which the PRODUCED COUNT MOVED. `ADR-203`
     // moved the declared count and left production alone, which was that
-    // ruling's own point. Three blockers lifted in this diff and 27 became 33:
-    // one leaf gained a SOURCE (`B4`), one gained a SPELLING FOR ITS ABSENCE
-    // (`B3`), and four more came with that spelling because a `gaps` array with
-    // a member in it is an array {@link leavesOf} can walk.
+    // ruling's own point. Three blockers lifted in this diff and 27 became 34:
+    // one leaf gained a SOURCE (`B4`), two gained a SPELLING FOR THEIR ABSENCE
+    // (`B3` and `B2`), and four more came with that spelling because a `gaps`
+    // array with a member in it is an array {@link leavesOf} can walk.
+    //
+    // **THE CENSUS IS TAKEN OVER AN ESTATE WHERE EVERY NULLABLE FIGURE DECLINES,
+    // AND THAT IS A PROPERTY OF THE TWO READERS RATHER THAN A CHOICE OF
+    // FIXTURE.** `RI-18`'s reader does not walk into a union arm, so it counts
+    // `payout_velocity` as ONE declared leaf; {@link leavesOf} walks a produced
+    // OBJECT and would count four. The two agree exactly when the figure is
+    // `null`, which is what the default estate produces and what the case above
+    // subtracts. `payout_velocity` produced whole is asserted on its own
+    // fixture, in its own block.
     const declared = await contractLeaves();
     expect(declared).toHaveLength(39);
-    expect(BLOCKED_LEAVES).toHaveLength(6);
+    expect(BLOCKED_LEAVES).toHaveLength(5);
     for (const leaf of BLOCKED_LEAVES) expect(declared).toContain(leaf);
     // AND THE LEAVES THAT MOVED ARE NAMED, so a later reader can tell an
     // arithmetic change from a production change without diffing two revisions
     // of a count.
-    for (const moved of ['integrations.recon.last_run_at', 'per_plan[].cusum', 'gaps[].cause']) {
+    for (const moved of [
+      'integrations.recon.last_run_at',
+      'per_plan[].cusum',
+      'payout_velocity',
+      'gaps[].cause',
+    ]) {
       expect(declared).toContain(moved);
       expect(BLOCKED_LEAVES).not.toContain(moved);
     }
+    // AND EVERY ONE STILL STANDING IS `eligible_next_7d`'s, which is B5 and is
+    // the only blocker this session did not spend.
+    expect(BLOCKED_LEAVES.every((leaf) => leaf.startsWith('eligible_next_7d'))).toBe(true);
     const { result } = await read();
-    expect(leavesOf(result?.book)).toHaveLength(33);
+    expect(leavesOf(result?.book)).toHaveLength(34);
   });
 
   it('reads a contract whose LiabilityResponse block is still the one RI-18 binds', () => {
@@ -871,6 +1057,89 @@ describe('the subtraction this whole slice measures', () => {
     // never found the block would report zero blocked leaves and zero declared.
     const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
     expect(contract).toContain('type LiabilityResponse = {');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE BOOK'S GAPS, AGAINST THE REAL VALIDATOR AND NOT AGAINST A COPY OF IT
+// -----------------------------------------------------------------------------
+// **THIS IS THE CASE THAT SAYS THE BOOK IS SERVABLE**, and it is the one thing
+// `readGaps` cannot assert about itself. `assertLiabilityGapsPaired` is the
+// control `projectLiability` runs on every response, and it refuses BOTH
+// directions of `ADR-203` ruling 2. A suite that re-implemented the pairing here
+// would agree with `readGaps` by construction and would say nothing.
+//
+// THE ONE FIELD THE BOOK DOES NOT CARRY IS SUPPLIED, and it is `eligible_next_7d`
+// (blocker `B5`). That is the whole of the difference between `LiabilityBook` and
+// `LiabilityResponse` today, and writing it out here is what makes the gap
+// between them one line long and visible rather than a subtraction to re-derive.
+// -----------------------------------------------------------------------------
+
+/** `eligible_next_7d`, the one leaf group `B5` still holds, stood in for so the validator has a whole body. */
+const B5_STAND_IN: LiabilityResponse['eligible_next_7d'] = {
+  total_cents: 0,
+  account_count: 0,
+  by_day: [],
+};
+
+function asResponse(book: LiabilityBook): LiabilityResponse {
+  return { ...book, eligible_next_7d: B5_STAND_IN };
+}
+
+describe('the gaps this book writes satisfy ADR-203 ruling 2 in BOTH directions', () => {
+  it('passes the served validator on an estate where two figures decline', async () => {
+    const { result } = await read();
+    const body = asResponse(result?.book as LiabilityBook);
+    // Non-vacuity FIRST: two figures really are null and really are named.
+    expect(body.payout_velocity).toBeNull();
+    expect(body.per_plan.every((plan) => plan.cusum === null)).toBe(true);
+    expect([...body.gaps].map((gap) => gap.field).sort()).toStrictEqual([
+      'payout_velocity',
+      'per_plan[].cusum',
+    ]);
+    expect(() => {
+      assertLiabilityGapsPaired(body);
+    }).not.toThrow();
+  });
+
+  it('passes it on an estate where the velocity is PRESENT, which is the other direction', async () => {
+    const { result } = await read(COVERED_CALENDAR);
+    const body = asResponse(result?.book as LiabilityBook);
+    expect(body.payout_velocity).not.toBeNull();
+    expect(body.gaps.map((gap) => gap.field)).toStrictEqual(['per_plan[].cusum']);
+    expect(() => {
+      assertLiabilityGapsPaired(body);
+    }).not.toThrow();
+  });
+
+  it('and the validator FIRES on both seeds, so the two cases above are not vacuous', async () => {
+    const { result } = await read(COVERED_CALENDAR);
+    const book = result?.book as LiabilityBook;
+
+    // SEED 1: the gap dropped. A null nothing explains is the bare null ADR-203
+    // exists to refuse.
+    expect(() => {
+      assertLiabilityGapsPaired(asResponse({ ...book, gaps: [] }));
+    }).toThrow(/gaps` does not name it/);
+
+    // SEED 2: a gap over a figure that is PRESENT, which the entry calls the
+    // worse failure. `payout_velocity` is produced on this estate.
+    expect(() => {
+      assertLiabilityGapsPaired(
+        asResponse({
+          ...book,
+          gaps: [
+            ...book.gaps,
+            {
+              field: 'payout_velocity',
+              cause: 'estate_uncovered',
+              awaiting: null,
+              detail: 'seeded',
+            },
+          ],
+        }),
+      );
+    }).toThrow(/is PRESENT on this response/);
   });
 });
 
@@ -1249,16 +1518,25 @@ describe('the horizon refuses rows that disagree with the constraints above them
   });
 });
 
-describe('the horizon is not on the book, and the book does not pay for it', () => {
-  it('reads neither calendar table inside readLiabilityBook', async () => {
-    // `LIABILITY_READ_TABLES` names both tables and `readLiabilityBook` reads
-    // NEITHER, which the array alone would imply the opposite of. The book
-    // carries no `eligible_next_7d` (blocker B5), so two whole-table reads
-    // inside it would buy a group it cannot return.
-    const { tx, calls } = handle(estate());
-    await readLiabilityBook(tx);
-    expect(calls.map((c) => c.key)).not.toContain('tradingCalendar');
-    expect(calls.map((c) => c.key)).not.toContain('tradingCalendarLoads');
+describe('the FORWARD horizon is not on the book, and B5 is still why', () => {
+  // **INVERTED, AND THE PREMISE THAT MOVED IS NOT THE ONE THE OLD CASE NAMED.**
+  // This block read "the horizon is not on the book, and the book does not pay
+  // for it", and its case asserted `readLiabilityBook` touches NEITHER calendar
+  // table, reasoning that the book carries no `eligible_next_7d` so two
+  // whole-table reads would buy a group it cannot return. The book carries no
+  // `eligible_next_7d` still. It pays for both tables anyway, because
+  // `evaluatePayoutVelocity` walks them BACKWARDS through `readTradingLookback`
+  // for `payout_velocity`'s thirty-day window. The premise held and the
+  // conclusion stopped following.
+  it('reads both calendar tables, for the LOOKBACK and not for the horizon', async () => {
+    const { calls } = await read(COVERED_CALENDAR);
+    expect(calls.map((call) => call.key)).toContain('tradingCalendar');
+    expect(calls.map((call) => call.key)).toContain('tradingCalendarLoads');
+    // AND THE FORWARD WALK IS STILL UNCALLED, which is the property the old case
+    // was reaching for and could not separate from the table reads.
+    const module = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
+    const body = module.slice(module.indexOf('export async function readLiabilityBook'));
+    expect(body.slice(0, body.indexOf('\n}\n'))).not.toContain('readTradingHorizon');
   });
 
   it('names both calendar tables in LIABILITY_READ_TABLES, and they are real TableKeys', () => {
