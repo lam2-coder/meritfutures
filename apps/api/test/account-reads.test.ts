@@ -879,11 +879,15 @@ describe('the eligibility blocker states causes that are LIVE, and each is deriv
     expect(await eligibilityBlocker()).toContain('writeRuleStateVia');
   });
 
-  test('clause 1: nothing in a deployable calls the batch, so no row is ever produced', async () => {
-    // `runNightlyBatch` is the writer's only caller. Two files in the whole of
-    // `src/` NAME it: the module that declares it and the barrel that exports
-    // it. A THIRD would be a scheduler or an adapter, and there is none, which
-    // is why `rule_states` is empty rather than merely small.
+  test('clause 1: a deployable DOES call the batch now, and the fold still stops short', async () => {
+    // **THIS TEST READ "nothing in a deployable calls the batch" UNTIL ADR-241
+    // AND THAT WENT FALSE BY REPAIR RATHER THAN BY DRIFT.** THREE files under
+    // `src/` name `runNightlyBatch`: the module that declares it, the barrel
+    // that exports it, and `apps/worker/src/job.ts`, which is the job
+    // `apps/worker/src/start.ts` runs. The clause that survives is a different
+    // and smaller one, and it is asserted rather than assumed below: the run
+    // reaches a port that refuses, so no row is written and no verdict here can
+    // be computed off one.
     //
     // THIS MODULE IS EXCLUDED AND THE EXCLUSION IS THE FINDING, not a
     // convenience: `ELIGIBILITY_BLOCKER` NAMES `runNightlyBatch` inside a
@@ -895,8 +899,19 @@ describe('the eligibility blocker states causes that are LIVE, and each is deriv
       .map((path) => path.slice(REPO_ROOT.length + 1))
       .filter((path) => path !== 'apps/api/src/routes/account-reads.ts')
       .sort();
-    expect(namers).toEqual(['apps/worker/src/batch/nightly.ts', 'apps/worker/src/index.ts']);
-    expect(await eligibilityBlocker()).toContain('without scheduling it');
+    expect(namers).toEqual([
+      'apps/worker/src/batch/nightly.ts',
+      'apps/worker/src/index.ts',
+      'apps/worker/src/job.ts',
+    ]);
+
+    // AND THE ADAPTER REFUSES THE LOAD, which is the clause that now stands
+    // under this endpoint's 503. `apps/worker/test/entrypoint.test.ts` watches a
+    // real process meet that refusal and exit non-zero.
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
+      "new BatchPortUnwired('loadAccountDay'",
+    );
+    expect(await eligibilityBlocker()).toContain('rejects `loadAccountDay` by name');
   });
 
   test('clause 2: no `engine_gates` encoding ships under any `src/`, so the writer would refuse', async () => {

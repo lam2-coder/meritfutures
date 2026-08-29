@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "node --experimental-strip-types src/index.ts"
+    "start": "node --experimental-strip-types src/start.ts"
   },
   "//": "IT DEPENDS ON THE ENGINE AND THE ENGINE DEPENDS ON NOTHING. RI-01 asserts packages/rules-engine declares no workspace dependency, so the arrow can never point back. `@merit/rules-engine` resolves through that package's `exports` map, which publishes `.` and nothing else, so `../rules-engine/src/day/advance.js` is not reachable from here at all: the batch folds through the PUBLISHED interface because the module resolver gives it no other option.",
   "dependencies": {
