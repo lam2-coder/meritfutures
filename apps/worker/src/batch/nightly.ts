@@ -243,6 +243,15 @@ export function foldAccountDay(
     // build produced it.
     engineVersion: state.engineVersion,
     calendarRevisionId,
+    // `0065`'s three, read off the state rather than derived here. The engine is
+    // the only authority on all three: `breached` and `breachKind` move together
+    // at every site that sets them (`day/breach.ts` returns the pair, and
+    // `day/advance.ts`'s breach branch is guarded on `kind !== null`), and
+    // `rule_states_breach_flag_matches_kind` refuses the row if a mapping ever
+    // separates them.
+    lifetimeSettledCents: state.lifetimeSettledCents,
+    breached: state.breached,
+    breachKind: state.breachKind,
   };
 
   return { kind: 'row', row, events: out.events, state };

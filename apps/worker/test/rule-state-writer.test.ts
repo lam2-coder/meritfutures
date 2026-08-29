@@ -22,11 +22,14 @@
 // a recorder "proves which key was named, which address was written, which
 // values were set and which reason the handle carried. It proves NOTHING about
 // whether the composed predicate reaches one row or many." So the round trip is
-// NOT asserted here. It was EXECUTED, against a live PostgreSQL over all 60
-// migrations, and `docs/sessions/2026-08-29-session-395.md` carries the
-// transcript: three rows written into a table that held zero, twenty-three
-// columns read back with no mismatch, and `id`, `computed_at` and `created_at`
-// supplied by the database.
+// NOT asserted here. It was EXECUTED TWICE, and each transcript is in the
+// session log that produced it. `docs/sessions/2026-08-29-session-395.md`:
+// three rows written into a table that held zero, twenty-three columns read
+// back with no mismatch, and `id`, `computed_at` and `created_at` supplied by
+// the database. `docs/sessions/2026-08-29-session-400.md`, over `0065`: the
+// clean and the BREACHED fold both written, the three new columns read back
+// with no mismatch, and `0065`'s four CHECK constraints each watched REFUSING
+// a row this mapping would never send, NAMED at the store.
 //
 // -----------------------------------------------------------------------------
 // THE ONE IMPORT THAT NEEDS AN ARGUMENT
@@ -66,7 +69,7 @@ import {
 } from '../src/batch/state-writer.ts';
 import type { RuleStateTx, RuleStateValues, RuleStateWriterIo } from '../src/batch/state-writer.ts';
 import { WORKER_BARREL_LEGS } from '../src/index.ts';
-import { ACCOUNT_A, CALENDAR, ENGINE_VERSION, accountDay } from './fixtures.ts';
+import { ACCOUNT_A, CALENDAR, DAY_ONE, ENGINE_VERSION, accountDay } from './fixtures.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const WRITER = join(ROOT, 'apps/worker/src/batch/state-writer.ts');
@@ -97,6 +100,34 @@ function sourceFiles(): string[] {
 function foldedRow(): RuleStateRow {
   const fold = foldAccountDay(accountDay(ACCOUNT_A), CALENDAR, ENGINE_VERSION, 1);
   if (fold.kind !== 'row') throw new Error(`the fixture day was refused: ${fold.kind}`);
+  return fold.row;
+}
+
+/**
+ * The same fold on a day that BREACHED, so `0065`'s breach pair is exercised on
+ * the branch that sets it rather than only on the opening state.
+ *
+ * `PLAN.eval.drawdown` is `trailing_eod` at `250_000n` off a `5_000_000n`
+ * opening, so the day-one floor is `4_750_000n` and R-21 is strict: a low BELOW
+ * it breaches. The mark is otherwise `DAY_ONE`, so nothing but the low and the
+ * close moves, and the fold picks the kind itself.
+ */
+function breachedRow(): RuleStateRow {
+  const fold = foldAccountDay(
+    accountDay(ACCOUNT_A, {
+      mark: {
+        ...DAY_ONE,
+        closingBalanceCents: 4_700_000n,
+        highBalanceCents: 5_000_000n,
+        lowBalanceCents: 4_690_000n,
+        realizedPnlCents: -300_000n,
+      },
+    }),
+    CALENDAR,
+    ENGINE_VERSION,
+    1,
+  );
+  if (fold.kind !== 'row') throw new Error(`the breaching day was refused: ${fold.kind}`);
   return fold.row;
 }
 
@@ -194,6 +225,18 @@ describe('1. the column set is the schema’s and not this writer’s', () => {
     // are the database's ... THE BATCH THEREFORE READS NO CLOCK." A column a
     // later migration adds appears here and in neither list, so this case is
     // what makes that column a red suite rather than a value nobody writes.
+    //
+    // **IT FIRED. `0065` ADDED THREE COLUMNS AND THIS CASE WENT RED ON THE
+    // MERGE**, naming `lifetimeSettledCents`, `breached` and `breachKind`, while
+    // each branch was green alone. **THE ASSERTION BELOW IS UNCHANGED FROM THE
+    // LINE THAT CAUGHT THEM.** Widening it to six names was the available fix
+    // and is the exact failure the case exists to prevent: the writer would then
+    // set none of the three, every row would carry the columns' DEFAULTS, and
+    // `readEligibility` -- wired in production at `apps/api/src/start.ts` --
+    // would report `0 / false / null` for every account regardless of truth.
+    // What cleared it is the WRITER carrying the three, which is why this case
+    // reads the same words it did before `0065` and passes for a different
+    // reason.
     const written = new Set<string>(RULE_STATE_WRITE_COLUMNS);
     const unwritten = schemaProperties().filter((p) => !written.has(p));
     expect(unwritten.sort()).toEqual(['computedAt', 'createdAt', 'id']);
@@ -202,7 +245,10 @@ describe('1. the column set is the schema’s and not this writer’s', () => {
   test('1.3 the values object names those columns and no others', () => {
     const values = ruleStateValues(foldedRow(), ENCODE_FLAT);
     expect(Object.keys(values).sort()).toEqual([...RULE_STATE_WRITE_COLUMNS].sort());
-    expect(RULE_STATE_WRITE_COLUMNS).toHaveLength(23);
+    // TWENTY-THREE UNTIL `0065`. The literal is derived from the assertion
+    // above rather than the other way round: the set equality is the check and
+    // this length is the non-vacuity guard on it.
+    expect(RULE_STATE_WRITE_COLUMNS).toHaveLength(26);
   });
 
   test('1.4 the write union is one table and it is the one 0015 declares', () => {
@@ -304,6 +350,89 @@ describe('2. the mapping carries the fold’s values through unchanged', () => {
     expect(seen).toEqual([row.engineGates]);
     expect(seen[0]).toBe(row.engineGates);
     expect(values.engineGates).toEqual({ marker: 'this encoding is a stand-in' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // `0065`'s three
+  // ---------------------------------------------------------------------------
+  // The columns exist and this writer sets them, which is what case 1.2 went red
+  // to demand. These cases are about the two ways the mapping could be wrong
+  // WITHOUT case 1.2 noticing: it could send the wrong value, and it could send
+  // a pair the database refuses.
+
+  test('2.7 the three 0065 columns are the fold’s own values, by identity', () => {
+    const row = foldedRow();
+    const values = ruleStateValues(row, ENCODE_FLAT);
+    expect(values.lifetimeSettledCents).toBe(row.lifetimeSettledCents);
+    expect(values.breached).toBe(row.breached);
+    expect(values.breachKind).toBe(row.breachKind);
+    // `lifetime_settled_cents` is `bigint NOT NULL` and `Cents` is `bigint`, so
+    // unlike `calendarRevisionId` there is no conversion at this boundary and a
+    // `number` reaching the column would be money through a float.
+    expect(typeof values.lifetimeSettledCents).toBe('bigint');
+  });
+
+  test('2.8 the breach pair is TRANSCRIBED and never derived, so the CHECK stays a detector', () => {
+    // `0065`'s `rule_states_breach_flag_matches_kind` is
+    // `breached = (breach_kind IS NOT NULL)`. A mapping that computed one side
+    // from the other would satisfy that constraint BY CONSTRUCTION and the
+    // constraint would then detect nothing. This case pins the opposite: an
+    // inconsistent pair reaches the values object unrepaired, so the database is
+    // comparing two independently carried facts. The row below is one the engine
+    // cannot produce, which is exactly why the writer must not quietly fix it.
+    const row = foldedRow();
+    const impossible = ruleStateValues({ ...row, breached: true, breachKind: null }, ENCODE_FLAT);
+    expect(impossible.breached).toBe(true);
+    expect(impossible.breachKind).toBeNull();
+
+    const alsoImpossible = ruleStateValues(
+      { ...row, breached: false, breachKind: 'static_floor' },
+      ENCODE_FLAT,
+    );
+    expect(alsoImpossible.breached).toBe(false);
+    expect(alsoImpossible.breachKind).toBe('static_floor');
+  });
+
+  test('2.9 what the ENGINE produces satisfies 0065’s two breach CHECKs, on both branches', () => {
+    // "Your mapping must satisfy that CHECK for every state the engine can
+    // produce, INCLUDING THE NO-BREACH STATE." The vocabulary is read out of the
+    // migration rather than typed here: a fourth `BreachKind` member with no
+    // `CHECK` member is the failure this reads for, and it is `packages/db`'s
+    // `rule-state-breach-vocabulary.test.ts` that owns the two-way comparison.
+    const migration = readFileSync(
+      join(ROOT, 'packages/db/migrations/0065_rule_state_lifetime_and_breach.sql'),
+      'utf8',
+    );
+    const list = /breach_kind IN \(([^)]*)\)/.exec(migration)?.[1];
+    expect(list, 'the vocabulary CHECK is no longer written that way').toBeDefined();
+    const vocabulary = [...(list ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1] ?? '');
+    // NON-VACUITY. A regex that found nothing would make the membership
+    // assertions below trivially true.
+    expect(vocabulary.length).toBeGreaterThan(0);
+
+    for (const [label, values] of [
+      ['the clean fold', ruleStateValues(foldedRow(), ENCODE_FLAT)],
+      ['the breached fold', ruleStateValues(breachedRow(), ENCODE_FLAT)],
+    ] as const) {
+      // rule_states_breach_flag_matches_kind
+      expect(values.breached, `${label}: the pair disagrees`).toBe(values.breachKind !== null);
+      // rule_states_breach_kind_is_a_breach_kind
+      if (values.breachKind !== null)
+        expect(vocabulary, `${label}: a kind the CHECK does not admit`).toContain(
+          values.breachKind,
+        );
+      // rule_states_no_settlements_no_lifetime_total, and the >= 0 CHECK
+      expect(typeof values.lifetimeSettledCents).toBe('bigint');
+      const lifetime = values.lifetimeSettledCents as bigint;
+      expect(lifetime >= 0n, `${label}: a negative lifetime total`).toBe(true);
+      if (values.payoutsSettledCount === 0)
+        expect(lifetime, `${label}: no settlements and a lifetime total`).toBe(0n);
+    }
+
+    // THE BREACHED BRANCH IS NOT VACUOUS EITHER: it must actually have breached,
+    // or the loop above asserted the no-breach state twice.
+    expect(breachedRow().breached).toBe(true);
+    expect(breachedRow().breachKind).not.toBeNull();
   });
 });
 

@@ -830,6 +830,27 @@ export const ruleStates = pgTable('rule_states', {
   // 0035_rule_states_calendar_revision.sql. References
   // `trading_calendar_revisions`, not one of this file's tables.
   calendarRevisionId: bigint('calendar_revision_id', { mode: 'bigint' }),
+  // 0065_rule_state_lifetime_and_breach.sql, ADR-207. THE THREE FIELDS
+  // `RuleState` REQUIRES AND `0015` NEVER DECLARED. Until 0065 the engine's own
+  // type was not persistable in this schema, which is why `readEligibility`
+  // rejects in production today.
+  //
+  // `breached` IS DERIVABLE FROM `breachKind` AND IS STORED ANYWAY. The pair is
+  // bound by `rule_states_breach_flag_matches_kind`, so a mapping that carries
+  // one and drops the other is refused at the store rather than writing a row
+  // that says a breached account is not breached.
+  //
+  // `breachKind` IS TYPED `text` AND NOT AN ENUM, and the vocabulary lives in a
+  // CHECK. `packages/db/test/rule-state-breach-vocabulary.test.ts` derives
+  // `BreachKind` from `packages/rules-engine/src/types.ts` and compares it to
+  // the migration, so the copy has a comparator rather than a reader.
+  //
+  // NONE OF THE THREE IS A `state_hash` INPUT TODAY and none is ruled excluded
+  // either: ADR-026 C-07's nineteen stand because `HASHED_COLUMNS` lives in
+  // `packages/rules-engine`, and ADR-207 section 5 is the open question.
+  lifetimeSettledCents: bigint('lifetime_settled_cents', { mode: 'bigint' }).notNull().default(0n),
+  breached: boolean('breached').notNull().default(false),
+  breachKind: text('breach_kind'),
 });
 
 // -----------------------------------------------------------------------------

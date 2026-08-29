@@ -1202,6 +1202,22 @@ export const EVIDENCE_COLUMNS: Readonly<Record<string, EvidenceColumnMap>> = {
     computedAt: ['computed_at', 'instant'],
     createdAt: ['created_at', 'instant'],
     calendarRevisionId: ['calendar_revision_id', 'bigid?'],
+    // `0065_rule_state_lifetime_and_breach.sql`, ADR-207. THE THREE COLUMNS
+    // `RuleState` REQUIRES AND `0015` NEVER DECLARED. This map is total over
+    // the table by assertion, so the migration turned that case red and named
+    // them, which is the clearing condition working rather than a break.
+    //
+    // THEY BELONG IN AN EVIDENCE PACK ON THEIR OWN MERITS AND NOT ONLY BECAUSE
+    // THE MAP IS TOTAL. `breach_kind` is the column that lets the pack say
+    // WHICH rule closed the account, which is the reason the engine
+    // distinguishes the two floor types at all (`breach.ts:54`), and
+    // `lifetime_settled_cents` is the figure a payout dispute is about.
+    lifetimeSettledCents: ['lifetime_settled_cents', 'int'],
+    breached: ['breached', 'bool'],
+    // NULL MEANS NOT BREACHED, INCLUDING ON AN EXPIRED ACCOUNT, which is phase
+    // `closed` with `breached` false. A pack that read the phase to explain a
+    // closure would report a drawdown type that never happened.
+    breachKind: ['breach_kind', 'text?'],
   },
   planVersions: {
     id: ['id', 'text'],

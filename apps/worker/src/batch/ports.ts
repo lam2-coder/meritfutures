@@ -24,6 +24,7 @@
 
 import type {
   AssertionFailure,
+  BreachKind,
   CalendarSlice,
   DailyMark,
   EngineGateResults,
@@ -149,6 +150,43 @@ export interface RuleStateRow {
    * until the first correction, and it is NOT "unknown".
    */
   readonly calendarRevisionId: number | null;
+  /**
+   * R-50, `0065`. Gross cents settled to this account over its whole life.
+   *
+   * THE LAST THREE FIELDS ARE `0065`'s AND THEY ARE LAST FOR THE SAME REASON
+   * THE COLUMNS ARE. `0015` declared neither the columns nor these fields, and
+   * `0065_rule_state_lifetime_and_breach.sql` adds the columns by `ALTER TABLE
+   * ADD COLUMN`, which appends. So this interface, `packages/db/src/schema.ts`'s
+   * `ruleStates` block and the migration all put them in one order, and
+   * `RULE_STATE_WRITE_COLUMNS` follows the same order rather than `RuleState`'s,
+   * which interleaves them.
+   *
+   * `lifetime_settled_cents` is `bigint NOT NULL DEFAULT 0` with
+   * `CHECK (lifetime_settled_cents >= 0)`. The engine opens a fold at `0n`
+   * (`day/advance.ts`) and only `payout/settle.ts` moves it, in the same object
+   * literal that increments `payoutsSettledCount`, which is what makes
+   * `rule_states_no_settlements_no_lifetime_total` satisfiable by transcription.
+   */
+  readonly lifetimeSettledCents: bigint;
+  /**
+   * DO-5, `0065`. Derivable from `breachKind` and carried anyway.
+   *
+   * `rule_states_breach_flag_matches_kind` is `breached = (breach_kind IS NOT
+   * NULL)`, so the pair reaches the database as one fact or the row is refused.
+   * `0065`'s header states why the redundancy is the point: a generated column
+   * would absorb an adapter that dropped one of the two and write a row saying a
+   * breached account is not breached.
+   */
+  readonly breached: boolean;
+  /**
+   * DO-4, `0065`. Which rule closed the account, `null` when none did.
+   *
+   * `null` INCLUDES AN EXPIRED ACCOUNT, which is phase `closed` and `breached`
+   * false: `day/progression.ts`'s own comment says a consumer reading
+   * `breachKind` to explain that closure "would otherwise be told a drawdown
+   * type that never happened".
+   */
+  readonly breachKind: BreachKind | null;
 }
 
 /** R-40's four gate verdicts plus R-38's, which API_CONTRACT reports separately. */
