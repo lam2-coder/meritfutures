@@ -195,7 +195,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // ADR-172 clause 2 ruled that the handle is not the missing thing: the only
   // value satisfying `LedgerTx` is generic over EVERY TABLE IN THE ESTATE
-  // (`scoped-db.ts:1802`, `insert<K extends TableKey>`), so a door in `apps/api`
+  // (`scoped-db.ts:2167`, `insert<K extends TableKey>`), so a door in `apps/api`
   // returning one would be `systemDb` renamed. ADR-176 applied that to
   // `routes/payouts.ts`: `PayoutTx.ledger` is DELETED, the `LT-01` posting is
   // performed at a system authority, and the request path records the approval
@@ -224,8 +224,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'to call `evaluatePayout` with identical inputs. SECOND, AND INDEPENDENT: `PayoutSubject' +
     '.plan` (`:331`) is a `ResolvedPlan`, which M01 section 1.3 builds from `plan_versions' +
     '.rules` and a `plan_version_sizes` row; both tables are scope class `firm` ' +
-    '(`packages/db/src/scope.ts:644,649`) and `ScopedTableKey` is ' +
-    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1307`), so no `ScopedTx` read ' +
+    '(`packages/db/src/scope.ts:701,706`) and `ScopedTableKey` is ' +
+    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1423`), so no `ScopedTx` read ' +
     'reaches either, while `PayoutTx` runs every method on ONE transaction. A PARTIAL BACKEND ' +
     'IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are both constructible ' +
     'today (`payoutRequests` is `owned`, `scope.ts:1056`, and `databaseIdempotencyStore` exists ' +
