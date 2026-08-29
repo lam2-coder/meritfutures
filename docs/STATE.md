@@ -8636,6 +8636,116 @@ Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants re
 
 **WHAT IS STILL OWED.** `account_status_history.from_phase` and `to_phase`, and `from_status` and `to_status` beside them, registered and unruled. **Whether `breach_kind` follows this column onto a type**, which is one slice superseding `0065` and is free while the table is empty. `RI-15`'s reach, which reports a pointer landing on nothing and not one landing on the wrong thing. The three `Phase` copies in `apps/**`, which no comparator reaches. And `ADR-207` section 5's state-hash question, which `0067` neither answers nor moves.
 
+## 2026-08-29 - Session 408: exactly one of the sign-in page's four routes is served, and it still signs nobody in
+
+**THE SERVED SET ADMITS NO COMPLETE SIGN-IN, AND THAT IS THE DELIVERABLE.** The
+objective was to make SC-M4-01 call what is served, refuse what is not, and say
+which is which. Derived at the backend rather than read off any prose: the
+`AuthBackend` port declares **16** methods, `databaseAuthBackend` implements
+**5** (`sessionByToken`, `logout`, `listSessions`, `revokeSession`, `verifyOtp`)
+and refuses **11**, each with its own blocker.
+
+**OF THE FOUR ROUTES BEHIND THE SCREEN, EXACTLY ONE IS SERVED:
+`POST /auth/verify`, which is `verifyOtp`, wired by [ADR-200](decisions/ADR-200.md).**
+`POST /auth/otp` is blocked on `NO_DELIVERY`, and both passkey ceremonies on
+`NO_WEBAUTHN`.
+
+**THE RESERVATION FORBADE A GUESS AND THE GUESS IS WRONG IN BOTH HALVES.** The
+four read as an OTP pair and a passkey pair, so the free reading is "OTP works,
+passkeys do not". The passkey pair is indeed both blocked; **the OTP pair is
+SPLIT down the middle**, and split in the direction that matters -- the route
+that ISSUES a code is blocked and the route that CONSUMES one is wired.
+
+**SO NOTHING IS WIRED, AND IT IS A DERIVATION RATHER THAN A DEFERRAL.** The one
+served route reads an `otp_challenges` row and `requestOtp`, the only writer of
+one in the port, is blocked. `verifyOtp` returns the deliberately
+indistinguishable failure for a bad or expired code, so a control posting to it
+has exactly one reachable outcome and it is that failure: a wrong answer dressed
+as a working button, which [ADR-190](decisions/ADR-190.md) rules worse than an
+honest refusal, on the surface a trader meets FIRST. **Merit is PASSWORDLESS**
+([ADR-039](decisions/ADR-039.md), and `0002_identity.sql` states there is no
+password table anywhere in the schema by design), so these three factors are the
+whole of trader authentication and there is no third door: **nobody can sign in
+to this deployment by any route.**
+
+**A SECOND AND INDEPENDENT REFUSAL WOULD STOP IT ANYWAY.** All four routes are
+`POST` and `apps/portal/src/http/client.ts` declares an `ApiClient` with `get`
+and nothing else, so this application cannot express any of the four even for
+the one that answers. The portal's first write verb is a transport ruling with a
+CSRF posture, an unsafe-method cookie policy and an idempotency question
+attached; `app/security/source.ts` declined exactly that widening one screen
+over, and this screen's write is heavier still because `POST /auth/verify` sets
+the session cookie. The two refusals would lift on different days, which is why
+`view/sign-in.ts` keeps `submits_to` a separate field from `served`.
+
+**A FINDING IN NO DISPATCH, AND IT WAS INSIDE THE FILE THE RESERVATION POINTS
+AT.** `apps/portal/src/app/sign-in/availability.ts` carried a CORRECT per-method
+wiring measurement and, six lines above it, a summary reading *"all four routes
+behind SC-M4-01 are REGISTERED, and NOT ONE of them is wired"*. That has been
+false since `ADR-200`, and the measurement six lines below it in the same file
+already said so; `page.ts` repeated the false half. **Both were prose, so both
+were out of reach of every gate in this repository, and the summary is the half
+a reader trusts.** It was caught only because the session derived the split at
+the backend instead of reading the paragraph.
+
+**WHAT NOW HOLDS IT.** `ENDPOINT_WIRING` carries the measurement as DATA and
+`REQUIRED_ENDPOINTS` is DERIVED from it, so the flat list the other five portal
+segments also export cannot disagree with the table above it.
+`apps/portal/test/sign-in.test.ts` reads the split back off `apps/api` and
+**fails in BOTH directions**: `served: false` on a method since implemented is a
+screen refusing something that works, and `served: true` on one still refused is
+the `AuthBackendUnwired` thrown at a trader that this session was dispatched not
+to introduce. It reads text, which is narrower than it looks -- dispatch
+protocol section 5 rules a grep unreliable for **which routes exist**, and this
+is the **wiring** question, off the one object literal that answers it.
+**THE PARTITION ASSERTION IS THE NEGATIVE CONTROL**: blocked plus implemented
+must equal the port exactly, so a regex that silently stopped matching fails the
+count rather than letting every per-row check pass over empty sets, which is
+`falsify`'s own 36-rows-to-13 lesson applied to a new reader. **THREE SEEDED
+DEFECTS WATCHED FIRING** -- a blocked route claimed served (**3** red), the
+wired route denied (**2** red), and a row citing the wrong blocker (**1** red)
+-- each restored from a byte copy taken before the seed and confirmed identical.
+
+**A SECOND FINDING, IN `apps/api` AND THEREFORE REPORTED RATHER THAN REPAIRED.**
+Three surviving counts there still say **twelve** where the tree holds
+**eleven**, stale since `ADR-200` moved `verifyOtp` across, while that package's
+own suite already asserts the eleven. The code is right and only the prose is
+behind, which is the same class as the defect repaired on this side of the
+fence. **`apps/api/**` was not touched.**
+
+**AND `docs/DISPATCH_PROTOCOL.md` SECTION 4 STILL READS "It was 18".** The
+runner's own last line reports **19**. That row instructs every session to
+derive rather than carry forward, which this one did; the row is outside this
+fence and now names the sixth session to report the drift without repairing it.
+
+**`ADR-218` IS NOT TAKEN AND THE NUMBER RETURNS TO THE
+POOL UNSPENT.** Every ruling the answer needed already exists -- `ADR-190`,
+`ADR-039` with `0002`, `ADR-200`, `ADR-120` ruling 4, and `ADR-162` with
+`ADR-083` section 3 and `ADR-095` ruling 3 -- so the work was transcription and
+a transcription mints nothing. The `ALLOCATION` row is amended in place
+([ADR-065](decisions/ADR-065.md) T3).
+
+**WHAT IS STILL OWED.** The portal's first write verb, now declined by two
+screens, which blocks SC-M4-01 becoming a working screen independently of
+delivery. Delivery itself, a vendor integration in nobody's fence, whose landing
+flips one entry in `ENDPOINT_WIRING` and reddens the new gate until the screen
+is updated with it. And the three stale **twelve**s in `apps/api`.
+
+Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants
+read off the runner's own last line, typecheck 0, lint 0, `format:check` clean,
+`falsify.mjs` read as OUTPUT with all **33** gates clean-and-dirty plus **80**
+scope and **10** loader cases and the tree clean after it,
+`pnpm --filter @merit/portal build` green with `/sign-in` still listed and still
+static, against **247 files / 6,159 passed / 6 skipped** on an `origin/main`
+baseline at `dee94a1` of **247 / 6,153 / 6** reproduced before a line changed,
+which is this branch's own delta of **+0 files and +6 cases**.
+
+No `SD-nn`, no `U-nn`, no `OI-nn`, no `GS-nnn`, no `CI-06` letter, no `RI-nn`,
+no migration, no enum type or label, no `SystemReason` or `SqlExecutorReason`
+member, no `pg` import, no cast past a key type, no ledger account named, no
+gate weakened, no fence widened, no merged migration touched, no ADR signed and
+no ADR minted.
+
 ---
 
 ## 2026-08-29 - Session 407: the wallet page was already calling its API, and what it could not do was say that a call had failed ([ADR-217](decisions/ADR-217.md), proposed)

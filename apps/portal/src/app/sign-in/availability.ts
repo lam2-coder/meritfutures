@@ -26,8 +26,23 @@
 // DIFFERENCE IS THE WHOLE ANSWER
 // -----------------------------------------------------------------------------
 // `app/security/source.ts` made this split one screen over and it is sharper
-// here: all four routes behind SC-M4-01 are REGISTERED, and NOT ONE of them is
-// wired. A grep, or a route table, would report this screen as fully served.
+// here: all four routes behind SC-M4-01 are REGISTERED, and EXACTLY ONE of the
+// four is wired. A grep, or a route table, would report this screen as fully
+// served.
+//
+// THE SENTENCE ABOVE USED TO READ "NOT ONE of them is wired" AND THAT WAS FALSE
+// AGAINST THE MEASUREMENT SIX LINES BELOW IT IN THIS SAME FILE. `verifyOtp` has
+// been wired since ADR-200 and the WIRING block already said so; only the
+// summary above it did not. Session 408 derived the split at the backend rather
+// than reading this paragraph, which is the only reason it was caught: a
+// summary and the measurement it summarises drifted apart inside one file, and
+// the summary is the half a reader trusts.
+//
+// AND THE WIRED ONE IS NOT THE ONE A READER GUESSES. The four fall into two
+// obvious pairs, an OTP pair and a passkey pair, and the guess that follows
+// from the shape -- OTP served, passkey not -- IS WRONG IN BOTH HALVES. The OTP
+// pair is SPLIT down the middle: the route that ISSUES a code is blocked and
+// the route that CONSUMES one is wired. See {@link ENDPOINT_WIRING}.
 //
 // REGISTRATION, measured through `CompositionReport.registered` over a real
 // `compose()` (dispatch protocol section 5, "a grep over route files has been
@@ -51,6 +66,49 @@
 // `apps/api/test/auth-backend.test.ts` asserts that eleven of the sixteen
 // methods refuse this way, each with its own reason, so the measurement above is
 // a property that suite already holds rather than one this file claims.
+//
+// -----------------------------------------------------------------------------
+// THE SERVED SET ADMITS NO COMPLETE SIGN-IN, AND THAT IS THE FINDING
+// -----------------------------------------------------------------------------
+// ONE OF THE FOUR IS SERVED AND IT CANNOT BE REACHED. `POST /auth/verify`
+// consumes an `otp_challenges` row. The only thing in the port that WRITES one
+// is `requestOtp`, and `requestOtp` is blocked on `NO_DELIVERY`. So the wired
+// half of the OTP pair is the half that reads a row nothing in this deployable
+// can create, and `auth-backend.ts`'s own header says it in one sentence: "a
+// trader cannot sign up today, because nobody can send them a code."
+//
+// AND THERE IS NO THIRD DOOR TO FALL BACK TO, WHICH IS WHAT MAKES THIS TOTAL
+// RATHER THAN PARTIAL. Merit is PASSWORDLESS (ADR-039), and `0002_identity.sql`
+// records it on the table where a password would have to live: "Merit is
+// passwordless only, so THERE IS NO PASSWORD TABLE ANYWHERE IN THIS SCHEMA, by
+// design." OTP and passkeys are therefore the WHOLE of trader authentication,
+// both passkey ceremonies are blocked on `NO_WEBAUTHN`, and nothing else in the
+// contract signs a person in. So:
+//
+//   NOBODY CAN SIGN IN TO THIS DEPLOYMENT BY ANY ROUTE, AND THE SCREEN SAYS SO
+//   ON ALL THREE FACTORS RATHER THAN ON THE NEAREST ONE.
+//
+// THAT IS WHY NOTHING HERE IS WIRED, AND IT IS A DERIVATION RATHER THAN A
+// DEFERRAL. "Call what is served" resolves, on this screen, to a single route
+// that would answer a code no trader could have been sent. A button that posts
+// to it is a button whose only reachable outcome is the deliberately
+// indistinguishable failure `verifyOtp` returns for a bad code -- which is a
+// WRONG ANSWER dressed as a working control, and ADR-190's distinction is that
+// a wrong answer is worse than an honest refusal. On the surface a trader meets
+// FIRST, the honest refusal is the whole product of this file.
+//
+// AND A SECOND REFUSAL WOULD STOP IT ANYWAY, INDEPENDENTLY OF ALL OF THE ABOVE.
+// All four routes are POST and ../../http/client.ts declares an `ApiClient` with
+// `get` and NOTHING ELSE, so this application cannot express any of the four
+// even for the one that answers. Giving the portal its first write verb is a
+// transport ruling with a CSRF posture, an unsafe-method cookie policy and an
+// idempotency question attached; `app/security/source.ts` declined exactly that
+// widening one screen over for `POST /sessions/:id/revoke`, and this screen's
+// write is heavier still because `POST /auth/verify` sets the session cookie.
+// `src/http/client.ts` is outside this segment either way. The two refusals are
+// independent and would lift on different days, which is why
+// `view/sign-in.ts`'s `submits_to` is a separate field from `served` and not a
+// second spelling of it.
 //
 // -----------------------------------------------------------------------------
 // THE THREE BLOCKERS, QUOTED, AND WHAT EACH ONE MEANS ON A SCREEN
@@ -118,17 +176,102 @@ import { toSignInView } from '../../view/sign-in.ts';
 import type { SignInView } from '../../view/sign-in.ts';
 
 /**
- * Every route SC-M4-01 would call, in the spelling API_CONTRACT section 3 uses.
+ * One route behind SC-M4-01, and what the installed backend does with it.
  *
- * ALL FOUR ARE REGISTERED AND NONE IS WIRED. The list is carried so the screen
- * can be checked against the composed surface rather than against this comment.
+ * THE FOUR FIELDS ARE FOUR DIFFERENT FACTS AND THE FILE USED TO CARRY ONLY THE
+ * FIRST. `endpoint` is API_CONTRACT's, `method` is the port's, and `served` is
+ * the installed backend's; keeping them in one row is what lets a test check the
+ * third against `apps/api` instead of against a comment that can go stale the
+ * way this file's own summary did.
  */
-export const REQUIRED_ENDPOINTS = [
-  'POST /auth/otp',
-  'POST /auth/verify',
-  'POST /auth/passkey/login/options',
-  'POST /auth/passkey/login/verify',
-] as const;
+export type EndpointWiring = {
+  /** `METHOD /path`, in the spelling API_CONTRACT section 3 uses. */
+  readonly endpoint: string;
+
+  /**
+   * The `AuthBackend` method behind it, spelled as `routes/auth.ts` declares it.
+   *
+   * IT IS THE JOIN KEY AND THAT IS ITS WHOLE PURPOSE. Wiring is a property of a
+   * METHOD and this screen names ROUTES, so without the method in the row there
+   * is nothing a check can match `databaseAuthBackend` on, and `served` below
+   * would be an unverifiable assertion in a file whose unverifiable assertion
+   * was already wrong once.
+   */
+  readonly method: string;
+
+  /** Whether `databaseAuthBackend` implements {@link method} rather than raising. */
+  readonly served: boolean;
+
+  /**
+   * The operator's blocker CONSTANT, or `null` exactly when {@link served}.
+   *
+   * THE NAME AND NEVER THE PROSE, AND IT REACHES NO SCREEN. ADR-120 ruling 4:
+   * "the reason never reaches the response", because every blocker names a
+   * table, a scope class or a construction. This field exists so a check can
+   * match `blocked('<method>', <BLOCKER>)` in `apps/api/src/auth-backend.ts`;
+   * the trader-facing sentences are {@link AVAILABILITY}'s and say what a person
+   * cannot do. `test/sign-in.test.ts` asserts no value of this field renders.
+   */
+  readonly blocker: string | null;
+};
+
+/**
+ * Every route SC-M4-01 would call, and which of them this deployment serves.
+ *
+ * ALL FOUR ARE REGISTERED. **EXACTLY ONE IS WIRED, AND IT IS NOT THE PAIR THE
+ * SHAPE SUGGESTS.** The four look like an OTP pair and a passkey pair, so the
+ * reading that comes for free is "OTP works, passkeys do not". That reading is
+ * wrong in both halves: the passkey pair is indeed both blocked, and the OTP
+ * pair is SPLIT, with the route that ISSUES a code blocked and the route that
+ * CONSUMES one wired.
+ *
+ * WHICH LEAVES THE SCREEN EXACTLY WHERE THIS FILE'S HEADER SAYS: the one served
+ * route reads a row the blocked one is the only writer of, so the served set
+ * admits no complete sign-in at all. `served: true` on a row is therefore a
+ * statement about `apps/api` and never a licence for this screen to call it.
+ *
+ * CARRIED AS DATA SO IT IS CHECKABLE. `test/sign-in.test.ts` matches every row
+ * against `apps/api/src/auth-backend.ts`'s own text and fails when the two
+ * disagree in either direction, so a session that wires `requestOtp` over there
+ * cannot leave this screen quietly claiming it is still blocked.
+ */
+export const ENDPOINT_WIRING: readonly EndpointWiring[] = [
+  // The half of the OTP pair that puts a code in front of a person, and the
+  // reason the other half is unreachable. `NO_DELIVERY`: "nothing in this
+  // deployable delivers a code."
+  { endpoint: 'POST /auth/otp', method: 'requestOtp', served: false, blocker: 'NO_DELIVERY' },
+
+  // THE ONE THAT ANSWERS. ADR-200 wired it, and `auth-backend.ts` implements it
+  // as `async verifyOtp`. Its `sms` arm still raises `NO_PHONE_RESOLUTION`
+  // (ADR-200 section 4.4), which is a per-FACTOR fact and lands in
+  // {@link AVAILABILITY}.sms_otp rather than here: the ROUTE answers, and it is
+  // the email channel that it answers for.
+  { endpoint: 'POST /auth/verify', method: 'verifyOtp', served: true, blocker: null },
+
+  {
+    endpoint: 'POST /auth/passkey/login/options',
+    method: 'passkeyLoginOptions',
+    served: false,
+    blocker: 'NO_WEBAUTHN',
+  },
+  {
+    endpoint: 'POST /auth/passkey/login/verify',
+    method: 'passkeyLoginVerify',
+    served: false,
+    blocker: 'NO_WEBAUTHN',
+  },
+];
+
+/**
+ * The same four routes as a flat list, DERIVED so the two cannot disagree.
+ *
+ * It is the shape the other five segments carry, which is why it survives the
+ * table landing above it: `app/wallet/source.ts`, `app/payouts/source.ts`,
+ * `app/accounts/source.ts`, `app/calendar/load.ts` and `app/security/source.ts`
+ * all export a `REQUIRED_ENDPOINTS`, and a sixth spelling of that name would be
+ * this segment describing the same thing differently for no reason.
+ */
+export const REQUIRED_ENDPOINTS: readonly string[] = ENDPOINT_WIRING.map((row) => row.endpoint);
 
 /**
  * What each factor can do in this deployment today.
