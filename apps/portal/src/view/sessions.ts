@@ -153,12 +153,14 @@ export type ActiveSessionView = {
    * not a missing endpoint: it was measured through `CompositionReport.
    * registered` over a real `compose()`, and `databaseAuthBackend.revokeSession`
    * is a real implementation. WHAT IS MISSING IS ON THIS SIDE. ../http/client.ts
-   * declares an `ApiClient` with `get` and nothing else, `test/surface.test.ts`
-   * fails on a second file in this application growing a `fetch(`, and ADR-083
-   * section 3 with ADR-095 ruling 3 forbid a route handler or a Server Action
-   * here. So this application has no write path of any kind, and the payout
-   * centre's `RequestControlView.submits_to` records the same `null` for the
-   * same reason one screen over.
+   * declared an `ApiClient` with `get` and nothing else until ADR-219, which
+   * added `post` and WIRED NO PAGE, so the transport half has lifted and the
+   * segment half has not: nothing in `app/security/**` calls it. Around that,
+   * `test/surface.test.ts` still fails on a second file in this application
+   * growing a `fetch(`, and ADR-083 section 3 with ADR-095 ruling 3 still forbid
+   * a route handler or a Server Action here, so a call has exactly one place it
+   * may live. The payout centre's `RequestControlView.submits_to` records the
+   * same `null` for the same reason one screen over.
    *
    * THE CONTROL IS RENDERED INERT AND THE SCREEN SAYS SO, which is that file's
    * rule: "An enabled control that silently does nothing is a promise to a

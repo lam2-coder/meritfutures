@@ -410,11 +410,20 @@ test('POST /kyc/session is registered by apps/api and is still not called from h
   // session needed it narrowed, so nothing was.
   expect(route).toContain('WRITES TWO ROWS IN ONE TRANSACTION');
 
-  // THE TRANSPORT CANNOT DO IT EITHER, which is the second, independent fence.
-  // `ApiClient` is `get` and no second method, and `src/http/client.ts` is
-  // ADR-162's file rather than this segment's to extend.
+  // THE TRANSPORT CAN DO IT NOW, AND THAT IS WHY THIS ASSERTION MOVED RATHER
+  // THAN BEING DELETED. Until ADR-219 this read `expect(Object.keys(client))
+  // .toEqual(['get'])`, and the second, independent fence it recorded was that
+  // `ApiClient` had no write verb at all. `post` exists from ADR-219 and that
+  // half of the reason is gone; what has NOT changed is that no file in this
+  // segment calls it, which is the fact this test was actually protecting and
+  // is now asserted directly. ADR-219 ships the transport and wires no page.
   const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport: DEAD });
-  expect(Object.keys(client)).toEqual(['get']);
+  expect(Object.keys(client).sort()).toEqual(['get', 'post']);
+
+  for (const entry of readdirSync(SEGMENT, { withFileTypes: true })) {
+    const source = readFileSync(join(SEGMENT, entry.name), 'utf8');
+    expect(source, `${entry.name} calls no write verb`).not.toMatch(/\.post\s*\(/);
+  }
 
   // SO NO FILE IN THIS SEGMENT SPELLS THE PATH, in code. A constant declared
   // here for an endpoint nothing calls is an invitation to the next session.

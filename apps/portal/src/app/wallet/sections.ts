@@ -205,11 +205,13 @@ const ELEVATION_NOTE =
 /**
  * The sentence an inert control carries.
  *
- * IT SAYS THE CONTROL DOES NOT WORK YET AND DOES NOT BLAME THE TRADER. The cause
- * is that this application has no write path at all -- ../../http/client.ts's
- * `ApiClient` declares `get` and nothing else -- and `app/payouts/view.ts` set
- * the rule this follows: "An enabled control that silently does nothing is a
- * promise to a trader that the code cannot keep."
+ * IT SAYS THE CONTROL DOES NOT WORK YET AND DOES NOT BLAME THE TRADER. Until
+ * ADR-219 the cause was that this application had no write path at all, because
+ * ../../http/client.ts's `ApiClient` declared `get` and nothing else. THE VERB
+ * EXISTS NOW AND THIS CONTROL IS STILL INERT: that entry ships the transport
+ * and wires no page, so nothing in this segment calls it. `app/payouts/view.ts`
+ * set the rule this follows either way: "An enabled control that silently does
+ * nothing is a promise to a trader that the code cannot keep."
  */
 const INERT_NOTE = 'This control is not available in this build.';
 

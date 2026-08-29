@@ -48,22 +48,23 @@
 // -----------------------------------------------------------------------------
 // THE REVOKE ROUTE IS THE ONE GAP THAT IS ENTIRELY ON THIS SIDE
 // -----------------------------------------------------------------------------
-// `POST /sessions/:id/revoke` is registered and wired and this application still
-// cannot call it, because ../../http/client.ts declares an `ApiClient` with
-// `get` and nothing else. THIS APPLICATION HAS NO WRITE PATH OF ANY KIND: the
-// transport has no verb but GET, `test/surface.test.ts` fails on a second file
-// growing a `fetch(`, and ADR-083 section 3 with ADR-095 ruling 3 forbid a route
-// handler or a Server Action here.
+// `POST /sessions/:id/revoke` is registered and wired and this segment still
+// does not call it. UNTIL ADR-219 IT COULD NOT: ../../http/client.ts declared an
+// `ApiClient` with `get` and nothing else, so this application had no write path
+// of any kind. That entry took the transport ruling this file declined, and
+// `post` exists.
 //
-// IT IS NOT TAKEN IN THIS SESSION AND THE REFUSAL IS DELIBERATE. Giving this
-// application its first write verb is a transport ruling with a CSRF posture, a
-// cookie policy for an unsafe method and an idempotency question attached, on a
-// path that revokes credentials. `app/payouts/view.ts` already declined the same
-// widening for `POST /accounts/:id/payout` and rendered its control inert
-// instead, and this is the same call on a narrower endpoint. The control renders
-// disabled, `ActiveSessionView.revokes_at` is typed as the literal `null`, and
-// the screen says the control is unavailable in this build rather than promising
-// a trader they have thrown an attacker out.
+// WHAT REMAINS TRUE IS EVERYTHING ELSE, AND IT IS WHY NOTHING HERE MOVED.
+// `test/surface.test.ts` still fails on a second file growing a `fetch(`, and
+// ADR-083 section 3 with ADR-095 ruling 3 still forbid a route handler or a
+// Server Action here, so a call may live in one place only. ADR-219 SHIPS THE
+// VERB AND WIRES NO PAGE, on ADR-190's ground that a screen posting on a posture
+// nobody has read is worse than one that honestly refuses. `app/payouts/view.ts`
+// declined the same widening for `POST /accounts/:id/payout` and rendered its
+// control inert, and this is the same call on a narrower endpoint. The control
+// renders disabled, `ActiveSessionView.revokes_at` is typed as the literal
+// `null`, and the screen says the control is unavailable in this build rather
+// than promising a trader they have thrown an attacker out.
 
 import type { SessionRow } from '../../api/types.ts';
 import type { ApiClient } from '../../http/client.ts';

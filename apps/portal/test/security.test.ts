@@ -191,10 +191,12 @@ describe('revocation', () => {
 
     const html = render();
 
-    // `POST /sessions/:id/revoke` IS REGISTERED AND WIRED and this application
-    // has no write verb to call it with. The promise an enabled-but-dead control
-    // would make here is the worst one in the product: a trader who believes
-    // they have just thrown an attacker out and has not.
+    // `POST /sessions/:id/revoke` IS REGISTERED AND WIRED and nothing in this
+    // segment calls it. The transport gained `post` in ADR-219, which wires no
+    // page, so the control stays inert until a slice wires it deliberately. The
+    // promise an enabled-but-dead control would make here is the worst one in
+    // the product: a trader who believes they have just thrown an attacker out
+    // and has not.
     for (const button of [...html.matchAll(/<button[^>]*>/g)].map((m) => m[0]))
       expect(button).toContain('disabled=""');
 

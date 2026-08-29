@@ -181,13 +181,15 @@ export type WalletExitId = 'spend' | 'withdraw';
  * nothing is a promise to a trader that the code cannot keep, and this
  * application's whole subject is not making false statements on a screen."
  *
- * THE REASON IT IS NULL IS NOT ELEVATION AND SAYING SO MATTERS. There is no
- * write path in this application AT ALL: ../http/client.ts's `ApiClient`
- * declares `get` and nothing else, `test/surface.test.ts` fails on a second file
- * growing a `fetch(`, and ADR-083 section 3 with ADR-095 ruling 3 forbid a route
- * handler or a Server Action here. So both exits are inert for a transport
- * reason that has nothing to do with who the trader is, and a screen that
- * blamed the trader's session for it would be wrong about its own cause.
+ * THE REASON IT IS NULL IS NOT ELEVATION AND SAYING SO MATTERS. Until ADR-219
+ * there was no write path in this application at all, because ../http/client.ts's
+ * `ApiClient` declared `get` and nothing else. `post` exists now and NOTHING IN
+ * THIS SEGMENT CALLS IT: that entry ships the transport and wires no page.
+ * `test/surface.test.ts` still fails on a second file growing a `fetch(`, and
+ * ADR-083 section 3 with ADR-095 ruling 3 still forbid a route handler or a
+ * Server Action here. So both exits are inert for a reason that has nothing to
+ * do with who the trader is, and a screen that blamed the trader's session for
+ * it would be wrong about its own cause.
  */
 export type WalletExitView = {
   readonly id: WalletExitId;

@@ -22,12 +22,12 @@
 //
 // IT REVOKES NOTHING, AND THAT IS THE ONE THING THIS SCREEN IS FOR. ./source.ts
 // carries the measurement and the refusal in full: `POST /sessions/:id/revoke`
-// is registered AND wired, and this application cannot call it because its
-// transport has no verb but GET. Giving the portal its first write verb is a
-// transport ruling with a CSRF posture, an unsafe-method cookie policy and an
-// idempotency question attached, on a path that revokes credentials. It is
-// reported rather than taken, the control renders disabled, and the screen says
-// so instead of promising a trader they have thrown an attacker out.
+// is registered AND wired, and this screen still does not call it. Until
+// ADR-219 the reason was that the transport had no verb but GET; that entry
+// took the ruling, added `post` and DELIBERATELY WIRED NO PAGE, so what is
+// missing here is now a segment slice rather than a transport one. The control
+// renders disabled and the screen says so instead of promising a trader they
+// have thrown an attacker out.
 //
 // IT SHOWS NO PASSWORD ROW AND NO RESET LINK. Merit is passwordless in the
 // schema (`0002:280`, ADR-039), so there is nothing here to reset.
