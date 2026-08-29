@@ -29,17 +29,17 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->196<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->197<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->196<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->197<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->196<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->197<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->196<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->197<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->196<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->197<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->196<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->197<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -8312,6 +8312,30 @@ Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, t
 **WHAT IS STILL OWED.** The `readLiability` adapter and the operator session, both outside this fence; the two rulings findings 2 and 3 name; and the four panels `page.ts` holds in `PENDING` whose figures are now on the wire and which have no `LiabilityHomeInput` member.
 
 ---
+
+## `B5` term 2 is ruled, the storage constrained nothing, and the tempting answer was a lossy wire shape already writing `jsonb` today ([ADR-206](decisions/ADR-206.md), proposed 2026-08-29, session 394)
+
+**THE ENCODING OF `rule_states.engine_gates` IS DECLARED AND IT IS THE ENGINE'S OWN VALUE.** Six gate groups and twenty-five leaves at `ENGINE_GATE_LEAVES`' dotted paths, in the engine's field names, with every cents leaf a base-10 string. The declaration lands at [`rule_states.md`](architecture/data-model/rule_states.md), beside the `state_hash` input list and for that list's own stated reason: an ADR records a decision, and the design record is where a reader checking a row looks.
+
+**READING THE ROWS WAS THE FINDING.** Over every migration in the tree the column is `jsonb NOT NULL` and the database says nothing else: `rule_states` carries fourteen `CHECK` constraints and not one names `engine_gates`, no index reads into it, no trigger inspects it, and the table held zero rows. **So there was never an encoding to discover. There were three disagreeing shapes already in the tree**, each defensible from where it sits, and the ruling is the choice between them.
+
+**THE TRAP WAS THE WIRE SHAPE, AND IT WAS LIVE RATHER THAN HYPOTHETICAL.** `projectGates` already serializes these same six gate groups into a `jsonb` column today, through `snapshotOf` into `payout_requests.eligibility_snapshot`, so reusing it would have read as consistency. Against the hash's twenty-five leaves it drops three, renames two beyond casing, reports a `minimum_amount.pass` that is the route's conjunction with the clamp rather than the engine's gate, and adds the four context gates `INV-23` bars. **Twenty-two of twenty-five survive and one of the twenty-two is a different fact**, so a row written that way would hash-mismatch on day one and name a field the reader cannot find.
+
+**CENTS ARE STRINGS FOR A REASON THAT IS NOT THE OBVIOUS ONE.** `jsonb` holds a large integer exactly, because its numbers are `numeric`. The lossy leg is the read: through `JSON.parse` a value past `2^53` comes back wrong, and `storedRuleStates` is typed to rebuild a `bigint` for the left-hand side of `INV-04`'s replay audit. The write path also may not refuse, because a throw leaves the account-day with no row, which is `DO-3`.
+
+**A ROW WAS WRITTEN AND READ BACK**, through the whole foreign-key chain and against every migration, and it came back with twenty-five leaf paths identical set for set to `ENGINE_GATE_LEAVES` and in a different key order from the one written. Three seeds imitating the wire shape's three differences are each **RED** against it, with the control green before and after. **A fourth seed was GREEN and did not fire, inside this session's own new assertion**: a bare `toContain` on a symbol is satisfied by a renamed superstring of it, which is session 392's landmine met one field over. Anchored, re-seeded, red.
+
+**WHY A SECOND RULING WAS NEEDED.** [ADR-204](decisions/ADR-204.md) ruled the meaning of the projection and found one of eleven conditions forward-knowable, so its whole ruling rests on reading one leaf out of this bag and it declared nothing about the bag. That is why three sessions recorded that it moves nothing.
+
+**`0015`'s EIGHT-GATE COMMENT AND THE DESIGN RECORD'S COPY OF IT WERE BOTH WRONG**, two copies of one statement with nothing comparing them, which is `FM-16`'s shape a second time on this blocker. The design record is corrected and the merged migration is superseded rather than edited (E2).
+
+**Registered rather than repaired, both against session 395's fence**: `hash.ts` says four of its leaves are `Cents` and seven are, and `failingGates` is the bag's only live reader, depending on the nesting rather than the names, which is the one place an encoding chosen from the read side would have produced a wrong flag rather than a type error.
+
+Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, typecheck 0, lint 0, `format:check` clean, `falsify.mjs` read as OUTPUT with all 33 gates clean-and-dirty plus 80 scope and 10 loader cases and the tree clean after it, **60** migrations and **115** live tables, `IMPLEMENTED_ADMIN_READS` at **five** and not naming `readLiability`, and **244 files / 6,063 passed / 6 skipped** against an `origin/main` baseline at `dd9117c` of **244 / 6,063 / 6** reproduced before a line changed. **The delta is zero files and zero cases, which is correct**: this slice rules and repairs, and its three added assertions went into cases that already existed.
+
+**No migration number, no `SD-nn`, no `GS-nnn`**, no `SystemReason` or `SqlExecutorReason` member, no `pg` import, no cast past a key type, no ledger account named, no gate weakened, no fence widened, no merged migration touched, `readLiability` not composed, the approval line NOT SIGNED, and `packages/**`, `apps/worker/**`, `apps/admin/**`, `API_CONTRACT.md` and `routes/admin-reads.ts` byte for byte unchanged.
+
+**WHAT IS STILL OWED.** `B5`'s terms 1 and 3. Term 1 is now writable, because the encoding its adapter must produce is declared; the suite-side check that walks a stored row against `ENGINE_GATE_LEAVES` belongs with it. A `CHECK` on the six group keys needs a migration number nobody reserved and is cheaper before rows land than after.
 
 ## `RI-19` binds a clearing condition to the case that restates it, and the drift it was sent to catch had already been repaired (2026-08-29, session 396)
 

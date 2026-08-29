@@ -22,7 +22,7 @@ Per account **per trading day**, not a single current row. Roughly 250 rows per 
 | `payout_anchor_day` | date | null | **`SD-02`.** The last settled payout's **basis** day. Resets win days and starts the consistency period **Unit: trading day**, win days reset from it and the consistency period starts at it. |
 | `cadence_anchor_day` | date | null | **`SD-02`.** That payout's **effective** day. Drives the [cadence gap](../../GLOSSARY.md#cadence-gap) **Unit: trading day**, the cadence gap is counted in trading days from it. |
 | `engine_eligible` | boolean | not null | **`SD-06`.** The engine's verdict from **engine gates only**, replayable by construction |
-| `engine_gates` | jsonb | not null | **`SD-06`.** Profit target, drawdown, win days, minimum days, consistency, cadence, cap, minimum payout. Replayable, **in the hash** |
+| `engine_gates` | jsonb | not null | **`SD-06`.** The engine's own `EngineGateResults` value: six gate groups, twenty-five leaves, in the engine's field names, with every cents leaf a base-10 string. Ruled by [ADR-206](../../decisions/ADR-206.md) and declared in full below. Replayable, **in the hash** |
 | `context_gates` | jsonb | not null | **`SD-06`.** Freeze, recon, KYC, in-flight. Not replayable, **not in the hash** (INV-23) |
 | `state_hash` | bytea | not null, check `length = 32` | **`SD-08`.** SHA-256 over a canonical serialization of the state |
 | `engine_version` | text | not null | which build produced this row. Required for replay **comparison** and deliberately excluded from the hash it is compared with |
@@ -47,6 +47,27 @@ Append-only. Retention: forever.
 Excluded, each for a stated reason: `context_gates` (the whole reason `SD-06` split them, INV-23); `engine_version` (a build identifier is not state, and including it makes every engine upgrade a universal divergence); **`calendar_revision_id`** ([ADR-047](../../decisions/ADR-047.md): the calendar revision is the engine's **second version-like input**, so the `engine_version` argument applies with identical force. In the hash, one calendar correction changes every row's hash at once and pages once per account, which is the 5,000-page morning ADR-047 exists to prevent); `computed_at` (wall clock, not state); `id` and `state_hash` themselves.
 
 **The nineteen stay nineteen.** `0035` adds a column and adds it to the **exclusion** list, in the `state_hash` column comment as well as here, because that comment is the only machine-readable record of the input set and `probe_rule_states_calendar_revision.sql` SUCCESS 6 asserts it names this column as excluded rather than merely mentioning it. A comment that added it to the hashed list would satisfy a presence check while inverting the ruling.
+
+**The `engine_gates` encoding ([ADR-206](../../decisions/ADR-206.md)), reproduced here because a `jsonb` bag whose shape is implicit is a bag every reader fixes differently.** The column stores the engine's `EngineGateResults` value, group for group and leaf for leaf, in the engine's own field names. The leaves are exactly the dotted paths `ENGINE_GATE_LEAVES` declares in [`hash.ts`](../../../packages/rules-engine/src/hash.ts), which is the same enumeration `state_hash` column 19 hashes, so the column and the hash read one list rather than two copies of one list.
+
+| Group | Leaves, in the order the interface declares them |
+|---|---|
+| `tradedDays` | `pass`, `skipped`, `have`, `need` |
+| `winDays` | `pass`, `have`, `need`, `floorCents` |
+| `buffer` | `pass`, `haveCents`, `needCents` |
+| `consistency` | `pass`, `skipped`, `bestDayShareBp`, `maxDayShareBp`, `profitNeededToDiluteCents` |
+| `cadenceGap` | `pass`, `skipped`, `tradingDaysSinceLastPayout`, `need`, `nextEligibleTradingDay` |
+| `minimumAmount` | `pass`, `withdrawableCents`, `capCents`, `minPayoutCents` |
+
+**Every `*Cents` leaf is a JSON string holding the base-10 integer, and no other leaf is a string except `nextEligibleTradingDay`.** `Cents` is `bigint` and the encoding has to be total over it: a write path that refused a legal state would leave the day with no row at all, which is `DO-3` and a raised reconciliation for a value the engine computed correctly. A JSON number is not total in the direction that matters. Postgres holds it exactly, because `jsonb` numbers are `numeric`, and JavaScript loses it on the way back: `9007199254740993` stored as a number and read through `JSON.parse` returns `9007199254740992`, so the read port could not rebuild the `bigint` it is typed to return. A base-10 string round-trips through `BigInt` exactly and is the same rendering `hash.ts`'s `money()` already puts into the hash.
+
+**`skipped` is present on the three groups that declare it and absent on the other three, which is the interface's shape rather than an omission.** `CV-19` fixed the vocabulary: a gate that was not evaluated reports `pass: true, skipped: true`. `winDays`, `buffer` and `minimumAmount` are always evaluated and carry no such leaf, so a bag that grew one there would be carrying a fact the engine never produced.
+
+**Key order is not part of the encoding and no reader may depend on it.** `jsonb` sorts keys by length and then bytewise, so the value Postgres returns is in a different order from the one written. The hash is therefore taken over the engine's in-memory value and never over the round trip: the column and the hash are written from one value in one step, and a hash recomputed from what storage gives back is a different serializer.
+
+**Nothing else goes in the bag.** The four context gates are barred by `INV-23`, which is the whole reason `SD-06` split the column in two, and the wire shape is not the storage shape: `projectGates` in [`payouts.ts`](../../../apps/api/src/routes/payouts.ts) is an allowlist for `API_CONTRACT`'s eligibility breakdown, it drops three of the twenty-five leaves, renames two beyond casing, and reports a `minimum_amount.pass` that is the route's conjunction with the clamp rather than the engine's gate.
+
+**This row used to name eight gates and the engine produces six.** "Profit target, drawdown, win days, minimum days, consistency, cadence, cap, minimum payout" was carried here and in [`0015`](../../../packages/db/migrations/0015_rule_states.sql)'s column comment, in two copies with nothing comparing them, and neither copy names a group `EngineGateResults` declares. `ADR-060` had already closed the enumeration at the six `R-33`, `R-34`, `R-35`, `R-36`, `R-37` and `R-39`. This row is corrected under `ADR-206`; the migration is merged and its comment is superseded rather than edited (constitution E2).
 
 **Why the two anchors stay two columns (`SD-02`, finding C-09).** They are genuinely different dates and conflating them is a silent liability change of 40 percent (EC-039). Under [ADR-019](../../decisions/ADR-019.md)'s current configuration they coincide, and that is precisely the trap: a single column would work perfectly until the anchor moved back, at which point the gap between payouts changes and nothing in the schema records that two facts had been merged. `rule_states_settlements_imply_anchors` is the constraint that would have failed loudly if they had been collapsed and half-populated.
 
