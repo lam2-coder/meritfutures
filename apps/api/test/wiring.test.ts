@@ -130,7 +130,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   an authority, it is a shape" (`routes/admin-reads.ts:961`).
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
-  // (`packages/db/src/scoped-db.ts:197`) and ADR-165 ruled it gains no member, so
+  // (`packages/db/src/scoped-db.ts:248`) and ADR-165 ruled it gains no member, so
   // the vocabulary was never the obstacle either. ADR-171 section 9 states the
   // condition under which the door becomes takeable: the slice that lands an
   // `AdminSessionSource` a deployment can install, because that is the first
@@ -275,7 +275,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "version's size grid (`0066_published_size_grid_immutable.sql:212`) beside `0027`'s " +
     '`plan_versions_published_immutable` (`0027_triggers_invariants.sql:260`), so the crossing ' +
     'is safe and the crossing is still not built. SECOND: NOTHING IN THIS TREE IMPLEMENTS ' +
-    '`PayoutTx`. THIRD, AND REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:439` states ' +
+    '`PayoutTx`. THIRD, AND REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:438-439` states ' +
     '"no member of this interface that a scoped door cannot serve" while `subject()` returns a ' +
     '`ResolvedPlan` no scoped door reaches. Session 401 registered it, ADR-213 section 8 ' +
     'registered it again, and `routes/payouts.ts` is a handler file outside this fence. A ' +
@@ -320,7 +320,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
     'and now `statements` -- and all four are an adapter somebody can write. REGISTERED RATHER ' +
     "THAN REPAIRED: the route module's own `STATEMENTS_UNREACHABLE` " +
-    '(`routes/affiliate.ts:445`) still carries the retired sentence and serves it to a caller as ' +
+    '(`routes/affiliate.ts:444`) still carries the retired sentence and serves it to a caller as ' +
     'the reason `statements` refuses. That is a handler file and outside this fence. NOTE: this ' +
     'port already holds `productionAffiliateDeps` at module scope (`affiliate.ts:478`), so ' +
     'calling the setter here would install what is already installed. That is not a wiring.',
