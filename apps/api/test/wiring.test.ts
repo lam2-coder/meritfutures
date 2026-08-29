@@ -492,31 +492,63 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
   // drives `requested --> approved` or `cooling --> approved`, and `:287-292`
   // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES` (the
-  // array is `wallet-withdrawals.ts:287-292`; :283-288 was the docblock above
-  // it), on
-  // which `gateNoInFlight` (`:1254`) refuses. So a wired endpoint writes a row
-  // nothing will ever advance and then refuses that identity's every later
-  // withdrawal, permanently, behind a screen saying a withdrawal is in flight.
+  // array is `wallet-withdrawals.ts:288-293` since ADR-232 added an import
+  // above it; it was :287-292, and :283-288 was the docblock above that), on
+  // which `gateNoInFlight` refuses. So a wired endpoint writes a row nothing
+  // will ever advance and then refuses that identity's every later withdrawal,
+  // permanently, behind a screen saying a withdrawal is in flight.
   //
   // A 503 AND A LOCKOUT BOTH REFUSE, AND ONLY ONE OF THEM IS REVERSIBLE. That
   // is why the 503 is kept, and it is the same fail-closed direction session
   // 303 was reaching for with the reason it had.
+  //
+  // AND THEN THE ENTRY NAMED THE WRONG EDGE, WHICH IS ADR-232's FINDING AND IS
+  // THE FOURTH TIME THIS FILE HAS RECORDED A REASON THAT DID NOT SURVIVE BEING
+  // CHECKED. It read the missing approval edge as the thing standing between a
+  // wired backend and the lockout, and IT IS NOT: `approved` IS ITSELF ONE OF
+  // THE FOUR OPEN STATUSES. A withdrawal that crosses `G-WITHDRAWAL-CLEARED`
+  // moves from `requested` to `approved`, `gateNoInFlight` finds it in exactly
+  // the same list, and the trader is refused their next withdrawal by the same
+  // 409. Building the approval edge -- which session 422 did build, guarded,
+  // with the founder's dual-control threshold on it -- does not shorten this
+  // entry by a word.
+  //
+  // WHAT ACTUALLY RELEASES AN IDENTITY IS `settled`, `failed` OR `cancelled`,
+  // the three arrows STATE_MACHINES section 3.2 draws into `[*]`, and NOTHING
+  // IN THIS TREE DRIVES ANY OF THEM EITHER. Derived over `apps/**` and
+  // `packages/**` outside the test and tooling directories at the moment
+  // ADR-232 was written: the only writers of a `wallet_withdrawals` row are the
+  // creation INSERT in `routes/wallet-withdrawals.ts` and one `updateAt` in
+  // `apps/worker/src/sweeps/expiry.ts`, and the second writes the freeze trio
+  // and `updated_at` without touching `status` at all.
+  //
+  // SO THE OBSTRUCTION IS ONE EDGE WIDER THAN IT WAS WRITTEN, and the honest
+  // 503 is kept for the reason it was always kept for rather than for the
+  // reason this entry used to give.
   // ---------------------------------------------------------------------------
   useWithdrawalBackend:
-    'A DRIVER FOR THE APPROVAL EDGE, AND NOT THE STORE THIS ENTRY USED TO NAME (ADR-172 clause ' +
-    '5). `databaseIdempotencyStore` (`src/idempotency-store.ts:144`) exists and serves the ' +
-    'identity arm this route presents (`routes/wallet-withdrawals.ts:1527`), so the idempotency ' +
-    'half is no longer what refuses. What refuses is that NOTHING IN THIS TREE performs ' +
-    '`requested --> approved` or `cooling --> approved` (`routes/wallet-withdrawals.ts:57-60`), ' +
-    'and both statuses are in `OPEN_WITHDRAWAL_STATUSES` (`:287-292`), so `gateNoInFlight` ' +
-    '(`:1254`) would refuse that identity every later withdrawal. Wiring it trades an honest 503 ' +
-    'for a permanent per-trader lockout, and only the 503 is reversible. TWO LINE NUMBERS IN ' +
-    'THIS ENTRY WERE FALSE BY EIGHTEEN LINES WHEN ADR-176 CHECKED THEM, in the reason ADR-172 ' +
-    'wrote one session earlier to replace a false one: line 1233 was the KYC term and line 1506 ' +
-    'was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, which is the ' +
-    'same drift in its quietest form. THOSE TWO NUMBERS ARE WRITTEN OUT OF CITATION GRAMMAR ON ' +
-    'PURPOSE: a `file:line` pointer is a claim about THIS tree, so a pointer quoted as HISTORY ' +
-    'must not wear the shape that says follow me (ADR-212).',
+    'A TERMINAL EDGE, AND NOT THE APPROVAL EDGE THIS ENTRY USED TO NAME (ADR-232), WHICH IN ' +
+    'TURN WAS NOT THE STORE IT NAMED BEFORE THAT (ADR-172 clause 5). ' +
+    '`databaseIdempotencyStore` (`src/idempotency-store.ts:144`) exists and serves the identity ' +
+    'arm this route presents, so the idempotency half has not been what refuses since ADR-172. ' +
+    'THE APPROVAL EDGE IS NOT WHAT REFUSES EITHER, and that sentence IS FALSE where this entry ' +
+    'used to state it: session 422 built `requested --> approved` and `cooling --> approved`, ' +
+    'guarded and dual controlled above 500000 integer cents, and the port did not become ' +
+    'wireable, because `approved` IS ITSELF ONE OF THE FOUR MEMBERS OF ' +
+    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:288-293`) and `gateNoInFlight` ' +
+    'refuses on the whole list. What refuses is that NOTHING IN THIS TREE reaches `settled`, ' +
+    '`failed` or `cancelled`, which are the three arrows STATE_MACHINES section 3.2 draws into ' +
+    'the terminal state and the only statuses that let an identity open a second withdrawal. ' +
+    'THE ENTRY SUPPLIES ITS OWN DECISION PROCEDURE AND RI-20 RUNS IT: ' +
+    '`grep -rn driveApprovals apps/api/src` returns 2 lines, which are the transition and one ' +
+    'reference to it in a docblock, and no third line is a caller. Wiring it trades an honest ' +
+    '503 for a permanent per-trader lockout, and only the 503 is reversible. TWO LINE NUMBERS ' +
+    'IN THIS ENTRY WERE FALSE BY EIGHTEEN LINES WHEN ADR-176 CHECKED THEM, in the reason ' +
+    'ADR-172 wrote one session earlier to replace a false one: line 1233 was the KYC term and ' +
+    'line 1506 was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, ' +
+    'which is the same drift in its quietest form. THOSE TWO NUMBERS ARE WRITTEN OUT OF ' +
+    'CITATION GRAMMAR ON PURPOSE: a `file:line` pointer is a claim about THIS tree, so a ' +
+    'pointer quoted as HISTORY must not wear the shape that says follow me (ADR-212).',
 };
 
 // -----------------------------------------------------------------------------

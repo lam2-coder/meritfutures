@@ -512,36 +512,81 @@ describe('the dual-control threshold the founder answered', () => {
 });
 
 // -----------------------------------------------------------------------------
-// 2b. THE FINDING: THE THRESHOLD IS UNDISCHARGED ON THE PATH THE QUESTION NAMED
+// 2b. THE FINDING, AND THE DAY IT WAS DISCHARGED ON ONE OF THE FOUR PATHS
 // -----------------------------------------------------------------------------
-// The founder was asked about a PAYOUT amount. `dual_control_threshold_cents`
-// is the only amount-denominated dual-control threshold in the estate and it
-// exists on ONE table, which is the ADMIN adjustment table. Every assertion in
-// this block is a claim ADR-228 section 5 makes, pinned so that the day one of
-// them stops being true this suite says so.
+// The founder was asked about a PAYOUT amount, and when ADR-228 landed
+// `dual_control_threshold_cents` was the only amount-denominated dual-control
+// threshold in the estate and existed on ONE table, the ADMIN adjustment table.
+// Every assertion below was a claim ADR-228 section 5 makes, "pinned so that
+// the day one of them stops being true this suite says so".
+//
+// THREE OF THEM STOPPED BEING TRUE ON 2026-08-29 AND THIS SUITE SAID SO, which
+// is the pinning working rather than a regression. ADR-232 put the threshold on
+// the approval edge of `wallet_withdrawals`: `0070` gives that table
+// `approved_by`, `dual_control_approval_id` and its own
+// `dual_control_threshold_cents` under a `<= 500000` ceiling, and
+// `wallet-withdrawals.ts` carries the comparison. THE ASSERTIONS ARE MOVED
+// RATHER THAN DELETED, each one recording what it used to say, because a
+// deleted assertion leaves nothing for the next reader to check and this block
+// exists to be that record.
+//
+// WHAT IS STILL UNDISCHARGED IS THE OTHER THREE PATHS. `payouts.ts`,
+// `admin-payouts.ts` and `wallet.ts` carry 0 each, and `POST
+// /admin/identities/:identityId/wallet/withdrawals` -- the admin-originated
+// withdrawal ADR-069 section 5 rules dual controlled at EVERY amount -- does
+// not exist in this tree at all.
 
 describe('what the payout and withdrawal paths carry, which is the finding', () => {
   const ROUTES = ['payouts.ts', 'admin-payouts.ts', 'wallet-withdrawals.ts', 'wallet.ts'] as const;
 
-  it('is no dual control at all, on any of the four money-out routes', () => {
-    for (const file of ROUTES) {
+  it('is no dual control on THREE of the four money-out routes, and the fourth now has it', () => {
+    // THIS CASE READ "on any of the four" AND ASSERTED 0 ON ALL FOUR. It was
+    // true when ADR-228 wrote it and ADR-232 made it false on one route, on
+    // purpose: the approval edge is where money leaves and is where the
+    // threshold belongs. The other three are unmoved and are still the finding.
+    for (const file of ['payouts.ts', 'admin-payouts.ts', 'wallet.ts'] as const) {
       const body = readFileSync(join(REPO, 'apps/api/src/routes', file), 'utf8');
       expect({ file, matches: (body.match(/dual_control|dualControl/g) ?? []).length }).toEqual({
         file,
         matches: 0,
       });
     }
+    const withdrawals = readFileSync(
+      join(REPO, 'apps/api/src/routes/wallet-withdrawals.ts'),
+      'utf8',
+    );
+    expect(withdrawals).toContain('dualControlRequired');
+    expect(withdrawals).toContain('DUAL_CONTROL_THRESHOLD_CENTS');
+  });
+
+  it('and ROUTES is still the set the finding was measured over', () => {
+    // The list is unchanged so the shrinking is visible as a shrinking. A
+    // fourth name here without a ruling is a path nobody measured.
+    expect(ROUTES).toStrictEqual([
+      'payouts.ts',
+      'admin-payouts.ts',
+      'wallet-withdrawals.ts',
+      'wallet.ts',
+    ]);
   });
 
   it('and `dual_channel` on the withdrawal route is an AUTH FACTOR, not a second human', () => {
     // The one near-miss a reader is likely to mistake for the control. It is a
     // step-up factor for the SAME person, and it appears on `required:`.
+    //
+    // THIS CASE USED TO PROVE THE POINT WITH `not.toContain('dual_control')`,
+    // WHICH IS NOW FALSE AND WAS ALWAYS THE WEAKER PROOF: it read the absence
+    // of the real control as evidence about this string. The two now sit in one
+    // file and the distinction is asserted directly instead.
     const withdrawals = readFileSync(
       join(REPO, 'apps/api/src/routes/wallet-withdrawals.ts'),
       'utf8',
     );
     expect(withdrawals).toContain("required: 'passkey or dual_channel'");
-    expect(withdrawals).not.toContain('dual_control');
+    // The factor is declared on an ENDPOINT and the control is decided over an
+    // AMOUNT and an approver. Neither line mentions the other.
+    expect(withdrawals).not.toContain("required: 'passkey or dual_control'");
+    expect(withdrawals).toContain('dualControlRequired(amountCents: bigint, hand: ApprovalHand');
   });
 
   it('and neither payout table declares a dual-control column of any kind', () => {
@@ -551,17 +596,37 @@ describe('what the payout and withdrawal paths carry, which is the finding', () 
     }
   });
 
-  it('so the only amount threshold in the estate is on the admin adjustment table', () => {
+  it('so the amount thresholds in the estate are the adjustment one and the withdrawal one', () => {
     const dir = join(REPO, 'packages/db/migrations');
     const carriers = readdirSync(dir)
       .filter((f) => f.endsWith('.sql'))
       .filter((f) => readFileSync(join(dir, f), 'utf8').includes('dual_control_threshold_cents'));
-    // `0038` declares it and `0068` bounds it. A third file here means a second
-    // threshold exists and this suite's claim needs re-deriving.
+    // THIS LIST HELD TWO FILES AND THE CASE READ "the only amount threshold in
+    // the estate is on the admin adjustment table". `0038` declares that column
+    // and `0068` bounds it; `0070` declares the second, on `wallet_withdrawals`,
+    // WITH ITS CEILING IN THE SAME FILE, which is the whole difference between
+    // the two landings. A FOURTH file here means a third threshold exists and
+    // this suite's claim needs re-deriving.
     expect(carriers).toEqual([
       '0038_account_adjustments.sql',
       '0068_dual_control_threshold_ceiling.sql',
+      '0070_withdrawal_approval_and_dual_control.sql',
     ]);
+  });
+
+  it('and the withdrawal threshold was born bounded, which the adjustment one was not', () => {
+    const dir = join(REPO, 'packages/db/migrations');
+    const withdrawal = readFileSync(
+      join(dir, '0070_withdrawal_approval_and_dual_control.sql'),
+      'utf8',
+    );
+    // The ceiling and the column in one file. `0038` shipped the column on
+    // 2026-08-16 and `0068` bounded it on 2026-08-29, and in between a
+    // $1,000,000 credit naming a threshold no adjustment could reach cleared
+    // every CHECK on the table.
+    expect(withdrawal).toContain('ADD COLUMN dual_control_threshold_cents  bigint NULL');
+    expect(withdrawal).toContain('wallet_withdrawals_dual_control_threshold_ceiling');
+    expect(withdrawal).toContain('dual_control_threshold_cents <= 500000');
   });
 });
 
