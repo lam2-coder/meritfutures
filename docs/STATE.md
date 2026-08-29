@@ -8270,3 +8270,21 @@ byte unchanged.
 Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, typecheck 0, lint 0, `format:check` clean, `falsify.mjs` read as OUTPUT with the tree clean after it, **60** migrations and **115** live tables, and **241 files / 5,971 passed / 6 skipped** against a `main` baseline reproduced exactly before a line changed. **Nine seeds, nine reds.**
 
 **WHAT IS STILL OWED.** The one-line payload repair in `apps/worker/src`; the writer's home, which is the founder's; `detector.run_degraded` and `breaker.state_changed`, which have no catalogue row at all; and the untenanted rows this ruling deliberately left undecided, each of which is its own fence's to decide rather than a sweep's.
+
+---
+
+## Session 393 (2026-08-29): the screen is ready and the source is not, and the wire's gap vocabulary has no figure on this page to speak about yet
+
+**THE ADMIN LIABILITY DASHBOARD RENDERS ITS HONEST UNAVAILABLE STATE, AND WHAT IS MISSING IS THE SOURCE RATHER THAN THE SCREEN.** `readLiability` is still not one of `IMPLEMENTED_ADMIN_READS`' five, re-derived at reporting time, and nothing calls `setAdminSessionSource` outside a test, so no deployment can mint the cookie a real read would send. The root route's `P5-l` blocker now recites the register rather than a `WAVE-06` line count, and `M6-A-86` binds the recital to the array it recites so the blocker comes out on the day the adapter lands rather than sitting stale.
+
+**WHAT LANDED IS THE JOIN NOBODY HAD WRITTEN.** [`apps/admin/src/liability-read.ts`](../apps/admin/src/liability-read.ts) narrows a `GET /admin/liability` body structurally against `api/types.ts`, enforces [ADR-203](decisions/ADR-203.md) ruling 2 **on the reading side** in both directions because that entry's own section 10 finding 3 records the producer's guard as running on no served path, and projects what survives into `page.ts`'s input. One response builds a whole `LiabilityHomePage` and the bytes carry the figures.
+
+**THE CONSOLE'S ABSENT AND THE WIRE'S NULL AGREE, AND THEY DO NOT YET MEET.** [ADR-203](decisions/ADR-203.md) section 5's mapping is total, and both nullable sites on the response, `payout_velocity` and `per_plan[].cusum`, belong to `P-M6-04` and `P-M6-06`, which `page.ts` holds in `PENDING` and for which `LiabilityHomeInput` declares no member. The mechanism is correct and silent on this page.
+
+**THREE OPTIONAL MEMBERS THE PROJECTION REFUSES TO INVENT, AND TWO OF THEM NEED A RULING.** The third component has no column ([ADR-195](decisions/ADR-195.md), already ruled and rendering ABSENT with the total INCOMPLETE). `eligible_next_7d` carries the FIGURE and no AS-OF while `INV-M6-04` requires one, which is [ADR-203](decisions/ADR-203.md) section 7a's territory. And **two of `P-M6-09`'s five trust inputs are on the wire as FIGURES and neither as a STATE**, so the verdict is red on five missing rather than green on two invented: deriving a state needs a boundary no document fixes, which `page.ts` refuses for staleness and `INV-M6-12` refuses for an alarm.
+
+**`reserve.breaker_armed` IS A SECOND ANSWER TO A QUESTION `0049` DELIBERATELY STORES NO COLUMN FOR**, so a body whose flag and ratio disagree is refused rather than half rendered. Whether the field should be on that response at all is `API_CONTRACT`'s question and is reported rather than taken.
+
+**Eleven seeds, eleven reds**, each reverted from a byte-identical copy with the hash checked both ways and the tree clean after every one. Seed 5 fired one case, the case was strengthened to read the served bytes, and the retake fired two. **243 files / 6,047 passed / 6 skipped** against a `main` baseline of **242 / 6,002 / 6** reproduced exactly at `028143c` before a line changed; 33 of 33 gates, **17 of 17** invariants, `falsify` clean read at its output, typecheck 0, lint 0, format clean, `@merit/admin` six routes unmoved, and the barrel surface from 74 names over 8 modules to 86 over 9.
+
+**WHAT IS STILL OWED.** The `readLiability` adapter and the operator session, both outside this fence; the two rulings findings 2 and 3 name; and the four panels `page.ts` holds in `PENDING` whose figures are now on the wire and which have no `LiabilityHomeInput` member.
