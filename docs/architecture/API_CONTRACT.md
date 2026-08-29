@@ -100,12 +100,14 @@ type OtpRequest = {
   channel: "email" | "sms";
   email?: string;
   phone?: string;              // E.164
-  turnstile_token: string;
+  turnstile_token: string;     // verified against Cloudflare. Any string no longer works
 };
 // response 202 (always, whether or not the account exists)
 type OtpResponse = { sent: true; expires_in_seconds: number };
 ```
-Auth: none. Rate limit: see §11; the `sms` channel is **pre-identity** and carries per-number, per-IP and per-country velocity plus the cost breaker (`INV-M16-12`, [SECURITY](SECURITY.md) C-28). Errors: `validation_failed`, `rate_limited`.
+Auth: none. Rate limit: see §11; the `sms` channel is **pre-identity** and carries per-number, per-IP and per-country velocity plus the cost breaker (`INV-M16-12`, [SECURITY](SECURITY.md) C-28). Errors: `validation_failed`, `forbidden` (the challenge was not accepted), `rate_limited`, `service_unavailable` (the challenge could not be decided).
+
+**`turnstile_token` IS VERIFIED, AND UNTIL [ADR-226](../decisions/ADR-226.md) IT WAS NOT.** The server checked the field was a non-empty string and threw it away, which taught a caller that any string works. It is now submitted to Cloudflare's `siteverify` before the handler does anything else, and **the check runs ahead of the send budget**, so a caller that cannot pass it never reaches §11's velocity and never causes an SMS to be paid for. **A refused challenge is `403 forbidden` and carries no `required_factor`**, which names an elevation factor and not a challenge; the client's answer is to solve the challenge again. **A challenge that cannot be DECIDED is `503 service_unavailable`**, which covers a deployment holding no secret and a `siteverify` that does not answer within its deadline: the control **fails closed in both directions and never admits an unverified token**. A Cloudflare outage therefore blocks new sign-ins while it lasts; it logs nobody out, because a session is resolved from its own row and reaches no vendor.
 
 **A `202` on the `sms` channel does not mean a message was sent.** When `otp_send_budget` is degraded the response is unchanged and `deferred` is set, because [ADR-039](../decisions/ADR-039.md)'s breaker **degrades rather than stopping**: registration continues and phone verification is deferred to the `pre_funded` funding gate. Distinguishing the degraded response for an unauthenticated caller would tell an attacker exactly when their own traffic tripped the breaker.
 

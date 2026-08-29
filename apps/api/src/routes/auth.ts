@@ -64,6 +64,25 @@
 // `Retry-After` the budget row implies.
 //
 // -----------------------------------------------------------------------------
+// `turnstile_token` IS NOW SPENT, AND UNTIL ADR-226 IT WAS NOT
+// -----------------------------------------------------------------------------
+// The field was declared on `OtpRequest`, checked for emptiness by
+// `validateOtpRequest`, and referred to nowhere else in this file. Nothing in
+// this repository called Cloudflare. A REQUIRED FIELD THAT IS NEVER VERIFIED IS
+// WORSE THAN AN ABSENT ONE: it teaches a caller that any string works, and it
+// makes the endpoint look protected to every reader of the type. `turnstile.ts`
+// holds the verification and `POST /auth/otp` below spends the token through
+// it, ahead of the backend and therefore ahead of the send budget.
+//
+// THE CONTROL IS LIVE ON A ROUTE WHOSE BACKEND IS NOT, and that is why it sits
+// in the HANDLER rather than in `AuthBackend.requestOtp`. `requestOtp` is
+// `blocked('requestOtp', NO_DELIVERY)`, so a check inside it would be code no
+// request can reach and no test can drive through the router. Here, a token
+// Cloudflare will not vouch for is refused today, before the 503 the blocked
+// backend produces, and the ORDER of those two answers is what the suite
+// asserts.
+//
+// -----------------------------------------------------------------------------
 // THE BACKEND IS A PORT, AND AS OF ADR-120 PART OF IT HAS AN IMPLEMENTATION
 //
 // THIS HEADING READ "FOR FOUR OF ITS SIXTEEN METHODS" UNTIL SESSION 410 AND THE
@@ -110,6 +129,8 @@ import { defineRoutes } from '../registry.ts';
 import type { HttpMethod, RouteDefinition, RouteHandler } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
 import type { Problem } from '../server.ts';
+import { cloudflareTurnstileVerifier } from '../turnstile.ts';
+import type { TurnstileOutcome, TurnstileVerifier } from '../turnstile.ts';
 
 // -----------------------------------------------------------------------------
 // The factor vocabularies. Both are the database's CHECK lists, verbatim.
@@ -596,6 +617,38 @@ export function currentAuthBackend(): AuthBackend {
 }
 
 // -----------------------------------------------------------------------------
+// The anti-bot control, held the same way the backend is
+// -----------------------------------------------------------------------------
+// THE DEFAULT IS THE REAL VERIFIER AND NOT AN UNWIRED SENTINEL, which is the one
+// place this differs from `AuthBackend` and it is a deliberate difference. A
+// port whose default refuses everything needs a wiring slice to install the
+// working one, and a control that is live only when somebody remembers to wire
+// it is the defect ADR-226 exists to remove. `cloudflareTurnstileVerifier`
+// reads its secret from `process.env` PER CALL, so this costs nothing at import
+// and picks up a rotation without a restart.
+//
+// IT STILL FAILS CLOSED WITH NO SECRET: the default answers `unconfigured`,
+// which refuses. Installing nothing is safe; installing the wrong thing is the
+// suite's problem and `resetTurnstileVerifier` is how it puts it back.
+
+let turnstile: TurnstileVerifier = cloudflareTurnstileVerifier();
+
+/** Install a verifier. The suite calls this; nothing in the wiring slice needs to. */
+export function useTurnstileVerifier(next: TurnstileVerifier): void {
+  turnstile = next;
+}
+
+/** Restore the real Cloudflare verifier. */
+export function resetTurnstileVerifier(): void {
+  turnstile = cloudflareTurnstileVerifier();
+}
+
+/** The installed verifier. */
+export function currentTurnstileVerifier(): TurnstileVerifier {
+  return turnstile;
+}
+
+// -----------------------------------------------------------------------------
 // The transport: cookie, problem documents, validation
 // -----------------------------------------------------------------------------
 
@@ -702,6 +755,58 @@ function sendForbidden(
         : `This is a ${action} and requires ${required}.`,
     required_factor: required,
   });
+}
+
+/**
+ * The three outcomes that are not `passed`.
+ *
+ * DERIVED FROM THE UNION RATHER THAN RESTATED, and read by a `switch` with no
+ * `default`, which is `authorize`'s idiom two hundred lines up. `strict` plus
+ * `noImplicitReturns` (tsconfig.base.json) turn a fourth refusing outcome in
+ * `turnstile.ts` into a `tsc` error here rather than into a member this file
+ * silently serves as 503.
+ */
+type TurnstileRefusal = Exclude<TurnstileOutcome, { readonly outcome: 'passed' }>;
+
+/**
+ * The refusal an unpassed Turnstile challenge produces. ADR-226.
+ *
+ * TWO STATUSES OVER THREE OUTCOMES, AND THE SPLIT IS WHAT THE CLIENT SHOULD DO
+ * NEXT. `failed` is the caller's token, so it is `403 forbidden` and the client
+ * solves the challenge again. `unconfigured` and `unavailable` are Merit's
+ * deployment and Cloudflare's availability, so both are `503
+ * service_unavailable`, section 2's *"dependency down, safe to retry"*, and the
+ * client waits. Neither is a pass, which is the property that matters.
+ *
+ * NO NEW CANONICAL CODE. Section 2's table is closed and both codes are in it,
+ * on `sendForbidden`'s own reasoning one function up.
+ *
+ * NO `required_factor`. ADR-111 clause 4 makes that member the ELEVATION factor
+ * a client can offer, and a challenge is not one; ADR-221's cross-origin 403
+ * omits it for the same reason. The `detail` is the discriminator instead, and
+ * it is generic: the vendor's `error-codes` go to the log and never to the
+ * caller, so a bot learns nothing from the body it did not already know from
+ * the status.
+ */
+function sendTurnstileRefusal(
+  reply: FastifyReply,
+  request: FastifyRequest,
+  outcome: TurnstileRefusal,
+): FastifyReply {
+  request.log.warn({ turnstile: outcome.outcome, detail: outcome.detail }, 'turnstile refused');
+  switch (outcome.outcome) {
+    case 'failed':
+      return sendProblem(reply, {
+        ...problem('forbidden', 403, request.id),
+        detail: 'The anti-bot challenge was not accepted. Solve it again and retry.',
+      });
+    case 'unconfigured':
+    case 'unavailable':
+      return sendProblem(reply, {
+        ...problem('service_unavailable', 503, request.id),
+        title: 'Service unavailable',
+      });
+  }
 }
 
 /**
@@ -1027,6 +1132,14 @@ export const AUTH_ENDPOINTS: readonly EndpointSpec[] = [
     handle: async ({ request, reply, backend: b }) => {
       const parsed = validateOtpRequest(request.body);
       if (!parsed.ok) return sendValidationFailed(reply, request.id, parsed.errors);
+      // ADR-226. THE ORDER IS RULED AND IT IS NOT INCIDENTAL. Validation runs
+      // first, so a malformed body is answered without spending a call on
+      // Cloudflare; the challenge runs SECOND, ahead of `requestOtp`, so a
+      // caller that cannot pass it never reaches the budget and never spends
+      // `otp_send_budget.spend_cents` on an SMS. Anti-bot before the thing the
+      // bot came for is the whole point of putting it here.
+      const challenge = await currentTurnstileVerifier().verify(parsed.value.turnstile_token);
+      if (challenge.outcome !== 'passed') return sendTurnstileRefusal(reply, request, challenge);
       const outcome = await b.requestOtp(parsed.value, requestIp(request));
       if (outcome.status === 'rate_limited') {
         // Section 1: "Exceeding returns 429 with Retry-After". The number is

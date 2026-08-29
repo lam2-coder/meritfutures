@@ -52,7 +52,7 @@ import { expect, test } from 'vitest';
 //      leave a reason pointing at nothing.
 //
 // -----------------------------------------------------------------------------
-// A NO-OP CALL IS NOT A WIRING, AND THREE PORTS MAKE THAT REACHABLE
+// A NO-OP CALL IS NOT A WIRING, AND FOUR PORTS MAKE THAT REACHABLE
 // -----------------------------------------------------------------------------
 // `useAffiliateDeps`, `useKycDeps` and `useCheckoutAdapters` already hold their
 // PRODUCTION value at module scope (`affiliate.ts:478`, `kyc.ts:284`,
@@ -61,6 +61,13 @@ import { expect, test } from 'vitest';
 // also make this file pass. THE REASON TEXT IS WHERE THAT IS RECORDED, so a
 // later reader raising the count that way meets the sentence saying it is not a
 // wiring before they meet the green tick.
+//
+// `useTurnstileVerifier` IS THE FOURTH AND IT IS NOT WAITING ON ANYTHING
+// (ADR-226). Its module-scope default is the REAL Cloudflare verifier rather
+// than a fail-closed stand-in, so the port is live with nothing installed, and
+// an absent secret is a refusal rather than an unwired state. Its entry says so
+// in those terms, because a reader who meets it beside sixteen liabilities
+// should not read it as a seventeenth.
 // =============================================================================
 
 const HERE = import.meta.dirname;
@@ -299,6 +306,34 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'serve nothing, and it is not a wiring.',
 
   // ---------------------------------------------------------------------------
+  // THE FOURTH NO-OP, AND IT IS THE STRONGEST OF THE FOUR. ADR-226.
+  //
+  // The three above hold a PRODUCTION OBJECT at module scope. This one holds
+  // the real Cloudflare verifier, reading `MERIT_TURNSTILE_SECRET` from
+  // `process.env` on every call, so a deployment that sets the secret is
+  // verifying tokens with nothing installed and nothing remembered. That is
+  // deliberate rather than convenient: an anti-bot control that is live only
+  // when a wiring slice remembers it is the class of defect ADR-226 exists to
+  // remove, and `start.ts` is not this session's file to edit.
+  //
+  // AND IT DOES NOT FAIL OPEN WHEN THE SECRET IS ABSENT. The default answers
+  // `unconfigured`, which `routes/auth.ts` serves as 503. So the port has no
+  // unwired state: it verifies, or it refuses, and there is no third thing for
+  // `start.ts` to install.
+  // ---------------------------------------------------------------------------
+  useTurnstileVerifier:
+    'NOTHING. THIS PORT IS ALREADY LIVE AND THE ENTRY EXISTS TO SAY SO. ' +
+    '`routes/auth.ts` initialises it with `cloudflareTurnstileVerifier()` at module scope ' +
+    '(`routes/auth.ts:634`), which reads `MERIT_TURNSTILE_SECRET` from `process.env` per call ' +
+    'and calls Cloudflare, so calling the setter from `start.ts` would install what is already ' +
+    'installed. That would raise the wired count and serve nothing, and it is not a wiring, on ' +
+    "`useCheckoutAdapters`'s stated rule three entries up. THE DIFFERENCE FROM THOSE THREE, AND " +
+    'IT IS THE REASON THIS ENTRY IS NOT A LIABILITY: they wait on a vendor adapter that does not ' +
+    'exist, and this one waits on nothing at all. An absent secret is not an unwired state ' +
+    'either; the default answers `unconfigured` and `POST /auth/otp` serves that as 503 ' +
+    '(ADR-226), so there is no configuration under which this port admits an unverified token.',
+
+  // ---------------------------------------------------------------------------
   // A dependency that does not exist in this workspace, or a row the registry
   // cannot name.
   // ---------------------------------------------------------------------------
@@ -527,5 +562,5 @@ test('the wired count is reported, so a regression is a number and not a paragra
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 23, wired: 6, blocked: 17 });
+  }).toStrictEqual({ declared: 24, wired: 6, blocked: 18 });
 });

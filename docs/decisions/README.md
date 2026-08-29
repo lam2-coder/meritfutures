@@ -238,6 +238,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-221](ADR-221.md) | the constitution's CSRF control, taken as an Origin check because the cookie the corpus trusted is scoped to a site and the attack is scoped to an origin  (2026-08-29, status: proposed) |
 | [ADR-224](ADR-224.md) | `.env` is ignored by a three-line rule and the rule is asserted by running git, because an entry anybody can delete is not a control and the gate that claimed to verify it reads no gitignore  (2026-08-29, status: proposed) |
 | [ADR-225](ADR-225.md) | `zod at every boundary` names a mechanism this workspace has never had, so the six citations are separated from the control they claim, and the one thing zod uniquely supplies turns out not to be validation at all  (2026-08-29, status: proposed) |
+| [ADR-226](ADR-226.md) | the Turnstile token is verified, because a required field that is never checked teaches every caller that any string works  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

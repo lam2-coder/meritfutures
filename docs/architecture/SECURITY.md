@@ -22,7 +22,7 @@ Controls carry stable IDs so plans, tests, and code comments can cite them.
 | C-04 | Zod validation at every boundary, request and response allowlists | every endpoint |
 | C-05 | Idempotency keys on all mutating endpoints and outbound money operations | `idempotency_keys`, `payout_transfers` |
 | C-06 | Webhook HMAC verification before parsing, plus timestamp and nonce replay window | all `/webhooks/*` |
-| C-07 | Rate limits per IP and per identity, plus Turnstile on auth, checkout, payout | edge and app |
+| C-07 | Rate limits per IP and per identity, plus Turnstile on auth, checkout, payout | edge and app. **The Turnstile half is discharged on `POST /auth/otp` ONLY, by [ADR-226](../decisions/ADR-226.md)**: [`apps/api/src/turnstile.ts`](../../apps/api/src/turnstile.ts) verifies the token against Cloudflare's `siteverify` before the handler runs, refusing `403` on a token Cloudflare declines and `503` when the answer cannot be obtained, so **an absent secret is a refusal rather than a disabled control**. **THE OTHER TWO ENDPOINTS THIS ROW NAMES CARRY NO TOKEN FIELD AT ALL**: [API_CONTRACT](API_CONTRACT.md) says *"Anti-bot: Turnstile"* for `POST /checkout` and for `POST /accounts/:accountId/payout` and declares `turnstile_token` on `OtpRequest` and nowhere else, so both remain OWED. **No browser widget exists either**, so nothing in this repository yet produces a token for any of the three |
 | C-08 | RBAC on admin, admin on a separate origin, IP allowlist, hardware-key SSO | admin app |
 | C-09 | Append-only tables enforced by database grants (no UPDATE, no DELETE) | events, ledger, fills, marks, rule_states, admin_actions |
 | C-10 | Dual control plus delay window on cap, split, gap, and treasury credential changes | `POST /admin/plans/versions/:id/publish` |
@@ -139,7 +139,7 @@ The [D0 checklist](../../research/SECURITY_LANDSCAPE.md) mapped onto the real en
 
 | Endpoint | Primary risks (API Top-10) | Controls |
 |---|---|---|
-| `POST /auth/otp` | API2, API4, API6, **SMS pumping** | C-01, C-04, C-07 plus Turnstile, no enumeration, **C-28** on the SMS channel |
+| `POST /auth/otp` | API2, API4, API6, **SMS pumping** | C-01, C-04, C-07 plus Turnstile **verified rather than declared** ([ADR-226](../decisions/ADR-226.md)), and the verification runs **ahead of the send budget** so a bot pays for no message, no enumeration, **C-28** on the SMS channel |
 | `POST /auth/verify` | API2 | C-01, C-02, C-04, C-07, attempt lockout, **C-27** (the establishing factor is recorded on the session, or it cannot be refused later) |
 | `POST /auth/passkey/*` | API2 | C-01, C-02, C-04, C-07, **C-27** (the only factor that both establishes and elevates) |
 | `GET /me` | API1, API3 | C-02, C-03, response allowlist |
