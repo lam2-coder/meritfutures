@@ -25,9 +25,10 @@ The founder's instruction of 2026-08-29 names *"111 adrs or money path e2 reads"
 It is two, and they are different objects wearing the same signature box:
 
 - an **approval line on a ruling**, which attests that a decision was taken with authority, and
-- an **`E2` line-by-line read of a money-path diff**, which the constitution
-  ([`MERIT_BUILD_MASTER_PROMPT.md:392`](../../MERIT_BUILD_MASTER_PROMPT.md)) reserves for a human
-  because a model reviewing model-written code is not a control.
+- an **`E2` line-by-line read of a money-path diff**, which the constitution reserves for a human
+  at [`MERIT_BUILD_MASTER_PROMPT.md:395`](../../MERIT_BUILD_MASTER_PROMPT.md), inside the
+  base-rates bullet of section `E2` at [`:392`](../../MERIT_BUILD_MASTER_PROMPT.md), because a model
+  reviewing model-written code is not a control.
 
 A single count over both cannot be acted on, because the two have opposite remedies. Sections 2 and
 3 separate them.
@@ -101,7 +102,7 @@ git diff --name-only "$m^1" "$m" | grep -E '^(apps|packages)/' \
 ### 3.1 The money-path predicate, written out so it can be argued with
 
 The constitution reserves the read for `rules-engine/`, `payout/`, `ledger/` and auth
-([`:358`](../../MERIT_BUILD_MASTER_PROMPT.md), [`:392`](../../MERIT_BUILD_MASTER_PROMPT.md)).
+([`:358`](../../MERIT_BUILD_MASTER_PROMPT.md), [`:395`](../../MERIT_BUILD_MASTER_PROMPT.md)).
 Migrations are added because [CLAUDE.md](../../CLAUDE.md) makes them unamendable once merged.
 Transcribed to this tree's layout, the predicate is:
 
@@ -110,9 +111,19 @@ Transcribed to this tree's layout, the predicate is:
  |packages/db/migrations/
  |packages/db/src/(scope|scoped-db)\.ts$
  |apps/api/src/(auth-backend|csrf|turnstile|db)\.ts$
- |apps/api/src/routes/(payouts|admin-payouts|checkout|auth)\.ts$
+ |apps/api/src/routes/(payouts|admin-payouts|checkout|auth
+                      |wallet|wallet-withdrawals|admin-wallet)\.ts$
  |apps/worker/src/(batch|breaker|provisioning)/)
 ```
+
+**THE THREE WALLET ROUTES WERE ADDED AFTER DISPATCH REVIEW OF THE FIRST DRAFT, ON THE DISPATCHER'S
+RULING OF 2026-08-29, AND THE BEFORE AND AFTER ARE BOTH REPORTED IN SECTION 7 RATHER THAN THE OLD
+NUMBERS BEING PATCHED.** The ground was checked at source before the widening was taken: **a wallet
+spend is money movement.** [`2026-08-29-d2-controls-audit.md:80`](2026-08-29-d2-controls-audit.md)
+records checkout's `RATE_LIMITED` as `INV-M20-07`'s *"wallet SPEND velocity, a money control per
+identity, not a request rate limit per IP"*, and
+[`admin-wallet.ts:111`](../../apps/api/src/routes/admin-wallet.ts) carries the
+`dual_control_threshold_cents` constraint. All three files exist on `main` today.
 
 **This predicate is a judgement and it is stated so.** `packages/psp/` and `packages/rail/` are in
 because money enters and settles through them; `packages/db/src/scope.ts` and `scoped-db.ts` are in
@@ -320,3 +331,40 @@ a session changing the size of its own residue, which is exactly the move
 [ADR-227](../decisions/ADR-227.md) section 6 condition 4 forbids elsewhere.
 **It is the third question put to the founder**, and this is the first live
 evidence that it is a real question rather than a formality.
+
+## 7. Re-derived against `dddb3860` with the predicate widened, and the widening changed no entry
+
+**Both readings are reported rather than the earlier one being patched.** Sections 2 and 3 are facts
+about the `21afc5d8` baseline they name, taken with the narrow predicate. This section is the merged
+base with the three wallet routes added.
+
+| | narrow, at `21afc5d8` | widened, at `dddb3860` merged |
+| --- | ---: | ---: |
+| files matching `docs/decisions/ADR-*.md` | 212 | **214** |
+| `status: proposed` | 108 | **110** |
+| `status: accepted` | 104 | **104** |
+| `proposed` entries landing at least one money-path file | 42 | **42** |
+| distinct money-path files under a `proposed` entry | 62 | **64** |
+| the residue, by the entries' own founder-read blocks | 30 | **30** |
+
+**THE WIDENING ADDED TWO FILES AND NOT ONE ENTRY, AND THAT IS THE RESULT WORTH READING.** The two
+are [`wallet-withdrawals.ts`](../../apps/api/src/routes/wallet-withdrawals.ts) under
+[ADR-176](../decisions/ADR-176.md) and [`admin-wallet.ts`](../../apps/api/src/routes/admin-wallet.ts)
+under [ADR-192](../decisions/ADR-192.md), and **both entries were already in the 42 and already in
+tier 1**, because each also landed `payouts.ts` or `admin-payouts.ts`. **The entry set is byte for
+byte the same 42 and the residue is the same 30**, so **the tier table does not move.**
+
+**That is evidence about the predicate's shape rather than about its membership.** A definition
+whose widening changes which files are named and not which entries are owed is measuring the entry
+population robustly, which is what section 3.2's counts are for.
+
+**AND THE HOLE THAT PROMPTED THE QUESTION IS STILL OPEN.** [ADR-223](../decisions/ADR-223.md)
+declares *"The `E2` read is owed on [`apps/api/src/security-headers.ts`]"*, and **the widened
+predicate still does not match that file.** The widening addressed wallet routes; the miss that
+found the question was a security-headers file, and it was not closed by the ruling that answered it.
+**So 42 remains a FLOOR and not a total, and the residue of 30 is a floor with it.** Stated here
+rather than absorbed, because the second half of a corrected finding is the half that gets dropped.
+
+**`ADR-227` ITSELF IS ONE OF THE 110** and is not yet on `main`, so it has no landing merge and is
+counted by its heading alone. It lands no money-path file, is class A by its own section 5, and is
+**UNSIGNED**.
