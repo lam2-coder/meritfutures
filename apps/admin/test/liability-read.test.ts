@@ -443,6 +443,14 @@ describe('M6-A-83: what the projection supplies, and what it will not', () => {
     expect(lines).toContain(formatCents(4_000_000n));
     expect(lines).toContain('2026-08-28T06:00:00.000Z');
 
+    // AND THE PANEL SAYS SO IN THE BYTES. Session 364 landmine 2: an unsupplied
+    // third term defaulted to zero is a confident wrong answer with a source
+    // citation attached. A seed that supplied `0n` here turned exactly ONE case
+    // red before this line, and the one it turned red was two functions away
+    // from the page an operator reads.
+    expect(lines).toContain('INCOMPLETE');
+    expect(lines).toContain('THE THIRD COMPONENT IS UNSUPPLIED ON THIS ROW');
+
     // P-M6-09 IS RED AND EVERY FIGURE BELOW SAYS SO IN THE LINE. FM-M6-01: the
     // page must refuse to look healthy while data trust is red, and it is red
     // here because three of the five inputs have no supplier at all.
