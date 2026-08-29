@@ -219,11 +219,21 @@ function cleanTree(): string {
   // literal numbers, so a fixture that did not move with them would report
   // every registered finding as vacant. It went red exactly that way before
   // this shift, on the same run that proved the register entries had followed.
+  //
+  // AND ONE OF THEM MOVED BY TWO MORE UNDER ADR-252, WHICH IS THE SECOND TIME
+  // AND THE FIRST ONE WHERE ONLY ONE MOVED. `0074` added `firmParameters` to
+  // `TABLES` and a rule at the foot of `SCOPE_RULES`, so everything below the
+  // `TABLES` object shifted by two and the `},` this fixture models went from
+  // `909` to `911`. The two `ALLOCATION.md` pointers did NOT move with it: they
+  // are registered on their FIRST number, that number is another session's to
+  // repair, and only the SECOND of each was repointed in the real document. So
+  // `firm` and `derived` stay where they are here and the blank line alone
+  // moves, which is the shape the register actually holds.
   write(
     root,
     'packages/db/src/scope.ts',
     Array.from({ length: 960 }, (_, i) => {
-      if (i + 1 === 909) return '';
+      if (i + 1 === 911) return '';
       const name = { 511: 'firm', 545: 'derived' }[i + 1];
       return name === undefined ? '//' : `// class: '${name}',`;
     })
@@ -246,7 +256,7 @@ function cleanTree(): string {
   write(
     root,
     'apps/worker/src/provisioning/payload.ts',
-    '// The payload is flat, and `scope.ts:909` repeats it at length.\n',
+    '// The payload is flat, and `scope.ts:911` repeats it at length.\n',
   );
   write(
     root,
@@ -1566,7 +1576,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
 
   test('RI-15 catches a pointer that lands on a blank line or a bare closing bracket, with no name at all', () => {
     // THE HALF THAT NEEDS NO NAME, and three of the five wrong `scope.ts`
-    // pointers on `origin/main` were this shape: `:1307` and `:909` are both
+    // pointers on `origin/main` were this shape: `:1307` and `:911` are both
     // `},`, the close of some other entry. A pointer that lands on nothing reads
     // as verified exactly as loudly as one that lands on the claim.
     const root = cleanTree();
