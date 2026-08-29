@@ -2926,3 +2926,119 @@ describe('RI-22 measures the certificate code by minting codes', () => {
     expect(findings('RI-22', root).join('\n')).toContain('point it at the new path');
   });
 });
+
+// -----------------------------------------------------------------------------
+// RI-23, whose subject is an approval that CLAIMS to be earned
+// -----------------------------------------------------------------------------
+// ADR-227 SECTION 3 MADE A CLASS B APPROVAL AN ARTIFACT RATHER THAN A
+// SIGNATURE, and the way that regime fails is not that somebody forges a
+// signature: it is that an entry writes the vocabulary of an earned approval
+// with nothing behind it. Each case below breaks exactly one of the two
+// conditions RI-23 can read and watches it fire, and the last two are the
+// scope predicate in both directions, because a check that matched a ruling
+// ABOUT class B would be asking an entry to put a transcript in its own
+// ruling, and a check that matched nothing would pass forever.
+const CLASS_B_ENTRY = [
+  '## ADR-900: a claim (2026-08-29, status: proposed)',
+  '',
+  '- **CLASS B APPROVAL, EARNED 2026-08-29 UNDER [ADR-227](ADR-227.md) SECTION 3.**',
+  '  The assertion is [`apps/api/test/adr-900-the-claim.test.ts`](../../apps/api/test/adr-900-the-claim.test.ts),',
+  '  watched RED on the real tree and GREEN after a byte-identical restore.',
+  '',
+].join('\n');
+
+describe('RI-23 refuses a class B approval that is a signature in a test’s clothes', () => {
+  /** Put the suite the fixture entry names on the fixture's disk. */
+  const withSuite = (root: string): string => {
+    write(root, 'apps/api/test/adr-900-the-claim.test.ts', 'export {};\n');
+    return root;
+  };
+
+  test('the clean shape passes, so the seeds below are evidence', () => {
+    const root = withSuite(cleanTree());
+    write(root, 'docs/decisions/ADR-900.md', CLASS_B_ENTRY);
+    expect(findings('RI-23', root)).toEqual([]);
+  });
+
+  test('a suite cited by BARE BASENAME resolves, because the corpus cites them that way', () => {
+    const root = withSuite(cleanTree());
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      CLASS_B_ENTRY.replace(
+        /The assertion is .*$/m,
+        'The assertion is `adr-900-the-claim.test.ts`, watched RED.',
+      ),
+    );
+    expect(findings('RI-23', root)).toEqual([]);
+  });
+
+  test('an approval that names no assertion is refused', () => {
+    const root = withSuite(cleanTree());
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      CLASS_B_ENTRY.replace(
+        /The assertion is .*$/m,
+        'The claim is a PROPERTY and it was watched RED.',
+      ),
+    );
+    expect(findings('RI-23', root).join('\n')).toContain('names no assertion');
+  });
+
+  test('an approval resting on a suite that is not on disk is refused', () => {
+    const root = withSuite(cleanTree());
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      CLASS_B_ENTRY.replace(/adr-900-the-claim\.test\.ts/g, 'a-suite-nobody-wrote.test.ts'),
+    );
+    expect(findings('RI-23', root).join('\n')).toContain('is not on disk');
+  });
+
+  test('an approval that records no RED is refused, which is ADR-227 condition 2', () => {
+    const root = withSuite(cleanTree());
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      CLASS_B_ENTRY.replace('watched RED on the real tree and GREEN', 'GREEN'),
+    );
+    expect(findings('RI-23', root).join('\n')).toContain('states no RED');
+  });
+
+  test('a RULING about class B approvals is not a recorded one, and stays out of scope', () => {
+    // THE FALSE POSITIVE THIS CHECK WOULD OTHERWISE HAVE. ADR-243 section 3
+    // clause 4 reads "**4. A CLASS B APPROVAL IS RECORDED IN THE ENTRY IT
+    // APPROVES**", inside a blockquote, and it names no assertion and no red
+    // because it is a rule rather than an approval. The marker must OPEN the
+    // bolded run, so this is silent, and the clean case above is what says the
+    // narrowing did not simply switch the check off.
+    const root = withSuite(cleanTree());
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      [
+        '## ADR-900: a ruling (2026-08-29, status: proposed)',
+        '',
+        '> **4. A CLASS B APPROVAL IS RECORDED IN THE ENTRY IT APPROVES.**',
+        '',
+        CLASS_B_ENTRY,
+      ].join('\n'),
+    );
+    expect(findings('RI-23', root)).toEqual([]);
+  });
+
+  test('a corpus of entries carrying no marker at all is a finding, not a pass', () => {
+    // A CHECK WHOSE SCOPE PREDICATE IS A PHRASE STOPS CHECKING WHEN THE PHRASE
+    // DRIFTS, silently and while reporting PASS. That is this file's first rule
+    // broken where nobody sees it, so an empty scope over a non-empty corpus is
+    // reported rather than assumed to mean there is nothing to check.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      '## ADR-900: a claim (2026-08-29, status: proposed)\n',
+    );
+    expect(findings('RI-23', root).join('\n')).toContain('found NO block carrying the marker');
+  });
+});

@@ -5269,6 +5269,246 @@ const ri22 = {
   },
 };
 
+// =============================================================================
+// RI-23. A RECORDED CLASS B APPROVAL NAMES AN ASSERTION AND A RED
+// =============================================================================
+// ADR-227 SECTION 3 RULED THAT A MONEY-PATH DIFF WHOSE CENTRAL CLAIM IS A
+// PROPERTY HAS ITS APPROVAL **EARNED** BY A NAMED MECHANICAL ASSERTION RATHER
+// THAN GRANTED BY A SIGNATURE, AND ITS SECTION 6 SET FOUR CONDITIONS ON WHAT
+// COUNTS AS ONE. Two of the four are checkable from the entry's own text and
+// two are not, and this check takes the two that are:
+//
+//   condition 2, "it was watched RED before the change and GREEN after, with
+//   the transcript in the entry", and condition 3, "it is named in a registry
+//   that a gate runs", of which the checkable half is that the assertion is
+//   NAMED AT ALL and that the file it names is on disk.
+//
+// WHY IT EXISTS. ADR-227's own approval block asked for exactly this and said
+// it did not have it: "Section 6's four conditions are the whole defence and
+// condition 4 is unenforceable by anything mechanical ... the honest repair is
+// an invariant that reads a gate's own history against the entry citing it, and
+// that invariant does not exist, is not written here, and is the first thing to
+// build if this regime is adopted." This is the buildable part of that.
+//
+// THE FAILURE MODE IT REMOVES, in the words of ALLOCATION row 244: "an approval
+// without a red-then-green transcript is a signature wearing a test's clothes,
+// and it is exactly what section E2 refutes." A class B approval block that
+// names no assertion, or names a test file that has since been deleted or
+// renamed, reads to every later reader as an earned approval and is a granted
+// one with better vocabulary.
+//
+// THE MARKER IS READ FROM THE CORPUS AND NOT INVENTED HERE. `CLASS B APPROVAL`
+// is the form ADR-243 established across the four entries it moved, and ADR-244
+// wrote eleven more in it. A check whose scope predicate is a phrase one entry
+// coined would be a check that stops matching the day the phrasing drifts, so
+// the phrase is the one already in use and the drift direction is safe: an
+// entry that stops using the marker leaves this check's scope, which is a
+// SILENT drop, and that is named below rather than hidden.
+// =============================================================================
+
+/**
+ * The marker that puts an approval block in RI-23's scope, and it must OPEN the
+ * bolded run rather than appear inside it. ADR-243 section 3 clause 4 is a
+ * ruling ABOUT what a class B approval records -- "**4. A CLASS B APPROVAL IS
+ * RECORDED IN THE ENTRY IT APPROVES**" -- and a check that read that as a
+ * recorded approval would be asking an entry's ruling to carry its own
+ * transcript. The four blocks ADR-243 actually wrote open with the marker, in
+ * two spellings, and both are matched.
+ */
+const CLASS_B_MARKER = /^\s*(?:[-*>]\s+)?\*\*CLASS B APPROVAL\b/;
+
+/**
+ * A recorded RED. ADR-227 section 6 condition 2 is about a result somebody
+ * WATCHED, so the words are the ones a transcript uses. `GREEN` alone is not
+ * one of them, deliberately: an assertion never seen failing asserts nothing.
+ */
+const CLASS_B_RED = /\bRED\b|\bREDDEN(?:ED|S)?\b|\bFAIL(?:S|ED|ING)?\b/;
+
+/**
+ * A named assertion. A vitest file, a `CI-06<letter>` gate, or an `RI-nn`
+ * invariant, which are the three things ADR-227 section 6 admits.
+ */
+const CLASS_B_TEST_PATH = /`([A-Za-z0-9_./-]+\.test\.tsx?)`|\(([^)\s]+\.test\.tsx?)\)/g;
+const CLASS_B_NAMED_GATE = /\bCI-06[a-z]\b|\bRI-\d{2}\b/;
+
+/**
+ * The block a `CLASS B APPROVAL` marker opens: the marker line and every line
+ * after it up to the next top-level bullet or heading, which is where the next
+ * claim starts. A block that runs to the end of the file is the last bullet.
+ *
+ * @param {readonly string[]} lines
+ * @param {number} start index of the marker line
+ * @returns {string} the block, joined
+ */
+function classBBlock(lines, start) {
+  const out = [lines[start] ?? ''];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i] ?? '';
+    if (/^(- |#|\| |> )/.test(line)) break;
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+/** @type {Map<string, Set<string>>} */
+const CLASS_B_SUITE_INDEX = new Map();
+
+/**
+ * Every `*.test.ts` basename in the tree, so a citation by name resolves.
+ *
+ * @param {string} root
+ * @returns {Set<string>}
+ */
+function classBSuiteIndex(root) {
+  const cached = CLASS_B_SUITE_INDEX.get(root);
+  if (cached) return cached;
+  /** @type {Set<string>} */
+  const names = new Set();
+  /** @param {string} dir */
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name === 'dist' || e.name === '.git') continue;
+      const abs = join(dir, e.name);
+      if (e.isDirectory()) walk(abs);
+      else if (/\.test\.tsx?$/.test(e.name)) names.add(e.name);
+    }
+  };
+  walk(root);
+  CLASS_B_SUITE_INDEX.set(root, names);
+  return names;
+}
+
+const ri23 = {
+  id: 'RI-23',
+  title: 'A recorded class B approval names an assertion that exists and a RED that was watched',
+  covers:
+    'every `ADR-*.md` under docs/decisions. AN ENTRY IS IN SCOPE WHEN IT ' +
+    'CARRIES THE MARKER `CLASS B APPROVAL` AT THE OPENING OF A BOLDED RUN, ' +
+    'which is the form ADR-243 established and ADR-244 extended; the block is ' +
+    'that line and every line after it up to the next top-level bullet, ' +
+    'heading, table row or blockquote. THE MARKER MUST OPEN THE RUN RATHER ' +
+    'THAN SIT INSIDE IT, because ADR-243 section 3 clause 4 is a RULING about ' +
+    'what a class B approval records and is not one, and a check that read it ' +
+    'as one would ask an entry to put a transcript inside its own ruling. ' +
+    'A TEST CITED BY BARE BASENAME IS RESOLVED BY SEARCHING THE TREE and one ' +
+    'carrying a separator is resolved exactly: the corpus cites a suite by ' +
+    'name in prose as often as by path, and a pointer that names a directory ' +
+    'is making a claim about WHERE. Three ' +
+    'things are required of each block, and each is one of ADR-227 section 6 ' +
+    "conditions 2 and 3 reduced to the part an entry's own text can settle. " +
+    '(1) IT NAMES AN ASSERTION: a `*.test.ts` path, a `CI-06<letter>` gate or ' +
+    "an `RI-nn`. An approval that names none is a signature with a test's " +
+    'vocabulary and nothing behind it. (2) EVERY TEST PATH IT NAMES IS ON ' +
+    'DISK, resolved from the repository root and from `docs/decisions/`, so a ' +
+    'renamed or deleted suite turns the approval that rests on it RED instead ' +
+    'of leaving it reading as earned. (3) IT RECORDS A RED: the block states ' +
+    'RED, REDDENED, FAILS or FAILED somewhere, because ADR-227 condition 2 is ' +
+    'that the assertion was WATCHED FAILING and an assertion never seen ' +
+    'failing asserts nothing. WHAT IT DOES NOT CATCH, stated rather than left ' +
+    'to be discovered, and the list is longer than the list of what it does. ' +
+    '(1) IT NEVER RE-RUNS THE TRANSCRIPT, so a recorded red that no longer ' +
+    'reproduces passes. That is not hypothetical: ADR-244 section 6 re-ran ' +
+    "ADR-230's two recorded seeds and one of them is green on the tree today, " +
+    'with the property still held by the other. The check that would catch ' +
+    'that is running the seed, which a static reader cannot do. (2) IT DOES ' +
+    'NOT READ WHETHER THE ASSERTION FALSIFIES THE CENTRAL CLAIM, which is ' +
+    'condition 1 and is a judgement about prose. (3) IT DOES NOT READ WHETHER ' +
+    'THE ASSERTION WAS WEAKENED TO PASS, which is condition 4 and which ' +
+    "ADR-227's own approval block calls unenforceable by anything mechanical. " +
+    '(4) AN ENTRY THAT STOPS USING THE MARKER LEAVES SCOPE SILENTLY. The ' +
+    'direction is the safe one for a check that can only ever be a floor, and ' +
+    'it is the same shape RI-13 records about an unreadable approval status.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const dir = join(root, 'docs/decisions');
+    if (!existsSync(dir)) return findings;
+    const entries = readdirSync(dir)
+      .filter((f) => /^ADR-.*\.md$/.test(f))
+      .sort();
+
+    let blocks = 0;
+    for (const file of entries) {
+      const lines = readFileSync(join(dir, file), 'utf8').split('\n');
+      for (let i = 0; i < lines.length; i += 1) {
+        if (!CLASS_B_MARKER.test(lines[i] ?? '')) continue;
+        blocks += 1;
+        const block = classBBlock(lines, i);
+        const where = `docs/decisions/${file}:${String(i + 1)}`;
+
+        /** @type {string[]} */
+        const paths = [];
+        CLASS_B_TEST_PATH.lastIndex = 0;
+        for (const m of block.matchAll(CLASS_B_TEST_PATH)) {
+          const p = m[1] ?? m[2];
+          if (p !== undefined) paths.push(p);
+        }
+
+        if (paths.length === 0 && !CLASS_B_NAMED_GATE.test(block)) {
+          findings.push(
+            `${where} records a CLASS B APPROVAL and names no assertion. ADR-227 section 6 ` +
+              'makes a class B approval EARNED BY A NAMED MECHANICAL ASSERTION -- a ' +
+              '`*.test.ts` suite, a `CI-06<letter>` gate or an `RI-nn` -- and an approval ' +
+              "that names none is a signature wearing a test's clothes, which is the one " +
+              'thing section E2 refutes',
+          );
+        }
+
+        for (const p of paths) {
+          const bare = p.replace(/^(\.\.\/)+/, '');
+          const fromRoot = join(root, bare);
+          const fromEntry = resolve(dir, p);
+          if (existsSync(fromRoot) || existsSync(fromEntry)) continue;
+          // A BARE BASENAME IS RESOLVED BY SEARCHING, because this corpus cites
+          // a suite by name in prose as often as by path -- "`payouts.test.ts`'s
+          // 38 cases stayed green" -- and refusing those would fail a form the
+          // entries were already written in. A path carrying a separator is
+          // resolved exactly and never by search: a pointer that names a
+          // directory is making a claim about WHERE, and answering it from
+          // somewhere else is the vacancy RI-15 exists to refuse.
+          if (!p.includes('/') && classBSuiteIndex(root).has(p)) continue;
+          findings.push(
+            `${where} rests its CLASS B APPROVAL on \`${p}\`, which is not on disk. An ` +
+              'approval earned by an assertion stops being earned the moment the assertion ' +
+              'stops existing, and this is exactly ADR-227 section 6 condition 3: an ' +
+              'assertion nothing runs is prose. Repoint the block, or the approval it ' +
+              'records is owed again',
+          );
+        }
+
+        if (!CLASS_B_RED.test(block)) {
+          findings.push(
+            `${where} records a CLASS B APPROVAL and states no RED. ADR-227 section 6 ` +
+              'condition 2 is that the assertion was WATCHED FAILING before it passed, with ' +
+              'the transcript in the entry, and an assertion never seen failing asserts ' +
+              'nothing: a tautology green on an empty tree passes every other condition',
+          );
+        }
+      }
+    }
+
+    // A CHECK THAT MATCHES NOTHING IS NOT A CHECK THAT PASSED, and this one's
+    // scope predicate is a phrase, so an empty scope is the failure mode worth
+    // reporting rather than the happy case. It is a FINDING and not a throw,
+    // because a corpus that has genuinely retired class B is a state this file
+    // must be able to describe rather than crash on. IT IS SILENT ON A TREE
+    // WITH NO ENTRIES AT ALL, because a scaffold fixture that carries no
+    // `ADR-*.md` has nothing for a marker to be missing from, and failing it
+    // would be this check reporting on a corpus rather than on a repository.
+    if (blocks === 0 && entries.length > 0)
+      findings.push(
+        'RI-23 read every `ADR-*.md` under docs/decisions and found NO block carrying the ' +
+          'marker `CLASS B APPROVAL`. Fifteen entries carried one when this check was ' +
+          'written (ADR-243 moved four, ADR-244 eleven), so a run that matches none is a ' +
+          'renamed marker and this check silently checking nothing, not a corpus without ' +
+          'earned approvals',
+      );
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -5291,6 +5531,7 @@ export const CHECKS = [
   ri20,
   ri21,
   ri22,
+  ri23,
 ];
 
 function main() {
