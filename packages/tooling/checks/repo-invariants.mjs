@@ -4491,6 +4491,359 @@ const ri20 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-21  The `.env` ignore RULE holds, asked of git rather than read off a line
+// -----------------------------------------------------------------------------
+//
+// WHAT HAPPENED. `INFRA:145` stated ".env files are gitignored and CI verifies
+// it rather than trusting it (VG-1)" and BOTH HALVES WERE FALSE for as long as
+// the sentence existed. `.gitignore` is the only one in this repository and it
+// carried no `.env` entry at all: its sole `env` matches were `.venv/` and
+// `next-env.d.ts`, and `git check-ignore -v .env` exited 1, so the file was not
+// ignored. And `VG-1` is gitleaks, which reads FILE CONTENT for secret-shaped
+// strings and reads no `.gitignore` at any point: a `DATABASE_URL`, a vendor
+// base URL or a bucket name is not secret-shaped, so the one control the
+// sentence named would have passed the commit it claimed to refuse. ADR-224.
+//
+// WHY THIS CHECK RUNS A COMMAND INSTEAD OF GREPPING `.gitignore` FOR A STRING,
+// which is the whole reason the number was spent. The entry in `.gitignore` is
+// NOT the deliverable. Anybody can delete three lines, and a check that greps
+// for `.env` would then be asserting that a line exists rather than that
+// anything is ignored -- and, worse, would keep passing after a later `!.env`
+// or a `.gitignore` in a subdirectory reversed the rule several lines down. A
+// GREP FOR A PATTERN IS NOT A TEST THAT THE PATTERN MATCHES. So the subject of
+// this check is the RULE: it hands git a list of representative paths and reads
+// back what git says about each one, which is the same question a `git add`
+// asks.
+//
+// THE BOUNDARY THAT MADE IT POSSIBLE HERE AND NOT IN `RI-17`'s HOME. `Invariant.run`
+// is synchronous and `execFileSync` is already imported by RI-20, so a check in
+// this file can execute a command. RI-17 could not be written here because
+// `packages/tooling` resolves neither `@merit/api` nor `fastify` and
+// `discoverRouteModules` is async; neither disqualifier reaches `git`.
+//
+// TWO LEGS, BECAUSE AN IGNORE RULE DOES NOT REACH A FILE THAT IS ALREADY
+// TRACKED. Git applies `.gitignore` to UNTRACKED paths only, so a `.env`
+// committed before the rule landed stays in the tree, stays in every clone and
+// stays in the history, with the rule above it reading green forever. Leg 2 is
+// one `git ls-files` and it closes that.
+//
+// IT IS NOT A SECRETS SCANNER AND MUST NOT BECOME ONE. It reads no file content
+// anywhere. `CI-05` already runs gitleaks twice (VG-1, history and working
+// tree), semgrep, `pnpm audit` and syft/grype, none of them with
+// `continue-on-error`; a sixth scanner here would be a second copy of a control
+// rather than a control. The property this check owns is the one none of those
+// five reads: what git will do with a path that does not exist yet.
+//
+// WHAT IT DOES NOT CATCH, stated rather than left to be discovered.
+//   (1) It reads the RULE and never the working tree, so it says nothing about
+//       whether a `.env` exists on somebody's disk right now. That is the
+//       correct scope: an ignored file that exists is the system working.
+//   (2) `--no-index` is passed deliberately, so leg 1 answers a question about
+//       PATTERNS alone. Without it, git reports a tracked path as not-ignored,
+//       and a committed `.env.example` would then satisfy the "not ignored"
+//       assertion for the wrong reason. Leg 2 asks the tracking question
+//       separately and on purpose.
+//   (3) The population is a LIST OF SPELLINGS and not the set of all strings.
+//       A file named `env.production` with no leading dot, or `secrets.txt`, is
+//       outside the rule this check asserts and outside the rule `.gitignore`
+//       states. Widening either is a ruling.
+//   (4) `.envrc` is asserted NOT ignored, which is direnv's file and is a
+//       decision ADR-224 records rather than an omission. Nothing in this
+//       repository uses direnv.
+//   (5) It reads whether a path is ignored and never whether a `.env` is
+//       SAFE. Content is `VG-1`'s and stays there.
+
+/**
+ * The paths RI-21 asks git about, and what the rule must say about each.
+ *
+ * EVERY MEMBER IS HERE FOR A SPELLING THAT A NEIGHBOURING PATTERN DOES NOT
+ * COVER, which is the difference between a population and a list somebody
+ * lengthened until it looked thorough. `.env` does not match `.env.local`;
+ * `*.env` does not match `.env`; a leading-slash `/.env` does not match
+ * `apps/api/.env`. Each row names the pattern it would survive the deletion of.
+ *
+ * @type {{ path: string; ignored: boolean; why: string }[]}
+ */
+export const ENV_IGNORE_SUBJECTS = [
+  {
+    path: '.env',
+    ignored: true,
+    why: 'the plain spelling at the root, and the one `git check-ignore -v .env` exited 1 for',
+  },
+  {
+    path: '.env.local',
+    ignored: true,
+    why: "dotenv's local override, which a `.env` pattern alone does NOT match",
+  },
+  {
+    path: '.env.production',
+    ignored: true,
+    why: 'a named environment, the spelling a deploy README tells somebody to create',
+  },
+  {
+    path: '.env.production.local',
+    ignored: true,
+    why: 'the two-suffix spelling, which a `.env.?*` shape narrower than `.env.*` would miss',
+  },
+  {
+    path: '.env.test',
+    ignored: true,
+    why: 'the test environment, the one a fixture author reaches for first',
+  },
+  {
+    path: 'apps/api/.env',
+    ignored: true,
+    why: 'the per-package file. A root-anchored `/.env` would leave this uncovered',
+  },
+  {
+    path: 'apps/api/.env.local',
+    ignored: true,
+    why: 'depth AND suffix together, which is the pair no single pattern of the three covers alone',
+  },
+  {
+    path: 'packages/db/.env',
+    ignored: true,
+    why: 'a second directory at a different depth, so the rule is not one path in disguise',
+  },
+  {
+    path: 'apps/portal/.env.development.local',
+    ignored: true,
+    why: 'depth and two suffixes, the deepest spelling any of this workspace tooling documents',
+  },
+  {
+    path: '.env.example',
+    ignored: false,
+    why: 'THE ONE EXCEPTION. A committed template carries names and never values, and a rule that ignored it would make every developer invent the variable list',
+  },
+  {
+    path: 'apps/api/.env.example',
+    ignored: false,
+    why: 'the exception AT DEPTH, so the negation is a basename rule rather than a root-only one',
+  },
+  {
+    path: '.envrc',
+    ignored: false,
+    why: "direnv's file, deliberately outside the rule (ADR-224). Asserting it is the difference between a decision and an oversight",
+  },
+  {
+    path: 'apps/site/src/environment.ts',
+    ignored: false,
+    why: 'A CONTROL. A source file whose basename starts with `env`, which a `.env*` or `*env*` pattern would swallow along with the tree',
+  },
+  {
+    path: 'docs/architecture/INFRA.md',
+    ignored: false,
+    why: 'A SECOND CONTROL, and it is the document the false sentence lived in. A pattern set wide enough to ignore this is a pattern set that ignores the corpus',
+  },
+];
+
+/** A tracked path whose basename is a `.env` spelling this rule refuses. */
+const trackedEnvSpelling = (/** @type {string} */ p) => {
+  const base = p.slice(p.lastIndexOf('/') + 1);
+  if (base === '.env.example') return false;
+  return base === '.env' || base.startsWith('.env.');
+};
+
+/** @type {Invariant} */
+const ri21 = {
+  id: 'RI-21',
+  title: 'git ignores every .env spelling and does not ignore the committed example',
+  covers:
+    'the `.env` ignore RULE, asked of `git check-ignore --no-index` over ' +
+    `${String(ENV_IGNORE_SUBJECTS.length)} representative paths read live from ` +
+    '`ENV_IGNORE_SUBJECTS`, plus a second leg over `git ls-files`. THE `.gitignore` ' +
+    'ENTRY IS NOT WHAT THIS CHECKS AND THAT IS THE POINT: a grep for `.env` in ' +
+    'that file asserts a line exists, which is not the same claim as the rule ' +
+    'matching, and it would keep passing after a later negation or a ' +
+    'subdirectory `.gitignore` reversed the rule. `INFRA:145` claimed for ' +
+    'months that this rule existed and that `VG-1` verified it, and BOTH ' +
+    'HALVES WERE FALSE: `.gitignore` carried no `.env` entry, `git ' +
+    'check-ignore -v .env` exited 1, and gitleaks reads file CONTENT for ' +
+    'secret-shaped strings and reads no `.gitignore`, so a `DATABASE_URL` or a ' +
+    'vendor base URL would have passed the one control the sentence named ' +
+    '(ADR-224). LEG 1 asserts what the rule says: nine spellings ignored, ' +
+    'five not, each row naming the pattern whose deletion it would survive. ' +
+    'For an expected-ignored path the MATCHING SOURCE must be this ' +
+    "repository's own `.gitignore` and the matching pattern must mention " +
+    '`env`, so a global excludes file, a `.git/info/exclude` or a `*` ' +
+    'catch-all cannot make this check green. LEG 2 asserts that no `.env` ' +
+    'spelling is TRACKED, because git applies an ignore rule to untracked ' +
+    'paths only: a `.env` committed before the rule landed stays in every ' +
+    'clone and in the history with the rule above it reading green forever. ' +
+    'IT IS NOT A SECRETS SCANNER AND READS NO FILE CONTENT ANYWHERE. `CI-05` ' +
+    'already runs gitleaks twice, semgrep, `pnpm audit` and syft/grype with ' +
+    'no `continue-on-error` in the workflow at all; the property this check ' +
+    'owns is the one none of those five reads, which is what git will do with ' +
+    'a path that does not exist yet. WHAT IT DOES NOT CATCH. (1) It reads the ' +
+    'RULE and never the working tree, so an ignored `.env` on somebody s disk ' +
+    'is outside it and correctly so. (2) `--no-index` is deliberate, so leg 1 ' +
+    'is about PATTERNS alone; without it a tracked path reports as not-ignored ' +
+    'and a committed `.env.example` would satisfy its assertion for the wrong ' +
+    'reason. (3) The population is a list of SPELLINGS: `env.production` with ' +
+    'no leading dot, or `secrets.txt`, is outside this rule and outside the ' +
+    'one `.gitignore` states, and widening either is a ruling. (4) `.envrc` is ' +
+    'asserted NOT ignored, which is direnv s file and a decision ADR-224 ' +
+    'records. (5) Whether a `.env` is SAFE is content, which is `VG-1`s and ' +
+    'stays there.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    if (!ENV_IGNORE_SUBJECTS.some((s) => s.ignored))
+      throw new Error(
+        'RI-21 has no path it expects to be IGNORED, so leg 1 would pass over a ' +
+          'repository with an empty `.gitignore`. A check that asserts nothing is not a ' +
+          'check that passed',
+      );
+
+    // LEG 1. WHAT THE RULE SAYS, ASKED OF GIT.
+    //
+    // `-n` prints the non-matching paths too, so every subject comes back on a
+    // line of its own and a path git says nothing about is distinguishable from
+    // one it did not see. `-v` carries the SOURCE and the PATTERN, which is what
+    // lets the ignored direction refuse a match that came from somewhere other
+    // than this repository's own `.gitignore`.
+    /** @type {string} */
+    let out;
+    try {
+      out = execFileSync('git', ['check-ignore', '--no-index', '-v', '-n', '--stdin'], {
+        cwd: root,
+        input: ENV_IGNORE_SUBJECTS.map((s) => s.path).join('\n') + '\n',
+        encoding: 'utf8',
+        timeout: 30_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+    } catch (err) {
+      const e = /** @type {{ status?: number; stdout?: string }} */ (err);
+      // Exit 1 means NO path in the list is ignored, which is a result and is
+      // the exact state this check was written to catch. Anything else -- no
+      // `git` on the PATH, a root that is not a work tree -- means the question
+      // was never asked, and a check that cannot run is not a check that passed.
+      if (e.status === 1 && typeof e.stdout === 'string') out = e.stdout;
+      else
+        throw new Error(
+          `RI-21 could not ask git about the ignore rule (\`git check-ignore\` exited ` +
+            `${String(e.status)} in ${root}). This check's whole subject is what git says, ` +
+            `so an unanswerable question is an ERROR rather than a pass`,
+          { cause: err },
+        );
+    }
+
+    /** @type {Map<string, { source: string; pattern: string } | null>} */
+    const verdict = new Map();
+    for (const line of out.split('\n')) {
+      if (line === '') continue;
+      const tab = line.indexOf('\t');
+      if (tab === -1) continue;
+      const rule = line.slice(0, tab);
+      const path = line.slice(tab + 1);
+      if (rule === '::') {
+        verdict.set(path, null);
+        continue;
+      }
+      // `<source>:<linenum>:<pattern>`, and the source is matched NON-GREEDILY
+      // so a pattern carrying a colon stays in the pattern.
+      const m = /^(.*?):(\d+):(.*)$/.exec(rule);
+      verdict.set(
+        path,
+        m === null ? { source: rule, pattern: '' } : { source: m[1] ?? '', pattern: m[3] ?? '' },
+      );
+    }
+
+    for (const subject of ENV_IGNORE_SUBJECTS) {
+      if (!verdict.has(subject.path)) {
+        findings.push(
+          `git said nothing at all about \`${subject.path}\`, which this check hands it on ` +
+            `stdin and expects a line back for. The runner read ${String(verdict.size)} verdict(s) ` +
+            `for ${String(ENV_IGNORE_SUBJECTS.length)} path(s)`,
+        );
+        continue;
+      }
+      const matched = verdict.get(subject.path) ?? null;
+      // A NEGATION IS A MATCH THAT MEANS NOT-IGNORED. `git check-ignore -v`
+      // reports `!.env.example` as the rule for `.env.example`, so reading "a
+      // rule matched" as "ignored" would invert exactly the exception this rule
+      // exists to carve out.
+      const negated = matched !== null && matched.pattern.startsWith('!');
+      const isIgnored = matched !== null && !negated;
+
+      if (subject.ignored && !isIgnored) {
+        findings.push(
+          `\`${subject.path}\` IS NOT IGNORED and the rule says it must be (${subject.why}). ` +
+            (matched === null
+              ? 'No pattern in this repository matches it at all'
+              : `The nearest rule is \`${matched.pattern}\` at ${matched.source}, which re-includes it`) +
+            `. This is the state \`INFRA:145\` asserted was impossible while it held for every ` +
+            `\`.env\` spelling in the tree; a value written here would be staged by a bare ` +
+            `\`git add -A\` and caught only if gitleaks recognised its SHAPE`,
+        );
+        continue;
+      }
+      if (subject.ignored && matched !== null) {
+        // THE RULE MUST BE THIS REPOSITORY'S OWN AND MUST BE ABOUT `env`. A
+        // developer's global excludes file, a `.git/info/exclude`, or a `*`
+        // catch-all several lines down would otherwise turn this check green on
+        // a repository whose `.gitignore` says nothing at all.
+        if (matched.source !== '.gitignore')
+          findings.push(
+            `\`${subject.path}\` is ignored by \`${matched.pattern}\` at ${matched.source}, which ` +
+              `is not this repository's own \`.gitignore\`. A rule that lives in a global ` +
+              `excludes file or in \`.git/info/exclude\` is not in any clone but this one, so ` +
+              `the property holds for the person who ran the check and for nobody else`,
+          );
+        else if (!matched.pattern.includes('env'))
+          findings.push(
+            `\`${subject.path}\` is ignored by \`${matched.pattern}\`, which does not name ` +
+              `\`env\` at all. A catch-all that happens to cover this path is not the rule ` +
+              `ADR-224 states, and it would go on reading green after the \`.env\` entries were ` +
+              `deleted`,
+          );
+        continue;
+      }
+      if (!subject.ignored && isIgnored) {
+        findings.push(
+          `\`${subject.path}\` IS ignored, by \`${matched?.pattern ?? '?'}\` at ` +
+            `${matched?.source ?? '?'}, and the rule says it must not be (${subject.why}). ` +
+            `A pattern set wide enough to swallow this one is wide enough to hide a file ` +
+            `somebody meant to commit`,
+        );
+      }
+    }
+
+    // LEG 2. AN IGNORE RULE DOES NOT REACH A TRACKED FILE.
+    /** @type {string} */
+    let tracked;
+    try {
+      tracked = execFileSync('git', ['ls-files', '-z'], {
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 30_000,
+        maxBuffer: 64 * 1024 * 1024,
+      });
+    } catch (err) {
+      const e = /** @type {{ status?: number }} */ (err);
+      throw new Error(
+        `RI-21 could not list the tracked files (\`git ls-files\` exited ${String(e.status)} in ` +
+          `${root}). Leg 2 exists because an ignore rule is silent about a file that is already ` +
+          `committed, so skipping it would leave the worse half of the property unchecked`,
+        { cause: err },
+      );
+    }
+    for (const path of tracked.split('\0')) {
+      if (path === '' || !trackedEnvSpelling(path)) continue;
+      findings.push(
+        `\`${path}\` is TRACKED. A \`.gitignore\` rule applies to untracked paths only, so ` +
+          `this file is in every clone and in the history no matter what leg 1 says, and ` +
+          `deleting it from the tip does not remove it from the history. Only ` +
+          `\`.env.example\` may be committed`,
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -4511,6 +4864,7 @@ export const CHECKS = [
   ri18,
   ri19,
   ri20,
+  ri21,
 ];
 
 function main() {

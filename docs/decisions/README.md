@@ -236,6 +236,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-217](ADR-217.md) | the wallet gains an `error` arm, and the boundary between "we do not serve this" and "this failed" is the contract's 404 ruling  (2026-08-29, status: proposed) |
 | [ADR-219](ADR-219.md) | the portal's first write verb, and the CSRF control it does not mint because the one the corpus already has is on the wrong side of a fence  (2026-08-29, status: proposed) |
 | [ADR-221](ADR-221.md) | the constitution's CSRF control, taken as an Origin check because the cookie the corpus trusted is scoped to a site and the attack is scoped to an origin  (2026-08-29, status: proposed) |
+| [ADR-224](ADR-224.md) | `.env` is ignored by a three-line rule and the rule is asserted by running git, because an entry anybody can delete is not a control and the gate that claimed to verify it reads no gitignore  (2026-08-29, status: proposed) |
 | [ADR-225](ADR-225.md) | `zod at every boundary` names a mechanism this workspace has never had, so the six citations are separated from the control they claim, and the one thing zod uniquely supplies turns out not to be validation at all  (2026-08-29, status: proposed) |
 <!--/gen-->
 
