@@ -3341,6 +3341,433 @@ const ri16 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-19  A clearing condition's terms are the same in the module and in the case
+// -----------------------------------------------------------------------------
+// SESSION 363 BUILT THE CLEARING-CONDITION PATTERN so that the day a blocker
+// lifts, a case goes RED and NAMES it rather than the next session re-deriving
+// everything from scratch. Five waves of work have run on it. IT HAS ONE FAILURE
+// MODE AND THE FAILURE MODE FIRED: `B5`'s condition was stated TWICE, in
+// `apps/api/src/admin-source/liability.ts` and in
+// `apps/api/test/admin-source-liability.test.ts`, WITH TWO OF ITS THREE TERMS
+// EACH, and no control compared them. The module named the stored `engine_gates`
+// encoding and not the `| null`; the case named the `| null` and not the
+// encoding. FOUR SESSIONS IN A ROW READ A TWO-TERM CONDITION off a three-term
+// blocker, and each of the two statements was individually true.
+//
+// Session 392 repaired it by writing the condition ONCE, with all three terms,
+// and asserting all three. THIS CHECK IS WHAT STOPS IT DRIFTING BACK. RI-15 and
+// RI-16 exist because a `file:line` pointer drifts and no reader opens the file
+// to notice; A CONDITION RESTATED IN TWO PLACES IS THAT SAME FAILURE ONE LEVEL
+// UP, on the artefact every later session trusts to tell it what is still owed.
+//
+// IT IS A DERIVATION AND NOT A SECOND LIST, which is the trap RI-05's own
+// `covers` calls "a hand-maintained count in a different costume" and which
+// RI-04 actually fell into: it reported PASS while asserting nothing, because
+// its literal held four names where the tree had five. This check stores no
+// condition, no term, no blocker, no file and no count. It reads the module's
+// own numbered enumeration AS the term set and asks the case whether it names
+// each one. THE DAY A FOURTH TERM IS ADDED TO A MODULE, THIS CHECK IS ABOUT FOUR
+// TERMS WITH NOBODY EDITING IT.
+//
+// WHAT A TERM IS, MECHANICALLY. This corpus writes code identifiers in
+// backticks. A term's identifiers are the backtick spans inside its numbered
+// item, split on everything an identifier cannot hold, so
+// `eligible_next_7d: EligibleNext7d | null` is three of them. A term is NAMED in
+// the restatement when the restatement carries an identifier DISTINCTIVE to that
+// term, meaning one no sibling term carries. The distinctiveness is DERIVED from
+// the enumeration rather than declared: `apps` sits in two of `B5`'s three terms
+// and buys nothing, `engine_gates` sits in one and is the whole of what term 2
+// is about.
+//
+// A TERM WITH NO DISTINCTIVE IDENTIFIER IS REPORTED RATHER THAN PASSED, on this
+// file's rule 1. A term that shares every identifier with a sibling is a term
+// this check cannot bind, and saying so is not the same as holding.
+//
+// WHY THE MODULE IS THE CANONICAL SIDE AND THE CASE RESTATES IT. That is session
+// 392's own repair, in its words: the condition is written "ONCE, in the module,
+// with all three terms", and the case asserts them. So the module's enumeration
+// is the term set and the case is measured against it, in both directions: a
+// term the case does not name is drift, and an identifier the case names that no
+// term carries is drift the other way. BOTH DIRECTIONS ARE THE DEFECT THAT
+// ACTUALLY HAPPENED, one each.
+//
+// WHY IT LIVES IN THIS FILE AND NOT BESIDE ITS SUBJECT. RI-17 sits in
+// `apps/api/test/api-contract-coverage.test.ts` because it needs `@merit/api`
+// and `fastify`, which `packages/tooling` cannot resolve. THIS CHECK NEEDS
+// NEITHER: it reads source files as text, so it is a row of `CHECKS` and the
+// runner reports 18.
+
+/** The source set this check reads. `.json` and `.md` carry no `//` comment. */
+const CLEARING_EXTENSIONS = /\.(?:ts|tsx|mts|mjs)$/;
+
+/**
+ * The DECLARING form. A statement that does not spell its own term count is not
+ * one, which is the whole of how this check finds its subject without a list.
+ * The count word is captured because it is a second statement of the same fact
+ * sitting beside the enumeration, and RI-04's failure was exactly a count that
+ * had stopped agreeing with what it counted.
+ */
+const CLEARING_MARKER = /CLEARING CONDITION\b[^`\n]{0,24}?\bALL\s+([A-Za-z]+)\s+TERMS\b/i;
+
+/** Number words this check reads. Anything else is reported, never guessed. */
+const TERM_COUNT_WORDS = new Map([
+  ['one', 1],
+  ['two', 2],
+  ['three', 3],
+  ['four', 4],
+  ['five', 5],
+  ['six', 6],
+  ['seven', 7],
+  ['eight', 8],
+  ['nine', 9],
+  ['ten', 10],
+  ['eleven', 11],
+  ['twelve', 12],
+]);
+
+/** A numbered term opens an item. Continuation lines do not match. */
+const TERM_ITEM = /^(\d+)\.\s+(.*)$/;
+
+/**
+ * The comment text of one line, or null when the line ends a statement: code, a
+ * bare `//`, a bare `*`, or a block-comment terminator. A blank comment line is
+ * a paragraph break in this corpus and is the natural end of a statement.
+ *
+ * @param {string} line
+ * @returns {string | null}
+ */
+function commentBody(line) {
+  const t = line.trim();
+  if (t.startsWith('*/')) return null;
+  /** @type {string | null} */
+  let body = null;
+  if (t.startsWith('///')) body = t.slice(3);
+  else if (t.startsWith('//')) body = t.slice(2);
+  else if (t.startsWith('/**')) body = t.slice(3);
+  else if (t.startsWith('/*')) body = t.slice(2);
+  else if (t.startsWith('*')) body = t.slice(1);
+  if (body === null) return null;
+  const trimmed = body.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Every identifier inside the backtick spans of `text`, keyed by its lower-cased
+ * form and valued by the spelling the file actually wrote.
+ *
+ * SPLIT RATHER THAN TAKEN WHOLE, because a span is often a declaration and not a
+ * name: `eligible_next_7d: EligibleNext7d | null` is one span and three
+ * identifiers, and a restatement that writes only `eligible_next_7d` is naming
+ * the same term. Tokens shorter than three characters and tokens opening with a
+ * digit are dropped: `0015` and `199` are a migration and a section number
+ * reached through `ADR-199`, and neither identifies a term.
+ *
+ * MATCHED CASE-INSENSITIVELY AND REPORTED AS WRITTEN. The comparison is folded
+ * so a case restating `EngineGates` still names a term the module spells
+ * `engineGates`, which is a difference in prose rather than in what is owed. The
+ * SPELLING is carried alongside because a finding naming `enginegateresults` is
+ * a finding a reader has to translate before they can grep for it.
+ *
+ * @param {string} text
+ * @returns {Map<string, string>}
+ */
+function backtickIdentifiers(text) {
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  for (const m of text.matchAll(/`([^`]+)`/g)) {
+    for (const token of (m[1] ?? '').split(/[^A-Za-z0-9_]+/)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]{2,}$/.test(token)) continue;
+      const key = token.toLowerCase();
+      if (!out.has(key)) out.set(key, token);
+    }
+  }
+  return out;
+}
+
+/**
+ * The pair a file belongs to, and which side of it the file is.
+ *
+ * DERIVED FROM THE PATH, which is the objective's own grouping: a condition
+ * "stated in code" and "the one stated in its test". `apps/api/src/admin-source/
+ * liability.ts` and `apps/api/test/admin-source-liability.test.ts` are one pair
+ * because this tree flattens the source directory into the test file name.
+ *
+ * @param {string} rel
+ * @returns {{key: string, side: 'module' | 'case'} | null}
+ */
+function clearingPair(rel) {
+  const src = /^(.*?)\/src\/(.+)\.[A-Za-z]+$/.exec(rel);
+  if (src && src[1] !== undefined && src[2] !== undefined) {
+    return { key: `${src[1]}::${src[2].replace(/\//g, '-')}`, side: 'module' };
+  }
+  const spec = /^(.*?)\/test\/(.+)\.test\.[A-Za-z]+$/.exec(rel);
+  if (spec && spec[1] !== undefined && spec[2] !== undefined) {
+    return { key: `${spec[1]}::${spec[2].replace(/\//g, '-')}`, side: 'case' };
+  }
+  return null;
+}
+
+/**
+ * One clearing condition as its file states it.
+ *
+ * @typedef {object} ClearingStatement
+ * @property {string} file
+ * @property {number} line          1-based line of the declaring marker
+ * @property {string} countWord     the word the statement spells its term count with
+ * @property {number | null} count  that word as a number, null when unreadable
+ * @property {string[]} terms       the text of each numbered item, in order
+ * @property {string} text          the whole statement, one line
+ */
+
+/**
+ * Every declaring statement in one file.
+ *
+ * @param {string} body
+ * @param {string} rel
+ * @returns {ClearingStatement[]}
+ */
+function clearingStatements(body, rel) {
+  const lines = body.split('\n');
+  /** @type {ClearingStatement[]} */
+  const out = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? '';
+    const opening = commentBody(line);
+    if (opening === null) continue;
+    const marker = CLEARING_MARKER.exec(opening);
+    if (!marker || marker[1] === undefined) continue;
+    /** @type {string[]} */
+    const parts = [];
+    for (let j = i; j < lines.length; j += 1) {
+      const part = commentBody(lines[j] ?? '');
+      if (part === null) break;
+      parts.push(part);
+    }
+    /** @type {string[]} */
+    const terms = [];
+    for (const part of parts) {
+      const item = TERM_ITEM.exec(part);
+      if (item && item[2] !== undefined) terms.push(item[2]);
+      else if (terms.length > 0) terms[terms.length - 1] += ` ${part}`;
+    }
+    const countWord = marker[1];
+    out.push({
+      file: rel,
+      line: i + 1,
+      countWord,
+      count: TERM_COUNT_WORDS.get(countWord.toLowerCase()) ?? null,
+      terms,
+      text: parts.join(' '),
+    });
+    i += parts.length - 1;
+  }
+  return out;
+}
+
+/**
+ * Every `src/` module and `test/` case in `root` that declares a clearing
+ * condition, grouped into pairs.
+ *
+ * EXPORTED SO A CASE CAN ASSERT THE SUBJECT RATHER THAN THE VERDICT. RI-04
+ * reported PASS for three sessions while checking nothing, and "the run returned
+ * an empty array" cannot tell those two apart. The suite reads this to say which
+ * pair RI-19 is actually about on the real tree.
+ *
+ * @param {string} root
+ * @returns {{pairs: Map<string, {module: ClearingStatement[], case: ClearingStatement[]}>, declared: number}}
+ */
+export function clearingConditionPairs(root) {
+  /** @type {Map<string, {module: ClearingStatement[], case: ClearingStatement[]}>} */
+  const pairs = new Map();
+  let declared = 0;
+  for (const rel of walk(root)) {
+    if (!CLEARING_EXTENSIONS.test(rel)) continue;
+    // THIS PACKAGE IS OUT OF SCOPE, on RI-15's measured reason for the same
+    // exclusion: the statements in here are the GRAMMAR worked through in a
+    // header and the SEEDS a suite plants, not claims about what this tree owes.
+    // A check that read its own examples would report its own documentation.
+    if (rel.startsWith(`${OWN_PACKAGE}/`)) continue;
+    const pair = clearingPair(rel);
+    if (pair === null) continue;
+    const body = read(root, rel);
+    if (!/CLEARING CONDITION/i.test(body)) continue;
+    const statements = clearingStatements(body, rel);
+    if (statements.length === 0) continue;
+    declared += statements.length;
+    const slot = pairs.get(pair.key) ?? { module: [], case: [] };
+    slot[pair.side].push(...statements);
+    pairs.set(pair.key, slot);
+  }
+  return { pairs, declared };
+}
+
+/** @type {Invariant} */
+const ri19 = {
+  id: 'RI-19',
+  title: 'A clearing condition names the same terms in the module and in the case that restates it',
+  covers:
+    'every pair of clearing-condition statements that DECLARE THEIR OWN TERM ' +
+    'COUNT (`CLEARING CONDITION, ALL THREE TERMS`), one in a `src/` module and ' +
+    'one in the `test/` file whose name is that module path with its slashes ' +
+    "flattened to dashes. THE TERM SET IS DERIVED FROM THE MODULE'S OWN " +
+    'NUMBERED ENUMERATION and nothing about any condition is stored here, on ' +
+    "RI-05's rule that a stored copy is a hand-maintained count in a different " +
+    "costume and RI-04's demonstration that it goes stale in step. FOUR THINGS " +
+    "ARE ASSERTED. (1) The module's spelled count equals the number of items it " +
+    "enumerates. (2) The case's spelled count equals that same number. (3) Every " +
+    'term of the module is NAMED in the case, where named means the case carries ' +
+    'a backticked identifier DISTINCTIVE to that term, meaning one no sibling ' +
+    'term carries; the distinctiveness is derived from the enumeration, so ' +
+    '`apps` binds nothing on `B5` and `engine_gates` binds term 2. (4) Every ' +
+    "backticked identifier in the case appears somewhere in the module's terms, " +
+    'so the case cannot introduce a term the module does not carry. BOTH ' +
+    'DIRECTIONS ARE THE DEFECT THAT HAPPENED, one each: the module named the ' +
+    '`engine_gates` encoding and not the `| null`, the case named the `| null` ' +
+    'and not the encoding, and no control compared them for four sessions. ' +
+    'WHAT IT DOES NOT CATCH, and the list is the point rather than a caveat. ' +
+    '(a) A RESTATEMENT THAT DOES NOT DECLARE ITS TERM COUNT IS INVISIBLE TO IT. ' +
+    'The corpus states clearing conditions in many other forms (`RESTATED:`, ' +
+    '`FIRED`, `UNCHANGED AND NOW HELD BY ONE BLOCKER`, a bare `it()` title) and ' +
+    'this check reads none of them; it binds the form session 392 established ' +
+    'and makes that form load-bearing. (b) A condition stated on only ONE side of ' +
+    'a pair has nothing to compare and yields no finding. (c) A THIRD statement, ' +
+    'in a file that is neither the module nor its name-derived test, is not in ' +
+    'any pair. (d) IT READS IDENTIFIERS AND NOT PROSE, so a term whose MEANING ' +
+    'drifts while its identifiers stay put passes: "`eligible_next_7d` gains its ' +
+    '`| null`" and "`eligible_next_7d` loses its `| null`" are the same term to ' +
+    'it. (e) The marker must sit on one line; a count wrapped across two comment ' +
+    'lines is not found. (f) It does not ask whether a stated condition has a ' +
+    'case at all, which is a convention beyond binding the two statements. ' +
+    'A term with no distinctive identifier, a module that enumerates nothing, ' +
+    'and a count word it cannot read are REPORTED rather than passed.',
+  /** @type {(root: string) => string[]} */
+  run: (root) => {
+    const { pairs, declared } = clearingConditionPairs(root);
+
+    // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. Zero declarations
+    // means the form this check binds has left the tree, and every restatement
+    // in it would then be free to drift for the reason the check was written.
+    if (declared === 0) {
+      throw new Error(
+        'RI-19 read the tree and found NO clearing condition declaring its own term count. ' +
+          'The `CLEARING CONDITION, ALL <N> TERMS` form is the whole of how this check finds ' +
+          'its subject, so zero means the convention has been dropped or reworded and every ' +
+          'restatement in this tree is now unbound',
+      );
+    }
+
+    /** @type {string[]} */
+    const findings = [];
+    for (const [key, slot] of [...pairs].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      const [module] = slot.module;
+      const [restatement] = slot.case;
+      if (slot.module.length > 1 || slot.case.length > 1) {
+        throw new Error(
+          `${key.replace('::', '/')}: ${slot.module.length} declaring statement(s) in the ` +
+            `module and ${slot.case.length} in the case. RI-19 pairs them BY FILE and cannot ` +
+            'tell which restatement belongs to which condition once a file holds two. Give ' +
+            'the statements a blocker label this check can group on, or it is guessing',
+        );
+      }
+      if (module === undefined || restatement === undefined) continue;
+
+      const where = `${module.file}:${module.line} and ${restatement.file}:${restatement.line}`;
+      if (module.terms.length === 0) {
+        findings.push(
+          `${module.file}:${module.line}: declares ${module.countWord} terms and ENUMERATES ` +
+            'NONE. RI-19 takes the numbered items as the term set, so a statement with no ' +
+            `\`1.\` item binds nothing and ${restatement.file}:${restatement.line} is free to ` +
+            'drift from it, which is the condition this check exists to refuse',
+        );
+        continue;
+      }
+      if (module.count === null) {
+        findings.push(
+          `${module.file}:${module.line}: spells its term count \`${module.countWord}\`, which ` +
+            'is not a number word RI-19 reads. A count it cannot read is a count it cannot ' +
+            'compare against the ' +
+            `${module.terms.length} item(s) enumerated below it`,
+        );
+      } else if (module.count !== module.terms.length) {
+        findings.push(
+          `${module.file}:${module.line}: says ALL ${module.countWord.toUpperCase()} TERMS and ` +
+            `enumerates ${module.terms.length}. That is RI-04's own failure on the condition ` +
+            'itself: a count that has stopped agreeing with what it counts, in the sentence ' +
+            'every later session reads to learn what is still owed',
+        );
+      }
+      if (restatement.count === null) {
+        findings.push(
+          `${restatement.file}:${restatement.line}: spells its term count ` +
+            `\`${restatement.countWord}\`, which is not a number word RI-19 reads`,
+        );
+      } else if (restatement.count !== module.terms.length) {
+        findings.push(
+          `${restatement.file}:${restatement.line}: says ALL ` +
+            `${restatement.countWord.toUpperCase()} TERMS where ${module.file}:${module.line} ` +
+            `enumerates ${module.terms.length}. The two statements of one condition disagree ` +
+            'about how many terms it has, which is exactly the shape that let four sessions ' +
+            'read a two-term condition off a three-term blocker',
+        );
+      }
+
+      const perTerm = module.terms.map((t) => backtickIdentifiers(t));
+      /** @type {Map<string, number>} */
+      const carriers = new Map();
+      for (const tokens of perTerm) {
+        for (const key of tokens.keys()) carriers.set(key, (carriers.get(key) ?? 0) + 1);
+      }
+      const restated = backtickIdentifiers(restatement.text);
+
+      if (carriers.size === 0) {
+        findings.push(
+          `${module.file}:${module.line}: enumerates ${module.terms.length} term(s) and NOT ONE ` +
+            'of them backticks an identifier. This corpus names code in backticks and RI-19 ' +
+            'binds on those names, so this condition is asserting nothing about ' +
+            `${restatement.file}:${restatement.line}`,
+        );
+        continue;
+      }
+
+      for (let t = 0; t < perTerm.length; t += 1) {
+        const tokens = perTerm[t] ?? new Map();
+        const distinctive = [...tokens.keys()].filter((k) => carriers.get(k) === 1).sort();
+        if (distinctive.length === 0) {
+          findings.push(
+            `${module.file}:${module.line}: term ${t + 1} shares every identifier it names with ` +
+              'another term of the same condition, so RI-19 cannot tell whether ' +
+              `${restatement.file}:${restatement.line} names it. Give the term one identifier ` +
+              'of its own. A check never returns PASS for something it did not look at',
+          );
+          continue;
+        }
+        if (distinctive.some((k) => restated.has(k))) continue;
+        const named = distinctive.map((k) => tokens.get(k) ?? k);
+        findings.push(
+          `${where}: term ${t + 1} of the condition is stated in the module and NAMED NOWHERE ` +
+            `IN THE CASE. It is identified by \`${named.join('`, `')}\` and the ` +
+            'restatement carries none of them. TWO STATEMENTS OF ONE CONDITION, EACH ' +
+            'INDIVIDUALLY TRUE, IS TWO CONDITIONS: this is how `B5` was read as a two-term ' +
+            'blocker for four sessions. Restate the term or point the case at the module',
+        );
+      }
+
+      for (const key of [...restated.keys()].sort()) {
+        if (carriers.has(key)) continue;
+        findings.push(
+          `${where}: the case names \`${restated.get(key) ?? key}\` inside its clearing ` +
+            'condition and NO TERM OF ' +
+            'THE MODULE CARRIES IT. Either the case is holding a term the module dropped, ' +
+            'which is the drift that actually happened on `B5` in this direction, or it is ' +
+            'prose that reads as a term. The condition is stated ONCE, in the module',
+        );
+      }
+    }
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -3359,6 +3786,7 @@ export const CHECKS = [
   ri15,
   ri16,
   ri18,
+  ri19,
 ];
 
 function main() {

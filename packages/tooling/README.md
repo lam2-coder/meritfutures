@@ -1,15 +1,15 @@
 # @merit/tooling
 
-Shared build tooling. Two things live here and nothing else:
+Shared build tooling. Two kinds of thing live here and nothing else:
 
-| File | What it is |
+| Path | What it is |
 |---|---|
 | `eslint.base.js` | The ESLint base the workspace root composes. One copy, so a rule cannot be disabled in one application without a diff anyone reads |
-| `checks/repo-invariants.mjs` | The five repository invariants CI-01 asserts, with `covers` lines stating what each one does not check |
+| `checks/` | The repository invariants CI-01 asserts, each with a `covers` line stating what it does not check. `repo-invariants.mjs` holds the `CHECKS` array and the runner; a check whose argument runs long enough to crowd its neighbours lives in its own module beside it and is imported into that array |
 
-There is deliberately no `src/`: neither file is compiled, both are read by a
-tool that runs before anything is built. They are still type-checked, from
-their JSDoc, by this package's `tsc --noEmit`.
+There is deliberately no `src/`: nothing here is compiled, all of it is read by
+a tool that runs before anything is built. It is still type-checked, from its
+JSDoc, by this package's `tsc --noEmit`.
 
 ## The invariants
 
@@ -17,18 +17,24 @@ Run them with `pnpm check:invariants` from the workspace root, or
 `node packages/tooling/checks/repo-invariants.mjs list` to read what each one
 covers.
 
-| | Invariant | Why it is mechanical rather than reviewed |
-|---|---|---|
-| RI-01 | `packages/rules-engine` declares no workspace dependencies | The first `import { db }` into the engine will be added because it is convenient, in a session with a deadline, and the replay self-audit, the property suites and Stryker all degrade quietly at that moment |
-| RI-02 | No coverage threshold exists anywhere | Every scaffold generator in this ecosystem adds one by default, and the strategy rules coverage out as a gate. Absence has to be asserted, not assumed |
-| RI-03 | The Vitest projects are named for the CI stages | Vitest 4 silently ignores `vitest.workspace.ts`, and one project per package makes the golden-file stage unrunnable alone |
-| RI-04 | `site`, `portal`, `admin` and `worker` are four deployables | One application with three route groups is invisible for months, is a re-platform to undo, and converts a security control into a URL convention |
-| RI-05 | `.nvmrc` is the only Node version in the tree | Two files holding one number is a hand-maintained count in a different costume |
+**THERE IS NO TABLE OF THEM HERE, AND THE ABSENCE IS THE POINT.** This file
+carried one for five invariants and the tree grew past it: by the time anyone
+looked, the table named five of what `list` prints, and its `RI-04` row said
+"four deployables" where the check itself had said five since `apps/api`
+landed. That is precisely what `RI-05`'s own `covers` calls a hand-maintained
+count in a different costume, and what `RI-04` did when its literal held four
+names against a tree of five: **it reported PASS for three sessions while
+asserting nothing.** A second copy of a list does not fail when the list moves.
+It goes stale in step, silently, in the document a reader trusts most.
 
-Each is watched failing on a seeded violation in `test/repo-invariants.test.ts`
-before it is trusted, which is the rule
+So the roster is `list` and the reasons are the `covers` lines beside each
+check, which the runner prints from the checks themselves. Read those.
+
+Each invariant is watched failing on a seeded violation in
+`test/repo-invariants.test.ts` before it is trusted, which is the rule
 [`scripts/corpus/falsify.mjs`](../../scripts/corpus/falsify.mjs) applies to the
-corpus gates.
+corpus gates. A check that has only ever been seen pass is indistinguishable
+from a check that cannot fail.
 
 ## Why the package is not called `config`
 
