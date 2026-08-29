@@ -154,7 +154,15 @@
 // reported as a gap. The enumeration control here is three things: the 128-bit
 // code with no sequence (`INV-M11-05`), the rate limit section 11 gives this
 // row its own line for, and the anomaly signal, which is the
-// `certificate_verifications` write below. ADR-168 foreclosure 5 exists to stop
+// `certificate_verifications` write below.
+//
+// OF THOSE THREE, ONE IS NOW ENFORCED AND ONE STILL DOES NOT EXIST, and the
+// sentence above states the SPECIFICATION rather than the deployment. ADR-235
+// built the mint the first leg names: `mintCertificateCode` in `@merit/db` at
+// 130 bits, measured by `RI-22` on every CI-01 pass. THE RATE LIMIT THIS ROW
+// HAS ITS OWN LINE FOR EXISTS NOWHERE IN THIS TREE, per IP or per `code`, and
+// ADR-235 section 5 rules it owed. Read the first leg as a property this
+// repository now holds and the second as one it does not. ADR-168 foreclosure 5 exists to stop
 // an implementer chasing the fourth one forever.
 //
 // -----------------------------------------------------------------------------

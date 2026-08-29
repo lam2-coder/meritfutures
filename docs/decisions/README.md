@@ -246,6 +246,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-230](ADR-230.md) | The `pair` class gets a WRITE door and keeps its read refusal, the narrowness is a stamp rather than a check, and the route it was built for still does not serve  (2026-08-29, status: proposed) |
 | [ADR-231](ADR-231.md) | The public lookup door, and the enumeration control it rests on is asserted by the corpus and enforced by nothing  (2026-08-29, status: proposed) |
 | [ADR-232](ADR-232.md) | The approval edge exists and is dual controlled above `500000` cents on an operator's hand alone, and it is not what ends a per-trader lockout  (2026-08-29, status: proposed) |
+| [ADR-235](ADR-235.md) | The code is the only credential, and the corpus asserted its strength in five places while no function in the repository produced one  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

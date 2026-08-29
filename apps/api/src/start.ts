@@ -123,11 +123,27 @@ setMethodDefinitionSource(databaseMethodDefinitions(LIVE_DB));
 // refusal, and that is a hit-versus-miss oracle built out of a configuration
 // error. `INV-M11-03`'s unknown wording is NOT among them and cannot be set.
 //
-// THE CODE'S OWN STRENGTH IS NOT SETTLED BY THIS LINE and ADR-231 section 6 is
-// the finding: `certificates.code` carries no length or alphabet bound in DDL,
-// nothing in this repository issues a certificate, and `INV-M11-05`'s 128 bits
-// is a corpus commitment with no enforcement in this tree. This route is the
-// surface that would pay for that, and the fix lands where a code is minted.
+// THE CODE'S OWN STRENGTH IS SETTLED AT THE MINT AND NOT BY THIS LINE, and
+// ADR-235 is where it was settled. When the door above landed, ADR-231 section 6
+// recorded that `INV-M11-05`'s 128 bits was a corpus commitment no function in
+// this repository produced: there was no minter, so the entropy of a certificate
+// code was not a small number, it was undefined. There is one now,
+// `mintCertificateCode` in `@merit/db`, at 130 bits from `node:crypto`, and
+// `RI-22` EXECUTES it on every CI-01 pass and measures the draws rather than
+// reading the source.
+//
+// TWO OF THE THREE CONTROLS THIS ROUTE RESTS ON NOW EXIST AND THE THIRD DOES
+// NOT. The entropy is real and asserted; the `certificate_verifications` write
+// below is real; the rate limit per IP and per ASN that `INV-M11-05` requires in
+// its own words and `API_CONTRACT:1473` rows as data EXISTS NOWHERE IN THIS
+// TREE. ADR-235 section 5 rules it owed rather than discharged, because no
+// arithmetic about the code space discharges a clause of the invariant that
+// names a limit.
+//
+// AND THE COLUMN IS STILL UNBOUNDED. `certificates.code` is `text NOT NULL`
+// with no length or alphabet CHECK, so what defends this route is that the mint
+// is the only writer in the tree and `RI-22` leg 3 keeps it that way. A bound in
+// DDL is a migration and ADR-235 section 6.1 leaves it owed.
 useVerifySource(databaseVerifySource(LIVE_DB));
 
 await main();
