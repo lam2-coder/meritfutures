@@ -636,6 +636,30 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     );
   });
 
+  // **THE CONDITION IS RESTATED WITH ALL THREE OF ITS TERMS, AND THE REPAIR IS
+  // THE FINDING RATHER THAN A TIDY-UP.** It was stated TWICE -- here and in
+  // `src/admin-source/liability.ts`'s `B5` block -- with TWO OF THREE TERMS
+  // EACH. This case said "a `writeRuleState` implementation lands, AND
+  // `eligible_next_7d` gains its `| null`"; the module said "a `rule_states`
+  // writer lands AND a primary source declares the stored `engine_gates` shape,
+  // or a ruling defines the forecast over columns that exist". **NEITHER NAMED
+  // THE OTHER'S SECOND TERM AND NO CONTROL COMPARED THEM**, which is `FM-16`'s
+  // shape -- a second statement of one predicate, free to drift -- arriving on
+  // the clearing condition that exists to stop exactly that. Session 392 wrote
+  // it ONCE in the module, with all three terms, and this case asserts all
+  // three. THE RULING ARM IS STRUCK: `ADR-204` is that ruling, it landed, and
+  // three sessions have now recorded that it moves nothing.
+  //
+  // **THE FOURTH ARM LANDED IN THIS SESSION'S OWN DIFF AND MOVED IT NO FURTHER
+  // EITHER.** `readCalendarSlice` is `projectPayout`'s `calendar` input, built
+  // over one covered interval and executed against a live PostgreSQL across a
+  // holiday and a coverage edge (`test/admin-source-liability-calendar.test.ts`).
+  // **`projectPayout` TAKES FIVE INPUTS AND THE ONE THAT BLOCKS IS `state`**: a
+  // `RuleState` carries `engineGates: EngineGateResults`, which lives in the bag
+  // term 2 is about. Four arms are now spent on this condition -- a ruling, an
+  // engine producer, a calendar loader, and a leg-2 refutation -- and not one of
+  // them was ever a term of it.
+  //
   // **THE RULING HALF OF THIS CONDITION FIRED AND THE PRODUCER HALF DID NOT**,
   // which is why the condition is restated rather than inverted. It read: "a
   // rule_states writer lands, OR a ruling defines the forecast". `ADR-204` is
@@ -670,10 +694,11 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   //      whose empty-horizon body is an open ruling. So the transcribing slice
   //      owes one `| null`, one gap entry, and one ruling on a sibling body.
   //
-  // CLEARING CONDITION, RESTATED: a `writeRuleState` implementation lands, AND
-  // `eligible_next_7d` gains its `| null`. Either one alone leaves this group
+  // CLEARING CONDITION, ALL THREE TERMS: a `writeRuleState` IMPLEMENTATION
+  // lands, AND a primary source declares the stored `engine_gates` ENCODING, AND
+  // `eligible_next_7d` gains its `| null`. Any one alone leaves this group
   // unproducible, and the group goes whole or not at all (EC-074).
-  it('CLEARING CONDITION: a rule_states WRITER lands, and the field gains its `| null`', () => {
+  it('CLEARING CONDITION: a rule_states WRITER, a declared engine_gates ENCODING, and the `| null`', () => {
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
     );
@@ -682,6 +707,19 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(
       readFileSync(join(ROOT, 'packages/rules-engine/src/payout/project.ts'), 'utf8'),
     ).toContain('export function projectPayout');
+    // TERM 2, WHICH THIS CASE DID NOT ASSERT AND THE MODULE'S COPY DID. The
+    // stored encoding is declared nowhere, so a reader would fix it from the
+    // read side. The bag is reached through `projectPayout`'s OWN input type,
+    // which is why term 1 landing alone would not clear this.
+    expect(
+      readFileSync(join(ROOT, 'packages/rules-engine/src/payout/project.ts'), 'utf8'),
+    ).toContain('readonly state: RuleState;');
+    expect(readFileSync(join(ROOT, 'packages/rules-engine/src/types.ts'), 'utf8')).toContain(
+      'readonly engineGates: EngineGateResults;',
+    );
+    expect(readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8')).not.toContain(
+      'engine_gates:',
+    );
     // THE DECLARATION HALF, READ AT THE CONTRACT. `ADR-203` ruling 8 names this
     // exact edit and does not make it, so a reader of that entry alone would
     // conclude the shape had landed.
@@ -704,6 +742,92 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     const book = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
     expect(book).toContain(
       "export type LiabilityBook = Omit<LiabilityResponse, 'eligible_next_7d'>;",
+    );
+  });
+});
+
+// =============================================================================
+// TERM 3 IS ATOMIC ACROSS THREE FILES, AND TAKING IT COSTS `RI-18` ITS SIGHT
+// =============================================================================
+// **SESSION 392 SEEDED THIS IN BOTH DIRECTIONS AND THE SECOND HALF WAS NOT
+// EXPECTED.** `ADR-203` ruled that a liability figure which is not there is a
+// null whose reason rides on the body, and `ADR-204` ruling 9 puts
+// `eligible_next_7d` under that shape. What nobody had measured is what the
+// shape costs the one control binding the three copies.
+//
+//   SEED A: `| null` on the `apps/api` copy ALONE.  **RED**, six findings, and
+//           it names the three declarations. FIVE field paths vanish from that
+//           copy at once, because `response-shape-copies.mjs` says in its own
+//           words that "A UNION is deliberately NOT reduced".
+//   SEED B: the same `| null` on ALL THREE copies.  **GREEN.**
+//   SEED C: with all three nulled, `by_day` RENAMED on ONE copy only.  **GREEN.
+//           DID NOT FIRE.**
+//   CONTROL: an identical drop at the same depth under a parent that is NOT
+//           nulled (`reserve.rcr_bp`).  **RED.** Without it seed C proves
+//           nothing.
+//
+// **SO THE ABSENCE SHAPE BUYS A WIRE THAT CAN DECLINE AND PAYS FOR IT IN THE
+// CHECK'S SIGHT**, and the price is not hypothetical: `per_plan[].cusum` has
+// carried `| null` since `ADR-203`, so `RI-18` is blind inside it TODAY. The
+// cases below are that measurement on the tree as it stands.
+// =============================================================================
+
+describe('term 3 of B5`s condition: the `| null` RI-18 binds in three copies', () => {
+  /** A member named EXACTLY `eligible_next_7d`, so a renamed one does not count. */
+  const declaresField = (rel: string): boolean =>
+    /(^|[\s(|])eligible_next_7d\s*:/m.test(readFileSync(join(ROOT, rel), 'utf8'));
+
+  it('has THREE declarations of the shape, one frozen and one in another deployable', () => {
+    // **WHY THIS TERM IS NOT ONE FENCE'S TO TAKE.** The contract is a FROZEN
+    // document, so moving it is an ADR and never a commit (`DISPATCH_PROTOCOL`
+    // section 3); `apps/admin` is a different deployable; and RI-18 refuses the
+    // partial move. A session holding one of the three can measure this term and
+    // cannot spend it.
+    //
+    // **THE PREDICATE IS A MEMBER NAME AND NOT A SUBSTRING, WHICH A SEED
+    // CAUGHT.** A first draft asked whether each file CONTAINED the string, and
+    // renaming the member to `eligible_next_7d_GONE` left it green, because the
+    // old name is a prefix of the new one. That non-firing is why the regex
+    // above anchors on the colon.
+    expect(declaresField('docs/architecture/API_CONTRACT.md')).toBe(true);
+    expect(declaresField('apps/api/src/routes/admin-reads.ts')).toBe(true);
+    expect(declaresField('apps/admin/src/api/types.ts')).toBe(true);
+    // Non-vacuity on the predicate itself: a name that is a SUPERSTRING of the
+    // field's does not satisfy it, which is the seed above turned into a case.
+    expect(/(^|[\s(|])eligible_next_7d\s*:/m.test('  readonly eligible_next_7d_GONE: {')).toBe(
+      false,
+    );
+    // And the check really does bind all three, out of its own source.
+    const check = readFileSync(
+      join(ROOT, 'packages/tooling/checks/response-shape-copies.mjs'),
+      'utf8',
+    );
+    expect(check).toContain("export const SUBJECTS = ['LiabilityResponse'];");
+    expect(check).toContain("export const CONTRACT_REL = 'docs/architecture/API_CONTRACT.md';");
+  });
+
+  it('goes BLIND inside any field that takes the absence shape, which cusum already has', () => {
+    // THE MECHANISM, AT ITS OWN LINE. A union is not reduced to a field set, so
+    // a nulled field contributes ONE path and none of its members. That is a
+    // deliberate ruling in that file (`SUBJECTS`: "Reducing a union to a field
+    // set needs a rule ... and no entry states one") and this case pins the
+    // CONSEQUENCE, which no entry had recorded.
+    const check = readFileSync(
+      join(ROOT, 'packages/tooling/checks/response-shape-copies.mjs'),
+      'utf8',
+    );
+    expect(check).toContain('A UNION is deliberately NOT reduced');
+    expect(check).toContain('Reducing a union to a field set');
+    // AND THE FIELD IT IS ALREADY BLIND INSIDE. `ADR-203` nulled `cusum` across
+    // the three copies, so its three members are outside RI-18's reach today.
+    const routes = readFileSync(join(ROOT, 'apps/api/src/routes/admin-reads.ts'), 'utf8');
+    expect(routes).toMatch(/readonly cusum: \{[^}]*\} \| null;/s);
+    expect(routes).toContain('readonly statistic: number;');
+    // Non-vacuity, and it is the CONTROL half of the seed pair: a member at the
+    // same depth whose parent is NOT nulled, where an identical drop went RED.
+    expect(routes).toContain('readonly rcr_bp: number;');
+    expect(readFileSync(join(ROOT, 'docs/decisions/ADR-203.md'), 'utf8')).toContain(
+      '`eligible_next_7d` TAKES THIS SHAPE',
     );
   });
 });

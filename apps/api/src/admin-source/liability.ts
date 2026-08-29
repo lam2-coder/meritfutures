@@ -161,6 +161,13 @@
 //       PER-ACCOUNT half is not, on two INDEPENDENT legs, either of which alone
 //       blocks the group.
 //
+//       **THE CALENDAR INPUT IS BUILT AS OF SESSION 392 AND IT LIFTS NOTHING**,
+//       which is stated before the legs so no reader infers otherwise.
+//       `projectPayout` takes FIVE inputs and {@link readCalendarSlice} is the
+//       one this fence can produce. `state: RuleState` carries `engineGates:
+//       EngineGateResults`, which is the bag leg 1 is about, so the input that
+//       blocks the fold is not the calendar and never was.
+//
 //       LEG 1, THE ENGINE'S OWN FORECAST IS UNWRITTEN AND UNSPECIFIED. Six gate
 //       groups decide eligibility (`tradedDays`, `winDays`, `buffer`,
 //       `consistency`, `cadenceGap`, `minimumAmount`) and exactly ONE of them
@@ -182,34 +189,71 @@
 //       which is why ADR-199 clause 4 could rule those two figures readable off
 //       an event nothing has emitted yet.
 //
-//       LEG 2, RECOMPUTING THE GATE NEEDS A COLUMN THAT DOES NOT EXIST. ADR-199
-//       section 6's own input table offers the other route: `plan_versions.rules`
-//       for `cadence_gap_trading_days` and the ladder caps, `accounts` for the
-//       pinned version, `rule_states` for the anchors. Every one of those is a
-//       real column and a registered `TableKey`. **`CalendarDay.sequence` IS
-//       NOT.** R-37 counts the gap by `sequence` subtraction and R-02 fixes that
-//       "gap counting is `calendar.sequence` subtraction, NEVER date arithmetic";
-//       `trading_calendar` declares no such column in `0004` or in any of the 59
-//       migrations, and `packages/db/src/seed/calendars/` assigns none. The
-//       engine gets its slice from a PORT (`BatchPorts.read.calendarSlice`) that
-//       the caller supplies, never from a table. So the substitute available here
-//       is date arithmetic, which is the one thing AS-06 says publishes "a rule
-//       its own traders cannot evaluate".
+//       LEG 2, **REFUTED BY `ADR-204` SECTION 8 AND NOW BUILT.** This paragraph
+//       read: "R-37 counts the gap by `sequence` subtraction and R-02 fixes that
+//       gap counting is `calendar.sequence` subtraction, NEVER date arithmetic;
+//       `trading_calendar` declares no such column ... So the substitute
+//       available here is date arithmetic, which is the one thing AS-06 says
+//       publishes a rule its own traders cannot evaluate."
 //
-//       **AND RECOMPUTING IT WOULD BE THE WRONG SHAPE EVEN IF THE COLUMN
-//       EXISTED.** `admin-source/account.ts` states this directory's rule for the
-//       same column: "Nothing in this module derives an eligibility, recomputes a
-//       gate or summarises one". A second evaluator of a money gate living in an
-//       admin read adapter is FM-M6-07's shape on the pager one field over.
+//       **THE PREMISE HOLDS AND THE CONCLUSION DOES NOT FOLLOW.** The column is
+//       still absent and nothing here adds one. `CalendarDay.sequence` is a
+//       property of the SLICE rather than of the table, every reader of it is
+//       slice local, and a slice over ONE COVERED INTERVAL cannot have a hole,
+//       because `0032` makes a day inside coverage the table does not hold
+//       POSITIVELY not a session. So position over the ordered, holiday-filtered
+//       rows of one covered interval IS the dense index. That entry returned the
+//       work to this fence in terms -- "a `CalendarSlice` loader in the
+//       `apps/api` fence, not DDL" -- and {@link readCalendarSlice} below is it,
+//       executed against a live database across a holiday and a coverage edge.
+//       **LEG 2 IS SPENT AND IT WAS NEVER A MIGRATION.**
+//
+//       **AND NOTHING BELOW RECOMPUTES A GATE, WHICH THE ROUTE THIS PARAGRAPH
+//       USED TO FEAR WOULD HAVE.** `admin-source/account.ts` states this
+//       directory's rule: "Nothing in this module derives an eligibility,
+//       recomputes a gate or summarises one". The loader produces a CALENDAR and
+//       `packages/rules-engine`'s own `projectPayout` is the evaluator, so the
+//       second evaluator of a money gate that would be FM-M6-07's shape one field
+//       over does not exist and is not proposed.
 //
 //       **THE GROUP GOES WHOLE OR NOT AT ALL**, on B2's stated reason. Producing
 //       only the accounts eligible TODAY would understate `total_cents`, and that
 //       figure is the one the payout wallet is funded against (EC-074, P-M6-02,
 //       ADR-011's top-up trigger). EC-074's own words for understating it:
 //       "Funding the wallet against the overstatement starves operations".
-//       CLEARING CONDITION: a `rule_states` writer lands and a primary source
-//       declares the stored `engine_gates` shape, or a ruling defines the
-//       forecast over columns that exist.
+//
+//       **THE CLEARING CONDITION WAS STATED TWICE, IN TWO PLACES, WITH TWO OF
+//       ITS THREE TERMS EACH, AND THE TWO STATEMENTS HAD DRIFTED APART.** This
+//       header said "a `rule_states` writer lands AND a primary source declares
+//       the stored `engine_gates` shape, or a ruling defines the forecast over
+//       columns that exist"; `test/admin-source-liability.test.ts` said "a
+//       `writeRuleState` implementation lands, AND `eligible_next_7d` gains its
+//       `| null`". Neither named the other's second term. **THAT IS `FM-16`'s
+//       shape arriving on the clearing condition itself** -- a second statement
+//       of one predicate, free to drift, with no control comparing them -- and it
+//       is repaired by writing the condition ONCE, here, with all three terms.
+//       The ruling arm is struck: `ADR-204` IS that ruling, it landed, and it
+//       moved nothing, which is what session 388 recorded and 389 confirmed.
+//
+//       **CLEARING CONDITION, ALL THREE TERMS, AND THE GROUP NEEDS EVERY ONE:**
+//         1. A `writeRuleState` IMPLEMENTATION. `nightly.ts` calls the port and
+//            the only things satisfying it are test doubles and
+//            `scripts/demo/world.ts`, which refuses. `rule_states` therefore
+//            holds no rows, which session 392 measured on a live database over
+//            all 60 migrations: **ZERO**. `apps/worker/**` and `packages/**`.
+//         2. A PRIMARY SOURCE DECLARING THE STORED `engine_gates` ENCODING.
+//            `EngineGateResults` types every cents member `bigint`, which JSON
+//            cannot carry, and `0015`'s column comment names EIGHT gates where
+//            the engine produces six. Without it a reader here would FIX the
+//            encoding from the read side, which is the trade `ADR-199` section 7
+//            refuses. An ADR.
+//         3. `eligible_next_7d: EligibleNext7d | null`, so the response can
+//            decline where the horizon has no answer (`ADR-204` ruling 9,
+//            `ADR-203`). **`RI-18` MAKES THIS ONE ATOMIC ACROSS THREE FILES** --
+//            `API_CONTRACT.md`, `routes/admin-reads.ts` and
+//            `apps/admin/src/api/types.ts` -- and session 392 seeded it and
+//            watched it fire: the partial move drops FIVE field paths from one
+//            copy and reports six findings. An ADR plus two fences.
 //
 // **`withdrawals_in_flight_cents` IS ABSENT AND IS NOT A FIFTH BLOCKER**, because
 // it is not on the response. ADR-195 section 6 row 1 owes the column, no migration
