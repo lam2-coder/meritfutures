@@ -206,16 +206,25 @@ function cleanTree(): string {
   // register's own pointers back rather than some other ones.
   //
   // `scope.ts` DOUBLES AS RI-16'S TWO REGISTERED DOC FINDINGS, and the line
-  // choices are not free: `derived` sits at 521 and `firm` at 487, so the
+  // choices are not free: `derived` sits at 545 and `firm` at 511, so the
   // SECOND number of each comma list in `ALLOCATION.md` below resolves and the
   // FIRST one does not. That is the real tree's shape -- four wrong pointers of
   // which two go green on a coincidence -- reproduced rather than described.
+  //
+  // ALL FOUR NUMBERS MOVED BY 24 UNDER ADR-237 AND THE SHAPE IS UNCHANGED. The
+  // real `scope.ts` gained two registry entries, every declaration below its
+  // `TABLES` object moved, and the register moved with the rows rather than the
+  // rows being left pointing at a coincidence. THE FIXTURE IS A COPY OF A
+  // MOVING TREE AND THAT IS THE ONE THING IT CANNOT DERIVE: the register names
+  // literal numbers, so a fixture that did not move with them would report
+  // every registered finding as vacant. It went red exactly that way before
+  // this shift, on the same run that proved the register entries had followed.
   write(
     root,
     'packages/db/src/scope.ts',
     Array.from({ length: 960 }, (_, i) => {
       if (i + 1 === 909) return '';
-      const name = { 487: 'firm', 521: 'derived' }[i + 1];
+      const name = { 511: 'firm', 545: 'derived' }[i + 1];
       return name === undefined ? '//' : `// class: '${name}',`;
     })
       .join('\n')
@@ -282,9 +291,9 @@ function cleanTree(): string {
     '# Number allocation\n\n## Reservations\n\n' +
       '| 164 | `PayoutTx.ledger` (`routes/payouts.ts:395`) is required, and the worker at ' +
       "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts; both are scope " +
-      'class `derived` (`scope.ts:512,521`) |\n' +
+      'class `derived` (`scope.ts:536,545`) |\n' +
       '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395`, and ' +
-      'both plan tables are scope class `firm` (`scope.ts:482,487`) |\n',
+      'both plan tables are scope class `firm` (`scope.ts:506,511`) |\n',
   );
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(

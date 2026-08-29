@@ -3548,14 +3548,14 @@ const WAVE_06 = 'docs/plans/WAVE-06-admin-console-transport.md';
  * matches nothing and becomes a finding of its own.
  *
  * TWO MORE ARRIVED WITH THE COMMA LIST (ADR-212), AND THEY WERE NEVER READ AT
- * ALL BEFORE IT. `` `scope.ts:512,521` `` and `` `scope.ts:482,487` `` are the
+ * ALL BEFORE IT. `` `scope.ts:536,545` `` and `` `scope.ts:506,511` `` are the
  * shape the tail expression did not match, so the WHOLE token fell through as
  * prose and neither number in either was ever resolved. Read now, all four
  * pointers are 200-plus lines out -- `ledgerTransactions` and `ledgerEntries`
- * are at `scope.ts:742` and `:733`, `planVersions` and `planVersionSizes` at
- * `:702` and `:707` -- and TWO of the four go green anyway, on the coincidence
- * this entry's own subject is about: `derived` sits at `:518` inside
- * `DerivedRule` and `firm` at `:489` inside a docblock, both within the window
+ * are at `scope.ts:766` and `:757`, `planVersions` and `planVersionSizes` at
+ * `:726` and `:731` -- and TWO of the four go green anyway, on the coincidence
+ * this entry's own subject is about: `derived` sits at `:542` inside
+ * `DerivedRule` and `firm` at `:513` inside a docblock, both within the window
  * of the pointer beside them. The two the window does catch are registered
  * here. THE ROWS ARE NOT REPAIRED AND THAT IS DELIBERATE: rows 164 and 168 are
  * other sessions' dated reservations, this register already holds three
@@ -3566,8 +3566,8 @@ const WAVE_06 = 'docs/plans/WAVE-06-admin-console-transport.md';
  * @type {readonly {file: string, cites: string, name: string | null}[]}
  */
 const DOC_CITATIONS_OWNED_ELSEWHERE = [
-  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:512', name: 'derived' },
-  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:482', name: 'firm' },
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:536', name: 'derived' },
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:506', name: 'firm' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'ledger' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'LedgerTx' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'sweeps/ports.ts:219', name: 'systemDb' },
