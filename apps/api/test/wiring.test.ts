@@ -284,38 +284,82 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // superseded (constitution E2), so what a TABLE can store is never a fact about
   // one file. An entry asking a per-file question about a per-table fact is stale
   // the moment the next `ALTER TABLE` lands, by construction.
+  //
+  // AND SESSION 429 FOUND A FOURTH REASON UNDER THE THIRD, WHICH IS WHY THE ENTRY
+  // NOW LEADS SOMEWHERE ELSE ENTIRELY. Every clause this entry has ever carried
+  // was a clause about a DOOR: a handle, a read, a decoding. The thing actually
+  // standing between this port and a `RuleState` is not a door at all and is not
+  // in `apps/api`. `rule_states` is written by one function, that function is
+  // called by one function, and that function is called by NOTHING: the worker
+  // deployable's `start` script loads a barrel of exports, declares `main` and
+  // never invokes it, so the process exits 0 having scheduled nothing. A payout
+  // that needs a rule state, in an estate where no job ever computes one, is a
+  // MISSING SCHEDULED JOB and not a wiring, and ADR-239 sizes it.
+  //
+  // THE THIRD CLAUSE ALSO NARROWED AND THE NARROWING IS THE GOOD NEWS. This entry
+  // said a decoding for `engine_gates` would be inventing a corpus fact. ADR-206
+  // ruled that fact on 2026-08-29 and `rule_states.md` reproduces it, so what is
+  // owed is a codec somebody writes rather than a decision somebody makes. The
+  // clause is REWRITTEN rather than deleted, because the implementation is still
+  // absent and the refusal still stands; only its price changed.
+  //
+  // ADR-239 RULES THE QUESTION THIS ENTRY KEPT IMPLYING WITHOUT ASKING: the API
+  // READS a `RuleState` the WORKER WROTE, and the two deployables meet at
+  // `rule_states`. The alternative, an API that folds its own, puts the engine on
+  // two paths and only one of them is audited, which is the divergence ADR-026
+  // C-07's `state_hash` exists to make detectable.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
-    'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND NOT THE `firm` READ THIS ENTRY LED WITH ' +
-    'UNTIL ADR-233. THE FIRM-READ CLAUSE IS DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A ' +
-    'DOOR THAT LANDED: `ScopedTx` now carries `catalogRows`, `catalogRowsWhere` and ' +
-    '`catalogRowAt` over `CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2558`), a closed ' +
-    'list of five `firm` keys that includes `planVersions` and `planVersionSizes`, so ' +
-    "`PayoutTx.subject`'s `ResolvedPlan` inputs are readable ON THE PAYOUT TRANSACTION and " +
-    'the two-transaction remedy ADR-211 clause 2 ruled is not needed. AN OLDER CLAUSE IS KEPT AS ' +
-    'HISTORY BECAUSE IT WAS FALSE: this entry once read "a `RuleState` NO MIGRATION IN THIS TREE ' +
-    'CAN STORE", and `lifetime_settled_cents`, `breached` and `breach_kind` are all three ' +
-    'columns of `rule_states` as of ' +
+    'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE IS NOW THE ONE NO ENTRY ' +
+    'ON THIS PORT OR ON `/eligibility` HAD EVER NAMED: NOTHING SCHEDULES THE JOB THAT WOULD ' +
+    'PRODUCE ONE, AND THAT IS A MISSING DEPLOYABLE RATHER THAN A MISSING DOOR. ' +
+    "`apps/worker/package.json` starts this workspace's only batch deployable at " +
+    '`node --experimental-strip-types src/index.ts`, and that module DECLARES ' +
+    '`export function main` (`apps/worker/src/index.ts:1268`) and calls it nowhere, while ' +
+    '`apps/api/src/start.ts:149` is `await main();`. The two entrypoints differ by one ' +
+    'statement. MEASURED RATHER THAN READ: `pnpm --filter @merit/worker start` loads the ' +
+    'barrel, prints nothing and exits 0, which is what a HEALTHY service looks like to a ' +
+    'supervisor, so the absence pages nobody. SECOND, EVEN GIVEN A SCHEDULER THERE IS NOTHING ' +
+    'TO SCHEDULE AGAINST: `runNightlyBatch` (`apps/worker/src/batch/nightly.ts:276`) takes a ' +
+    '`BatchPorts`, its read half declares SEVEN methods and its write half THREE ' +
+    '(`apps/worker/src/batch/ports.ts:265,336`), and NO VALUE OF THAT TYPE IS CONSTRUCTED ' +
+    'UNDER ANY `src/`: the four that exist are three test doubles and `scripts/demo/world.ts`, ' +
+    'whose `writeRuleState` refuses. THIRD, THE WRITER WOULD REFUSE ON A CODEC THAT IS RULED ' +
+    'AND UNWRITTEN, AND THIS CLAUSE NARROWED SINCE ADR-233: ' +
+    '`RuleStateWriterIo.encodeEngineGates` (`apps/worker/src/batch/state-writer.ts:354`) has no ' +
+    'implementation under any `src/` and `UNWIRED_RULE_STATE_WRITER_IO` throws by name, but ' +
+    'the stored shape is NO LONGER UNDECLARED. This entry read that writing a decoding would be ' +
+    "inventing a corpus fact; ADR-206 ruled the encoding as the engine's own value, six groups " +
+    'and twenty-five leaves with every cents leaf a base-10 string, and ' +
+    '`docs/architecture/data-model/rule_states.md` reproduces it in full. SO THE BLOCKER MOVED ' +
+    'FROM A RULING NOBODY HAD MADE TO A MODULE NOBODY HAS TYPED, and it binds the READ this ' +
+    'port needs as hard as the write: `PayoutTx.subject` (`routes/payouts.ts:428`) returns a ' +
+    '`PayoutSubject` whose `state` (`routes/payouts.ts:331`) is a `RuleState`, ' +
+    '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1006`) is `EngineGateResults` ' +
+    '(`packages/rules-engine/src/types.ts:961`), and `rule_states.engine_gates` is `jsonb`. ' +
+    'FOURTH, `rule_states` HOLDS NO ROWS, so a backend installed today would compute a ' +
+    'confident payout verdict off an empty table, which is a wrong answer where a 503 is an ' +
+    'honest one. FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
+    'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
+    '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
+    "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
+    'detectable, computed on the one path no replay audit reads. THE FIRM-READ CLAUSE IS ' +
+    'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
+    'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
+    '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +
+    "`planVersions` and `planVersionSizes`, so `PayoutTx.subject`'s `ResolvedPlan` inputs are " +
+    'readable ON THE PAYOUT TRANSACTION and the two-transaction remedy ADR-211 clause 2 ruled ' +
+    'is not needed. AN OLDER CLAUSE IS KEPT AS HISTORY BECAUSE IT WAS FALSE: this entry once ' +
+    'read "a `RuleState` NO MIGRATION IN THIS TREE CAN STORE", and `lifetime_settled_cents`, ' +
+    '`breached` and `breach_kind` are all three columns of `rule_states` as of ' +
     '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
     'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
-    'lines. WHAT REFUSES NOW, DERIVED ON THIS TREE RATHER THAN INHERITED, AND IT IS NOT THE ' +
-    'CHEAPEST BLOCKER THIS ENTRY EVER NAMED, IT IS THE DEAREST. FIRST, `PayoutTx.subject` ' +
-    '(`routes/payouts.ts:428`) returns `PayoutSubject` whose `state` (`routes/payouts.ts:331`) ' +
-    'is a `RuleState`, and `RuleState.engineGates` ' +
-    '(`packages/rules-engine/src/types.ts:1006`) is `EngineGateResults` ' +
-    '(`packages/rules-engine/src/types.ts:961`) while `rule_states.engine_gates` is `jsonb`. ' +
-    'THERE IS NO DECODING FOR THAT COLUMN AND WRITING ONE WOULD BE INVENTING A CORPUS FACT: ' +
-    '`RuleStateWriterIo.encodeEngineGates` (`apps/worker/src/batch/state-writer.ts:337`) has no ' +
-    'implementation under any `src/`, and the stored encoding is a corpus amendment rather than ' +
-    'a line of code. SECOND, `rule_states` HOLDS NO ROWS AND NOTHING IN A DEPLOYMENT WRITES ' +
-    'ONE, so a backend would compute a confident payout verdict off an empty table. THOSE TWO ' +
-    'ARE NOT FOUND BY THIS ENTRY AND THAT IS THE FINDING: `ELIGIBILITY_BLOCKER` ' +
-    '(`routes/account-reads.ts:851`) has stated both about `GET /accounts/:id/eligibility` ' +
-    'since session 401, `INV-M5-02` requires BOTH payout endpoints to call `evaluatePayout` ' +
-    'with identical inputs, and no reason on this port had ever named it. THIRD: NOTHING IN ' +
-    'THIS TREE IMPLEMENTS `PayoutTx`. FOURTH, AND REGISTERED RATHER THAN REPAIRED: ' +
-    '`routes/payouts.ts:438-439` states "no member of this interface that a scoped door cannot ' +
-    'serve", which ADR-233 makes TRUE of the catalogue half and leaves false of `state`. A ' +
+    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:438-439` states "no member of ' +
+    'this interface that a scoped door cannot serve", which ADR-233 makes TRUE of the ' +
+    'catalogue half and leaves false of `state`. EVERY CLAUSE ABOVE IS A PREDICATE SOMEWHERE ' +
+    'AND NOT ONLY A SENTENCE HERE: `apps/api/test/rule-state-producibility.test.ts` runs the ' +
+    'four links on every CI-01 pass, because a reason naming the second-cheapest blocker ' +
+    'retires the question for every reader after it and this entry has done that twice. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
     'both constructible today (`payoutRequests` is `owned`, `scope.ts:1126`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +

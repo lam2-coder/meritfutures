@@ -29,11 +29,11 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->223<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->224<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->223<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->224<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->223<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->224<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9648,6 +9648,95 @@ is whether a mint may land ahead of its issuer at all.
 **Measured, not carried**: 66 migrations applied forward-only under `ON_ERROR_STOP=1` on PostgreSQL 16.13, **115** base tables unchanged, **17** cases watched refusing and permitting. **33 of 33** gates, **20 of 20** invariants, **256 files / 6,403 passed / 6 skipped**, typecheck 0, lint 0, `format:check` clean.
 
 **LANDMINE, AND IT IS THE SAME ONE TWICE.** A test that greps the tree for a pattern **contains that pattern**, so it matches itself. The importer scan failed on its own finding text, then on its own comment explaining the first failure. The needle is now assembled from fragments so the scan needs no exclusion list and stays total. **The same class as ADR-212's rule for `file:line` pointers, arriving in a runner instead of in prose.**
+
+## 2026-08-29 - Session 429: the payout port is not blocked by a door, it is blocked by a deployable that runs no job ([ADR-239](decisions/ADR-239.md), proposed)
+
+**THE ROW'S OWN FIRST INSTRUCTION WAS RIGHT AND THERE IS A LINK UNDER IT.**
+`runNightlyBatch` is exported and called by nothing, and **the deployable that
+would call it does not run.** [`apps/worker/package.json`](../apps/worker/package.json)
+starts `src/index.ts`; that module declares `export function main` at
+[`:1268`](../apps/worker/src/index.ts) and calls it nowhere;
+[`apps/api/src/start.ts:149`](../apps/api/src/start.ts) is `await main();`. The
+two entrypoints differ by one statement. **MEASURED RATHER THAN READ:
+`pnpm --filter @merit/worker start` prints nothing and exits 0**, which is what a
+healthy service looks like to a supervisor, **so the absence pages nobody**.
+
+**THAT IS LARGER THAN THE WIRING THE ROW WAS WILLING TO SETTLE FOR.** The
+provisioning saga, the expiry sweep, the detector runner, the breaker evaluator
+and the two digest producers are all downstream of the same uncalled function.
+Every one of them is described in
+[CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md) as *"built against ports and not
+yet wired or scheduled"*, which reads as one missing adapter per job. **There is
+no process.**
+
+**FOUR LINKS STAND BETWEEN THIS TREE AND ONE `rule_states` ROW, ALL ABSENT, AND
+ONLY TWO HAD EVER BEEN NAMED ON THIS PORT.** A scheduler. A `BatchPorts` value,
+which **no file under any `src/` constructs**: seven read methods at
+[`ports.ts:265`](../apps/worker/src/batch/ports.ts), three write at
+[`:336`](../apps/worker/src/batch/ports.ts), and the four satisfiers that exist
+are three test doubles and [`scripts/demo/world.ts`](../scripts/demo/world.ts),
+which refuses. An `engine_gates` codec. And rows.
+
+**THE QUESTION IS RULED AND THE FIRST ANSWER IS THE RIGHT ONE: the API READS a
+`RuleState` the WORKER WROTE**, and the two deployables meet at `rule_states`.
+`INV-M5-02` ([M05:81](plans/M05-payout-system.md)) is a claim about the number of
+EVALUATORS and states its own control in five words, *"a second evaluator would
+be a second rule"*; a request-path fold is **invisible** to
+[ADR-026](decisions/ADR-026.md) `C-07`'s `state_hash`, which is the one detector
+this corpus built for two disagreeing producers, because a state computed in a
+request is never stored and never hashed; and `R-06`
+([M01:470](plans/M01-rules-engine.md)) leaves the request path no legal mark to
+fold from at all.
+
+**ONE BLOCKER GOT CHEAPER AND THAT IS THE ENTRY'S SECOND FINDING.**
+`usePayoutBackend` said a decoding for `engine_gates` **would be inventing a
+corpus fact**. [ADR-206](decisions/ADR-206.md) ruled that fact on 2026-08-29,
+six groups and twenty-five leaves with every cents leaf a base-10 string, and
+[`rule_states.md`](architecture/data-model/rule_states.md) reproduces it in full.
+**So the clause moved from a ruling nobody had made to a module nobody has
+typed.** Two live sentences still said otherwise:
+[`state-writer.ts`](../apps/worker/src/batch/state-writer.ts)'s docblock is
+**REPAIRED** and the port's reason is **REWRITTEN**, both in fence.
+**`ELIGIBILITY_BLOCKER` carries the same retired sentence and is REPORTED rather
+than edited**, `routes/account-reads.ts` being outside this fence, so
+`INV-M5-02`'s one blocker across two endpoints now reads two ways until somebody
+holds that file.
+
+**THE PORT IS NARROWED AND NOT WIRED**, and a PARTIAL backend is refused rather
+than overlooked: `listPayouts` and `idempotency` are constructible today, and
+installing them beside a `transact` whose `subject` rejects would put a
+live-looking route in front of the arm that approves payouts.
+
+**THE NEXT SLICE IS SIZED AS THREE, STRICTLY ORDERED.** The **codec** in
+`packages/rules-engine`, cheapest and with no open question, reachable from both
+manifests, and it also clears `B5` term 2's implementation that `readLiability`
+waits on. The **`BatchPorts` adapter**, ten methods plus `FM-10`'s per-account
+advisory lock, whose event sink `TRANSACTION_EVENT_WRITER` lives in `apps/api`
+and which `apps/worker` cannot import. The **scheduler**, which is where the
+migration is: pg-boss's schema is in no migration in this tree.
+
+**A THIRD FINDING, REPORTED AND NOT REPAIRED.**
+[CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md)'s nightly-batch row does not say
+the job is unscheduled while four rows below it say exactly that about their own
+jobs, and it is the `S2` row the `S1` replay self-audit and the statistics run
+both sit downstream of.
+
+**EVERY CLAUSE IS A PREDICATE AND NOT ONLY A SENTENCE.**
+[`rule-state-producibility.test.ts`](../apps/api/test/rule-state-producibility.test.ts)
+runs the four links on every `CI-01` pass, each with a non-vacuity half: the
+entrypoint case asserts the API's `main()` call with the identical predicate that
+finds no call in the worker, and the `BatchPorts` census is shown finding the
+four values that exist outside `src/`. **Eight seeds, eight red**, each restored
+from a byte copy with SHA-256 checked both ways.
+
+Counts derived at reporting time: **33 of 33** gates, **21 of 21** invariants
+read off the runner's own last line, **260 files / 6,461 passed / 6 skipped**
+against an `origin/main` baseline at `294a64f` of **259 / 6,454 / 6** reproduced
+before a line changed, a delta of **+1 file and +7 cases**, typecheck 0, lint 0,
+`format:check` clean. **`RI-15` went red on this branch's own citation drift**
+and is repaired at source. **No migration taken and none needed**; `0073` is
+session 427's and stays free of this branch. **`falsify.mjs` was NOT run**: it is
+not in this row's verification list and it mutates the working tree.
 
 ## Session 428: the checkout port kept all three blockers, and the cap had the wrong home rather than no source
 
