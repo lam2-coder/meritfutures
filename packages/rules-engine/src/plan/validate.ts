@@ -215,6 +215,11 @@ function validateRules(rules: PlanRulesJson, out: CvViolation[]): void {
   // `phase_funded.max_payouts`, DATA_MODEL section 11 carries it, and
   // `0004_catalog.sql` says "the zod schema and the CV publish validations key
   // off these names". The rule is unchanged and only its spelling moved.
+  //
+  // OF THAT PAIR ONLY THE CV HALF EXISTS AND THIS FILE IS IT (ADR-225). `zod`
+  // is a dependency of no `package.json` in this workspace and no file under
+  // `apps/**` or `packages/**` imports it. The quotation above is exact and
+  // `0004` is not edited (constitution E2).
   if (!(fu.max_payouts >= 1) || !isInt(fu.max_payouts)) {
     out.push(
       versionViolation('CV-14', 'phase_funded.max_payouts', `max_payouts is ${fu.max_payouts}`),

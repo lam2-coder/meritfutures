@@ -416,7 +416,24 @@ export type JsonValue =
  * API_CONTRACT declares this field as `PlanRules`, "exact JSON from DATA_MODEL
  * §11", and §11 is a jsonc example rather than a TypeScript declaration. So a
  * portal type enumerating its keys would be a SECOND COPY OF THE RULE SCHEMA,
- * maintained here, against a zod validator that lives at the write boundary.
+ * maintained here.
+ *
+ * THIS COMMENT READ "against a zod validator that lives at the write boundary"
+ * AND THAT WAS FALSE ABOUT THIS TREE. ADR-225 is the finding and the ruling:
+ * `zod` is a dependency of no `package.json` in this workspace, no file under
+ * `apps/**` or `packages/**` imports it, and after `pnpm install
+ * --frozen-lockfile` a resolve of `zod` from `apps/portal/src` fails
+ * `MODULE_NOT_FOUND`. This was the ONE citation of the five that ASSERTED the
+ * validator rather than quoting a document that names it.
+ *
+ * THE REFUSAL IS UNCHANGED AND THE REPAIRED REASON IS STRONGER THAN THE ONE IT
+ * REPLACES. What stands at that boundary is `validatePlan`, hand-written, in
+ * `packages/rules-engine/src/plan/validate.ts`, reached through
+ * `AdminWriteBackend` at `POST /admin/plans/versions/:versionId/publish`. It is
+ * `CV-01` to `CV-19` over NAMED keys: it enumerates no key set and refuses
+ * nothing for being unknown, and the draft INSERT one route earlier checks only
+ * that `rules` is a JSON object. So the rules object can carry a key that no
+ * validator anywhere names, and a typed portal walk would drop exactly that key.
  *
  * THE FAILURE THAT COPY PRODUCES IS THE WORST ONE AVAILABLE ON THIS SURFACE.
  * The rule diff (SC-M4-06) walks two of these and reports where they differ. A

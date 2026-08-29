@@ -56,7 +56,7 @@ import { expect, test } from 'vitest';
 // -----------------------------------------------------------------------------
 // `useAffiliateDeps`, `useKycDeps` and `useCheckoutAdapters` already hold their
 // PRODUCTION value at module scope (`affiliate.ts:478`, `kyc.ts:284`,
-// `checkout.ts:1005`), so calling their setter from `start.ts` would install the
+// `checkout.ts:1013`), so calling their setter from `start.ts` would install the
 // object that is already installed and change nothing a request sees. It would
 // also make this file pass. THE REASON TEXT IS WHERE THAT IS RECORDED, so a
 // later reader raising the count that way meets the sentence saying it is not a
@@ -285,16 +285,16 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'beside a `transact` that rejects would put a live-looking route in front of the arm that ' +
     'approves payouts. MONEY PATH.',
   useCheckoutBackend:
-    '`CheckoutTx.insertAttribution` (`routes/checkout.ts:878`) writes `attributions`, which is ' +
+    '`CheckoutTx.insertAttribution` (`routes/checkout.ts:886`) writes `attributions`, which is ' +
     'scope class `pair` and which no authority in `packages/db` admits a request handler ' +
-    "writing; and the wallet arm's `ledger` (`routes/checkout.ts:869`) is the same `LedgerTx` " +
+    "writing; and the wallet arm's `ledger` (`routes/checkout.ts:877`) is the same `LedgerTx` " +
     'ADR-165 declined to reach. The card arm alone would be a partial backend whose port ' +
     'promises the whole transaction.',
   useCheckoutAdapters:
     'a configured PSP adapter per MID plus the `returnUrl` and `cancelUrl` configuration. ' +
     '`packages/psp` ships a port and TWO FAKES (`fakes/psp-a.ts`, `fakes/psp-b.ts`) and no ' +
     'vendor adapter, and `packages/enrichment` is in the same position. NOTE: this port already ' +
-    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1005`), so calling the ' +
+    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1013`), so calling the ' +
     'setter here would install what is already installed. That would raise the wired count and ' +
     'serve nothing, and it is not a wiring.',
 
