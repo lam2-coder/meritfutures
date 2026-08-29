@@ -21,6 +21,13 @@
 -- and 2 are session 401's exact mutations: `buffer_cents` 100000 -> 777777 on a
 -- published version, and that version's whole size grid DELETEd.
 --
+-- WHAT THIS PROBE DOES NOT SEE, measured rather than guessed. Seeded with the
+-- trigger moved from `BEFORE` to `AFTER`, all seventeen cases stay GREEN: the
+-- exception aborts the statement either way, so the row never lands and every
+-- assertion here is satisfied. The timing is a property of the migration and
+-- not of this file, and a reader who takes green here as proof of `BEFORE` is
+-- taking more than was measured. Six other seeds were watched turning it red.
+--
 -- Run against a database with the full migration set applied:
 --   psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_published_size_grid_immutable.sql
 --
@@ -149,6 +156,10 @@ BEGIN
       CASE WHEN msg LIKE '%is published and its size grid is immutable%'
                 AND msg LIKE '%Attempted UPDATE%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('published grid refuses an UPDATE',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
   -- The value must still be the one the version published with, not merely
@@ -172,6 +183,10 @@ BEGIN
       CASE WHEN msg LIKE '%is published and its size grid is immutable%'
                 AND msg LIKE '%Attempted DELETE%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('published grid refuses a DELETE',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
   SELECT count(*) INTO n FROM plan_version_sizes WHERE plan_version_id = pub;
@@ -199,6 +214,10 @@ BEGIN
       CASE WHEN msg LIKE '%is published and its size grid is immutable%'
                 AND msg LIKE '%Attempted INSERT%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('published grid refuses an INSERT',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
   -- ---------------------------------------------------------------------------
@@ -217,6 +236,10 @@ BEGIN
       CASE WHEN msg LIKE '%is published and its size grid is immutable%'
                 AND msg LIKE '%size_cents 15000000 row.%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('a row cannot MOVE ONTO a published version',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
   -- ---------------------------------------------------------------------------
@@ -233,6 +256,10 @@ BEGIN
     INSERT INTO probe_result VALUES ('a row cannot MOVE OFF a published version',
       CASE WHEN msg LIKE '%it already carries%' AND msg LIKE '%size_cents 5000000%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('a row cannot MOVE OFF a published version',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
   -- ---------------------------------------------------------------------------
@@ -289,6 +316,10 @@ BEGIN
     INSERT INTO probe_result VALUES ('retired grid refuses an UPDATE',
       CASE WHEN msg LIKE '%is retired and its size grid is immutable%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('retired grid refuses an UPDATE',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
   BEGIN
@@ -300,14 +331,24 @@ BEGIN
     INSERT INTO probe_result VALUES ('retired grid refuses a DELETE',
       CASE WHEN msg LIKE '%is retired and its size grid is immutable%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('retired grid refuses a DELETE',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
+  -- A SIZE OF ITS OWN, AND THE SEED IS WHY. Reusing rejection 3's 10000000 made
+  -- this statement collide with rejection 3's row on
+  -- plan_version_sizes_version_size_uq the moment a seed let that INSERT
+  -- through, and unique_violation is not check_violation, so the exception
+  -- escaped the block and took the whole probe with it. One seeded defect
+  -- reported as a crash three cases later rather than as its own FAIL row.
   BEGIN
     INSERT INTO plan_version_sizes (plan_version_id, size_cents, price_cents,
       reset_price_cents, drawdown_cents, profit_target_cents, buffer_cents,
       win_day_floor_cents, payout_cap_schedule_cents, floor_lock_enabled)
-    VALUES (pub, 10000000, 45000, 40000, 400000, 600000, 400000, 20000,
-            '[{"from_ordinal":1,"cap_cents":400000}]'::jsonb, false);
+    VALUES (pub, 20000000, 85000, 80000, 800000, 1200000, 800000, 40000,
+            '[{"from_ordinal":1,"cap_cents":800000}]'::jsonb, false);
     INSERT INTO probe_result VALUES ('retired grid refuses an INSERT',
       'FAIL: the insert committed');
   EXCEPTION WHEN check_violation THEN
@@ -315,6 +356,10 @@ BEGIN
     INSERT INTO probe_result VALUES ('retired grid refuses an INSERT',
       CASE WHEN msg LIKE '%is retired and its size grid is immutable%'
            THEN 'PASS' ELSE 'FAIL: wrong message: ' || msg END);
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT, code = RETURNED_SQLSTATE;
+    INSERT INTO probe_result VALUES ('retired grid refuses an INSERT',
+      'FAIL: wrong error class ' || code || ' ' || msg);
   END;
 
   -- ---------------------------------------------------------------------------
