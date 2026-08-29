@@ -39,6 +39,24 @@
 //
 // NO SHAPE CLAIM. `get` returns `unknown` and section 5 argues why a generic
 // `get<T>` was refused.
+//
+// -----------------------------------------------------------------------------
+// THE WRITE VERB ARRIVED SECOND, AND IT IS ADR-219 RATHER THAN ADR-162
+// -----------------------------------------------------------------------------
+// For seven weeks this interface had exactly one member. Three screens declined
+// to add the second and each said why at the point it declined: the payout
+// centre for `POST /accounts/:accountId/payout`, the security screen for
+// `POST /sessions/:id/revoke`, and the sign-in screen for all four of its
+// routes. THE DECLINES WERE RIGHT. A write is not a read with a different
+// string in `method`: it carries a request body, it is the only place a CSRF
+// posture can be argued, it is the only place an `Idempotency-Key` can be sent
+// or withheld, and it is the first thing in this application that can receive a
+// `Set-Cookie` it cannot deliver. Section 6 rules those four and nothing else.
+//
+// NO PAGE CALLS `post` IN THE COMMIT THAT ADDS IT, AND THAT IS THE RULING'S
+// SHAPE RATHER THAN AN OMISSION. ADR-190 refuses a control that answers wrongly
+// more strongly than it refuses one that honestly says it is not there, and a
+// screen that starts posting on a posture nobody has read is that control.
 
 import { toPortalErrorKind } from '../shell/app-shell.ts';
 import type { PortalErrorKind } from '../shell/app-shell.ts';
@@ -249,6 +267,37 @@ export type ApiResult = ApiSuccess | ApiFailure;
  */
 const TRANSPORT_FAILURE: ApiFailure = { ok: false, error: 'server_error', status: null };
 
+/**
+ * A response that DID arrive, read into the vocabulary above.
+ *
+ * EXTRACTED RATHER THAN COPIED, and the extraction is the whole of what section
+ * 6 shares with section 5. A second copy of these six lines beside a `POST` is
+ * how a read and a write drift apart on the one axis a trader can see, which is
+ * which sentence a refusal renders as. There is no parameter here and there is
+ * no branch on method: a status means the same thing whichever verb asked.
+ *
+ * THE ONE THING IT DOES NOT SETTLE IS `204`, and that is deliberate. A `204` is
+ * a success with no body, `response.ok` is already true for it, and this
+ * function would then hand `response.json()` an empty stream and map a
+ * successful logout to `server_error`. It is section 6.4's arm rather than a
+ * flag here, because a `204` on a READ is not in the contract and the read path
+ * keeps the stricter reading it already had.
+ */
+async function settle(response: Response): Promise<ApiResult> {
+  if (!response.ok)
+    return { ok: false, error: toPortalErrorKind(response.status), status: response.status };
+
+  try {
+    return { ok: true, body: (await response.json()) as unknown };
+  } catch {
+    // A 2xx whose body is not JSON is a server that answered wrongly, and it is
+    // `server_error` for the same reason a 500 is: the trader can do nothing
+    // about it and no other member of the vocabulary is true. The status is
+    // carried because there WAS one.
+    return { ok: false, error: 'server_error', status: response.status };
+  }
+}
+
 // -----------------------------------------------------------------------------
 // 4. The cache
 // -----------------------------------------------------------------------------
@@ -303,6 +352,21 @@ const CACHE_POLICY = 'no-store' as const;
  */
 export type Transport = (input: string, init: RequestInit) => Promise<Response>;
 
+/**
+ * The endpoint path a caller names, refused when this file cannot compose it.
+ *
+ * SHARED BY BOTH VERBS BECAUSE THE COMPOSITION IS ONE FACT. `get` carried this
+ * check inline while it was the only caller; a second inline copy is how a
+ * write ends up accepting a path a read refuses.
+ */
+function refuseUncomposablePath(path: string): void {
+  if (!path.startsWith('/'))
+    throw new ApiConfigError(
+      `\`${path}\` is not an endpoint path. API_CONTRACT spells every path with a leading ` +
+        `slash and without \`${API_BASE_PATH}\`, which this file appends`,
+    );
+}
+
 /** What every segment in this application talks to. */
 export interface ApiClient {
   /**
@@ -312,6 +376,22 @@ export interface ApiClient {
    *   `API_BASE_PATH` NOT included. `/payouts`, not `/api/v1/payouts`.
    */
   readonly get: (path: string) => Promise<ApiResult>;
+
+  /**
+   * Write one endpoint. SECTION 6 IS THE RULING AND THIS IS THE SIGNATURE.
+   *
+   * `POST` AND NO OTHER METHOD, measured rather than assumed: a real `compose()`
+   * over the modules discovered from disk registers 46 routes on the `public`
+   * surface and withholds 27, and the 46 are 24 `GET` and 22 `POST` with no
+   * `PATCH`, `PUT` or `DELETE` among them. A method parameter would be a
+   * vocabulary this contract does not use, and `registry.ts` closes the verb
+   * list at five for the API's own side of the same argument.
+   *
+   * IT TAKES ONE ARGUMENT, which is the same foreclosure `get`'s arity is: there
+   * is no options object a caller could put a cache window, a redirect policy or
+   * a second cookie into.
+   */
+  readonly post: (request: WriteRequest) => Promise<ApiResult>;
 }
 
 /**
@@ -339,11 +419,7 @@ export function createApiClient(input: {
 
   return {
     get: async (path: string): Promise<ApiResult> => {
-      if (!path.startsWith('/'))
-        throw new ApiConfigError(
-          `\`${path}\` is not an endpoint path. API_CONTRACT spells every path with a leading ` +
-            `slash and without \`${API_BASE_PATH}\`, which this file appends`,
-        );
+      refuseUncomposablePath(path);
 
       const headers: Record<string, string> = { accept: 'application/json' };
       if (input.sessionToken !== null)
@@ -361,20 +437,324 @@ export function createApiClient(input: {
         return TRANSPORT_FAILURE;
       }
 
-      if (!response.ok)
-        return { ok: false, error: toPortalErrorKind(response.status), status: response.status };
+      return settle(response);
+    },
 
+    post: async (request: WriteRequest): Promise<ApiResult> => {
+      refuseUncomposablePath(request.path);
+      const payload = serialisedBody(request);
+      const key = checkedIdempotencyKey(request);
+
+      // SECTION 6.2. The forward is the same one named cookie the read sends,
+      // and `content-type` is the only header the method adds beyond the key.
+      const headers: Record<string, string> = {
+        accept: 'application/json',
+        'content-type': WRITE_CONTENT_TYPE,
+      };
+      if (input.sessionToken !== null)
+        headers['cookie'] = `${SESSION_COOKIE}=${input.sessionToken}`;
+      if (key !== null) headers[IDEMPOTENCY_HEADER] = key;
+
+      let response: Response;
       try {
-        return { ok: true, body: (await response.json()) as unknown };
+        response = await transport(`${input.origin}${API_BASE_PATH}${request.path}`, {
+          method: 'POST',
+          headers,
+          body: payload,
+          cache: CACHE_POLICY,
+
+          // `redirect: 'error'` IS LOAD-BEARING ON A WRITE IN A WAY IT IS NOT ON
+          // A READ. `fetch` follows a 301, 302 or 303 by REWRITING the request
+          // to a bodyless `GET`, so a misconfigured edge could turn a payout
+          // request into a read of whatever it redirected to and answer 200.
+          // Nothing in API_CONTRACT redirects, so a redirect here is a
+          // deployment fault, and it surfaces as a transport failure rather
+          // than as a success nobody asked for.
+          redirect: 'error',
+        });
       } catch {
-        // A 2xx whose body is not JSON is a server that answered wrongly, and
-        // it is `server_error` for the same reason a 500 is: the trader can do
-        // nothing about it and no other member of the vocabulary is true. The
-        // status is carried because there WAS one.
-        return { ok: false, error: 'server_error', status: response.status };
+        return TRANSPORT_FAILURE;
       }
+
+      // SECTION 6.4. A `204` is a success with no body and `settle` would hand
+      // its empty stream to `response.json()`.
+      if (response.status === NO_CONTENT) return { ok: true, body: null };
+
+      return settle(response);
     },
   };
+}
+
+// -----------------------------------------------------------------------------
+// 6. The write verb
+// -----------------------------------------------------------------------------
+//
+// THIS SECTION IS BELOW SECTION 5 RATHER THAN BESIDE THE READ IT PARALLELS, AND
+// THE REASON IS A CITATION COUNT RATHER THAN A PREFERENCE. Five files outside
+// this one cite "its section 5" for the `unknown` argument: `app/referrals/
+// data.ts`, `app/payouts/source.ts`, `app/(purchases)/source.ts`,
+// `app/accounts/source.ts` and `app/calendar/load.ts`. Inserting a section
+// above it would renumber five pointers in five files this fence does not hold,
+// which is the citation drift this corpus has now repaired more often than it
+// has written new transport.
+//
+// -----------------------------------------------------------------------------
+// 6.1 THE CSRF POSTURE. NO TOKEN IS MINTED HERE, AND `SameSite=Lax` IS NOT THE
+// WHOLE REASON
+// -----------------------------------------------------------------------------
+// THE CORPUS IS NOT SILENT, WHICH IS WHERE THIS HAD TO START.
+// `grep -rn CSRF docs/architecture/SECURITY.md docs/architecture/API_CONTRACT.md` returns nothing,
+// which is what ALLOCATION row 219 measured and what re-running it still shows.
+// BUT THE CONSTITUTION RULES IT IN FOUR WORDS. `MERIT_BUILD_MASTER_PROMPT.md`
+// Appendix D section D2 lists "CSRF on cookie mutations" among the binding
+// application controls, beside Turnstile and the CSP. So the live question is
+// never whether Merit wants the control. It is WHOSE it is, and it is not this
+// file's, for three reasons that are measured rather than argued.
+//
+// ONE. NOTHING ON THE SERVER CHECKS ONE. `grep -rni csrf apps packages` returns nothing.
+// A token minted here would be an unread header, and an unread header on a
+// money path is worse than no header: it is a control a later reader counts.
+//
+// TWO. THE REQUEST THIS CLIENT MAKES IS NOT THE REQUEST CSRF DEFENDS AGAINST.
+// Section 2 established that the browser never calls the API at all and that the
+// portal's SERVER holds the inbound `Cookie` header and forwards one name from
+// it. A cross-site request forgery is a request the VICTIM'S BROWSER is tricked
+// into issuing with its own cookies attached. This `fetch` runs in Node, the
+// cookie is attached by the eleven lines above rather than by a cookie jar, and
+// no page anywhere can cause it to be issued: `ADR-095` ruling 3 and `ADR-138`
+// section 3 refuse a Server Action in this deployable OUTRIGHT, and `RI-11`
+// reads every compiled file under `apps/` for one. THE PORTAL EXPOSES NO
+// BROWSER-REACHABLE WRITE ENDPOINT FOR A FORGED FORM TO TARGET.
+//
+// THREE. FOR THE CROSS-SITE CASE, THE COOKIE IS ALREADY THE CONTROL AND A TOKEN
+// WOULD BE A SECOND COPY OF IT. `apps/api/src/routes/auth.ts:589` sets
+// `merit_session` with `HttpOnly; Secure; SameSite=Lax`, which is API_CONTRACT
+// line 19's attribute list, and a `Lax` cookie is not attached to a cross-site
+// `POST` at all. An attacker page on `evil.com` posting to `/api/v1/checkout`
+// therefore arrives with no session and is a 401.
+//
+// -----------------------------------------------------------------------------
+// WHAT `Lax` DOES NOT COVER, STATED SO THE RULING IS NOT MISTAKEN FOR A CLEAN
+// BILL
+// -----------------------------------------------------------------------------
+// `SameSite` IS SITE-SCOPED AND MERIT'S TRADER SURFACES SHARE A SITE.
+// `INFRA` section 2.1 rows `site` on `meritfutures.com`, `portal` on
+// `app.meritfutures.com`, and `api` on `app.meritfutures.com` under `/api/v1`.
+// `meritfutures.com` and `app.meritfutures.com` are the SAME SITE, so a request
+// issued by a page on the marketing origin to the API is same-site, `Lax`
+// permits it, and the host-only `merit_session` cookie is sent because the
+// destination host matches. AN INJECTION ON THE MARKETING SITE IS A FULLY
+// AUTHENTICATED WRITE AGAINST A TRADER'S MONEY, AND `Lax` DOES NOTHING ABOUT IT.
+//
+// THE CORPUS ALREADY REASONS THIS WAY ONE ORIGIN OVER, WHICH IS WHY THE GAP IS
+// AN OVERSIGHT RATHER THAN A TRADE. `INFRA` section 3 hard rule 3 puts the
+// admin console and `api-admin` on `ADMIN_ORIGIN`, "a separate apex domain",
+// and says in terms that "cookie scope, CORS, and the CSP never span the two
+// origins". The operator surfaces were separated at the SITE boundary on
+// purpose. The trader surfaces were not.
+//
+// The other two things `Lax` does not do are named so nobody has to rediscover
+// them. It permits a top-level GET navigation, which is harmless only while
+// every mutation is a `POST` (measured above: 24 GET and 22 POST, no other
+// verb, and `registry.ts` closes the list). And it is not a defence against
+// script running on the origin itself, where `httpOnly` is the control and a
+// token in a readable cookie would be no control at all.
+//
+// SO THE OBLIGATION IS REGISTERED RATHER THAN DISCHARGED, AND IT IS
+// `apps/api`'s. That package is outside this fence by ADR-219's own terms. The
+// shape a founder has to choose between is in ADR-219 section 4 and this file
+// does not pick one, because a client that starts sending a header before the
+// server decides which header it reads has made the decision by shipping.
+//
+// -----------------------------------------------------------------------------
+// 6.2 THE UNSAFE-METHOD COOKIE POLICY, AGAINST C-02 AS WRITTEN
+// -----------------------------------------------------------------------------
+// OUTBOUND: NOTHING CHANGES, AND THAT IS THE RULING RATHER THAN AN ABSENCE OF
+// ONE. Section 2's three measurements were about who can present the cookie and
+// what a wholesale header relay would leak, and not one of them turns on the
+// method. So a write forwards exactly one named cookie, never
+// `request.headers.cookie`, and asks for no `credentials` mode. `SECURITY`
+// `C-02` reads "short-lived access session, rotating refresh, httpOnly Secure
+// SameSite cookies" and rules nothing about unsafe methods separately.
+//
+// C-02 IS ALSO WEAKER THAN THE DISPATCH THAT CITED IT, AND THE DIFFERENCE IS
+// WORTH ONE LINE. C-02 says "SameSite" and names NO MODE. `Lax` appears in
+// API_CONTRACT line 19 and in `auth.ts:589`, and nowhere in `SECURITY.md`. The
+// mode is the contract's and the code's, and reading it back out of C-02 is
+// reading a document for a word it does not contain.
+//
+// INBOUND IS THE HALF ONLY A WRITE HAS, AND IT IS A DEAD END THAT MUST BE SAID
+// OUT LOUD. THREE REGISTERED `POST`s ANSWER WITH A `Set-Cookie`:
+// `auth.ts:1033` and `auth.ts:1088` establish a session and `auth.ts:1098`
+// clears one. This client receives all three on a server-side `Response` and
+// DELIVERS NONE OF THEM. That is not a gap this file can close:
+// `next@16.3.2` raises `ReadonlyRequestCookiesError`, "Cookies can only be
+// modified in a Server Action or Route Handler", and `ADR-138` section 3 with
+// `RI-11` refuse a Server Action in this deployable outright. A portal-owned
+// Route Handler on a path API_CONTRACT does not specify is the one door
+// `ADR-095` ruling 3 leaves standing, and nobody has ruled on it.
+//
+// SO `post` IS NECESSARY AND NOT SUFFICIENT FOR SIGN-IN, and a session
+// established through it would be established for a browser that never receives
+// it. Session 408 found that the served set already admits no complete sign-in;
+// this is a second and independent reason, on this side of the fence.
+//
+// -----------------------------------------------------------------------------
+// 6.3 IDEMPOTENCY. THE CALLER'S KEY, NEVER THIS FILE'S, AND NEVER A DEFAULT
+// -----------------------------------------------------------------------------
+// WHAT IS SENT: the caller's string, verbatim, in `Idempotency-Key`, when the
+// caller supplies one, and no header at all when the caller passes `null`.
+//
+// WHO GENERATES IT: THE CALLER, AND A TRANSPORT THAT MINTED ONE WOULD DEFEAT
+// THE MECHANISM RATHER THAN IMPLEMENT IT. API_CONTRACT line 23 is the whole
+// argument: "replaying a key with an identical body returns the original
+// response verbatim". A replay is a SECOND CALL, and a client that minted a
+// fresh key per call would send a different key on the retry, which is a second
+// payout rather than a replay of the first. `INV-M5-06` states the same rule one
+// leg over, for the API's own call to the transfer rail, in the form that makes
+// the direction unmissable: "the same `idempotency_key` on every attempt,
+// generated BEFORE the first send and persisted in the same transaction"
+// (`docs/plans/M05-payout-system.md:85`). Before the first send is before this
+// function is entered.
+//
+// WHY THE FIELD IS REQUIRED AND `null` MUST BE WRITTEN OUT. API_CONTRACT line 23
+// requires a key on `POST /checkout`, `POST /accounts/:id/payout`,
+// `POST /accounts/:id/reset` and `POST /wallet/withdrawals`, and accepts one
+// everywhere else. THIS FILE HOLDS NO LIST OF THOSE FOUR, on purpose: three of
+// them carry a path parameter, so a check here would need a pattern table,
+// which is a third copy of a contract fact whose enforcement already lives in
+// the handler. The portal is not the idempotency control for the same reason
+// `INV-M4-06` makes it not the authorization control. What an OPTIONAL field
+// would buy is a silent default, and a payout that omitted its key by omission
+// rather than by decision is exactly the failure the key exists to prevent. A
+// required `string | null` puts the decision at the call site, in the diff, next
+// to the path, which is `submits_to`'s idiom on three screens already.
+//
+// WHAT IS CHECKED HERE IS THE SHAPE AND NOTHING ELSE, because a header value is
+// this layer's business: a key carrying CR, LF or a NUL is a header-injection
+// attempt and is refused before it reaches a socket.
+//
+// -----------------------------------------------------------------------------
+// 6.4 THE BODY, THE `204`, AND THE ONE THING THIS RESULT TYPE STILL CANNOT SAY
+// -----------------------------------------------------------------------------
+// THE BODY IS ALWAYS SENT AND IS ALWAYS JSON. API_CONTRACT section 1's content
+// type is `application/json` for requests. A `POST` with no meaningful payload
+// passes `{}` and says so at the call site; there is no branch here that omits
+// a body, because a branch on "did the caller mean to send nothing" is a branch
+// that fires on `undefined` arriving by accident. `JSON.stringify` returning
+// `undefined`, which is what it does for `undefined`, a function and a symbol,
+// is refused by name rather than sent as an empty body.
+//
+// A `204` IS A SUCCESS WITH `body: null`. RFC 9110 gives 204 no content, two
+// registered routes use it (`auth.ts:1100` and `auth.ts:1176`), and
+// `response.ok` is true for it, so without this arm a successful logout parses
+// an empty stream and renders as `server_error`. It is keyed on the STATUS and
+// never on an empty payload: a status is a statement the server made, while an
+// empty body on a 200 is a server that answered wrongly, which is section 3's
+// existing reading and does not move.
+//
+// WHAT THIS TYPE STILL CANNOT SAY, AND THIS IS NOW THE FIFTH SITE ASKING.
+// `ApiSuccess` is `{ ok: true, body: unknown }` and carries NO STATUS, so a
+// `204` and a `200` whose body is the JSON value `null` are indistinguishable
+// here, and `201` (`POST /checkout`), `202` (`POST /auth/otp`) and `200` are the
+// same answer to a caller. FOUR SEGMENTS ALREADY REPORTED THIS AND EACH REFUSED
+// TO REACH FOR IT because this file was outside their fence:
+// `app/accounts/source.ts`, `app/calendar/load.ts`, `app/(purchases)/source.ts`
+// and `app/referrals/data.ts` each carry the sentence "widening `ApiSuccess` is
+// a change to ADR-162's file". THIS SESSION HOLDS THAT FENCE AND STILL DECLINES,
+// and the reason is a count rather than caution: adding the field would make
+// those four sentences false in four files this fence does not hold, which is
+// four new stale citations bought to save one. ADR-219 section 5 registers it as
+// one slice over `client.ts` AND the four segments, which is the shape ADR-217
+// clause 5 used for the identical trade.
+
+/** The request line 23 of API_CONTRACT and section 6 above describe. */
+export type WriteRequest = {
+  /**
+   * An endpoint path as API_CONTRACT spells it, leading slash, with
+   * `API_BASE_PATH` NOT included. `/checkout`, not `/api/v1/checkout`.
+   */
+  readonly path: string;
+
+  /**
+   * The request payload, serialised as JSON. `{}` for a route that takes none.
+   *
+   * `unknown` FOR THE REASON `get` RETURNS `unknown`. A generic `post<T>` would
+   * read as a guarantee that the body matches what the contract declares, and
+   * this layer has inspected nothing. `src/api/types.ts` is where the wire
+   * shapes are transcribed and the segment is where one is asserted.
+   */
+  readonly body: unknown;
+
+  /**
+   * The caller's `Idempotency-Key`, or `null` said out loud.
+   *
+   * NOT OPTIONAL. Section 6.3 is the argument: an omitted key must be a
+   * decision a reviewer can see beside the path, and never a default.
+   */
+  readonly idempotencyKey: string | null;
+};
+
+/** API_CONTRACT section 1: "`application/json` for requests". */
+const WRITE_CONTENT_TYPE = 'application/json';
+
+/**
+ * The header API_CONTRACT line 23 names, spelled as this file spells `cookie`.
+ *
+ * LOWER CASE BECAUSE HEADER NAMES ARE CASE-INSENSITIVE AND THE READER IS
+ * ALREADY LOWER CASE: `apps/api/src/routes/affiliate.ts:807` reads
+ * `headers['idempotency-key']`, which is the shape Fastify normalises to.
+ */
+const IDEMPOTENCY_HEADER = 'idempotency-key';
+
+/** RFC 9110's no-content status. Section 6.4. */
+const NO_CONTENT = 204;
+
+/**
+ * A legal HTTP field value: visible ASCII, with no leading or trailing space.
+ *
+ * THE POINT IS CR, LF AND NUL. Everything else this rejects is a key no server
+ * would accept anyway, and rejecting a control character in a header value is
+ * the transport's job rather than the contract's.
+ */
+const LEGAL_HEADER_VALUE = /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/;
+
+/** The body as bytes, or a refusal naming the path that cannot be composed. */
+function serialisedBody(request: WriteRequest): string {
+  let payload: string | undefined;
+  try {
+    payload = JSON.stringify(request.body);
+  } catch (cause) {
+    throw new ApiConfigError(
+      `the body for \`${request.path}\` cannot be serialised as JSON (${String(cause)}). ` +
+        'API_CONTRACT section 1 makes every request `application/json`, and a circular ' +
+        'structure or a BigInt is a caller defect rather than a transport failure',
+    );
+  }
+
+  if (payload === undefined)
+    throw new ApiConfigError(
+      `the body for \`${request.path}\` serialises to nothing. \`undefined\`, a function and ` +
+        'a symbol each produce no JSON at all; a route that takes no payload sends `{}` and ' +
+        'says so at the call site',
+    );
+
+  return payload;
+}
+
+/** The caller's key, checked as a header value, or `null`. */
+function checkedIdempotencyKey(request: WriteRequest): string | null {
+  const key = request.idempotencyKey;
+  if (key === null) return null;
+
+  if (!LEGAL_HEADER_VALUE.test(key))
+    throw new ApiConfigError(
+      `the \`Idempotency-Key\` for \`${request.path}\` is not a legal header value. It must be ` +
+        'visible ASCII with no leading or trailing space, which is what keeps a carriage ' +
+        'return out of a request this file composes by hand',
+    );
+
+  return key;
 }
 
 /**

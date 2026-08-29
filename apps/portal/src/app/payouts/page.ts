@@ -70,9 +70,9 @@ import { load } from './source.ts';
  *
  * THE MECHANISM IS AN ORDERING IN THE TRANSPORT AND IT IS WORTH STATING. What
  * marks an App Router route dynamic is a request-scoped API, and this segment's
- * only one is `cookies()`. `serverApiClient` (`../../http/client.ts:412`) is
+ * only one is `cookies()`. `serverApiClient` (`../../http/client.ts:792`) is
  * where it is reached, and it is reached in the LAST of that function's four
- * lines: `resolveApiOrigin` (`../../http/client.ts:121`) runs first and throws
+ * lines: `resolveApiOrigin` (`../../http/client.ts:139`) runs first and throws
  * `ApiConfigError` when `MERIT_API_ORIGIN` is unset. A build environment
  * without that variable therefore never reaches the cookie, ./source.ts
  * correctly returns `unavailable`, and Next successfully bakes THAT screen into
