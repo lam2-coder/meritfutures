@@ -37,6 +37,10 @@
 // for exactly this reason: the handle itself reads `client()`, which throws when
 // `DATABASE_URL` is unset.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { getTableColumns } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import type { PgTable } from 'drizzle-orm/pg-core';
@@ -51,6 +55,8 @@ import {
   type PubliclyLookedUpTableKey,
   type StatementSource,
 } from '../src/scoped-db.ts';
+
+const MIGRATIONS = fileURLToPath(new URL('../migrations', import.meta.url));
 
 interface Sent {
   readonly sql: string;
@@ -218,5 +224,43 @@ describe('the vocabulary is the control, so growing it is a decision somebody ta
     const resolvable = new Set(Object.keys(RESOLUTION_ADDRESS));
     const publicly = Object.keys(PUBLIC_LOOKUP_ADDRESS);
     expect(publicly.filter((key) => resolvable.has(key))).toEqual([]);
+  });
+});
+
+// =============================================================================
+// WHAT THE VOCABULARY'S SAFETY ACTUALLY RESTS ON (ADR-231 SECTION 6)
+// =============================================================================
+
+describe('the address is the credential, so the shape of the address is the finding', () => {
+  test('certificates.code carries a unique index and NO bound on its length or alphabet', () => {
+    // A LIABILITY THAT EXPIRES, IN THE SHAPE `wiring.test.ts` USES FOR ONE. A
+    // member of `PUBLIC_LOOKUP_ADDRESS` is an assertion that the named column
+    // cannot be guessed, and `INV-M11-05` fixes `certificates.code` at "128 bits
+    // of entropy, no sequence". NOTHING IN THIS REPOSITORY ENFORCES THAT: the
+    // column is `text NOT NULL` under `certificates_code_uq`, the table's three
+    // CHECK constraints are about payout kind, revocation completeness and
+    // deferral, and none of them touches `code`. Nothing in this tree issues a
+    // certificate either, so there is no minter to hold the invariant instead.
+    //
+    // THIS CASE ASSERTS THE GAP SO THAT CLOSING IT IS VISIBLE. The day a
+    // migration adds a length or alphabet CHECK, this goes red, and the reader
+    // it sends to ADR-231 section 6 is the reader who closed it. Delete it then.
+    const ddl = readFileSync(join(MIGRATIONS, '0020_public_surface.sql'), 'utf8');
+    const table = ddl.slice(ddl.indexOf('CREATE TABLE certificates ('));
+    const body = table.slice(0, table.indexOf('\n);'));
+
+    expect(body, 'the column this door is addressed by').toMatch(/\n\s*code\s+text NOT NULL,/);
+    expect(ddl, 'the unique index the fold above reads').toContain(
+      'CREATE UNIQUE INDEX certificates_code_uq ON certificates (code);',
+    );
+
+    const checks = [...body.matchAll(/CONSTRAINT\s+(\w+)\s+CHECK/g)].map((m) => m[1]);
+    expect(checks).toEqual([
+      'certificates_payout_kind_has_request',
+      'certificates_revocation_is_complete',
+      'certificates_deferral_is_explained',
+    ]);
+    expect(body, 'no length bound on the token').not.toMatch(/length\s*\(\s*code\s*\)/i);
+    expect(body, 'no alphabet bound on the token').not.toMatch(/code\s*~/);
   });
 });
