@@ -257,6 +257,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-241](ADR-241.md) | the worker is a one-shot job whose exit code is its only signal, the schedule is external, and the first `BatchPorts` value over Postgres serves four of ten methods and refuses six by name  (2026-08-29, status: proposed) |
 | [ADR-242](ADR-242.md) | an ops plane is four different questions, and one of them is a database read whose blocker is a door somebody already ruled (2026-08-29, status: proposed) |
 | [ADR-243](ADR-243.md) | four money-path approvals are earned rather than granted, and the classifier that sized the queue is over-inclusive at the tier that matters most  (2026-08-29, status: proposed) |
+| [ADR-246](ADR-246.md) | three certificate ports are two questions, the card is one deliverable and not three, and a port whose own message promised a 503 was answering 500 (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -29,9 +29,9 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->229<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->230<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->229<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->230<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -9899,3 +9899,29 @@ not in this row's verification list and it mutates the working tree.
 **NOTHING HERE HAS MET A DATABASE**, which is where the entry is most likely wrong. Every case executes over source, over the scope registry and over rendering functions handed fixtures.
 
 **MERGED WITH `origin/main` AT `26423be` AFTER THOSE COUNTS WERE TAKEN.** Main moved by **two documentation files and no code** ([ADR-240](decisions/ADR-240.md)'s merge record and [session 430](sessions/2026-08-29-session-430.md)'s log). **The merge was CLEAN, with zero conflict hunks**, and `gates.mjs generate` produced no change on the merged tree. **Re-derived on the merge**: **33 of 33** gates, **21 of 21** invariants, **266 files / 6,548 passed / 6 skipped**, typecheck 0, lint 0, `format:check` clean, identical to the pre-merge run because main brought no executable line.
+
+---
+
+## 2026-08-29 - Session 436: three certificate ports are two questions, and the card is one deliverable rather than three absences ([ADR-246](decisions/ADR-246.md), proposed)
+
+**[ADR-246](decisions/ADR-246.md), `status: proposed`, UNSIGNED. No migration number taken, no `RI-` number taken, no port wired and no environment variable named.** The wired triple in [`wiring.test.ts`](../apps/api/test/wiring.test.ts) does not move.
+
+**THE THREE CERTIFICATE PORTS HAD NEVER BEEN READ TOGETHER AND READING THEM TOGETHER SPLITS THEM TWO AND ONE.** `useCertificateBackend` and `useCertificateImageSource` wait on **ONE ABSENT ARTEFACT**: a rendered card and somewhere for it to live. `useCertificateRevokeBackend` waits on the operator door through `principal(request)` ([`admin-certificates.ts:353`](../apps/api/src/routes/admin-certificates.ts)), was read, is said so with its evidence, and is **LEFT STANDING** with no admin identity invented. **The card landing does nothing for it**, which is the sentence the entry gains.
+
+**A SIGNER SIGNS AN ADDRESS, AN ADDRESS ADDRESSES AN OBJECT, AND THERE IS NO OBJECT.** [ADR-240](decisions/ADR-240.md) ruled the URL signing key out of this deployable one wave ago and **that ruling is read FORWARD rather than overturned**: even a key held in the right place would sign a URL for a card no producer in this repository renders. So `image_url` and `CertificateLookup.card` are **two sides of one deliverable**, and the two entries expire together or not at all.
+
+**A THIRD REFUSAL IN THIS DEPLOYABLE IS ON THE SAME ABSENCE AND ONLY THE SET READING FINDS IT.** `databaseAccountReads.readCertificate` is **installed** and refuses by name; its `CERTIFICATE_BLOCKER` ([`account-reads.ts:878`](../apps/api/src/routes/account-reads.ts)) reached this finding independently on the `/certificate` row. The card is worth measuring once, not three times.
+
+**AND THE TABLE HOLDS NO ADDRESS FOR IT EITHER, MEASURED RATHER THAN QUOTED.** `certificates` carries **seventeen** columns and none is an image location, and **no migration in the set alters the table**. [`0020_public_surface.sql`](../packages/db/migrations/0020_public_surface.sql) states the reason one line above its own DDL: *"THE CARD IS A RENDERING; THE CERTIFICATE IS THE ROW."* The column set is asserted **by name**, so a column added tomorrow fails with its own name in the diff. **Whether the address belongs in a column at all is NOT ruled**: a presigned URL is minted per request and need not be persisted.
+
+**THE SET READING FOUND A DEFECT THE PORTS WERE HIDING FROM EACH OTHER.** `CertificateBackendUnwired` is raised by **both** arms of the port and its own message promises `GET /certificates` answers **503**; the list handler guarded only `readCertificates` and called the render after the `catch`, so a refusal from the signer answered **500**. **Watched RED before GREEN on unmodified shipped source** and repaired on [ADR-240](decisions/ADR-240.md) section 4's standing ruling, which had ruled the identical shape on `economic-calendar.ts`. **Reading a file for one question does not find the defects belonging to another.**
+
+**THE REPAIR IS EXPLICITLY NOT A STEP TOWARDS WIRING AND THE REASON IS EXECUTED RATHER THAN COMMENTED.** `projectCertificate` never mints for a deferred row ([ADR-168](decisions/ADR-168.md) foreclosure 4, structural), so a half-wired backend answers **200** to a trader whose certificates are all deferred and **refuses** the trader beside them whose certificate issued. **That is a response decided by the state of the caller's own rows**, it is the shape `verify.ts`' `readPresentation` refuses in its own words, and it stands even if the card lands tomorrow.
+
+**TWO CITATIONS INSIDE THE `BLOCKED` ENTRIES DID NOT SURVIVE AND BOTH WERE ALREADY WRONG AT `52b5202`**, before this branch changed a byte: `certificates.ts:918-938` for `CertificateLookup.card` (it is at `:976`, its bytes at `:958`) and `certificates.ts:654` for `databaseCertificateBackend` (it is at `:692`).
+
+**BUILT**: [`apps/api/test/certificate-ports.test.ts`](../apps/api/test/certificate-ports.test.ts), five cases, three of them red before the repair. **MEASURED**: [`2026-08-29-the-three-certificate-ports.md`](reviews/2026-08-29-the-three-certificate-ports.md).
+
+**Measured, not carried**: **33 of 33** gates, **21 of 21** invariants read off the runner's own last line, **269 files / 6,573 passed / 6 skipped** against a baseline of **268 / 6,568 / 6** measured on this same tree with the new file removed. Typecheck 0, lint 0, `format:check` clean after one prettier reflow of the edited entries. **`falsify.mjs` was NOT run**: it is not in this row's verification list and it mutates the working tree.
+
+**WHERE THIS IS MOST LIKELY WRONG.** The claim that the two ports are ONE deliverable rests on the card being one artefact, and nothing here proves the bytes `useCertificateImageSource` serves and the object `image_url` addresses are the same object. **A live re-rendering endpoint and a stored card in an object store are both consistent with every approved sentence read here**, and if they are two the coupling falls.
