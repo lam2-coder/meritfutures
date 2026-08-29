@@ -244,6 +244,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // SETTLES IT and `RI-20` runs the command. The grep below is live: it is
   // executed on every CI-01 run and the number beside it is checked.
   //
+  // AND ADR-233 TOOK THE LEAD BLOCKER OFF THIS ENTRY FOR THE SECOND TIME IN A
+  // WEEK, WHICH IS WHY WHAT IS LEFT IS WORTH READING SLOWLY. `ScopedTx` gained a
+  // `firm`-class READ over a closed list of five catalogue keys, so the
+  // `ResolvedPlan` half of `PayoutTx.subject` is now a call somebody can write on
+  // the payout transaction. THE PORT DID NOT BECOME WIREABLE. Underneath the read
+  // was a third obstruction that no reason on this port had ever named, and it is
+  // not a door at all: `PayoutSubject.state` is a `RuleState`, whose `engineGates`
+  // has no decoding for `rule_states.engine_gates` and whose table holds no rows.
+  // `routes/account-reads.ts` has said both about `/eligibility` since session
+  // 401, and `INV-M5-02` makes it one blocker across two endpoints rather than
+  // two. THREE REASONS ON THIS PORT HAVE NOW BEEN DISCHARGED AND THE PORT HAS
+  // NEVER BEEN CLOSER TO WIRED THAN 503, which is what this list is for.
+  //
   // THE PER-FILE CLAIM WAS A GRAIN ERROR AND IT IS WORTH NAMING. "`0015` declares
   // none of the three" was TRUE the day it was written and is true today, and it
   // was still the wrong question: a merged migration is never edited, only
@@ -252,45 +265,41 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // the moment the next `ALTER TABLE` lands, by construction.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
-    'A `firm` READ ON A ONE-TRANSACTION PORT, AND NOT THE STORABILITY OF A `RuleState` THIS ' +
-    'ENTRY USED TO NAME. IT READ "A `RuleState` NO MIGRATION IN THIS TREE CAN STORE" AND THAT ' +
-    'IS FALSE. `lifetime_settled_cents` ' +
-    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:101`), `breached` ' +
-    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:107`) and `breach_kind` ' +
-    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:118`) are all three ' +
-    'columns of `rule_states`, and the constraint ' +
-    '`rule_states_breach_kind_is_a_breach_kind` ' +
-    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:126`) enumerates every ' +
-    'member of `BreachKind` (`packages/rules-engine/src/types.ts:789`) in its `IN` list. ' +
-    'Session 400 landed the writer, so `RULE_STATE_WRITE_COLUMNS` ' +
-    '(`apps/worker/src/batch/state-writer.ts:232`) carries them. THE ' +
-    'ENTRY ALSO SAID `0015_rule_states.sql` DECLARES NONE OF THE THREE, WHICH IS TRUE AND WAS ' +
-    'THE WRONG QUESTION: a merged migration is never edited, only superseded (E2), so what a ' +
-    'TABLE can store is not a fact about one file. THE GREP IT QUOTED IS NOW LIVE AND RI-20 ' +
-    'RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 lines. WHAT REFUSES ' +
-    'NOW, RE-DERIVED ON THIS TREE RATHER THAN INHERITED. FIRST, A `firm` READ INSIDE A PORT ' +
-    'THAT RUNS EVERY METHOD ON ONE TRANSACTION: `PayoutTx.subject` returns `PayoutSubject` ' +
-    '(`routes/payouts.ts:329`) whose `plan` (`:332`) is a `ResolvedPlan`, which M01 section 1.3 ' +
-    'builds from `plan_versions.rules` and a `plan_version_sizes` row; both tables are scope ' +
-    'class `firm` -- `planVersions` (`packages/db/src/scope.ts:772`) and `planVersionSizes` ' +
-    '(`packages/db/src/scope.ts:777`) -- and `ScopedTableKey` is ' +
-    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1514`), so no `ScopedTx` read ' +
-    'reaches either. ADR-211 clause 2 RULED THE REMEDY AND NOTHING HAS APPLIED IT: two ' +
-    'transactions, scoped first, the catalogue read a SECOND PORT beside `PayoutTx` rather ' +
-    'than a member of it. That is a change to `routes/payouts.ts`. THE MUTABILITY HALF OF ' +
-    "ADR-211 CLAUSE 3 IS SPENT AND ONLY THAT HALF: ADR-213's `0066` pins a published " +
-    "version's size grid (`0066_published_size_grid_immutable.sql:212`) beside `0027`'s " +
-    '`plan_versions_published_immutable` (`0027_triggers_invariants.sql:260`), so the crossing ' +
-    'is safe and the crossing is still not built. SECOND: NOTHING IN THIS TREE IMPLEMENTS ' +
-    '`PayoutTx`. THIRD, AND REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:438-439` states ' +
-    '"no member of this interface that a scoped door cannot serve" while `subject()` returns a ' +
-    '`ResolvedPlan` no scoped door reaches. Session 401 registered it, ADR-213 section 8 ' +
-    'registered it again, and `routes/payouts.ts` is a handler file outside this fence. A ' +
+    'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND NOT THE `firm` READ THIS ENTRY LED WITH ' +
+    'UNTIL ADR-233. THE FIRM-READ CLAUSE IS DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A ' +
+    'DOOR THAT LANDED: `ScopedTx` now carries `catalogRows`, `catalogRowsWhere` and ' +
+    '`catalogRowAt` over `CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2551`), a closed ' +
+    'list of five `firm` keys that includes `planVersions` and `planVersionSizes`, so ' +
+    "`PayoutTx.subject`'s `ResolvedPlan` inputs are readable ON THE PAYOUT TRANSACTION and " +
+    'the two-transaction remedy ADR-211 clause 2 ruled is not needed. AN OLDER CLAUSE IS KEPT AS ' +
+    'HISTORY BECAUSE IT WAS FALSE: this entry once read "a `RuleState` NO MIGRATION IN THIS TREE ' +
+    'CAN STORE", and `lifetime_settled_cents`, `breached` and `breach_kind` are all three ' +
+    'columns of `rule_states` as of ' +
+    '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
+    'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
+    'lines. WHAT REFUSES NOW, DERIVED ON THIS TREE RATHER THAN INHERITED, AND IT IS NOT THE ' +
+    'CHEAPEST BLOCKER THIS ENTRY EVER NAMED, IT IS THE DEAREST. FIRST, `PayoutTx.subject` ' +
+    '(`routes/payouts.ts:428`) returns `PayoutSubject` whose `state` (`routes/payouts.ts:331`) ' +
+    'is a `RuleState`, and `RuleState.engineGates` ' +
+    '(`packages/rules-engine/src/types.ts:1006`) is `EngineGateResults` ' +
+    '(`packages/rules-engine/src/types.ts:961`) while `rule_states.engine_gates` is `jsonb`. ' +
+    'THERE IS NO DECODING FOR THAT COLUMN AND WRITING ONE WOULD BE INVENTING A CORPUS FACT: ' +
+    '`RuleStateWriterIo.encodeEngineGates` (`apps/worker/src/batch/state-writer.ts:337`) has no ' +
+    'implementation under any `src/`, and the stored encoding is a corpus amendment rather than ' +
+    'a line of code. SECOND, `rule_states` HOLDS NO ROWS AND NOTHING IN A DEPLOYMENT WRITES ' +
+    'ONE, so a backend would compute a confident payout verdict off an empty table. THOSE TWO ' +
+    'ARE NOT FOUND BY THIS ENTRY AND THAT IS THE FINDING: `ELIGIBILITY_BLOCKER` ' +
+    '(`routes/account-reads.ts:851`) has stated both about `GET /accounts/:id/eligibility` ' +
+    'since session 401, `INV-M5-02` requires BOTH payout endpoints to call `evaluatePayout` ' +
+    'with identical inputs, and no reason on this port had ever named it. THIRD: NOTHING IN ' +
+    'THIS TREE IMPLEMENTS `PayoutTx`. FOURTH, AND REGISTERED RATHER THAN REPAIRED: ' +
+    '`routes/payouts.ts:438-439` states "no member of this interface that a scoped door cannot ' +
+    'serve", which ADR-233 makes TRUE of the catalogue half and leaves false of `state`. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
     'both constructible today (`payoutRequests` is `owned`, `scope.ts:1126`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
-    'beside a `transact` that rejects would put a live-looking route in front of the arm that ' +
-    'approves payouts. MONEY PATH.',
+    'beside a `transact` whose `subject` rejects would put a live-looking route in front of the ' +
+    'arm that approves payouts. MONEY PATH.',
   // ---------------------------------------------------------------------------
   // THE REVENUE PATH, AND ITS ENTRY NAMED TWO OF FOUR OBSTRUCTIONS. ADR-230.
   //
@@ -307,40 +316,53 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // answering 503, and had no written account of why. Both were derived on this
   // tree at the sources cited below rather than inherited.
   //
-  // THE FIRM READ IS THE ONE THAT BLOCKS EVERY REQUEST. `usePayoutBackend` above
-  // states the identical shape about a different port, and the difference is
-  // reach: there it is `PayoutTx.subject`, and here it is FIVE methods of which
-  // two are on the unconditional path of both handlers, so no checkout of any
-  // payment method gets past the plan lookup.
+  // THE FIRM READ WAS THE ONE THAT BLOCKED EVERY REQUEST AND ADR-233 BUILT IT,
+  // so that clause is DELETED rather than replaced: `CATALOG_TABLE_KEYS` is five
+  // keys and they are exactly the five tables this port reads. `usePayoutBackend`
+  // above lost the same clause in the same ruling.
+  //
+  // AND THE ENTRY STILL DID NOT NAME ITS CHEAPEST BLOCKER, FOR THE SECOND TIME.
+  // `accountCap()` is the FIRST line of both handlers and its `maxAccounts` has
+  // no source in any migration, which `databaseAuthBackend` has reported about
+  // the same number on `GET /me` since ADR-171. A session dispatched to remove
+  // what this entry named would have removed it twice over and found the route
+  // still answering 503, which is the failure mode the paragraph above describes
+  // and this is its second instance on one port.
   // ---------------------------------------------------------------------------
   useCheckoutBackend:
-    'A `firm` READ AND A CROSS-IDENTITY READ ON A ONE-TRANSACTION PORT, AND NOT THE ' +
-    '`attributions` WRITE THIS ENTRY USED TO LEAD WITH. IT READ that `CheckoutTx.' +
-    'insertAttribution` writes a `pair` table "which no authority in `packages/db` admits a ' +
-    'request handler writing", AND THAT IS NOW FALSE: ADR-230 gives `PairRule` a required ' +
-    '`writer` field (`packages/db/src/scope.ts:1422` registers `attributions` `pair`), and ' +
-    '`ScopedTx.insertAsParty` (`packages/db/src/scoped-db.ts:2547`) inserts one row of a table ' +
-    'whose rule says `by: party`, over `PartyWritableTableKey` ' +
-    '(`packages/db/src/scoped-db.ts:2338`), stamping the identity the handle carries into ' +
-    '`buyer_identity_id` and refusing a caller that names it. WHAT REFUSES NOW, DERIVED ON THIS ' +
-    'TREE. FIRST, A `firm` READ INSIDE A PORT THAT RUNS EVERY METHOD ON ONE TRANSACTION ' +
-    '(`routes/checkout.ts:722`): `publishedPlanVersion` (`routes/checkout.ts:730`) reads ' +
-    '`plan_versions`, `planVersionSize` (`:733`) reads `plan_version_sizes`, `couponByCode` ' +
-    '(`:739`) reads `coupons`, `geoDecision` (`:765`) reads `geo_restrictions` and ' +
-    '`midCandidates` (`:768`) reads `mid_health`; all five tables are scope class `firm` ' +
-    '(`packages/db/src/scope.ts:772`, `:777`, `:917`, `:1358`, `:934`) and `ScopedTableKey` is ' +
-    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`packages/db/src/scope.ts:1514`), so no ' +
-    '`ScopedTx` read reaches one. THE FIRST TWO ARE UNCONDITIONAL, so this refuses every ' +
-    'checkout rather than one arm, which is how it differs from `usePayoutBackend`. SECOND, A ' +
-    'ROW THE BUYER MUST SEE THAT BELONGS TO THE AFFILIATE: `clickByToken` (`routes/checkout.ts:753`) ' +
-    'returns a `ClickRef` whose `affiliate` is an `AffiliateRef` carrying ' +
-    '`affiliates.identity_id`, and `couponByCode` returns the same shape ' +
+    'A CAP WITH NO SOURCE, A CROSS-IDENTITY READ AND THE LEDGER ARM, AND NOT THE `firm` READ ' +
+    'THIS ENTRY LED WITH UNTIL ADR-233. THE FIRM-READ CLAUSE IS DISCHARGED AND IS DELETED ' +
+    'RATHER THAN KEPT BESIDE A DOOR THAT LANDED: it read that `publishedPlanVersion`, ' +
+    '`planVersionSize`, `couponByCode`, `geoDecision` and `midCandidates` read five `firm` ' +
+    'tables no `ScopedTx` read reaches, and `ScopedTx` now carries `catalogRows`, ' +
+    '`catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
+    '(`packages/db/src/scoped-db.ts:2551`), whose five members are exactly those five tables. ' +
+    'THE `attributions` WRITE CLAUSE BEFORE IT WAS DISCHARGED THE SAME WAY BY ADR-230, so this ' +
+    'entry has now lost its lead blocker twice and answered 503 after each. WHAT REFUSES NOW, ' +
+    'DERIVED ON THIS TREE. FIRST, AND IT IS NEW TO THIS ENTRY AND IS THE FIRST LINE OF BOTH ' +
+    'HANDLERS: `accountCap()` (`routes/checkout.ts:736`) is called before anything else on the ' +
+    'purchase path and on the reset path alike, and its `maxAccounts` (`routes/checkout.ts:491`) ' +
+    'is "the identity cap, `max_accounts_override` folded over the plan default" -- and THE ' +
+    'PLAN DEFAULT IS IN NO COLUMN OF ANY MIGRATION. RI-20 RUNS THE COMMAND THAT SETTLES IT: ' +
+    '`grep -rn max_accounts packages/db/migrations` returns 1 line, which is ' +
+    '`identities.max_accounts_override`, the per-entity EXCEPTION. `databaseAuthBackend` ' +
+    'reports the identical finding about `Me.max_accounts` (`src/auth-backend.ts:1520`) and ' +
+    'refuses `readMe` for it. The value the corpus states is ' +
+    '`limits.max_accounts_per_entity` inside the `plan_versions.rules` jsonb, which this door ' +
+    'now reaches -- and `accountCap()` TAKES NO PLAN, is called before the plan version is ' +
+    'resolved, and asks a PER-IDENTITY question of a PER-PLAN-VERSION parameter that nothing ' +
+    'validates and no two published versions are required to agree on. Choosing one is a ' +
+    'ruling about who gets refused a purchase, and it is not this one. SECOND, A ROW THE BUYER ' +
+    'MUST SEE THAT BELONGS TO THE AFFILIATE, AND ADR-233 SECTION 5 REFUSED IT RATHER THAN ' +
+    'LEAVING IT OPEN: `clickByToken` (`routes/checkout.ts:753`) returns a `ClickRef` whose ' +
+    '`affiliate` carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
     '(`routes/checkout.ts:457`); `affiliates` is scope class `owned` on `identity_id` ' +
-    '(`packages/db/src/scope.ts:1093`) and `affiliate_clicks` is `derived` through it ' +
-    '(`packages/db/src/scope.ts:1109`), so a BUYER-scoped read of either returns the empty set ' +
-    'and `resolveAttribution` folds every referral as organic. That is a wrong answer that ' +
-    'RETURNS ROWS and it needs a ruling, not a door. THIRD, THE LEDGER ARM, AND THE GROUND ADR-165 STATED ' +
-    'STILL HOLDS, RE-DERIVED RATHER THAN CARRIED: the `ledger` on the wallet arm ' +
+    '(`packages/db/src/scope.ts:1092`) and `affiliate_clicks` is `derived` through it ' +
+    '(`packages/db/src/scope.ts:1108`), so the row belongs to somebody else and the disclosure ' +
+    'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of ' +
+    'either returns the empty set and `resolveAttribution` folds every referral as organic, ' +
+    'which is a wrong answer that RETURNS ROWS. THIRD, THE LEDGER ARM, AND THE GROUND ADR-165 ' +
+    'STATED STILL HOLDS, RE-DERIVED RATHER THAN CARRIED: the `ledger` on the wallet arm ' +
     '(`routes/checkout.ts:906`) is a `LedgerTx`, which only `SystemTx` satisfies, `SystemReason` ' +
     'is still exactly two members (`packages/db/src/scoped-db.ts:267`) and `apps/api/src/db.ts` ' +
     'still declares no `system(reason, fn)` door. The card arm alone would be a partial backend ' +

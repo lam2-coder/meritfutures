@@ -167,6 +167,21 @@ export {
   type PubliclyLookedUpTableKey,
 } from './scoped-db.ts';
 
+// THE CATALOGUE READ A SCOPED TRANSACTION CARRIES (ADR-233).
+//
+// IT IS NOT A SIXTH DOOR AND THAT IS THE WHOLE OF ITS SHAPE. The five doors
+// above are ways to REACH the database; this is three read verbs on a handle a
+// caller already holds, over a CLOSED LIST of five `firm` keys, so nothing here
+// widens who may open anything. What it changes is WHICH TRANSACTION a
+// catalogue read runs in, which is the one property `firmDb()` cannot give a
+// port that runs every method on one transaction.
+//
+// THE LIST IS EXPORTED BESIDE THE TYPE BECAUSE A SUITE MUST BE ABLE TO ASSERT
+// ITS BOUNDS. `CATALOG_TABLE_KEYS` is what `packages/db/test/catalog-read.test.ts`
+// measures against `FirmTableKey` and against `SCOPE_RULES`, and a narrowness
+// nobody can enumerate is a narrowness nobody can watch shrink.
+export { CATALOG_TABLE_KEYS, type CatalogTableKey } from './scoped-db.ts';
+
 export { atLeast, atMost, isFilterTerm, isNull, type FilterTerm } from './scoped-db.ts';
 
 export {

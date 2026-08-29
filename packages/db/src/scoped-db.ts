@@ -2453,6 +2453,148 @@ export async function pairInsertStatement(
   await source.insert(table).values({ ...values, [writerProperty]: identityId });
 }
 
+// =============================================================================
+// READING A ROW THAT BELONGS TO NOBODY, INSIDE THE TRANSACTION THAT WRITES
+// (ADR-233)
+// =============================================================================
+// A PORT THAT RUNS EVERY METHOD ON ONE TRANSACTION NEEDS ITS CATALOGUE READ ON
+// THAT TRANSACTION. `apps/api/src/routes/checkout.ts` says so about itself --
+// "EVERY METHOD HERE RUNS ON ONE TRANSACTION AND THAT IS THE WHOLE POINT" -- and
+// five of its methods read `firm` tables: `plan_versions`, `plan_version_sizes`,
+// `coupons`, `geo_restrictions` and `mid_health`. `PayoutTx.subject` reads the
+// first two for the same reason one route over.
+//
+// `firmDb()` DOES NOT SERVE THAT AND THE REASON IS NOT ITS AUTHORITY, IT IS ITS
+// CONNECTION. `transaction(firmDb(), ...)` opens a SECOND transaction on a
+// SECOND connection, so a price read through it is read outside the transaction
+// the purchase commits in -- which is the exact thing a one-transaction port
+// exists to prevent, and it is not a hypothetical here: `0027`'s
+// `plan_versions_published_immutable` and `0066`'s published size grid pin a
+// published version, so the crossing is SAFE for those two tables and is still a
+// crossing, and neither trigger says anything at all about `coupons`,
+// `geo_restrictions` or `mid_health`.
+//
+// -----------------------------------------------------------------------------
+// THE DISCLOSURE ARGUMENT THAT GOVERNS `pair` AND `owned` IS ABSENT HERE RATHER
+// THAN OUTWEIGHED
+// -----------------------------------------------------------------------------
+// ADR-106 keeps `pair` out of `ScopedTableKey` because "returning the row to
+// either party discloses the other". ADR-008 keeps a scoped read filtered
+// because the row is somebody's. A `firm` row is NOBODY'S: `scope.ts` registers
+// the class for a table that "declares NO column against `identities(id)`", so
+// there is no party this read could disclose and no tenancy it could read
+// around. There is nothing here to weigh.
+//
+// AN ABSENT OBJECTION IS A STRONGER GROUND THAN AN OUTWEIGHED ONE, and this file
+// has taken that move twice already: ADR-230 says of `insertAsParty` that
+// building no `RETURNING` is "the reason the disclosure ground is ABSENT rather
+// than outweighed", and ADR-191 admits `either` because the row reaches an
+// identity two ways rather than because one way was preferred.
+//
+// SO THE NARROWNESS BELOW IS NOT ABOUT DISCLOSURE AT ALL. It is about the two
+// things that ARE at stake, and neither of them is tenancy:
+//
+//   1. NOT EVERY `firm` TABLE IS CATALOGUE. `otp_challenges` is `firm` because
+//      the row is written "before anybody is anybody", and `code_hash` is
+//      authentication material; `treasury_balances` and
+//      `reserve_coverage_snapshots` are the firm's own position, which
+//      `AS-M12-04` rules unpublishable. `FirmTableKey` is thirty-five keys and
+//      a checkout needs five of them. Handing a request handler the class
+//      because it needs a slice of the class is the widening this file exists
+//      to refuse.
+//   2. A READ IS NOT A WRITE. `FirmTx` carries `insert`, `updateAt` and
+//      `deleteAt`, and a buyer's transaction that could UPDATE `mid_health` or
+//      `geo_restrictions` would be a checkout that can switch off its own geo
+//      block. There is no write verb below and there must never be one.
+//
+// -----------------------------------------------------------------------------
+// AN EXPLICIT LIST AND NOT A REGISTRY DERIVATION, WHICH IS THE OPPOSITE CHOICE
+// FROM ADR-230 AND IS MADE ON ADR-230'S OWN REASONING
+// -----------------------------------------------------------------------------
+// `PartyWritableTableKey` is DERIVED from `SCOPE_RULES` because the ruling is
+// per table and already written there: `PairRule.writer` is required, carries
+// its own `why`, and defaults to nothing. `FirmRule` carries `class` and `why`
+// and NOTHING A DERIVATION COULD READ, so deriving here would yield
+// `FirmTableKey` entire -- the class, not a slice of it. That is
+// `ParentedTableKey`'s situation exactly, and this takes `ParentedTableKey`'s
+// answer: a CLOSED LIST, joined by a diff on this file with an argument
+// attached.
+//
+// THE ARGUMENT A MEMBER OWES IS NOT "THIS ROW IS NOBODY'S", which is already
+// true of thirty-five tables. It is "a request handler holding an identity has a
+// reason to read this INSIDE its own transaction", and each of the five below
+// names the port method that reason belongs to.
+
+/**
+ * The `firm` tables a SCOPED transaction may read.
+ *
+ * `as const satisfies readonly FirmTableKey[]` IS THE FIRST OF THE TWO GUARDS
+ * AND IT IS THE ONE THAT CANNOT BE CAST PAST AT AUTHORING TIME: a key whose
+ * registry class is not `firm` does not compile here at all, so this list cannot
+ * become a second door onto an `owned` table by an edit that looks like adding a
+ * catalogue table.
+ *
+ * FIVE MEMBERS, EACH NAMING THE READ IT EXISTS FOR:
+ *
+ * | key                 | the read                                              |
+ * | ------------------- | ----------------------------------------------------- |
+ * | `coupons`           | `CheckoutTx.couponByCode`, `coupons.code` is `citext`  |
+ * | `geoRestrictions`   | `CheckoutTx.geoDecision`, `SD-M3-05`'s recorded verdict |
+ * | `midHealth`         | `CheckoutTx.midCandidates`, `INV-M3-11`                |
+ * | `planVersions`      | `CheckoutTx.publishedPlanVersion`, `PayoutTx.subject`  |
+ * | `planVersionSizes`  | `CheckoutTx.planVersionSize`, and THE PRICE            |
+ *
+ * ALPHABETICAL AND NOT IN CALL ORDER, so that adding a member is an insertion
+ * with one obvious position rather than a judgement about where a reader would
+ * look for it. ALPHABETICAL MEANS `localeCompare` AND NOT `.sort()`, which is a
+ * distinction with a case in it: `'planVersionSizes' < 'planVersions'` by code
+ * unit, because `S` is smaller than `s`, and that is not the order a reader
+ * means. `catalog-read.test.ts` checks the ordering this docblock claims.
+ */
+export const CATALOG_TABLE_KEYS = [
+  'coupons',
+  'geoRestrictions',
+  'midHealth',
+  'planVersions',
+  'planVersionSizes',
+] as const satisfies readonly FirmTableKey[];
+
+/**
+ * A `firm` table a scoped transaction may read. ADR-233.
+ *
+ * DISJOINT FROM `ScopedTableKey` BY CONSTRUCTION, because `ScopedTableKey` is
+ * `Exclude<TableKey, FirmTableKey | PairTableKey>` and every member above is a
+ * `FirmTableKey`. The two key types cannot overlap, so no method below can be
+ * handed a key that carries a tenancy column, and no scoped method can be handed
+ * one of these.
+ */
+export type CatalogTableKey = (typeof CATALOG_TABLE_KEYS)[number];
+
+/**
+ * The runtime half of the narrowness, and it exists because the compile half is
+ * castable.
+ *
+ * `sqlExecutorOn` READS ITS REASON FOR THIS REASON AND SAYS SO: the vocabulary
+ * is closed by the type, and the check is here "so the parameter is not
+ * decorative, and so a cast past the type still names its reason". A caller
+ * writing `tx.catalogRows('otpChallenges' as never)` meets this rather than a
+ * `SELECT`.
+ *
+ * IT NAMES THE KEY AND THE LIST IN THE MESSAGE, because the reader who reaches
+ * it is a session that wanted a sixth table, and the answer they need is where
+ * the list is rather than that they were refused.
+ */
+function refuseUncatalogued(key: string): void {
+  if ((CATALOG_TABLE_KEYS as readonly string[]).includes(key)) return;
+  throw new Error(
+    `"${key}" is not a table a scoped transaction may read. CATALOG_TABLE_KEYS is a CLOSED ` +
+      `LIST (${CATALOG_TABLE_KEYS.join(', ')}) and joining it is a diff on packages/db with an ` +
+      'argument attached: ADR-233 admits a `firm` table here because a request handler holding ' +
+      'an identity must read it INSIDE its own transaction, and never because the row belongs ' +
+      'to nobody, which is already true of every `firm` table in the registry.',
+  );
+}
+
 // -----------------------------------------------------------------------------
 // THE TRANSACTION, AND THE `JobTransaction` NOTHING IN THIS WORKSPACE COULD
 // PRODUCE (ADR-102 clause 2)
@@ -2552,6 +2694,30 @@ export interface ScopedTx extends TxCommon {
   ): Promise<unknown[]>;
   /** ONE row, or `undefined`. The address must name a unique key. */
   rowAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown>;
+  /**
+   * Every row of ONE CATALOGUE TABLE, on THIS transaction (ADR-233).
+   *
+   * THREE READ VERBS AND NO WRITE VERB, which is the whole of what separates
+   * this from `FirmTx`: that handle carries `insert`, `updateAt` and `deleteAt`
+   * over the same class, and a buyer's transaction that could UPDATE
+   * `geo_restrictions` would be a checkout that switches off its own geo block.
+   *
+   * NO SCOPE PREDICATE IS APPLIED AND NONE COULD BE. A `firm` table declares no
+   * column against `identities(id)`, so `scopePredicate` throws on every key
+   * below; the read is unfiltered because there is no tenancy to filter by, and
+   * that is the CLASS being read correctly rather than a filter omitted.
+   */
+  catalogRows<K extends CatalogTableKey>(key: K): Promise<unknown[]>;
+  /** Catalogue rows matching a filter. `RowFilter` is equality, ANDed, and nothing else. */
+  catalogRowsWhere<K extends CatalogTableKey, F extends RowFilter<K>>(
+    key: K,
+    where: NamesAColumn<K, F>,
+  ): Promise<unknown[]>;
+  /** ONE catalogue row, or `undefined`. The address must name a unique key. */
+  catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(
     key: K,
     at: NamesAColumn<K, A>,
   ): Promise<unknown>;
@@ -2715,6 +2881,34 @@ export function scopedTx(
         source,
         key,
         scopedAddressPredicate(key, identityId, at),
+      )) as unknown[];
+      return oneOrNone(key, found);
+    },
+    async catalogRows<K extends CatalogTableKey>(key: K): Promise<unknown[]> {
+      // THE GUARD IS FIRST AND IT IS RUN ON ALL THREE, because the type is the
+      // only other thing standing here and a type is castable. `undefined` for
+      // the predicate is `firmTx.rows`' own argument: there is no tenancy column
+      // on any key this guard admits.
+      refuseUncatalogued(key);
+      return (await selectStatement(source, key, undefined)) as unknown[];
+    },
+    async catalogRowsWhere<K extends CatalogTableKey, F extends RowFilter<K>>(
+      key: K,
+      where: NamesAColumn<K, F>,
+    ): Promise<unknown[]> {
+      refuseUncatalogued(key);
+      return (await selectStatement(source, key, unscopedFilterPredicate(key, where))) as unknown[];
+    },
+    async catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown> {
+      refuseUncatalogued(key);
+      refuseUnaddressed(key, at);
+      const found = (await selectStatement(
+        source,
+        key,
+        unscopedAddressPredicate(key, at),
       )) as unknown[];
       return oneOrNone(key, found);
     },
