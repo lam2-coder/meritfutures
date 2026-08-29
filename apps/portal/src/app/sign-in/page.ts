@@ -43,10 +43,23 @@
 // in it, and the one `fetch(` in this application is in `src/http/client.ts`.
 //
 // IT SIGNS NOBODY IN, AND SAYS SO ON THE SCREEN. Four routes stand behind it,
-// all four are registered, and not one is wired; ./availability.ts carries the
-// measurement, each blocker quoted, and the reason none of them reaches the
-// person reading the page. Delivery is a vendor integration in nobody's fence,
-// which is ADR-200's own first sentence about the product's honest state.
+// all four are registered, and EXACTLY ONE is wired: `POST /auth/verify`, since
+// ADR-200. That does not make anybody signable in, and the reason is the whole
+// of ./availability.ts's finding rather than a caveat on it -- the served route
+// CONSUMES an `otp_challenges` row and the route that WRITES one is blocked on
+// delivery, so the one door that answers opens onto a code no trader could have
+// been sent. Merit is passwordless (ADR-039), both passkey ceremonies are
+// blocked, and there is no third factor to fall back to, so the honest state of
+// this screen is that nobody can sign in by any route. ./availability.ts carries
+// the measurement per endpoint and per factor, each blocker quoted, and the
+// reason none of them reaches the person reading the page. Delivery is a vendor
+// integration in nobody's fence, which is ADR-200's own first sentence about the
+// product's honest state.
+//
+// AND THAT IS WHY THIS SEGMENT STILL CALLS NOTHING, WHICH IS A DERIVATION AND
+// NOT A GAP. Wiring the one served route would draw a control whose only
+// reachable outcome is the indistinguishable failure a bad code gets, and
+// ADR-190 rules a wrong answer worse than an honest refusal.
 //
 // IT SHOWS NO PASSWORD FIELD, NO RESET LINK AND NO RECOVERY STEP. `0002` records
 // that there is no password table anywhere in the schema by design and ADR-039
