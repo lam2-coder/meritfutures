@@ -510,6 +510,40 @@ describe('3b. the stored bag is ADR-206’s, leaf for leaf', () => {
       refuseUnstorableJson('engine_gates', encodeEngineGates(foldedRow().engineGates));
     }).not.toThrow();
   });
+
+  test('3b.7 THE GUARD RUNS ON THE ENCODED BAG, AT THE CALL SITE AND NOT ONLY DIRECTLY', () => {
+    // **A SEED CAUGHT THIS FILE LEAVING A GUARD UNWATCHED AND IT IS THE MOST
+    // VALUABLE RESULT OF THIS SESSION'S SECOND PASS.** Deleting
+    // `refuseUnstorableJson('engine_gates', ...)` from `ruleStateValues` left
+    // the suite **GREEN at 163 of 163**. The reason is the ruling: once
+    // `encodeEngineGates` returns a typed `StoredEngineGates`, no encoder can
+    // hand the guard a bigint, and the case above calls the guard DIRECTLY
+    // rather than through the mapping. The call site had no witness.
+    //
+    // **THE SEED THAT DOES WITNESS IT IS NOT CONTRIVED.** Sixteen of the
+    // twenty-five leaves are passed through the encoder UNCONVERTED -- every
+    // `pass`, `skipped`, `have`, `need`, the two basis-point leaves,
+    // `tradingDaysSinceLastPayout` and `nextEligibleTradingDay` -- so a leaf
+    // whose engine type later becomes a `Cents` reaches the column raw, and
+    // this line is what fails instead of a query builder.
+    const row = foldedRow();
+    const raw = {
+      ...row,
+      engineGates: {
+        ...row.engineGates,
+        tradedDays: { ...row.engineGates.tradedDays, have: 12n },
+      },
+    } as unknown as RuleStateRow;
+    let raised: unknown;
+    try {
+      ruleStateValues(raw);
+    } catch (error) {
+      raised = error;
+    }
+    expect(raised).toBeInstanceOf(RuleStateEncodingRefusal);
+    expect((raised as RuleStateEncodingRefusal).column).toBe('engine_gates');
+    expect((raised as RuleStateEncodingRefusal).path).toBe('$.tradedDays.have');
+  });
 });
 
 // =============================================================================
