@@ -22,11 +22,14 @@
 // a recorder "proves which key was named, which address was written, which
 // values were set and which reason the handle carried. It proves NOTHING about
 // whether the composed predicate reaches one row or many." So the round trip is
-// NOT asserted here. It was EXECUTED, against a live PostgreSQL over all 60
-// migrations, and `docs/sessions/2026-08-29-session-395.md` carries the
-// transcript: three rows written into a table that held zero, twenty-three
-// columns read back with no mismatch, and `id`, `computed_at` and `created_at`
-// supplied by the database.
+// NOT asserted here. It was EXECUTED TWICE, and each transcript is in the
+// session log that produced it. `docs/sessions/2026-08-29-session-395.md`:
+// three rows written into a table that held zero, twenty-three columns read
+// back with no mismatch, and `id`, `computed_at` and `created_at` supplied by
+// the database. `docs/sessions/2026-08-29-session-400.md`, over `0065`: the
+// clean and the BREACHED fold both written, the three new columns read back
+// with no mismatch, and `0065`'s four CHECK constraints each watched REFUSING
+// a row this mapping would never send, NAMED at the store.
 //
 // -----------------------------------------------------------------------------
 // THE ONE IMPORT THAT NEEDS AN ARGUMENT
