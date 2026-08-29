@@ -3627,7 +3627,7 @@ const ri19 = {
     'and not the encoding, and no control compared them for four sessions. ' +
     'WHAT IT DOES NOT CATCH, and the list is the point rather than a caveat. ' +
     '(a) A RESTATEMENT THAT DOES NOT DECLARE ITS TERM COUNT IS INVISIBLE TO IT. ' +
-    'The corpus states clearing conditions nine other ways (`RESTATED:`, ' +
+    'The corpus states clearing conditions in many other forms (`RESTATED:`, ' +
     '`FIRED`, `UNCHANGED AND NOW HELD BY ONE BLOCKER`, a bare `it()` title) and ' +
     'this check reads none of them; it binds the form session 392 established ' +
     'and makes that form load-bearing. (b) A condition stated on only ONE side of ' +

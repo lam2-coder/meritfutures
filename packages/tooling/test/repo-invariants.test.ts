@@ -2054,8 +2054,8 @@ describe('RI-19 binds the two statements of one clearing condition', () => {
 
   test('IT IS BLIND TO A RESTATEMENT THAT DOES NOT DECLARE ITS OWN TERM COUNT', () => {
     // THE SECOND LIMIT, AND IT IS THE LARGER ONE. The corpus states clearing
-    // conditions nine other ways and RI-19 reads none of them: it binds the form
-    // session 392 established and makes that form load-bearing. A case that
+    // conditions in many other forms and RI-19 reads none of them: it binds the
+    // form session 392 established and makes it load-bearing. A case that
     // restates the condition WITHOUT the marker is not in any pair, and the two
     // statements are then free to drift exactly as `B5`'s did.
     const root = cleanTree();
