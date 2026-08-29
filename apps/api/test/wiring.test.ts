@@ -212,8 +212,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'USED TO NAME (ADR-176). The old reason was `PayoutTx.ledger`, a non-nullable `LedgerTx`; ' +
     'ADR-176 applied ADR-172 clause 2 and DELETED that member, so the port no longer asks for a ' +
     'handle any door refuses. WHAT REFUSES NOW IS A READ. `PayoutTx.subject` returns ' +
-    '`PayoutSubject` (`routes/payouts.ts:328`) whose `state` is the engine`s own `RuleState` ' +
-    '(`:330`), and `RuleState` requires `lifetimeSettledCents` ' +
+    '`PayoutSubject` (`routes/payouts.ts:329`) whose `state` is the engine`s own `RuleState` ' +
+    '(`:331`), and `RuleState` requires `lifetimeSettledCents` ' +
     '(`packages/rules-engine/src/types.ts:1004`), `breached` (`:1009`) and `breachKind` ' +
     '(`:1010`). `0015_rule_states.sql` declares NONE of the three; ' +
     '`grep -rn lifetime_settled packages/db/migrations` returns nothing at all, and no migration ' +
@@ -223,9 +223,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'fields, and `INV-M5-02` is what binds the two, because it requires both payout endpoints ' +
     'to call `evaluatePayout` with identical inputs. SECOND, AND INDEPENDENT: `PayoutSubject' +
     '.plan` (`:331`) is a `ResolvedPlan`, which M01 section 1.3 builds from `plan_versions' +
-    '.rules` and a `plan_version_sizes` row; both tables are scope class `firm` ' +
-    '(`packages/db/src/scope.ts:644,649`) and `ScopedTableKey` is ' +
-    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1307`), so no `ScopedTx` read ' +
+    '.rules` and a `plan_version_sizes` row; both tables are scope class `firm` -- ' +
+    '`planVersions` (`packages/db/src/scope.ts:702`) and `planVersionSizes` ' +
+    '(`packages/db/src/scope.ts:707`) -- and `ScopedTableKey` is ' +
+    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1423`), so no `ScopedTx` read ' +
     'reaches either, while `PayoutTx` runs every method on ONE transaction. A PARTIAL BACKEND ' +
     'IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are both constructible ' +
     'today (`payoutRequests` is `owned`, `scope.ts:1056`, and `databaseIdempotencyStore` exists ' +
@@ -357,9 +358,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`:1254`) would refuse that identity every later withdrawal. Wiring it trades an honest 503 ' +
     'for a permanent per-trader lockout, and only the 503 is reversible. TWO LINE NUMBERS IN ' +
     'THIS ENTRY WERE FALSE BY EIGHTEEN LINES WHEN ADR-176 CHECKED THEM, in the reason ADR-172 ' +
-    'wrote one session earlier to replace a false one: `:1233` was the KYC term and `:1506` was ' +
-    'a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, which is the ' +
-    'same drift in its quietest form.',
+    'wrote one session earlier to replace a false one: line 1233 was the KYC term and line 1506 ' +
+    'was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, which is the ' +
+    'same drift in its quietest form. THOSE TWO NUMBERS ARE WRITTEN OUT OF CITATION GRAMMAR ON ' +
+    'PURPOSE: a `file:line` pointer is a claim about THIS tree, so a pointer quoted as HISTORY ' +
+    'must not wear the shape that says follow me (ADR-212).',
 };
 
 // -----------------------------------------------------------------------------

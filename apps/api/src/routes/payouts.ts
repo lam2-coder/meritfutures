@@ -62,9 +62,10 @@
 // -----------------------------------------------------------------------------
 // `PayoutTx` USED TO CARRY A `LedgerTx` AND NO LONGER DOES, and the reason is a
 // type fact rather than a preference. `postTransaction` takes a `LedgerTx`,
-// whose `insert` names `ledgerTransactions` and `ledgerEntries`
-// (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`
-// (`packages/db/src/scope.ts:675,684`); `ScopedTx.insert` takes
+// whose `insert` names the two members of `LedgerWriteKey`
+// (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`:
+// `ledgerTransactions` (`packages/db/src/scope.ts:742`) and `ledgerEntries`
+// (`packages/db/src/scope.ts:733`); `ScopedTx.insert` takes
 // `OwnedTableKey` (`scoped-db.ts:2104`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
 // (`scoped-db.ts:1903`), a closed list of ONE. So the ONLY handle that
@@ -84,7 +85,7 @@
 // (`apps/worker/src/sweeps/ports.ts:229`) on a handle opened at
 // `systemDb(WORKER_REASON)`, and `WORKER_REASON` is `'nightly-batch'`
 // (`apps/worker/src/db.ts:112,124`); the operator console, whose release arm
-// posts at `AdminPayoutTx.ledger` (`admin-payouts.ts:1210`); and
+// posts at `AdminPayoutTx.ledger` (`admin-payouts.ts:369`); and
 // `POST /wallet/withdrawals`, which declined to post on its own request path
 // deliberately and in writing (`wallet-withdrawals.ts:9-12`).
 //

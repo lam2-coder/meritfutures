@@ -71,9 +71,14 @@
 // EXPRESS, and ADR-112 built the construction for all three: `updateAt` names
 // ONE row through the scoped door, `deleteAt` removes one, and `ScopedTx.update`
 // and the five methods beside it were REMOVED rather than documented. The three
-// citations that paragraph carried -- `scoped-db.ts:676`, `:701`, `:720` -- now
-// name methods that do not exist, so the paragraph is replaced rather than left
-// beside a tree that refutes it. `sqlExecutor`'s vocabulary is unmoved at
+// citations that paragraph carried -- lines 676, 701 and 720 of `scoped-db.ts`
+// -- now name methods that do not exist, so the paragraph is replaced rather
+// than left beside a tree that refutes it. THOSE THREE ARE WRITTEN OUT OF
+// CITATION GRAMMAR ON PURPOSE: a `file:line` pointer is a claim about THIS tree
+// and every reader follows it as one, so a pointer quoted as HISTORY must not
+// wear the shape that says follow me. `:701` is a blank line today, which is
+// exactly what the sentence is about and exactly what `RI-15` would have to
+// report if it were still spelled as a citation (ADR-212). `sqlExecutor`'s vocabulary is unmoved at
 // `'job-enqueue'` and was never spent.
 //
 // WHAT WIRING IT FOUND IS ONE SENTENCE AND IT IS IN `auth-backend.ts`'s HEADER:
