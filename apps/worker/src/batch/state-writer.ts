@@ -43,67 +43,72 @@
 // non-internal rows -- so an insert here emits nothing and needs no sink.
 //
 // -----------------------------------------------------------------------------
-// 2. THE COLUMN THAT NEEDED A RULING, AND THE RULING THAT LANDED
+// 2. THE ONE COLUMN THIS FILE REFUSES TO FILL, AND WHY THAT IS THE HONEST SHAPE
 // -----------------------------------------------------------------------------
-// `rule_states` has TWO `jsonb` columns and they arrived at a declared shape by
-// two different routes.
+// `rule_states` has TWO `jsonb` columns and they are in different positions.
 //
-//   `context_gates`  DECLARED IN CODE. `ports.ts`'s {@link StoredContextGates}
-//                    is the stored shape, its own comment rules the engine's
-//                    five fields over `0015`'s four, and every leaf is a
-//                    boolean, a string or `null`. It goes to the column as it
-//                    stands.
-//   `engine_gates`   DECLARED BY A RULING, `ADR-206`, and {@link encodeEngineGates}
-//                    below is that ruling as code.
+//   `context_gates`  DECLARED. `ports.ts`'s {@link StoredContextGates} is the
+//                    stored shape, its own comment rules the engine's five
+//                    fields over `0015`'s four, and every leaf is a boolean, a
+//                    string or `null`. It goes to the column as it stands.
+//   `engine_gates`   NOT DECLARED IN CODE, AND NOT DECLARABLE HERE.
+//                    `EngineGateResults` types SEVEN of its twenty-five leaves
+//                    as `Cents` -- this comment said FOUR, inherited from
+//                    `hash.ts`, which said four until 2026-08-29 -- which is
+//                    `bigint`, and `JSON.stringify` THROWS on a bigint --
+//                    `packages/rules-engine/src/hash.ts` says so in its own
+//                    words and adds the second half: `JSON.stringify` of the
+//                    gates is the key iteration `M01` section 1.4 bans. That
+//                    file solves it for the HASH with an explicit ordered leaf
+//                    list and states in terms that the result is NOT the column:
+//                    "THE HASH IS OVER THE ENGINE'S VALUE, NEVER OVER
+//                    POSTGRES'S `jsonb`". `0015`'s column comment names EIGHT
+//                    gates where the engine produces six.
 //
-// **WHAT THIS FILE SAID BEFORE `ADR-206` MERGED, KEPT RATHER THAN DELETED**,
-// because a refuted sentence deleted leaves nothing for the next reader to
-// check. It read: "THIS FILE THEREFORE TAKES THE ENCODING AS A PARAMETER AND
-// SUPPLIES NONE ... a landed writer clears term 1 and leaves term 2 standing.
-// THE DEPENDENCY RUNS BOTH WAYS. A writer cannot fill column 19 either." **THE
-// PREMISE WAS TRUE WHEN WRITTEN AND IS NOW SPENT.** Both halves of the argument
-// were right: no primary source declared the bag, `EngineGateResults` types
-// seven of its twenty-five leaves as `Cents`, and `hash.ts` states that its own
-// canonical serialization is NOT the column. `ADR-206` ruled it while this
-// branch was open, so the seam has a supplier and the parameter is gone: an
-// injected encoding with a refusing default, kept after its reason expired,
-// would be an invitation to a SECOND encoding, which is the defect that entry
-// was written to end.
+// **`ADR-206` LANDED WHILE THIS BRANCH WAS OPEN AND THE SENTENCE ABOVE USED TO
+// END "So no primary source says what goes in the column." IT DOES NOW.** That
+// entry (session 394) declares the bag at
+// `docs/architecture/data-model/rule_states.md`: the engine's own
+// `EngineGateResults`, six groups and twenty-five leaves at
+// `ENGINE_GATE_LEAVES`' dotted paths, in the ENGINE's field names, with every
+// `*Cents` leaf a base-10 string.
 //
-// **THE RULING, AS THIS FILE MUST BE ABLE TO SATISFY IT.** `ADR-206` ruling 1
-// through 5: the engine's own `EngineGateResults` value, six groups and
-// twenty-five leaves and no others, in the ENGINE's field names rather than
-// `API_CONTRACT`'s; every `*Cents` leaf a JSON string holding the base-10
-// integer, on the round-trip evidence in that entry's section 5 that a JSON
-// number loses a `Cents` at the READ port rather than in Postgres; every other
-// leaf its JSON primitive with `null` as JSON `null` and never as the hash's
-// `~null` sentinel; and `skipped` on `tradedDays`, `consistency` and
-// `cadenceGap` and on no other group.
+// **AND THE SEAM BELOW STAYS, WHICH IS A RULING RATHER THAN AN OVERSIGHT.**
+// What is DECLARED is not yet IMPLEMENTED: no adapter in this tree encodes to
+// that shape, `ADR-206` is `status: proposed` with an UNSIGNED approval line,
+// and the encoder is a later slice's rather than this one's. **A PORT THAT
+// REFUSES IS THE CORRECT STATE UNTIL AN ENCODER EXISTS**, and this session's own
+// attempt at that encoder is recorded in
+// `docs/sessions/2026-08-29-session-395.md` section 3 rather than kept, along
+// with the one thing building it taught: **the guard below loses its only
+// witness the moment the encoder's return type is strong enough to forbid a
+// bigint**, so the slice that writes it owes a case at the CALL SITE and not
+// only one that calls `refuseUnstorableJson` directly.
 //
-// **THE LEAF SET IS BOUND TO THE ENGINE'S OWN LIST RATHER THAN RE-TYPED HERE.**
-// Ruling 1 says the leaves "are exactly `ENGINE_GATE_LEAVES`' dotted paths", so
-// `test/rule-state-writer.test.ts` walks what {@link encodeEngineGates} produces,
-// flattens it to dotted paths and compares that set with `ENGINE_GATE_LEAVES` in
-// BOTH directions. A leaf added to a gate interface without a line here is a red
-// suite rather than a column quietly one field short of the hash beside it.
+// **THIS FILE THEREFORE TAKES THE ENCODING AS A PARAMETER AND SUPPLIES NONE.**
+// {@link RuleStateWriterIo.encodeEngineGates} is injected, and
+// {@link UNWIRED_RULE_STATE_WRITER_IO} refuses it by name. That is
+// `recon/ports.ts` section 3's device applied to a column rather than to a
+// literal: "a later slice that acquires the ledger reaches a COMPILE ERROR at
+// every write site rather than a field it may quietly leave alone, which is the
+// difference between an absence somebody decided and an absence somebody
+// inherited."
 //
-// **KEY ORDER IS NOT PART OF THE ENCODING** (ruling 6), because `jsonb` does not
-// preserve it. Measured on a live row by this session and independently by
-// `ADR-206` section 6: written in declaration order, stored sorted by length
-// then bytewise. The consequence is `hash.ts`'s and it is why {@link ruleStateValues}
-// passes `state_hash` through by REFERENCE: the column and the hash are written
-// from one in-memory value in one step, and a hash recomputed from a round trip
-// would be a different serializer.
+// **AND IT IS THE FINDING THIS SLICE OWES.** `B5`'s clearing condition lists the
+// writer as term 1 and the declared encoding as term 2, and session 392 recorded
+// the dependency in ONE direction: "a landed writer clears term 1 and leaves
+// term 2 standing." THE DEPENDENCY RUNS BOTH WAYS. A writer cannot fill column
+// 19 either, so term 2 gates the writer's WIRING as well as the reader's fold.
+// What term 1 buys without term 2 is eighteen columns transcribed, executed and
+// asserted, and a nineteenth with a named supplier -- which is worth landing and
+// is not the same as a wired producer.
 //
 // -----------------------------------------------------------------------------
-// 3. THE GUARD IS OVER ANY ENCODING RATHER THAN OVER THE ONE THAT WAS RULED
+// 3. THE GUARD IS OVER ANY ENCODING RATHER THAN OVER THE ONE THIS FILE WOULD
+//    HAVE PICKED
 // -----------------------------------------------------------------------------
-// **IT OUTLIVED THE SEAM IT WAS WRITTEN FOR AND IT IS KEPT DELIBERATELY.** With
-// the encoding ruled, the guard no longer stands between this file and an
-// encoder somebody else installs; it stands between this file and its own next
-// edit. A leaf added to a gate interface and transcribed here as a raw `Cents`
-// is a `TypeError: Do not know how to serialize a BigInt` raised inside a query
-// builder, with no column name in it.
+// A seam with no guard hands the next session a `TypeError: Do not know how to
+// serialize a BigInt` raised inside a query builder, with no column name in it.
 // Worse, two of the shapes that DO serialize are silent: `undefined` makes
 // `JSON.stringify` DROP the key, so a gate leaf disappears rather than failing,
 // and `NaN` and `Infinity` both render as `null`, so a money figure becomes an
@@ -282,16 +287,32 @@ export interface RuleStateTx {
 /**
  * Everything the writer needs from the world.
  *
- * **ONE MEMBER, AND IT USED TO BE TWO.** `encodeEngineGates` was here while
- * `B5` term 2 was open; `ADR-206` ruled the encoding, so the encoder is a
- * function in this file rather than a parameter a deployment supplies. Header
- * section 2 keeps the argument that put it here in the first place.
+ * `encodeEngineGates` IS HERE RATHER THAN IN THIS FILE'S BODY, and header
+ * section 2 is the whole reason. It is on the `Io` beside `transact` rather than
+ * behind a second parameter so that a deployment installs a door and an encoding
+ * together or installs neither.
  */
 export interface RuleStateWriterIo {
   /**
    * One unit of work. Called ONCE PER ROW; header section 4 is why.
    */
   transact<T>(fn: (tx: RuleStateTx) => Promise<T>): Promise<T>;
+  /**
+   * The value that goes into `rule_states.engine_gates`.
+   *
+   * **NO IMPLEMENTATION OF THIS METHOD SHIPS IN THIS FILE OR IN THIS
+   * DEPLOYABLE**, and {@link UNWIRED_RULE_STATE_WRITER_IO} refuses it by name.
+   * A primary source declaring the stored encoding is `B5` term 2 and is an
+   * amendment to the corpus rather than a line of code; this session held no
+   * number for it and took none.
+   *
+   * Its return is `unknown` and not a JSON type, because a JSON type here would
+   * be this file choosing the outer shape (an object? an array of leaves?) while
+   * declining to choose the inner one. {@link refuseUnstorableJson} is what
+   * checks the return instead, and it checks a property the constitution already
+   * fixed rather than a shape this file prefers.
+   */
+  encodeEngineGates(gates: EngineGateResults): unknown;
 }
 
 // -----------------------------------------------------------------------------
@@ -322,6 +343,9 @@ export class RuleStateWriterUnwired extends Error {
 /** The unwired default, which serves nothing. */
 export const UNWIRED_RULE_STATE_WRITER_IO: RuleStateWriterIo = {
   transact: () => Promise.reject(new RuleStateWriterUnwired('transact')),
+  encodeEngineGates: () => {
+    throw new RuleStateWriterUnwired('encodeEngineGates');
+  },
 };
 
 /**
@@ -449,7 +473,7 @@ export function refuseUnstorableJson(
 
     switch (typeof current) {
       case 'bigint':
-        // THE ONE THAT MADE THIS GUARD NECESSARY. `hash.ts`: "`JSON.stringify`
+        // THE ONE THAT MADE THIS SEAM NECESSARY. `hash.ts`: "`JSON.stringify`
         // THROWS ON A BIGINT, and SEVEN of the twenty-five leaf fields below
         // are `Cents`." **THAT SENTENCE SAID FOUR UNTIL 2026-08-29** and this
         // comment inherited the wrong number from it; both are repaired on this
@@ -538,148 +562,6 @@ export function refuseUnstorableJson(
 }
 
 // -----------------------------------------------------------------------------
-// `ADR-206`: the stored `engine_gates` bag
-// -----------------------------------------------------------------------------
-
-/**
- * `rule_states.engine_gates` as `ADR-206` rules it.
- *
- * SIX GROUPS AND TWENTY-FIVE LEAVES, in the ENGINE's field names. The groups
- * and their field order are `EngineGateResults`' own, which is what
- * `docs/architecture/data-model/rule_states.md` reproduces; the ORDER is not
- * part of the encoding (`ADR-206` ruling 6) and is written this way so a
- * reviewer can read this type beside the interface it stores.
- *
- * **THE SEVEN `string` MEMBERS ARE THE CENTS LEAVES AND THE TYPE IS THE POINT.**
- * `ADR-206` ruling 3 makes every `*Cents` leaf a base-10 string, so a `number`
- * here is a compile error rather than a value that survives to a round trip and
- * loses its low digits at the read port.
- */
-export interface StoredEngineGates {
-  readonly tradedDays: {
-    readonly pass: boolean;
-    readonly skipped: boolean;
-    readonly have: number;
-    readonly need: number;
-  };
-  readonly winDays: {
-    readonly pass: boolean;
-    readonly have: number;
-    readonly need: number;
-    readonly floorCents: string;
-  };
-  readonly buffer: {
-    readonly pass: boolean;
-    readonly haveCents: string;
-    readonly needCents: string;
-  };
-  readonly consistency: {
-    readonly pass: boolean;
-    readonly skipped: boolean;
-    readonly bestDayShareBp: number | null;
-    readonly maxDayShareBp: number | null;
-    readonly profitNeededToDiluteCents: string;
-  };
-  readonly cadenceGap: {
-    readonly pass: boolean;
-    readonly skipped: boolean;
-    readonly tradingDaysSinceLastPayout: number | null;
-    readonly need: number;
-    readonly nextEligibleTradingDay: string | null;
-  };
-  readonly minimumAmount: {
-    readonly pass: boolean;
-    readonly withdrawableCents: string;
-    readonly capCents: string;
-    readonly minPayoutCents: string;
-  };
-}
-
-/**
- * `ADR-206` ruling 3's base-10 string. `toString(10)` carries the sign.
- *
- * THE SAME TEXT `hash.ts`'s `money()` PRODUCES, which is ruling 3's own closing
- * argument: "the column and the hash speak one representation of money instead
- * of two". It is spelled again here rather than imported because that function
- * is module-private to the serializer and exporting it would make one helper
- * serve two encodings that are only incidentally the same today.
- */
-function centsText(value: bigint): string {
-  return value.toString(10);
-}
-
-/**
- * The engine's gates as the column holds them (`ADR-206` rulings 1 to 5).
- *
- * **WRITTEN OUT LEAF BY LEAF RATHER THAN WALKED, AND `M01` SECTION 1.4 IS WHY.**
- * That section bans "iteration over an object's keys where the result affects
- * output", and this function's whole output is such a result. `ENGINE_GATE_LEAVES`
- * is the corpus's answer to the same problem one column over and it renders for
- * a HASH rather than for `jsonb`, so its `render` is not reusable here: it
- * writes `null` as a sentinel and frames every leaf as text, both of which
- * ruling 4 refuses.
- *
- * **SO THE LEAF SET IS BOUND MECHANICALLY INSTEAD.** Ruling 1 says the leaves
- * "are exactly `ENGINE_GATE_LEAVES`' dotted paths", and
- * `test/rule-state-writer.test.ts` flattens what this returns and compares the
- * two sets in both directions. That is the check this file cannot perform on
- * itself: a leaf added to a gate interface and forgotten here is a column one
- * field short of the hash beside it, and nothing else in this tree would say so.
- *
- * **NO CONTEXT GATE IS HERE AND `INV-23` IS WHY.** `SD-06` split the column in
- * two precisely so the replayed half carries nothing that "was true on the day
- * and may not be true now", and `ADR-206`'s section 3 records that the wire
- * shape's four `R-40` gates are the reason the wire shape is not this.
- */
-export function encodeEngineGates(gates: EngineGateResults): StoredEngineGates {
-  return {
-    tradedDays: {
-      pass: gates.tradedDays.pass,
-      skipped: gates.tradedDays.skipped,
-      have: gates.tradedDays.have,
-      need: gates.tradedDays.need,
-    },
-    winDays: {
-      pass: gates.winDays.pass,
-      have: gates.winDays.have,
-      need: gates.winDays.need,
-      floorCents: centsText(gates.winDays.floorCents),
-    },
-    buffer: {
-      pass: gates.buffer.pass,
-      haveCents: centsText(gates.buffer.haveCents),
-      needCents: centsText(gates.buffer.needCents),
-    },
-    consistency: {
-      pass: gates.consistency.pass,
-      skipped: gates.consistency.skipped,
-      // Ruling 4: a nullable JSON integer, and `null` is JSON null. `R-30`'s
-      // denominator rule is what makes both of these absent rather than zero.
-      bestDayShareBp: gates.consistency.bestDayShareBp,
-      maxDayShareBp: gates.consistency.maxDayShareBp,
-      profitNeededToDiluteCents: centsText(gates.consistency.profitNeededToDiluteCents),
-    },
-    cadenceGap: {
-      pass: gates.cadenceGap.pass,
-      skipped: gates.cadenceGap.skipped,
-      tradingDaysSinceLastPayout: gates.cadenceGap.tradingDaysSinceLastPayout,
-      need: gates.cadenceGap.need,
-      // `AS-06`'s resolved date, and the ONE leaf `ADR-204` reads out of this
-      // bag: the only forward-knowable input to the figure the payout wallet is
-      // funded against. A `TradingDay` is a branded `YYYY-MM-DD` string, so it
-      // reaches the column as ruling 4's string with no conversion.
-      nextEligibleTradingDay: gates.cadenceGap.nextEligibleTradingDay,
-    },
-    minimumAmount: {
-      pass: gates.minimumAmount.pass,
-      withdrawableCents: centsText(gates.minimumAmount.withdrawableCents),
-      capCents: centsText(gates.minimumAmount.capCents),
-      minPayoutCents: centsText(gates.minimumAmount.minPayoutCents),
-    },
-  };
-}
-
-// -----------------------------------------------------------------------------
 // The mapping
 // -----------------------------------------------------------------------------
 
@@ -696,8 +578,7 @@ export function encodeEngineGates(gates: EngineGateResults): StoredEngineGates {
  * and it is asserted in the suite against `packages/db/src/schema.ts` rather
  * than trusted. TWO of the twenty-three are not identity, and both are here:
  *
- *   `engineGates`        header section 2. Encoded by {@link encodeEngineGates}
- *                        to `ADR-206`'s ruling, then guarded.
+ *   `engineGates`        header section 2. Encoded, then guarded.
  *   `calendarRevisionId` `RuleStateRow` types it `number | null` and
  *                        `0035_rule_states_calendar_revision.sql` declares the
  *                        column `bigint`, which the accessor reads in `bigint`
@@ -712,7 +593,10 @@ export function encodeEngineGates(gates: EngineGateResults): StoredEngineGates {
  * (executed: `BigInt(1.5)` raises `RangeError`), and that the value written and
  * the value read back are one type rather than two.
  */
-export function ruleStateValues(row: RuleStateRow): RuleStateValues {
+export function ruleStateValues(
+  row: RuleStateRow,
+  encodeEngineGates: (gates: EngineGateResults) => unknown,
+): RuleStateValues {
   const engineGates = encodeEngineGates(row.engineGates);
   refuseUnstorableJson('engine_gates', engineGates);
   // `StoredContextGates` is JSON-safe today and this walk asserts it rather than
@@ -771,7 +655,7 @@ export function ruleStateValues(row: RuleStateRow): RuleStateValues {
  */
 export function writeRuleStateVia(io: RuleStateWriterIo): BatchWritePort['writeRuleState'] {
   return async (row: RuleStateRow): Promise<void> => {
-    const values = ruleStateValues(row);
+    const values = ruleStateValues(row, (gates) => io.encodeEngineGates(gates));
 
     const written = await io.transact(async (tx) => {
       try {
