@@ -1,10 +1,28 @@
 // =============================================================================
 // apps/api/src/auth-backend.ts
 // =============================================================================
-// `AuthBackend` AGAINST THE REAL ACCESSOR. ADR-120, and the count is reported
-// honestly at the top rather than discovered at the bottom: FIVE of the port's
-// sixteen methods are implemented here and ELEVEN raise, each naming its own
-// blocker.
+// `AuthBackend` AGAINST THE REAL ACCESSOR. ADR-120. Some of the port's methods
+// are implemented here and the rest raise, each naming its own blocker.
+//
+// THE PARTITION IS NOT WRITTEN OUT HERE AND THAT IS THIS FILE'S OWN HISTORY
+// RATHER THAN A STYLE. It used to read "FIVE of the port's sixteen methods are
+// implemented here and ELEVEN raise", which is TRUE, and four other sentences in
+// this file went on saying twelve after ADR-200 moved `verifyOtp` across --
+// while the suite one directory over asserted the eleven and stayed green. Five
+// restatements of one measurement, one of them correct. So the number is stated
+// ONCE, in `routes/auth.ts`'s port docblock, where it quotes the commands that
+// settle it against THIS file and `RI-20` runs them on every `CI-01`. ADR-034's
+// remedy has exactly two branches, generate the value or delete it and point at
+// the source; every site here takes the second and that docblock takes the first.
+//
+// WHAT THIS FILE MAY STATE IS THE HALF IT CANNOT PERTURB, and the rule is worth
+// the sentence: a claim that greps the file it is written in matches itself, so
+// writing the refusal count here would change the refusal count. The port's SIZE
+// is a fact about `routes/auth.ts`, so it is settleable from here:
+// `grep -rn ": unwired" apps/api/src/routes/auth.ts` returns 16 lines, one per
+// member of `UNWIRED_AUTH_BACKEND`, and `UNWIRED_AUTH_BACKEND: AuthBackend`
+// makes that list the port's own membership at COMPILE time rather than a second
+// copy of it. Each of the two files therefore holds the claim about the other.
 //
 // -----------------------------------------------------------------------------
 // THE MEASUREMENT THIS FILE OPENS WITH
@@ -92,9 +110,11 @@
 // `endpointHandler` answers 503 for that class and logs the error, so a route
 // this deployment cannot serve says so with a reason in the log line rather than
 // in the response body -- API_CONTRACT section 2 keeps internals out of a
-// problem document. One error class and twelve different reasons is what makes
-// a 503 from `POST /auth/verify` a different fact from a 503 from
-// `POST /auth/passkey/login/options`.
+// problem document. One error class and a DISTINCT REASON PER REFUSAL is what
+// makes a 503 from `POST /auth/otp` a different fact from a 503 from
+// `POST /auth/passkey/login/options`. (This sentence named a count until session
+// 410; it named twelve, the tree held eleven, and the count was never what the
+// sentence was about.)
 // =============================================================================
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -743,7 +763,7 @@ export function userAgentFamily(raw: string | null): string {
 }
 
 // -----------------------------------------------------------------------------
-// The blockers, each named once so twelve refusals cannot drift apart
+// The blockers, each named once so the refusals cannot drift apart
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -803,7 +823,7 @@ const NO_DELIVERY =
   'needs a per-send price to charge against `otp_send_budget.spend_cents`, which is config that ' +
   'has no source in this tree';
 
-/** One refusal, so the twelve read identically and cite one reason each. */
+/** One refusal, so every blocked method reads identically and cites one reason each. */
 function blocked(method: string, reason: string): () => Promise<never> {
   return () => Promise.reject(new AuthBackendUnwired(method, reason));
 }
@@ -980,7 +1000,7 @@ export function databaseAuthBackend(
     },
 
     // -------------------------------------------------------------------------
-    // The twelve, each with its own reason
+    // `verifyOtp`, and then the refusals, each with its own reason
     // -------------------------------------------------------------------------
 
     /**

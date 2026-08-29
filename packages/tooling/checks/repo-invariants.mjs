@@ -4270,7 +4270,44 @@ const ri19 = {
 //       that is RI-16's territory.
 //   (4) It reads the COUNT of matching lines and never their content, so a
 //       command returning the right number of the wrong lines passes.
-const COMMAND_CLAIM_FILES = SOURCED_CLAIM_FILES;
+//
+// SESSION 410 ADDED THE TWO AUTH FILES, AND THE CLASS THEY BRING IS A COUNT
+// RATHER THAN AN EXISTENCE CLAIM. `databaseAuthBackend`'s wiring partition was
+// restated in TWELVE live source comments across `apps/api`; ELEVEN of them were
+// stale, four inside `auth-backend.ts` alone and two inside the very suite that
+// asserts the true number. Every gate was green, because a bare numeral in prose
+// is a claim no runner can settle: measured over this tree, a numeral-word
+// beside a refusal noun moves 902 sites across 585 shipped `.ts`/`.tsx` files,
+// and 34 in the three auth files alone of which 27 are honest -- "One refusal
+// is", "TWO INDEPENDENT REFUSALS", "One method per endpoint". THE RULE IS
+// THEREFORE ADR-214'S, UNCHANGED AND ONE CLASS OVER: a sentence wanting to state
+// a count supplies the command that settles it, and the runner runs it. Nothing
+// here recognises a numeral.
+//
+// WIDENING RI-14'S OWN LIST TO THESE FILES MOVES 0 SITES, which is ADR-212's and
+// ADR-214's finding a third time: the parameter everybody would change first
+// buys nothing. So SOURCED_CLAIM_FILES is unchanged and this check gets its own
+// list, which is also the honest shape -- the two checks read the same files
+// today by history rather than by principle.
+//
+// AND THE WHOLE TREE IS REFUSED ON A MEASUREMENT RATHER THAN ON TASTE. This
+// grammar over all 585 shipped `.ts`/`.tsx` moves 18 sites, of which 12 are the
+// SEEDED FIXTURES in this package's own suite -- a check that executes its own
+// negative controls is red on landing -- and 4 are prose the grammar mistakes
+// for a command, `col = NULL` in `scoped-db.ts` "matches nothing" and a
+// `tradingDay` error message in `recon/sweep.ts` likewise. The 2 that remain are
+// true live claims in `apps/portal` and `apps/worker`, and they are registered
+// in session 410's log rather than reached for here.
+const COMMAND_CLAIM_FILES = [
+  ...SOURCED_CLAIM_FILES,
+  // THE PORT AND ITS BACKEND, AND EACH ONE CARRIES THE CLAIM ABOUT THE OTHER.
+  // A claim that greps the file it is written in matches itself, so the refusal
+  // count lives in `routes/auth.ts` and greps `auth-backend.ts`, and the port's
+  // size lives in `auth-backend.ts` and greps `routes/auth.ts`. Neither file can
+  // satisfy its own sentence.
+  'apps/api/src/auth-backend.ts',
+  'apps/api/src/routes/auth.ts',
+];
 
 /**
  * A quoted command and the result the sentence claims for it, on a two-line
@@ -4336,7 +4373,22 @@ const ri20 = {
     'ADR-211 row 19 says "at this commit" and names `0064` as the last ' +
     'migration. A document may honestly record what a command returned in the ' +
     'past and a live source comment may not, and the exemption that needs is ' +
-    "RI-16's. (4) It reads the COUNT of matching lines and never their content.",
+    "RI-16's. (4) It reads the COUNT of matching lines and never their " +
+    'content. THE TWO AUTH FILES JOINED THE LIST IN SESSION 410 AND THE CLASS ' +
+    'THEY BRING IS A COUNT rather than an existence claim: the wiring partition ' +
+    'of `databaseAuthBackend` was restated in twelve live source comments and ' +
+    'eleven were stale, four in one file and two in the suite asserting the ' +
+    'true number, with every gate green. A BARE NUMERAL IS UNSETTLEABLE AND ' +
+    'THAT WAS MEASURED RATHER THAN ASSUMED: a numeral-word beside a refusal ' +
+    'noun moves 902 sites across 585 shipped `.ts`/`.tsx` and 34 in the three ' +
+    'auth files alone, of which 27 are honest. So the rule stays ADR-214 clause ' +
+    '3, the sentence supplies the command. Widening `RI-14` to these files ' +
+    'moves 0 sites, which is why that list is unchanged and this check has its ' +
+    'own; widening THIS grammar to the whole tree moves 18, of which 12 are ' +
+    "this package's own seeded fixtures. A CLAIM MUST NOT BE ABLE TO SATISFY " +
+    'ITSELF: a grep over the file the sentence is written in matches the ' +
+    'sentence, so each of the two auth files states the half that lives in the ' +
+    'other one.',
   run(root) {
     /** @type {string[]} */
     const findings = [];

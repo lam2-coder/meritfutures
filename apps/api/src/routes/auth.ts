@@ -64,8 +64,12 @@
 // `Retry-After` the budget row implies.
 //
 // -----------------------------------------------------------------------------
-// THE BACKEND IS A PORT, AND AS OF ADR-120 IT HAS AN IMPLEMENTATION FOR FOUR OF
-// ITS SIXTEEN METHODS
+// THE BACKEND IS A PORT, AND AS OF ADR-120 PART OF IT HAS AN IMPLEMENTATION
+//
+// THIS HEADING READ "FOR FOUR OF ITS SIXTEEN METHODS" UNTIL SESSION 410 AND THE
+// FOUR HAD BEEN FIVE SINCE ADR-200 WIRED `verifyOtp`. It is not replaced by
+// `FIVE`: the port docblock below states the partition once and quotes the
+// commands that settle it, and every other site points there.
 // -----------------------------------------------------------------------------
 // THE PARAGRAPH THAT STOOD HERE NAMED THREE WRITES `packages/db` COULD NOT
 // EXPRESS, and ADR-112 built the construction for all three: `updateAt` names
@@ -434,11 +438,30 @@ export interface Me {
  * Everything this surface needs from outside the process. One method per
  * endpoint, and no method takes or returns a Fastify type.
  *
- * `databaseAuthBackend` in `../auth-backend.ts` implements FIVE of these against
- * the real accessor and raises {@link AuthBackendUnwired} from the other eleven,
- * each carrying its own blocker. See this file's header for which and why, and
- * that file's header for what the eleven wait on. The fifth is `verifyOtp`,
- * wired by ADR-200.
+ * `databaseAuthBackend` in `../auth-backend.ts` implements some of these against
+ * the real accessor and raises {@link AuthBackendUnwired} from the rest, each
+ * carrying its own blocker. See this file's header for which and why, and that
+ * file's header for what the refused ones wait on.
+ *
+ * THE PARTITION IS STATED ONCE, HERE, AND IT QUOTES THE COMMANDS THAT SETTLE IT.
+ * `grep -rn "    async " apps/api/src/auth-backend.ts` returns 5 lines, one per
+ * method that file implements against the accessor, and
+ * `grep -rn ": blocked" apps/api/src/auth-backend.ts` returns 11 lines, one per
+ * refusal. `RI-20` executes both on every `CI-01` and fails the sentence when the
+ * count is not what it says, which is ADR-214 clause 3 applied to a COUNT rather
+ * than to an existence claim: a number written down goes stale and rewriting it
+ * only resets when, so the burden lands on the sentence making the claim.
+ *
+ * WHY THE CLAIM LIVES HERE AND NOT IN THE FILE IT IS ABOUT. A claim that greps
+ * the file it is written in matches itself, so a refusal count written into
+ * `auth-backend.ts` would change the refusal count. That file holds the claim
+ * about THIS one -- the port's size, `grep`ped over `UNWIRED_AUTH_BACKEND` --
+ * and this one holds the claim about that one. Neither can satisfy itself.
+ *
+ * FIVE RESTATEMENTS OF THIS ONE MEASUREMENT WERE ALIVE ON 2026-08-29 AND FOUR
+ * WERE STALE, saying twelve where the tree held eleven since ADR-200 moved
+ * `verifyOtp` across, while `apps/api/test/auth-backend.test.ts` asserted the
+ * eleven and every gate stayed green. That is why there is one of them now.
  */
 export interface AuthBackend {
   /** Resolve the session cookie's value. `null` for an unknown or dead token. */
@@ -500,7 +523,8 @@ export interface AuthBackend {
  * DIFFERENT ABSENCES. One is a deployment that installed no backend at all,
  * which is what {@link UNWIRED_AUTH_BACKEND} is. The other is a backend that IS
  * wired and cannot express this particular method, which is what
- * `databaseAuthBackend` raises from twelve of the sixteen. Both are `503
+ * `databaseAuthBackend` raises from every method it refuses -- the port docblock
+ * above says how many and quotes the commands that settle it. Both are `503
  * service_unavailable` to a client and they are different facts to an operator,
  * so the reason travels with the error.
  *

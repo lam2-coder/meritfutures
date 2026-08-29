@@ -76,7 +76,7 @@
 // -----------------------------------------------------------------------------
 // Six files under `apps/api/src` name `systemDb` in PROSE, every one of them in
 // order to say that they do not reach it: `auth-backend.ts` names it inside the
-// constant that refuses twelve methods, `routes/admin-reads.ts` names it in the
+// constant its refusals cite, `routes/admin-reads.ts` names it in the
 // port header that stops at it, `routes/certificates.ts` names it to say the
 // door would not serve an unauthenticated read. A substring check would count
 // each of those as a violation of the property it is describing, which is
