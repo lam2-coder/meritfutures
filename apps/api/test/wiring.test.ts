@@ -373,7 +373,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   useTurnstileVerifier:
     'NOTHING. THIS PORT IS ALREADY LIVE AND THE ENTRY EXISTS TO SAY SO. ' +
     '`routes/auth.ts` initialises it with `cloudflareTurnstileVerifier()` at module scope ' +
-    '(`routes/auth.ts:634`), which reads `MERIT_TURNSTILE_SECRET` from `process.env` per call ' +
+    '(`routes/auth.ts:642`), which reads `MERIT_TURNSTILE_SECRET` from `process.env` per call ' +
     'and calls Cloudflare, so calling the setter from `start.ts` would install what is already ' +
     'installed. That would raise the wired count and serve nothing, and it is not a wiring, on ' +
     "`useCheckoutAdapters`'s stated rule three entries up. THE DIFFERENCE FROM THOSE THREE, AND " +
