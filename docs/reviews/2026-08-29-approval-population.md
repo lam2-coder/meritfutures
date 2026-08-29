@@ -287,3 +287,36 @@ falsifiable, and a count asserted here would be the exact thing section 5 warns 
 - **It classifies 30 entries by a regular expression over their own prose.** The block is required
   by `RI-13`, so the block is always there; whether the sentence inside it names a judgement is read
   by pattern, and a rewording moves an entry between tiers with nothing failing.
+
+## 6. Re-derived on the merge with `main` at `dddb3860`, taken after the counts above
+
+**`main` moved to `dddb3860` while this branch was open**, carrying
+[ADR-223](../decisions/ADR-223.md) (session 413, the security headers). It was
+merged in rather than rebased, per the git workflow. **The counts in sections 2
+and 3 are facts about the `21afc5d8` baseline they name and are not rewritten.**
+Re-derived on the merged tree:
+
+| Re-derived at `dddb3860` merged | Count |
+| --- | ---: |
+| files matching `docs/decisions/ADR-*.md` | **214** |
+| `status: proposed` (108 at the baseline, plus `ADR-223` and `ADR-227`) | **110** |
+| `status: accepted` | **104** |
+| of the `proposed` entries, landing at least one money-path file | **42**, unchanged |
+
+**AND THE ARRIVAL FOUND A HOLE IN THE PREDICATE, WHICH IS WORTH MORE THAN THE
+COUNT.** `ADR-223` says of itself *"The `E2` read is owed on
+[`apps/api/src/security-headers.ts`]"*, and **section 3.1's predicate does not
+match that file**: it names `auth-backend.ts`, `csrf.ts`, `turnstile.ts` and
+`db.ts` under `apps/api/src/`, and nothing else. So the entry **declares an owed
+read that this measurement does not count.**
+
+**The derived 42 is therefore a FLOOR and not a total.** The direction is the
+safe one for a count of unread diffs, but it is not the direction the review
+claimed in section 5, which said the predicate errs toward false positives.
+**Both are true at once**: the predicate over-counts by reading landing merges
+rather than authorship, and it under-counts by naming files rather than
+properties. **Neither error is repaired here**, because widening it now would be
+a session changing the size of its own residue, which is exactly the move
+[ADR-227](../decisions/ADR-227.md) section 6 condition 4 forbids elsewhere.
+**It is the third question put to the founder**, and this is the first live
+evidence that it is a real question rather than a formality.
