@@ -228,6 +228,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-207](ADR-207.md) | `rule_states` stores `lifetime_settled_cents`, `breached` and `breach_kind`, and the state hash is the question this entry declines to answer  (2026-08-29, status: proposed) |
 | [ADR-208](ADR-208.md) | `GET /admin/eligible-forecast` declines with a body and never with a 404, because on its own heading a 404 already means a route nobody has built  (2026-08-29, status: proposed) |
 | [ADR-209](ADR-209.md) | a `TableKey` may name a VIEW, its scope class is the class of the relation it PROJECTS, and it is never addressable -- so `economic_calendar_current` is registered and `affiliate_statements` needed no ruling at all  (2026-08-29, status: proposed) |
+| [ADR-211](ADR-211.md) | one transaction does not make two reads consistent, so the crossing is two transactions keyed by the scoped result -- and the payout port stays blocked anyway, because nothing in this database pins the numbers `ResolvedPlan` is built from  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
