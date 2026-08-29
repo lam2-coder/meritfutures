@@ -41,7 +41,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join, dirname, resolve, relative, extname, basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // RI-11 LIVES IN ITS OWN FILE AND IS IMPORTED HERE, WHICH IS THE FIRST TIME A
 // CHECK IN THIS ARRAY HAS. ADR-138: three sessions were live in this file's
@@ -4844,6 +4844,431 @@ const ri21 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-22  The certificate code's entropy is MEASURED, by running the mint
+// -----------------------------------------------------------------------------
+//
+// WHAT HAPPENED. `INV-M11-05` fixes `certificates.code` at "128 bits of
+// entropy, no sequence" (`M11:54`); `M11:246` calls that the whole defence, "the
+// code space is not walkable, which makes the attack infeasible rather than
+// merely rate limited"; `API_CONTRACT:1472` and `:1473` each decline to inherit
+// the catalog's rate budget because it "is an enumeration budget on a 128-bit
+// token"; `EC-091` restates it a fifth time. ADR-231 then put
+// `GET /verify/:code` into service, public and unauthenticated, with the code
+// as the only credential a caller presents.
+//
+// AND NO FUNCTION IN THE REPOSITORY PRODUCED SUCH A CODE. The measurement is in
+// ADR-235 section 2: no `INSERT` reaches `certificates` from any deployable, and
+// no identifier resembling a certificate-code minter existed in `apps`,
+// `packages`, `e2e` or `scripts`. The number was not too small; the generator
+// was not there. Five documents described a property of a function nobody had
+// written, and two shipped `.ts` comments described it as a property the
+// deployment HAS.
+//
+// SO THIS CHECK EXECUTES THE MINT AND MEASURES WHAT COMES OUT, which is
+// `RI-20`'s move one class over: a claim that quotes its own decision procedure
+// is settled by running it. A static read of the source would settle the
+// alphabet and the length and would settle nothing about the DRAWS, and the
+// defects worth catching here -- a constant position, a biased index, a
+// counter dressed as a token -- are all properties of the output.
+//
+// THE THRESHOLD IS READ OUT OF THE CORPUS AND IS NOT TYPED HERE. `128` appears
+// in no constant below. The five documents above are parsed for the figure they
+// commit to, they must agree with each other, and the executed mint must clear
+// the number they name. A corpus that raises the commitment to 192 fails this
+// check on the next run rather than on the next reader, and a corpus that
+// quietly lowers it to 64 fails too, because the sites must agree and the mint
+// is the third opinion.
+//
+// WHAT IT DOES NOT CATCH, stated rather than left to be discovered.
+//   (1) IT CANNOT SEE THE DATABASE. `certificates.code` is `text NOT NULL` with
+//       no length bound and no alphabet bound (`0020:125`), so a hand-written
+//       `INSERT` can still put a weak code in the column. That bound is a
+//       migration and ADR-235 leaves it owed. Leg 3 catches the tree's own
+//       writers and nothing else does.
+//   (2) IT MEASURES A SAMPLE. Uniformity is asserted with margins wide enough
+//       that a fair generator cannot fail by chance (section 4 of ADR-235 does
+//       the arithmetic), which means a subtly biased one can pass. The
+//       properties it settles cheaply are the ones that actually go wrong: a
+//       position that never varies, a symbol outside the declared alphabet, a
+//       repeated draw, an alphabet that repeats a character.
+//   (3) IT ASSERTS NOTHING ABOUT THE RATE LIMIT. `INV-M11-05`'s other half is
+//       "the verification endpoint is rate limited", and nothing in this tree
+//       implements one. ADR-235 section 5 rules that separately and reports it
+//       as owed. A check that quietly widened to cover it would be reporting a
+//       property nobody built.
+
+/** The mint under measurement. */
+const MINT_MODULE = 'packages/db/src/certificate-code.ts';
+
+/**
+ * Every document that states a bit count for this token. THE LIST IS WRITTEN
+ * OUT rather than globbed: a glob that stopped matching would empty this leg in
+ * silence, which is the shape of the defect the check exists for.
+ */
+const ENTROPY_COMMITMENT_FILES = [
+  'docs/plans/M11-certificates-social-proof.md',
+  'docs/architecture/API_CONTRACT.md',
+  'docs/edge-cases/EC-091.md',
+];
+
+/** `128 bits of entropy`, `128-bit token`, and the two spellings between. */
+const ENTROPY_COMMITMENT = /(\d+)[ -]bits?(?: of entropy| token)/gi;
+
+/**
+ * Sources of ambience a token may not be drawn from, with the reason each one
+ * is disqualifying. The NAME is written beside the pattern rather than derived
+ * from it: a regex printed back into a finding reads as line noise, and a
+ * finding a reader cannot parse is a finding they will re-derive by hand.
+ */
+const AMBIENT_SOURCES = [
+  {
+    name: 'Math.random',
+    pattern: /\bMath\.random\b/,
+    why: 'a non-cryptographic PRNG whose internal state is recoverable from its own output',
+  },
+  {
+    name: 'Date.now',
+    pattern: /\bDate\.now\b/,
+    why: 'a clock, which makes part of the token predictable from when it was issued',
+  },
+  { name: 'performance.now', pattern: /\bperformance\.now\b/, why: 'a clock' },
+];
+
+/** How many codes leg 2 draws. */
+const DRAWS = 2000;
+
+/**
+ * A file that writes a `certificates` row, in either idiom this tree uses.
+ * Leg 3 requires every one of them to reach the mint.
+ */
+const CERTIFICATE_WRITE = /insert\(\s*'certificates'|INSERT\s+INTO\s+certificates/i;
+
+/** @type {Invariant} */
+const ri22 = {
+  id: 'RI-22',
+  title:
+    'The certificate code carries the entropy the corpus commits to, measured by running the mint',
+  covers:
+    `${MINT_MODULE}, executed. Leg 1 reads the bit count the corpus commits to ` +
+    `out of ${ENTROPY_COMMITMENT_FILES.join(', ')} and requires every site to ` +
+    'name the SAME figure, so `INV-M11-05`, `AS-M11-04`, the two rate-limit ' +
+    'rows and `EC-091` cannot drift apart; the number is read rather than typed ' +
+    'here, and a corpus that raises or lowers it moves this check by itself. ' +
+    'Leg 2 imports the mint in a child process and draws codes from it, then ' +
+    'asserts over the DRAWS rather than over the source: every code is the ' +
+    'declared length, every symbol is in the declared alphabet, the alphabet ' +
+    'repeats no symbol, no two draws collide, every position exercises most of ' +
+    'the alphabet, no symbol dominates a position, and the module-reported bit ' +
+    'count equals the count recomputed here from the observed alphabet. THE ' +
+    'BIT COUNT IS TAKEN OVER DISTINCT SYMBOLS AND NOT STRING LENGTH, because an ' +
+    'alphabet that repeats one character is still 32 characters long and is 31 ' +
+    'symbols of entropy. Leg 3 requires that any file writing a `certificates` ' +
+    'row imports the mint, so the issuance slice inherits a measured token ' +
+    'instead of inventing one. WHY EXECUTION RATHER THAN A READ: the generator ' +
+    'did not exist at all when this check was written (ADR-235 section 2), and ' +
+    'the defects worth catching in the one that replaced it -- a constant ' +
+    'position, a biased index, a counter dressed as a token -- are properties ' +
+    'of the output and not of the text. WHAT IT DOES NOT CATCH. (1) The COLUMN ' +
+    'is still `text NOT NULL` with no length or alphabet bound, so a ' +
+    'hand-written `INSERT` outside this tree can still store a weak code; that ' +
+    'bound is a migration and ADR-235 leaves it owed. (2) It measures a SAMPLE, ' +
+    'with margins wide enough that a fair generator cannot fail by chance, ' +
+    'which means a subtly biased one can pass. (3) It asserts nothing about the ' +
+    "RATE LIMIT, which is `INV-M11-05`'s other half and exists nowhere in this " +
+    'tree; ADR-235 section 5 rules it separately rather than letting this check ' +
+    'imply it was built.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    // -------------------------------------------------------------------------
+    // Leg 1. What the corpus commits to, read from the corpus.
+    // -------------------------------------------------------------------------
+    /** @type {Map<number, string[]>} */
+    const committed = new Map();
+    for (const rel of ENTROPY_COMMITMENT_FILES) {
+      const abs = join(root, rel);
+      if (!existsSync(abs)) {
+        findings.push(
+          `${rel} does not exist. This check names the documents whose COMMITMENT it reads, so ` +
+            `a rename silently empties leg 1 and leaves the mint measured against nothing; ` +
+            `point it at the new path`,
+        );
+        continue;
+      }
+      const lines = readFileSync(abs, 'utf8').split('\n');
+      for (let i = 0; i < lines.length; i += 1) {
+        ENTROPY_COMMITMENT.lastIndex = 0;
+        for (const m of (lines[i] ?? '').matchAll(ENTROPY_COMMITMENT)) {
+          const bits = Number(m[1]);
+          const where = `${rel}:${i + 1}`;
+          const seen = committed.get(bits);
+          if (seen) seen.push(where);
+          else committed.set(bits, [where]);
+        }
+      }
+    }
+
+    if (committed.size === 0)
+      throw new Error(
+        `RI-22 read ${String(ENTROPY_COMMITMENT_FILES.length)} document(s) and found NO stated ` +
+          'bit count for the certificate code in any of them. This check exists because five ' +
+          'documents asserted 128 bits with nothing enforcing it, so a run that settles the ' +
+          'threshold against nothing is not a pass',
+      );
+
+    if (committed.size > 1) {
+      const spread = [...committed.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([bits, at]) => `${String(bits)} at ${at.join(', ')}`)
+        .join('; ');
+      findings.push(
+        `the corpus states MORE THAN ONE bit count for the certificate code: ${spread}. These ` +
+          `sentences are one commitment written in several places, and a mint cannot be ` +
+          `measured against a threshold the corpus does not agree on. Move them together in ` +
+          `one edit, or say in an ADR which one binds`,
+      );
+    }
+
+    const required = Math.max(...committed.keys());
+
+    // -------------------------------------------------------------------------
+    // Leg 2. The mint, executed.
+    // -------------------------------------------------------------------------
+    const mintAbs = join(root, MINT_MODULE);
+    if (!existsSync(mintAbs)) {
+      findings.push(
+        `${MINT_MODULE} does not exist, and the corpus commits to ${String(required)} bits at ` +
+          `${[...committed.values()].flat().join(', ')}. THAT IS THE STATE ADR-235 WAS OPENED ` +
+          `ON: a property asserted in five documents, leaned on by two rate-limit rows, and ` +
+          `produced by no function in the repository. If the mint moved, point this check at ` +
+          `it; if it was deleted, the five sentences above are false again`,
+      );
+      return findings;
+    }
+
+    const source = readFileSync(mintAbs, 'utf8');
+    if (!/from 'node:crypto'/.test(source))
+      findings.push(
+        `${MINT_MODULE} does not import from \`node:crypto\`. A public token drawn from anything ` +
+          `but a cryptographic source has no entropy worth the name, whatever its length, and ` +
+          `the arithmetic below would report the same 130 bits for a counter`,
+      );
+    for (const { name, pattern, why } of AMBIENT_SOURCES) {
+      if (!pattern.test(source)) continue;
+      findings.push(
+        `${MINT_MODULE} names \`${name}\`, which is ${why}. Every symbol of this token comes ` +
+          `from \`node:crypto\` or the token is not what INV-M11-05 says it is`,
+      );
+    }
+
+    const script =
+      `const m = await import(${JSON.stringify(pathToFileURL(mintAbs).href)});\n` +
+      `const draws = [];\n` +
+      `for (let i = 0; i < ${String(DRAWS)}; i += 1) draws.push(m.mintCertificateCode());\n` +
+      `process.stdout.write(JSON.stringify({\n` +
+      `  alphabet: m.CERTIFICATE_CODE_ALPHABET,\n` +
+      `  length: m.CERTIFICATE_CODE_LENGTH,\n` +
+      `  bits: m.CERTIFICATE_CODE_ENTROPY_BITS,\n` +
+      `  draws,\n` +
+      `}));\n`;
+
+    /** @type {string} */
+    let raw;
+    try {
+      raw = execFileSync(
+        process.execPath,
+        ['--experimental-strip-types', '--input-type=module', '-e', script],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          timeout: 60_000,
+          maxBuffer: 64 * 1024 * 1024,
+          // CAPTURED RATHER THAN INHERITED. `execFileSync` sends the child's
+          // stderr to this process by default, which prints a stack trace above
+          // the runner's own output and leaves the FINDING with nothing to say.
+          // The module refuses to load on a repeated alphabet symbol, so its
+          // stderr is the whole diagnosis in exactly the case worth diagnosing.
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      );
+    } catch (err) {
+      const e = /** @type {{ status?: number, stderr?: string }} */ (err);
+      // THE THROWN MESSAGE AND NOT THE STACK TAIL. The last lines of a node
+      // stderr are `at ...` frames and the version banner, which name the loader
+      // rather than the defect; the module's own refusal is the line that says
+      // what is wrong with the alphabet.
+      const lines = String(e.stderr ?? '')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l !== '');
+      const thrown = lines.find((l) => /^[A-Za-z]*Error:/.test(l)) ?? lines.slice(-1)[0] ?? '';
+      findings.push(
+        `${MINT_MODULE} could not be executed (node exited ${String(e.status)}): ${thrown}. A ` +
+          `mint that does not run mints nothing, and the module refuses to LOAD rather than ` +
+          `report a number it cannot support, so a load failure here is a finding rather than ` +
+          `an environment problem`,
+      );
+      return findings;
+    }
+
+    /** @type {{ alphabet: unknown, length: unknown, bits: unknown, draws: unknown }} */
+    let measured;
+    try {
+      measured = JSON.parse(raw);
+    } catch {
+      findings.push(
+        `${MINT_MODULE} ran and did not print a measurement this check can read. It printed ` +
+          `${String(raw.length)} byte(s) whose first line is \`${raw.split('\n')[0] ?? ''}\``,
+      );
+      return findings;
+    }
+
+    const alphabet = typeof measured.alphabet === 'string' ? measured.alphabet : '';
+    const length = typeof measured.length === 'number' ? measured.length : 0;
+    const claimedBits = typeof measured.bits === 'number' ? measured.bits : 0;
+    const draws = Array.isArray(measured.draws) ? measured.draws.map((d) => String(d)) : [];
+
+    if (draws.length !== DRAWS)
+      throw new Error(
+        `RI-22 asked ${MINT_MODULE} for ${String(DRAWS)} codes and read ${String(draws.length)}. ` +
+          'This check settles the entropy by measuring the OUTPUT, so a run with no draws in ' +
+          'it is not a pass',
+      );
+
+    const symbols = new Set(alphabet);
+    if (symbols.size !== alphabet.length)
+      findings.push(
+        `the declared alphabet is ${String(alphabet.length)} character(s) and ` +
+          `${String(symbols.size)} DISTINCT symbol(s). A repeated character costs entropy and ` +
+          `costs it invisibly: the string is still as long as it was, and every arithmetic ` +
+          `taken over its length reports no loss at all`,
+      );
+
+    const derived = Math.floor(length * Math.log2(Math.max(symbols.size, 1)));
+    if (derived !== claimedBits)
+      findings.push(
+        `${MINT_MODULE} reports ${String(claimedBits)} bit(s) and ${String(length)} position(s) ` +
+          `over ${String(symbols.size)} distinct symbol(s) is ${String(derived)}. The figure the ` +
+          `module exports is the one other files will cite, so it is computed here from the ` +
+          `observed alphabet rather than believed`,
+      );
+
+    if (derived < required)
+      findings.push(
+        `the mint yields ${String(derived)} bit(s) and the corpus commits to ` +
+          `${String(required)} at ${[...committed.values()].flat().join(', ')}. ` +
+          `${String(length)} position(s) over ${String(symbols.size)} symbol(s) is not enough, ` +
+          `and \`API_CONTRACT:1473\` declines the catalog's rate budget on the strength of this ` +
+          `number. A code short enough to walk turns GET /verify/:code into a directory of ` +
+          `every funded trader (AS-M11-04)`,
+      );
+
+    /** @type {Set<string>} */
+    const distinctDraws = new Set();
+    /** @type {Map<string, number>[]} */
+    const perPosition = Array.from({ length }, () => new Map());
+    let wrongLength = 0;
+    /** @type {Set<string>} */
+    const foreign = new Set();
+
+    for (const draw of draws) {
+      distinctDraws.add(draw);
+      if (draw.length !== length) {
+        wrongLength += 1;
+        continue;
+      }
+      for (let i = 0; i < length; i += 1) {
+        const ch = draw.charAt(i);
+        if (!symbols.has(ch)) foreign.add(ch);
+        const at = perPosition[i];
+        if (at) at.set(ch, (at.get(ch) ?? 0) + 1);
+      }
+    }
+
+    if (wrongLength > 0)
+      findings.push(
+        `${String(wrongLength)} of ${String(draws.length)} minted code(s) are not ` +
+          `${String(length)} character(s) long. The bit count above is the length times the ` +
+          `symbol count, so a code shorter than the declared length carries less entropy than ` +
+          `every document in the corpus says it does`,
+      );
+
+    if (foreign.size > 0)
+      findings.push(
+        `minted codes contain ${String(foreign.size)} symbol(s) outside the declared alphabet: ` +
+          `${[...foreign].map((c) => JSON.stringify(c)).join(', ')}. The declared alphabet is ` +
+          `what the entropy is computed over, so a mint drawing from a different set is ` +
+          `measured against the wrong denominator in both directions`,
+      );
+
+    if (distinctDraws.size !== draws.length)
+      findings.push(
+        `${String(draws.length)} draw(s) produced ${String(distinctDraws.size)} distinct code(s). ` +
+          `At ${String(derived)} bits a collision in ${String(draws.length)} draws does not ` +
+          `happen, so this is a mint with state: a counter, a seeded PRNG, or a cache. ` +
+          `\`certificates_code_uq\` would reject the second one and the trader would lose a ` +
+          `card, which is the visible half; the invisible half is that the space is walkable`,
+      );
+
+    // A POSITION THAT DOES NOT VARY IS THE STRUCTURE `M11:246` REFUSES, and it
+    // is what a prefix, a version marker or a checksum digit looks like from
+    // out here. The margins are wide on purpose: over 2,000 draws a fair
+    // position shows each of 32 symbols with probability 1 - (31/32)^2000, so
+    // missing three is not something a fair mint does, and a symbol reaching
+    // three times its expected share is sixteen standard deviations out.
+    const expected = draws.length / Math.max(symbols.size, 1);
+    const coverageFloor = Math.floor(symbols.size * 0.9);
+    for (let i = 0; i < perPosition.length; i += 1) {
+      const at = perPosition[i];
+      if (!at || at.size === 0) continue;
+      if (at.size < coverageFloor) {
+        const only = [...at.keys()].sort().join('');
+        findings.push(
+          `position ${String(i)} of a minted code showed only ${String(at.size)} of ` +
+            `${String(symbols.size)} symbol(s) over ${String(draws.length)} draw(s) (\`${only}\`). ` +
+            `A position that does not vary is a prefix, a version marker or a checksum, and ` +
+            `\`M11:246\` reads "128 bits of entropy, no sequence, NO STRUCTURE". The bit count ` +
+            `above assumes every position is free`,
+        );
+        continue;
+      }
+      for (const [ch, seen] of at) {
+        if (seen <= expected * 3) continue;
+        findings.push(
+          `position ${String(i)} drew \`${ch}\` ${String(seen)} time(s) in ` +
+            `${String(draws.length)} draw(s), against ${String(Math.round(expected))} expected. ` +
+            `A dominated position is a biased index, which is what a modulo over a range the ` +
+            `alphabet size does not divide produces, and the low symbols are exactly the ones ` +
+            `an enumerator tries first`,
+        );
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Leg 3. The mint is the only producer.
+    // -------------------------------------------------------------------------
+    for (const rel of walk(root)) {
+      if (!/^(apps|packages|e2e|scripts)\//.test(rel)) continue;
+      if (!/\.(ts|tsx|mts|mjs|js)$/.test(rel)) continue;
+      if (rel === MINT_MODULE) continue;
+      const body = readFileSync(join(root, rel), 'utf8');
+      if (!CERTIFICATE_WRITE.test(body)) continue;
+      if (body.includes('mintCertificateCode')) continue;
+      findings.push(
+        `${rel} writes a \`certificates\` row and never names \`mintCertificateCode\`. The ` +
+          `column is \`text NOT NULL\` with no length bound and no alphabet bound (\`0020:125\`), ` +
+          `so the database will accept whatever this file puts in \`code\` and every enumeration ` +
+          `control the corpus names for GET /verify/:code rests on what that value is. Mint it ` +
+          `through ${MINT_MODULE}, or if this row's code legitimately comes from elsewhere, say ` +
+          `where in an ADR and widen this leg deliberately`,
+      );
+    }
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -4865,6 +5290,7 @@ export const CHECKS = [
   ri19,
   ri20,
   ri21,
+  ri22,
 ];
 
 function main() {

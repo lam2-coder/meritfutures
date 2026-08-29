@@ -239,8 +239,11 @@ describe('the address is the credential, so the shape of the address is the find
     // of entropy, no sequence". NOTHING IN THIS REPOSITORY ENFORCES THAT: the
     // column is `text NOT NULL` under `certificates_code_uq`, the table's three
     // CHECK constraints are about payout kind, revocation completeness and
-    // deferral, and none of them touches `code`. Nothing in this tree issues a
-    // certificate either, so there is no minter to hold the invariant instead.
+    // deferral, and none of them touches `code`. THE MINTER HALF OF THAT
+    // SENTENCE IS NO LONGER TRUE and the clause is corrected rather than left
+    // standing: ADR-235 landed `mintCertificateCode` at 130 bits and `RI-22`
+    // executes it, so the invariant IS held, by the only writer this tree has.
+    // What is still unenforced is the COLUMN, which is what this case reads.
     //
     // THIS CASE ASSERTS THE GAP SO THAT CLOSING IT IS VISIBLE. The day a
     // migration adds a length or alphabet CHECK, this goes red, and the reader

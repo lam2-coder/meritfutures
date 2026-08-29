@@ -29,7 +29,11 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->219<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->222<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->222<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->222<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9416,6 +9420,212 @@ checking it out, the same delta of **+1 file and +27 cases**.
 **MERGED WITH `origin/main` AT `6613b8f9`, THE FOURTH TIME THIS SESSION.** `docs/STATE.md` was the only conflict and was resolved **ADDITIVELY**: session 417's merge note and session 421's record are disjoint records of disjoint slices and neither supersedes the other. **`RI-12` was checked immediately afterward and passes**, the `gen:adr_count` line standing at **3** sites rather than the twelve that tripped it on another branch this afternoon. **Re-derived at `6613b8f9`**: **219** entry files, **115** `status: proposed`, **104** `status: accepted`, **47** money-path entries over **66** files, residue **39**, tiers **14 / 4 / 4 / 5 / 8 / 4**, with [ADR-231](decisions/ADR-231.md) landing [`payouts.ts`](../apps/api/src/routes/payouts.ts) and therefore tier 1. **67** `proposed` entries contain `read is owed`, and **17** merged migrations landed under an entry still `proposed`, of the **51** of 65 carrying `E2 READ: MONEY PATH`.
 
 **FOUR READINGS IN ONE AFTERNOON AND THE SHAPE IS THE ARGUMENT.** Money-path entries **42, 44, 46, 47**. Residue **34, 36, 38, 39**. Migrations owed **15, then 17**. **Nobody read any of it in that time.** [ADR-227](decisions/ADR-227.md)'s section 2 numbers were not wrong when written and were stale within the hour, which is the same sentence twice: **the queue is filling faster than any reader could drain it.** That is a fact about this repository rather than an argument about it, and it is why the entry reaches for an assertion rather than a reader. **`ADR-227` is unchanged in substance and still `status: proposed` with an UNSIGNED approval line.** Only the numbers moved.
+
+---
+
+## Session 426: the admin read port was never waiting on a shape, and six of its seven shapes were already built
+
+**[ADR-236](decisions/ADR-236.md), `status: proposed`, approval line UNSIGNED. No migration, no `packages/db` change, nothing wired.**
+
+**THE ROW ASKED HOW MANY OF SIX READ SHAPES ARE CONSTRUCTIBLE AND THE PORT DECLARES SEVEN.** `listEvents` was added by [ADR-184](decisions/ADR-184.md) ruling 1. **Six of the seven already have producers**: `IMPLEMENTED_ADMIN_READS` names five and `adminReadSourceParts` supplies `exportEvidence` as a sixth. **Not one calls `sqlExecutor` and not one imports `@merit/db`.** So [`admin-reads.ts`](../apps/api/src/routes/admin-reads.ts)'s *"WHAT IS MISSING IS NOT AN AUTHORITY, IT IS A SHAPE"* and *"There is no join and no aggregate to reach for"* are **MEASURED FALSE FOR SIX OF SEVEN**, and both are retired at the port rather than only in a review. **Both dispatched citations held exactly at `:961` and `:967` before this branch moved them.**
+
+**THE RULING IS THAT THE ROW'S SEPARATION IS WRONG IN EXACTLY ONE PLACE.** `setAdminReadSource` **IS** behind the SSO purchase. Wiring it needs an `AdminSourceBackend`, whose one method takes a `SystemTx`; `systemDb` is the only constructor yielding one; [`db.ts`](../apps/api/src/db.ts) declares no `operator(fn)`; [`test/db.test.ts`](../apps/api/test/db.test.ts) pins that file's import list at six names and pins that no other file under `apps/api/src` may take a handle at all; and [ADR-171](decisions/ADR-171.md) clause 1 refuses the door while section 9 makes it takeable only by *"the slice that lands an `AdminSessionSource` a deployment can install"*. **Three mechanical controls rather than a convention.**
+
+**SO THE PURCHASE BLOCKS SIX PORTS AND NOT FOUR**: `setAdminSessionSource`, the four backends reducing to it through `principal(request)`, and this one. ADR-171 counted four because `useCertificateRevokeBackend` had not landed and because it placed this port on the shape side; [`wiring.test.ts`](../apps/api/test/wiring.test.ts) carried its figure as *"THREE OTHER PORTS"* against a list holding four. **[ADR-171](decisions/ADR-171.md) IS NOT REOPENED**: its condition is unmet, the door stays shut, its section 5 argument is untouched, and **only the reason for one row moves.**
+
+**THE ONE READ SHAPE GENUINELY UNBUILT IS `readLiability`, AND IT IS BEHIND NO PURCHASE.** Its book reader, its seven-day trading horizon and its payout-velocity evaluator all exist and are exercised; **nothing folds them into one `LiabilityResponse`**. The figure holding that fold is `eligible_next_7d`, whose one remaining clearing term of three is a `writeRuleState` implementation under `apps/worker/**` or `packages/**`. `rule_states` holds **zero** rows, five of the six eligibility gate groups clear only when a trader trades, and EC-074 makes the group whole or nothing. **No aggregate was invented and the session stopped there**, per `M06` section 1.2. **The assembly is registered and not taken**: it is the composition directory's and this fence does not hold it.
+
+**THE DEFECT REPAIRED IS A TRUE SENTENCE GOING FALSE WITH NOTHING WATCHING.** Producers landed one method at a time, each session **reporting** the narrowing rather than editing a claim in another fence, and nothing compared the two. The wrong reason then propagated four levels: port header, `wiring.test.ts`, ADR-171 section 4, ALLOCATION row, and this session was dispatched to build shapes that existed. **[`test/admin-read-constructibility.test.ts`](../apps/api/test/admin-read-constructibility.test.ts) is the remedy**: six cases deriving every number from source on every run, **each falsified by hand before the push** by injecting a `sqlExecutor` call, a `systemDb` import and a composed `readLiability`.
+
+**ONE FORCED FENCE EXTENSION AND IT IS ONE NUMBER.** The header repair moved `setAdminReadSource` by 43 lines and `RI-16` went red on [`WAVE-06-admin-console-transport.md:257`](plans/WAVE-06-admin-console-transport.md), repointed from `:1018` to `:1061` with no prose changed.
+
+**TWO STALE CITATIONS REPORTED AND NOT REPAIRED, both outside this fence.** [`admin-feed.ts:18`](../apps/api/src/routes/admin-feed.ts) cites `admin-reads.ts:1361` for a sentence at **`:2004`**, already wrong by **643** lines before this branch existed, and this branch moves the target further. The composition header states the wiring triple as `{ 23, 6, 17 }` against a runner reporting `{ 24, 7, 17 }`.
+
+**Verified, derived rather than carried**: **33 of 33** gates (one failure on the way, `CI-06/table-row-width`, an unescaped pipe in an ADR table cell), **20 of 20** invariants (one failure on the way, `RI-16`), **257 files / 6,391 passed / 6 skipped** against a pre-edit baseline of **256 / 6,385 / 6**, the delta being exactly the six new cases, typecheck 0, lint 0, `format:check` clean. **The [ADR-012](decisions/ADR-012.md) grep over the whole diff came back EMPTY.**
+
+## 2026-08-29 - Session 423: a `firm`-class read on the scoped transaction, and the two ports it was built for are each blocked by something neither had ever named ([ADR-233](decisions/ADR-233.md), proposed)
+
+**THE RULING LANDED AND NEITHER PORT IS WIRED.** `ScopedTx` gains a `firm`-class
+READ over `CATALOG_TABLE_KEYS`
+([`scoped-db.ts:2558`](../packages/db/src/scoped-db.ts)), a closed list of five
+keys at three verbs and **no write verb**, guarded at run time by
+`refuseUncatalogued` ([`:2591`](../packages/db/src/scoped-db.ts)) as well as by
+type. Row `233` asked for exactly this and the two ports it was asked to unblock
+are still 503, for reasons underneath the one it named.
+
+**THE DISCLOSURE ARGUMENT IS ABSENT RATHER THAN OUTWEIGHED, AND IT IS SAID IN
+THOSE TERMS.** [ADR-106](decisions/ADR-106.md) keeps a `pair` key out of a scoped
+read because returning the row discloses the counterparty;
+[ADR-008](decisions/ADR-008.md) filters an `owned` read because the row is
+somebody's. **A `firm` row is nobody's**, so there is no party to disclose and no
+tenancy to read around, and there is nothing to weigh. What the narrowness is
+bought for instead is two things that are not tenancy: **not every `firm` table
+is catalogue** (`otp_challenges` holds `code_hash`, and the class is **45 keys of
+a registry of 112**, derived at reporting time), and **a read is not a write**
+(`FirmTx` carries `insert`, `updateAt` and `deleteAt`, and a buyer's transaction
+that could `UPDATE geo_restrictions` is a checkout that switches off its own geo
+block).
+
+**AN EXPLICIT LIST, NOT [ADR-230](decisions/ADR-230.md)'s REGISTRY DERIVATION,
+ON ADR-230's OWN REASONING.** `PairRule.writer` is a per-table ruling a
+derivation can read; `FirmRule` carries `class` and `why` and nothing else, so
+deriving would yield `FirmTableKey` **entire**, which is the class rather than a
+slice of it. That is `ParentedTableKey`'s situation and this takes
+`ParentedTableKey`'s answer.
+
+**THE CROSS-IDENTITY READ IS RULED SEPARATELY AND REFUSED.** `affiliates` is
+`owned` ([`scope.ts:1094`](../packages/db/src/scope.ts)) and `affiliate_clicks`
+is `derived` through it ([`:1108`](../packages/db/src/scope.ts)), so the row
+belongs to somebody and the objection that is ABSENT for `firm` is fully
+PRESENT. **And the refusal registers a contradiction in ADR-230**: that entry
+declined to validate `insertAsParty`'s counterparty on the ground that *"the
+identity it names is one the caller already held"*, and **no door in this tree
+resolves a coupon code or a click token to an identity**, so the write door has
+no possible caller until this is ruled.
+
+**THE STOP CONDITION IS NOT MET AND THE REASON IS THE FINDING.** Each port
+carries a blocker no reason on it had ever stated, and neither is a door.
+`usePayoutBackend`: `PayoutTx.subject`
+([`payouts.ts:428`](../apps/api/src/routes/payouts.ts)) returns a `RuleState`
+whose `engineGates` ([`types.ts:1006`](../packages/rules-engine/src/types.ts))
+has **no decoding** for `rule_states.engine_gates`, `encodeEngineGates`
+([`state-writer.ts:337`](../apps/worker/src/batch/state-writer.ts)) has no
+implementation under any `src/`, and the table holds no rows. All three have been
+stated by `ELIGIBILITY_BLOCKER`
+([`account-reads.ts:851`](../apps/api/src/routes/account-reads.ts)) since session
+401, about the other endpoint `INV-M5-02` binds to the same evaluator.
+`useCheckoutBackend`: `accountCap()`
+([`checkout.ts:736`](../apps/api/src/routes/checkout.ts)) is the **first** call
+of both handlers and its `maxAccounts` has no source. `grep -rn max_accounts
+packages/db/migrations` returns one line and it is the per-entity **exception**,
+which `databaseAuthBackend` already refuses `readMe` for
+([`auth-backend.ts:1518`](../apps/api/src/auth-backend.ts)).
+
+**NOTHING WAS WIRED BECAUSE BOTH AVAILABLE WIRINGS ARE SHAPES THIS TREE ALREADY
+REFUSES.** A payout backend with `listPayouts` live and `subject` rejecting is
+the live-looking route in front of the approving arm that `usePayoutBackend`'s
+own entry forbids; a checkout backend whose first unconditional call rejects
+raises the wired count and serves no request, which `useCheckoutAdapters`'s entry
+already calls *"not a wiring"*. **Both `BLOCKED` entries are rewritten and
+neither is deleted.**
+
+**TWO TRANSCRIPTION REPAIRS, FOUND BY BUILDING ON THEM.** `coupons.code` (inline
+`UNIQUE` in `0006`) and `plan_version_sizes_version_size_uq` (a standalone
+`CREATE UNIQUE INDEX` in `0004`) were both absent from
+[`schema.ts`](../packages/db/src/schema.ts), which is the one file
+`uniqueKeys()` reads, so two of the five catalogue tables were unaddressable
+through **every** accessor. This is [ADR-231](decisions/ADR-231.md)'s
+`certificates_code_uq` repair on two more tables, and session 421's landmine
+about that transcription gap is now three instances rather than one.
+
+**A STALE COUNT IS REGISTERED RATHER THAN REPAIRED.** `firmDb()`'s docblock says
+the `firm` classification decides authorization for *"thirty-five"* tables and
+the class is **45**. It is a bare numeral in prose, which `RI-20`'s own header
+records as the one claim shape it measured and could not settle, and the
+correction is a sentence about a different door.
+
+**Counts derived at reporting time**: **33 of 33** gates, **20 of 20**
+invariants off the runner's own last line, typecheck 0, lint 0, `format:check`
+clean, **257 files / 6,405 passed / 6 skipped** against a `b8351af` baseline of
+**256 / 6,385 / 6** reproduced by checking `origin/main` out into a worktree and
+running it, a delta of **+1 file and +20 cases**. **Four seeded defects watched
+firing**, each restored from a byte copy with `diff` confirming identity.
+**`falsify.mjs` was NOT run**: it is not in this row's verification list and it
+mutates the working tree.
+
+## 2026-08-29 - Session 425: the code is the only credential, and the corpus asserted its strength in five places while no function in the repository produced one ([ADR-235](decisions/ADR-235.md), proposed)
+
+**THE MEASUREMENT IS THAT THERE WAS NO GENERATOR, and that is a larger finding
+than the one row `235` anticipated.** Over `apps/`, `packages/`, `e2e/` and
+`scripts/`, which is every directory in this repository holding executable
+source: `INSERT INTO certificates` returns nothing, `insert('certificates'`
+returns nothing, and a seven-alternative grep for a certificate-code minter
+returns nothing. Of the eight files that draw from a CSPRNG at all, four draw for
+session secrets, OTP codes, a payout request id, a purchase id and a plan version
+id, and **four name the identifiers only to BAN them**.
+
+**So the real entropy of a certificate code was not 128 bits and not 64. It was
+undefined.** `INV-M11-05` ([M11:54](plans/M11-certificates-social-proof.md)),
+[M11:246](plans/M11-certificates-social-proof.md),
+[`API_CONTRACT:1472`](architecture/API_CONTRACT.md),
+[`:1473`](architecture/API_CONTRACT.md) and [`EC-091:3`](edge-cases/EC-091.md)
+described the output of a function nobody had written, and two shipped `.ts`
+files described it as a property the deployment HAS. **An absent generator reads
+as a satisfied specification**, because a short code is visible in a diff and a
+missing one has never been contradicted.
+
+**THE FIX IS [`certificate-code.ts`](../packages/db/src/certificate-code.ts) AND
+IT LANDS AHEAD OF ITS ISSUER ON PURPOSE.** Crockford Base32, thirty-two distinct
+symbols, twenty-six positions, `randomInt` per position, **130** bits, computed
+from the alphabet and typed in no constant, with a load-time refusal on a
+repeated symbol because an alphabet repeating one character is still thirty-two
+characters long and is thirty-one symbols of entropy. It is in `packages/db`
+because [M11:111](plans/M11-certificates-social-proof.md) puts the issuer in the
+WORKER and [ADR-231](decisions/ADR-231.md) put the verifier in the API, and
+`@merit/db` is the **only** package both manifests declare. The order is
+`ADR-231` section 6's own named safer order applied to the half that is not a
+migration, and [ADR-197](decisions/ADR-197.md) finding 1 is the standing argument
+against it: an unused ACCESSOR is an authority nobody can reach, an unused
+SECURITY PARAMETER is one the next slice re-derives under deadline.
+
+**`RI-22` EXECUTES THE MINT RATHER THAN READING IT**, which is `RI-20`'s move one
+class over and is what the subject forces: a constant position, a biased index
+and a counter are all source that reads perfectly well. It draws **2,000** codes
+in a child `node --experimental-strip-types` and asserts over the DRAWS.
+**The threshold is read out of the five corpus sites, which must agree with each
+other, and `128` appears in no constant in the check**, so a corpus that raised
+the commitment would fail on the next run rather than on the next reader.
+**Seeded red eight ways on the real tree**, each restored from a byte copy with
+`diff` confirming identity, transcripts in the entry's section 4. **Two fired
+before they were seeded**: the fixture's clean-direction case went red the moment
+`RI-22` joined `CHECKS`, and the repair's first attempt OVERWROTE the
+`API_CONTRACT` specification `RI-18` reads, so one check's fixture silently
+deleted another's.
+
+**THE ROW'S OWN CITATION IS THE FINDING AND IT IS REFUTED.**
+[`API_CONTRACT:1473`](architecture/API_CONTRACT.md) does not decline a rate limit
+for this endpoint. It SPECIFIES one, *"per IP and per ASN"*, holds its values as
+data on the SMS row's precedent, and declines only the INHERITANCE of the
+catalog's `600/minute/IP`. **And `INV-M11-05` itself reads *"the verification
+endpoint IS RATE LIMITED and non-enumerable"***, so a limit is owed by the
+invariant regardless of any measurement of the entropy. **Ruled both ways and
+they are not the same way**: the catalog declination STANDS and now stands on a
+number that is real and asserted, and a per-IP, per-ASN limit is **OWED AND
+ABSENT**, no limiter existing anywhere in `apps` or `packages`. **`API_CONTRACT`
+is not touched**, because the row was right and the dispatch's reading of it was
+wrong.
+
+**OF THE THREE ENUMERATION CONTROLS THE CORPUS NAMES, TWO ARE NOW REAL.** Session
+421 made the anomaly signal real; this session made the entropy real. **The rate
+limit is the one that is still absent**, and the column still carries no `CHECK`:
+a bound is a migration, this row reserves no number, and
+`public-lookup.test.ts`'s pinned red light still passes unchanged.
+
+**No `SD-nn`, no `GS-nnn`, no `CI-06` letter, no `VG` row, no migration, no edge
+case, no new enum member, no new canonical error code, no dependency, no float on
+a money path, no gate weakened and no fence widened to finish.** `scope.ts`,
+`scoped-db.ts`, every migration, `API_CONTRACT.md`, `M11`, `EC-091`,
+`SECURITY.md` and `MERIT_BUILD_MASTER_PROMPT.md` were **read and not written**.
+**Two fence readings are stated rather than assumed**: `packages/db/**` under the
+row's own *"wherever the code is generated"*, and `packages/tooling/test/**`
+because `repo-invariants.mjs`'s clean-direction case runs every member of
+`CHECKS` against its fixture and went red on the first run.
+
+Counts derived at reporting time: **33 of 33** gates, **21 of 21** invariants
+read off the runner's own last line, typecheck 0, lint 0, `format:check` clean,
+**257 files / 6,410 passed / 6 skipped** against an `origin/main` baseline at
+`b8351af` of **256 / 6,385 / 6** reproduced before a line changed, a delta of
+**+1 file and +25 cases**. **`falsify.mjs` was NOT run**: it is not in this row's
+verification list and it mutates the working tree.
+
+**WHAT IS STILL OWED.** **A `CHECK` on `certificates.code`**, which is a small
+migration-only session and is the one control here that becomes irreversible once
+a weak code is committed. **The rate limit**, per IP and per ASN, held as data.
+**The issuer**, which `M11` section 3.2 specifies and which now has a mint
+waiting for it. **The `certificate.verify_anomaly` detector**. **The
+constant-time floor measurement**, which is the deployment's. **The founder
+decision in [ADR-235](decisions/ADR-235.md)'s approval block**, whose first item
+is whether a mint may land ahead of its issuer at all.
 
 ## The terminal edge is `cancelled`, and the two exits above it are held by a rail rather than by a ruling (2026-08-29, session 424)
 

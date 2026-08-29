@@ -167,6 +167,21 @@ export {
   type PubliclyLookedUpTableKey,
 } from './scoped-db.ts';
 
+// THE CATALOGUE READ A SCOPED TRANSACTION CARRIES (ADR-233).
+//
+// IT IS NOT A SIXTH DOOR AND THAT IS THE WHOLE OF ITS SHAPE. The five doors
+// above are ways to REACH the database; this is three read verbs on a handle a
+// caller already holds, over a CLOSED LIST of five `firm` keys, so nothing here
+// widens who may open anything. What it changes is WHICH TRANSACTION a
+// catalogue read runs in, which is the one property `firmDb()` cannot give a
+// port that runs every method on one transaction.
+//
+// THE LIST IS EXPORTED BESIDE THE TYPE BECAUSE A SUITE MUST BE ABLE TO ASSERT
+// ITS BOUNDS. `CATALOG_TABLE_KEYS` is what `packages/db/test/catalog-read.test.ts`
+// measures against `FirmTableKey` and against `SCOPE_RULES`, and a narrowness
+// nobody can enumerate is a narrowness nobody can watch shrink.
+export { CATALOG_TABLE_KEYS, type CatalogTableKey } from './scoped-db.ts';
+
 export { atLeast, atMost, isFilterTerm, isNull, type FilterTerm } from './scoped-db.ts';
 
 export {
@@ -183,6 +198,29 @@ export {
   type ScopedTableKey,
   type TableKey,
 } from './scope.ts';
+
+// THE MINT FOR THE ONE COLUMN AN UNAUTHENTICATED CALLER MAY ADDRESS (ADR-235).
+//
+// `PUBLIC_LOOKUP_ADDRESS` above asserts that `certificates.code` cannot be
+// guessed. NOTHING IN THIS TREE PRODUCED SUCH A CODE until this export existed:
+// no `INSERT` reaches `certificates` from any deployable, so the 128 bits
+// `INV-M11-05` commits to were a property of a function nobody had written. The
+// mint is exported HERE rather than from the issuer, because `M11:111` puts the
+// issuer in the worker and ADR-231 put the verifier in the api, and `@merit/db`
+// is the only package both deployables already declare.
+//
+// IT IS EXPORTED AHEAD OF ITS CALLER, WHICH IS THE OPPOSITE OF THE RULE THE
+// DOOR ABOVE FOLLOWS, and the difference is what each thing costs when it sits
+// unused. An unexported accessor is an authority nobody can reach, which
+// ADR-197 finding 1 shows gets misreported as absent; an unexported mint is a
+// security parameter the next slice re-invents under deadline. `RI-22` executes
+// this function on every `CI-01` pass and measures what it actually returns.
+export {
+  CERTIFICATE_CODE_ALPHABET,
+  CERTIFICATE_CODE_ENTROPY_BITS,
+  CERTIFICATE_CODE_LENGTH,
+  mintCertificateCode,
+} from './certificate-code.ts';
 
 export * as schema from './schema.ts';
 
