@@ -706,24 +706,28 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   //      finding: the CALL SITE is real (`nightly.ts` calls `writeRuleState`)
   //      and the IMPLEMENTATION is missing, so what is owed is one adapter and
   //      not a call path. `packages/**` and `apps/worker/**` hold it.
-  //   2. `eligible_next_7d: EligibleNext7d | null`. `ADR-203` ruling 8 rules
-  //      that this field takes the absence shape and that BOTH causes it needs
-  //      are already in the vocabulary, and it deliberately did NOT move the
-  //      declaration: the seed produced exactly two `TS2345`s and no `RI-18`
-  //      finding, one of them in `EligibleForecastResponse`, a SECOND response
-  //      whose empty-horizon body is an open ruling. So the transcribing slice
-  //      owes one `| null`, one gap entry, and one ruling on a sibling body.
+  //   2. `eligible_next_7d: EligibleNext7d | null`. **PAID BY `ADR-208`
+  //      (session 397).** `ADR-203` ruling 8 ruled that this field takes the
+  //      absence shape and that BOTH causes it needs are already in the
+  //      vocabulary, and it deliberately did NOT move the declaration: the seed
+  //      produced exactly two `TS2345`s and no `RI-18` finding, one of them in
+  //      `EligibleForecastResponse`, a SECOND response whose empty-horizon body
+  //      was an open ruling. **THAT MEASUREMENT WAS TAKEN ON THE PARTIAL MOVE
+  //      `RI-18` REFUSES AND IT UNDERSTATED THE COST**: the atomic three-copy
+  //      move produces two MORE type errors, in `apps/admin`, which no entry
+  //      had measured because no entry had made the move `RI-18` forces.
   //
   // CLEARING CONDITION, ALL THREE TERMS: a `writeRuleState` IMPLEMENTATION
   // lands, AND a primary source declares the stored `engine_gates` ENCODING, AND
   // `eligible_next_7d` gains its `| null`. Any one alone leaves this group
   // unproducible, and the group goes whole or not at all (EC-074).
   //
-  // **TERM 2 IS CLEARED BY `ADR-206` AND IT IS THE ONLY ONE THAT HAS MOVED.**
-  // The assertion below is now a POSITIVE one on that term rather than the
-  // absence it used to be, so this case still carries all three and a reader
-  // cannot mistake a two-term condition for the whole of it. Terms 1 and 3
-  // stand, and `readLiability` stays uncomposed for a sixth session.
+  // **TERMS 2 AND 3 ARE CLEARED, BY `ADR-206` AND `ADR-208`, AND TERM 1 HOLDS
+  // THE GROUP ALONE.** Both assertions below are now POSITIVE ones on their
+  // terms rather than the absences they used to be, so this case still carries
+  // all three and a reader cannot mistake a one-term condition for the whole of
+  // it. `readLiability` stays uncomposed for a seventh session, and the reason
+  // is now a single missing adapter rather than three open questions.
   it('CLEARING CONDITION: a rule_states WRITER, a declared engine_gates ENCODING, and the `| null`', () => {
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
@@ -753,16 +757,37 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(
       readFileSync(join(ROOT, 'docs/architecture/data-model/rule_states.md'), 'utf8'),
     ).toContain('[ADR-206](../../decisions/ADR-206.md)');
-    // THE DECLARATION HALF, READ AT THE CONTRACT. `ADR-203` ruling 8 names this
-    // exact edit and does not make it, so a reader of that entry alone would
-    // conclude the shape had landed.
+    // TERM 3, CLEARED, READ AT THE CONTRACT. `ADR-203` ruling 8 named this exact
+    // edit and did not make it, so a reader of that entry alone would conclude
+    // the shape had landed; `ADR-208` made it. THE ASSERTION IS POSITIVE NOW AND
+    // WAS `not.toContain('| null')`, which is term 2's inversion repeated.
     const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
     const declared = contract.split('\n').filter((line) => /^ {2}eligible_next_7d:/.test(line));
     expect(declared).toHaveLength(1);
     expect(declared[0]).toContain('by_day: Array<{');
-    expect(declared[0]).not.toContain('| null');
+    expect(declared[0]).toContain('| null');
     expect(readFileSync(join(ROOT, 'docs/decisions/ADR-203.md'), 'utf8')).toContain(
       '`eligible_next_7d` TAKES THIS SHAPE',
+    );
+    // AND ALL THREE COPIES CARRY IT, WHICH IS THE HALF `RI-18` BINDS AND THE
+    // HALF A ONE-FILE READ WOULD MISS. **THE PARTIAL MOVE WAS MEASURED ON THIS
+    // BRANCH BEFORE THE WHOLE ONE**: the `apps/api` copy alone is `RI-18` RED on
+    // SIX findings, which is session 392's seed A reproduced and is the opposite
+    // of what `ADR-203` section 7a predicted. Each copy is asserted in its own
+    // spelling rather than through one regex, because the three declare the
+    // shape three ways and a pattern loose enough to match all three would match
+    // a sentence about it.
+    expect(readFileSync(join(ROOT, 'apps/api/src/routes/admin-reads.ts'), 'utf8')).toContain(
+      'readonly eligible_next_7d: EligibleNext7d | null;',
+    );
+    expect(readFileSync(join(ROOT, 'apps/admin/src/api/types.ts'), 'utf8')).toMatch(
+      /readonly eligible_next_7d: \{[\s\S]*?\n {2}\} \| null;/,
+    );
+    // THE SIBLING BODY, WHICH IS WHAT `ADR-203` LEFT AND `ADR-208` TOOK. A
+    // ruling that only nulled the liability copy would have left this endpoint
+    // unable to compile against its own source.
+    expect(readFileSync(join(ROOT, 'docs/decisions/ADR-208.md'), 'utf8')).toContain(
+      'GET /admin/eligible-forecast',
     );
     // AND THE METHOD IS STILL NOT COMPOSED, which is what the two above decide.
     expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');

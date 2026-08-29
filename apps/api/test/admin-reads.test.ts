@@ -635,6 +635,63 @@ test('ADR-203: a null with no gap naming it is refused, in both directions', () 
   }).not.toThrow();
 });
 
+test('ADR-208: `eligible_next_7d` is the THIRD nullable site and is paired like the other two', () => {
+  // THE CONTROL THIS SESSION ADDED, WATCHED FIRING. `ADR-208` gave the field its
+  // `| null` and added one line to `assertLiabilityGapsPaired`; without a case
+  // that line is a guard nobody has seen refuse anything, and the figure it
+  // guards is the one the payout wallet is funded against (`EC-074`).
+  expect(() => {
+    assertLiabilityGapsPaired(withGap({ eligible_next_7d: null }, []));
+  }).toThrow(AdminReadError);
+
+  // DIRECTION TWO, over a horizon the response IS carrying.
+  expect(() => {
+    assertLiabilityGapsPaired(
+      withGap({}, [
+        {
+          field: 'eligible_next_7d',
+          cause: 'estate_uncovered',
+          awaiting: null,
+          detail: 'trading_calendar_loads covers no interval containing 2026-09-04.',
+        },
+      ]),
+    );
+  }).toThrow(AdminReadError);
+
+  // AND THE PAIRED FORM PASSES, on each of the two causes `ADR-204` ruling 9
+  // requires stay distinct: an exhausted calendar and an uncovered one are
+  // different answers and only one of them is somebody's job today.
+  for (const cause of ['insufficient_history', 'estate_uncovered'] as const)
+    expect(() => {
+      assertLiabilityGapsPaired(
+        withGap({ eligible_next_7d: null }, [
+          {
+            field: 'eligible_next_7d',
+            cause,
+            awaiting: null,
+            detail: 'the horizon ends before the seventh trading day this run needs.',
+          },
+        ]),
+      );
+    }, cause).not.toThrow();
+
+  // AND `awaiting` IS REFUSED ON THIS FIELD, because neither of its two causes
+  // is `awaiting_dependency`. A body that named a deliverable for an exhausted
+  // calendar sends an operator to read a document that does not exist.
+  expect(() => {
+    assertLiabilityGapsPaired(
+      withGap({ eligible_next_7d: null }, [
+        {
+          field: 'eligible_next_7d',
+          cause: 'estate_uncovered',
+          awaiting: 'DEP-M6-01',
+          detail: 'the horizon ends before the seventh trading day this run needs.',
+        },
+      ]),
+    );
+  }).toThrow(AdminReadError);
+});
+
 test('ADR-203: `awaiting` is non-null exactly when the cause is `awaiting_dependency`', () => {
   const absent = { per_plan: LIABILITY.per_plan.map((plan) => ({ ...plan, cusum: null })) };
   expect(() => {
@@ -852,11 +909,89 @@ test('the forecast is projected from the SAME read as the liability page and car
   expect(JSON.parse(res.body)).toEqual({
     as_of: LIABILITY.as_of,
     eligible_next_7d: LIABILITY.eligible_next_7d,
+    // `ADR-208`: the array is PRESENT AND EMPTY on a complete forecast, never
+    // omitted, on `ADR-203`'s rule for `gaps` one response over. An optional key
+    // makes "this figure is blocked" and "this deployment did not fill the
+    // field" the same body.
+    gaps: [],
   });
   expect(source.liabilityReads).toBe(1);
   // Section 8: the focused projections are "cursor-free and cached for 60
   // seconds", and the position of the firm belongs in no shared cache.
   expect(res.headers['cache-control']).toBe('private, max-age=60');
+});
+
+test('ADR-208: a forecast with no horizon is a body with a null and its reason, never a 404', async () => {
+  // **THE RULING, EXECUTED OVER THE REAL ROUTE.** `/admin/eligible-forecast`
+  // exists to carry this one figure, so the two shapes available were a body
+  // with a `null` and a reason, or `adminNotFound`. The 404 is refused because
+  // API_CONTRACT section 8 records that the two sibling projections are
+  // "registered by nothing" and answer 404 already: on this heading a 404 means
+  // A ROUTE NOBODY HAS BUILT, and "the estate records no opinion about this
+  // period" is the one an operator must act on today.
+  setAdminSessionSource(sessionOf(operator('ops')));
+  const gap: LiabilityGap = {
+    field: 'eligible_next_7d',
+    cause: 'estate_uncovered',
+    awaiting: null,
+    detail: 'trading_calendar_loads covers no interval containing 2026-09-04.',
+  };
+  setAdminReadSource(
+    sourceOf({
+      readLiability: () => Promise.resolve({ ...LIABILITY, eligible_next_7d: null, gaps: [gap] }),
+    }),
+  );
+  const res = await get('operator', ADDRESSES.forecast, COOKIE);
+  expect(res.statusCode).toBe(200);
+  expect(JSON.parse(res.body)).toEqual({
+    as_of: LIABILITY.as_of,
+    eligible_next_7d: null,
+    gaps: [gap],
+  });
+});
+
+test('ADR-208: the forecast keeps only the gaps naming ITS field, and pairs them', async () => {
+  // THE FORWARD IS A FILTER AND NOT A COPY OF THE WHOLE ARRAY. A body carrying
+  // one field must not carry another field's reason: an operator reading "the
+  // velocity window is short" beside a forecast they can see is direction two of
+  // `ADR-203` ruling 2, which is the worse direction.
+  setAdminSessionSource(sessionOf(operator('ops')));
+  const velocityGap: LiabilityGap = {
+    field: 'payout_velocity',
+    cause: 'insufficient_history',
+    awaiting: null,
+    detail: 'four trading days short of thirty.',
+  };
+  setAdminReadSource(
+    sourceOf({
+      readLiability: () =>
+        Promise.resolve({ ...LIABILITY, payout_velocity: null, gaps: [velocityGap] }),
+    }),
+  );
+  const res = await get('operator', ADDRESSES.forecast, COOKIE);
+  expect(res.statusCode).toBe(200);
+  expect(JSON.parse(res.body)).toEqual({
+    as_of: LIABILITY.as_of,
+    eligible_next_7d: LIABILITY.eligible_next_7d,
+    gaps: [],
+  });
+});
+
+test('ADR-208: the forecast route runs the pairing control, which it never used to', async () => {
+  // **THE REPAIR, WATCHED.** `assertLiabilityGapsPaired` runs inside
+  // `projectLiability` and THIS HANDLER DOES NOT CALL `projectLiability`, so
+  // until `ADR-208` the one control `ADR-203` ruling 2 rests on ran on
+  // `/admin/liability` and on no other path that reads a liability. A bare null
+  // reaching this route is now a 500 rather than a chart of nothing.
+  setAdminSessionSource(sessionOf(operator('ops')));
+  setAdminReadSource(
+    sourceOf({
+      readLiability: () => Promise.resolve({ ...LIABILITY, eligible_next_7d: null, gaps: [] }),
+    }),
+  );
+  const res = await get('operator', ADDRESSES.forecast, COOKIE);
+  expect(res.statusCode).toBe(500);
+  expect(JSON.parse(res.body)).toMatchObject({ code: 'internal_error' });
 });
 
 test('a liability page with no snapshot is 404 and never an invented zero', async () => {

@@ -407,8 +407,8 @@ describe('the tables this module may reach', () => {
     // and is now blocker B5 rather than B1. `readTradingHorizon` produces the
     // seven trading days; the per-account fold over them has no source. A
     // reader of this case alone would otherwise conclude the field had landed.
-    expect(BLOCKED_LEAVES).toContain('eligible_next_7d.total_cents');
-    expect(BLOCKED_LEAVES.filter((leaf) => leaf.startsWith('eligible_next_7d'))).toHaveLength(5);
+    expect(BLOCKED_LEAVES).toContain('eligible_next_7d');
+    expect(BLOCKED_LEAVES.filter((leaf) => leaf.startsWith('eligible_next_7d'))).toHaveLength(1);
   });
 });
 
@@ -965,16 +965,21 @@ function leavesOf(value: unknown, prefix = ''): readonly string[] {
  */
 const BLOCKED_LEAVES = [
   // B5, and it was B1 UNTIL SESSION 377 REGISTERED THE CALENDAR. B1 was the
-  // horizon and it is lifted and built (`readTradingHorizon`). What holds these
-  // five is the PER-ACCOUNT half: the only forward-looking eligibility date in
+  // horizon and it is lifted and built (`readTradingHorizon`). What holds this
+  // group is the PER-ACCOUNT half: the only forward-looking eligibility date in
   // the estate is `rule_states.engine_gates.cadenceGap.nextEligibleTradingDay`,
-  // and nothing writes that bag or declares its shape. THE COUNT DID NOT MOVE
-  // AND THAT IS THE FINDING.
-  'eligible_next_7d.total_cents',
-  'eligible_next_7d.account_count',
-  'eligible_next_7d.by_day[].trading_day',
-  'eligible_next_7d.by_day[].cents',
-  'eligible_next_7d.by_day[].accounts',
+  // and nothing writes that bag.
+  //
+  // **THIS LIST WAS FIVE ENTRIES AND IS ONE, AND NOT ONE FIGURE GAINED A
+  // SOURCE.** `ADR-208` gave `eligible_next_7d` its `| null` and `RI-18`'s
+  // reader does not walk into a union arm, so the contract now declares the
+  // group as ONE leaf where it declared five. This is `ADR-203` ruling 7's
+  // arithmetic a third time -- that entry cost seven paths and bought back five
+  // -- and the direction is worth stating plainly: **A FALLING BLOCKED-LEAF
+  // COUNT HERE CAN MEAN A FIGURE ARRIVED OR IT CAN MEAN THE CHECK STOPPED
+  // LOOKING**, and this time it is the second. The PRODUCED count is the one
+  // that answers which, and the case below asserts it did not move.
+  'eligible_next_7d',
 ] as const;
 
 /**
@@ -1012,14 +1017,23 @@ describe('the subtraction this whole slice measures', () => {
     );
   });
 
-  it('holds 5 blocked leaves against 39 declared, so 34 are produced', async () => {
-    // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY, and this
-    // is the first session in four in which the PRODUCED COUNT MOVED. `ADR-203`
-    // moved the declared count and left production alone, which was that
-    // ruling's own point. Three blockers lifted in this diff and 27 became 34:
-    // one leaf gained a SOURCE (`B4`), two gained a SPELLING FOR THEIR ABSENCE
-    // (`B3` and `B2`), and four more came with that spelling because a `gaps`
-    // array with a member in it is an array {@link leavesOf} can walk.
+  it('holds 1 blocked leaf against 35 declared, so 34 are produced', async () => {
+    // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY. The
+    // session before last was the first in four in which the PRODUCED COUNT
+    // MOVED: three blockers lifted, one leaf gained a SOURCE (`B4`), two gained
+    // a SPELLING FOR THEIR ABSENCE (`B3` and `B2`), four more came with that
+    // spelling because a `gaps` array with a member in it is an array
+    // {@link leavesOf} can walk, and 27 became 34.
+    //
+    // **THIS SESSION MOVED THE DECLARED COUNT AND THE BLOCKED COUNT AND LEFT
+    // PRODUCTION EXACTLY WHERE IT WAS**, 39 and 5 becoming 35 and 1 with 34
+    // unchanged. `ADR-208` gave `eligible_next_7d` its `| null`, and `RI-18`'s
+    // reader does not walk into a union arm, so four of the five paths that
+    // left are paths the CHECK stopped binding rather than figures anybody
+    // produced. **THE SUBTRACTION IS THE ONLY HONEST STATEMENT OF THE POSITION**
+    // and it is why this case asserts all three numbers rather than the
+    // difference: 35 minus 1 is 34 both before and after, and a reader looking
+    // only at `BLOCKED_LEAVES` going 5 to 1 would read four figures arriving.
     //
     // **THE CENSUS IS TAKEN OVER AN ESTATE WHERE EVERY NULLABLE FIGURE DECLINES,
     // AND THAT IS A PROPERTY OF THE TWO READERS RATHER THAN A CHOICE OF
@@ -1030,8 +1044,8 @@ describe('the subtraction this whole slice measures', () => {
     // subtracts. `payout_velocity` produced whole is asserted on its own
     // fixture, in its own block.
     const declared = await contractLeaves();
-    expect(declared).toHaveLength(39);
-    expect(BLOCKED_LEAVES).toHaveLength(5);
+    expect(declared).toHaveLength(35);
+    expect(BLOCKED_LEAVES).toHaveLength(1);
     for (const leaf of BLOCKED_LEAVES) expect(declared).toContain(leaf);
     // AND THE LEAVES THAT MOVED ARE NAMED, so a later reader can tell an
     // arithmetic change from a production change without diffing two revisions
