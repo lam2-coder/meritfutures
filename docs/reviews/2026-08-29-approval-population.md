@@ -368,3 +368,79 @@ rather than absorbed, because the second half of a corrected finding is the half
 **`ADR-227` ITSELF IS ONE OF THE 110** and is not yet on `main`, so it has no landing merge and is
 counted by its heading alone. It lands no money-path file, is class A by its own section 5, and is
 **UNSIGNED**.
+
+## 8. Re-derived against `a86971c6`, with the residue classifier CORRECTED UPWARD
+
+**`main` moved again**, carrying [ADR-228](../decisions/ADR-228.md) (the dual-control threshold) and
+[ADR-229](../decisions/ADR-229.md) (OTP delivery). Merged in, not rebased. Four files conflicted and
+every one is a shared registry: `STATE`, `ALLOCATION`, `decisions/README`, `sessions/README`. Each
+was resolved by taking the side that owns the row, and **the generated header spans in `STATE.md`
+were taken from ONE side rather than both**, because a keep-both there duplicates the six sites and
+gives 13 where the file holds 7. That was caught by counting the spans, not by a gate.
+
+| | `21afc5d8` | `dddb3860` | **`a86971c6`** |
+| --- | ---: | ---: | ---: |
+| entry files | 212 | 214 | **216** |
+| `status: proposed` | 108 | 110 | **112** |
+| `status: accepted` | 104 | 104 | **104** |
+| money-path entries | 42 | 42 | **44** |
+| money-path files | 62 | 64 | **65** |
+| the residue, **first classifier** | 30 | 30 | 30 |
+| **the residue, corrected classifier** | (34) | (34) | **36** |
+
+**THE WIDENED PREDICATE EARNED ITS KEEP ON ARRIVAL.** `ADR-228` lands
+[`admin-wallet.ts`](../../apps/api/src/routes/admin-wallet.ts), which is one of the three routes
+added at section 3.1 and which the narrow predicate would have missed entirely. `ADR-229` lands
+`auth.ts` and `auth-backend.ts`, which the narrow predicate already held.
+
+### 8.1 The residue classifier was under-inclusive, and the correction runs against this session's interest
+
+**The first classifier matched the NOUN and missed the VERB.** It tested for *"judgement"*, *"a
+choice"*, *"is the founder's"* and their relatives. **It did not test for *"the first thing to
+decide"***, which is the form `ADR-228` and `ADR-229` both use while asking three questions each:
+
+> **THE FIRST THING TO DECIDE IS WHETHER `500000` IS STILL YOUR ANSWER NOW THAT YOU KNOW WHAT COLUMN
+> IT LANDS ON.**
+
+**That block declares an outstanding judgement in every sense the ruling cares about, and the
+classifier scored it as declaring none.** Corrected to match both spellings, and the count moves
+**30 to 36** over 44 entries, or 34 over the earlier 42.
+
+**Six entries were missed**: [ADR-211](../decisions/ADR-211.md), [ADR-213](../decisions/ADR-213.md),
+[ADR-216](../decisions/ADR-216.md), [ADR-221](../decisions/ADR-221.md), `ADR-228` and `ADR-229`.
+
+**THIS IS THE SAME DEFECT AS THE PREDICATE HOLE, ONE LAYER OUT, AND IT IS THE SECOND TIME TODAY.** A
+pattern over prose misses entries that phrase the thing differently, whether the pattern names files
+or names words. **Both errors were found by a document arriving rather than by anything in this
+repository**, and neither would have been found by re-reading the measurement. The durable repair is
+the same in both cases: **read each entry's own declaration rather than pattern-matching around it.**
+
+**The correction is reported because it makes the residue LARGER.** A measurement corrected only when
+the correction flatters the measurer is not a measurement.
+
+### 8.2 The residue at `a86971c6`: thirty-six, re-tiered
+
+The six recovered entries take their tier from the same rule as the rest: the highest surface their
+landing merge touched.
+
+| Tier | Entries | Count |
+| --- | --- | ---: |
+| **1** money leaving the firm | `ADR-176` `ADR-192` `ADR-140` `ADR-199` `ADR-191` `ADR-175` `ADR-174` `ADR-177` `ADR-212` **`ADR-211`** **`ADR-228`** | **11** |
+| **2** the ledger | `ADR-104` `ADR-157` `ADR-183` `ADR-186` | **4** |
+| **3** money entering | `ADR-105` `ADR-225` `ADR-123` `ADR-113` | **4** |
+| **4** the engine | `ADR-207` `ADR-122` `ADR-127` **`ADR-213`** **`ADR-216`** | **5** |
+| **5** who is allowed to be the party | `ADR-106` `ADR-102` `ADR-112` `ADR-226` `ADR-120` `ADR-171` **`ADR-221`** **`ADR-229`** | **8** |
+| **6** append-only, provisioning, roles | `ADR-169` `ADR-128` `ADR-164` `ADR-107` | **4** |
+
+**Two of the six land in tier 1**, which is the part worth reading twice.
+[ADR-211](../decisions/ADR-211.md) lands
+[`payouts.ts`](../../apps/api/src/routes/payouts.ts) and
+[ADR-228](../decisions/ADR-228.md) lands
+[`admin-wallet.ts`](../../apps/api/src/routes/admin-wallet.ts) with migration `0068`. **`ADR-228`'s
+own block says its number governs how much an admin can credit a trader's wallet without a second
+key, and asks whether `500000` is still the answer now that the column is known.** That is a tier 1
+decision by any reading, and the first classifier scored it as declaring no judgement at all.
+
+**And `ADR-228` section 5 carries a finding this review did not go looking for**, quoted because it
+belongs in front of whoever reads the residue: **no payout path in this tree carries dual control at
+any amount.**

@@ -5,9 +5,12 @@ import { expect, test } from 'vitest';
 import { IdentityAlreadyEstablished, normalizedEmail } from '@merit/db';
 import {
   AuthRowError,
+  OTP_CODE_DIGITS,
+  OTP_EMAIL_SENDS_PER_WINDOW,
   OTP_MAC_KEY_RETIRING_VAR,
   OTP_MAC_KEY_VAR,
   OTP_MAX_ATTEMPTS,
+  OTP_TTL_SECONDS,
   OtpKeyError,
   SESSION_LIFETIME_MS,
   SESSION_SECRET_BYTES,
@@ -23,6 +26,7 @@ import {
   userAgentFamily,
 } from '../src/auth-backend.ts';
 import { DbDoorError, LIVE_DB, isIdentityId } from '../src/db.ts';
+import type { OtpDeliveryOutcome, OtpMessage, OtpSender } from '../src/otp-delivery.ts';
 import { AuthBackendUnwired, UNWIRED_AUTH_BACKEND } from '../src/routes/auth.ts';
 import type { AuthBackend, AuthSession } from '../src/routes/auth.ts';
 import { recordingDb } from './db-recorder.ts';
@@ -340,14 +344,27 @@ test('the agent vocabulary is closed and its ORDER is the trap', () => {
 // against `auth-backend.ts`; nothing here restates it.
 
 /**
- * The five wired, named once so the partition below is checkable.
+ * The six wired, named once so the partition below is checkable.
  *
  * `verifyOtp` IS THE FIFTH AND IT ARRIVED WITH ADR-200. The four before it are
  * ADR-120's, and the difference between them is worth a sentence: those four
  * ADDRESS rows through one door, and this one composes all four doors in a ruled
  * order and is the only method in the file that WRITES a row nobody owned.
+ *
+ * `requestOtp` IS THE SIXTH AND IT IS ADR-229's. It is the pair of the fifth and
+ * it is the half that had been missing since the beginning: `verifyOtp` reads an
+ * `otp_challenges` row and until this one landed nothing in this deployable
+ * wrote one, so the wired half of the OTP pair answered a row that could not
+ * exist.
  */
-const WIRED = ['sessionByToken', 'logout', 'listSessions', 'revokeSession', 'verifyOtp'] as const;
+const WIRED = [
+  'sessionByToken',
+  'logout',
+  'listSessions',
+  'revokeSession',
+  'verifyOtp',
+  'requestOtp',
+] as const;
 
 test('every method of the port is either wired or refused, and none is forgotten', () => {
   // THE ASSERTION THAT SURVIVES A NEW METHOD. `AuthBackend` gaining a
@@ -361,7 +378,7 @@ test('every method of the port is either wired or refused, and none is forgotten
   for (const wired of WIRED) expect(names).toContain(wired);
 });
 
-test('the eleven refuse as AuthBackendUnwired, each with its own reason, opening no door', async () => {
+test('the ten refuse as AuthBackendUnwired, each with its own reason, opening no door', async () => {
   const { db, calls } = recordingDb();
   const backend = databaseAuthBackend(db, clock) as unknown as Record<
     string,
@@ -370,7 +387,7 @@ test('the eleven refuse as AuthBackendUnwired, each with its own reason, opening
   const blocked = Object.keys(databaseAuthBackend(db, clock)).filter(
     (name) => !(WIRED as readonly string[]).includes(name),
   );
-  expect(blocked).toHaveLength(11);
+  expect(blocked).toHaveLength(10);
 
   const reasons = new Set<string>();
   for (const name of blocked) {
@@ -387,12 +404,18 @@ test('the eleven refuse as AuthBackendUnwired, each with its own reason, opening
     expect(unwired.reason.length, name).toBeGreaterThan(40);
     reasons.add(unwired.reason);
   }
-  // ELEVEN METHODS AND EIGHT OR MORE DISTINCT REASONS: the phone-change trio
+  // TEN METHODS AND SEVEN OR MORE DISTINCT REASONS: the phone-change trio
   // shares a schema gap with three different tails, and the two passkey
   // ceremonies that need nothing but a verifier share one exactly. Asserted as
   // "more than one reason per blocker class" rather than as a count, because a
   // count here would drift the first time two of them merged.
-  expect(reasons.size).toBeGreaterThanOrEqual(8);
+  //
+  // THE FLOOR MOVED FROM EIGHT TO SEVEN WHEN ADR-229 WIRED `requestOtp`, AND
+  // THAT IS THE FLOOR DOING ITS JOB RATHER THAN BEING WEAKENED. The reason that
+  // left the set is the one that method carried alone; every other blocker still
+  // states its own fact, and the ratio the sentence above is about -- more
+  // reasons than blocker classes -- is unchanged.
+  expect(reasons.size).toBeGreaterThanOrEqual(7);
   // AND NOT ONE OF THEM TOUCHED THE DATABASE. A refusal that opened a
   // transaction first would be a 503 that had already spent a connection.
   expect(calls).toEqual([]);
@@ -448,7 +471,19 @@ test('no refusal in this file cites the OTP digest as unspecified', async () => 
           { requestIp: null, userAgent: null },
         ),
     ],
-    ['requestOtp', () => backend.requestOtp({ channel: 'email', turnstile_token: 't' }, null)],
+    // THE ADDRESS IS PRESENT BECAUSE THE METHOD IS WIRED NOW (ADR-229) AND A
+    // REQUEST WITHOUT ONE NEVER REACHES THE DIGEST AT ALL: it raises
+    // `AuthRowError` at the type obligation, which is a 500 about this
+    // deployable rather than a refusal carrying a reason, and this case is about
+    // the reasons.
+    [
+      'requestOtp',
+      () =>
+        backend.requestOtp(
+          { channel: 'email', email: 'nobody@example.test', turnstile_token: 't' },
+          null,
+        ),
+    ],
     ['elevate', () => backend.elevate(session(), { factor: 'passkey', credential: {} })],
     ['verifyPhone', () => backend.verifyPhone(session(), { challenge_id: 'c', code: '0' })],
   ];
@@ -1002,4 +1037,264 @@ test('the minted token is the format the reader parses, and the secret is 32 byt
   // AND TWO MINTS DO NOT COLLIDE, which `refresh_token_hash bytea NOT NULL
   // UNIQUE` would otherwise arbitrate by refusing somebody's login.
   expect(mintSessionToken(ALICE)).not.toBe(token);
+});
+
+// -----------------------------------------------------------------------------
+// `requestOtp`, the half of the OTP pair that had never been written (ADR-229)
+// -----------------------------------------------------------------------------
+// EVERY CASE HERE RUNS AGAINST A FAKE SENDER AND NOTHING REACHES A VENDOR. A
+// suite that could reach one is a suite that can spend money, and
+// `otp-delivery.test.ts` drives the real sender's body through an injected
+// `fetch` for the same reason.
+//
+// THE STRONGEST CASE IN THIS BLOCK IS THE ROUND TRIP: the digest written into
+// `otp_challenges.code_hash` is checked against the code handed to the sender,
+// under `otpCodeMatches`, which is the one property that makes a delivered code
+// answerable. A suite that asserted "a row was written" and "a message was sent"
+// separately would pass over a handler that sent one code and stored another.
+
+/** A sender that records what it was asked to deliver and answers as told. */
+function fakeSender(outcome: OtpDeliveryOutcome = { outcome: 'sent', reference: 'ref-1' }): {
+  sender: OtpSender;
+  sent: OtpMessage[];
+} {
+  const sent: OtpMessage[] = [];
+  return {
+    sent,
+    sender: {
+      send: (message: OtpMessage) => {
+        sent.push(message);
+        return Promise.resolve(outcome);
+      },
+    },
+  };
+}
+
+/** A sender nothing may call. The negative control on every refuse-before-send case. */
+const SENDS_NOTHING: OtpSender = {
+  send: () => {
+    throw new Error('a message was handed to a sender on a call that must refuse before it');
+  },
+};
+
+const OTP_REQUEST = { channel: 'email', email: TYPED, turnstile_token: 't' } as const;
+
+test('requestOtp writes the challenge and sends the code, and the two agree', async () => {
+  const { db, calls } = recordingDb({ rowsWhere: [] });
+  const { sender, sent } = fakeSender();
+  const outcome = await databaseAuthBackend(db, clock, KEYED, sender).requestOtp(
+    OTP_REQUEST,
+    '203.0.113.7',
+  );
+
+  // API_CONTRACT section 3's `OtpResponse`, and the TTL is `0002:313`'s ten
+  // minutes rather than a number this suite chose.
+  expect(outcome).toEqual({ status: 'sent', expiresInSeconds: OTP_TTL_SECONDS });
+  expect(OTP_TTL_SECONDS).toBe(600);
+
+  // ONE DOOR AND IT IS THE FIRM ONE. `otp_challenges` is `firm` because the row
+  // is written for a caller this database holds no identity for, and a scoped
+  // door here would need an identity that does not exist yet.
+  expect(calls.map((call) => `${call.door}:${call.verb}`)).toEqual([
+    'firm:rowsWhere',
+    'firm:insert',
+  ]);
+
+  // THE VELOCITY READ IS COUNTED OFF `otp_challenges` AND IS ADDRESSED BY THE
+  // NORMALIZED FORM, which is the column `0002` keys the table on.
+  const read = calls[0]!.address as Record<string, unknown>;
+  expect(read['channel']).toBe('email');
+  expect(read['emailNormalized']).toBe(normalizedEmail(TYPED));
+
+  const written = calls[1]!.values as Record<string, unknown>;
+  expect(written['channel']).toBe('email');
+  expect(written['emailNormalized']).toBe(normalizedEmail(TYPED));
+  expect(written['requestIp']).toBe('203.0.113.7');
+  expect(written['expiresAt']).toEqual(new Date(NOW.getTime() + OTP_TTL_SECONDS * 1000));
+  // ONE CLOCK FOR BOTH TIMESTAMPS. A `created_at` from the database beside an
+  // `expires_at` from this process is a row whose own two timestamps can
+  // disagree about which came first.
+  expect(written['createdAt']).toEqual(NOW);
+  // `destination_hash` IS NULL ON AN EMAIL ROW, which is what
+  // `otp_challenges_exactly_one_destination` refuses a second destination for.
+  expect(written['destinationHash']).toBeUndefined();
+
+  // THE ROUND TRIP. The code that left and the digest that was stored are one
+  // challenge, checked through the verifier's own matcher rather than by
+  // recomputing the digest a second way.
+  expect(sent).toHaveLength(1);
+  expect(sent[0]!.channel).toBe('email');
+  expect(sent[0]!.destination).toBe(TYPED);
+  expect(
+    otpCodeMatches(
+      [MAC_KEY],
+      { channel: 'email', destination: TYPED, code: sent[0]!.code },
+      written['codeHash'] as Uint8Array,
+    ),
+  ).toBe(true);
+
+  // AND THE CODE IS SIX DIGITS, PADDED. The digest is taken over the string, so
+  // a code minted as `12345` and typed as `012345` must be one string in both
+  // places and it is the padded one.
+  expect(sent[0]!.code).toMatch(/^\d{6}$/);
+  expect(sent[0]!.code).toHaveLength(OTP_CODE_DIGITS);
+});
+
+test('the code is minted per call rather than once per process', async () => {
+  // A CONSTANT CODE WOULD PASS EVERY OTHER CASE IN THIS BLOCK. Two calls, and
+  // the assertion is that the two codes differ; a collision at six digits is one
+  // in a million and this case is worth that risk against a handler that
+  // returned the same code to everybody.
+  const seen = new Set<string>();
+  for (let i = 0; i < 8; i += 1) {
+    const { db } = recordingDb({ rowsWhere: [] });
+    const { sender, sent } = fakeSender();
+    await databaseAuthBackend(db, clock, KEYED, sender).requestOtp(OTP_REQUEST, null);
+    seen.add(sent[0]!.code);
+  }
+  expect(seen.size).toBeGreaterThan(1);
+});
+
+test('the sms channel refuses, and the reason is not delivery', async () => {
+  const { db, calls } = recordingDb();
+  const err: unknown = await databaseAuthBackend(db, clock, KEYED, SENDS_NOTHING)
+    .requestOtp({ channel: 'sms', phone: '+15555550123', turnstile_token: 't' }, null)
+    .then(
+      () => null,
+      (e: unknown) => e,
+    );
+  expect(err).toBeInstanceOf(AuthBackendUnwired);
+  const reason = (err as AuthBackendUnwired).reason;
+  // BOTH HALVES, NAMED. A refusal that said only "no vendor" would let a later
+  // session take one and believe the branch was wired, and a refusal that said
+  // only "no price" would hide that a delivered code could not be verified.
+  expect(reason).toContain('cannot be verified');
+  expect(reason).toContain('MERIT_OTP_SMS_PRICE_CENTS');
+  // AND NOT A DATABASE CALL, so a refusal never spends a connection.
+  expect(calls).toEqual([]);
+});
+
+test('a deployment with no OTP MAC key refuses BEFORE a row is written', async () => {
+  // THE ORDER IS THE POINT. A challenge whose `code_hash` was taken under no
+  // admitted key is a challenge nothing can ever verify, so the refusal has to
+  // land ahead of the write rather than after it.
+  const { db, calls } = recordingDb({ rowsWhere: [] });
+  const err: unknown = await databaseAuthBackend(db, clock, {}, SENDS_NOTHING)
+    .requestOtp(OTP_REQUEST, null)
+    .then(
+      () => null,
+      (e: unknown) => e,
+    );
+  expect(err).toBeInstanceOf(AuthBackendUnwired);
+  expect((err as AuthBackendUnwired).reason).toContain(OTP_MAC_KEY_VAR);
+  expect(calls).toEqual([]);
+});
+
+test('the retiring key never issues, so a rotation does not extend its life', async () => {
+  // `resolveOtpMacKeys` returns the keys newest first and admits the retiring
+  // one "for VERIFY only, for one TTL". Issuing under it would keep a retired
+  // key answering for a full TTL past the rotation that retired it.
+  const { db, calls } = recordingDb({ rowsWhere: [] });
+  const { sender, sent } = fakeSender();
+  await databaseAuthBackend(
+    db,
+    clock,
+    {
+      [OTP_MAC_KEY_VAR]: KEY_A.toString('base64'),
+      [OTP_MAC_KEY_RETIRING_VAR]: KEY_B.toString('base64'),
+    },
+    sender,
+  ).requestOtp(OTP_REQUEST, null);
+
+  const stored = (calls[1]!.values as Record<string, unknown>)['codeHash'] as Uint8Array;
+  const subject = { channel: 'email', destination: TYPED, code: sent[0]!.code } as const;
+  expect(otpCodeMatches([KEY_A], subject, stored)).toBe(true);
+  expect(otpCodeMatches([KEY_B], subject, stored)).toBe(false);
+});
+
+test('a window at its limit is rate_limited, and nothing is written or sent', async () => {
+  // API_CONTRACT section 11's "5/hour/email", counted off `otp_challenges` --
+  // which is what `0029:539` says that index is for -- rather than off a counter
+  // nothing maintains.
+  const oldest = new Date(NOW.getTime() - 40 * 60 * 1000);
+  const rows = Array.from({ length: OTP_EMAIL_SENDS_PER_WINDOW }, (_unused, i) =>
+    challengeRow({ createdAt: i === 0 ? oldest : new Date(NOW.getTime() - 60 * 1000) }),
+  );
+  const { db, calls } = recordingDb({ rowsWhere: rows });
+  const outcome = await databaseAuthBackend(db, clock, KEYED, SENDS_NOTHING).requestOtp(
+    OTP_REQUEST,
+    null,
+  );
+
+  // THE `Retry-After` IS DERIVED FROM THE OLDEST ROW AND NOT FROM A CONSTANT:
+  // the window frees a slot when its oldest member ages out, which is 20 minutes
+  // after `NOW` for a row created 40 minutes into a 60 minute window.
+  expect(outcome).toEqual({ status: 'rate_limited', retryAfterSeconds: 20 * 60 });
+  // AND THE READ IS THE ONLY CALL. A refusal that inserted first would spend the
+  // slot it just refused for.
+  expect(calls.map((call) => call.verb)).toEqual(['rowsWhere']);
+});
+
+test('one under the limit still sends, so the boundary refuses at the limit and not before', async () => {
+  // A BOUNDARY TESTED ONLY WHERE IT REFUSES IS INDISTINGUISHABLE FROM A BOUNDARY
+  // THAT REFUSES EVERYTHING.
+  const rows = Array.from({ length: OTP_EMAIL_SENDS_PER_WINDOW - 1 }, () => challengeRow());
+  const { db, calls } = recordingDb({ rowsWhere: rows });
+  const { sender, sent } = fakeSender();
+  const outcome = await databaseAuthBackend(db, clock, KEYED, sender).requestOtp(OTP_REQUEST, null);
+  expect(outcome.status).toBe('sent');
+  expect(sent).toHaveLength(1);
+  expect(calls.map((call) => call.verb)).toEqual(['rowsWhere', 'insert']);
+});
+
+test('a refusal to deliver is a 503 and never a 202, on all three outcomes', async () => {
+  // `OtpOutcome` HAS NO FAILURE ARM because API_CONTRACT gives the endpoint
+  // none: it answers 202 "whether or not the account exists". So a send that did
+  // not happen has to raise, and answering `sent: true` over a message that
+  // never left is the exact sentence `NO_DELIVERY` existed to prevent.
+  //
+  // ALL THREE REFUSING OUTCOMES, because they arrive at the caller as one status
+  // and a handler that mapped only the one it was written against would let the
+  // other two through as a success.
+  const refusals: Exclude<OtpDeliveryOutcome, { readonly outcome: 'sent' }>[] = [
+    { outcome: 'unconfigured', detail: 'no token here' },
+    { outcome: 'rejected', detail: 'the vendor said no' },
+    { outcome: 'unavailable', detail: 'the vendor did not answer' },
+  ];
+  for (const refusal of refusals) {
+    const { db, calls } = recordingDb({ rowsWhere: [] });
+    const { sender } = fakeSender(refusal);
+    const err: unknown = await databaseAuthBackend(db, clock, KEYED, sender)
+      .requestOtp(OTP_REQUEST, null)
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(err, refusal.outcome).toBeInstanceOf(AuthBackendUnwired);
+    // THE VENDOR'S OWN WORDS REACH THE LOG. `endpointHandler` logs the reason
+    // and API_CONTRACT section 2 keeps it out of the problem document.
+    expect((err as AuthBackendUnwired).reason, refusal.outcome).toContain(refusal.detail);
+    // AND THE ROW WAS WRITTEN FIRST, which is the ordering that fails safe: a
+    // row nobody was sent expires in ten minutes, where a delivered code with no
+    // row is a code that can never verify.
+    expect(
+      calls.map((call) => call.verb),
+      refusal.outcome,
+    ).toEqual(['rowsWhere', 'insert']);
+  }
+});
+
+test('an email-channel request with no address is a 500 and not a refusal', async () => {
+  // `validateOtpRequest` refuses that shape, so reaching this line means the
+  // handler was called past its own validator: a bug in this deployable rather
+  // than a fact about the caller. `AuthRowError` is a 500 and `AuthBackendUnwired`
+  // is a 503, and the difference is which of the two is wrong.
+  const { db, calls } = recordingDb();
+  await expect(
+    databaseAuthBackend(db, clock, KEYED, SENDS_NOTHING).requestOtp(
+      { channel: 'email', turnstile_token: 't' },
+      null,
+    ),
+  ).rejects.toThrow(AuthRowError);
+  expect(calls).toEqual([]);
 });
