@@ -61,7 +61,11 @@
 // numbers in the same table and are ALSO not written here: a `5` in the email
 // path is the same defect as a `5` in the SMS path arriving one row earlier.
 // Both go through `AuthBackend.requestOtp`, which returns the outcome and the
-// `Retry-After` the budget row implies.
+// `Retry-After` the budget row implies. AS OF ADR-229 THE EMAIL HALF OF THAT
+// SENTENCE HAS A SITE: `OTP_EMAIL_SENDS_PER_WINDOW` in `auth-backend.ts` is the
+// prose `5` transcribed with its citation, on `OTP_MAX_ATTEMPTS`' precedent in
+// that same file, and it is still not written HERE, which is what this paragraph
+// has always been about.
 //
 // -----------------------------------------------------------------------------
 // `turnstile_token` IS NOW SPENT, AND UNTIL ADR-226 IT WAS NOT
@@ -74,13 +78,16 @@
 // holds the verification and `POST /auth/otp` below spends the token through
 // it, ahead of the backend and therefore ahead of the send budget.
 //
-// THE CONTROL IS LIVE ON A ROUTE WHOSE BACKEND IS NOT, and that is why it sits
-// in the HANDLER rather than in `AuthBackend.requestOtp`. `requestOtp` is
-// `blocked('requestOtp', NO_DELIVERY)`, so a check inside it would be code no
-// request can reach and no test can drive through the router. Here, a token
-// Cloudflare will not vouch for is refused today, before the 503 the blocked
-// backend produces, and the ORDER of those two answers is what the suite
-// asserts.
+// THE CONTROL SITS IN THE HANDLER AND NOT IN `AuthBackend.requestOtp`, AND THE
+// REASON IT WAS PUT THERE HAS SINCE EXPIRED. ADR-226 placed it here because
+// `requestOtp` was `blocked('requestOtp', NO_DELIVERY)`, so a check inside it
+// would have been code no request could reach. ADR-229 wired that method, so the
+// placement now rests on its OTHER half rather than on that one: the challenge
+// runs ahead of the backend and therefore ahead of the send, so a caller that
+// cannot pass it never causes a message to be paid for and never spends a slot
+// of the address's own velocity budget. Moving it inside would put an anti-bot
+// check after the work the bot came for. The ORDER of the two answers is what
+// the suite asserts.
 //
 // -----------------------------------------------------------------------------
 // THE BACKEND IS A PORT, AND AS OF ADR-120 PART OF IT HAS AN IMPLEMENTATION
@@ -465,10 +472,11 @@ export interface Me {
  * file's header for what the refused ones wait on.
  *
  * THE PARTITION IS STATED ONCE, HERE, AND IT QUOTES THE COMMANDS THAT SETTLE IT.
- * `grep -rn "    async " apps/api/src/auth-backend.ts` returns 5 lines, one per
+ * `grep -rn "    async " apps/api/src/auth-backend.ts` returns 6 lines, one per
  * method that file implements against the accessor, and
- * `grep -rn ": blocked" apps/api/src/auth-backend.ts` returns 11 lines, one per
- * refusal. `RI-20` executes both on every `CI-01` and fails the sentence when the
+ * `grep -rn ": blocked" apps/api/src/auth-backend.ts` returns 10 lines, one per
+ * refusal. (It read 5 and 11 until ADR-229 wired `requestOtp`, and `RI-20` is
+ * what turned that edit red rather than a reader noticing.) `RI-20` executes both on every `CI-01` and fails the sentence when the
  * count is not what it says, which is ADR-214 clause 3 applied to a COUNT rather
  * than to an existence claim: a number written down goes stale and rewriting it
  * only resets when, so the burden lands on the sentence making the claim.
