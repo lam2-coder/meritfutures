@@ -443,8 +443,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
   // drives `requested --> approved` or `cooling --> approved`, and `:287-292`
   // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES` (the
-  // array is `wallet-withdrawals.ts:287-292`; :283-288 was the docblock above
-  // it), on
+  // array is `wallet-withdrawals.ts:288-293` since ADR-232 added an import
+  // above it; it was :287-292, and :283-288 was the docblock above that), on
   // which `gateNoInFlight` refuses. So a wired endpoint writes a row nothing
   // will ever advance and then refuses that identity's every later withdrawal,
   // permanently, behind a screen saying a withdrawal is in flight.
@@ -486,7 +486,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'used to state it: session 422 built `requested --> approved` and `cooling --> approved`, ' +
     'guarded and dual controlled above 500000 integer cents, and the port did not become ' +
     'wireable, because `approved` IS ITSELF ONE OF THE FOUR MEMBERS OF ' +
-    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:287-292`) and `gateNoInFlight` ' +
+    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:288-293`) and `gateNoInFlight` ' +
     'refuses on the whole list. What refuses is that NOTHING IN THIS TREE reaches `settled`, ' +
     '`failed` or `cancelled`, which are the three arrows STATE_MACHINES section 3.2 draws into ' +
     'the terminal state and the only statuses that let an identity open a second withdrawal. ' +
