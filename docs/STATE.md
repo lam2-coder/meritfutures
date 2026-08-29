@@ -8516,6 +8516,6 @@ Counts derived at reporting time: **33 of 33** gates, **18 of 18** invariants, t
 
 **`RI-20` was derived as the next free invariant number and RETURNED UNSPENT.** This is the property `RI-15` already claimed, made honest.
 
-Counts derived at reporting time: **33 of 33** gates, **18 of 18** invariants, typecheck 0, lint 0, `format:check` clean, `falsify` read as output with all 33 gates clean-and-dirty plus 80 scope and 10 loader cases and the tree clean after it, and **245 files / 6,121 passed / 6 skipped** against an `origin/main` baseline reproduced exactly at **245 / 6,118 / 6** before a line changed.
+Counts derived at reporting time: **33 of 33** gates, **18 of 18** invariants, typecheck 0, lint 0, `format:check` clean, `falsify` read as output with all 33 gates clean-and-dirty plus 80 scope and 10 loader cases and the tree clean after it, and **246 files / 6,129 passed / 6 skipped** on the merge with `origin/main` at `2f97e2c`, whose own baseline was measured in a worktree at **246 / 6,126 / 6**. Before the merge the branch read **245 / 6,121 / 6** against a `37d70b3` baseline reproduced exactly at **245 / 6,118 / 6**. **The delta is +3 cases and no new file against both baselines.**
 
 **No migration number, no `SD-nn`, no `GS-nnn`**, no `SystemReason` or `SqlExecutorReason` member, no `pg` import, no cast past a key type, no ledger account named, no gate weakened, no merged migration touched, `apps/worker/**` and `packages/db/migrations/**` byte for byte unchanged, and the approval line **NOT SIGNED**.
