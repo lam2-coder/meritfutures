@@ -268,7 +268,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND NOT THE `firm` READ THIS ENTRY LED WITH ' +
     'UNTIL ADR-233. THE FIRM-READ CLAUSE IS DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A ' +
     'DOOR THAT LANDED: `ScopedTx` now carries `catalogRows`, `catalogRowsWhere` and ' +
-    '`catalogRowAt` over `CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2551`), a closed ' +
+    '`catalogRowAt` over `CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2558`), a closed ' +
     'list of five `firm` keys that includes `planVersions` and `planVersionSizes`, so ' +
     "`PayoutTx.subject`'s `ResolvedPlan` inputs are readable ON THE PAYOUT TRANSACTION and " +
     'the two-transaction remedy ADR-211 clause 2 ruled is not needed. AN OLDER CLAUSE IS KEPT AS ' +
@@ -336,7 +336,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`planVersionSize`, `couponByCode`, `geoDecision` and `midCandidates` read five `firm` ' +
     'tables no `ScopedTx` read reaches, and `ScopedTx` now carries `catalogRows`, ' +
     '`catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:2551`), whose five members are exactly those five tables. ' +
+    '(`packages/db/src/scoped-db.ts:2558`), whose five members are exactly those five tables. ' +
     'THE `attributions` WRITE CLAUSE BEFORE IT WAS DISCHARGED THE SAME WAY BY ADR-230, so this ' +
     'entry has now lost its lead blocker twice and answered 503 after each. WHAT REFUSES NOW, ' +
     'DERIVED ON THIS TREE. FIRST, AND IT IS NEW TO THIS ENTRY AND IS THE FIRST LINE OF BOTH ' +
@@ -346,8 +346,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'PLAN DEFAULT IS IN NO COLUMN OF ANY MIGRATION. RI-20 RUNS THE COMMAND THAT SETTLES IT: ' +
     '`grep -rn max_accounts packages/db/migrations` returns 1 line, which is ' +
     '`identities.max_accounts_override`, the per-entity EXCEPTION. `databaseAuthBackend` ' +
-    'reports the identical finding about `Me.max_accounts` (`src/auth-backend.ts:1520`) and ' +
-    'refuses `readMe` for it. The value the corpus states is ' +
+    'REFUSES `readMe` (`src/auth-backend.ts:1518`) for the identical finding about the same ' +
+    'number on `GET /me`. The value the corpus states is ' +
     '`limits.max_accounts_per_entity` inside the `plan_versions.rules` jsonb, which this door ' +
     'now reaches -- and `accountCap()` TAKES NO PLAN, is called before the plan version is ' +
     'resolved, and asks a PER-IDENTITY question of a PER-PLAN-VERSION parameter that nothing ' +
@@ -357,7 +357,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'LEAVING IT OPEN: `clickByToken` (`routes/checkout.ts:753`) returns a `ClickRef` whose ' +
     '`affiliate` carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
     '(`routes/checkout.ts:457`); `affiliates` is scope class `owned` on `identity_id` ' +
-    '(`packages/db/src/scope.ts:1092`) and `affiliate_clicks` is `derived` through it ' +
+    '(`packages/db/src/scope.ts:1094`) and `affiliate_clicks` is `derived` through it ' +
     '(`packages/db/src/scope.ts:1108`), so the row belongs to somebody else and the disclosure ' +
     'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of ' +
     'either returns the empty set and `resolveAttribution` folds every referral as organic, ' +
@@ -420,7 +420,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
     'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
     'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
-    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2693`) declares it while ' +
+    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2725`) declares it while ' +
     '`affiliateStatements` (`packages/db/src/scope.ts:1116`) registers it `derived` through ' +
     '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
     '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
@@ -434,7 +434,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ONE THING, AND THIS ENTRY USED TO NAME TWO. It read that the view the port reads is in ' +
     'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
     'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
-    '(`packages/db/src/schema.ts:2386`) declares `economic_calendar_current` and ' +
+    '(`packages/db/src/schema.ts:2418`) declares `economic_calendar_current` and ' +
     '`economicCalendarCurrent` (`packages/db/src/scope.ts:1033`) classes it `firm`, so it is a ' +
     '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
     '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +

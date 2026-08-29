@@ -2498,8 +2498,12 @@ export async function pairInsertStatement(
 //      the row is written "before anybody is anybody", and `code_hash` is
 //      authentication material; `treasury_balances` and
 //      `reserve_coverage_snapshots` are the firm's own position, which
-//      `AS-M12-04` rules unpublishable. `FirmTableKey` is thirty-five keys and
-//      a checkout needs five of them. Handing a request handler the class
+//      `AS-M12-04` rules unpublishable. `FirmTableKey` is FORTY-FIVE keys of a
+//      registry of 112, derived here rather than carried, and a checkout needs
+//      five of them. THE `firmDb()` DOCBLOCK ABOVE STILL READS "thirty-five" AND
+//      IT IS STALE; it is a bare numeral in prose, which is the one claim shape
+//      `RI-20` measured and could not settle, and correcting it is a sentence
+//      about a different door. Handing a request handler the class
 //      because it needs a slice of the class is the widening this file exists
 //      to refuse.
 //   2. A READ IS NOT A WRITE. `FirmTx` carries `insert`, `updateAt` and
@@ -2521,7 +2525,7 @@ export async function pairInsertStatement(
 // attached.
 //
 // THE ARGUMENT A MEMBER OWES IS NOT "THIS ROW IS NOBODY'S", which is already
-// true of thirty-five tables. It is "a request handler holding an identity has a
+// true of forty-five tables. It is "a request handler holding an identity has a
 // reason to read this INSIDE its own transaction", and each of the five below
 // names the port method that reason belongs to.
 
