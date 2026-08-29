@@ -1142,12 +1142,18 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
     }
   });
 
-  // THE SPLIT IS NON-VACUOUS IN BOTH HALVES, asserted rather than assumed. A
-  // `VIEWS_IN_MIGRATIONS` that returned the empty set would send the view back
-  // through the table assertions and take them down loudly, but one that
-  // returned EVERY name would empty `DDL_NAMES` and every per-table drift
-  // assertion with it, and the suite would go green on a smaller test count --
-  // which is exactly the direction `SQL_NAME`'s header says went unnoticed once.
+  // THE SPLIT IS NON-VACUOUS IN BOTH HALVES, asserted rather than assumed --
+  // AND THIS ASSERTION CLAIMS LESS THAN IT WAS WRITTEN TO CLAIM. It was written
+  // for the failure `SQL_NAME`'s header records, a suite going GREEN on a
+  // smaller test count. BOTH DIRECTIONS WERE SEEDED AND NEITHER IS SILENT: an
+  // empty view half sends the view back through the table loop, whose fold
+  // throws, and eleven assertions go red beside this one; an empty table half
+  // takes 449 down with it. So this is REDUNDANT WITH A LOUD FAILURE rather
+  // than the only thing between the suite and a false green. What it still
+  // holds alone is the COUNT -- the four assertions below going to zero is the
+  // one consequence nothing else observes -- and its reach is written here
+  // rather than assumed, because a guard believed to cover more than it does is
+  // worse than the one that is missing (ADR-209 section 6).
   test('the table half and the view half are both non-empty and together are the registry', () => {
     expect(VIEW_NAMES.length, 'registered relations created as a VIEW').toBeGreaterThan(0);
     expect(DDL_NAMES.length, 'registered relations created as a TABLE').toBeGreaterThan(0);
