@@ -285,21 +285,29 @@ describe('the two absences, which are independent and are both stated', () => {
   });
 
   test('no factor can be completed today, and each says why in the person’s terms', () => {
-    // ADR-200 states the same fact from the API side and puts it first: "A
-    // TRADER STILL CANNOT SIGN UP ... nothing in this deployable writes the
-    // `otp_challenges` row this handler reads."
+    // THE EMAIL SENTENCE READ "Merit cannot send a code to an email address
+    // yet." UNTIL ADR-229 WIRED THE SEND, and it is the copy this case asserts,
+    // so the case is the thing that had to move with it. What holds the factor
+    // closed now is this application and not the API: ADR-219 section 6.2's
+    // cookie refusal, which was always the second and independent half.
     for (const factor of SIGN_IN.factors) {
       expect(factor.served, `${factor.factor} is served`).toBe(false);
       expect(factor.unavailable, `${factor.factor} says why not`).not.toBeNull();
     }
 
     const html = render();
-    expect(html).toContain('Merit cannot send a code to an email address yet.');
+    expect(html).toContain('Merit cannot complete a sign-in yet.');
     expect(html).toContain('Merit cannot check a passkey yet.');
 
+    // THE COPY THAT IS GONE IS ASSERTED GONE, because a sentence that became
+    // false is worth one line saying it may not come back: nothing on this
+    // screen may tell a trader that a code cannot be sent, now that one can.
+    expect(html).not.toContain('cannot send a code to an email');
+
     // SMS CARRIES BOTH OF ITS BLOCKERS AND NOT THE NEARER ONE. ADR-200 section
-    // 4.4 found the second: a phone has no address in `RESOLUTION_ADDRESS`, so
-    // delivery landing would leave this factor still unable to complete.
+    // 4.4 found the second: a phone has no address in `RESOLUTION_ADDRESS`, and
+    // delivery landing for EMAIL left this factor exactly where it was, which is
+    // that prediction measured rather than restated.
     expect(html).toContain('cannot yet match a phone to an account');
   });
 
@@ -522,11 +530,17 @@ describe('the wiring this screen claims is the wiring apps/api has', () => {
     // A GUARD NOBODY WATCHED FIRE IS A GUARD NOBODY HAS. The seed is a value
     // rather than an edit to `src/`, so nothing is written to the working tree.
     const { blocked, wired } = backendSplit();
+    // THE SEED IS THE OPPOSITE OF THE TREE, AND WHICH DIRECTION THAT IS MOVED
+    // WITH ADR-229. It used to claim a refused method was served; `requestOtp`
+    // is served now, so the contradiction that exercises the same guard is a row
+    // claiming a served method is refused -- which is the OTHER direction the
+    // case above asserts, and the direction this file was actually wrong in
+    // before session 408 measured it.
     const seeded: EndpointWiring = {
       endpoint: 'POST /auth/otp',
       method: 'requestOtp',
-      served: true,
-      blocker: null,
+      served: false,
+      blocker: 'NO_SMS_DELIVERY',
     };
 
     expect(wired.has(seeded.method)).not.toBe(seeded.served);
@@ -539,22 +553,34 @@ describe('the wiring this screen claims is the wiring apps/api has', () => {
 // -----------------------------------------------------------------------------
 
 describe('the served set admits no complete sign-in', () => {
-  test('exactly one route is served and it is POST /auth/verify', () => {
-    // NOT THE PAIR THE SHAPE SUGGESTS. The four read as an OTP pair and a
-    // passkey pair, and the free reading -- OTP served, passkey not -- is wrong
-    // in both halves. The OTP pair is split down the middle.
+  test('two routes are served and they are the OTP pair', () => {
+    // IT IS THE PAIR THE SHAPE SUGGESTS, FOR THE FIRST TIME. This case asserted
+    // `['POST /auth/verify']` alone while the OTP pair was split down the middle
+    // -- the route that ISSUES a code blocked and the route that CONSUMES one
+    // wired -- and ADR-229 wired the issuing half. The passkey pair is still
+    // both blocked, so the free reading is now correct rather than wrong in both
+    // halves.
+    //
+    // THE ORDER IS THE TABLE'S AND IS ASSERTED AS SUCH: `POST /auth/otp` comes
+    // first because a code is issued before it is consumed.
     expect(ENDPOINT_WIRING.filter((row) => row.served).map((row) => row.endpoint)).toEqual([
+      'POST /auth/otp',
       'POST /auth/verify',
     ]);
   });
 
-  test('no factor can even begin, because the served route is nobody first step', () => {
-    // THE MECHANICAL FORM OF THIS SCREEN'S FINDING. `view/sign-in.ts` maps each
-    // factor to the route its control would call FIRST. All three of those are
-    // unserved, and the one route that answers is the SECOND step of a flow
-    // whose first step cannot run: `POST /auth/verify` consumes an
-    // `otp_challenges` row and `requestOtp`, the only writer of one, is blocked
-    // on `NO_DELIVERY`.
+  test('no factor is offered, and the email one is now held closed by this application', () => {
+    // THE MECHANICAL FORM OF THIS SCREEN'S FINDING, AND THE FINDING HAS CHANGED
+    // SHAPE WITHOUT CHANGING ANSWER. This case asserted that every factor's
+    // FIRST step was unserved, which is how it read while `requestOtp` was
+    // blocked. ADR-229 wired that route, so `email_otp`'s first step is served
+    // now and the factor is STILL not offered -- because this deployable cannot
+    // deliver the `Set-Cookie` a sign-in answers with (ADR-219 section 6.2),
+    // which was always the independent second refusal.
+    //
+    // SO THE INVARIANT THAT SURVIVES IS THE ONE ABOUT THE SCREEN AND NOT ABOUT
+    // THE API: no factor is offered as available and every one says why. That is
+    // the property a trader meets, and it is the property that must not drift.
     //
     // MERIT IS PASSWORDLESS, WHICH IS WHAT MAKES THAT TOTAL RATHER THAN PARTIAL.
     // `0002` states there is no password table anywhere in the schema by design
@@ -565,14 +591,27 @@ describe('the served set admits no complete sign-in', () => {
     for (const factor of SIGN_IN.factors) {
       const first = wiring.get(factor.endpoint);
       expect(first, `${factor.endpoint} is one of the four`).toBeDefined();
-      expect(first!.served, `${factor.factor} cannot even begin`).toBe(false);
       expect(factor.served, `${factor.factor} is not offered as available`).toBe(false);
       expect(factor.unavailable, `${factor.factor} says why`).not.toBeNull();
     }
 
-    const servedRoutes = ENDPOINT_WIRING.filter((row) => row.served).map((row) => row.endpoint);
-    const firstSteps = SIGN_IN.factors.map((factor) => factor.endpoint);
-    expect(servedRoutes.filter((route) => firstSteps.includes(route))).toEqual([]);
+    // AND THE SPLIT ITSELF, ASSERTED RATHER THAN DESCRIBED. Two of the three
+    // factors have a served first step and neither is offered: a served route
+    // the screen declines to call is this file's whole distinction between
+    // `ENDPOINT_WIRING.served` and `AVAILABILITY.served`, and without this line
+    // nothing checks that the two are allowed to disagree.
+    //
+    // BOTH OTP FACTORS SHARE `POST /auth/otp` AND WIRING IS A PROPERTY OF THE
+    // ROUTE, so `sms_otp` appears here on a route that answers for the email
+    // channel and raises `NO_SMS_DELIVERY` for its own. That is the same
+    // route-versus-channel seam `verifyOtp` already had, and it is why the SMS
+    // factor's sentence in `AVAILABILITY` is a per-FACTOR fact rather than a
+    // per-route one.
+    const withServedFirstStep = SIGN_IN.factors.filter(
+      (factor) => wiring.get(factor.endpoint)?.served === true,
+    );
+    expect(withServedFirstStep.map((factor) => factor.factor)).toEqual(['email_otp', 'sms_otp']);
+    expect(withServedFirstStep.every((factor) => !factor.served)).toBe(true);
   });
 
   test('no blocker constant reaches the screen', () => {
