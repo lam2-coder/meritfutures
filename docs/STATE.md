@@ -8240,9 +8240,9 @@ the seed learned from the database rather than from the schema file.
 Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, typecheck 0, lint 0,
 `format:check` clean, `falsify.mjs` read as OUTPUT with the tree clean after it, **60** migrations and
 **115** live tables, `LIABILITY_READ_TABLES` at **12**, `IMPLEMENTED_ADMIN_READS` at **5**, **5**
-blocked leaves against **39** declared so **34** produced, and **241 files / 5,981 passed / 6
-skipped** against an `origin/main` baseline at `6bc827f` of **241 / 5,965 / 6** measured in this tree.
-The delta is **+16 cases and no new file**.
+blocked leaves against **39** declared so **34** produced, and **242 files / 6,002 passed / 6
+skipped** against an `origin/main` baseline at `bca754c` of **242 / 5,986 / 6** measured in this tree
+after the merge. The delta is **+16 cases and no new file**.
 
 **No ADR number, no migration number, no `SD-nn`**, no `SystemReason` or `SqlExecutorReason` member, no
 `pg` import, no cast past a key type, no ledger account named, no gate weakened, no merged migration
