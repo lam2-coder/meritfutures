@@ -540,15 +540,35 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(ports).toContain('readonly engineGates: EngineGateResults;');
   });
 
-  it('LEG 1: no primary source declares the STORED shape, and 0015 names different gates', () => {
+  it('LEG 1: ADR-206 declares the STORED shape, and NEITHER the contract NOR 0015 does', () => {
+    // **CITATION REPAIR, AND THE BLOCKER THAT LIFTED IS NAMED.** This case read
+    // "no primary source declares the STORED shape". `ADR-206` (session 394) is
+    // that source now, and EVERY ASSERTION BELOW IS UNCHANGED: the two places
+    // this case looked are still silent, which is why the declaration had to be
+    // written somewhere and is what makes the two new assertions worth adding.
+    //
     // THE CONTRAST WITH `integrations.batch` IS WHAT MAKES THIS PRECISE. ADR-199
     // clause 4 could rule the batch's two figures readable off an event nothing
     // has emitted, because EVENTS section 5 DECLARES that event's body in the
-    // approved catalogue. Nothing declares this bag: API_CONTRACT carries no
-    // `engine_gates` shape at all, and `0015`'s own column comment names EIGHT
-    // gates where `EngineGateResults` has six.
+    // approved catalogue. This bag is now declared the same way: API_CONTRACT
+    // still carries no `engine_gates` shape at all, `0015`'s own column comment
+    // still names EIGHT gates where `EngineGateResults` has six, and the design
+    // record carries the ruled encoding.
     expect(readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8')).not.toContain(
       'engine_gates:',
+    );
+    // THE DECLARATION, PINNED WHERE IT LANDED, AND EVERY NAME ANCHORED INSIDE
+    // ITS CODE SPAN RATHER THAN AS A BARE SUBSTRING. That is session 392's
+    // landmine met a second time and IN THIS CASE'S OWN FIRST DRAFT: a bare
+    // `toContain('ENGINE_GATE_LEAVES')` was seeded by renaming the symbol to
+    // `ENGINE_GATE_LEAVES_RENAMED` in the record and STAYED GREEN, because the
+    // old name is a prefix of the new one. Closing the backtick fixes it and
+    // the re-seed is red.
+    const record = readFileSync(join(ROOT, 'docs/architecture/data-model/rule_states.md'), 'utf8');
+    expect(record).toContain('`ENGINE_GATE_LEAVES`');
+    expect(record).toContain('`profitNeededToDiluteCents`');
+    expect(readFileSync(join(ROOT, 'docs/decisions/ADR-206.md'), 'utf8')).toContain(
+      'status: proposed',
     );
     const migration = readFileSync(join(MIGRATIONS, '0015_rule_states.sql'), 'utf8');
     expect(migration).toContain('profit target, drawdown, win days, minimum days');
@@ -698,6 +718,12 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   // lands, AND a primary source declares the stored `engine_gates` ENCODING, AND
   // `eligible_next_7d` gains its `| null`. Any one alone leaves this group
   // unproducible, and the group goes whole or not at all (EC-074).
+  //
+  // **TERM 2 IS CLEARED BY `ADR-206` AND IT IS THE ONLY ONE THAT HAS MOVED.**
+  // The assertion below is now a POSITIVE one on that term rather than the
+  // absence it used to be, so this case still carries all three and a reader
+  // cannot mistake a two-term condition for the whole of it. Terms 1 and 3
+  // stand, and `readLiability` stays uncomposed for a sixth session.
   it('CLEARING CONDITION: a rule_states WRITER, a declared engine_gates ENCODING, and the `| null`', () => {
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
@@ -707,10 +733,11 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(
       readFileSync(join(ROOT, 'packages/rules-engine/src/payout/project.ts'), 'utf8'),
     ).toContain('export function projectPayout');
-    // TERM 2, WHICH THIS CASE DID NOT ASSERT AND THE MODULE'S COPY DID. The
-    // stored encoding is declared nowhere, so a reader would fix it from the
-    // read side. The bag is reached through `projectPayout`'s OWN input type,
-    // which is why term 1 landing alone would not clear this.
+    // TERM 2, WHICH THIS CASE DID NOT ASSERT AND THE MODULE'S COPY DID, AND
+    // WHICH IS NOW CLEARED. `ADR-206` declares the stored encoding, so a reader
+    // no longer has to fix it from the read side. The bag is reached through
+    // `projectPayout`'s OWN input type, which is why term 1 landing alone would
+    // not have cleared this and why clearing term 2 does not clear term 1.
     expect(
       readFileSync(join(ROOT, 'packages/rules-engine/src/payout/project.ts'), 'utf8'),
     ).toContain('readonly state: RuleState;');
@@ -720,6 +747,12 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8')).not.toContain(
       'engine_gates:',
     );
+    // TERM 2, CLEARED, ASSERTED AT THE SOURCE THAT DECLARES IT. The design
+    // record is where a reader checking a row looks, and the entry that ruled
+    // it is UNSIGNED, so this pins the ruling and not an approval.
+    expect(
+      readFileSync(join(ROOT, 'docs/architecture/data-model/rule_states.md'), 'utf8'),
+    ).toContain('[ADR-206](../../decisions/ADR-206.md)');
     // THE DECLARATION HALF, READ AT THE CONTRACT. `ADR-203` ruling 8 names this
     // exact edit and does not make it, so a reader of that entry alone would
     // conclude the shape had landed.
