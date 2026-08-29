@@ -2992,6 +2992,17 @@ export const walletWithdrawals = pgTable('wallet_withdrawals', {
   // (`<= 500000`) arrives in the same migration as the column, so a writer may
   // lower it and may not raise it.
   dualControlThresholdCents: bigint('dual_control_threshold_cents', { mode: 'bigint' }),
+  // ADR-234, 0072. THE THIRD TERMINAL CLOCK, and the last of the three to be
+  // added. `0011` gave `settled` its `settled_at`; `0070` gave `approved` its
+  // `approved_at` and, by exempting only `requested`, `cooling` and `cancelled`
+  // from `wallet_withdrawals_approved_has_timestamp`, requires one on `failed`
+  // too. `cancelled` was the terminal status with no clock of its own,
+  // recording WHEN only through `updated_at` -- which the halt release at
+  // `apps/worker/src/sweeps/expiry.ts` moves without touching the rail status
+  // at all. `wallet_withdrawals_uncancelled_records_no_cancellation` is the
+  // other half of `0070`'s pair shape: the status requires the clock and the
+  // clock requires the status.
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

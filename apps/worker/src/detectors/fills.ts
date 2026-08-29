@@ -86,7 +86,7 @@
 // tradingDay`.** It is exact rather than approximate -- an account cannot have a
 // fill before it was opened -- and it is one range term rather than a join.
 // **`accounts` is read because `fills` HAS NO `identity_id` COLUMN**
-// (`packages/db/src/schema.ts:3077`), so the account-to-identity edge every one
+// (`packages/db/src/schema.ts:3395`), so the account-to-identity edge every one
 // of these three needs is a second table and `ADR-157` refused the join. **IF
 // THAT READ STOPS BEING AFFORDABLE THE REMEDY IS AN ENTRY AGAINST
 // `scoped-db.ts` ARGUING A JOIN ON ITS OWN TERMS, AND NOT A WIDENING HERE**, and
@@ -1032,7 +1032,7 @@ function scanNewsWindow(input: DetectorScanInput): DetectorOutcome {
 // "Eval brute-forcing".
 //
 // **`fills` HAS NO REALIZED P&L AND THAT DECIDES THE SHAPE OF THIS DETECTOR.**
-// `M07`'s Input cell for `D-05` is `fills` and `packages/db/src/schema.ts:3077`
+// `M07`'s Input cell for `D-05` is `fills` and `packages/db/src/schema.ts:3395`
 // gives that table no P&L column of any kind; `realized_pnl_cents` is
 // `daily_marks`' (`schema.ts:652`) and round-trip results live in `round_trips`,
 // which is not a member of `DETECTOR_READ_TABLES`. So "after loss" has exactly

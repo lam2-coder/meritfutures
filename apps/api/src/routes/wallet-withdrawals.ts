@@ -294,7 +294,13 @@ export const OPEN_WITHDRAWAL_STATUSES = [
 
 /**
  * The statuses that RELEASE an identity, which is the other half of the list
- * above and the half nothing in this tree can reach.
+ * above and the half this tree reaches ONE THIRD OF.
+ *
+ * ADR-234 REPAIRS THE SECOND CLAUSE OF THIS SENTENCE, WHICH READ "the half
+ * nothing in this tree can reach" AND IS NO LONGER TRUE.
+ * {@link driveCancellation} drives `cancelled`; `settled` and `failed` are
+ * still driven by nothing and {@link TERMINAL_EDGE_FINDINGS} is why, per
+ * status, with the sources.
  *
  * IT IS `wallet_withdrawals_open_idx`'s COMPLEMENT AND IT IS WRITTEN OUT
  * BECAUSE THE ARITHMETIC IS THE POINT. `wallet_withdrawal_status` has seven
@@ -919,6 +925,20 @@ export interface WithdrawalTx {
    * predicate into the `WHERE` alongside the address (ADR-112).
    */
   approveWithdrawal(id: string, values: WithdrawalApprovalValues): Promise<void>;
+
+  /**
+   * `requested --> cancelled` or `cooling --> cancelled`, written. ADR-234.
+   *
+   * THE ONLY WRITE IN THIS INTERFACE THAT RELEASES AN IDENTITY.
+   * `insertWithdrawal` opens a lockout and `approveWithdrawal` moves the row
+   * from one open status to another; this is the method that takes it out of
+   * `wallet_withdrawals_open_idx`'s predicate and lets the trader ask again.
+   *
+   * KEYED ON `id` AND SCOPED BY THE ACCESSOR, so this cannot terminate another
+   * identity's row even if a caller handed it one: `updateAt` carries the scope
+   * predicate into the `WHERE` alongside the address (ADR-112).
+   */
+  cancelWithdrawal(id: string, values: WithdrawalCancellationValues): Promise<void>;
 }
 
 /** What opens a transaction, plus the store the idempotency layer needs. */
@@ -1090,6 +1110,17 @@ export function databaseWithdrawalBackend(
                 approvedBy: values.approvedBy,
                 dualControlApprovalId: values.dualControlApprovalId,
                 dualControlThresholdCents: values.dualControlThresholdCents,
+                updatedAt: values.updatedAt,
+              },
+            );
+          },
+          cancelWithdrawal: async (id, values) => {
+            await tx.updateAt(
+              'walletWithdrawals',
+              { id },
+              {
+                status: values.status,
+                cancelledAt: values.cancelledAt,
                 updatedAt: values.updatedAt,
               },
             );
@@ -1727,6 +1758,257 @@ export async function driveApprovals(args: {
     outcomes.push({ id: candidate.id, decision });
   }
   return outcomes;
+}
+
+// -----------------------------------------------------------------------------
+// The TERMINAL edge, which is the one that releases a trader
+// -----------------------------------------------------------------------------
+// ADR-234. `withdrawalReleasesIdentity` above says which statuses end a lockout
+// and ADR-232 left every one of them unreachable. STATE_MACHINES section 3.2
+// draws three arrows into `[*]` and THIS FILE NOW DRIVES EXACTLY ONE OF THEM,
+// which is not a shortfall against the row that dispatched it but the finding
+// the row asked for: the other two are unreachable for a reason that is
+// measured rather than argued, and {@link TERMINAL_EDGE_FINDINGS} is where each
+// reason is written down with the command that settles it.
+//
+// THE ONE THAT LANDS IS `cancelled`, AND IT LANDS BECAUSE IT IS THE EXIT MONEY
+// NEVER TRAVELS DOWN. `G-TRADER-CANCELS` is drawn from `requested` and from
+// `cooling`, both BEFORE approval, so `LT-06` has not posted, the trader's
+// wallet claim was never extinguished and there is nothing to discharge:
+// `0057`'s `WD-C1` nets over zero rows and says so in its own comment. A
+// cancellation moves no money, observes no rail and posts no ledger
+// transaction, which is why it is buildable in a tree that has none of those
+// things.
+//
+// `settled` AND `failed` ARE NOT BUILT AND THE ABSENCE IS A RULING. A
+// withdrawal reaches either because a rail reported, and `packages/rail` opens
+// no socket, has no adapter that is not a fake and has no importer at all. The
+// row that dispatched this session granted that "if the rail cannot report, the
+// terminal edge is an OPERATOR action rather than an automatic one". THE
+// MEASUREMENT REFUSES EVEN THAT: an operator asserting a settlement is an
+// operator asserting that money left through a package that cannot send it, and
+// a withdrawal marked settled that never left tells a trader their money is gone
+// and tells the ledger the same, and neither is true. See finding `A`.
+
+/**
+ * WHY TWO OF THE THREE TERMINAL ARROWS ARE NOT DRIVEN HERE.
+ *
+ * `LT_07_FINDINGS`'s SHAPE (`packages/rail/src/settlement.ts`) AND ITS
+ * DISCIPLINE: each entry is `{id, claim, ruled, sources}`, the sources are
+ * paths a second reader can open, and `wallet-withdrawals.test.ts` asserts each
+ * claim against those sources rather than against this comment. So none of
+ * these is prose that can go stale quietly: THE DAY ANY OF THEM IS FIXED THIS
+ * FILE'S SUITE GOES RED, which is the trap the entry exists to set.
+ */
+export const TERMINAL_EDGE_FINDINGS = [
+  {
+    id: 'A',
+    claim:
+      'settled is unreachable because transferring is unreachable. Section 3.2 draws ' +
+      'G-SETTLEMENT-CONFIRMED out of transferring and out of no other status, and reaching ' +
+      'transferring is G-TRANSFER-QUEUED, which enqueues on a rail. packages/rail opens no ' +
+      'socket and names no vendor SDK by its own index.ts header; its only implementation of ' +
+      'RailAdapter is SandboxRail, which lives under src/fakes/; and NOTHING IMPORTS IT. ' +
+      'Derived over apps and packages: a recursive search for the specifier @merit/rail across ' +
+      'every .ts and .json file outside packages/rail itself returns zero lines, and the string ' +
+      "'transferring' appears in that same scope outside test files at three sites, all three " +
+      'of them vocabulary declarations and none of them a write.',
+    ruled:
+      'RULED HERE, AND THE RULING IS THAT THIS IS NOT AN OPERATOR ACTION EITHER. A withdrawal ' +
+      'reaches settled because money moved. An operator who marks one settled in this tree is ' +
+      'asserting that money left through a package with no socket, which is the one row ADR-234 ' +
+      'refuses to make representable through a door. It is not held on a decision; it is held ' +
+      'on a rail that does not exist, and the fix is a vendor and a webhook rather than a ' +
+      'branch of a function.',
+    sources: [
+      'packages/rail/src/index.ts',
+      'packages/rail/src/port.ts',
+      'packages/rail/src/fakes/sandbox.ts',
+      'docs/architecture/STATE_MACHINES.md',
+    ],
+  },
+  {
+    id: 'B',
+    claim:
+      'failed is unreachable for finding A reason AND for a second one underneath it. ' +
+      'G-TRANSFER-EXHAUSTED is drawn out of transferring, so finding A already holds it; and ' +
+      "0057's WD-C1 assertion 2 requires that a failed withdrawal carrying a provenance " +
+      'summary name at least one ledger_transactions row, which is LT-09, the reversal of ' +
+      'LT-06. EXECUTED against PostgreSQL 16.13 with every migration applied: an UPDATE ' +
+      'carrying a provenanced row from transferring to failed with no posting RAISES WD-C1 at ' +
+      'the moment a COMMIT would evaluate it.',
+    ruled:
+      'NOT RULED HERE AND DELIBERATELY NOT. The posting is the ledger arm, and no door in ' +
+      'apps/api may open the authority it needs: ADR-165 declined SystemReason a member for it ' +
+      'and ADR-172 clause 2 ruled the handle is not the missing thing, because the only value ' +
+      'satisfying LedgerTx is generic over every table in the estate. ADR-176 applied that one ' +
+      'leg over by moving the posting to a system authority and leaving the request path to ' +
+      'record it. THE SAME SHAPE IS OWED HERE and apps/worker is outside this session fence.',
+    sources: [
+      'packages/db/migrations/0057_terminal_withdrawal_obligation.sql',
+      'docs/decisions/ADR-165.md',
+      'docs/decisions/ADR-172.md',
+      'docs/decisions/ADR-176.md',
+    ],
+  },
+  {
+    id: 'C',
+    claim:
+      'cancelled is reachable TODAY and needs neither the rail nor the ledger. ' +
+      'G-TRADER-CANCELS is drawn from requested and from cooling, both BEFORE approval, so ' +
+      "LT-06 never posted and 0057's own COMMENT ON FUNCTION says the consequence in terms: " +
+      'cancelled discharges nothing "because LT-06 never posted -- cancelled is reachable only ' +
+      'from requested and cooling, both BEFORE approval, so its net is a sum over zero rows".',
+    ruled:
+      'RULED AND BUILT. decideCancellation and driveCancellation below are the edge, and 0072 ' +
+      'is the half of it the database owes: WD-C1 rested that whole sentence on an arrow set ' +
+      'NOTHING ENFORCED, and an UPDATE from approved to cancelled landed against this estate ' +
+      'until 0072 refused it. WHAT IS STILL OWED IS A DOOR. API_CONTRACT states that there is ' +
+      'no endpoint that cancels a withdrawal and names it "as owed rather than invented", and ' +
+      'that document is outside this fence, so the transition is written and guarded here and ' +
+      'called by nothing, which is ADR-232 shape one edge over.',
+    sources: [
+      'packages/db/migrations/0057_terminal_withdrawal_obligation.sql',
+      'packages/db/migrations/0072_terminal_withdrawal_transitions.sql',
+      'docs/architecture/API_CONTRACT.md',
+      'docs/architecture/STATE_MACHINES.md',
+    ],
+  },
+] as const;
+
+/** The statuses a cancellation may be taken FROM. Section 3.2's two arrow tails. */
+export const CANCELLABLE_STATUSES = ['requested', 'cooling'] as const;
+
+/**
+ * Why a cancellation did not happen.
+ *
+ * SHORT, AND THE SHORTNESS IS THE RULING. {@link APPROVAL_HOLDS} has eight
+ * members because approval is the edge on which money leaves the wallet, so
+ * every term guards a movement: the identity's standing, the freeze, the KYC
+ * chain, the provenance, the destination window, the second hand. A
+ * CANCELLATION MOVES NOTHING. The money is where it already was, the trader is
+ * withdrawing their own request, and a guard that refused it would trap the row
+ * open and the identity behind it, which is the lockout this edge exists to
+ * end. So there is no identity term, no KYC term, no destination term and no
+ * dual control on this arrow, and each absence is this sentence rather than an
+ * omission.
+ */
+export const CANCELLATION_HOLDS = ['not_cancellable', 'halted'] as const;
+
+/** @see CANCELLATION_HOLDS */
+export type CancellationHold = (typeof CANCELLATION_HOLDS)[number];
+
+/** The columns a cancellation writes. `0072`. */
+export interface WithdrawalCancellationValues {
+  readonly status: 'cancelled';
+  readonly cancelledAt: Date;
+  readonly updatedAt: Date;
+}
+
+/** What {@link decideCancellation} concluded about one row. */
+export type CancellationDecision =
+  | {
+      readonly kind: 'cancel';
+      readonly guard: 'G-TRADER-CANCELS';
+      readonly values: WithdrawalCancellationValues;
+    }
+  | { readonly kind: 'hold'; readonly hold: CancellationHold };
+
+/**
+ * `requested --> cancelled` and `cooling --> cancelled`, decided and not written.
+ *
+ * TOTAL AND PURE, which is {@link decideApproval}'s shape and its reason: every
+ * case below is reachable from a test with no database and the writing half is
+ * one accessor call.
+ *
+ * IT TAKES A {@link WithdrawalApprovalCandidate} AND THAT TYPE IS NOT
+ * RE-DECLARED UNDER A SECOND NAME. It is this module's reading of one
+ * `wallet_withdrawals` row and the cancellation needs three of its fields; a
+ * parallel interface over the same columns would be a second thing to keep in
+ * step with the same migration, which is the drift this file argues against
+ * everywhere else.
+ *
+ * THE HALT IS THE ONE HOLD AND IT FAILS CLOSED, WHICH IS A RULING RATHER THAN A
+ * DERIVATION AND THE DATABASE DOES NOT AGREE WITH IT. EXECUTED: `0072` and
+ * every constraint on this table PERMIT an UPDATE carrying a halted `requested`
+ * row to `cancelled`. The halt is orthogonal to the rail status (section 3.2),
+ * so nothing in the schema reads it here. IT IS HELD ANYWAY, on ADR-232
+ * section 5's direction one edge over: a halt is an investigation whose SUBJECT
+ * is this row, cancelling destroys the subject, and a trader who may cancel a
+ * halted withdrawal may open a fresh one the same second, which is the
+ * investigation routed around rather than resolved. A founder or a later ADR
+ * may overturn it and it is one branch of one function.
+ */
+export function decideCancellation(args: {
+  readonly candidate: WithdrawalApprovalCandidate;
+  readonly at: Date;
+}): CancellationDecision {
+  const { candidate, at } = args;
+
+  if (!(CANCELLABLE_STATUSES as readonly string[]).includes(candidate.status))
+    return { kind: 'hold', hold: 'not_cancellable' };
+
+  if (candidate.frozenAt !== null) return { kind: 'hold', hold: 'halted' };
+
+  return {
+    kind: 'cancel',
+    guard: 'G-TRADER-CANCELS',
+    values: { status: 'cancelled', cancelledAt: at, updatedAt: at },
+  };
+}
+
+/** One row's outcome, for a driver that wants to say what it did. */
+export interface CancellationOutcome {
+  readonly id: string;
+  readonly decision: CancellationDecision;
+}
+
+/**
+ * The transition over one transaction: read, decide, write.
+ *
+ * ONE ROW AND ADDRESSED BY `id`, WHERE {@link driveApprovals} SWEEPS. The
+ * asymmetry is the two edges' own: an approval is taken on whatever has become
+ * ready, so its driver reads a set; a cancellation is a trader naming the
+ * withdrawal they no longer want, so its driver reads one. A cancellation
+ * sweep would cancel rows nobody asked about.
+ *
+ * UNDER `lockScope()` FOR THIS FILE'S HEADER'S REASON, AND HERE THE REASON IS
+ * SHARPER THAN ON THE APPROVAL EDGE. `wallet_withdrawals_open_idx` is not
+ * unique (ADR-158 finding 8), so `G-NO-IN-FLIGHT` is an application check on
+ * the leg that moves cash. THIS TRANSITION IS THE ONE THAT MAKES THAT CHECK
+ * PASS: a cancellation racing a creation would release the identity while the
+ * creation was deciding against a set that still held the open row, and the
+ * lock is what orders them.
+ *
+ * A MISSING ROW IS `not_cancellable` AND NOT A THROW. The accessor scopes every
+ * read to the caller's identity before this file sees a row, so an `id` that
+ * resolves to nothing is either a row of somebody else's or a row that does not
+ * exist, and those two must be indistinguishable from outside: a driver that
+ * threw on one and held on the other would answer the question of whether an
+ * arbitrary withdrawal id belongs to another trader.
+ *
+ * NOTHING IN THIS TREE CALLS IT, AND THAT IS RECORDED RATHER THAN LEFT TO BE
+ * NOTICED. API_CONTRACT states in terms that "there is no endpoint that cancels
+ * a withdrawal" and that G-TRADER-CANCELS is "named here as owed rather than
+ * invented"; that document is `approved` and is outside this session's fence,
+ * so minting a route would be inventing the row it declines to invent. This is
+ * ADR-232's own restraint applied to the neighbouring arrow.
+ */
+export async function driveCancellation(args: {
+  readonly tx: WithdrawalTx;
+  readonly id: string;
+  readonly at: Date;
+}): Promise<CancellationOutcome> {
+  const { tx, id, at } = args;
+
+  await tx.lockScope();
+
+  const candidate = (await tx.approvalCandidates()).find((row) => row.id === id);
+  if (candidate === undefined) return { id, decision: { kind: 'hold', hold: 'not_cancellable' } };
+
+  const decision = decideCancellation({ candidate, at });
+  if (decision.kind === 'cancel') await tx.cancelWithdrawal(id, decision.values);
+  return { id, decision };
 }
 
 /**
