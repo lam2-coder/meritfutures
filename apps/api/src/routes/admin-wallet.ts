@@ -111,10 +111,27 @@
 //      dual_control_threshold_cents OR dual_control_approval_id IS NOT NULL`,
 //      `dual_control_threshold_cents` is `bigint NOT NULL CHECK (> 0)`, and
 //      `dual_control_approval_id` references `dual_control_approvals`. The
-//      contract's body carries `second_approver: string`. **The threshold has no
-//      wire field and no configured source in this tree**, and picking one here
-//      would be a number this repository invented on the cash door, which is
-//      ADR-139 clause 3's refusal and ADR-158 clause 6's.
+//      contract's body carries `second_approver: string`.
+//
+//      **THE THRESHOLD NOW HAS A SOURCE AND STILL HAS NO WIRE FIELD, AND ADR-228
+//      RULED BOTH HALVES.** This paragraph read "the threshold has no wire field
+//      and no configured source in this tree", and the second half stopped being
+//      true when the founder answered on 2026-08-29: the value is
+//      `DUAL_CONTROL_THRESHOLD_CENTS`, `500000` integer cents, declared below
+//      with the question it answers. It is NOT a number this repository
+//      invented, which is the refusal ADR-139 clause 3 and ADR-158 clause 6 make
+//      and which stands unchanged; it is the founder's, transcribed.
+//
+//      The first half is now a RULING rather than an observation: the endpoint
+//      has no wire field for the threshold and must never gain one, because a
+//      caller who names it can name one no adjustment reaches. `0068` is that
+//      refusal in DDL (`account_adjustments_dual_control_threshold_ceiling`,
+//      `<= 500000`), because a comment is not a control.
+//
+//      WHAT IS STILL MISSING IS THE APPROVAL ROW, NOT THE NUMBER. There is no
+//      wire field for `dual_control_approval_id` and no path here that creates a
+//      `dual_control_approvals` row, so this item remains unrepaired: what
+//      changed is that the missing piece is now one thing rather than two.
 //
 //   4. `reason_code` IS `NOT NULL` OVER A CLOSED THREE-MEMBER VOCABULARY
 //      (`goodwill`, `reconciliation_error`, `promotional_credit`) and the
@@ -126,10 +143,16 @@
 // IS NOT AVAILABLE TO THIS FENCE. Item 1 turned out to need no migration at all,
 // which is ADR-173's ruling and the reason it could be applied from a route file.
 // Items 2, 3 and 4 need contract rows this slice may not write (API_CONTRACT is
-// `approved`, so a change to it is an ADR and this slice has no number), and
-// item 3 needs something no document in this tree supplies: the VALUE of
-// `dual_control_threshold_cents`. **The honest thing is built and the loss is
-// named**, which is the disposition ADR-158 used on its own findings and
+// `approved`, so a change to it is an ADR and this slice has no number).
+//
+// THIS PARAGRAPH USED TO ADD "and item 3 needs something no document in this
+// tree supplies: the VALUE of `dual_control_threshold_cents`", AND THAT HALF IS
+// DISCHARGED. ADR-228 landed the founder's answer as
+// `DUAL_CONTROL_THRESHOLD_CENTS` below and `0068`'s ceiling in DDL. Item 3 is
+// still unrepaired and the reason is now a DIFFERENT one, which is worth more
+// than the sentence it replaces: what is missing is the `dual_control_approvals`
+// row, not the number. **The honest thing is built and the loss is named**,
+// which is the disposition ADR-158 used on its own findings and
 // `admin-payouts.ts` used on the hold the biconditional erases.
 //
 // SO `writeCorrection` IS STILL A PORT AND THIS MODULE STILL COMPOSES NO
@@ -350,6 +373,52 @@ export const INSUFFICIENT_FUNDS_STATUS = 422;
 /** The only `wallet_entries.provenance` value this endpoint may write. */
 export const CORRECTION_PROVENANCE = 'correction';
 
+/**
+ * The dual-control threshold, `500000` INTEGER CENTS. ADR-228.
+ *
+ * THE ANSWER IS RECORDED WITH ITS QUESTION, because a threshold whose reasoning
+ * is lost is a threshold the next session moves. Put to the founder on
+ * 2026-08-29:
+ *
+ *   > "above what payout amount should a second human have to approve it"
+ *
+ * and the `$5,000` option they chose was described to them as catching the
+ * unusual payouts
+ *
+ *   > "without adding friction to normal trader withdrawals, which typically
+ *   >  run $500-$3,000"
+ *
+ * ANSWER: `$5,000`, which is `500000` integer cents. A `bigint`, compared
+ * against a `bigint`, so no float touches it.
+ *
+ * **THE REASONING OFFERED WITH THE QUESTION IS NOT THE REASONING THIS NUMBER
+ * CARRIES, AND THIS COMMENT SAYS SO RATHER THAN LETTING THE NEXT READER ASSUME
+ * IT DOES.** `account_adjustments` is the ADMIN adjustment table. No trader
+ * withdrawal writes a row of it and none can, so the friction this threshold
+ * does not add to normal trader withdrawals is friction it could not have added
+ * at ANY value, `1` cent included. What the number actually sets is ADR-067
+ * section 5's quantity: *"the size of the loss one compromised owner session can
+ * cause without a second key"*. `OQ-F6-01` recommended `10000` cents and argued
+ * the number should *"be set low and read as that number"*. **This is 50x that
+ * recommendation and it is the founder's answer**; the disagreement is ADR-228
+ * section 4's, surfaced for the `E2` read rather than settled by a session.
+ *
+ * IT IS A CONSTANT AND NOT A CONFIGURATION READ, on `MINIMUM_WITHDRAWAL_CENTS`'s
+ * precedent one route over (`wallet-withdrawals.ts`), for two measured reasons
+ * rather than for convenience: no configuration table exists among the 115
+ * tables this estate declares, and no config reader exists in this deployable.
+ * `0038:279` makes the COLUMN the threshold *"IN FORCE when the row was
+ * written"*, which is a RECORD of this value and not a second source of it.
+ *
+ * **IT IS NEVER A WIRE FIELD.** {@link WalletCorrectionBody} carries no
+ * threshold and must never gain one: a caller who names the threshold is a
+ * caller who can name one no adjustment reaches, which satisfies
+ * `account_adjustments_dual_control_above_threshold` with no approval row at
+ * all. The refusal is `0068`'s `account_adjustments_dual_control_threshold_ceiling`
+ * (`<= 500000`) and not this sentence, because a comment is not a control.
+ */
+export const DUAL_CONTROL_THRESHOLD_CENTS = 500_000n;
+
 // -----------------------------------------------------------------------------
 // The wire shapes, transcribed from API_CONTRACT section 8
 // -----------------------------------------------------------------------------
@@ -527,9 +596,18 @@ export interface AdminWalletTx {
  * THIS IS THE FINDING MADE CONCRETE RATHER THAN A TASK LIST. Every field here
  * comes off the contract's body or off the locked read; `account_adjustments`
  * additionally requires `reason_code`, `dual_control_threshold_cents` and, for
- * a debit, `reverses_adjustment_id`, and NONE of those three has a source in
- * this draft or anywhere else in this tree. A wiring slice cannot satisfy the
- * schema from this and that is the point of declaring it.
+ * a debit, `reverses_adjustment_id`.
+ *
+ * THIS READ "NONE OF THOSE THREE HAS A SOURCE IN THIS DRAFT OR ANYWHERE ELSE IN
+ * THIS TREE" AND IT IS NOW TWO OF THE THREE. `dual_control_threshold_cents` has
+ * a source: {@link DUAL_CONTROL_THRESHOLD_CENTS}, the founder's answer of
+ * 2026-08-29, bounded above in DDL by `0068`. **It is deliberately NOT A FIELD
+ * ON THIS DRAFT and never becomes one** (ADR-228 ruling 2): a threshold the
+ * caller supplies is a threshold the caller can raise beyond any adjustment's
+ * reach, which satisfies `account_adjustments_dual_control_above_threshold`
+ * with no approval row at all. The writer reads the constant. A wiring slice
+ * still cannot satisfy the schema from this draft, on `reason_code` and
+ * `reverses_adjustment_id`, and that is the point of declaring it.
  *
  * `destination` USED TO BE A FOURTH AND IS NOT ONE. It is `'trader_wallet'`
  * for every row this endpoint can write:
