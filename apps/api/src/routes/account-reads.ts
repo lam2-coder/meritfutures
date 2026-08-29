@@ -62,16 +62,16 @@
 //
 //   `/eligibility`  `evaluatePayout` IS THE ONE EVALUATOR (`INV-M5-02`: both
 //                payout endpoints call the identical function with identical
-//                inputs) AND ITS `RuleState` ARGUMENT IS NOT PERSISTABLE. The
-//                engine's `RuleState` requires `lifetimeSettledCents`,
-//                `breached` and `breachKind`; `0015_rule_states.sql` declares
-//                none of the three and no migration in the tree declares
-//                `lifetime_settled_cents` at all. Supplying them would mean
-//                inventing a lifetime money total and a breach verdict for a
-//                money read, and deriving the total by summing `payout_requests`
-//                is the aggregate `ADR-157` section 5 refused on evidence.
-//                Writing a second evaluator instead is what `INV-M5-02` exists
-//                to forbid. This is a SCHEMA DELTA and is reported, not patched.
+//                inputs) AND ITS `RuleState` ARGUMENT HAS NO PRODUCER HERE.
+//                THE SCHEMA DELTA THIS REASON USED TO NAME IS SPENT:
+//                `0065_rule_state_lifetime_and_breach.sql` declares all three
+//                columns and `apps/worker/src/batch/state-writer.ts` maps
+//                them, so the engine's type IS persistable now. What refuses
+//                today is that `rule_states` holds no rows, nothing in a
+//                deployment writes one, and the stored encoding of
+//                `engine_gates` is undeclared, which stops the writer and this
+//                reader alike. `ELIGIBILITY_BLOCKER` carries the three clauses
+//                and `account-reads.test.ts` derives each at its own source.
 //
 //   `/certificate`  `image_url` IS NON-NULLABLE IN THE CONTRACT AND NOTHING IN
 //                THIS TREE CAN PRODUCE ONE. It is "signed, time-limited", and
@@ -850,13 +850,24 @@ const TIMELINE_BLOCKER =
 
 const ELIGIBILITY_BLOCKER =
   '`INV-M5-02` requires both payout endpoints to call `evaluatePayout` with identical inputs, ' +
-  'and its `RuleState` argument is not persistable in this schema. The engine type requires ' +
-  '`lifetimeSettledCents`, `breached` and `breachKind`; `0015_rule_states.sql` declares none of ' +
-  'the three, and no migration in the tree declares `lifetime_settled_cents` at all. Supplying ' +
-  'them would mean inventing a lifetime money total and a breach verdict on a money read, and ' +
-  'summing `payout_requests` for the total is the aggregate ADR-157 section 5 refused on ' +
-  'evidence. Writing a second evaluator instead is what `INV-M5-02` exists to forbid. This is a ' +
-  'SCHEMA DELTA and its repair is a migration, which is not a transcription session';
+  'and its `RuleState` argument has NO PRODUCER in this deployment. THE SCHEMA DELTA THIS ' +
+  'REASON USED TO NAME IS SPENT: `0065_rule_state_lifetime_and_breach.sql` declares ' +
+  '`lifetime_settled_cents`, `breached` and `breach_kind`, and ' +
+  '`apps/worker/src/batch/state-writer.ts` maps all three, so `lifetimeSettledCents`, ' +
+  '`breached` and `breachKind` ARE persistable now. Three things refuse instead, each measured ' +
+  'rather than inherited. (1) `rule_states` HOLDS NO ROWS AND NOTHING IN A DEPLOYMENT WRITES ' +
+  'ONE: the single insert site in this tree is `writeRuleStateVia`, its only caller is ' +
+  '`runNightlyBatch`, no adapter implements `BatchPorts` over Postgres, and ' +
+  '`apps/worker/src/index.ts` exports the batch without scheduling it. (2) EVEN GIVEN AN ' +
+  'ADAPTER THE WRITER WOULD REFUSE: `RuleStateWriterIo.encodeEngineGates` has no ' +
+  'implementation under any `src/`, and `UNWIRED_RULE_STATE_WRITER_IO` throws ' +
+  '`RuleStateWriterUnwired` by name, because the stored encoding of `engine_gates` is `B5` ' +
+  'term 2 and is a corpus amendment rather than a line of code. (3) THAT SAME ABSENCE BINDS ' +
+  'THIS READER: `RuleState.engineGates` is `EngineGateResults`, `rule_states.engine_gates` is ' +
+  '`jsonb`, and with a row in hand this adapter would still have to INVENT a decoding for that ' +
+  'column. So the refusal is no longer about the schema and it is not weaker for that: serving ' +
+  'a confident verdict computed off an empty table is a wrong answer where a 503 is an honest ' +
+  'one. It clears when a row exists and its `engine_gates` encoding is declared, not before';
 
 const CERTIFICATE_BLOCKER =
   'section 6 types `image_url` as a non-nullable "signed, time-limited" URL and nothing in this ' +
