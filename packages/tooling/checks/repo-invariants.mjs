@@ -2211,6 +2211,77 @@ const ri13 = {
 // A FALSE POSITIVE HERE IS AN ARGUMENT SOMEBODY HAS AND A FALSE NEGATIVE IS THIS
 // DEFECT A SEVENTH TIME, so where the two are in tension this check takes the
 // noisier side and the narrowings above are each stated with their reason.
+//
+// -----------------------------------------------------------------------------
+// WHAT A CITATION PROVES, AND WHY A NAME IN A WINDOW WAS NOT IT (ADR-212)
+// -----------------------------------------------------------------------------
+// EVERYTHING ABOVE THIS LINE WAS TRUE AND THE CHECK WAS STILL GREEN ON CITATIONS
+// THAT POINT AT THE WRONG RULE. Session 399 found five of them in
+// `packages/db/src/scope.ts` and could not repair them, because repairing them
+// needed a ruling about what this check should verify. That ruling is ADR-212
+// and it is the three assertions below.
+//
+// THE MECHANISM, RE-DERIVED AT SOURCE RATHER THAN INHERITED. `scope.ts` is a
+// registry of 112 entries, each `key: { class: 'firm' | 'owned' | ..., ... }`,
+// so `firm`, `owned` and `identity_id` are among the commonest tokens in the
+// file: 107, 72 and 109 lines hold one. The reader binds the NEAREST backticked
+// token, and in "`payoutRequests` is `owned` (`scope.ts:1056`)" the nearest
+// token is `owned`. A window of two lines around ANY of the 41 `class: 'owned'`
+// lines satisfies it. The citation proves the file contains a common word near that
+// spot, and the subject -- `payoutRequests`, the one token in that sentence a
+// runner could actually check -- is the one the reader drops.
+//
+// AND THE WINDOW WAS NOT THE THING KEEPING THE SURVIVING FIVE GREEN, which is
+// the finding that changed the ruling. Every count below was measured on
+// `origin/main` at `37d70b3`, BEFORE a line of this branch's repairs: narrowing the window from 2 to 0 moves NO site at all --
+// of the named citations that resolve, every one whose name is within two lines
+// has it on the cited line ITSELF -- and it catches NONE of the five. Two of
+// the five were never READ (`scope.ts:644,649`, the comma list); two bind NO
+// NAME, so only resolution and range were ever asserted about them; one binds a
+// name and is caught. A rule about how far a name may sit was answering a
+// question none of them turned on.
+//
+// SO THREE THINGS ARE ADDED, EACH FOR ONE OF THE THREE WAYS A CITATION GOT PAST.
+//
+//   (1) THE COMMA LIST IS READ. `x.ts:644,649` is two citations, one per number.
+//       It was zero.
+//   (2) THE CITED LINE MUST CARRY SOMETHING. A pointer landing on a blank line
+//       or a bare `},` proves nothing, and it is the shape a pointer takes when
+//       what it named moved down. Asserted over EVERY citation, named or not,
+//       because it needs no name. It cost 6 of 225 citations on `37d70b3` and
+//       every one of the six was a defect.
+//   (3) THE ANCHOR. Where a name binds and the window admits it, the cited line
+//       must also be PART OF SOMETHING THE SENTENCE NAMES: the range declares
+//       the name, or the enclosing declaration of the cited line is named among
+//       the backticked tokens beside the citation. `class: 'owned'` inside the
+//       `payoutRequests` entry is anchored by a sentence that says
+//       `payoutRequests`; the same line cited by a sentence about a different
+//       table is not.
+//
+// WHAT WAS REFUSED, WITH THE COST OF EACH DERIVED BY RUNNING IT RATHER THAN
+// ESTIMATED. Requiring the CITED LINE ITSELF to declare the name turns 26 of 52
+// named citations red and 18 of those are honest -- a citation to
+// `class: 'firm'` proves a class and declares nothing. Requiring the anchor of
+// EVERY citation, named or not, turns 116 of 225 red, most of them pointers
+// into prose that declares nothing a reader can name. Both are stronger and
+// neither is better: a rule that turns a hundred honest citations red is a rule
+// somebody deletes, and this file has said so about a list since RI-05.
+//
+// TWO MORE MISSES, ADDED TO THE EIGHT ABOVE.
+// (9)  The anchor is asked only where a NAME BINDS, so a citation with no name
+//      beside it is still checked for resolution, range and vacancy alone. That
+//      is 173 of the 225 citations here.
+// (10) The vacant-line rule fires only when EVERY file a suffix path could name
+//      has a vacant line there, on `nearestName`'s own rule that a suffix path
+//      is answered by all of them. `provisioning/payload.ts:217` cites
+//      `ports.ts:98`, blank in the `ports.ts` it means and not in the other ten,
+//      and this check does not raise it.
+//
+// RI-16 READS THE SAME GRAMMAR AND DOES NOT YET APPLY (2) OR (3), and the
+// reason is a measurement rather than an oversight: over docs/ they raise 46
+// findings where 2 stand today, 40-odd of them the vacant-line rule inside
+// documents whose frontmatter reads `status: approved`, where a change is an
+// ADR rather than a commit. Extending it is a slice, not a line.
 
 /** The extensions a reason is written in. */
 const CITED_REASON_EXTENSIONS = /\.(?:ts|tsx|mts|mjs|js)$/;
@@ -2342,7 +2413,7 @@ function citedReasonFiles(tree) {
  * would blind the check to the narrowest FALSE citation on record, which is
  * also three; that trade is refused here and stated rather than taken quietly.
  *
- * @type {readonly {file: string, cites: string, name: string}[]}
+ * @type {readonly {file: string, cites: string, name: string | null}[]}
  */
 const CITATIONS_OWNED_ELSEWHERE = [
   { file: 'apps/api/test/wiring.test.ts', cites: 'routes/admin-wallet.ts:538', name: 'principal' },
@@ -2365,10 +2436,71 @@ const CITATIONS_OWNED_ELSEWHERE = [
     name: 'entriesOf',
   },
   { file: 'apps/api/test/db.test.ts', cites: 'scoped-db.ts:662', name: 'FilterTerm' },
+  // THREE ARRIVED WITH THE ANCHOR AND THE VACANT-LINE RULE, all three in
+  // `apps/worker/**`, which session 400 holds. Each was measured at the commit
+  // that registered it and each names the line the claim is actually on. A
+  // `name` of null is a citation the reader binds no name to, which is what the
+  // vacant-line rule asserts about and why the register now carries the field.
+  //
+  //   `detectors/identity.ts:1609`   quotes "flags attach to HUMANS, not to
+  //                                  accounts" at `0008_risk.sql:107`, which is
+  //                                  BLANK. The sentence is at `:111`
+  //   `provisioning/payload.ts:21`   `scope.ts:909` is `},`, the close of the
+  //                                  `kycFunnelEvents` entry. The `payload
+  //                                  jsonb` sentence it quotes is at `:1226`,
+  //                                  inside `provisioningQueue`
+  //
+  // A THIRD IS MEASURED AND DELIBERATELY NOT REGISTERED, because this check does
+  // NOT raise it and a register entry that raises nothing is itself a finding.
+  // `provisioning/payload.ts:217` cites `ports.ts:98` for "THE BATCH THEREFORE
+  // READS NO CLOCK", which is at `apps/worker/src/batch/state-writer.ts:207` and
+  // is not in a `ports.ts` at all. Line 98 is blank in the `ports.ts` the
+  // sentence means, and this tree holds ELEVEN files whose path ends that way;
+  // the vacant-line rule fires only when EVERY candidate is vacant, on
+  // `nearestName`'s own rule that a suffix path is answered by all of them. That
+  // is miss (10) and it is stated rather than tuned away.
+  { file: 'apps/worker/src/detectors/identity.ts', cites: '0008_risk.sql:107', name: null },
+  { file: 'apps/worker/src/provisioning/payload.ts', cites: 'scope.ts:909', name: null },
 ];
+
+/**
+ * Whether one citation is registered as owned elsewhere.
+ *
+ * @param {string} file
+ * @param {string} cites
+ * @param {string | null} name
+ * @returns {boolean}
+ */
+function registeredCitation(file, cites, name) {
+  return CITATIONS_OWNED_ELSEWHERE.some(
+    (k) => k.file === file && k.cites === cites && k.name === name,
+  );
+}
 
 /** How far from the cited line the name may sit. Two, and the header says why. */
 const CITATION_WINDOW = 2;
+
+/**
+ * How far before a citation its SUBJECT may be written, in flattened characters.
+ *
+ * THE SUBJECT IS NOT THE NEAREST TOKEN AND THAT IS THE WHOLE POINT OF THE
+ * ANCHOR. "`payoutRequests` is `owned` (`scope.ts:1056`)" binds `owned` as the
+ * name, because `owned` is nearest; `payoutRequests` is the thing the sentence
+ * is ABOUT and it is the only token in that sentence a runner can check the
+ * cited line against. So the anchor reads EVERY backticked token in the span
+ * rather than one, and asks whether any of them names the declaration the cited
+ * line sits inside.
+ *
+ * 400 IS THE SENTENCE THESE REASONS ARE WRITTEN IN, and it sits inside a FLAT
+ * REGION rather than on a cliff, which is measured rather than asserted. Over
+ * the 56 named citations this check reads, the count the anchor refuses is 9 at
+ * a span of 100 and 7 at 200, 300, 400, 600, 800 and 1600 alike. Every subject
+ * in this corpus is written within 200 characters of the pointer that cites it,
+ * so the parameter buys nothing above that and only loses sentences below it;
+ * 400 is chosen for the margin and NOT because a number was tuned until a tree
+ * went green.
+ */
+const CITATION_SUBJECT_SPAN = 400;
 
 /** How far a bare `:N` may sit from the full path it continues. */
 const CITATION_INHERIT_LINES = 6;
@@ -2391,8 +2523,19 @@ const CITED_EXTENSIONS = 'ts|tsx|mts|mjs|js|sql|md|json|ya?ml';
  * NOT RUN. The tokenizer in `citationsIn` walks the backticks once and tests
  * each candidate token against these two, both anchored, which is linear in the
  * file and reads the same citations.
+ *
+ * THE COMMA LIST IS THE THIRD SHAPE AND IT WAS READ AS NO CITATION AT ALL until
+ * this trailing group was added. `` `packages/db/src/scope.ts:644,649` `` is how
+ * this corpus cites two rules of one registry in one breath, and the tail was
+ * anchored at the end of the token, so `:644,649` matched nothing and the whole
+ * token fell through as ordinary prose. TWO OF THE FIVE `scope.ts` CITATIONS
+ * SESSION 399 MEASURED WRONG ARE THIS SHAPE, and neither was green because a
+ * window admitted it: neither was ever read. A pointer no reader parses reads as
+ * verified exactly as loudly as one that resolves, which is the property this
+ * whole check exists for. Each number becomes its OWN citation, sharing the path
+ * and the name, so `:644,649` is two pointers and each is answered separately.
  */
-const CITATION_TAIL = /:(\d+)(?:-(\d+))?$/;
+const CITATION_TAIL = /:(\d+)(?:-(\d+))?((?:,\d+)+)?$/;
 
 /** The path half, anchored at the end of whatever sits before the pointer. */
 const CITATION_PATH = new RegExp('[A-Za-z0-9_./()-]*[A-Za-z0-9_-]\\.(?:' + CITED_EXTENSIONS + ')$');
@@ -2595,6 +2738,188 @@ function identifierIn(token) {
 }
 
 /**
+ * Every backticked token written within `CITATION_SUBJECT_SPAN` characters
+ * before a citation, as the SUBJECTS that citation may be about.
+ *
+ * DELIBERATELY UNFILTERED. `identifierIn` narrows a token to the one name it
+ * BINDS, because binding is a claim the check then enforces; this list is the
+ * other direction -- it is asked whether one particular declaration is named,
+ * and a token that names nothing simply answers no. Filtering here would drop
+ * `liability_snapshots` for having an underscore or `CheckoutTx.insert` for
+ * having a dot, and both of those are exactly the shape a subject is written in.
+ *
+ * THE TOKENS ARE THE SCANNER'S OWN AND NOT A SECOND PAIRING. Re-tokenizing the
+ * span with a regex pairs backticks from wherever the span happens to start, so
+ * a span opening mid-token inverts every pair inside it and the subject a
+ * sentence plainly writes goes missing. That is the same defect `citedIdentifier`
+ * records about walking pairs from the start of a file, arriving at the other
+ * end of the same reader.
+ *
+ * @param {readonly {at: number, token: string}[]} seen  tokens already paired
+ * @param {number} upto  where the citation's own token starts
+ * @returns {string[]}
+ */
+function subjectsBefore(seen, upto) {
+  /** @type {string[]} */
+  const out = [];
+  for (const s of seen) {
+    if (s.at < upto - CITATION_SUBJECT_SPAN || s.at >= upto) continue;
+    out.push(s.token);
+  }
+  return out;
+}
+
+/**
+ * The shapes a line DECLARES a name in, in the languages this tree cites.
+ *
+ * FIVE SHAPES AND NOT A PARSER, and the difference is the point. A parser would
+ * be right about more lines and would be a second compiler in a check that must
+ * finish in a second over 19 MB. These five are what the cited files are written
+ * in: a TypeScript binding, an object-literal or interface member, a `CREATE`,
+ * a named constraint, and a SQL column. Anything else declares nothing HERE,
+ * which makes the anchor fail closed -- it reports rather than guesses.
+ */
+const DECLARATION_SHAPES = [
+  /^\s*(?:export\s+)?(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:function|const|let|var|class|interface|type|enum|namespace)\s+([A-Za-z_$][A-Za-z0-9_$]*)/,
+  /^\s*(?:readonly\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*[?!]?\s*[:(]/,
+  /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:UNIQUE\s+)?(?:MATERIALIZED\s+)?(?:TABLE|VIEW|INDEX|TYPE|FUNCTION|TRIGGER)\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([A-Za-z_][A-Za-z0-9_]*)"?/i,
+  /^\s*CONSTRAINT\s+"?([A-Za-z_][A-Za-z0-9_]*)"?/i,
+  /^\s*"?([A-Za-z_][A-Za-z0-9_]*)"?\s+(?:uuid|text|citext|integer|bigint|numeric|boolean|jsonb|json|bytea|timestamptz|timestamp|date|smallint|interval)\b/i,
+];
+
+/**
+ * The name one line declares, or null when it declares none.
+ *
+ * @param {string} line
+ * @returns {string | null}
+ */
+function declaredNameOn(line) {
+  for (const shape of DECLARATION_SHAPES) {
+    const found = shape.exec(line);
+    if (found?.[1] !== undefined) return found[1];
+  }
+  return null;
+}
+
+/** A line that carries nothing to check: empty, or a bare closing bracket. */
+const VACANT_LINE = /^[\s)\]}>;,]*$/;
+
+/**
+ * The indent of a line, in characters, tabs counted as one.
+ *
+ * @param {string} line
+ * @returns {number}
+ */
+function indentOf(line) {
+  let i = 0;
+  while (i < line.length && (line.charAt(i) === ' ' || line.charAt(i) === '\t')) i += 1;
+  return i;
+}
+
+/**
+ * The name of the declaration one line sits INSIDE, or null when it sits inside
+ * none this reader can name.
+ *
+ * BY INDENTATION, WHICH IS WHAT THESE FILES ARE FORMATTED BY. `prettier` and
+ * `pg_format` both indent a member under the thing that declares it, so the
+ * enclosing declaration of a line is the nearest line above it at a strictly
+ * smaller indent that declares a name -- and when that line declares none (a
+ * `{` continuation, a docblock opener), the walk continues from THERE rather
+ * than giving up, so a member two levels in still reaches its table.
+ *
+ * A LINE AT COLUMN ZERO IS ITS OWN DECLARATION and nothing above it is asked,
+ * because `export type ScopedTableKey = ...` is enclosed by the file.
+ *
+ * @param {readonly string[]} lines
+ * @param {number} start  one-based
+ * @returns {string | null}
+ */
+function enclosingDeclaration(lines, start) {
+  let from = start;
+  for (let guard = 0; guard < 64; guard += 1) {
+    const self = lines[from - 1] ?? '';
+    const base = indentOf(self);
+    if (base === 0) return declaredNameOn(self);
+    let next = -1;
+    for (let j = from - 2; j >= 0; j -= 1) {
+      const line = lines[j] ?? '';
+      if (line.trim() === '') continue;
+      if (indentOf(line) < base) {
+        next = j + 1;
+        break;
+      }
+    }
+    if (next < 0) return declaredNameOn(self);
+    const named = declaredNameOn(lines[next - 1] ?? '');
+    if (named !== null) return named;
+    from = next;
+  }
+  return null;
+}
+
+/**
+ * Whether two written names are the same name.
+ *
+ * THE CORPUS WRITES ONE THING TWO WAYS AND BOTH ARE CORRECT: the registry key
+ * is `liabilitySnapshots` and the sentence that cites it says
+ * `liability_snapshots`, because one is the TypeScript name and the other is the
+ * table. So the comparison is over letters and digits only.
+ *
+ * CONTAINMENT IS ADMITTED ONLY FROM FOUR CHARACTERS UP, which is measured
+ * rather than chosen: `CheckoutTx.insertAttribution` must reach
+ * `insertAttribution` and `certificates.id` must reach `certificates`, and a
+ * bare `id` or `tx` must reach nothing, because a two-letter token is inside
+ * half the identifiers in this tree.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function sameName(a, b) {
+  const x = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const y = b.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (x === '' || y === '') return false;
+  if (x === y) return true;
+  const short = x.length <= y.length ? x : y;
+  const long = x.length <= y.length ? y : x;
+  return short.length >= 4 && long.includes(short);
+}
+
+/**
+ * Whether one file ANCHORS a citation: whether the cited line is part of the
+ * declaration the citing sentence is about.
+ *
+ * TWO WAYS, AND A CITATION NEEDS ONE OF THEM.
+ *   (a) THE CITED RANGE DECLARES THE NAME. `gateNoInFlight`
+ *       (`wallet-withdrawals.ts:1254`) lands on
+ *       `export function gateNoInFlight(...)`, and there is nothing left to
+ *       argue about.
+ *   (b) THE ENCLOSING DECLARATION IS NAMED IN THE CITING SENTENCE.
+ *       "`payoutRequests` is `owned` (`scope.ts:1056`)" lands on
+ *       `class: 'owned',`, which declares `class` rather than `owned` -- but it
+ *       sits inside the `payoutRequests` entry, and the sentence says
+ *       `payoutRequests`. THAT is what the citation proves.
+ *
+ * NEITHER IS SATISFIABLE BY A COINCIDENTAL TOKEN, which is the entire reason
+ * this exists. `firm`, `owned` and `identity_id` are the commonest words in
+ * `scope.ts`; a registry entry's KEY appears once.
+ *
+ * @param {readonly string[]} lines
+ * @param {{start: number, end: number, name: string, subjects: readonly string[]}} c
+ * @returns {boolean}
+ */
+function anchoredIn(lines, c) {
+  const last = Math.min(c.end, lines.length);
+  for (let line = c.start; line <= last; line += 1) {
+    const declared = declaredNameOn(lines[line - 1] ?? '');
+    if (declared !== null && sameName(declared, c.name)) return true;
+  }
+  const enclosing = enclosingDeclaration(lines, c.start);
+  if (enclosing === null) return false;
+  return c.subjects.some((s) => sameName(s, enclosing));
+}
+
+/**
  * Every citation in one text, with the bare `:12` resolved against the path
  * cited above it and the name it is about bound to it.
  *
@@ -2615,11 +2940,11 @@ function identifierIn(token) {
  *
  * @param {string} text
  * @param {boolean} [inherit]
- * @returns {{at: number, target: string, href: string | null, start: number, end: number, cited: string, name: string | null}[]}
+ * @returns {{at: number, target: string, href: string | null, start: number, end: number, cited: string, name: string | null, subjects: string[]}[]}
  */
 function citationsIn(text, inherit = true) {
   const { flat, lineOf } = flattenReasons(text);
-  /** @type {{at: number, target: string, href: string | null, start: number, end: number, cited: string, name: string | null}[]} */
+  /** @type {{at: number, target: string, href: string | null, start: number, end: number, cited: string, name: string | null, subjects: string[]}[]} */
   const out = [];
   /** @type {number[]} */
   const ticks = [];
@@ -2631,10 +2956,13 @@ function citationsIn(text, inherit = true) {
   // token that is not a citation gives its CLOSING backtick up to be the next
   // token's opener, which is what a left-to-right search does and what keeps a
   // backtick used as an apostrophe from inverting every pairing after it.
+  /** @type {{at: number, token: string}[]} */
+  const seen = [];
   for (let k = 0; k + 1 < ticks.length;) {
     const open = ticks[k] ?? 0;
     const close = ticks[k + 1] ?? 0;
     const token = flat.slice(open + 1, close);
+    seen.push({ at: open, token });
     const tail = CITATION_TAIL.exec(token);
     if (tail === null || tail[1] === undefined) {
       k += 1;
@@ -2686,27 +3014,40 @@ function citationsIn(text, inherit = true) {
     if (target === null) continue;
     const first = tail[1];
     const last = tail[2];
-    const start = Number(first);
-    const end = last === undefined ? start : Number(last);
-    out.push({
-      href,
-      at,
-      target,
-      start,
-      end,
-      cited: `${target}:${first}${last === undefined ? '' : `-${last}`}`,
-      // THE NAME IN FRONT FIRST, THEN THE NAME INSIDE, AND THE SECOND ONLY
-      // WHERE THE PATH IS STATED. A token whose prefix is a PATH names the file
-      // and no symbol; a token whose path was INHERITED is a registry shorthand
-      // far more often than a symbol, and the count is not close. Every one of
-      // the seven prefixed tokens in `CITED_REASON_FILES` is `M07:111` or
-      // `M20:62` -- a PLAN and a section line -- and 41 of the 163 in docs/ are
-      // the same shape. Binding a name there would be the check guessing a path
-      // and then guessing a symbol inside it.
-      name:
-        citedIdentifier(flat, open) ??
-        (href !== null && path === '' ? citedInToken(flat, open, before, target) : null),
-    });
+    // THE NAME IN FRONT FIRST, THEN THE NAME INSIDE, AND THE SECOND ONLY
+    // WHERE THE PATH IS STATED. A token whose prefix is a PATH names the file
+    // and no symbol; a token whose path was INHERITED is a registry shorthand
+    // far more often than a symbol, and the count is not close. Every one of
+    // the seven prefixed tokens in `CITED_REASON_FILES` is `M07:111` or
+    // `M20:62` -- a PLAN and a section line -- and 41 of the 163 in docs/ are
+    // the same shape. Binding a name there would be the check guessing a path
+    // and then guessing a symbol inside it.
+    const name =
+      citedIdentifier(flat, open) ??
+      (href !== null && path === '' ? citedInToken(flat, open, before, target) : null);
+    const subjects = subjectsBefore(seen, open);
+    // A COMMA LIST IS N CITATIONS SHARING ONE PATH AND ONE SENTENCE. They are
+    // emitted separately so each is resolved, range-checked and anchored on its
+    // own; the check's own miss (8) already says the reader binds one name to a
+    // list of pointers, and emitting one citation per number does not fix that
+    // -- it stops the second and later pointers being read as nothing at all.
+    /** @type {{first: string, last: string | undefined}[]} */
+    const pointers = [{ first, last }];
+    for (const extra of (tail[3] ?? '').split(',')) {
+      if (extra !== '') pointers.push({ first: extra, last: undefined });
+    }
+    for (const p of pointers) {
+      out.push({
+        href,
+        at,
+        target,
+        start: Number(p.first),
+        end: p.last === undefined ? Number(p.first) : Number(p.last),
+        cited: `${target}:${p.first}${p.last === undefined ? '' : `-${p.last}`}`,
+        name,
+        subjects,
+      });
+    }
   }
   return out;
 }
@@ -2803,7 +3144,7 @@ function citationReader(root) {
 /** @type {Invariant} */
 const ri15 = {
   id: 'RI-15',
-  title: 'No reason cites a line that does not hold the name beside it',
+  title: 'No reason cites a line that is not part of what the sentence names',
   covers:
     'every `file.ts:12` and `file.ts:12-34` citation in EVERY SOURCE FILE THIS ' +
     `TREE HOLDS -- ${CITED_REASON_EXTENSIONS.source} outside \`${OWN_PACKAGE}\`, ` +
@@ -2816,16 +3157,39 @@ const ri15 = {
     'all 78 findings inside it sit in the two files whose subject IS this ' +
     'grammar and the other four carry none. It is 588 files and 207 citations ' +
     'where it was 6 and 94. Plus the bare `:12` that continues a path cited within ' +
-    `${CITATION_INHERIT_LINES} lines above it. THREE THINGS ARE ASSERTED: the ` +
-    'path resolves to a file in this tree, the file reaches the line, and -- ' +
+    `${CITATION_INHERIT_LINES} lines above it, AND the comma list ` +
+    '`x.ts:644,649`, which is read as ONE CITATION PER NUMBER and was read as ' +
+    'NO CITATION AT ALL before ADR-212: the tail was anchored at the end of the ' +
+    'token, so the whole token fell through as prose and two of the five wrong ' +
+    '`scope.ts` pointers session 399 measured were never parsed. FOUR THINGS ' +
+    'ARE ASSERTED: the ' +
+    'path resolves to a file in this tree, the file reaches the line, the CITED ' +
+    'LINE IS NOT BLANK OR A BARE CLOSING BRACKET in every file that path could ' +
+    'name -- asserted over every citation, named or not, because it needs no ' +
+    'name, and 6 of the 225 citations on `37d70b3` failed it, every one a ' +
+    'defect -- and -- ' +
     'when the citation is preceded by a BACKTICKED NAME with nothing but glue ' +
     'between them, or CARRIES ONE INSIDE ITS OWN BACKTICKS beside a path the ' +
     'text STATES -- that name appears within ' +
     `${CITATION_WINDOW} lines of the line cited, matched case-insensitively as ` +
-    'a substring. THE WINDOW IS TUNED AGAINST THIS CORPUS: the widest TRUE ' +
+    'a substring, AND THE CITED LINE IS ANCHORED TO IT: the cited range ' +
+    'DECLARES the name, or the ENCLOSING DECLARATION of the cited line is ' +
+    `named among the backticked tokens within ${CITATION_SUBJECT_SPAN} ` +
+    'characters before the citation. THE ANCHOR IS WHAT THE WINDOW COULD NOT ' +
+    'SUPPLY. In `scope.ts` the tokens `firm`, `owned` and `identity_id` sit on ' +
+    '107, 72 and 109 lines, so a window around any of the 41 `class: ' +
+    "'owned'" +
+    '` ' +
+    'lines is satisfied by coincidence; a registry entry key appears ONCE. THE ' +
+    'WINDOW IS TUNED AGAINST THIS CORPUS: the widest TRUE ' +
     'citation measured is one line off and the narrowest FALSE one on record is ' +
     'three, so two catches every false citation on record and admits every true ' +
-    'one. WHAT IT DOES NOT CATCH. (1) A citation with no name beside it is ' +
+    'one -- and it is now known to be beside the point, because narrowing it ' +
+    'from 2 to 0 moves NO SITE on this tree and catches NONE of the five. WHAT ' +
+    'WAS REFUSED, EACH COST DERIVED BY RUNNING IT: requiring the cited line ' +
+    'itself to DECLARE the name turns 26 of 52 named citations red and 18 of ' +
+    'those are honest; requiring the anchor of EVERY citation turns 116 of 225 ' +
+    'red. WHAT IT DOES NOT CATCH. (1) A citation with no name beside it is ' +
     'checked for resolution and range only; of the four false citations of ' +
     '2026-08-28 this catches THREE and misses `wallet-withdrawals.ts:1506`, ' +
     'which sits behind the words "the identity arm this route presents" and ' +
@@ -2853,7 +3217,15 @@ const ri15 = {
     'FALSE THE DAY IT WAS WRITTEN; both kinds are in the tree and both are ' +
     'findings. (8) A LIST of names against a LIST of pointers binds only its ' +
     'first pair, because the nearest token is the only one this reader can ' +
-    'attach without guessing the positions. ' +
+    'attach without guessing the positions -- reading the comma list makes the ' +
+    'later pointers RESOLVE and RANGE-CHECK, and does not give them their own ' +
+    'name. (9) The ANCHOR is asked only where a name binds, which is 52 of the ' +
+    '225 citations here; the other 173 are checked for resolution, range and ' +
+    'vacancy alone. (10) The vacant-line rule fires only when EVERY file a ' +
+    'suffix path could name is vacant there, on `nearestName`s rule that a ' +
+    'suffix path is answered by all of them, so ' +
+    '`provisioning/payload.ts:217` citing `ports.ts:98` -- blank in the one it ' +
+    'means and not in the other ten -- is NOT raised. ' +
     `${CITATIONS_OWNED_ELSEWHERE.length} CITATION(S) ARE NAMED AND NOT ENFORCED, in ` +
     'CITATIONS_OWNED_ELSEWHERE, each exact on file, pointer and name so that it ' +
     'covers one citation and expires by itself. `wiring.test.ts:168` cites ' +
@@ -2899,25 +3271,59 @@ const ri15 = {
           );
           continue;
         }
+        // THE CITED LINE CARRIES SOMETHING TO CHECK. A pointer that lands on a
+        // blank line or on a bare `},` names nothing a reader can compare a
+        // claim against, and it is the shape a drifted pointer takes when the
+        // declaration it named moved DOWN: the reader follows it, finds the end
+        // of some other thing, and cannot tell whether the claim is wrong or
+        // the pointer is. Asserted over EVERY citation and not only the named
+        // ones, because it needs no name.
+        const vacant = reachable.every((f) => VACANT_LINE.test(linesOf(f)[c.start - 1] ?? ''));
+        if (vacant) {
+          raised.add(`${rel} ${c.cited} ${c.name ?? ''}`);
+          if (!registeredCitation(rel, c.cited, c.name)) {
+            findings.push(
+              `${rel}:${c.at}: cites \`${c.cited}\` and that line is BLANK OR A BARE CLOSING ` +
+                `BRACKET in ${reachable.join(', ')}. A pointer that lands on nothing reads as ` +
+                `verified and proves nothing; it is what a pointer becomes when the declaration ` +
+                `it named moved. Open the file and repoint it at the line that holds the claim`,
+            );
+          }
+          continue;
+        }
         if (c.name === null) continue;
         const hit = nearestName(reachable, linesOf, c.start, c.end, c.name.toLowerCase());
-        if (hit !== null && hit.away <= CITATION_WINDOW) continue;
-        raised.add(`${rel} ${c.cited} ${c.name}`);
-        if (
-          CITATIONS_OWNED_ELSEWHERE.some(
-            (k) => k.file === rel && k.cites === c.cited && k.name === c.name,
-          )
-        )
+        if (hit === null || hit.away > CITATION_WINDOW) {
+          raised.add(`${rel} ${c.cited} ${c.name}`);
+          if (registeredCitation(rel, c.cited, c.name)) continue;
+          const where =
+            hit === null
+              ? 'NOWHERE IN THAT FILE'
+              : `at ${hit.file}:${hit.line}, ${hit.away} lines away`;
+          findings.push(
+            `${rel}:${c.at}: cites \`${c.cited}\` for \`${c.name}\` and \`${c.name}\` is ${where}. ` +
+              `A citation that drifts is worse than none: it reads as verified and sends the ` +
+              `next reader to the wrong line, which is how one stale claim survived four ` +
+              `restatements. Open the file and repoint it, or say what the line does hold`,
+          );
           continue;
-        const where =
-          hit === null
-            ? 'NOWHERE IN THAT FILE'
-            : `at ${hit.file}:${hit.line}, ${hit.away} lines away`;
+        }
+        // THE ANCHOR, AND IT IS THE HALF A WINDOW CANNOT SUPPLY. The name is
+        // within reach; the question this asks is whether being within reach of
+        // it MEANS anything. See `anchoredIn`.
+        const bound = c.name;
+        if (reachable.some((f) => anchoredIn(linesOf(f), { ...c, name: bound }))) continue;
+        raised.add(`${rel} ${c.cited} ${bound}`);
+        if (registeredCitation(rel, c.cited, bound)) continue;
+        const enclosing = enclosingDeclaration(linesOf(reachable[0] ?? ''), c.start);
         findings.push(
-          `${rel}:${c.at}: cites \`${c.cited}\` for \`${c.name}\` and \`${c.name}\` is ${where}. ` +
-            `A citation that drifts is worse than none: it reads as verified and sends the ` +
-            `next reader to the wrong line, which is how one stale claim survived four ` +
-            `restatements. Open the file and repoint it, or say what the line does hold`,
+          `${rel}:${c.at}: cites \`${c.cited}\` for \`${c.name}\`, and \`${c.name}\` is within ` +
+            `${CITATION_WINDOW} line(s) of it WITHOUT THE CITED LINE BEING PART OF ANYTHING THIS ` +
+            `SENTENCE NAMES. The line neither declares \`${c.name}\` nor sits inside ` +
+            `${enclosing === null ? 'a declaration this reader can name' : `\`${enclosing}\``}, ` +
+            `which nothing beside the citation names. A common word near a pointer is a ` +
+            `coincidence, not a proof: name the declaration the line belongs to, or repoint the ` +
+            `citation at the declaration you meant`,
         );
       }
     }
@@ -2934,9 +3340,11 @@ const ri15 = {
     // naming a citation that is no longer a finding is a repair that landed
     // without the register following it.
     for (const k of CITATIONS_OWNED_ELSEWHERE) {
-      if (raised.has(`${k.file} ${k.cites} ${k.name}`)) continue;
+      if (raised.has(`${k.file} ${k.cites} ${k.name ?? ''}`)) continue;
       findings.push(
-        `${k.file}: the register claims \`${k.cites}\` for \`${k.name}\` is a known finding and ` +
+        `${k.file}: the register claims \`${k.cites}\`${
+          k.name === null ? '' : ` for \`${k.name}\``
+        } is a known finding and ` +
           'it is not one on this ref. Either the repair landed and this entry goes, or the file ' +
           'moved and the entry moves with it. A register entry that names nothing exempts ' +
           'nothing and hides the next one',
@@ -3122,9 +3530,27 @@ const WAVE_06 = 'docs/plans/WAVE-06-admin-console-transport.md';
  * The register still SHRINKS ONLY: the day the plan is repointed each entry
  * matches nothing and becomes a finding of its own.
  *
+ * TWO MORE ARRIVED WITH THE COMMA LIST (ADR-212), AND THEY WERE NEVER READ AT
+ * ALL BEFORE IT. `` `scope.ts:512,521` `` and `` `scope.ts:482,487` `` are the
+ * shape the tail expression did not match, so the WHOLE token fell through as
+ * prose and neither number in either was ever resolved. Read now, all four
+ * pointers are 200-plus lines out -- `ledgerTransactions` and `ledgerEntries`
+ * are at `scope.ts:742` and `:733`, `planVersions` and `planVersionSizes` at
+ * `:702` and `:707` -- and TWO of the four go green anyway, on the coincidence
+ * this entry's own subject is about: `derived` sits at `:518` inside
+ * `DerivedRule` and `firm` at `:489` inside a docblock, both within the window
+ * of the pointer beside them. The two the window does catch are registered
+ * here. THE ROWS ARE NOT REPAIRED AND THAT IS DELIBERATE: rows 164 and 168 are
+ * other sessions' dated reservations, this register already holds three
+ * entries out of the same file for the same reason, and amending another
+ * session's row to repoint a pointer inside a restatement is a decision about
+ * the ALLOCATION table rather than a citation repair.
+ *
  * @type {readonly {file: string, cites: string, name: string | null}[]}
  */
 const DOC_CITATIONS_OWNED_ELSEWHERE = [
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:512', name: 'derived' },
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:482', name: 'firm' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'ledger' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'LedgerTx' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'sweeps/ports.ts:219', name: 'systemDb' },
