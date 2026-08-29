@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +7,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import {
   CHECKS,
   COVERAGE_NEEDLES,
+  ENV_IGNORE_SUBJECTS,
   clearingConditionPairs,
   DB_ADMITTED,
   DEPLOYABLES,
@@ -440,6 +442,19 @@ function cleanTree(): string {
       '// lands, AND a primary source declares the stored `engine_gates` ENCODING,\n' +
       '// AND `eligible_next_7d` gains its `| null`.\n',
   );
+
+  // RI-21 ASKS `git` ABOUT THIS TREE, so the fixture is a real work tree rather
+  // than a directory. `git init` is measured at roughly 7ms and this helper runs
+  // 100-odd times in this file, which is under a second for the whole suite and
+  // is what a check whose subject is git's own answer costs.
+  //
+  // AND THE `git init` IS LOAD-BEARING FOR A SECOND REASON. Without a `.git`
+  // here, `git check-ignore` would walk UP out of the temp directory looking for
+  // a work tree, and on a machine where `TMPDIR` sits inside a repository every
+  // RI-21 case would silently be reading that repository's rules instead of the
+  // fixture's.
+  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+  write(root, '.gitignore', '.env\n.env.*\n!.env.example\n');
   return root;
 }
 
@@ -2494,5 +2509,152 @@ describe('RI-15 can anchor a citation on a column a migration ADDS', () => {
         '// (`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:4`).\n',
     );
     expect(findings('RI-15', root)).toEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// RI-21, whose subject is what git DOES rather than what `.gitignore` SAYS
+// -----------------------------------------------------------------------------
+// THE DEFECT THIS CHECK WAS WRITTEN FOR WAS ON THE REAL TREE AND HAD BEEN FOR
+// MONTHS: `INFRA:145` said ".env files are gitignored and CI verifies it rather
+// than trusting it (VG-1)", `.gitignore` carried no `.env` entry at all, and
+// `git check-ignore -v .env` exited 1. The seeds below are the four ways the
+// rule can be lost, each watched firing, plus the two cases that are the whole
+// argument for asking git instead of grepping the file: a subdirectory
+// `.gitignore` that re-includes a path while the root entry is still there word
+// for word, and a file that is already tracked, which no ignore rule reaches.
+describe('RI-21 asks git what the ignore rule says', () => {
+  /** The fixture's root `.gitignore`, replaced wholesale. */
+  const ignoring = (root: string, body: string): void => write(root, '.gitignore', body);
+
+  test('THE REAL DEFECT: the entry is deleted and every ignored spelling reports', () => {
+    // `.gitignore` WITH NO `.env` LINE IS THE STATE THE REPOSITORY WAS IN, and
+    // it is the state a single careless edit returns it to. Nine paths must be
+    // ignored, so nine findings and not one.
+    const root = cleanTree();
+    ignoring(root, 'node_modules/\ndist/\n');
+    const found = findings('RI-21', root);
+    expect(found).toHaveLength(9);
+    expect(found.join('\n')).toContain('`.env` IS NOT IGNORED');
+    expect(found.join('\n')).toContain('No pattern in this repository matches it at all');
+  });
+
+  test('the suffix family is its own pattern, and deleting it leaves `.env` passing', () => {
+    // THE REASON THE RULE IS THREE LINES AND NOT ONE. `.env` does not match
+    // `.env.local`, so a set that looks complete to a reader covers the file
+    // nobody creates and misses the five people actually write.
+    const root = cleanTree();
+    ignoring(root, '.env\n!.env.example\n');
+    const found = findings('RI-21', root);
+    expect(found.join('\n')).toContain('`.env.local` IS NOT IGNORED');
+    expect(found.join('\n')).not.toContain('`.env` IS NOT IGNORED and');
+    expect(found).toHaveLength(6);
+  });
+
+  test('deleting the negation swallows the committed template, in both directions', () => {
+    // THE EXCEPTION IS PART OF THE RULE AND NOT A CONVENIENCE. A `.env.example`
+    // that is silently ignored is a template nobody can commit, and the failure
+    // is invisible: `git add` simply does nothing.
+    const root = cleanTree();
+    ignoring(root, '.env\n.env.*\n');
+    const found = findings('RI-21', root);
+    expect(found).toHaveLength(2);
+    expect(found.join('\n')).toContain('`.env.example` IS ignored, by `.env.*`');
+    expect(found.join('\n')).toContain('`apps/api/.env.example` IS ignored');
+  });
+
+  test('a catch-all that happens to cover the paths is refused as the rule', () => {
+    // A `*` IGNORES EVERY SUBJECT AND WOULD SATISFY A CHECK THAT ONLY ASKED
+    // "is it ignored". It is not the rule ADR-224 states, it would read green
+    // after the `.env` entries were deleted, and it takes the corpus with it.
+    const root = cleanTree();
+    ignoring(root, '*\n');
+    const found = findings('RI-21', root).join('\n');
+    expect(found).toContain('is ignored by `*`, which does not name `env` at all');
+    expect(found).toContain('`docs/architecture/INFRA.md` IS ignored');
+  });
+
+  test('THE CASE THAT IS THE WHOLE ARGUMENT: the root entry survives and the rule does not', () => {
+    // A GREP FOR `.env` IN `.gitignore` PASSES HERE AND THE FILE IS NOT
+    // IGNORED. The root entries are untouched, word for word, and a
+    // subdirectory `.gitignore` re-includes the path underneath them. This is
+    // why the check runs a command: `.gitignore` is not the only file that
+    // decides, and even within one file a later negation wins.
+    const root = cleanTree();
+    write(root, 'apps/api/.gitignore', '!.env.local\n');
+    const found = findings('RI-21', root);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('`apps/api/.env.local` IS NOT IGNORED');
+    expect(found[0]).toContain('which re-includes it');
+    // The root entry the grep would have found is still there, unedited.
+    expect(existsSync(join(root, '.gitignore'))).toBe(true);
+  });
+
+  test('a rule that lives outside this repository is not this repository having it', () => {
+    // `.git/info/exclude` AND A GLOBAL EXCLUDES FILE ARE NOT IN ANY CLONE BUT
+    // ONE. A check that accepted them would hold for whoever ran it and for
+    // nobody who checks the repository out tomorrow.
+    const root = cleanTree();
+    ignoring(root, '!.env.example\n');
+    write(root, '.git/info/exclude', '.env\n.env.*\n');
+    const found = findings('RI-21', root).join('\n');
+    expect(found).toContain('at .git/info/exclude, which is not this repository');
+  });
+
+  test('LEG 2: an ignore rule is silent about a file that is already tracked', () => {
+    // GIT APPLIES `.gitignore` TO UNTRACKED PATHS ONLY. A `.env` committed
+    // before the rule landed is in every clone and in the history, and leg 1
+    // goes on reporting that the rule holds, which it does. THE FIXTURE FILE IS
+    // EMPTY: this suite stages a NAME and never a value.
+    const root = cleanTree();
+    writeFileSync(join(root, '.env.local'), '');
+    execFileSync('git', ['add', '-f', '.env.local'], { cwd: root, stdio: 'ignore' });
+    const found = findings('RI-21', root);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('`.env.local` is TRACKED');
+    expect(found[0]).toContain('applies to untracked paths only');
+  });
+
+  test('the committed example is the one tracked spelling leg 2 admits', () => {
+    // THE ACCEPTANCE HALF OF LEG 2, so the case above is not passing because
+    // every tracked path reports.
+    const root = cleanTree();
+    writeFileSync(join(root, '.env.example'), 'DATABASE_URL=\n');
+    execFileSync('git', ['add', '.env.example'], { cwd: root, stdio: 'ignore' });
+    expect(findings('RI-21', root)).toEqual([]);
+  });
+
+  test('a root git cannot answer for is an ERROR and never a pass', () => {
+    // "A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED", and this one's
+    // entire subject is git's own answer, so a directory with no work tree must
+    // throw rather than report an empty findings array.
+    const root = mkdtempSync(join(tmpdir(), 'merit-invariants-nogit-'));
+    seeded.push(root);
+    expect(() => findings('RI-21', root)).toThrow(/could not ask git about the ignore rule/);
+  });
+
+  test('THE ACCEPTANCE DIRECTION: the three-line rule satisfies every subject', () => {
+    // A PROBE THAT ONLY EVER ATTEMPTS FORBIDDEN THINGS PASSES AGAINST A GUARD
+    // THAT REJECTS EVERYTHING. The fixture carries the shipped pattern set and
+    // this asserts all fourteen subjects are read and cleared.
+    const root = cleanTree();
+    expect(findings('RI-21', root)).toEqual([]);
+    expect(ENV_IGNORE_SUBJECTS.filter((s) => s.ignored)).toHaveLength(9);
+    expect(ENV_IGNORE_SUBJECTS.filter((s) => !s.ignored)).toHaveLength(5);
+  });
+
+  test('a population with nothing to ignore throws rather than passing over an empty rule', () => {
+    // THE SAME GUARD RI-20 CARRIES, one check over: an empty input is silence
+    // rather than a green tick, and here the input is the subject list itself.
+    const root = cleanTree();
+    const shipped = [...ENV_IGNORE_SUBJECTS];
+    ENV_IGNORE_SUBJECTS.length = 0;
+    ENV_IGNORE_SUBJECTS.push(...shipped.filter((s) => !s.ignored));
+    try {
+      expect(() => findings('RI-21', root)).toThrow(/no path it expects to be IGNORED/);
+    } finally {
+      ENV_IGNORE_SUBJECTS.length = 0;
+      ENV_IGNORE_SUBJECTS.push(...shipped);
+    }
   });
 });

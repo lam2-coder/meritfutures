@@ -57,3 +57,41 @@ next-env.d.ts
 # findings when it was measured. Deleting the directory is the whole repair.
 # ADR-127 finding 3; the fix is a gate edit nobody has taken.
 .stryker-tmp/
+
+# ENVIRONMENT FILES, AND THE THREE LINES ARE A DERIVED SET RATHER THAN A COPIED
+# ONE. `INFRA` section 7 puts every credential in the platform vault and injects
+# it at run time, so no file of environment VALUES belongs in this tree at all.
+# `INFRA:145` claimed for months that this rule already existed and that `VG-1`
+# verified it; both halves were false, and `RI-21` is the half that matters
+# (ADR-224).
+#
+# WHY THREE PATTERNS AND NOT ONE.
+#   `.env` carries no slash, so git matches it by BASENAME at any depth: it
+#   covers `apps/api/.env` and `packages/db/.env` as well as the root file. A
+#   leading-slash `/.env` would have been root-only, which is the spelling that
+#   leaves a per-package file uncovered.
+#   `.env.*` is the suffix family and it is a SEPARATE pattern because `.env`
+#   does not match `.env.local` and `*.env` does not match `.env`. It covers
+#   `.env.local`, `.env.production`, `.env.test` and the two-suffix
+#   `.env.production.local` spelling, at any depth.
+#   `!.env.example` re-includes the one file that is a TEMPLATE rather than a
+#   value store. The exception set has exactly one member on purpose: every
+#   additional spelling admitted here (`.env.sample`, `.env.template`) is
+#   another name under which somebody can commit a real value and be told by
+#   this file that it was fine.
+#
+# `.envrc` IS DELIBERATELY NOT COVERED, and it is named here so the omission
+# reads as a decision rather than an oversight. It is direnv's file, direnv is
+# used by nothing in this repository (absent from `package.json`, `.github/**`,
+# `scripts/**` and every workspace manifest), and it is a shell SCRIPT rather
+# than a value file. ADR-224 registers it: the day direnv is adopted, that entry
+# is where the pattern set is re-argued.
+#
+# AND THE ENTRY IS NOT THE CONTROL. Anybody can delete these three lines and no
+# gate would notice, which is exactly the defect ADR-224 was written for. `RI-21`
+# in `packages/tooling/checks/repo-invariants.mjs` asks `git check-ignore` what
+# the rule SAYS about a list of representative paths, so deleting a line here
+# turns CI-01 red rather than turning this comment into fiction.
+.env
+.env.*
+!.env.example
