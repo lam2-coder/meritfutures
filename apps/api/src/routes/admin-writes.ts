@@ -128,9 +128,16 @@ export const ADMIN_ROLES = ['owner', 'ops', 'readonly'] as const satisfies reado
 /**
  * Who is performing the write.
  *
- * `actor` is what lands in `admin_actions.actor`, which is `text NOT NULL` and
- * carries no foreign key: the audit names an operator string rather than a row,
- * because the operator directory is the SSO provider's and not this database's.
+ * `actor` is what lands in `admin_actions.actor`, and it NAMES A ROW SINCE
+ * `0073_operator_directory.sql` (ADR-237). This comment read "which is `text
+ * NOT NULL` and carries no foreign key: the audit names an operator string
+ * rather than a row, because the operator directory is the SSO provider's and
+ * not this database's", and that reasoning conflated two questions. Proving WHO
+ * an operator is stays the C-08 provider's and is a purchase; recording WHICH
+ * operators exist and WHAT ROLE each holds is `operators`, and
+ * `admin_actions_actor_is_an_operator` makes this string a foreign key into it.
+ * An audit row naming an actor in no directory is now unwritable rather than
+ * merely undesirable.
  */
 export interface AdminPrincipal {
   readonly actor: string;

@@ -122,11 +122,15 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // measured what it would unblock, and REFUSED IT ON THE MEASUREMENT: the door
   // moves NONE of the five.
   //
-  //   `setAdminSessionSource` is the SSO port itself and no door onto this
+  //   `setAdminSessionSource` is the SSO port itself, and HALF OF WHAT IT WAITED
+  //   ON IS NOW IN THIS DATABASE (ADR-237). This block read "no door onto this
   //   database can serve it, because THE OPERATOR DIRECTORY IS NOT IN THIS
-  //   DATABASE. `admin_actions.actor` is `text NOT NULL` with no foreign key
-  //   (`0017_events_and_audit.sql:77`) and `routes/admin-writes.ts:133` says why:
-  //   "the operator directory is the SSO provider's and not this database's".
+  //   DATABASE", which was true of every migration up to `0072` and is false of
+  //   `0073`: `operators` and `operator_sessions` exist, the role set is a CHECK
+  //   over API_CONTRACT section 8's closed three, and `admin_actions.actor` has
+  //   a foreign key into the directory rather than being free text. WHAT IS
+  //   LEFT IS AUTHENTICATION AND NOT THE DIRECTORY, which is one named thing
+  //   and is named in the entry below.
   //
   //   `useAdminWriteBackend`, `useAdminPayoutBackend` and `useAdminWalletBackend`
   //   each require `principal(request)`, whose only resolver in this tree is that
@@ -171,19 +175,38 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`apps/worker/**` or `packages/**`. `test/admin-read-constructibility.test.ts` holds every ' +
     'count in this entry and derives each from source.',
   setAdminSessionSource:
-    'THE ADMIN IDENTITY PROVIDER, AND NO DOOR ONTO THIS DATABASE COULD EVER SERVE IT. The port ' +
-    'says so at `routes/admin-reads.ts:186-197`: C-08 hardware-key SSO and the D3 IP allowlist ' +
-    'are edge controls on `ADMIN_ORIGIN`, and "the mapping from a session to an actor and a role ' +
-    'is the admin identity provider\'s". THE OPERATOR DIRECTORY IS NOT IN THIS DATABASE: ' +
-    '`admin_actions.actor` is `text NOT NULL` with no foreign key ' +
-    '(`0017_events_and_audit.sql:77`) and no table in the registry holds an operator, a role or ' +
-    'an operator session. ADR-171 rules this port never waited on the operator door, and that ' +
-    'FOUR OTHER PORTS WAIT ON THIS ONE through `principal(request)` and A FIFTH WAITS ON IT ' +
-    'THROUGH A DOOR, WHICH IS SIX ENTRIES IN THIS LIST BEHIND ONE PURCHASE. The four are ' +
-    '`useAdminWriteBackend`, `useAdminPayoutBackend`, `useAdminWalletBackend` and ' +
-    '`useCertificateRevokeBackend`; ADR-171 said THREE, which was right before ' +
-    '`useCertificateRevokeBackend` existed. The fifth is `setAdminReadSource`, through ' +
-    'ADR-171 section 9 (ADR-236). `test/admin-read-constructibility.test.ts` derives ' +
+    'THE ADMIN IDENTITY PROVIDER, AND IT IS NOW THE ONLY THING LEFT (ADR-237). This entry read ' +
+    '"NO DOOR ONTO THIS DATABASE COULD EVER SERVE IT" over two reasons, and ONE OF THE TWO IS ' +
+    'DISCHARGED. It said "THE OPERATOR DIRECTORY IS NOT IN THIS DATABASE: `admin_actions.actor` ' +
+    'is `text NOT NULL` with no foreign key (`0017_events_and_audit.sql:77`) and no table in ' +
+    'the registry holds an operator, a role or an operator session". ' +
+    '`0073_operator_directory.sql` creates `operators` and `operator_sessions`, closes ' +
+    "`operators.role` over API_CONTRACT section 8's three with a CHECK, and adds " +
+    '`admin_actions_actor_is_an_operator`, so that sentence is false in every clause and the ' +
+    'registry holds both relations (`packages/db/src/scope.ts`). ' +
+    'WHAT STILL REFUSES IS AUTHENTICATION, WHICH IS ONE FUNCTION AND THREE VARIABLES. ' +
+    '`src/operator-identity.ts` declares `OperatorAssertionVerifier`, whose one method turns a ' +
+    'presented assertion into an `AssertionOutcome`; NO IMPLEMENTATION OF IT EXISTS IN THIS ' +
+    'REPOSITORY, because C-08 requires hardware-key SSO and that is a purchase. A deployment ' +
+    'closes the seam by supplying `MERIT_ADMIN_IDP_ISSUER`, `MERIT_ADMIN_IDP_AUDIENCE` and ' +
+    '`MERIT_ADMIN_IDP_JWKS_URL` AND by the slice that writes the verifier: ' +
+    '`refusingAssertionVerifier` answers `unconfigured` when any variable is absent and ' +
+    '`unavailable` when all three are set, so the configuration is necessary and is not ' +
+    'sufficient, and NEITHER ARM CAN BE MADE TO PASS BY AN ENVIRONMENT FILE. Both refusals are ' +
+    "503 rather than 401, on this port's own stated ground: an unfinished deployment is not a " +
+    'caller who is logged out. ' +
+    'THE DECISIONS BEHIND THE PORT ARE BUILT AND TESTED WITHOUT IT. `resolveOperatorSession` is ' +
+    "`lookup`'s verdict without its query and `operatorFromAssertion` is the directory join, " +
+    'both total, both pure, both exercised in `test/operator-identity.test.ts`. WIRING THE PORT ' +
+    'OUT OF THEM IS REFUSED AND ADR-237 SECTION 8 SAYS WHY: nothing can write an ' +
+    '`operator_sessions` row, so every operator would be told 401 on a door that is not shut ' +
+    'against them, and a live-looking route in front of an arm that cannot answer is worse than ' +
+    "an honest 503 (`usePayoutBackend`'s rule). " +
+    'FIVE OTHER PORTS STILL REDUCE TO THIS ONE, four through `principal(request)` ' +
+    '(`useAdminWriteBackend`, `useAdminPayoutBackend`, `useAdminWalletBackend` and ' +
+    '`useCertificateRevokeBackend`) and a fifth through a door (`setAdminReadSource`, ADR-171 ' +
+    'section 9, ADR-236). ADR-171 said THREE, which was right before ' +
+    '`useCertificateRevokeBackend` existed. `test/admin-read-constructibility.test.ts` derives ' +
     'both counts from this file.',
   useAdminPayoutBackend:
     '`principal(request)` (`routes/admin-payouts.ts:390`), which resolves only through ' +
@@ -204,7 +227,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'resolve either finding and must not paper over them. MONEY PATH.',
   useAdminWriteBackend:
     'THREE SUPPLIERS AND NONE OF THEM IS A DOOR. `principal(request)` ' +
-    '(`routes/admin-writes.ts:269`), blocked on `setAdminSessionSource` above. `tradingDay()`, ' +
+    '(`routes/admin-writes.ts:276`), blocked on `setAdminSessionSource` above. `tradingDay()`, ' +
     'which is the smallest and the least tractable: nothing in this workspace maps an instant to ' +
     'an exchange trading day, and ADR-145 names the gap rather than papering over it with a UTC ' +
     'date. And a projection of `ValidationResult` onto `PlanValidation`, whose `errors` is ' +
@@ -213,7 +236,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'DECLARE `@merit/rules-engine` STOOD HERE AND WAS FALSE: it has been declared since session ' +
     '252 landed `routes/payouts.ts` (`apps/api/package.json`), and `validatePlan` is exported ' +
     '(`packages/rules-engine/src/index.ts:163`). ADR-171 finding 10. The same stale sentence ' +
-    "survives in that port's own docstring at `routes/admin-writes.ts:277-281`, which is a " +
+    "survives in that port's own docstring at `routes/admin-writes.ts:284-288`, which is a " +
     "handler file and outside that entry's fence.",
 
   // ---------------------------------------------------------------------------
@@ -317,7 +340,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`routes/payouts.ts:438-439` states "no member of this interface that a scoped door cannot ' +
     'serve", which ADR-233 makes TRUE of the catalogue half and leaves false of `state`. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
-    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1126`, and ' +
+    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1150`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
     'beside a `transact` whose `subject` rejects would put a live-looking route in front of the ' +
     'arm that approves payouts. MONEY PATH.',
@@ -378,7 +401,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'LEAVING IT OPEN: `clickByToken` (`routes/checkout.ts:753`) returns a `ClickRef` whose ' +
     '`affiliate` carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
     '(`routes/checkout.ts:457`); `affiliates` is scope class `owned` on `identity_id` ' +
-    '(`packages/db/src/scope.ts:1094`) and `affiliate_clicks` is `derived` through it ' +
+    '(`packages/db/src/scope.ts:1118`) and `affiliate_clicks` is `derived` through it ' +
     '(`packages/db/src/scope.ts:1108`), so the row belongs to somebody else and the disclosure ' +
     'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of ' +
     'either returns the empty set and `resolveAttribution` folds every referral as organic, ' +
@@ -442,7 +465,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
     'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
     'all, and `affiliateStatements` (`packages/db/src/schema.ts:2725`) declares it while ' +
-    '`affiliateStatements` (`packages/db/src/scope.ts:1116`) registers it `derived` through ' +
+    '`affiliateStatements` (`packages/db/src/scope.ts:1140`) registers it `derived` through ' +
     '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
     '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
     'and now `statements` -- and all four are an adapter somebody can write. REGISTERED RATHER ' +
@@ -456,7 +479,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
     'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
     '(`packages/db/src/schema.ts:2418`) declares `economic_calendar_current` and ' +
-    '`economicCalendarCurrent` (`packages/db/src/scope.ts:1033`) classes it `firm`, so it is a ' +
+    '`economicCalendarCurrent` (`packages/db/src/scope.ts:1057`) classes it `firm`, so it is a ' +
     '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
     '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +
     'not in this deployable. The port says so at `routes/economic-calendar.ts:166`, "the answer ' +
@@ -498,16 +521,17 @@ const BLOCKED: Readonly<Record<string, string>> = {
   useCertificateRevokeBackend:
     'TWO OBSTRUCTIONS, AND THE SECOND IS A CIRCULARITY RATHER THAN A MISSING DOOR. ' +
     '`principal(request)` (`routes/admin-certificates.ts:353`) resolves only through ' +
-    '`AdminSessionSource`, so it is blocked on `setAdminSessionSource` above, which ADR-171 ' +
-    'rules no door onto this database could ever serve. SECOND AND INDEPENDENT: ' +
+    '`AdminSessionSource`, so it is blocked on `setAdminSessionSource` above, WHICH IS NOW ONE ' +
+    'NAMED THING RATHER THAN TWO (ADR-237): the operator directory is in this database and the ' +
+    'assertion verifier is not. SECOND AND INDEPENDENT: ' +
     '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
-    'class `owned` on `identity_id` (`packages/db/src/scope.ts:860`). `db.firm` refuses that key ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:884`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1473-1475`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1507-1509`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
-    '(`packages/db/src/scope.ts:1009`), so the audit half alone has a door and the subject half ' +
+    '(`packages/db/src/scope.ts:1033`), so the audit half alone has a door and the subject half ' +
     "does not, which is the one-live-arm shape this file refuses on `usePayoutBackend`'s stated " +
     'rule. ADR-231 DOES NOT REACH THIS ONE AND THE REASON IS THE ADDRESS: `db.publicLookup` is ' +
     'READ ONLY and its vocabulary is `certificates` by `code`, while this route locks and ' +
