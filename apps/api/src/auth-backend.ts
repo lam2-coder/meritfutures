@@ -64,12 +64,22 @@
 // verification selects, what a wrong code does to `attempts`, that consumption
 // precedes establishment, and how long the session it mints lives.
 //
+// THAT PARAGRAPH USED TO END "A TRADER CANNOT SIGN UP TODAY, BECAUSE NOBODY CAN
+// SEND THEM A CODE", AND ADR-229 IS THE ENTRY THAT MAKES IT FALSE. `requestOtp`
+// below writes the `otp_challenges` row `verifyOtp` reads and hands the code to
+// `otp-delivery.ts`, so the email half of sign-in is end to end and what is owed
+// is a vendor token in the platform vault rather than a construction.
+//
 // WHAT STILL DOES NOT WORK, SAID HERE RATHER THAN LEFT TO BE INFERRED FROM A
-// GREEN SUITE. `requestOtp` is blocked on DELIVERY, so nothing in this
-// deployable can write the `otp_challenges` row `verifyOtp` reads: a trader
-// cannot sign up today, because nobody can send them a code. What has changed is
-// that a code which DOES verify now creates the identity, in the shape ADR-196
-// ruled, rather than answering 503.
+// GREEN SUITE. THE `sms` CHANNEL, ON BOTH ENDS AND FOR TWO DIFFERENT REASONS
+// NEITHER OF WHICH IS DELIVERY: `verifyOtp` refuses it because a phone has no
+// address in the pre-identity reader's vocabulary ({@link NO_PHONE_RESOLUTION}),
+// and `requestOtp` refuses it because sending a code nothing can verify is money
+// spent for nothing and because the price that send charges against
+// `otp_send_budget.spend_cents` has a name and no value ({@link
+// NO_SMS_DELIVERY}). And no deployment in this repository holds the mail
+// vendor's token, so an unconfigured deployment answers 503 on `POST /auth/otp`
+// rather than pretending: that is the control working, not the gap surviving.
 //
 // -----------------------------------------------------------------------------
 // THE SESSION TOKEN CARRIES ITS OWN IDENTITY, AND THAT IS A RULING
@@ -117,12 +127,14 @@
 // sentence was about.)
 // =============================================================================
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 
 import { IdentityAlreadyEstablished, atLeast, atMost, isNull, normalizedEmail } from '@merit/db';
 
 import type { ApiDb } from './db.ts';
 import { isIdentityId } from './db.ts';
+import { postmarkOtpSender } from './otp-delivery.ts';
+import type { OtpDeliveryOutcome, OtpSender } from './otp-delivery.ts';
 import { AUTH_FACTORS, AuthBackendUnwired, ELEVATION_FACTORS } from './routes/auth.ts';
 import type {
   AuthBackend,
@@ -130,6 +142,8 @@ import type {
   AuthSession,
   ElevationFactor,
   Established,
+  OtpOutcome,
+  OtpRequest,
   RequestContext,
   SessionRow,
   VerifyRequest,
@@ -561,6 +575,89 @@ const OTP_CHALLENGES = 'otpChallenges';
  */
 export const OTP_MAX_ATTEMPTS = 5;
 
+// -----------------------------------------------------------------------------
+// ISSUANCE: THREE NUMBERS, AND NOT ONE OF THEM IS THIS FILE'S CHOICE
+// -----------------------------------------------------------------------------
+// `OTP_MAX_ATTEMPTS` above states the rule these follow: a number the corpus
+// already states is TRANSCRIBED here with its source beside it, and a number the
+// corpus does not state is config. All three below are the first kind, and each
+// names the two places it comes from so a later reader checks rather than
+// trusts. ADR-229 section 4.
+//
+// THE ONE THAT IS DELIBERATELY ABSENT IS THE PER-IP LIMIT. API_CONTRACT section
+// 11 rows the email channel as "5/hour/IP, 5/hour/email" and only the second
+// half is enforced here, because `server.ts:170` builds the instance as
+// `Fastify({ logger: options.logger ?? false })` and CONFIGURES no `trustProxy`
+// anywhere, so `request.ip` is the IMMEDIATE PEER. Behind Cloudflare that
+// is one edge address for every trader at once, and a five-per-hour limit
+// counted on it is a five-per-hour limit for the whole product. INFRA section 2
+// puts rate limiting at the edge, which is the one place the address is the
+// trader's; ADR-226 refused to send `remoteip` for this same reason one file
+// over, and this is that landmine arriving as a counter instead of as a field.
+
+/**
+ * The digits in a code. SIX.
+ *
+ * NOT A CHOICE MADE HERE. `otpCodeDigest`'s own docblock above prices the
+ * construction against "a six-digit code is 10^6 candidates" and ADR-197 section
+ * 3 rules the keyed MAC on exactly that arithmetic, so a code of another length
+ * would make the reasoning that admitted HMAC-SHA-256 over a slow KDF false
+ * without a line of it changing.
+ */
+export const OTP_CODE_DIGITS = 6;
+
+/**
+ * How long a challenge lives, in minutes. TEN.
+ *
+ * `0002_identity.sql:313` declares `expires_at timestamptz NOT NULL` with the
+ * comment "short TTL, 10 minutes", and `otpCodeDigest`'s docblock leans on that
+ * TTL for the whole rotation story: "the only rows a key must still open are the
+ * ones that can still verify". So this number is already load bearing in a
+ * construction that shipped, and it is transcribed rather than picked.
+ */
+export const OTP_TTL_MINUTES = 10;
+
+/** {@link OTP_TTL_MINUTES} in seconds. Integer arithmetic, no floats. */
+export const OTP_TTL_SECONDS = OTP_TTL_MINUTES * 60;
+
+/** {@link OTP_TTL_SECONDS} in milliseconds. */
+export const OTP_TTL_MS = OTP_TTL_SECONDS * 1000;
+
+/**
+ * How many codes one email address may be sent in one window. FIVE.
+ *
+ * API_CONTRACT section 11's row for `POST /auth/otp` (`channel: "email"`) reads
+ * "5/hour/IP, 5/hour/email", and this is the second half of it.
+ *
+ * WHY IT IS A CONSTANT HERE WHERE THE SMS BRANCH'S LIMIT IS A ROW, because that
+ * asymmetry looks like an oversight and is the contract's own. The same section
+ * puts the SMS limits in `otp_send_budget` explicitly "so the values are config
+ * the way every other plan parameter is", and states the email limits as prose
+ * in the very same table. A prose number transcribed with its citation is
+ * `OTP_MAX_ATTEMPTS`; a number this file invented would be neither.
+ */
+export const OTP_EMAIL_SENDS_PER_WINDOW = 5;
+
+/** The window that limit is counted over. One hour, from the same row. */
+export const OTP_EMAIL_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * A code, uniform over every value of its length.
+ *
+ * `randomInt` AND NOT `randomBytes` WITH A MODULO. A modulo over a byte range
+ * that is not a multiple of 10^6 makes the low codes fractionally likelier than
+ * the high ones, which is a bias an attacker guessing codes is exactly the
+ * person who benefits from. `randomInt` rejection-samples in the runtime and is
+ * documented uniform; the bias is removed by not writing the arithmetic.
+ *
+ * THE PADDING IS PART OF THE VALUE AND NOT A DISPLAY DECISION. The digest is
+ * taken over the string this returns, so a code minted as `12345` and typed as
+ * `012345` must be one string in both places, and it is the padded one.
+ */
+export function mintOtpCode(): string {
+  return String(randomInt(0, 10 ** OTP_CODE_DIGITS)).padStart(OTP_CODE_DIGITS, '0');
+}
+
 /**
  * One `otp_challenges` row, as this surface reads it.
  *
@@ -639,6 +736,34 @@ function newestLiveChallenge(rows: readonly unknown[], now: Date): OtpChallenge 
       newest = candidate;
   }
   return newest;
+}
+
+/**
+ * `Retry-After`, in whole seconds, DERIVED FROM THE ROWS AND NOT FROM A CONSTANT.
+ *
+ * A sliding window frees a slot when its OLDEST member ages out, so that is what
+ * this reads: the caller is told to come back when the window will actually
+ * admit them, rather than being handed a number this file picked and which is
+ * wrong for every caller but the one who filled the window in an instant.
+ * `routes/auth.ts` says the same thing about the SMS branch's value -- "the
+ * number is the budget row's, never this file's".
+ *
+ * WHOLE SECONDS, ROUNDED UP, AND FLOORED AT ONE. `Retry-After` carries no
+ * fraction, rounding DOWN would name an instant the window has not yet reached,
+ * and a zero invites an immediate retry that refuses again.
+ */
+function retryAfterFor(rows: readonly unknown[], now: Date): number {
+  let oldest: number | null = null;
+  for (const raw of rows) {
+    const created = instantOf(asRow(raw, 'otp_challenges'), 'createdAt', 'otp_challenges');
+    if (oldest === null || created.getTime() < oldest) oldest = created.getTime();
+  }
+  // NO ROWS CANNOT HAPPEN HERE -- the caller reaches this only having counted at
+  // least OTP_EMAIL_SENDS_PER_WINDOW of them -- and the whole window is the
+  // answer that is safe if it ever does, rather than a zero.
+  if (oldest === null) return OTP_EMAIL_WINDOW_MS / 1000;
+  const seconds = Math.ceil((oldest + OTP_EMAIL_WINDOW_MS - now.getTime()) / 1000);
+  return seconds > 0 ? seconds : 1;
 }
 
 /**
@@ -817,11 +942,72 @@ const OTP_KEY_UNRESOLVED =
   'row, read from `MERIT_OTP_MAC_KEY` per INFRA section 7, and there is deliberately no ' +
   'fallback: a baked-in default would be a published key. The underlying failure is';
 
-const NO_DELIVERY =
-  'nothing in this deployable delivers a code. A handler that writes an `otp_challenges` row and ' +
-  'answers `sent: true` having sent nothing is a worse answer than 503, and the SMS branch also ' +
-  'needs a per-send price to charge against `otp_send_budget.spend_cents`, which is config that ' +
-  'has no source in this tree';
+// -----------------------------------------------------------------------------
+// `NO_DELIVERY` STOOD HERE FOR TWENTY-SIX WAVES AND ADR-229 HAS RETIRED IT
+// -----------------------------------------------------------------------------
+// IT READ, AND IT IS QUOTED RATHER THAN DELETED because a sentence that was true
+// for that long is the one a later reader will want to check against the tree
+// that refutes it:
+//
+//   "nothing in this deployable delivers a code. A handler that writes an
+//   `otp_challenges` row and answers `sent: true` having sent nothing is a worse
+//   answer than 503, and the SMS branch also needs a per-send price to charge
+//   against `otp_send_budget.spend_cents`, which is config that has no source in
+//   this tree"
+//
+// THE FIRST CLAUSE IS FALSE AS OF `otp-delivery.ts`. The second is not softened
+// and not deleted: it survives INTACT on the branch it was always about, and
+// {@link NO_SMS_DELIVERY} carries it plus the second thing that blocks that
+// branch and is not delivery at all. This is ADR-197 section 7's rule -- a
+// refusal replaced by a softer version of itself is the failure mode -- applied
+// in the one direction it permits, which is naming what is left rather than
+// paraphrasing what is gone.
+const NO_SMS_DELIVERY =
+  'this deployable sends no SMS, and the two things blocking that branch are stated separately ' +
+  'because they lift on different days and neither is the delivery construction. FIRST, a code ' +
+  'sent to a phone cannot be verified anywhere in this tree: `verifyOtp` refuses the `sms` ' +
+  'channel for want of a phone resolution, so an SMS send is money spent on a code no handler ' +
+  'here can answer. SECOND, the per-send price that send charges against ' +
+  '`otp_send_budget.spend_cents` has a NAME (`MERIT_OTP_SMS_PRICE_CENTS`) and no value in any ' +
+  'environment, and a send that cannot be priced is a cost breaker counting every message as ' +
+  'free. ADR-229 took a mail vendor and deliberately took no SMS vendor on the first of those';
+
+/**
+ * The three delivery outcomes that are not `sent`.
+ *
+ * DERIVED FROM THE UNION RATHER THAN RESTATED, and read by a `switch` with no
+ * `default`, which is `sendTurnstileRefusal`'s idiom in `routes/auth.ts`.
+ * `strict` plus `noImplicitReturns` turn a fifth outcome member in
+ * `otp-delivery.ts` into a `tsc` error here rather than into a case this file
+ * silently treats as one of the others.
+ *
+ * ALL THREE BECOME ONE 503 AT THE CALLER AND THE SPLIT IS FOR THE LOG. That is
+ * where this differs from Turnstile's, and `otp-delivery.ts`'s header argues it:
+ * a refused DESTINATION told apart from a broken deployment would disclose
+ * through the status what API_CONTRACT section 3 withholds from the body.
+ */
+type OtpDeliveryRefusal = Exclude<OtpDeliveryOutcome, { readonly outcome: 'sent' }>;
+
+/** What a refusal to deliver becomes. One 503, with the reason in the log line. */
+function deliveryRefused(refusal: OtpDeliveryRefusal): AuthBackendUnwired {
+  switch (refusal.outcome) {
+    case 'unconfigured':
+      return new AuthBackendUnwired(
+        'requestOtp',
+        `this deployment is not configured to deliver a code: ${refusal.detail}`,
+      );
+    case 'rejected':
+      return new AuthBackendUnwired(
+        'requestOtp',
+        `the delivery vendor would not take the message: ${refusal.detail}`,
+      );
+    case 'unavailable':
+      return new AuthBackendUnwired(
+        'requestOtp',
+        `the delivery vendor could not be reached: ${refusal.detail}`,
+      );
+  }
+}
 
 /** One refusal, so every blocked method reads identically and cites one reason each. */
 function blocked(method: string, reason: string): () => Promise<never> {
@@ -848,11 +1034,25 @@ const SESSIONS = 'sessions';
  *               reason `clock` is one: `resolveOtpMacKeys` refuses a key that is
  *               absent, short or not standard base64, and a suite that could not
  *               vary the environment could assert none of it.
+ * @param sender who delivers the code. ADR-229.
+ *
+ * THE SENDER'S DEFAULT IS THE REAL VENDOR AND NOT AN UNWIRED SENTINEL, which is
+ * `routes/auth.ts`'s ruling on the Turnstile verifier applied to the other
+ * outbound call on this route: a port whose default refuses everything needs a
+ * wiring slice to install the working one, and a control -- or here a
+ * capability -- that is live only when somebody remembers to wire it is a defect
+ * one layer out. `start.ts` therefore needs no change and cannot forget.
+ *
+ * IT STILL FAILS CLOSED WITH NO TOKEN: `postmarkOtpSender` answers `unconfigured`
+ * with none, which refuses. It also reads `env`, so a suite that varies the
+ * environment varies the sender's configuration with it and the two cannot
+ * disagree about which deployment they are in.
  */
 export function databaseAuthBackend(
   db: ApiDb,
   clock: () => Date = () => new Date(),
   env: Environment = process.env,
+  sender: OtpSender = postmarkOtpSender(env),
 ): AuthBackend {
   /**
    * The admitted keys, or a 503 naming the config that is missing.
@@ -1134,12 +1334,132 @@ export function databaseAuthBackend(
       };
     },
 
-    // THE KEY IS WIRED AND DELIVERY IS NOT, so this method's blocker is one
-    // sentence where it used to be two. ADR-197 left the key unwired because
-    // "every method that would use a key is blocked on delivery or on a
-    // handler"; the handler landed, the key came with it, and what is left here
-    // is that nothing in this deployable sends anything.
-    requestOtp: blocked('requestOtp', NO_DELIVERY),
+    /**
+     * `POST /auth/otp`. ADR-229, and the sentence that blocked it is gone.
+     *
+     * THE ORDER IS THE RULING, and every step refuses before the next one costs
+     * anything:
+     *
+     *   1. THE CHANNEL. `sms` refuses here and the reason is not delivery. See
+     *      {@link NO_SMS_DELIVERY}.
+     *   2. THE KEY. `otpKeys` refuses a deployment that cannot take a digest,
+     *      BEFORE a code is minted and before a row is written. A challenge
+     *      whose `code_hash` was taken under no admitted key is a challenge
+     *      nothing can ever verify.
+     *   3. THE VELOCITY, counted and then the row written, in ONE firm
+     *      transaction.
+     *   4. THE SEND, which is the only step that leaves the process.
+     *
+     * THE ROW IS WRITTEN BEFORE THE SEND AND THAT ORDERING IS DELIBERATE. The
+     * two orders fail differently and only one of them fails safe. Writing
+     * second means a delivered code with no row to answer it, which is a person
+     * holding a valid-looking code that can never verify. Writing first means at
+     * worst a row nobody was sent, which expires in {@link OTP_TTL_MINUTES}
+     * minutes and costs one of that address's own velocity slots. ADR-126 priced
+     * this same trade one method over and took the same side: "paid in an
+     * inconvenience rather than in a row".
+     *
+     * A FAILED SEND IS A 503 AND NEVER A 202. `OtpOutcome` has no failure arm
+     * because API_CONTRACT section 3 gives the endpoint none: it answers 202
+     * always, "whether or not the account exists". So a refusal to deliver
+     * raises, and {@link deliveryRefused} is where the three refusing outcomes
+     * become one status with three different log lines. Answering `sent: true`
+     * over a message that never left is the exact sentence `NO_DELIVERY` existed
+     * to keep this file from writing.
+     *
+     * THE COUNT-THEN-INSERT IS NOT ATOMIC ACROSS CONCURRENT REQUESTS AND THE
+     * OVERSHOOT IS STATED RATHER THAN IMPLIED. Two requests for one address that
+     * read the same count both insert, so the limit is a budget that converges
+     * rather than a barrier that cannot be crossed; the overshoot is bounded by
+     * the number of requests in flight at once for a single address, and the
+     * window is what makes it converge. `0029`'s own header puts sub-minute
+     * velocity "at the edge, where it can refuse a send before one is paid for"
+     * and this table's job is the durable, reviewable state, so the burst arm of
+     * this control is deliberately somewhere else.
+     */
+    async requestOtp(input: OtpRequest, requestIp: string | null): Promise<OtpOutcome> {
+      if (input.channel === 'sms') throw new AuthBackendUnwired('requestOtp', NO_SMS_DELIVERY);
+      const email = input.email;
+      // THE VALIDATOR ALREADY REFUSED THIS AND THIS IS NOT A SECOND VALIDATOR.
+      // `OtpRequest` types `email` as optional because one shape carries two
+      // channels, so the narrowing is a type obligation. It raises rather than
+      // answering, on `AuthRowError`'s own rule: reaching this line means the
+      // handler was called past its own validator, which is a bug in this
+      // deployable and not a fact about the caller's request.
+      if (email === undefined || email.trim() === '')
+        throw new AuthRowError(
+          '`requestOtp` was called on the `email` channel with no address. ' +
+            '`validateOtpRequest` refuses that shape, so this is a call that did not come ' +
+            'through it',
+        );
+      const keys = otpKeys('requestOtp');
+      // THE CURRENT KEY ISSUES AND THE RETIRING ONE ONLY VERIFIES.
+      // `resolveOtpMacKeys` returns them newest first and its own docblock
+      // admits the retiring key "for VERIFY only, for one TTL"; issuing under it
+      // would extend a retired key's life by a full TTL past the rotation that
+      // retired it.
+      const issuing = keys[0];
+      if (issuing === undefined)
+        throw new AuthBackendUnwired(
+          'requestOtp',
+          `${OTP_KEY_UNRESOLVED}: the resolver admitted no key at all`,
+        );
+
+      const now = clock();
+      const code = mintOtpCode();
+      const digest = otpCodeDigest(issuing, { channel: 'email', destination: email, code });
+      const windowStart = new Date(now.getTime() - OTP_EMAIL_WINDOW_MS);
+
+      const decided = await db.firm(async (tx) => {
+        // THE VELOCITY IS COUNTED OFF `otp_challenges` AND NOT OFF A COUNTER,
+        // and the schema says so rather than this file deciding it: `0029:539`
+        // calls `otp_challenges_destination_created_idx` "the per-number
+        // velocity read, which is what `otp_send_budget`'s 'phone' scope is
+        // counted from", and it is declared THE SMS SIBLING of
+        // `otp_challenges_email_created_idx (email_normalized, created_at DESC)`
+        // from `0002`. So the index for this exact read exists and was built for
+        // it. EVERY ROW IN THE WINDOW COUNTS, consumed and expired ones
+        // included: this is a budget on SENDING, and a code that was used is
+        // still a code that was sent.
+        const recent = await tx.rowsWhere(OTP_CHALLENGES, {
+          channel: 'email',
+          emailNormalized: normalizedEmail(email),
+          createdAt: atLeast(windowStart),
+        });
+        if (recent.length >= OTP_EMAIL_SENDS_PER_WINDOW)
+          return { limited: true, retryAfterSeconds: retryAfterFor(recent, now) } as const;
+        await tx.insert(OTP_CHALLENGES, {
+          channel: 'email',
+          emailNormalized: normalizedEmail(email),
+          codeHash: Buffer.from(digest),
+          expiresAt: new Date(now.getTime() + OTP_TTL_MS),
+          // WRITTEN RATHER THAN LEFT TO `DEFAULT now()`, so the window this read
+          // counts over and the row it writes are measured on ONE clock. A row
+          // whose `created_at` is the database's while its `expires_at` is this
+          // process's is a row whose own two timestamps can disagree about which
+          // came first, and `newestLiveChallenge` compares the second against
+          // this same clock.
+          createdAt: now,
+          // SD-M4-03's caveat applies and is not repeated as a control: with no
+          // `trustProxy` this is the immediate peer. It is RECORDED because the
+          // column exists to record it, and nothing in this file counts on it.
+          requestIp,
+        });
+        return { limited: false } as const;
+      });
+
+      if (decided.limited)
+        return { status: 'rate_limited', retryAfterSeconds: decided.retryAfterSeconds };
+
+      const delivery = await sender.send({
+        channel: 'email',
+        destination: email,
+        code,
+        expiresInSeconds: OTP_TTL_SECONDS,
+      });
+      if (delivery.outcome !== 'sent') throw deliveryRefused(delivery);
+      return { status: 'sent', expiresInSeconds: OTP_TTL_SECONDS };
+    },
 
     // BOTH ARMS ARE BLOCKED AND FOR DIFFERENT REASONS, which is worth stating
     // because the union is C-27 and a reader will ask whether the refusal is the
@@ -1147,7 +1467,7 @@ export function databaseAuthBackend(
     // COMPILE time and always did, and these two are the two members it admits.
     elevate: blocked(
       'elevate',
-      `the passkey arm: ${NO_WEBAUTHN}. The dual_channel arm: ${NO_DELIVERY}`,
+      `the passkey arm: ${NO_WEBAUTHN}. The dual_channel arm: ${NO_SMS_DELIVERY}`,
     ),
 
     passkeyRegisterOptions: blocked('passkeyRegisterOptions', NO_WEBAUTHN),
@@ -1165,7 +1485,7 @@ export function databaseAuthBackend(
       'verifyPhone',
       '`PhoneVerifyResponse.line_type` is a carrier lookup (ADR-039 (a) scores VoIP and never ' +
         'rejects it) and no lookup adapter exists in this workspace, so the field would have to ' +
-        `be invented. And ${NO_DELIVERY}`,
+        `be invented. And ${NO_SMS_DELIVERY}`,
     ),
 
     // THE PHONE-CHANGE TRIO IS BLOCKED BY A SCHEMA GAP AND NOT BY THE ACCESSOR,
