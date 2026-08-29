@@ -9346,3 +9346,38 @@ holds. **The rate limit**, per IP and per ASN, which nothing in this tree can
 express. **The floor measurement**, which is the deployment's. **`OQ-M11-02`**,
 the `account_enforced` wording, still open. **A renderer**, which is what
 `GET /certificates/:code/image.png` now waits on rather than a door.
+
+**MERGED WITH `origin/main` AT `bfe690f` AFTER THE COUNTS ABOVE WERE TAKEN**,
+which brought [ADR-230](decisions/ADR-230.md), session 420's `pair` write door,
+and [ADR-232](decisions/ADR-232.md), session 422's approval edge. The counts
+above are facts about the `15eae35` baseline they name and are not rewritten.
+
+**SEVEN FILES CONFLICTED AND EACH WAS RESOLVED ON ITS MERITS.**
+[`verify.ts`](../apps/api/src/routes/verify.ts) and two of
+[`wiring.test.ts`](../apps/api/test/wiring.test.ts)'s four hunks took THIS
+branch, because main's side still says `lookup` reaches neither door and still
+carries the `useVerifySource` entry, and both stopped being true when the door
+landed. [`payouts.ts`](../apps/api/src/routes/payouts.ts) and the other two
+hunks were line-number drift on both sides. The four registers were unioned by
+key, so rows `419`, `420`, `421` and `422` all stand, and this file took main's
+collapse of the duplicated `gen:adr_count` paragraph to ONE copy, which is the
+`RI-12` repair `d120098` made after it reached twelve.
+
+**TWELVE CITATIONS WERE REPOINTED AND NO CLAIM CHANGED.** The two branches each
+inserted **212** lines into [`scoped-db.ts`](../packages/db/src/scoped-db.ts),
+so pointers from BOTH sides were stale: main's accounted for 420's insertion and
+not for this one's, and this branch's for neither of 420's nor 422's. **That is
+the merge-time form of this session's own landmine**, and the rule it produces is
+sharper than "derive pointers last": on a merge, re-derive both sides.
+
+**BOTH DOORS WERE VERIFIED BY READING RATHER THAN BY TYPECHECKING**, because a
+clean `tsc` cannot see an export that is simply gone. `insertAsParty` is at
+[`scoped-db.ts:2547`](../packages/db/src/scoped-db.ts), `publicLookupDb` at
+[`:1807`](../packages/db/src/scoped-db.ts) with `PUBLIC_LOOKUP_ADDRESS` at
+[`:1697`](../packages/db/src/scoped-db.ts), and `scopePredicate`'s `case 'pair'`
+still throws on every read.
+
+**Re-derived on the merge**: **33 of 33** gates, **20 of 20** invariants,
+typecheck 0, lint 0, `format:check` clean, **256 files / 6,385 passed / 6
+skipped** against a `bfe690f` baseline of **255 / 6,358 / 6** reproduced by
+checking it out, the same delta of **+1 file and +27 cases**.
