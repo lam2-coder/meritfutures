@@ -571,21 +571,27 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'both null, so calling the setter here would install what is already installed. That is not ' +
     'a wiring.',
   useAffiliateDeps:
-    'TWO obstructions, and this entry used to name THREE. `AffiliateBackend` states them in its ' +
-    'own defaults (`routes/affiliate.ts:432-450`): `affiliate_commissions` is UNREGISTERED in ' +
-    '`packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
-    'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
-    'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
-    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2725`) declares it while ' +
-    '`affiliateStatements` (`packages/db/src/scope.ts:1140`) registers it `derived` through ' +
-    '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
-    '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
-    'and now `statements` -- and all four are an adapter somebody can write. REGISTERED RATHER ' +
-    "THAN REPAIRED: the route module's own `STATEMENTS_UNREACHABLE` " +
-    '(`routes/affiliate.ts:444`) still carries the retired sentence and serves it to a caller as ' +
-    'the reason `statements` refuses. That is a handler file and outside this fence. NOTE: this ' +
-    'port already holds `productionAffiliateDeps` at module scope (`affiliate.ts:478`), so ' +
-    'calling the setter here would install what is already installed. That is not a wiring.',
+    'ONE obstruction, and this entry has named THREE and then TWO. `affiliate_commissions` is ' +
+    'UNREGISTERED in `packages/db/src/scope.ts` and UNDECLARED in `packages/db/src/schema.ts`, ' +
+    'and ADR-253 rules that it is not one registration away but a SEVENTH SCOPE CLASS away. Its ' +
+    'only path to an identity runs through `attributions`, which is `pair`, so a `derived` rule ' +
+    'compiles and throws; the row declares no column against `identities(id)`, so `owned`, ' +
+    '`pair` and `either` have nothing to name; and `firm` is available, is accepted by every ' +
+    'mechanical check in this repository, and is FALSE, because a commission is what Merit owes ' +
+    'a named affiliate. THE SECOND OBSTRUCTION IS DISCHARGED AS A REGISTRY QUESTION AND IS NOT ' +
+    'DELETED: it read that no table records an ISSUED link, and ADR-253 section 3 rules that ' +
+    'none is owed, because `affiliate_clicks_token_uq` is UNIQUE and one issued link is clicked ' +
+    'many times, so an issued handle and a click token cannot be one column, and every attribute ' +
+    'a link would carry is already on `affiliate_clicks` at click grain. `issueLink` therefore ' +
+    'waits on an ADAPTER and a BASE URL rather than on DDL, which is the same position ' +
+    '`affiliate`, `requiredDisclosure`, `submitCreative` and `statements` are in. FIVE of the ' +
+    'six methods are an adapter somebody can write and ONE is not. THE REPAIR REGISTERED HERE ' +
+    'LAST WAVE IS TAKEN: `STATEMENTS_UNREACHABLE` served a caller the retired sentence that ' +
+    '`affiliate_statements` is not in `schema.ts`, and ADR-253 section 5 repairs it at the ' +
+    'constant and at the module header, which carried the same sentence a second time and which ' +
+    'no entry had named. NOTE: this port already holds `productionAffiliateDeps` at module scope ' +
+    '(`affiliate.ts:478`), so calling the setter here would install what is already installed. ' +
+    'That is not a wiring.',
   setInternalOpsSource:
     'FOUR METHODS, AND ADR-242 RULES THEM ONE AT A TIME BECAUSE ONE REASON COVERED WHICHEVER OF ' +
     'THEM IT HAPPENED TO FIT. This entry read: "an ops plane rather than a database read. ' +
