@@ -8357,6 +8357,8 @@ Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, t
 
 **WHAT IS STILL OWED.** `B5` is unchanged and still needs all three terms, held by sessions 394 and 395 and by an ADR nobody has a number for. Widening `RI-19` to the 25 sites that do not declare their term count needs a convention decision about how a restatement declares itself, which is a ruling rather than a check.
 
+---
+
 ## `writeRuleState` is implemented and executed, `rule_states` holds rows for the first time, and term 1 turns out to need term 2 as well (2026-08-29, session 395)
 
 **`B5` TERM 1 IS LANDED AND IT IS EXECUTED RATHER THAN ARGUED.** The port's only satisfiers were test doubles and `scripts/demo/world.ts`, which refuses; `rule_states` therefore held zero rows, which session 392 measured live. [`apps/worker/src/batch/state-writer.ts`](../apps/worker/src/batch/state-writer.ts) is the implementation, and on a PostgreSQL rebuilt for the run over **60** migrations and **115** tables the table went from **zero rows to three**, with twenty-three columns read back and **no mismatch** and `id`, `computed_at` and `created_at` all supplied by the database.
