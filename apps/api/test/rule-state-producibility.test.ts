@@ -92,48 +92,49 @@ function payoutReason(): string {
   return rest.slice(0, end);
 }
 
-describe('link 1: no scheduler, and the worker deployable starts, runs nothing and exits 0', () => {
-  test("the worker's entrypoint DECLARES `main` and never calls it, and the API's calls it", () => {
-    // THE FIRST LINK, AND IT WAS NAMED BY NEITHER REASON UNTIL SESSION 429.
-    // Both deployables start the same way, at `node --experimental-strip-types`
-    // on one module. `apps/api/src/start.ts` ends with a call. The worker's
-    // barrel ends with a DECLARATION, so the process loads 1,277 lines of
-    // exports, binds nothing, schedules nothing and exits 0.
+describe('link 1: CLOSED. The worker deployable runs its job and fails loudly when it cannot', () => {
+  test("the worker's entrypoint CALLS `main`, and so does the API's", () => {
+    // **THIS BLOCK ASSERTED THE DEFECT UNTIL ADR-241 AND NOW ASSERTS THE
+    // REPAIR.** It read "the worker's entrypoint DECLARES `main` and never calls
+    // it": `apps/worker/package.json` started the deployable on the barrel,
+    // which is this package's `exports` target, so the process loaded 1,277
+    // lines of exports, bound nothing, scheduled nothing and exited 0. Both
+    // deployables now start the same way, at `node --experimental-strip-types`
+    // on a `start.ts` whose last statement is a top-level call.
     //
-    // THE COMPARATOR IS THE POINT AND NOT DECORATION. An assertion that the
-    // worker has no `main()` call passes just as well when the spelling of the
-    // entrypoint changes, when the barrel is renamed, or when this sweep reads
-    // the wrong file. Asserting the API's call with the identical predicate on
-    // the identical shape makes the sweep prove it can see one.
+    // THE COMPARATOR IS STILL THE POINT AND NOT DECORATION. An assertion about
+    // one entrypoint passes just as well when the sweep reads the wrong file;
+    // asserting BOTH with the identical predicate on the identical shape makes
+    // the sweep prove it can see a call and see its absence.
     const manifest = (app: string): { readonly scripts: Record<string, string> } =>
       JSON.parse(readFileSync(join(REPO_ROOT, 'apps', app, 'package.json'), 'utf8')) as {
         readonly scripts: Record<string, string>;
       };
 
-    expect(manifest('worker').scripts['start']).toBe(
-      'node --experimental-strip-types src/index.ts',
-    );
-    expect(manifest('api').scripts['start']).toBe('node --experimental-strip-types src/start.ts');
+    for (const app of ['worker', 'api'])
+      expect(manifest(app).scripts['start']).toBe('node --experimental-strip-types src/start.ts');
 
-    const workerEntry = codeOf(join(REPO_ROOT, 'apps/worker/src/index.ts'));
+    const workerEntry = codeOf(join(REPO_ROOT, 'apps/worker/src/start.ts'));
     const apiEntry = codeOf(join(REPO_ROOT, 'apps/api/src/start.ts'));
 
-    // The worker DECLARES one and exports it.
-    expect(workerEntry).toContain('export function main(): void {');
-
-    // Exactly one CALLS one, and the call is a top-level statement.
     expect(apiEntry).toContain('\nawait main();');
-    expect(workerEntry).not.toContain('\nawait main();');
-    expect(workerEntry).not.toContain('\nmain();');
+    expect(workerEntry).toContain('\nawait main()');
+
+    // AND THE BARREL STILL DOES NOT CALL IT, which is the half that must not be
+    // lost in the repair: `index.ts` is the package's `exports` target and
+    // importing it must have no effect.
+    const workerBarrel = codeOf(join(REPO_ROOT, 'apps/worker/src/index.ts'));
+    expect(workerBarrel).not.toContain('\nawait main()');
+    expect(workerBarrel).not.toContain('\nmain();');
   });
 
-  test('nothing under any `src/` calls the batch, so no deployment ever folds a day', () => {
+  test('a deployable calls the batch now, and a failed batch leaves a NON-ZERO status', () => {
     // `runNightlyBatch` is `writeRuleStateVia`'s only caller and the writer is
-    // the only site in the tree that inserts a `rule_states` row. THREE files
-    // under `src/` name the batch: the module declaring it, the barrel
-    // exporting it, and the API reason that NAMES IT INSIDE A STRING LITERAL,
-    // which comment stripping does not reach. A FOURTH would be a scheduler or
-    // an adapter. There is none.
+    // the only site in the tree that inserts a `rule_states` row. THIS TEST READ
+    // "nothing under any `src/` calls the batch, so no deployment ever folds a
+    // day" and counted THREE namers: the module declaring it, the barrel
+    // exporting it, and the API reason that names it inside a string literal.
+    // The fourth is the one it said would be "a scheduler or an adapter".
     const namers = deployableSources()
       .filter((path) => codeOf(path).includes('runNightlyBatch'))
       .map(rel)
@@ -142,26 +143,48 @@ describe('link 1: no scheduler, and the worker deployable starts, runs nothing a
       'apps/api/src/routes/account-reads.ts',
       'apps/worker/src/batch/nightly.ts',
       'apps/worker/src/index.ts',
+      'apps/worker/src/job.ts',
     ]);
+
+    // **AND NOTHING BETWEEN THE FOLD AND THE PROCESS SWALLOWS A FAILURE**, which
+    // is the property that makes the repair worth anything: a job that ran and
+    // failed silently is the exit-0 defect in a new costume. The status itself
+    // is asserted where a process can be watched leaving one,
+    // `apps/worker/test/entrypoint.test.ts`; what is asserted here is that no
+    // `catch` was added to the path between them afterwards.
+    for (const path of ['apps/worker/src/start.ts', 'apps/worker/src/job.ts'])
+      expect(
+        codeOf(join(REPO_ROOT, path)),
+        `${path} catches the failure the exit code is`,
+      ).not.toMatch(/\bcatch\b/);
   });
 });
 
-describe('link 2: no `BatchPorts` value is constructed under any `src/`', () => {
-  test('every satisfier of the port lives in a test double or in the demo world', () => {
-    // The batch takes its I/O as an argument, so a caller needs a value. Under
-    // `src/` there is none: `nightly.ts` and `replay.ts` NAME `BatchPorts` as a
-    // PARAMETER TYPE, which is the opposite of implementing it.
+describe('link 2: a `BatchPorts` value IS constructed under `src/`, and it serves four of ten', () => {
+  test('the adapter is the one constructor, and it refuses six methods by name', () => {
+    // **THIS BLOCK WAS NAMED "no `BatchPorts` value is constructed under any
+    // `src/`" AND ADR-241 MADE THAT FALSE.** The batch takes its I/O as an
+    // argument and, until session 431, every satisfier was a test double or
+    // `scripts/demo/world.ts`. `postgresBatchPorts` is the first one over a
+    // database.
     //
-    // NON-VACUITY IS THE SECOND HALF AND IT IS WHY THE SWEEP RUNS TWICE. A
-    // census that finds nothing proves nothing until the same predicate is
-    // shown finding the four values that do exist, none of which opens a
-    // connection: three test doubles and `scripts/demo/world.ts`, whose
-    // `writeRuleState` refuses.
-    const constructed = deployableSources()
-      .filter((path) => codeOf(path).includes(': BatchPorts = '))
-      .map(rel);
-    expect(constructed).toEqual([]);
+    // THE NEEDLE MOVED WITH THE FACT AND IS NAMED HERE RATHER THAN IN A
+    // COMMENT. The old sweep matched `': BatchPorts = '`, which finds a value
+    // ASSIGNED TO AN ANNOTATED CONST and does not find one RETURNED FROM AN
+    // ANNOTATED FUNCTION. Both spellings are swept below, so a second
+    // constructor in either shape is a named failure rather than a silent one.
+    const constructors = deployableSources()
+      .filter(
+        (path) =>
+          codeOf(path).includes(': BatchPorts = ') || codeOf(path).includes('): BatchPorts {'),
+      )
+      .map(rel)
+      .sort();
+    expect(constructors).toEqual(['apps/worker/src/batch/adapter.ts']);
 
+    // NON-VACUITY IS THE SECOND HALF AND IT IS WHY THE SWEEP RUNS TWICE. A
+    // census is worth nothing until the same predicate is shown finding the four
+    // values that live outside `src/`, none of which opens a connection.
     const elsewhere = [
       'apps/worker/test/replay.test.ts',
       'apps/worker/test/nightly-batch.test.ts',
@@ -172,6 +195,28 @@ describe('link 2: no `BatchPorts` value is constructed under any `src/`', () => 
         readFileSync(join(REPO_ROOT, path), 'utf8'),
         `the sweep's needle no longer matches ${path}`,
       ).toContain(': BatchPorts = ');
+  });
+
+  test('and the six refusals each carry a blocker, so a red batch names what to build', () => {
+    // A PORT THAT RETURNED A PLAUSIBLE VALUE WOULD BE WORSE THAN ONE THAT
+    // REFUSES, because `runNightlyBatch` counts a `written` outcome per account
+    // that did not throw. Each refusal below is a `BatchPortUnwired` naming the
+    // method, and the message carries the slice that clears it.
+    const adapter = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'));
+    for (const port of ['loadAccountDay', 'accountDaysFrom', 'storedRuleStates'])
+      expect(adapter, `${port} no longer refuses by name`).toContain(
+        `new BatchPortUnwired('${port}'`,
+      );
+    for (const port of ['raiseReconciliation', 'raiseDivergence'])
+      expect(adapter, `${port} no longer refuses by name`).toContain(
+        `new BatchPortUnwired('${port}'`,
+      );
+
+    // AND THE WRITE PORT IS COMPOSED ON THE UNWIRED ENCODER, which is link 3's
+    // subject seen from the adapter: the door is real and the codec is not, and
+    // the two arrive on one `RuleStateWriterIo` so that a deployment installs
+    // both or neither.
+    expect(adapter).toContain('UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates');
   });
 });
 
@@ -216,8 +261,14 @@ describe("link 4: the payout port's reason carries the chain, and carries no ret
     // very entry, twice. The first link is the one a session dispatched to
     // remove the blocker walks into last.
     const reason = payoutReason();
-    expect(reason).toContain('NOTHING SCHEDULES THE JOB');
-    expect(reason).toContain('exits 0');
+    // THE LEAD CLAUSE MOVED WHEN THE LINK UNDER IT CLOSED, and this assertion
+    // moved with it rather than being deleted. The entry read "NOTHING SCHEDULES
+    // THE JOB" and "exits 0"; ADR-241 made both false, and an entry still
+    // leading with them would send the next session to repair a link that is
+    // already repaired.
+    expect(reason).not.toContain('NOTHING SCHEDULES THE JOB');
+    expect(reason).toContain('THE JOB NOW RUNS');
+    expect(reason).toContain('NON-ZERO exit status');
     expect(reason).toContain('BatchPorts');
     expect(reason).toContain('encodeEngineGates');
   });
