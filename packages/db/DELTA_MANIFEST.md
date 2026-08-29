@@ -2043,3 +2043,144 @@ pg_proc (public)                     111       112       +1
 **It does not wire `usePayoutBackend`, and it clears one of four grounds.** What `ResolvedPlan` is built from is now pinned on both halves. What still refuses is re-derived in [ADR-213](../../docs/decisions/ADR-213.md) section 8: `PayoutTx` runs every method on one transaction while `subject()` needs a `firm` read, and [ADR-211](../../docs/decisions/ADR-211.md)'s two-transaction remedy is unapplied; `wiring.test.ts`'s `BLOCKED` entry still states the state-half blocker as *"`grep -rn lifetime_settled packages/db/migrations` returns nothing at all"* (`wiring.test.ts:219`), **which is false since [`0065:101`](migrations/0065_rule_state_lifetime_and_breach.sql)**; `routes/payouts.ts:438-439` still states a property the port does not have; and no adapter exists. `apps/**` was outside this fence, so all three are registered.
 
 **It does not say how a published grid is corrected when it is found wrong.** The answer the ruling implies is *publish a new version*, and no route performs one.
+
+## 32. `0067` lands, and the argument against a `CHECK` is a count nobody had taken (2026-08-29)
+
+**Session 406, [ADR-216](../../docs/decisions/ADR-216.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `216` and `0067`.** [`0001:45`](migrations/0001_extensions_and_enums.sql) declares `account_phase` as **exactly** the engine's four `Phase` members, and it did so before any other table existed. [`0015:47`](migrations/0015_rule_states.sql) typed `rule_states.phase` bare `text` and wrote no `CHECK`. **For fifty-two migrations the table replay compares against admitted ANY STRING as a phase**, on a column that is hash input 3 of [ADR-026](../../docs/decisions/ADR-026.md) `C-07`. `0001` and `0015` are untouched on disk; `0067` supersedes one column declaration from outside them (constitution `E2`), which is the mechanism `0037`, `0046` and `0065` have already used on this table.
+
+**[SESSION 398](../../docs/sessions/2026-08-29-session-398.md) FOUND THIS AND DID NOT TAKE IT**, under `ADR-003`, and said in terms that it is cheaper before rows land than after. It was right about the price and the price is not symmetric: section 32.4 measures which way.
+
+### The defect, re-derived from the catalogue rather than taken from the dispatch
+
+`0001`..`0066` applied forward-only into an empty database under `ON_ERROR_STOP=1` against **PostgreSQL 16.13**, then read at `pg_attribute`, `pg_constraint`, `pg_enum` and `pg_type` rather than by grep:
+
+| Query | Result |
+|---|---|
+| `rule_states.phase` | `text`, `NOT NULL` |
+| constraints on `rule_states` whose definition names `phase` | **zero** |
+| `account_phase` labels, in `enumsortorder` | `eval`, `funded`, `closed`, `graduated` -- **the engine union exactly, and in the same order** |
+| table columns of type `account_phase` | **`accounts.phase`, and that is all** |
+| `rule_states` rows | **zero**, and no writer exists: `B5` term 1 is still owed |
+| enum types in `public` | **thirteen**, all created in `0001` |
+
+**AND THE FINDING IS WIDER THAN THE RESERVATION SAID.** `rule_states.phase` is not the only unconstrained phase-shaped column in the estate. [`0007:192-193`](migrations/0007_accounts.sql) declares `account_status_history.from_phase` and `to_phase` as bare `text NULL` with no `CHECK`, beside `from_status` and `to_status` which are bare `text` against `account_status`. **That table is `0007`'s and is outside this fence**; it is registered in section 32.7 rather than repaired.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-216` | `rule_states` | `phase` moves from `text` to `account_phase`; the column comment `0015` never wrote | 0067 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed**, on `0051`, `0064`, `0065` and `0066`'s reasoning: this is not a schema delta proposed by an approved module document. **An ADR number was allocated and is taken**, and it carries the ruling a statement cannot state: which of [ADR-207](../../docs/decisions/ADR-207.md)'s three reasons transfer to this column and which do not.
+
+### 32.4 The ruling, and the reason ADR-207 had no access to
+
+`ADR-207` chose a `CHECK` over a new `ENUM` for `breach_kind` on three measured reasons. **Re-argued on this column's facts rather than copied**, two of the three do not survive the move:
+
+| `ADR-207`'s reason | Here |
+|---|---|
+| **1.** All thirteen enum types are created in `0001` and no migration since has added one, so an enum would be a ruling about where new estate vocabularies live | **DOES NOT TRANSFER.** It is a reason against CREATING a type. `account_phase` already exists. Measured: **13 enum types before `0067` and 13 after**, `65` labels before and `65` after. Adding no new type is not the same as using an existing one, and only the first is what this reason speaks to |
+| **2.** This table already stores an engine union as bare `text` (`phase`), so an enum for `breach_kind` would make it internally inconsistent | **INVERTS.** Its premise is the defect `0067` repairs. A reason that cites a gap as its justification cannot survive the gap's repair with its sign unchanged. What survives is the requirement underneath it, and section 32.6 states where `0067` leaves it |
+| **3.** A `CHECK` narrows by `DROP` and re-`ADD` under one name, which is `E2`'s own mechanism, while an enum value can be added and **can never be removed** | **TRANSFERS AS A FACT AND FAILS AS A REASON.** Both halves executed rather than recalled: `ALTER TYPE account_phase DROP VALUE 'graduated'` is a **SYNTAX ERROR** on 16.13, so it is not a permission that could be granted; `ALTER TYPE ... ADD VALUE` inside a transaction then raises `unsafe use of new value` when the same transaction uses it, so widening costs two migrations here. **BOTH COSTS ARE ALREADY BORNE.** `accounts.phase` has been `account_phase` since `0001`, so removing a `Phase` member already means recreating the type, and adding one already costs the dance. A second column joining adds ONE MORE COLUMN to a rewrite that has to happen anyway. **The marginal cost is zero, and that is what `breach_kind` had no counterpart to** |
+
+**THE REASON `ADR-207` COULD NOT REACH IS THE COPY COUNT.** `Phase`'s four members are written out **literally six times** in this repository with **no comparator between any two of them**:
+
+| # | Site |
+|---|---|
+| 1 | [`packages/rules-engine/src/types.ts:787`](../rules-engine/src/types.ts) -- `export type Phase` |
+| 2 | [`migrations/0001_extensions_and_enums.sql:45`](migrations/0001_extensions_and_enums.sql) -- `CREATE TYPE account_phase` |
+| 3 | [`packages/db/src/schema.ts:163`](src/schema.ts) -- `pgEnum('account_phase', ...)` |
+| 4 | `apps/api/src/routes/accounts.ts:157` -- `type AccountPhase` |
+| 5 | `apps/api/src/routes/accounts.ts:748` -- `const PHASES` |
+| 6 | `apps/portal/src/api/types.ts:123` -- an inline union |
+
+**`breach_kind` had TWO copies and `ADR-207` paid for the second with a comparator. A `CHECK` here would have been a SEVENTH copy of four members that already have six and none.** `ALTER COLUMN ... TYPE account_phase` writes the type's NAME rather than its members, so this column's vocabulary is copy 2 **by construction** and there is nothing new for a comparator to defend. That is not an aesthetic preference; it is the difference between a fact stated once and a fact stated twice.
+
+**AND THE PRICE OF DEFERRING IS NOT SYMMETRIC.** A `CHECK` added after rows land can be added `NOT VALID` and validated without an exclusive-lock rewrite. A column type change cannot: it takes `ACCESS EXCLUSIVE` and rewrites the table. **The answer taken is precisely the one whose price rises fastest, and it is taken on the day the table holds zero rows.**
+
+### 32.5 The existing rows were checked before the statement was written
+
+**A constraint added to a table already holding a violating row fails AT INSTALL, and this one was made to.** With `0001`..`0066` installed, a `rule_states` row carrying `phase 'nonsense'` was committed and `0067`'s statement then run against it:
+
+```
+ERROR:  invalid input value for enum account_phase: "nonsense"
+```
+
+**The table holds zero rows, so `0067` cannot fail that way**, and that is a measurement rather than an assumption. `merit_app` still holds `INSERT` and `SELECT` on the retyped column and no `UPDATE`, read from `information_schema.column_privileges` after the change: **append-only is not widened**, and no `GRANT` was needed because `account_phase`'s `typacl` is `NULL`, which is `USAGE` to `PUBLIC`.
+
+### The counterfactual, both directions, from empty and forward-only
+
+[`probe_rule_state_phase_vocabulary.sql`](../../scripts/db/probe_rule_state_phase_vocabulary.sql), eleven cases, **five of them acceptances and they lead**. The dangerous direction on a vocabulary is not a missing guard but one that fell BEHIND: a fifth member added to `Phase` and not to `account_phase` makes a legitimate row unwritable while all six rejections still fire.
+
+| | `0001`..`0066` | `0001`..`0067` |
+|---|---|---|
+| the probe | **RED at REJECTION 1**, five acceptances first | **11 of 11 PASS** |
+| every `scripts/db/probe_*.sql` | **17 of 18** | **18 of 18** |
+
+The failing line against `0001`..`0066`, verbatim:
+
+```
+ERROR:  PROBE FAILED: REJECTION 1: rule_states stored phase not_a_phase_at_all.
+The engine's own per-day record admits a string the engine cannot produce, on
+the table replay compares against.
+```
+
+and against `0001`..`0067` the same row is refused at the cast, `invalid_text_representation` (`22P02`) rather than `check_violation`: **an enum refuses before the row is a row.**
+
+**ACCEPTANCE 5 EXECUTES `0048`'s `rewrite_rule_state` RATHER THAN REASONING ABOUT IT.** That function takes a `rule_states` ROWTYPE and derives its `UPDATE` from `pg_attribute` through `%I`, binding the row as `$1`, so a column type change is invisible to it by construction. **`0027` installed a function that was WRONG and still installed cleanly**, so the one path in the estate that writes this column through a rowtype is run.
+
+**THE PROBE'S FIRST DRAFT WAS WRONG AND ONLY THE ACCEPTANCE HALF COULD SEE IT.** Its writer took the phase as a `text` parameter and bound it straight into the column. A `text` VARIABLE does not implicitly cast to an enum, so against `0001`..`0067` it failed at ACCEPTANCE 1 with `column "phase" is of type account_phase but expression is of type text` -- on `eval`, a phase the column accepts perfectly well. **Every rejection passed while the file was measuring PL/pgSQL's assignment rules rather than the column's vocabulary.** Casting the variable instead would have moved every rejection into the cast, which tests the TYPE and not the COLUMN and would stay green against a column moved back to `text`. The phase goes in as a LITERAL through `%L`, which is what an adapter and a hand-written `INSERT` both emit, so **the same file runs unchanged on both sides of `0067` and its verdict is the migration's.**
+
+### `scoped-db.test.ts` refused this migration and was right to
+
+**The suite went RED before the migration was believed, and the control that did it says in its own comment that this was its purpose.** `ADR-094` and [ADR-103](../../docs/decisions/ADR-103.md) close the fold's `ALTER COLUMN` sub-vocabulary at ONE shape, `DROP NOT NULL`, with a default of FAIL, on `ADR-094` item 3's rule against writing a rule for a shape with zero instances. Its inventory assertion reads: *"The day a fourth one lands -- a `SET DATA TYPE`, a `SET NOT NULL`, or a `DROP NOT NULL` on a third table -- this is RED and the next session reads the ruling before writing a regex."* **`0067` is that day and this is that session.**
+
+`ADR-216` clause 5 adds the fold's **third member** the way `ADR-103` added its second: the comparison first, the vocabulary second. `retypedColumns` reads `ALTER COLUMN <name> TYPE` and `SET DATA TYPE` as one member and returns `null` on anything else; `withType` applies it to the folded definition and **throws on the two ways of applying nothing**, on `withoutNotNull`'s own argument. A new assertion holds that **exactly one of the two readers claims each statement**, because a reader widened until it matched everything would satisfy the inventory while folding `DROP NOT NULL` as a retype to the type `NULL`.
+
+**REFUSING THE TYPE CHANGE BECAUSE A PARSER COULD NOT READ IT WOULD HAVE BEEN CHOOSING THE WEAKER SCHEMA GUARANTEE TO AVOID EXTENDING A TEST**, which is weakening a gate to pass it in the exact shape the standing refusals name. The vocabulary is closed because there had been nothing to rule on; the moment there is an instance, the rule is written against something.
+
+**AND ADR-216'S MEMBER RUNS ON A REGISTERED TABLE ON THE DAY IT LANDS, WHICH `ADR-103`'S DID NOT.** That member shipped with no registered carrier and session 214 had to find the gap for `ADR-106` to close. `rule_states` has been registered since `ADR-094`, so the per-table TYPE-and-NULLABILITY comparison reads this column against the transcription immediately.
+
+### 32.6 What `0067` leaves open, stated rather than glossed
+
+**AFTER `0067`, `rule_states` HOLDS ONE ENGINE UNION AS A TYPE AND ANOTHER AS BARE `text` WITH A `CHECK`.** That is the shape `ADR-207` reason 2 named as worse than either uniform answer, now true in the other direction. **It is not hidden**: it is the second item on `ADR-216`'s approval block. The two are not symmetric, which is why it is not decisive -- `Phase` has a type in `0001` that names its members exactly and `BreachKind` has none, and creating one is the ruling `ADR-207` declined and `0067` does not take either way. **Uniformity bought by leaving this column unconstrained against a type that already spells it out is uniformity bought with the defect.**
+
+**THE STATE HASH IS UNTOUCHED AND UNMOVED.** `phase` is input 3 of `ADR-026` `C-07`'s nineteen and stays input 3. `0067` changes the column's DOMAIN and not its value: every string this column could legally hold before it, it holds after it, byte for byte, so no stored hash could change. `ADR-207` section 5's open question about the three columns `0065` added is neither answered nor moved.
+
+**IT DOES NOT BIND `rule_states.phase` TO `accounts.phase`.** Nothing does and nothing should: a per-day snapshot legitimately disagrees with the account's phase now, which is the whole reason the table has a grain. What `0067` guarantees is that the two draw from ONE vocabulary, by construction rather than by assertion.
+
+**IT DOES NOT MOVE `accounts.phase` OR `account_phase`'s DEFINITION.** Both were refused explicitly; if the ruling implies either should move, that is a separate decision with its own number.
+
+### 32.7 Registered rather than repaired, each with the fence that owns it
+
+1. **`account_status_history.from_phase` and `to_phase` are bare `text NULL` with no `CHECK`**, beside `from_status` and `to_status` which are bare `text` against `account_status`, while `accounts` is declared against both types. [`schema.ts`](src/schema.ts)'s own entry for that table records the asymmetry and says *"That is `0007`'s shape and not this file's to repair."* **It is a log table rather than the table replay compares against**, which is a difference in consequence and not in kind. `0007` and that table are outside this fence.
+
+2. **`RI-15` SEES A POINTER THAT LANDS ON NOTHING AND NOT ONE THAT LANDS ON THE WRONG THING.** `apps/worker/src/provisioning/vocabulary.ts:9` cited `schema.ts:3501` for the `provisioning_queue` type asymmetry; on `origin/main` that line sits inside the `graduation_invitations` comment, three hundred lines from the transcription it names. **The citation was already wrong and no invariant could see it.** `0067`'s edit to the `ruleStates` entry shifted the file and dropped `3501` onto a blank line, which is the only reason it went red. Repaired to `schema.ts:3867` under the citation-repair right; **the finding about the invariant's reach is reported, because `RI-15` is not this fence.**
+
+3. **`ADR-207` SECTION 9 CALLED THIS COLUMN'S GAP THE OBVIOUS NEXT SLICE AND IT WAS.** Its own reason 2 turns on this column being bare `text`, so that reason is now historical. The entry is another session's ruling and is not amended here; `ADR-216` states which of its reasons transfer, which is the reading rather than an edit.
+
+### Seeds, watched failing
+
+**Eleven seeds against the committed shape, ten red and one green control**, each restored from a byte copy with SHA-256 checked both ways and `git status --porcelain` empty after every one. No seed was restored with `git checkout`.
+
+| # | Seed | Result |
+|---|---|---|
+| 1 | a fifth member added to `Phase` in `types.ts` | **RED, 2 cases** |
+| 2 | `account_phase` reordered in `0001`, `closed` and `graduated` swapped | **RED, 2 cases.** The two ORDERED comparisons; the set comparison stays green, which is that case's stated blindness measured rather than described |
+| 3 | the `ruleStates` entry reverted to `text('phase')` | **RED, 2 cases, across two files.** A migration whose column the accessor types as an open string leaves every read of it wrong |
+| 4 | `0067`'s target type changed to `text`, so the retype retypes nothing | **RED, 9 cases.** `withType` throws rather than folding a definition it did not move |
+| 5 | a `CHECK` re-listing the vocabulary added to `0067` | **RED, 1 case.** The seventh copy the ruling refuses |
+| 6 | the probe step deleted from `corpus.yml` | **RED, `CI-06h`**, 31 of 33 |
+| 7 | the needle deleted from `gates.mjs`, probe left wired | **RED, `CI-06s`**, 32 of 33 |
+| 8 | `Phase` renamed in `types.ts`, blinding the parser | **RED, by THROWING.** A derivation whose parse returns nothing must not compare two empty lists and report PASS |
+| 9 | `graduated` deleted from the `schema.ts` `pgEnum` | **RED, 2 cases** |
+| 10 | **CONTROL**: a comment reworded in `0067`, no identifier moved | **GREEN, 317 of 317** |
+| 11 | `retypedColumns` widened until it also claims `DROP NOT NULL` | **RED, 4 cases**, on the overlap assertion written for exactly that |
+
+**Three more were seeded into the live catalogue rather than into a file**, against `0001`..`0067`, each undone and the probe rerun clean:
+
+| Seed | Result |
+|---|---|
+| a `CHECK` re-listing the vocabulary installed on `rule_states` | **RED at REJECTION 6**, quoting the constraint definition back |
+| the column moved back to `text` | **RED at REJECTION 1.** Not at REJECTION 4, and that is correct: the row cases catch the regression first and the catalogue assertion is the backstop for a future where they are gone |
+| `ALTER TYPE account_phase ADD VALUE 'probationary'` | **RED at REJECTION 5**, naming the widening that cannot be undone |
