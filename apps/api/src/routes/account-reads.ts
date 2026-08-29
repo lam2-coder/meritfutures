@@ -884,10 +884,12 @@ const CERTIFICATE_BLOCKER =
  * The backend, against the real accessor.
  *
  * ONE OF FOUR METHODS IS SERVED AND THREE REFUSE BY NAME, which is
- * `databaseAuthBackend`'s shape (four of sixteen) and
- * `databaseAccountsBackend`'s (two of three): in every case the refusal carries
- * the blocker rather than a shrug, and a fixture serving real traffic is worse
- * than a 503.
+ * `databaseAuthBackend`'s shape and `databaseAccountsBackend`'s (two of three):
+ * in every case the refusal carries the blocker rather than a shrug, and a
+ * fixture serving real traffic is worse than a 503. THE AUTH COUNT IS NOT
+ * RESTATED HERE and it read "(four of sixteen)" until session 410, stale since
+ * ADR-200; `routes/auth.ts`'s port docblock states it once, in the form `RI-20`
+ * settles.
  *
  * THE THREE REJECT RATHER THAN THROWING SYNCHRONOUSLY, which is `db.ts`'s own
  * ruling about its guard: "a method whose type says `Promise<T>` and which
