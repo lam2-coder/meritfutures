@@ -180,7 +180,7 @@ export type LiabilityResponse = {
       readonly cents: number;
       readonly accounts: number;
     }[];
-  };
+  } | null;
   /**
    * `null` WHEN THE SERVER CANNOT SUPPLY THE WINDOW, and `gaps` says which way.
    *

@@ -631,7 +631,28 @@ export interface LiabilityResponse {
    */
   readonly absorbed_corrections_cents: number;
   readonly funded_accounts: number;
-  readonly eligible_next_7d: EligibleNext7d;
+  /**
+   * `null` WHEN THE HORIZON HAS NO ANSWER, and `gaps` says which way.
+   *
+   * `ADR-203` ruling 8 and `ADR-204` ruling 9: *"WHERE THE HORIZON HAS NO
+   * ANSWER, THE FIELD HAS NO VALUE, AND THE SHAPE OF THAT ABSENCE IS
+   * `ADR-203`'s"*. The producer's `readTradingHorizon` already answers three
+   * ways -- covered, `exhausted` and `uncovered` -- and this field carried one,
+   * so an uncovered calendar had to be rendered as a horizon of zero accounts
+   * owed zero cents and read exactly like a week nobody clears.
+   *
+   * THE TWO CAUSES ARE `insufficient_history` AND `estate_uncovered` AND THEY
+   * MUST STAY DISTINCT, on `0032`'s and `ADR-042` F-4's rule that an exhausted
+   * calendar and an uncovered one are different answers and only one is safe to
+   * act on. Neither is `awaiting_dependency`, so `awaiting` is `null` on this
+   * field's gap and {@link assertLiabilityGapsPaired} enforces that pairing.
+   *
+   * THE ABSENCE IS AT THE OBJECT AND NOT AT A MEMBER, which is the same half
+   * `payout_velocity` gets from {@link assertContractScalars}: `total_cents:
+   * null` is refused at the boundary, so a partly supplied forecast is not a
+   * shape this response could serve.
+   */
+  readonly eligible_next_7d: EligibleNext7d | null;
   /**
    * `null` WHEN THE WINDOW CANNOT BE SUPPLIED, and `gaps` says which way.
    *
@@ -739,7 +760,40 @@ export interface LiabilityResponse {
  */
 export interface EligibleForecastResponse {
   readonly as_of: string;
-  readonly eligible_next_7d: EligibleNext7d;
+
+  /**
+   * `null` WHEN THE HORIZON HAS NO ANSWER, exactly as on `LiabilityResponse`.
+   *
+   * `ADR-208`. This endpoint exists to carry this one figure, so the two shapes
+   * it could take are a body with a `null` and a reason, or `adminNotFound`. The
+   * 404 is REFUSED, and the reason is this contract section's own: `API_CONTRACT`
+   * section 8 records that `/admin/loss-ratios` and `/admin/cusum` are
+   * *"registered by nothing"* and *"answer 404 on the admin origin as well as on
+   * the public one"*, so on this heading a 404 already means A ROUTE NOBODY HAS
+   * BUILT. Serving one for *"the estate records no opinion about this period"*
+   * would put two answers under one status code, and the one an operator must
+   * act on today is the one that would be mistaken for the backlog.
+   */
+  readonly eligible_next_7d: EligibleNext7d | null;
+
+  /**
+   * The gap explaining the `null`, FORWARDED from `LiabilityResponse.gaps`.
+   *
+   * `ADR-208`. It is `LiabilityGap` and not `admin-breaker.ts`'s
+   * {@link ../routes/admin-breaker.ts ProjectionGap}, which is the sibling
+   * projections' shape and cannot carry this absence: `ProjectionGap.awaiting`
+   * is a required `string`, and `ADR-204` ruling 9's two causes are
+   * `insufficient_history` and `estate_uncovered`, for which `ADR-203` ruling 4
+   * requires `awaiting` to be `null`. A body that named a deliverable for an
+   * exhausted calendar would send an operator to read a document that does not
+   * exist.
+   *
+   * FILTERED FROM THE LIABILITY BODY AND NEVER REBUILT, on this endpoint's own
+   * rule that it derives from the same read: two explanations of one absence is
+   * an operator choosing which to believe, which is `ADR-203` ruling 2's reason
+   * for refusing two entries over one field.
+   */
+  readonly gaps: readonly LiabilityGap[];
 }
 
 /** Section 8, `IdentityGraph`. */
@@ -1339,6 +1393,7 @@ export function assertLiabilityGapsPaired(value: LiabilityResponse): void {
   const absent = new Set<string>();
   if (value.payout_velocity === null) absent.add('payout_velocity');
   if (value.per_plan.some((plan) => plan.cusum === null)) absent.add('per_plan[].cusum');
+  if (value.eligible_next_7d === null) absent.add('eligible_next_7d');
 
   const named = new Set<string>();
   for (const gap of value.gaps) {
@@ -1391,7 +1446,8 @@ function projectLiability(value: LiabilityResponse): LiabilityResponse {
     remaining_ladder_exposure_cents: value.remaining_ladder_exposure_cents,
     absorbed_corrections_cents: value.absorbed_corrections_cents,
     funded_accounts: value.funded_accounts,
-    eligible_next_7d: projectEligibleNext7d(value.eligible_next_7d),
+    eligible_next_7d:
+      value.eligible_next_7d === null ? null : projectEligibleNext7d(value.eligible_next_7d),
     payout_velocity:
       value.payout_velocity === null
         ? null
@@ -1812,9 +1868,38 @@ export const ADMIN_READ_ENDPOINTS: readonly AdminEndpointSpec[] = [
       // seconds". `private` because the body is the firm's own position and no
       // shared cache has any business holding it.
       void reply.header('Cache-Control', 'private, max-age=60');
+      // ADR-208: THE PAIRING IS ASSERTED HERE TOO, AND THAT IS A REPAIR RATHER
+      // THAN A PRECAUTION. `assertLiabilityGapsPaired` runs inside
+      // `projectLiability`, and THIS HANDLER DOES NOT CALL `projectLiability`:
+      // it reads the same source and builds its own body, so until this line
+      // the one control `ADR-203` ruling 2 rests on ran on `/admin/liability`
+      // and on no other path that reads a liability. With `eligible_next_7d`
+      // nullable that is the difference between a reason and a bare `null` on
+      // the endpoint that exists to carry exactly this figure.
+      //
+      // THE PRODUCER'S OWN FUNCTION AND NOT A SECOND ONE. A pairing check
+      // written for this body would be `FM-16`'s shape on the guard against
+      // `FM-16`: a second statement of one predicate with nothing comparing
+      // them.
+      assertLiabilityGapsPaired(liability);
+      // AND THE GAP IS FORWARDED, NOT REBUILT. This projection carries one field
+      // of that body, so the entries it keeps are exactly the ones naming that
+      // field. A gap built here would be a second explanation of one absence,
+      // and the two would drift the first time the producer's did.
       const forecast: EligibleForecastResponse = {
         as_of: liability.as_of,
-        eligible_next_7d: projectEligibleNext7d(liability.eligible_next_7d),
+        eligible_next_7d:
+          liability.eligible_next_7d === null
+            ? null
+            : projectEligibleNext7d(liability.eligible_next_7d),
+        gaps: liability.gaps
+          .filter((gap) => gap.field === 'eligible_next_7d')
+          .map((gap) => ({
+            field: gap.field,
+            cause: gap.cause,
+            awaiting: gap.awaiting,
+            detail: gap.detail,
+          })),
       };
       return forecast;
     },
