@@ -10,7 +10,9 @@ import {
   SESSION_COOKIE,
   authorize,
   resetAuthBackend,
+  resetTurnstileVerifier,
   useAuthBackend,
+  useTurnstileVerifier,
 } from '../src/routes/auth.ts';
 import type {
   AuthBackend,
@@ -27,6 +29,8 @@ import type {
   VerifyResponse,
 } from '../src/routes/auth.ts';
 import { ME_ENDPOINTS, ME_REQUIRED_FACTORS } from '../src/routes/me.ts';
+import { TURNSTILE_SECRET_VAR } from '../src/turnstile.ts';
+import type { TurnstileOutcome, TurnstileVerifier } from '../src/turnstile.ts';
 
 // CI-02, the `unit` project.
 //
@@ -265,13 +269,31 @@ async function call(options: {
   return res;
 }
 
+/**
+ * A Turnstile verifier that answers one outcome, ADR-226.
+ *
+ * THE PASSING ONE IS INSTALLED FOR EVERY TEST IN THIS FILE and it is not a
+ * convenience. `POST /auth/otp` now spends the token, and the real verifier
+ * answers `unconfigured` in a suite that sets no secret, so without this the
+ * three `202` assertions below would be asserting a 503. That the fixture has
+ * to exist at all is the evidence the control is live: it was added in the same
+ * commit that made three green tests go red.
+ */
+function verifier(outcome: TurnstileOutcome): TurnstileVerifier {
+  return { verify: () => Promise.resolve(outcome) };
+}
+
+const PASSES = verifier({ outcome: 'passed' });
+
 beforeEach(() => {
   state = freshState();
   useAuthBackend(fixture);
+  useTurnstileVerifier(PASSES);
 });
 
 afterEach(() => {
   resetAuthBackend();
+  resetTurnstileVerifier();
 });
 
 // -----------------------------------------------------------------------------
@@ -363,6 +385,139 @@ test('exactly one destination, and it is the one the channel names', async () =>
     payload: { channel: 'sms', email: 'a@example.test', turnstile_token: 't' },
   });
   expect(mismatched.statusCode).toBe(400);
+});
+
+// -----------------------------------------------------------------------------
+// ADR-226. THE TURNSTILE TOKEN IS SPENT, AND EVERY ARM NAMES ITS OWN REASON
+// -----------------------------------------------------------------------------
+// WHAT A GREEN RUN HERE DOES AND DOES NOT PROVE, said plainly because the
+// interaction is easy to miss. `AuthBackend.requestOtp` is
+// `blocked('requestOtp', NO_DELIVERY)` in `auth-backend.ts`, so the DEPLOYED
+// arm that would spend this token does not run: every assertion below goes
+// through the real router and the real handler and reaches a FIXTURE backend.
+// What is proved is the handler's ordering and its four answers. What is not
+// proved is that a real `requestOtp` is reached only by a passing challenge,
+// because there is no real `requestOtp` yet.
+
+test('ADR-226: a token Cloudflare refuses is 403 and the budget is never touched', async () => {
+  useTurnstileVerifier(verifier({ outcome: 'failed', detail: 'invalid-input-response' }));
+  const res = await call({
+    method: 'POST',
+    path: '/auth/otp',
+    payload: { channel: 'sms', phone: '+15555550123', turnstile_token: 'a-string' },
+  });
+  expect(res.statusCode).toBe(403);
+  expect(res.json().code).toBe('forbidden');
+  // ADR-111 clause 4: the member names an ELEVATION factor and a challenge is
+  // not one. ADR-221's cross-origin 403 omits it for the same reason.
+  expect(res.json().required_factor).toBeUndefined();
+  // The vendor's own words stay in the log. A caller learns nothing from the
+  // body it did not already learn from the status.
+  expect(JSON.stringify(res.json())).not.toContain('invalid-input-response');
+  // THE ORDERING, ASSERTED RATHER THAN READ OFF THE SOURCE. The refusal runs
+  // ahead of `requestOtp`, so a caller that cannot pass the challenge never
+  // reaches the velocity row and never spends `otp_send_budget.spend_cents`.
+  expect(state.budget.sends).toBe(0);
+});
+
+test('ADR-226: an unconfigured deployment refuses 503 and does not admit the token', async () => {
+  // The arm that matters most. "A secret absent in a test environment must not
+  // silently disable a control in production": the outcome that means "no
+  // secret" is a REFUSAL, and the string that was good enough for every other
+  // test in this file does not get through it.
+  useTurnstileVerifier(verifier({ outcome: 'unconfigured', detail: 'no secret' }));
+  const res = await call({
+    method: 'POST',
+    path: '/auth/otp',
+    payload: { channel: 'sms', phone: '+15555550123', turnstile_token: 't' },
+  });
+  expect(res.statusCode).toBe(503);
+  expect(res.json().code).toBe('service_unavailable');
+  expect(state.budget.sends).toBe(0);
+});
+
+test('ADR-226: a Cloudflare outage refuses 503 rather than admitting the token', async () => {
+  // THE RULING, AND ITS COST IN ONE ASSERTION. `unavailable` covers a timeout, a
+  // reset and an unreadable answer, and the answer to all three is no. A trader
+  // cannot start a NEW sign-in while siteverify is down; an existing session is
+  // untouched, because `sessionByToken` reads a row and calls nobody.
+  useTurnstileVerifier(verifier({ outcome: 'unavailable', detail: 'siteverify timed out' }));
+  const res = await call({
+    method: 'POST',
+    path: '/auth/otp',
+    payload: { channel: 'sms', phone: '+15555550123', turnstile_token: 't' },
+  });
+  expect(res.statusCode).toBe(503);
+  expect(res.json().code).toBe('service_unavailable');
+  expect(state.budget.sends).toBe(0);
+});
+
+test('ADR-226: the token the caller sent is the token that is verified', async () => {
+  // A control that verifies SOMETHING is not a control that verifies THIS. The
+  // defect this catches is a handler that passes a constant, or the field name
+  // drifting between the validator and the call.
+  const seen: string[] = [];
+  useTurnstileVerifier({
+    verify: (token) => {
+      seen.push(token);
+      return Promise.resolve({ outcome: 'passed' });
+    },
+  });
+  const res = await call({
+    method: 'POST',
+    path: '/auth/otp',
+    payload: { channel: 'email', email: 'a@example.test', turnstile_token: 'the-caller-token' },
+  });
+  expect(res.statusCode).toBe(202);
+  expect(seen).toStrictEqual(['the-caller-token']);
+});
+
+test('ADR-226: a malformed body is refused before Cloudflare is called at all', async () => {
+  // The other half of the ordering. Validation first, so a body that could
+  // never be served does not spend a call on a vendor, and a flood of garbage
+  // costs Merit nothing outbound.
+  let calls = 0;
+  useTurnstileVerifier({
+    verify: () => {
+      calls += 1;
+      return Promise.resolve({ outcome: 'passed' });
+    },
+  });
+  const res = await call({
+    method: 'POST',
+    path: '/auth/otp',
+    payload: { email: 'a@example.test', turnstile_token: 't' },
+  });
+  expect(res.statusCode).toBe(400);
+  expect(calls).toBe(0);
+});
+
+test('ADR-226: the installed default refuses, so forgetting to wire anything fails closed', async () => {
+  // NO `useTurnstileVerifier` HERE. `resetTurnstileVerifier` puts back the real
+  // Cloudflare verifier, this suite sets no secret, and the answer is 503
+  // rather than 202. That is the whole ruling in one assertion: the field is no
+  // longer a string that any value satisfies.
+  expect(process.env[TURNSTILE_SECRET_VAR]).toBeUndefined();
+  resetTurnstileVerifier();
+  const res = await call({
+    method: 'POST',
+    path: '/auth/otp',
+    payload: { channel: 'sms', phone: '+15555550123', turnstile_token: 't' },
+  });
+  expect(res.statusCode).toBe(503);
+  expect(state.budget.sends).toBe(0);
+});
+
+test('ADR-226: `POST /auth/verify` carries no token and is not touched by the control', async () => {
+  // The fence, asserted. `VerifyRequest` declares no `turnstile_token` and the
+  // ruling adds none: a challenge is solved once, when the code is REQUESTED.
+  useTurnstileVerifier(verifier({ outcome: 'failed', detail: 'would refuse' }));
+  const res = await call({
+    method: 'POST',
+    path: '/auth/verify',
+    payload: { channel: 'email', email: 'a@example.test', code: 'good' },
+  });
+  expect(res.statusCode).toBe(200);
 });
 
 // -----------------------------------------------------------------------------
