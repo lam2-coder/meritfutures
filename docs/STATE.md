@@ -29,13 +29,13 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->232<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->232<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->232<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->232<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -9977,3 +9977,21 @@ not in this row's verification list and it mutates the working tree.
 **THE SHALLOW-CLONE TRAP [ADR-243](decisions/ADR-243.md) RECORDED WAS LIVE AGAIN**, 220 commits against 3,551, and `git fetch --unshallow origin` was run before any number was taken. **Second consecutive session to inherit it.**
 
 **THE POPULATION, re-derived at `52b5202`**: **229** entry files, **103** accepted, **126** proposed, **53** money-path entries over **69** files, tier 1 at **21**. The trend holds for a third day: 42, 44, 46, 47, 52, **53**.
+
+---
+
+## Session 441: an instant is not a trading day, and the sentence that said nothing maps one was already false (2026-08-29)
+
+**[ADR-251](decisions/ADR-251.md), `status: proposed`, UNSIGNED. MONEY PATH BY CONSEQUENCE, `E2` READ OWED. No migration number and no `RI-` number were taken.** Row `251` asked whether the smallest of `useAdminWriteBackend`'s three suppliers is buildable and said to build it if so. **IT IS, AND IT IS BUILT.** [`packages/rules-engine/src/calendar.ts`](../packages/rules-engine/src/calendar.ts) gains `buildSessionCalendar` and `tradingDayAt`, which answer by **CONTAINMENT** over `trading_calendar`'s stored session bounds and `trading_calendar_loads`' coverage, comparing an instant only with an instant and reading the day off the row that comparison selected.
+
+**THE CLAUSE IS NOT NARROWED, IT IS FALSE, AND IT WAS ALREADY FALSE IN TWO PLACES BEFORE THIS SESSION CHANGED A BYTE.** `readLastClosedTradingDay` in the worker and the PRIVATE `anchorCalendar` in `apps/api`'s own liability module both map an instant to a trading day today. **[ADR-145](decisions/ADR-145.md) finding 10's EVIDENCE was only ever about `calendar.ts`'s exports and its WORDING was about the whole workspace**, and the wording is what got quoted into a port docstring and a `BLOCKED` entry and read forward by two later entries. The honest gap was never that nothing maps an instant to a day; it was that both functions that do answer a different question in the wrong place.
+
+**THE TRAP WAS MEASURED IN BOTH DIRECTIONS RATHER THAN AVOIDED BY INTENTION.** Three paper-overs were seeded into the shipped function and each watched RED: the nearest loaded day, which the row named by name as "the same move in a better costume"; the collapse of `outside_coverage` into `not_a_session`, which is [ADR-042](decisions/ADR-042.md) F-4's silent failure; and the instant's own UTC calendar date. **THE THIRD SEED IS THE RESULT WORTH READING: it cannot be written inside `packages/rules-engine/src` at all**, because `merit/engine-purity` and `no-restricted-globals` both fire on the `new Date(atMs)` it needs. That is a control this session did not build and did not know it was relying on, and it is the argument for the engine being the right home rather than a route file.
+
+**THE PORT IS NOT WIRED AND THE WIRED COUNT DID NOT MOVE**, which the row required. `useAdminWriteBackend` stays blocked on `principal(request)` behind the C-08 purchase and on a `ValidationResult` projection nothing in this tree performs, so the entry goes from three clauses to two. **WHAT REPLACES THE THIRD IS A SHAPE RATHER THAN AN ABSENCE**: `tradingDay(): string` has ONE arm and the resolver answers THREE, and no ruling says which day an operator close takes when the instant is in no session while `accounts_terminal_has_close_date` requires `closed_on` on every `closed_admin` row. **A DECISION IS OWED AND A FUNCTION IS NOT**, and this entry declines to make it from a handler's authority.
+
+**THE FINDING NOBODY WENT LOOKING FOR IS THE MOST CONSEQUENTIAL THING HERE AND IT IS OUTSIDE THE FENCE.** **`apps/worker` NEVER READS `trading_calendar_loads`**, measured at zero occurrences under its `src/`. So [`toCalendarSlice`](../apps/worker/src/batch/adapter.ts) declares the nightly fold's coverage as the **extent of the rows it loaded**, while its own docblock says "COVERAGE IS EXACTLY WHAT WAS LOADED" and what was loaded is a stored fact in a table it does not read. The scope rule states the distinction the derivation loses: a day inside a declared load with no row **is a bug in the load**, and a day outside is UNKNOWN. Under the derivation a load bug reports as `not_a_session`, which the engine treats as positively not a trading day. **That is `ADR-042` F-4's exact substitution living in the deployable that folds every account every night, and it has been true since the adapter landed.** Reported, not fixed.
+
+**`RI-15` CAUGHT THIS SESSION'S OWN CITATIONS AT THREE SITES AND IS OBEYED RATHER THAN ARGUED WITH**, which is the second consecutive wave in which that invariant has caught the entry written to satisfy it. **Three citation repairs taken** under the row's up-front grant, one of them a line this session's own export moved. **One case of this session's own was wrong and is recorded rather than quietly corrected.**
+
+**No `packages/db/src/**` read helper was taken and the row is declared unowed**: `FirmTx` already reads both tables and `liability.ts` proves it in this same deployable.
