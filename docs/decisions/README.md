@@ -250,6 +250,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-234](ADR-234.md) | The terminal edge is `cancelled`, because it is the only exit money never travels down, and a rail that cannot report cannot be settled by an operator either  (2026-08-29, status: proposed) |
 | [ADR-235](ADR-235.md) | The code is the only credential, and the corpus asserted its strength in five places while no function in the repository produced one  (2026-08-29, status: proposed) |
 | [ADR-236](ADR-236.md) | The admin read port is behind the SSO purchase after all, its shape reason is retired as measured false for six of seven, and the one read that is genuinely unbuilt waits on a rule-state writer  (2026-08-29, status: proposed) |
+| [ADR-238](ADR-238.md) | The account cap is the firm's number and no plan version can hold it, the cross-identity read is refused a second time with the remedy named, and the checkout ledger arm is foreclosed by the corpus rather than by the accessor  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
