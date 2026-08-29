@@ -897,10 +897,10 @@ export type KycState = 'kyc_required' | 'pending' | 'verified' | 'rejected' | 'e
 /**
  * Context, never replayed (INV-23). Every field is resolved by the CALLER.
  *
- * M01 section 2.1 verbatim, and two fields carry a note that is part of the
- * contract rather than commentary: `payoutsFrozen` is "account level OR identity
- * level, RESOLVED BY THE CALLER", and `hasPayoutInFlight` is an outstanding
- * external-leg withdrawal for this identity.
+ * M01 SECTION 2.1 IS NOT REPRODUCED VERBATIM AND ONE NOTE IS CONTESTED IN THE
+ * CORPUS. `payoutsFrozen` is "account level OR identity level, RESOLVED BY THE
+ * CALLER" and matches its source. `hasPayoutInFlight` reads "for this account"
+ * in section 2.1 and "for this identity" in R-38's own row. ADR-248 rules NEITHER.
  */
 export interface ExternalGates {
   readonly accountStatus: AccountStatus;
@@ -908,7 +908,7 @@ export interface ExternalGates {
   /** Account level OR identity level, already resolved. */
   readonly payoutsFrozen: boolean;
   readonly reconBlocked: boolean;
-  /** R-38. An outstanding external-leg withdrawal exists for this identity. */
+  /** R-38, outstanding external leg. THE GRAIN IS CONTESTED: ADR-248, unruled. */
   readonly hasPayoutInFlight: boolean;
 }
 

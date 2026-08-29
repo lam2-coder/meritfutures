@@ -260,6 +260,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-244](ADR-244.md) | tier 1 is classified entire, its class C residue is ONE entry of twenty-one, and the classifier that sized it is not measuring the same object rather than measuring it wrongly  (2026-08-29, status: proposed) |
 | [ADR-245](ADR-245.md) | the worker landing closed two of the payout port's four links and moved neither of the other two, so the port still refuses, and `PayoutSubject`'s third field has never had a clause  (2026-08-29, status: proposed) |
 | [ADR-246](ADR-246.md) | three certificate ports are two questions, the card is one deliverable and not three, and a port whose own message promised a 503 was answering 500 (2026-08-29, status: proposed) |
+| [ADR-248](ADR-248.md) | `ExternalGates` is external to the REPLAYED STATE and not to this estate, three of its five facts resolve off registered tables, and the in-flight leg has no predicate to read because M01 states R-38's grain both ways  (2026-08-29, status: proposed) |
 | [ADR-249](ADR-249.md) | the certificate card is rendered on fetch, stored nowhere, addressed by the code and signed by nothing, so the two remaining certificate ports wait on a renderer and no migration is owed (2026-08-29, status: proposed) |
 <!--/gen-->
 
