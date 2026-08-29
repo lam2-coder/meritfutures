@@ -21,6 +21,14 @@
 // INV-M3-02's enforcement column is one sentence and it is the design:
 // "Zod schema has no price field at all. THE ABSENCE IS THE CONTROL."
 //
+// THERE IS NO ZOD SCHEMA IN THIS TREE AND THE CONTROL IS UNAFFECTED, WHICH IS
+// ADR-225's separation. `zod` is a dependency of no `package.json` in this
+// workspace and no file under `apps/**` or `packages/**` imports it, so the
+// quoted sentence names the MECHANISM `M03:52` assumed rather than the property
+// it enforces. The property is structural, it is held by the paragraph below,
+// and a parser would not have made it stronger: what defends the price is that
+// `CheckoutRequest` has no member to carry one.
+//
 // `CheckoutRequest` below declares `plan_id`, `size_cents`, `coupon_code`,
 // `affiliate_click_token` and `accept_tos_version_ids`, which is section 5's
 // list and no sixth member. `size_cents` IS AN INPUT TO A LOOKUP AND NEVER A

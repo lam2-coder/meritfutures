@@ -934,6 +934,16 @@ export const UNWIRED_EVENT_SINK: EventSink = {
  * comment on the payload column is "Validated against the event's zod schema AT
  * WRITE TIME", and {@link buildEvent} is that validation for the eight rows this
  * tree produces.
+ *
+ * THE QUOTATION IS EXACT AND THE MECHANISM IT NAMES IS NOT IN THIS TREE, WHICH
+ * IS ADR-225. `zod` is a dependency of no `package.json` in this workspace and
+ * no file under `apps/**` or `packages/**` imports it. So `0017:49` names the
+ * wrong MECHANISM for a control that does exist, and the distinction is the
+ * whole of ADR-225's separation: the substance of that claim HOLDS here,
+ * because {@link EVENT_WRITE_TABLE} is the only write into `events` in this
+ * tree and every path to it runs through {@link buildEvent}. `0004:63`'s
+ * matching sentence about `plan_versions.rules` is the one whose substance does
+ * NOT hold. Neither migration is edited (constitution E2).
  */
 export function makeEventSink(deps: { writer: EventWriter; clock: () => Date }): EventSink {
   return {
