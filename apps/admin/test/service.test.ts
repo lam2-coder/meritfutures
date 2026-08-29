@@ -8,6 +8,7 @@ import { ADMIN_BARREL_LEGS, ADMIN_MODULES_NOT_RE_EXPORTED, SERVICE, main } from 
 import * as dataTrustModule from '../src/data-trust.ts';
 import * as feedModule from '../src/feed.ts';
 import * as figureModule from '../src/figure.ts';
+import * as liabilityReadModule from '../src/liability-read.ts';
 import * as liabilityModule from '../src/liability.ts';
 import * as liveLiabilityModule from '../src/live-liability.ts';
 import * as originModule from '../src/origin.ts';
@@ -227,6 +228,12 @@ type _ReserveCoverageSnapshot = Expect<
 type _ThreeNumbers = Expect<Identical<admin.ThreeNumbers, liabilityModule.ThreeNumbers>>;
 type _TreasurySource = Expect<Identical<admin.TreasurySource, liabilityModule.TreasurySource>>;
 
+type _LiabilityRead = Expect<Identical<admin.LiabilityRead, liabilityReadModule.LiabilityRead>>;
+type _UnreadWireField = Expect<
+  Identical<admin.UnreadWireField, liabilityReadModule.UnreadWireField>
+>;
+type _WireGapCause = Expect<Identical<admin.WireGapCause, liabilityReadModule.WireGapCause>>;
+
 type _IndicativeMovement = Expect<
   Identical<admin.IndicativeMovement, liveLiabilityModule.IndicativeMovement>
 >;
@@ -302,6 +309,61 @@ const VALUE_LEGS: readonly (readonly [string, string, unknown, unknown])[] = [
   ['./liability.ts', 'theThreeNumbers', admin.theThreeNumbers, liabilityModule.theThreeNumbers],
 
   [
+    './liability-read.ts',
+    'ADMIN_LIABILITY_PATH',
+    admin.ADMIN_LIABILITY_PATH,
+    liabilityReadModule.ADMIN_LIABILITY_PATH,
+  ],
+  [
+    './liability-read.ts',
+    'LiabilityReadError',
+    admin.LiabilityReadError,
+    liabilityReadModule.LiabilityReadError,
+  ],
+  [
+    './liability-read.ts',
+    'TRUST_INPUTS_CARRIED_WITHOUT_A_STATE',
+    admin.TRUST_INPUTS_CARRIED_WITHOUT_A_STATE,
+    liabilityReadModule.TRUST_INPUTS_CARRIED_WITHOUT_A_STATE,
+  ],
+  [
+    './liability-read.ts',
+    'WIRE_FIELDS_THIS_PAGE_DOES_NOT_READ',
+    admin.WIRE_FIELDS_THIS_PAGE_DOES_NOT_READ,
+    liabilityReadModule.WIRE_FIELDS_THIS_PAGE_DOES_NOT_READ,
+  ],
+  [
+    './liability-read.ts',
+    'WIRE_GAP_CAUSES',
+    admin.WIRE_GAP_CAUSES,
+    liabilityReadModule.WIRE_GAP_CAUSES,
+  ],
+  [
+    './liability-read.ts',
+    'gapCauseRemedy',
+    admin.gapCauseRemedy,
+    liabilityReadModule.gapCauseRemedy,
+  ],
+  [
+    './liability-read.ts',
+    'liabilityHomeInputFrom',
+    admin.liabilityHomeInputFrom,
+    liabilityReadModule.liabilityHomeInputFrom,
+  ],
+  [
+    './liability-read.ts',
+    'narrowLiabilityResponse',
+    admin.narrowLiabilityResponse,
+    liabilityReadModule.narrowLiabilityResponse,
+  ],
+  [
+    './liability-read.ts',
+    'readLiabilityHome',
+    admin.readLiabilityHome,
+    liabilityReadModule.readLiabilityHome,
+  ],
+
+  [
     './live-liability.ts',
     'liveOpenLiability',
     admin.liveOpenLiability,
@@ -347,6 +409,7 @@ const LEG_BY_ALIAS: Readonly<Record<string, string>> = {
   feedModule: './feed.ts',
   figureModule: './figure.ts',
   liabilityModule: './liability.ts',
+  liabilityReadModule: './liability-read.ts',
   liveLiabilityModule: './live-liability.ts',
   originModule: './origin.ts',
   pageModule: './page.ts',
@@ -491,12 +554,17 @@ test('B.6 every module the barrel deliberately omits states a reason', () => {
     expect(reason.trim().length, `${module} is absent with no stated reason`).toBeGreaterThan(40);
 });
 
-test('B.7 the surface is 74 names over 8 modules, and the count is the tree`s', () => {
+test('B.7 the surface is 86 names over 9 modules, and the count is the tree`s', () => {
   // WAVE-06 section 5.1's measurement, re-derived. THE COUNT IS NOT WRITTEN
   // TWICE: the cardinal below is compared against what the modules declare, so a
   // module that grows a name moves it, and moving it is a diff a reviewer reads.
+  //
+  // 74 OVER 8 UNTIL `liability-read.ts` LANDED, and the move is the diff this
+  // case exists to make a reviewer read: one module, twelve names, and the count
+  // re-derived at the moment of writing rather than carried from the entry that
+  // set it.
   const declared = ADMIN_BARREL_LEGS.flatMap((leg) => declaredExports(sourceOf(leg)));
   expect(new Set(declared).size).toBe(declared.length);
-  expect(declared.length).toBe(74);
-  expect(ADMIN_BARREL_LEGS.length).toBe(8);
+  expect(declared.length).toBe(86);
+  expect(ADMIN_BARREL_LEGS.length).toBe(9);
 });

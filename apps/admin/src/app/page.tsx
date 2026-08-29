@@ -80,7 +80,8 @@
 // member has no producer.
 //
 // -----------------------------------------------------------------------------
-// THE SEAM IS ONE FUNCTION BODY AND THE OTHER ARM IS ALREADY BUILT
+// THE SEAM IS ONE FUNCTION BODY, AND THE BODY IT WILL HOLD IS NOW WRITTEN AND
+// TESTED ONE MODULE OVER
 // -----------------------------------------------------------------------------
 // `liabilityHomeRead()` returns the union. The `supplied` arm renders through
 // `renderLiabilityHomeDocument`, which asserts `INV-M6-10` over the served
@@ -88,11 +89,24 @@
 // `buildLiabilityHome` value through exactly that path. So the day a supplier
 // exists, what changes is this one function and nothing else in this file.
 //
-// THE FAILED ARM IS NOT PRE-BUILT AND ADR-190 RULING 3 IS ALSO WHY. The arm a
-// real read needs carries a kind AND the status it was derived from, which is
-// `AdminApiFailure`'s shape in `../http/client.ts` and is already written. A
-// third arm added here before a fetch exists would be a second place to spell
-// a status nobody sent, which is the defect this file just removed.
+// **THE HALF THAT USED TO BE MISSING FROM THAT SENTENCE IS `../liability-read.
+// ts`, AND IT LANDED.** `readLiabilityHome` takes one `AdminApiResult` and
+// answers `supplied`, `failed` or `refused`: it narrows the body structurally
+// against `../api/types.ts`, enforces `ADR-203` ruling 2 on the reading side in
+// both directions so a bare `null` cannot arrive here as a zero, and projects
+// what survives into `../page.ts`'s input. `test/liability-read.test.ts` builds
+// a whole `LiabilityHomePage` out of one response and reads the bytes.
+//
+// SO WHAT IS MISSING IS THE SOURCE AND NOT THE SCREEN, which is what the two
+// entries below say and is why neither of them names a console file.
+//
+// THE FAILED ARM IS STILL NOT PRE-BUILT HERE AND ADR-190 RULING 3 IS WHY. The
+// arm a real read needs carries a kind AND the status it was derived from,
+// which is `AdminApiFailure`'s shape in `../http/client.ts`; `LiabilityRead`
+// already carries it, in a module that is not a route. A third arm added HERE
+// before a fetch exists would be a second place to spell a status nobody sent,
+// which is the defect this file removed, and `M6-A-41` refuses this directory a
+// network call of any kind besides.
 
 import type { ReactElement } from 'react';
 
@@ -135,12 +149,15 @@ const BLOCKED_ON: readonly PendingPanel[] = [
     title: 'The `GET /admin/liability` adapter',
     blockedBy:
       'the route is registered on the operator surface and `AdminReadSource.readLiability` has ' +
-      'no adapter. WAVE-06 section 2.1 records the liability home as the surface with 1,764 ' +
-      'lines of console code, a registered route and no adapter, and gives the adapter to ' +
-      '`P5-l`. This wave holds none of the three files that slice holds. It is a SECOND ' +
-      'uncomposed port behind the first, and ADR-190 measured that it answers the same 500 as ' +
-      'the first: a caller who got past the session source would meet this one and could not ' +
-      'tell the two apart from the response',
+      'no adapter. RE-DERIVED RATHER THAN CARRIED: `IMPLEMENTED_ADMIN_READS` in ' +
+      '`apps/api/src/admin-source/index.ts` names listEvents, listFlags, readAccount, ' +
+      'readIdentityGraph and searchAccounts, and readLiability is not among the five, so ' +
+      '`setAdminReadSource` stays on the BLOCKED list. THE CONSOLE HALF IS NOT WHAT IS ' +
+      'MISSING: `../liability-read.ts` narrows this endpoint`s body and projects it into this ' +
+      'page`s input, and no file this page needs is unwritten. It is a SECOND uncomposed port ' +
+      'behind the first, and ADR-190 measured that it answers the same 500 as the first: a ' +
+      'caller who got past the session source would meet this one and could not tell the two ' +
+      'apart from the response',
   },
 ];
 

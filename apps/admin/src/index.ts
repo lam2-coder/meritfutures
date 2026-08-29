@@ -257,6 +257,26 @@ export {
   renderLiabilityHome,
 } from './page.ts';
 
+// `liability-read.ts` IS THE LAST LEG AND IT READS EVERY OTHER ONE. It turns a
+// `GET /admin/liability` body into `page.ts`'s input, so its names are on this
+// surface for the same reason `buildLiabilityHome` is: a consumer that could
+// reach the page builder and not the reader would have to write the narrowing
+// again, and a second narrowing is a second answer to what the response means.
+export {
+  ADMIN_LIABILITY_PATH,
+  type LiabilityRead,
+  LiabilityReadError,
+  TRUST_INPUTS_CARRIED_WITHOUT_A_STATE,
+  type UnreadWireField,
+  WIRE_FIELDS_THIS_PAGE_DOES_NOT_READ,
+  WIRE_GAP_CAUSES,
+  type WireGapCause,
+  gapCauseRemedy,
+  liabilityHomeInputFrom,
+  narrowLiabilityResponse,
+  readLiabilityHome,
+} from './liability-read.ts';
+
 // =============================================================================
 // THE BARREL'S OWN LEGS, AS DATA, BECAUSE A TYPE CHECKER CANNOT SEE AN EXPORT
 // THAT WAS NEVER WRITTEN
@@ -324,6 +344,7 @@ export const ADMIN_BARREL_LEGS = [
   './data-trust.ts',
   './feed.ts',
   './figure.ts',
+  './liability-read.ts',
   './liability.ts',
   './live-liability.ts',
   './origin.ts',
