@@ -958,18 +958,61 @@ export interface EvidenceExportRequest {
  * `'operator-console'` for exactly this: "The admin liability dashboard".
  * `SqlExecutorReason` has one member, `'job-enqueue'`, and it is not this.
  *
- * WHAT IS MISSING IS NOT AN AUTHORITY, IT IS A SHAPE. The accessor's whole read
- * vocabulary is `rows(key)`, `rowsWhere(key, filter)` and `rowAt(key, address)`,
- * where a filter is a TYPED EQUALITY over declared columns (ADR-112). None of
- * the seven bodies above is a projection of one table: `LiabilityResponse` is
- * six aggregates over the whole book, `AdminAccountSearchItem` joins accounts to
- * identities to flags to reconciliation state, and `IdentityGraph` is a walk.
- * There is no join and no aggregate to reach for, so a live adapter written
- * today would have to go through `sqlExecutor`, which would mean widening a
- * one-member vocabulary to smuggle in the SQL the accessor deliberately does not
- * offer. THAT IS THE FINDING AND THIS FILE STOPS AT IT rather than widening
- * anything: the routes, the guard, the validation and the projections are real
- * now, and the adapter is owed to a slice that holds `packages/db`.
+ * THE SHAPE WAS THE OBSTRUCTION AND IT IS NOT ONE ANY MORE, AND THE CORRECTION
+ * IS WRITTEN HERE BECAUSE THIS IS THE SENTENCE EVERY LATER READER CITED.
+ * ADR-236. The paragraph this replaces read "WHAT IS MISSING IS NOT AN
+ * AUTHORITY, IT IS A SHAPE", and then "None of the seven bodies above is a
+ * projection of one table ... There is no join and no aggregate to reach for,
+ * so a live adapter written today would have to go through `sqlExecutor`".
+ * THAT IS NOW MEASURED FALSE FOR SIX OF THE SEVEN. Six producer modules exist,
+ * one per method except `readLiability`, and NOT ONE OF THEM REACHES
+ * `sqlExecutor`: each reads through `rows(key)`, `rowsWhere(key, filter)` and
+ * `rowAt(key, address)` and does the rest in ordinary code. The claim was never
+ * that the accessor could not serve these bodies. It was that a JOIN had to
+ * happen in SQL, and what the six demonstrate is that a fold in TypeScript over
+ * keyed reads IS the join, at a cost each of them measures and returns.
+ *
+ * THE MODULES ARE NOT NAMED BY PATH HERE AND THAT IS THE CONTROL RATHER THAN A
+ * HEDGE. The dependency runs one way: the composition cites this module and
+ * this module cites it back nowhere, and the composition's own suite asserts
+ * that over this file as a SUBSTRING, so a path written into this paragraph
+ * would turn it red. The measurement above is therefore held where it can be
+ * checked without a back-reference, at
+ * `test/admin-read-constructibility.test.ts`, which derives the seven, the six
+ * and the one from source on every run rather than from this comment.
+ *
+ * WHAT IS MISSING NOW IS THE AUTHORITY, WHICH IS THE INVERSE OF WHAT THIS
+ * PARAGRAPH USED TO SAY. ADR-171 clause 2 refused the operator door on the
+ * measurement that it "unblocks ZERO of the five", and its row for THIS port
+ * read "the door supplies an authority; the port is missing a vocabulary". The
+ * vocabulary is supplied. So the port waits on the door and on nothing else,
+ * and the door is not takeable: ADR-171 section 9 makes it takeable by "the
+ * slice that lands an `AdminSessionSource` a deployment can install",
+ * `apps/api/src/db.ts` declares no `operator(fn)`, and `test/db.test.ts` pins
+ * both that file's import list and the fact that no other file under `src/` may
+ * take a handle off the accessor at all. THE REFUSAL STANDS AND ONLY ITS REASON
+ * MOVES. Nothing here reopens ADR-171, whose condition is still unmet.
+ *
+ * SO THIS PORT IS BEHIND THE SAME PURCHASE AS THE OTHER FOUR, AND THE COUNT IS
+ * FIVE RATHER THAN FOUR. `setAdminSessionSource` is the SSO integration itself,
+ * the three write backends resolve `principal(request)` only through it, and
+ * this one arrives at the same place one step further along, through ADR-171
+ * section 9's condition. That is `C-08` hardware-key SSO and the `D3` allowlist
+ * on `ADMIN_ORIGIN`, which are a founder decision and never a line written here.
+ *
+ * THE ONE THING ON THIS PORT NOT BEHIND THAT PURCHASE IS `readLiability`, AND
+ * IT IS UNBUILT RATHER THAN BLOCKED. Its rows are produced already: a book
+ * reader, a seven-day trading horizon and a payout-velocity evaluator all exist
+ * and are exercised against a live database. What does not exist is the
+ * assembly of the three into one `LiabilityResponse`. The figure holding it is
+ * `eligible_next_7d`, whose one remaining term is a `writeRuleState`
+ * implementation in `apps/worker/**` or `packages/**`: `rule_states` holds zero
+ * rows, so the per-account half of that forecast has no source, and EC-074
+ * makes the group whole or nothing. NO AGGREGATE IS INVENTED HERE FOR IT.
+ * `M06` section 1.2 is the rule, at `docs/plans/M06-admin-ops-console.md:35`:
+ * "M6 aggregates numbers other modules computed. It has no arithmetic on a
+ * rule". A console that computed its own forecast would put a number in front
+ * of an operator that no other part of this system agrees with.
  */
 export interface AdminReadSource {
   searchAccounts(query: AccountSearchQuery): Promise<AdminPage<AdminAccountSearchItem>>;
@@ -1024,8 +1067,11 @@ function currentReadSource(): AdminReadSource {
     throw new AdminReadError(
       'no admin read source is wired, so the operator console has nothing to read. This is a ' +
         'deployment which has not been finished rather than a request that failed: the door the ' +
-        "wiring slice must take is `systemDb('operator-console')`, and what it must build first " +
-        'is the join and aggregate shapes the keyed accessor does not offer',
+        "wiring slice must take is `systemDb('operator-console')`, and ADR-171 section 9 makes " +
+        'that door takeable by the slice landing an `AdminSessionSource` a deployment can ' +
+        'install. The shapes are NOT what is missing and this message used to say they were ' +
+        '(ADR-236): six of the seven reads have producers today and none of them reaches ' +
+        '`sqlExecutor`',
     );
   return readSource;
 }
