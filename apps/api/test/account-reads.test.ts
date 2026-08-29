@@ -37,6 +37,9 @@
 // requires 404. So the account read is asserted by name, in the order it runs.
 // =============================================================================
 
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { atMost, isFilterTerm } from '@merit/db';
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -714,7 +717,10 @@ describe('three of the four refuse by NAME and answer 503, never 500 and never a
 
   test.each([
     ['timeline', 'readTimeline', /not a registered table/],
-    ['eligibility', 'readEligibility', /lifetimeSettledCents/],
+    // NOT `/lifetimeSettledCents/`, WHICH IS THE WORD THIS BLOCKER USED TO
+    // REFUSE ON AND NOW USES TO SAY THE OPPOSITE. A pattern that matches both
+    // the old reason and its repair is a pattern that watched nothing.
+    ['eligibility', 'readEligibility', /`rule_states` HOLDS NO ROWS/],
     ['certificate', 'readCertificate', /image_url/],
   ])('the %s blocker is measured, not a shrug', async (_name, method, pattern) => {
     const { db } = storeDb(live);
@@ -766,5 +772,167 @@ describe('the row readers refuse rather than round', () => {
       cursor: null,
     });
     expect(snapshot?.marks[0]?.closingBalanceCents).toBe(5_012_300n);
+  });
+});
+
+// =============================================================================
+// THE ELIGIBILITY BLOCKER, CLAUSE BY CLAUSE, EACH DERIVED AT ITS OWN SOURCE
+// =============================================================================
+// A REASON NOTHING COMPARES IS A REASON THAT DRIFTS, and this one drifted on the
+// production request path. `ELIGIBILITY_BLOCKER` said until this session that
+// "no migration in the tree declares `lifetime_settled_cents` at all", which
+// `0065_rule_state_lifetime_and_breach.sql` falsified, and that the engine type
+// is "not persistable in this schema", which `apps/worker`'s writer falsified a
+// session later. NO GATE IN THE TREE SAW EITHER: `RI-14` reads exports and a
+// migration column is not an export, and `RI-15` and `RI-16` do not reach a
+// claim inside a string literal.
+//
+// So the repaired reason arrives with a comparator rather than with a promise.
+// Each case below derives ONE clause from the artifact it is about and fails on
+// the day that artifact moves, which is the day the sentence stops being true.
+//
+// THE CASES SWEEP `src/` AND NOT THIS PACKAGE, and that is deliberate: every
+// clause is about something OUTSIDE `apps/api`, and the file an encoder or an
+// adapter would arrive in is the file nobody has written yet.
+
+const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
+
+/** Every `.ts` file under a deployable's or a package's `src/`. */
+function deployableSources(): string[] {
+  const found: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      const path = join(dir, entry);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (entry.endsWith('.ts')) found.push(path);
+    }
+  };
+  for (const group of ['apps', 'packages'])
+    for (const unit of readdirSync(join(REPO_ROOT, group))) {
+      const src = join(REPO_ROOT, group, unit, 'src');
+      try {
+        if (statSync(src).isDirectory()) walk(src);
+      } catch {
+        // A workspace member with no `src/` is not a finding.
+      }
+    }
+  return found;
+}
+
+/**
+ * The file with its comment lines removed.
+ *
+ * `rule-state-writer.test.ts` 6.3's idiom and its reason: the modules swept here
+ * QUOTE the things they refuse, so a sweep over the prose would be red on the
+ * sentence that explains why it is green.
+ */
+function codeOf(path: string): string {
+  return readFileSync(path, 'utf8')
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'))
+    .join('\n');
+}
+
+/** The reason the port refuses with, taken off the rejection and not off a copy. */
+async function eligibilityBlocker(): Promise<string> {
+  const { db } = storeDb(live);
+  const error = await databaseAccountReads(db)
+    .readEligibility(SESSION_A, ACCOUNT_A)
+    .then(() => null)
+    .catch((raised: unknown) => raised);
+  expect(error).toBeInstanceOf(AccountReadsBackendUnwired);
+  return (error as Error).message;
+}
+
+describe('the eligibility blocker states causes that are LIVE, and each is derived here', () => {
+  test('the schema delta is spent, and the reason no longer claims it', async () => {
+    // CLAUSE 0. `0065` landed the three columns `0015` never declared. The old
+    // reason's existence claim is therefore false, and a reason that carries a
+    // false clause is worse than no reason: a reader who checks that clause,
+    // finds it spent and clears the refusal serves a verdict off an empty table.
+    const migrations = join(REPO_ROOT, 'packages/db/migrations');
+    const ddl = readdirSync(migrations)
+      .filter((file) => file.endsWith('.sql'))
+      .map((file) => readFileSync(join(migrations, file), 'utf8'))
+      .join('\n');
+    for (const column of ['lifetime_settled_cents', 'breached', 'breach_kind'])
+      expect(ddl, `${column} is not declared in any migration`).toContain(column);
+    // NON-VACUITY: the corpus was read and it does not contain everything.
+    expect(ddl).not.toContain('lifetime_settled_dollars');
+
+    const blocker = await eligibilityBlocker();
+    for (const stale of [
+      'no migration in the tree declares',
+      'not persistable in this schema',
+      'declares none of',
+    ])
+      expect(blocker, `the repaired reason still carries "${stale}"`).not.toContain(stale);
+  });
+
+  test('clause 1: ONE site in the tree inserts a `rule_states` row, and it is the batch writer', async () => {
+    // The blocker says the single insert site is `writeRuleStateVia`. This is
+    // that sentence as a predicate over every deployable's source.
+    const writers = deployableSources()
+      .filter((path) => codeOf(path).includes("insert('ruleStates'"))
+      .map((path) => path.slice(REPO_ROOT.length + 1));
+    expect(writers).toEqual(['apps/worker/src/batch/state-writer.ts']);
+    expect(await eligibilityBlocker()).toContain('writeRuleStateVia');
+  });
+
+  test('clause 1: nothing in a deployable calls the batch, so no row is ever produced', async () => {
+    // `runNightlyBatch` is the writer's only caller. Two files in the whole of
+    // `src/` NAME it: the module that declares it and the barrel that exports
+    // it. A THIRD would be a scheduler or an adapter, and there is none, which
+    // is why `rule_states` is empty rather than merely small.
+    //
+    // THIS MODULE IS EXCLUDED AND THE EXCLUSION IS THE FINDING, not a
+    // convenience: `ELIGIBILITY_BLOCKER` NAMES `runNightlyBatch` inside a
+    // STRING LITERAL, so comment stripping does not reach it and the sweep
+    // counted the reason as a caller on its first run. That is the same
+    // blindness `RI-15` and `RI-16` have about this file, met from the inside.
+    const namers = deployableSources()
+      .filter((path) => codeOf(path).includes('runNightlyBatch'))
+      .map((path) => path.slice(REPO_ROOT.length + 1))
+      .filter((path) => path !== 'apps/api/src/routes/account-reads.ts')
+      .sort();
+    expect(namers).toEqual(['apps/worker/src/batch/nightly.ts', 'apps/worker/src/index.ts']);
+    expect(await eligibilityBlocker()).toContain('without scheduling it');
+  });
+
+  test('clause 2: no `engine_gates` encoding ships under any `src/`, so the writer would refuse', async () => {
+    // `B5` TERM 2 IN MECHANICAL FORM. `apps/worker/test/rule-state-writer.test.ts`
+    // 5.6 asserts the same predicate over its own package because it is that
+    // module's claim; it is asserted again here because it is THIS reason's
+    // second clause, and a clause whose comparator lives in another package is
+    // a clause this file cannot keep true.
+    const declarations = deployableSources().flatMap((path) =>
+      [...codeOf(path).matchAll(/export const (\w+): RuleStateWriterIo =/g)].map(
+        (match) => match[1] ?? '',
+      ),
+    );
+    expect(declarations, 'a second RuleStateWriterIo value ships in src/').toEqual([
+      'UNWIRED_RULE_STATE_WRITER_IO',
+    ]);
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/state-writer.ts'))).toContain(
+      'throw new RuleStateWriterUnwired',
+    );
+    expect(await eligibilityBlocker()).toContain('encodeEngineGates');
+  });
+
+  test('clause 3: the reader has the same gap, because `engine_gates` is `jsonb` and its shape is undeclared', async () => {
+    // `RuleState.engineGates` is a STRUCTURE and the column is opaque. The
+    // engine declares the type; nothing declares the stored form, so an adapter
+    // handed a row would have to invent the decoding, which is the same act on
+    // the read side that clause 2 refuses on the write side.
+    const engine = readFileSync(join(REPO_ROOT, 'packages/rules-engine/src/types.ts'), 'utf8');
+    expect(engine).toContain('readonly engineGates: EngineGateResults;');
+    const schema = readFileSync(join(REPO_ROOT, 'packages/db/src/schema.ts'), 'utf8');
+    const ruleStates = schema.slice(schema.indexOf('export const ruleStates = pgTable('));
+    expect(ruleStates.slice(0, 3000)).toContain("engineGates: jsonb('engine_gates').notNull()");
+
+    const blocker = await eligibilityBlocker();
+    expect(blocker).toContain('EngineGateResults');
+    // AND IT SAYS WHAT WOULD CLEAR IT, which is the half a blocker usually omits.
+    expect(blocker).toContain('It clears when a row exists');
   });
 });
