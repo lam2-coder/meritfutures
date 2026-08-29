@@ -8293,6 +8293,8 @@ Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, t
 
 **WHAT IS STILL OWED.** All three of `B5`'s terms, and no single fence holds them. The cheapest next slice is term 2, an ADR declaring the stored `engine_gates` encoding, because it is the one that makes a `rule_states` reader writable and costs no code. Term 3 wants one ADR moving the contract and both code copies in one commit, with `EligibleForecastResponse`'s empty-horizon body still an open ruling. `M01:785` still wants a pointer to `projectPayout`.
 
+---
+
 ## Session 393 (2026-08-29): the screen is ready and the source is not, and the wire's gap vocabulary has no figure on this page to speak about yet
 
 **THE ADMIN LIABILITY DASHBOARD RENDERS ITS HONEST UNAVAILABLE STATE, AND WHAT IS MISSING IS THE SOURCE RATHER THAN THE SCREEN.** `readLiability` is still not one of `IMPLEMENTED_ADMIN_READS`' five, re-derived at reporting time, and nothing calls `setAdminSessionSource` outside a test, so no deployment can mint the cookie a real read would send. The root route's `P5-l` blocker now recites the register rather than a `WAVE-06` line count, and `M6-A-86` binds the recital to the array it recites so the blocker comes out on the day the adapter lands rather than sitting stale.
