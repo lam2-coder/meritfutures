@@ -68,6 +68,7 @@ import {
   MINIMUM_WITHDRAWAL_CENTS,
   OPEN_WITHDRAWAL_STATUSES,
   PAYOUTS_FROZEN,
+  TERMINAL_WITHDRAWAL_STATUSES,
   UNWIRED_WITHDRAWAL_BACKEND,
   WALLET_PROVENANCES,
   WITHDRAWALS_ENDPOINT,
@@ -81,10 +82,15 @@ import {
   databaseWithdrawalBackend,
   decideWithdrawal,
   currentKycState,
+  decideApproval,
+  driveApprovals,
+  dualControlRequired,
   gateIdentityStatus,
   provenanceReview,
   resetWithdrawalBackend,
+  toApprovalCandidate,
   toWalletEntryRow,
+  withdrawalReleasesIdentity,
   unspentLots,
   useWithdrawalBackend,
   validateWithdrawalRequest,
@@ -97,9 +103,12 @@ import {
   type KycState,
   type WalletEntryRow,
   type WithdrawalBackend,
+  type ApprovalHand,
+  type WithdrawalApprovalValues,
   type WithdrawalInsert,
   type WithdrawalTx,
 } from '../src/routes/wallet-withdrawals.ts';
+import { DUAL_CONTROL_THRESHOLD_CENTS } from '../src/routes/admin-wallet.ts';
 import { NO_PRE_IDENTITY_DOORS } from './db-recorder.ts';
 
 // -----------------------------------------------------------------------------
@@ -194,6 +203,8 @@ interface Fixture {
   calls: string[];
   written: WithdrawalInsert[];
   registered: DestinationInsert[];
+  /** Every `approveWithdrawal` this fixture committed. ADR-232. */
+  approved: { id: string; values: WithdrawalApprovalValues }[];
   keys: Map<string, IdempotencyRecord & { owner: string }>;
 }
 
@@ -213,6 +224,7 @@ function reset(): void {
     calls: [],
     written: [],
     registered: [],
+    approved: [],
     keys: new Map(),
   };
 }
@@ -236,6 +248,7 @@ const backend: WithdrawalBackend = {
     const stagedWritten = [...fixture.written];
     const stagedRegistered = [...fixture.registered];
     const stagedDestinations = new Map(fixture.destinations);
+    const stagedWithdrawals = fixture.withdrawals.map((row) => ({ ...row }));
     const tx: WithdrawalTx = {
       lockScope: () => {
         fixture.calls.push('lockScope');
@@ -251,9 +264,26 @@ const backend: WithdrawalBackend = {
       },
       withdrawals: () => {
         fixture.calls.push('withdrawals');
-        return Promise.resolve(
-          fixture.withdrawals.map((row) => ({ status: String(row['status']) })),
-        );
+        return Promise.resolve(stagedWithdrawals.map((row) => ({ status: String(row['status']) })));
+      },
+      approvalCandidates: () => {
+        fixture.calls.push('approvalCandidates');
+        return Promise.resolve(stagedWithdrawals.map(toApprovalCandidate));
+      },
+      approveWithdrawal: (id, values) => {
+        fixture.calls.push(`approveWithdrawal:${id}`);
+        const row = stagedWithdrawals.find((held) => held['id'] === id);
+        if (row === undefined) throw new Error(`no staged withdrawal ${id}`);
+        Object.assign(row, {
+          status: values.status,
+          approvedAt: values.approvedAt,
+          approvedBy: values.approvedBy,
+          dualControlApprovalId: values.dualControlApprovalId,
+          dualControlThresholdCents: values.dualControlThresholdCents,
+          updatedAt: values.updatedAt,
+        });
+        fixture.approved.push({ id, values });
+        return Promise.resolve();
       },
       entries: () => {
         fixture.calls.push('entries');
@@ -282,6 +312,7 @@ const backend: WithdrawalBackend = {
     fixture.written = stagedWritten;
     fixture.registered = stagedRegistered;
     fixture.destinations = stagedDestinations;
+    fixture.withdrawals = stagedWithdrawals;
     return value;
   },
   idempotency: {
@@ -1312,6 +1343,332 @@ describe('databaseWithdrawalBackend reads and writes through the accessor', () =
     expect(recorder.openedFor).toStrictEqual([IDENTITY]);
     expect(recorder.calls).toStrictEqual([
       { verb: 'rowAt', key: 'idempotencyKeys', address: { key: 'k' } },
+    ]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE APPROVAL EDGE, AND THE LOCKOUT IT DOES NOT END. ADR-232
+// -----------------------------------------------------------------------------
+
+/** A `wallet_withdrawals` row as the accessor returns it, camel cased. */
+function openRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'withdrawal-1',
+    status: 'requested',
+    amountCents: 150_000n,
+    destinationRef: DESTINATION,
+    sourceProvenanceSummary: [{ provenance: 'payout', cents: 150_000 }],
+    earliestCreditAt: new Date('2026-08-01T00:00:00.000Z'),
+    frozenAt: null,
+    ...over,
+  };
+}
+
+/** A destination whose 48 hour window elapsed before {@link NOW}. */
+function settledDestination(): void {
+  fixture.destinations.set(DESTINATION, {
+    firstSeenAt: new Date('2026-08-20T00:00:00.000Z'),
+    coolingUntil: new Date('2026-08-22T00:00:00.000Z'),
+  });
+}
+
+function drive(hand: ApprovalHand | null = null, at: Date = NOW): Promise<unknown> {
+  return backend.transact(SESSION, (tx) => driveApprovals({ tx, hand, at }));
+}
+
+describe('the approval edge does not release the identity, and that is asserted rather than argued', () => {
+  it('partitions `wallet_withdrawal_status` into the open four and the terminal three', () => {
+    // `0001:95-98` declares seven members. The two lists are complements, so a
+    // future eighth value that joins neither is a case this assertion sees.
+    expect([...OPEN_WITHDRAWAL_STATUSES, ...TERMINAL_WITHDRAWAL_STATUSES].sort()).toStrictEqual([
+      'approved',
+      'cancelled',
+      'cooling',
+      'failed',
+      'requested',
+      'settled',
+      'transferring',
+    ]);
+  });
+
+  it('reports `approved` as OPEN, which is the premise the blocked port reasoned past', () => {
+    // THE WHOLE FINDING IN ONE LINE. `wiring.test.ts`'s entry for
+    // `useWithdrawalBackend` reads the missing approval edge as the thing
+    // between a wired backend and a permanent per-trader lockout. Approval
+    // moves the row from one open status to another.
+    expect(withdrawalReleasesIdentity('approved')).toBe(false);
+    expect(withdrawalReleasesIdentity('transferring')).toBe(false);
+    for (const status of TERMINAL_WITHDRAWAL_STATUSES)
+      expect(withdrawalReleasesIdentity(status)).toBe(true);
+  });
+
+  it('STILL refuses a second withdrawal after the first is approved', async () => {
+    // The test the dispatch asked for, run against what the enum actually says.
+    // It was written expecting a 200 and it is a 409, and the 409 is correct.
+    settledDestination();
+    fixture.withdrawals = [openRow()];
+
+    const outcomes = await drive();
+    expect(outcomes).toStrictEqual([
+      {
+        id: 'withdrawal-1',
+        decision: expect.objectContaining({ kind: 'approve', guard: 'G-WITHDRAWAL-CLEARED' }),
+      },
+    ]);
+    expect(fixture.withdrawals[0]?.['status']).toBe('approved');
+
+    const res = await withdraw();
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('accepts a second withdrawal once the first reaches a TERMINAL status', async () => {
+    // THE NO-LOCKOUT PROPERTY, ASSERTED DIRECTLY AND OVER ALL THREE EXITS.
+    // These are the edges that release an identity, and nothing in this tree
+    // drives any of them either.
+    for (const status of TERMINAL_WITHDRAWAL_STATUSES) {
+      reset();
+      settledDestination();
+      fixture.withdrawals = [openRow({ status })];
+
+      const res = await withdraw();
+      expect(res.statusCode, `a ${status} withdrawal should not block the next one`).toBe(200);
+    }
+  });
+});
+
+describe('the transition, decided', () => {
+  const identity: IdentityRow = { status: 'active', payoutsFrozen: false };
+  const cleared: DestinationRow = {
+    firstSeenAt: new Date('2026-08-20T00:00:00.000Z'),
+    coolingUntil: new Date('2026-08-22T00:00:00.000Z'),
+  };
+
+  function decide(over: {
+    candidate?: Record<string, unknown>;
+    identity?: IdentityRow;
+    kyc?: KycState;
+    destination?: DestinationRow | undefined;
+    hand?: ApprovalHand | null;
+  }): ReturnType<typeof decideApproval> {
+    return decideApproval({
+      candidate: toApprovalCandidate(openRow(over.candidate ?? {})),
+      identity: over.identity ?? identity,
+      kyc: over.kyc ?? 'verified',
+      destination: 'destination' in over ? over.destination : cleared,
+      hand: over.hand ?? null,
+      at: NOW,
+    });
+  }
+
+  it('takes `requested --> approved` under G-WITHDRAWAL-CLEARED', () => {
+    expect(decide({})).toStrictEqual({
+      kind: 'approve',
+      guard: 'G-WITHDRAWAL-CLEARED',
+      values: {
+        status: 'approved',
+        approvedAt: NOW,
+        approvedBy: null,
+        dualControlApprovalId: null,
+        dualControlThresholdCents: null,
+        updatedAt: NOW,
+      },
+    });
+  });
+
+  it('takes `cooling --> approved` under G-COOLING-ELAPSED, and holds while the window runs', () => {
+    const candidate = { status: 'cooling' };
+    expect(decide({ candidate })).toStrictEqual(
+      expect.objectContaining({ kind: 'approve', guard: 'G-COOLING-ELAPSED' }),
+    );
+    expect(
+      decide({
+        candidate,
+        destination: { firstSeenAt: NOW, coolingUntil: new Date(NOW.getTime() + 1) },
+      }),
+    ).toStrictEqual({ kind: 'hold', hold: 'destination_cooling' });
+  });
+
+  it('carries every term of G-WITHDRAWAL-CLEARED onto the `cooling` arm as well', () => {
+    // THE GUARD TABLE GIVES G-COOLING-ELAPSED ONE TERM AND THIS FILE APPLIES
+    // FOUR. A guard that gets weaker the longer you wait is a queue an
+    // attacker joins.
+    const candidate = { status: 'cooling' };
+    expect(decide({ candidate, kyc: 'expired' })).toStrictEqual({
+      kind: 'hold',
+      hold: 'kyc_not_verified',
+    });
+    expect(
+      decide({ candidate, identity: { status: 'restricted', payoutsFrozen: false } }),
+    ).toStrictEqual({ kind: 'hold', hold: 'identity_not_active' });
+  });
+
+  it('holds on every guard term, one case each', () => {
+    expect(decide({ candidate: { status: 'approved' } })).toStrictEqual({
+      kind: 'hold',
+      hold: 'not_approvable',
+    });
+    expect(decide({ candidate: { status: 'settled' } })).toStrictEqual({
+      kind: 'hold',
+      hold: 'not_approvable',
+    });
+    expect(decide({ identity: { status: 'closed', payoutsFrozen: false } })).toStrictEqual({
+      kind: 'hold',
+      hold: 'identity_not_active',
+    });
+    expect(decide({ identity: { status: 'active', payoutsFrozen: true } })).toStrictEqual({
+      kind: 'hold',
+      hold: 'payouts_frozen',
+    });
+    expect(decide({ kyc: 'pending' })).toStrictEqual({ kind: 'hold', hold: 'kyc_not_verified' });
+    expect(decide({ candidate: { frozenAt: NOW } })).toStrictEqual({
+      kind: 'hold',
+      hold: 'halted',
+    });
+    expect(decide({ candidate: { sourceProvenanceSummary: [] } })).toStrictEqual({
+      kind: 'hold',
+      hold: 'provenance_missing',
+    });
+    expect(decide({ candidate: { earliestCreditAt: null } })).toStrictEqual({
+      kind: 'hold',
+      hold: 'provenance_missing',
+    });
+    expect(decide({ destination: undefined })).toStrictEqual({
+      kind: 'hold',
+      hold: 'destination_cooling',
+    });
+  });
+
+  it('holds `halted` while a live freeze runs, which no approved document rules', () => {
+    // FAIL CLOSED AND REPORTED AS OWED. `0031` refuses `settled` under a live
+    // freeze and says nothing about `approved`, and approval is where `LT-06`
+    // moves the balance into the firm's obligation (M06 INV-M6-15).
+    expect(decide({ candidate: { frozenAt: new Date('2026-08-26T00:00:00.000Z') } })).toStrictEqual(
+      {
+        kind: 'hold',
+        hold: 'halted',
+      },
+    );
+  });
+});
+
+describe('the dual control that belongs on the approval edge', () => {
+  const alice: ApprovalHand = { approvedBy: 'ops:alice', dualControlApprovalId: null };
+  const seconded: ApprovalHand = { approvedBy: 'ops:alice', dualControlApprovalId: 'dca-1' };
+
+  it('never asks a MACHINE approval for a second person, at any amount', () => {
+    // ADR-232 section 4. Both guards on this edge name no human, so there is
+    // no first approver for a second to check, and a trader locked out of
+    // their own money by a control meant to stop operator fraud is a worse
+    // product than the fraud.
+    expect(dualControlRequired(100_000_000n, null)).toBe(false);
+    expect(dualControlRequired(DUAL_CONTROL_THRESHOLD_CENTS, null)).toBe(false);
+  });
+
+  it('asks a NAMED OPERATOR for one at and above 500000 integer cents', () => {
+    expect(DUAL_CONTROL_THRESHOLD_CENTS).toBe(500_000n);
+    expect(dualControlRequired(DUAL_CONTROL_THRESHOLD_CENTS - 1n, alice)).toBe(false);
+    // `>=`, and `0070` carries the identical comparison. A route that
+    // disagreed with its own CHECK would fail at COMMIT rather than refuse.
+    expect(dualControlRequired(DUAL_CONTROL_THRESHOLD_CENTS, alice)).toBe(true);
+    expect(dualControlRequired(DUAL_CONTROL_THRESHOLD_CENTS + 1n, alice)).toBe(true);
+  });
+
+  it('holds an operator approval at the threshold until a second person has signed', async () => {
+    settledDestination();
+    fixture.withdrawals = [openRow({ amountCents: DUAL_CONTROL_THRESHOLD_CENTS })];
+
+    expect(await drive(alice)).toStrictEqual([
+      { id: 'withdrawal-1', decision: { kind: 'hold', hold: 'dual_control_required' } },
+    ]);
+    expect(fixture.approved).toStrictEqual([]);
+    expect(fixture.withdrawals[0]?.['status']).toBe('requested');
+  });
+
+  it('writes the approver, the citation and the threshold when one has', async () => {
+    settledDestination();
+    fixture.withdrawals = [openRow({ amountCents: DUAL_CONTROL_THRESHOLD_CENTS })];
+
+    await drive(seconded);
+
+    expect(fixture.approved).toStrictEqual([
+      {
+        id: 'withdrawal-1',
+        values: {
+          status: 'approved',
+          approvedAt: NOW,
+          approvedBy: 'ops:alice',
+          dualControlApprovalId: 'dca-1',
+          // RECORDED AND NOT SOURCED. `0070`'s ceiling refuses anything above
+          // this, so a writer may tighten the control and may not loosen it.
+          dualControlThresholdCents: DUAL_CONTROL_THRESHOLD_CENTS,
+          updatedAt: NOW,
+        },
+      },
+    ]);
+  });
+
+  it('records NEITHER an approver NOR a threshold on the machine arm', async () => {
+    // `wallet_withdrawals_operator_approval_records_threshold` and
+    // `wallet_withdrawals_unapproved_records_no_approval` (`0070`) read
+    // together: the machine arm writes neither column.
+    settledDestination();
+    fixture.withdrawals = [openRow({ amountCents: 100_000_000n })];
+
+    await drive();
+
+    const values = fixture.approved[0]?.values as WithdrawalApprovalValues;
+    expect(values.approvedBy).toBeNull();
+    expect(values.dualControlThresholdCents).toBeNull();
+    expect(values.dualControlApprovalId).toBeNull();
+  });
+
+  it('lets a sub-threshold operator approval through with no second person', async () => {
+    settledDestination();
+    fixture.withdrawals = [openRow({ amountCents: DUAL_CONTROL_THRESHOLD_CENTS - 1n })];
+
+    await drive(alice);
+
+    expect(fixture.approved[0]?.values.approvedBy).toBe('ops:alice');
+    expect(fixture.approved[0]?.values.dualControlApprovalId).toBeNull();
+  });
+});
+
+describe('the transition over one transaction', () => {
+  it('takes the per-identity lock BEFORE it reads anything', async () => {
+    // This file's header: `wallet_withdrawals_open_idx` is not unique, so two
+    // doors advancing one identity would both read `requested` and both write.
+    settledDestination();
+    fixture.withdrawals = [openRow()];
+
+    await drive();
+
+    expect(fixture.calls[0]).toBe('lockScope');
+    expect(fixture.calls).toContain('approveWithdrawal:withdrawal-1');
+  });
+
+  it('skips a row that is not at an approvable status without reading its destination', async () => {
+    settledDestination();
+    fixture.withdrawals = [openRow({ status: 'transferring' })];
+
+    expect(await drive()).toStrictEqual([]);
+    expect(fixture.calls).not.toContain(`destination:${DESTINATION}`);
+  });
+
+  it('decides each open row on its own destination', async () => {
+    settledDestination();
+    fixture.destinations.set('rise_dest_bbbb2222', {
+      firstSeenAt: NOW,
+      coolingUntil: new Date(NOW.getTime() + DESTINATION_COOLING_WINDOW_MS),
+    });
+    fixture.withdrawals = [
+      openRow(),
+      openRow({ id: 'withdrawal-2', status: 'cooling', destinationRef: 'rise_dest_bbbb2222' }),
+    ];
+
+    expect(await drive()).toStrictEqual([
+      { id: 'withdrawal-1', decision: expect.objectContaining({ kind: 'approve' }) },
+      { id: 'withdrawal-2', decision: { kind: 'hold', hold: 'destination_cooling' } },
     ]);
   });
 });

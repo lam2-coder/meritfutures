@@ -154,6 +154,7 @@ import {
   type IdempotencyStore,
 } from '../idempotency.ts';
 import { databaseIdempotencyStore } from '../idempotency-store.ts';
+import { DUAL_CONTROL_THRESHOLD_CENTS } from './admin-wallet.ts';
 import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX, problem } from '../server.ts';
 import {
@@ -290,6 +291,40 @@ export const OPEN_WITHDRAWAL_STATUSES = [
   'approved',
   'transferring',
 ] as const;
+
+/**
+ * The statuses that RELEASE an identity, which is the other half of the list
+ * above and the half nothing in this tree can reach.
+ *
+ * IT IS `wallet_withdrawals_open_idx`'s COMPLEMENT AND IT IS WRITTEN OUT
+ * BECAUSE THE ARITHMETIC IS THE POINT. `wallet_withdrawal_status` has seven
+ * members (`0001:95-98`); four of them are open. So `approved` DOES NOT
+ * RELEASE THE IDENTITY: a withdrawal that crosses `G-WITHDRAWAL-CLEARED` moves
+ * from one open status to another, `gateNoInFlight` still finds it, and the
+ * trader still cannot open a second withdrawal. THE APPROVAL EDGE IS NOT WHAT
+ * ENDS A LOCKOUT and `withdrawalReleasesIdentity` below is asserted directly
+ * rather than reasoned about, because the reasoning has already been wrong
+ * once: `wiring.test.ts`'s `BLOCKED` entry for `useWithdrawalBackend` reads the
+ * missing approval edge as the thing standing between a wired backend and a
+ * safe one, and it is not. STATE_MACHINES section 3.2 draws exactly three
+ * arrows into `[*]` and these are the three.
+ */
+export const TERMINAL_WITHDRAWAL_STATUSES = ['settled', 'failed', 'cancelled'] as const;
+
+/** A withdrawal status, as the enum declares it. */
+export type WithdrawalStatus =
+  (typeof OPEN_WITHDRAWAL_STATUSES)[number] | (typeof TERMINAL_WITHDRAWAL_STATUSES)[number];
+
+/**
+ * Whether a row in this status lets its identity open another withdrawal.
+ *
+ * THE PROPERTY THE APPROVAL EDGE DOES NOT HAVE, stated as a function so a test
+ * can assert it over the whole enum rather than over the two cases somebody
+ * remembered.
+ */
+export function withdrawalReleasesIdentity(status: string): boolean {
+  return !(OPEN_WITHDRAWAL_STATUSES as readonly string[]).includes(status);
+}
 
 // -----------------------------------------------------------------------------
 // The rows, as this file reads them off the accessor
@@ -863,6 +898,27 @@ export interface WithdrawalTx {
 
   /** Write the withdrawal. Returns `wallet_withdrawals.id`. */
   insertWithdrawal(row: WithdrawalInsert): Promise<{ readonly id: string }>;
+
+  /**
+   * The same rows {@link WithdrawalTx.withdrawals} reads, in full.
+   *
+   * A SECOND READ OF ONE TABLE AND NOT A WIDENING OF THE FIRST.
+   * `withdrawals()` returns `{ status }` because `G-NO-IN-FLIGHT` reads one
+   * column and this file's header argues at length that the rows crossing this
+   * boundary should be the ones the question needs. The approval edge needs the
+   * amount, the destination and the halt, so it asks for them under its own
+   * name rather than making the in-flight gate carry columns it does not read.
+   */
+  approvalCandidates(): Promise<readonly WithdrawalApprovalCandidate[]>;
+
+  /**
+   * `requested --> approved` or `cooling --> approved`, written. ADR-232.
+   *
+   * KEYED ON `id` AND SCOPED BY THE ACCESSOR, so this cannot advance another
+   * identity's row even if a caller handed it one: `updateAt` carries the scope
+   * predicate into the `WHERE` alongside the address (ADR-112).
+   */
+  approveWithdrawal(id: string, values: WithdrawalApprovalValues): Promise<void>;
 }
 
 /** What opens a transaction, plus the store the idempotency layer needs. */
@@ -1021,6 +1077,22 @@ export function databaseWithdrawalBackend(
             if (first === undefined)
               throw new WithdrawalRowError('the `wallet_withdrawals` INSERT returned no row');
             return { id: text(asRow(first, 'walletWithdrawals'), 'id', 'walletWithdrawals') };
+          },
+          approvalCandidates: async () =>
+            (await tx.rows('walletWithdrawals')).map(toApprovalCandidate),
+          approveWithdrawal: async (id, values) => {
+            await tx.updateAt(
+              'walletWithdrawals',
+              { id },
+              {
+                status: values.status,
+                approvedAt: values.approvedAt,
+                approvedBy: values.approvedBy,
+                dualControlApprovalId: values.dualControlApprovalId,
+                dualControlThresholdCents: values.dualControlThresholdCents,
+                updatedAt: values.updatedAt,
+              },
+            );
           },
         }),
       ),
@@ -1379,6 +1451,282 @@ export async function decideWithdrawal(args: {
     composition: composition.entries,
     earliestCreditAt: composition.earliestCreditAt,
   };
+}
+
+// -----------------------------------------------------------------------------
+// The approval edge, and the control that belongs on it
+// -----------------------------------------------------------------------------
+// ADR-232. MONEY PATH, E2 READ OWED ON EVERY LINE BELOW.
+//
+// STATE_MACHINES section 3.2 draws two arrows into `approved` and this file's
+// own header records that nothing in this tree performs either. That is still
+// true of the DRIVER and is no longer true of the TRANSITION: what follows is
+// the edge written down, guarded, and given the founder's dual-control
+// threshold, which is the one place on the external leg where a second human
+// belongs.
+//
+// THE TWO GUARDS SHARE EVERY TERM BUT THEIR ORIGIN STATE, AND THE DRAWING DOES
+// NOT SAY SO. STATE_MACHINES' guard table gives `G-WITHDRAWAL-CLEARED` four
+// terms -- "KYC `verified`, destination outside its cooling window, provenance
+// summary present, and `identities.status = 'active'`" (ADR-075) -- and gives
+// `G-COOLING-ELAPSED` one, "the window elapsed". Read literally that would let
+// a withdrawal leave `cooling` on the clock alone, with KYC expired and the
+// identity restricted, because the strict guard is drawn only on the arrow out
+// of `requested`. THE LOOSER READING IS REFUSED: the `cooling` arm carries
+// every term of `G-WITHDRAWAL-CLEARED` and the clock as well, so waiting out a
+// destination window can only ever require MORE of a row than not waiting.
+// A guard that gets weaker the longer you wait is a queue an attacker joins.
+//
+// AND `payouts_frozen` AND A LIVE HALT ARE ADDED, NEITHER OF THEM DRAWN.
+// `gatePayoutsFrozen` is already on the creation path one screen up, and a
+// freeze that stops a trader opening a withdrawal while permitting the one they
+// opened yesterday to be approved is a control with a doorway in it.
+// `frozen_at` is the halt, which STATE_MACHINES calls orthogonal to the rail
+// and enforces only against `settled`
+// (`wallet_withdrawals_live_freeze_blocks_settlement`, `0031`). NO APPROVED
+// DOCUMENT RULES WHETHER A HALTED WITHDRAWAL MAY BE APPROVED, and this file
+// fails closed: approval is the edge on which `LT-06` moves the trader's
+// balance into the firm's `withdrawals_in_flight` obligation (M06 `INV-M6-15`),
+// so approving under an open investigation is the one direction the halt cannot
+// be undone from cheaply. Reported as owed rather than as decided.
+
+/** Which arrow of section 3.2's drawing a decision took. */
+export const APPROVAL_GUARDS = ['G-WITHDRAWAL-CLEARED', 'G-COOLING-ELAPSED'] as const;
+
+/** @see APPROVAL_GUARDS */
+export type ApprovalGuard = (typeof APPROVAL_GUARDS)[number];
+
+/**
+ * Why an approval did not happen.
+ *
+ * NOT A {@link Refusal}. A guard that does not hold is "not yet" rather than
+ * "no": there is no request to answer, no reply to send and no status code that
+ * would be honest about it, and reusing the HTTP refusal here would mean this
+ * transition could only ever be driven by a request. The two names that are not
+ * "not yet" are `not_approvable`, which is a caller pointing this at a row the
+ * machine does not admit, and `dual_control_required`, which is the control.
+ */
+export const APPROVAL_HOLDS = [
+  'not_approvable',
+  'identity_not_active',
+  'payouts_frozen',
+  'kyc_not_verified',
+  'provenance_missing',
+  'destination_cooling',
+  'halted',
+  'dual_control_required',
+] as const;
+
+/** @see APPROVAL_HOLDS */
+export type ApprovalHold = (typeof APPROVAL_HOLDS)[number];
+
+/** The statuses an approval may be taken FROM. Section 3.2's two arrow tails. */
+export const APPROVABLE_STATUSES = ['requested', 'cooling'] as const;
+
+/**
+ * What the decision needs from one `wallet_withdrawals` row.
+ *
+ * `hasProvenance` IS A BOOLEAN AND NOT THE COMPOSITION, deliberately. The term
+ * the guard tests is `wallet_withdrawals_approved_has_provenance`'s own
+ * condition, `source_provenance_summary <> '{}'::jsonb AND earliest_credit_at
+ * IS NOT NULL` (`0011:192-195`), which is a question about PRESENCE. Re-parsing
+ * the composition here would be a second reader of a value this module wrote,
+ * and the CHECK is the thing that has to agree with it.
+ */
+export interface WithdrawalApprovalCandidate {
+  readonly id: string;
+  readonly status: string;
+  readonly amountCents: bigint;
+  readonly destinationRef: string;
+  readonly hasProvenance: boolean;
+  /** `frozen_at`. The halt, which is not a status. */
+  readonly frozenAt: Date | null;
+}
+
+/** `wallet_withdrawals` as {@link decideApproval} reads it. */
+export function toApprovalCandidate(value: unknown): WithdrawalApprovalCandidate {
+  const row = asRow(value, 'walletWithdrawals');
+  const summary = row['sourceProvenanceSummary'];
+  const hasEntries =
+    summary !== null && summary !== undefined && Array.isArray(summary) && summary.length > 0;
+  const frozen = row['frozenAt'];
+  return {
+    id: text(row, 'id', 'walletWithdrawals'),
+    status: text(row, 'status', 'walletWithdrawals'),
+    amountCents: big(row, 'amountCents', 'walletWithdrawals'),
+    destinationRef: text(row, 'destinationRef', 'walletWithdrawals'),
+    hasProvenance: hasEntries && row['earliestCreditAt'] instanceof Date,
+    frozenAt:
+      frozen === null || frozen === undefined
+        ? null
+        : instant(row, 'frozenAt', 'walletWithdrawals'),
+  };
+}
+
+/**
+ * The operator half of an approval, and `null` is the whole point of the type.
+ *
+ * `null` IS THE MACHINE ARM. Both guards on this edge are predicates naming no
+ * human, so an approval that satisfied them has no operator to record; ADR-232
+ * section 4 rules that a trader's own withdrawal never waits on one. A value
+ * here is a named operator, and `0070`'s constraints are written over
+ * `approved_by` for exactly that reason.
+ */
+export interface ApprovalHand {
+  /** `wallet_withdrawals.approved_by`. An operator name, `0002`'s actor idiom. */
+  readonly approvedBy: string;
+  /** `dual_control_approvals.id`, or `null` when no second person has signed. */
+  readonly dualControlApprovalId: string | null;
+}
+
+/** The columns an approval writes. `0070`. */
+export interface WithdrawalApprovalValues {
+  readonly status: 'approved';
+  readonly approvedAt: Date;
+  readonly approvedBy: string | null;
+  readonly dualControlApprovalId: string | null;
+  readonly dualControlThresholdCents: bigint | null;
+  readonly updatedAt: Date;
+}
+
+/** What {@link decideApproval} concluded about one row. */
+export type ApprovalDecision =
+  | {
+      readonly kind: 'approve';
+      readonly guard: ApprovalGuard;
+      readonly values: WithdrawalApprovalValues;
+    }
+  | { readonly kind: 'hold'; readonly hold: ApprovalHold };
+
+/**
+ * Whether a named operator needs a second person for this amount.
+ *
+ * THE CONSTANT IS IMPORTED AND NOT RESTATED. {@link DUAL_CONTROL_THRESHOLD_CENTS}
+ * is `admin-wallet.ts`'s, landed by ADR-228 from the founder's answer of
+ * 2026-08-29, and a second literal here would be a second number to move.
+ *
+ * `>=` AND NOT `>`. The founder's words are "above what payout amount", and
+ * `0038:235-238`'s constraint -- the only dual-control comparison this estate
+ * had before `0070` -- is `amount_cents < threshold OR approval IS NOT NULL`,
+ * so the threshold amount ITSELF requires the second key there. `0070` carries
+ * the identical comparison, and a route that disagreed with its own CHECK would
+ * fail at COMMIT rather than refuse, which is a 500 where a hold belongs.
+ */
+export function dualControlRequired(amountCents: bigint, hand: ApprovalHand | null): boolean {
+  if (hand === null) return false;
+  return amountCents >= DUAL_CONTROL_THRESHOLD_CENTS;
+}
+
+/**
+ * `requested --> approved` and `cooling --> approved`, decided and not written.
+ *
+ * TOTAL AND PURE. It takes rows and returns a decision, so every case below is
+ * reachable from a test without a database, and the writing half is one
+ * accessor call in {@link driveApprovals}.
+ *
+ * THE ORDER OF THE TERMS IS NOT ARBITRARY. The identity terms come first
+ * because a restricted or frozen identity is a fact about the person rather
+ * than about this row, and the dual-control term comes LAST because it is the
+ * only one whose answer changes when a second person acts: reporting
+ * `dual_control_required` on a row that is also missing its provenance would
+ * send an operator to find a colleague for a withdrawal that would then be held
+ * for a different reason anyway.
+ */
+export function decideApproval(args: {
+  readonly candidate: WithdrawalApprovalCandidate;
+  readonly identity: IdentityRow;
+  readonly kyc: KycState;
+  readonly destination: DestinationRow | undefined;
+  readonly hand: ApprovalHand | null;
+  readonly at: Date;
+}): ApprovalDecision {
+  const { candidate, identity, kyc, destination, hand, at } = args;
+
+  if (!(APPROVABLE_STATUSES as readonly string[]).includes(candidate.status))
+    return { kind: 'hold', hold: 'not_approvable' };
+
+  if (identity.status !== 'active') return { kind: 'hold', hold: 'identity_not_active' };
+  if (identity.payoutsFrozen) return { kind: 'hold', hold: 'payouts_frozen' };
+  if (kyc !== 'verified') return { kind: 'hold', hold: 'kyc_not_verified' };
+  if (candidate.frozenAt !== null) return { kind: 'hold', hold: 'halted' };
+  if (!candidate.hasProvenance) return { kind: 'hold', hold: 'provenance_missing' };
+
+  // THE DESTINATION TERM IS COMMON TO BOTH ARROWS. See this section's header:
+  // the `cooling` arm carries every term of `G-WITHDRAWAL-CLEARED` and the
+  // clock as well. A destination this tree has no row for has never started a
+  // window, and `coolingDecision` treats that as `register`; here it is a hold,
+  // because a window that has not started has not elapsed.
+  if (destination === undefined || destination.coolingUntil.getTime() > at.getTime())
+    return { kind: 'hold', hold: 'destination_cooling' };
+
+  if (dualControlRequired(candidate.amountCents, hand) && hand?.dualControlApprovalId == null)
+    return { kind: 'hold', hold: 'dual_control_required' };
+
+  return {
+    kind: 'approve',
+    guard: candidate.status === 'cooling' ? 'G-COOLING-ELAPSED' : 'G-WITHDRAWAL-CLEARED',
+    values: {
+      status: 'approved',
+      approvedAt: at,
+      approvedBy: hand?.approvedBy ?? null,
+      dualControlApprovalId: hand?.dualControlApprovalId ?? null,
+      // RECORDED ONLY WHEN A HAND IS RECORDED, which is
+      // `wallet_withdrawals_unapproved_records_no_approval` and
+      // `wallet_withdrawals_operator_approval_records_threshold` (`0070`) read
+      // together: the machine arm writes neither, and an operator arm writes
+      // both or the row is unwritable.
+      dualControlThresholdCents: hand === null ? null : DUAL_CONTROL_THRESHOLD_CENTS,
+      updatedAt: at,
+    },
+  };
+}
+
+/** One row's outcome, for a driver that wants to say what it did. */
+export interface ApprovalOutcome {
+  readonly id: string;
+  readonly decision: ApprovalDecision;
+}
+
+/**
+ * The transition over one transaction: read, decide, write.
+ *
+ * UNDER `lockScope()` AND FOR THIS FILE'S HEADER'S REASON. Two doors advancing
+ * the same identity's rows would both read `requested` and both write
+ * `approved`, and `wallet_withdrawals_open_idx` IS NOT UNIQUE (ADR-158 finding
+ * 8), so nothing in the database would catch the second.
+ *
+ * NOTHING IN THIS TREE CALLS IT, AND THAT IS RECORDED RATHER THAN LEFT TO BE
+ * NOTICED. ADR-232 section 6: an approval is the edge on which `LT-06` posts
+ * (M05 section 2.1, M06 `INV-M6-15`), a posting commits in the SAME transaction
+ * as the state change that caused it (`0057`'s header item 3, ADR-006), and no
+ * door in `apps/api` may open the ledger authority that posting needs (ADR-165,
+ * ADR-172 clause 2). So the edge is written and guarded here and the driver is
+ * owed to the slice that lands the posting. Approving without the posting would
+ * mark money as leaving while the wallet still shows it, which is the half of a
+ * mechanism this corpus has already paid for twice.
+ */
+export async function driveApprovals(args: {
+  readonly tx: WithdrawalTx;
+  readonly hand: ApprovalHand | null;
+  readonly at: Date;
+}): Promise<readonly ApprovalOutcome[]> {
+  const { tx, hand, at } = args;
+
+  await tx.lockScope();
+
+  const identity = await tx.identity();
+  const kyc = currentKycState(await tx.kycVerifications());
+  const candidates = await tx.approvalCandidates();
+
+  const outcomes: ApprovalOutcome[] = [];
+  for (const candidate of candidates) {
+    if (!(APPROVABLE_STATUSES as readonly string[]).includes(candidate.status)) continue;
+    const destination = await tx.destination(candidate.destinationRef);
+    const decision = decideApproval({ candidate, identity, kyc, destination, hand, at });
+    if (decision.kind === 'approve') await tx.approveWithdrawal(candidate.id, decision.values);
+    outcomes.push({ id: candidate.id, decision });
+  }
+  return outcomes;
 }
 
 /**
