@@ -59,6 +59,7 @@ import {
   events,
   evidencePacks,
   fills,
+  firmParameters,
   geoRestrictions,
   graduationBenefits,
   graduationInvitations,
@@ -488,6 +489,7 @@ export const TABLES = {
   // and a rule written through it would not compile.
   operators,
   operatorSessions,
+  firmParameters,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -1500,6 +1502,11 @@ export const SCOPE_RULES = {
   operatorSessions: {
     class: 'firm',
     why: "ONE OPERATOR SESSION, AND IT REACHES THE FIRM'S OWN DIRECTORY RATHER THAN ANY IDENTITY (0073_operator_directory.sql, ADR-237). `operator_id uuid NOT NULL REFERENCES operators(id)` is the only foreign key on the row and `operators` is FIRM, so a `derived` rule through it would compile at every call site -- `DerivedRule.via` is `TableKey` and includes every firm key -- and throw the first time anybody read the table, which is `raw_ingest_rows`' trap on a second estate. The row declares no column against `identities(id)` or `accounts(id)` at all. THE SHAPE IS `sessions`' AND THE CLASS IS THE OPPOSITE ONE, which is the distinction worth writing down: `sessions` is `derived` via `users` because a trader session belongs to a login that belongs to a person, and an operator session belongs to an employee, so the identical column layout carries opposite tenancy. NOTHING IN THIS REPOSITORY WRITES A ROW HERE and registering the relation does not change that: the minter needs the C-08 identity provider, and a registration makes a table READABLE rather than fillable.",
+  },
+
+  firmParameters: {
+    class: 'firm',
+    why: "THE FIRM'S OWN NUMBERS, AND THE FIRST MEMBER IS THE BASE ACCOUNT CAP (0074_firm_parameters.sql, ADR-252, on ADR-238 ruling 1). THE DDL SETTLES THE CLASS AND NO JUDGEMENT IS ADDED TO IT: the row declares no column against `identities(id)` and none against `accounts(id)`, so `owned`, `pair` and `either` have nothing to name and `root` is `identities`' alone. THE ARGUMENT IS `price_floors`' AND IT IS THE SAME ARGUMENT RATHER THAN A SIMILAR ONE: a floor that differed per trader would not be a floor, and a cap that differed per trader is not the firm's cap either -- it is `identities.max_accounts_override`, which is a different column on a different table and is the EXCEPTION this number is the base of. ADR-238 RULING 1 IS WHY THE ROW IS HERE AT ALL AND NOT IN `plan_versions.rules`: the cap is enforced against an identity's TOTAL live accounts across EVERY plan (constitution B1, INV-M3-08, GS-094), while `limits.max_accounts_per_entity` is stored PER PLAN VERSION, so reading the purchased version makes an identity's effective cap the MAXIMUM over every published version and reading the pinned version reads a row that may have been retired years earlier. THE AVAILABLE MISTAKE IS `derived` VIA `operators` AND THE EDGE IS REAL, WHICH IS WHAT MAKES IT AVAILABLE: `approved_by text NOT NULL REFERENCES operators(actor)` is single valued and NOT NULL, so such a rule would compile at every call site. It is refused because `operators` is itself FIRM -- `DerivedRule.via` is `TableKey` and includes every firm key -- so the chain terminates at a table with no identity on it and throws the first time anybody reads it, which is `offers.experiment_id`'s trap in this file's own words and `reserve_coverage_snapshots`' `treasury_balances` chain in a third dress. AND AN APPROVER IS NOT AN OWNER even where the chain terminates somewhere: the operator who signs a cap does not thereby hold the number, any more than `price_floors.approved_by` makes a floor theirs. REGISTERING THE TABLE MAKES IT READABLE THROUGH THE FIRM DOOR AND NOTHING ELSE, which is this file's standing sentence and is load bearing here: `CATALOG_TABLE_KEYS` is a CLOSED LIST of five in `scoped-db.ts` and this key is deliberately not added to it, so a scoped transaction still cannot read this table and `accountCap()` is no nearer to being implementable than it was. ADR-252 wires no port, and the table SHIPS EMPTY: an absent effective row is NO CAP and never an unlimited one, which is the refusal the slice that writes the reader owes.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 

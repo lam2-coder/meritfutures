@@ -5146,3 +5146,63 @@ export const operatorSessions = pgTable('operator_sessions', {
   lastSeenIp: inet('last_seen_ip'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// firm_parameters -- 0074_firm_parameters.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE NUMBERS THAT BELONG TO THE FIRM RATHER THAN TO ANY IDENTITY OR ANY PLAN
+// VERSION, AND THE FIRST MEMBER IS THE BASE ACCOUNT CAP. ADR-238 ruling 1 ruled
+// the cap the firm's number and refused `plan_versions.rules.limits
+// .max_accounts_per_entity` in all three of its available forms; ADR-252 builds
+// the home that ruling named. `identities.maxAccountsOverride` above is the
+// per-entity EXCEPTION and this is the base it is an exception to.
+//
+// THE SHAPE IS `priceFloors`' AND THE GRAIN IS THE WHOLE PRIMARY KEY. There is
+// no uuid of its own: a change is a NEW ROW dated `effectiveFrom` rather than an
+// UPDATE, so the number in force on the day a purchase was refused stays
+// readable after the number has moved. `walletSpendLimits` is the same idiom one
+// class over.
+//
+// TWO CLOSURES, AND NEITHER IS TRANSCRIBED HERE.
+// `firm_parameters_vocabulary_is_closed` admits exactly one member and
+// `firm_parameters_base_account_cap_is_positive` carries the cap's domain, and
+// this file transcribes no `CHECK` by its own standing rule. Both are asserted
+// against the DDL by `test/firm-parameter-vocabulary.test.ts` instead, which
+// carries no list of its own. THE SECOND CLOSURE IS THE COLUMN TYPE: there is
+// one value column and it is `integer`, so a firm parameter that is not an
+// integer has nowhere to go, and a `textValue` beside it is the first step of
+// the settings bag the table exists to refuse.
+//
+// `approvedBy` IS A REFERENT AND NOT A STRING, WHICH IS WHERE THIS DIVERGES
+// FROM ITS OWN PRECEDENT. `priceFloors.approvedBy` is bare `text` on 0002's
+// actor idiom because no operator directory existed when 0024 was written; 0073
+// built one, so this column is declared against `operators.actor` and a cap
+// approved by a name in no directory cannot be written at all.
+//
+// THE TABLE SHIPS EMPTY AND `integerValue` CARRIES NO `.default()`. A default is
+// a constant, and the corpus rules every one of these values a launch candidate
+// re-confirmed at launch as a row and never a constant. AN ABSENT ROW IS NO CAP
+// AND NOT AN UNLIMITED ONE: nothing in this tree reads this table yet, and
+// ADR-252 deliberately wires no reader, so that the refusal an empty read owes
+// is written once by the slice that owns it rather than three times by the
+// sessions that pass through.
+export const firmParameters = pgTable(
+  'firm_parameters',
+  {
+    parameter: text('parameter').notNull(),
+    // A COUNT AND NOT CENTS. `identities.maxAccountsOverride` is `integer` and
+    // the exception and the base agree on their type deliberately.
+    integerValue: integer('integer_value').notNull(),
+    // NOT NULL. A cap bounds how much exposure one buyer may accumulate, and a
+    // liability decision with no written rationale is one nobody can defend at
+    // the next review. `priceFloors.reason` carries the same sentence.
+    reason: text('reason').notNull(),
+    // A row dated in the future has not arrived and does not bind yet.
+    effectiveFrom: timestamp('effective_from', { withTimezone: true }).notNull(),
+    approvedBy: text('approved_by')
+      .notNull()
+      .references(() => operators.actor),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.parameter, table.effectiveFrom] })],
+);

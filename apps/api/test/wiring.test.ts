@@ -226,18 +226,32 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ADR-157 clause 6, which needs a join and an aggregate. Installing a backend would not ' +
     'resolve either finding and must not paper over them. MONEY PATH.',
   useAdminWriteBackend:
-    'THREE SUPPLIERS AND NONE OF THEM IS A DOOR. `principal(request)` ' +
-    '(`routes/admin-writes.ts:276`), blocked on `setAdminSessionSource` above. `tradingDay()`, ' +
-    'which is the smallest and the least tractable: nothing in this workspace maps an instant to ' +
-    'an exchange trading day, and ADR-145 names the gap rather than papering over it with a UTC ' +
-    'date. And a projection of `ValidationResult` onto `PlanValidation`, whose `errors` is ' +
-    '`{ code, message }` where `CvViolation` is `{ id, path, detail, sizeCents }` and whose `ok` ' +
-    'is false when `materialization` is non-empty as well. THE CLAIM THAT `apps/api` DOES NOT ' +
-    'DECLARE `@merit/rules-engine` STOOD HERE AND WAS FALSE: it has been declared since session ' +
-    '252 landed `routes/payouts.ts` (`apps/api/package.json`), and `validatePlan` is exported ' +
-    '(`packages/rules-engine/src/index.ts:163`). ADR-171 finding 10. The same stale sentence ' +
-    "survives in that port's own docstring at `routes/admin-writes.ts:284-288`, which is a " +
-    "handler file and outside that entry's fence.",
+    'TWO SUPPLIERS AND NEITHER OF THEM IS A DOOR. THIS ENTRY NAMED THREE AND THE THIRD IS ' +
+    'DISCHARGED (ADR-251). `principal(request)` (`routes/admin-writes.ts:276`), blocked on ' +
+    '`setAdminSessionSource` above. And a projection of `ValidationResult` onto ' +
+    '`PlanValidation` (`routes/admin-writes.ts:342`), whose `errors` is `{ code, message }` ' +
+    'where `CvViolation` is `{ id, path, detail, sizeCents }` and whose `ok` is false when ' +
+    '`materialization` is non-empty as well. Nothing in this tree performs that projection. ' +
+    'THE THIRD CLAUSE READ "nothing in this workspace maps an instant to an exchange trading ' +
+    'day" AND IT IS NOW FALSE RATHER THAN NARROWED: `@merit/rules-engine` exports ' +
+    '`buildSessionCalendar` (`packages/rules-engine/src/calendar.ts:443`) and `tradingDayAt` ' +
+    '(`packages/rules-engine/src/calendar.ts:591`), which answer by CONTAINMENT over ' +
+    "`trading_calendar`'s stored session bounds and `trading_calendar_loads`' coverage, " +
+    'comparing an instant only with an instant. Both tables are `firm` and `apps/api` holds ' +
+    '`db.firm`, so the supplier and the read are both in this deployable. ' +
+    'WHAT REPLACES IT IS SMALLER AND IS NOT A MISSING FUNCTION. `tradingDay(): string` ' +
+    '(`routes/admin-writes.ts:338`) has ONE arm and the resolver answers THREE, because ' +
+    'ADR-042 F-4 requires `outside_coverage` to be distinguishable from `not_a_session`; and no ' +
+    'ruling says which day an operator close takes when the instant is in no session, while ' +
+    '`accounts_terminal_has_close_date` requires `closed_on` on every `closed_admin` row. A ' +
+    'DECISION IS OWED AND A FUNCTION IS NOT. ' +
+    'THE CLAIM THAT `apps/api` DOES NOT DECLARE `@merit/rules-engine` ALSO STOOD HERE AND WAS ' +
+    'FALSE: it has been declared since session 252 landed `routes/payouts.ts` ' +
+    '(`apps/api/package.json`), and `validatePlan` is exported ' +
+    '(`packages/rules-engine/src/index.ts:185`). ADR-171 finding 10. That stale sentence ' +
+    "survived in this port's own docstring, which was outside that entry's fence and is inside " +
+    "ADR-251's; it is repaired at the source. `test/admin-write-trading-day.test.ts` derives " +
+    'every clause here from source on every run.',
 
   // ---------------------------------------------------------------------------
   // THE LEDGER DOOR, AND THE TWO PORTS THAT REACHED FOR IT ARE NOW ONE.
@@ -342,11 +356,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // THE SIXTH CLAUSE IS THE FINDING AND IT IS THIS ENTRY'S OWN DEFECT FOR THE
   // THIRD TIME. `PayoutSubject` has THREE fields and eleven revisions of this
-  // reason have named two. `gates` is not downstream of the worker, not
-  // downstream of the codec and not downstream of a row, so every session that
-  // clears links 1 to 4 still arrives at `subject()` unable to call it. A reason
-  // that names the second-cheapest blocker retires the question for every reader
-  // after it, and this list exists to make that expire.
+  // reason named two. ADR-248 RULED THE THIRD AND THE ANSWER IS THAT `gates` IS
+  // NOT CONSTRUCTIBLE IN THIS DEPLOYABLE: three of its five facts resolve off
+  // registered tables, `accountStatus` is not a total map, and the in-flight
+  // leg has NO PREDICATE TO READ because M01 states R-38's grain both ways. SO
+  // THE ENTRY NARROWS TO NAME ALL THREE FIELDS AND WHAT EACH ONE WAITS ON.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -398,19 +412,39 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'TWO files: `packages/rules-engine/src/types.ts`, which DECLARES the field, and ' +
     '`packages/harness/src/trial.ts`, which raises one member on a value its caller handed it ' +
     'inside a Monte Carlo loop whose package declares no database. Every constructed value is a ' +
-    'fixture or `scripts/demo/fold.ts`. THE FIVE FACTS ALL HAVE COLUMNS AND THE RESOLVER IS ' +
-    'WHAT IS MISSING: `identities.payouts_frozen` (`0002_identity.sql:50`), ' +
-    '`accounts.payouts_frozen` (`0007_accounts.sql:83`), `accounts.recon_blocked` ' +
-    '(`0007_accounts.sql:87`), the ' +
-    '`kyc_status` enum (`0001_extensions_and_enums.sql:29`) and R-38s in-flight leg off ' +
-    '`payout_requests`. AND THE ACCOUNT-STATUS LEG CANNOT BE A TOTAL MAP: `account_status` ' +
+    'fixture or `scripts/demo/fold.ts`. THE FIVE FACTS SPLIT THREE AND TWO, AND THE ENTRY ' +
+    'NARROWS BY ADR-248 RATHER THAN REPEATING THAT A RESOLVER IS MISSING. THREE RESOLVE: ' +
+    '`payoutsFrozen` is `identities.payouts_frozen` (`0002_identity.sql:50`) OR ' +
+    '`accounts.payouts_frozen` (`0007_accounts.sql:83`), which `admin-source/search.ts` ' +
+    'already works out and states; `reconBlocked` is `accounts.recon_blocked` ' +
+    '(`0007_accounts.sql:87`) and has no identity half; and `kycState` is the head of the ' +
+    'supersession chain over `kyc_verifications.state` (`0003_kyc.sql:51`), which ' +
+    '`currentKycState` (`apps/api/src/routes/wallet-withdrawals.ts:471`) ALREADY RESOLVES AND ' +
+    'FAILS CLOSED ON, on another money door. TWO DO NOT. THE ACCOUNT-STATUS LEG CANNOT BE A ' +
+    'TOTAL MAP: `account_status` ' +
     'declares SEVEN members (`0001_extensions_and_enums.sql:47`) and `AccountStatus` ' +
     '(`packages/rules-engine/src/types.ts:891`) takes SIX, the difference being ' +
     '`provisioning_pending`, and `M01:203` carries the same six, so the engine transcribed its ' +
-    'source correctly and the resolver owes a REFUSAL rather than a widened union. THIS CLAUSE ' +
-    'DID NOT MOVE WHEN THE WORKER LANDED because nothing ADR-241 built touches it, which is why ' +
-    'a session that lands the codec and the adapter would arrive at `subject()` with a ' +
-    '`RuleState` in hand and no third argument for it. THE FIRM-READ CLAUSE IS ' +
+    'source correctly and the resolver owes a REFUSAL rather than a widened union. AND THE ' +
+    'IN-FLIGHT LEG IS NOT A MISSING FUNCTION, IT IS A CONTRADICTED PREDICATE, WHICH IS WHERE ' +
+    'ADR-245 SIZED THIS SLICE TOO CHEAPLY: `M01:207` declares the field as an outstanding leg ' +
+    '"for this account" and `M01:531` states R-38 as one "for this identity". `EC-040`, ' +
+    '`M01:861`s AS-01 residual and the live SD-09 index (`payout_requests (account_id)`, ' +
+    '`0031_payout_hold_and_identity_restriction.sql:105`) all take the ACCOUNT reading, and ' +
+    'AS-09 is RULED at the gate as visibility rather than a rule, so the identity reading ' +
+    'would refuse nine of a copy traders ten accounts under a ceiling the corpus declined to ' +
+    'impose. THE TWO READINGS DIFFER BY EVERY IDENTITY HOLDING MORE THAN ONE ACCOUNT, AND ONE ' +
+    'OF THEM IS PERMISSIVE ON THE DOOR WHERE MONEY LEAVES. A resolver picking either would be ' +
+    'a route ruling a contradiction inside a FROZEN plan, so `gates` IS NOT CONSTRUCTIBLE IN ' +
+    'THIS DEPLOYABLE TODAY and ADR-248 refused to build it. THIS CLAUSE ' +
+    'DID NOT MOVE WHEN THE WORKER LANDED because nothing ADR-241 built touches it, and it is ' +
+    'NOT DOWNSTREAM OF THE CODEC EITHER: `rule_states.context_gates` is `NOT NULL` ' +
+    '(`0015_rule_states.sql:130`) and `AccountDay.external` is required ' +
+    '(`apps/worker/src/batch/ports.ts:87`), so this resolver is UPSTREAM of the row rather ' +
+    'than the independent fourth slice ADR-245 section 6 sized. SO THE THREE FIELDS WAIT ON ' +
+    'THREE DIFFERENT THINGS AND THE TWELFTH REVISION OF THIS REASON SAYS SO: `state` waits on ' +
+    'a codec, an adapter and a row, which is clauses one to four; `plan` waits on NOTHING and ' +
+    'ADR-233 discharged it; `gates` waits on a RULING and not on code. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +
@@ -428,7 +462,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'four links on every CI-01 pass, because a reason naming the second-cheapest blocker ' +
     'retires the question for every reader after it and this entry has done that twice. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
-    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1150`, and ' +
+    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1152`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
     'beside a `transact` whose `subject` rejects would put a live-looking route in front of the ' +
     'arm that approves payouts. MONEY PATH.',
@@ -461,13 +495,27 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // still answering 503, which is the failure mode the paragraph above describes
   // and this is its second instance on one port.
   //
-  // ADR-238 RULED ALL THREE AND DISCHARGED NONE, WHICH IS A DIFFERENT OUTCOME
-  // FROM THE TWO BEFORE IT AND IS WORTH THE DISTINCTION. ADR-230 and ADR-233
-  // each BUILT a door and this entry lost a clause to each. ADR-238 built
-  // nothing: it ruled where the cap comes from, refused the cross-identity read
-  // a second time on ground ADR-233 could not supply, and established that the
-  // ledger arm is foreclosed by the CORPUS rather than by the accessor. So the
-  // entry below is REWRITTEN FOR ACCURACY RATHER THAN NARROWED, and it says so.
+  // ADR-238 RULED ALL THREE AND DISCHARGED NONE, WHICH WAS A DIFFERENT OUTCOME
+  // FROM THE TWO BEFORE IT AND IS STILL WORTH THE DISTINCTION. ADR-230 and
+  // ADR-233 each BUILT a door and this entry lost a clause to each. ADR-238
+  // built nothing: it ruled where the cap comes from, refused the cross-identity
+  // read a second time on ground ADR-233 could not supply, and established that
+  // the ledger arm is foreclosed by the CORPUS rather than by the accessor.
+  //
+  // ADR-252 IS THE FIRST ENTRY TO NARROW CLAUSE 1 RATHER THAN RESTATE IT, AND
+  // IT DID NOT DELETE IT. `0074` gives the base cap a `firm` row and registers
+  // it, so the clause stops being "no column anywhere" and becomes "no door
+  // from a scoped transaction, and no row in the table". THAT IS TWO STEPS
+  // SHORT OF A WIRING AND BOTH ARE NAMED: a `CATALOG_TABLE_KEYS` admission with
+  // ADR-233's argument attached, which `refuseUncatalogued` states in its own
+  // message and this table satisfies, and a writer for the row.
+  //
+  // THE PAIRING WITH `readMe` IS WEAKER THAN IT WAS AND THE ENTRY SAYS SO. The
+  // two refusals were the same finding while neither number had a source. They
+  // are not now: `readMe` reads through `ApiDb.firm` and needs no catalogue
+  // admission, so only the empty table is common to both. An entry that kept
+  // calling them identical would send a session to clear one and find the other
+  // standing, which is the failure mode the paragraph above describes.
   //
   // THE REASONS ARE NOW ASSERTED AS WELL AS WRITTEN, which is what this entry
   // has needed since the first time it went stale. `test/checkout-backend-
@@ -478,34 +526,47 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // here going stale now turns a case red rather than waiting for a reader.
   // ---------------------------------------------------------------------------
   useCheckoutBackend:
-    'A CAP WITH NO SOURCE, A CROSS-IDENTITY READ AND THE LEDGER ARM. ALL THREE ARE NOW RULED AND ' +
-    'NONE IS DISCHARGED (ADR-238), WHICH IS WHY THIS ENTRY IS REWRITTEN FOR ACCURACY RATHER THAN ' +
-    'NARROWED. THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
+    'A CAP WHOSE ROW EXISTS AND WHOSE DOOR DOES NOT, A CROSS-IDENTITY READ AND THE LEDGER ARM. ' +
+    'THREE CLAUSES STILL, AND THE FIRST IS NARROWED RATHER THAN DELETED (ADR-252, on ADR-238 ' +
+    'ruling 1). THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
     '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
     '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2558`), whose five members are exactly ' +
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
-    '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS THE ' +
-    'FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:777`) runs before the plan ' +
-    'on the purchase path and before `resetTarget` on the reset path, and its `maxAccounts` ' +
-    '(`routes/checkout.ts:532`) has no column. RI-20 RUNS THE COMMAND THAT SETTLES IT: ' +
-    '`grep -rn max_accounts packages/db/migrations` returns 1 line, which is ' +
-    '`identities.max_accounts_override`, the per-entity EXCEPTION. `databaseAuthBackend` REFUSES ' +
-    '`readMe` (`src/auth-backend.ts:1518`) for the identical finding about the same number on ' +
-    "`GET /me`. ADR-238 RULING 1 RULES THE BASE CAP THE FIRM'S NUMBER AND REFUSES THE PLAN BLOB " +
-    'IN ALL THREE OF ITS AVAILABLE FORMS: `limits.max_accounts_per_entity` is PER PLAN VERSION ' +
-    "and `liveAccounts` beside it is this identity's total across every plan, so reading the " +
-    'purchased version makes the effective cap the MAXIMUM over published versions, reading the ' +
-    'pinned version reads a row that may have been retired years earlier, and requiring every ' +
-    "published version to agree is a firm parameter wearing a plan's costume that no CHECK can " +
-    'express. THE RULING NAMES A HOME AND DOES NOT BUILD IT, because a firm parameter row is a ' +
-    "registration in `packages/db/src/schema.ts` and `scope.ts`, which that entry's fence does " +
-    'not reach. SECOND, A ROW THE BUYER MUST SEE THAT BELONGS TO THE AFFILIATE, REFUSED A SECOND ' +
-    'TIME: `clickByToken` (`routes/checkout.ts:806`) returns a `ClickRef` whose `affiliate` ' +
+    '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
+    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:802`) runs before the ' +
+    'plan on the purchase path and before `resetTarget` on the reset path, and its `maxAccounts` ' +
+    '(`routes/checkout.ts:557`) NOW HAS A COLUMN AND STILL HAS NO DOOR. ADR-238 ruling 1 ruled ' +
+    "the base cap the FIRM'S number and refused `limits.max_accounts_per_entity` in all three of " +
+    'its available forms, because that leaf is PER PLAN VERSION while `liveAccounts` beside it ' +
+    "is this identity's total across EVERY plan: reading the purchased version makes the " +
+    'effective cap the MAXIMUM over published versions, reading the pinned version reads a row ' +
+    'that may have been retired years earlier, and requiring every published version to agree is ' +
+    "a firm parameter wearing a plan's costume that no CHECK can express. ADR-252 BUILT THAT " +
+    'HOME AND WIRED NOTHING TO IT: `grep -rln firm_parameters packages/db/migrations` returns ' +
+    '1 line, which is `0074_firm_parameters.sql`, and it creates `base_account_cap` on ' +
+    "`price_floors`' shape with its approver a foreign key into `operators`. THE EXCEPTION IS " +
+    'UNTOUCHED AND 0002 IS NOT EDITED: `grep -rn max_accounts_override ' +
+    'packages/db/migrations/0002_identity.sql` returns 1 line. WHAT REMAINS IS A DOOR AND NOT A ' +
+    'COLUMN, WHICH IS THE NARROWING: `accountCap()` is a method of `CheckoutTx`, which is a ' +
+    'SCOPED transaction, and a scoped transaction refuses every firm key outside ' +
+    '`CATALOG_TABLE_KEYS` -- five members -- and `grep -rn firmParameters ' +
+    'packages/db/src/scoped-db.ts` returns nothing. THE READ CANNOT MOVE OUTSIDE THE ' +
+    'TRANSACTION EITHER, because `INV-M3-15` requires the restriction check at the same point in ' +
+    'the transaction as the cap and `gateIdentity` performs both in one call. AND THE TABLE ' +
+    'SHIPS EMPTY, WHICH NO DOOR FIXES: nothing under any `src/` writes a `firm_parameters` row ' +
+    'or an `operators` row, and AN ABSENT ROW IS NO CAP RATHER THAN AN UNLIMITED ONE, so the ' +
+    'slice that writes this read owes a REFUSAL there before it owes anything else. ' +
+    '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1529`) ABOUT THE SAME ' +
+    'NUMBER AND NO LONGER FOR THE IDENTICAL FINDING: that method reads through `ApiDb.firm`, ' +
+    'which needs no catalogue admission, so its remaining half is the empty table alone. THE TWO ' +
+    'ENTRIES WERE ONE REFUSAL FOR AS LONG AS NEITHER HAD A SOURCE AND THEY ARE TWO NOW. SECOND, ' +
+    'A ROW THE BUYER MUST SEE THAT BELONGS TO THE AFFILIATE, REFUSED A SECOND ' +
+    'TIME: `clickByToken` (`routes/checkout.ts:831`) returns a `ClickRef` whose `affiliate` ' +
     'carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
     '(`routes/checkout.ts:478`); `affiliates` is scope class `owned` on `identity_id` ' +
-    '(`packages/db/src/scope.ts:1118`) and `affiliate_clicks` is `derived` through it ' +
-    '(`packages/db/src/scope.ts:1132`), so the row belongs to somebody else and the disclosure ' +
+    '(`packages/db/src/scope.ts:1119`) and `affiliate_clicks` is `derived` through it ' +
+    '(`packages/db/src/scope.ts:1135`), so the row belongs to somebody else and the disclosure ' +
     'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of either ' +
     'returns the empty set and `resolveAttribution` folds every referral as organic, which is a ' +
     'wrong answer that RETURNS ROWS. ADR-238 RULING 2 NAMES WHAT THE PORT MUST DO INSTEAD AND IT ' +
@@ -615,7 +676,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`apps/worker/src/recon/sweep.ts` writes the rows, every field maps to a column of ' +
     '`0014_marks.sql`, and the exact filter is ALREADY WRITTEN in this deployable at ' +
     '`admin-source/liability.ts:1193`. What refuses it is THE DOOR: `reconciliations` is scope ' +
-    'class `derived` (`packages/db/src/scope.ts:1339`), so `firm` refuses the key AT COMPILE ' +
+    'class `derived` (`packages/db/src/scope.ts:1341`), so `firm` refuses the key AT COMPILE ' +
     'TIME and `scoped` has no identity on this surface, and ADR-171 clause 1 refuses the ' +
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
@@ -645,14 +706,24 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ADR-170, `routes/verify.ts` implements it, and `start.ts` wires `databaseVerifySource(LIVE_DB)` ' +
     'today. What that half waits on is an ORIGIN, which is a deployment fact ADR-012 keeps out of ' +
     'this repository and which one named environment variable would close. ' +
-    'WHAT STILL REFUSES IS `image_url`, AND IT IS THE CARD RATHER THAN THE SIGNER. ADR-240 ruled ' +
-    'the URL signing key out of this deployable and named where it belongs (the object store or ' +
-    'the edge, INFRA section 2), and ADR-246 read that ruling forward: a signer signs an address, ' +
-    'an address addresses an object, and the object is a card THIS REPOSITORY HAS NO RENDERER ' +
-    'FOR. `certificates` (`0020_public_surface.sql`) carries seventeen columns and none ' +
-    'of them is an image location, so there is not even a stored value to sign, and no migration ' +
-    'in the set alters the table. `test/certificate-ports.test.ts` executes the column set and ' +
-    'the sweep, so the day either moves this entry goes red. ' +
+    'WHAT STILL REFUSES IS `image_url`, AND ADR-249 NARROWED IT TO ONE THING. It is no longer ' +
+    'the signer, the column and the renderer: it is the RENDERER, alone. ADR-249 ruled that this ' +
+    'card carries NO SIGNATURE AT ALL, so the key ADR-240 placed outside this deployable is a key ' +
+    'nothing in the design asks for, and that `image_url` is `origin` plus the path this file ' +
+    'already serves, DERIVED FROM `code` at projection time. `projectCertificate` hands `links` ' +
+    'the code and no other field of the row can reach the address, which is executed in ' +
+    '`test/certificate-card-home.test.ts` rather than argued here, so `certificates` needs no ' +
+    'image-location column and ADR-249 RESERVED NO MIGRATION NUMBER AND TOOK NONE. The table ' +
+    'still carries seventeen columns and none is an image location and no migration in the set ' +
+    'alters it (`0020_public_surface.sql`), and that is now a RULING that it needs none rather ' +
+    'than a measurement of an absence. `test/certificate-ports.test.ts` executes the column set ' +
+    'and the sweep, so the day either moves this entry goes red. ' +
+    'SO THIS PORT WAITS ON THE ENDPOINT ITS OWN FIELD WOULD ADDRESS, and on an origin. Publishing ' +
+    'a link to a trader is publishing a promise that bytes are there, and until ' +
+    '`useCertificateImageSource` has a renderer the address would resolve to a 503. ADR-240 ' +
+    'clause 10 still declines to name the origin variable, for a ground ADR-249 CHANGED rather ' +
+    'than repeated: it is no longer that the sibling field can never be built, it is that the ' +
+    'row it addresses does not answer yet. ' +
     'AND THE HALF-WIRING IS REFUSED ON A SECOND GROUND THAT IS NOT A MISSING PIECE AT ALL: ' +
     '`projectCertificate` never calls `links` for a deferred row (ADR-168 foreclosure 4), so a ' +
     'backend with a live read and a refusing signer answers 200 to a trader whose certificates ' +
@@ -690,9 +761,20 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'beside it are a renderer no deployment can set. ADR-240 declines to name the first while ' +
     'the second has no producer, because a variable whose only consumer refuses is a name ' +
     'nothing reads. ' +
-    'ADR-246 ADDS THE SET READING AND NOTHING ELSE: the bytes this port owes and the `image_url` ' +
+    'ADR-246 ADDED THE SET READING: the bytes this port owes and the `image_url` ' +
     '`useCertificateBackend` owes are ONE deliverable, so the two entries expire together or ' +
-    'not at all, and a session dispatched at either is dispatched at the card.',
+    'not at all, and a session dispatched at either is dispatched at the card. ' +
+    'AND ADR-249 RULED WHERE THAT CARD COMES FROM, WHICH LEAVES THIS ENTRY WAITING ON A ' +
+    'RENDERER AND ON NOTHING ELSE. It is rendered ON FETCH, from the live row, by whatever ' +
+    "answers this deployable's own image row, and it is stored NOWHERE DURABLE: `INV-M11-08` " +
+    'says a rendered image "is re-generated on fetch from the live row" and is "never a static ' +
+    'artifact Merit keeps serving after the row changed", and `imageHandler` already enforces it ' +
+    'by refusing a non-deferred lookup that carries no card. Every value the card draws is ' +
+    'already a column of `certificates`, so the renderer this port waits on needs NO MIGRATION, ' +
+    "and `FM-M11-05`'s cache key `(code, row_version)` names a column that does not exist and " +
+    'that ADR-249 rules DERIVED rather than stored. Both halves are executed in ' +
+    '`test/certificate-card-home.test.ts`. THE RENDERER IS STILL ABSENT AND THAT IS THE WHOLE ' +
+    'OF WHAT REFUSES HERE.',
   useCertificateRevokeBackend:
     'READ BY ADR-246 AS THE THIRD OF THE THREE CERTIFICATE PORTS AND LEFT EXACTLY WHERE IT ' +
     'STOOD: it is the one of the three that is NOT about the card, so the card landing does ' +
@@ -704,12 +786,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'assertion verifier is not. SECOND AND INDEPENDENT: ' +
     '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
-    'class `owned` on `identity_id` (`packages/db/src/scope.ts:884`). `db.firm` refuses that key ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:886`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
     '(`packages/db/src/scope.ts:1507-1509`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
-    '(`packages/db/src/scope.ts:1033`), so the audit half alone has a door and the subject half ' +
+    '(`packages/db/src/scope.ts:1035`), so the audit half alone has a door and the subject half ' +
     "does not, which is the one-live-arm shape this file refuses on `usePayoutBackend`'s stated " +
     'rule. ADR-231 DOES NOT REACH THIS ONE AND THE REASON IS THE ADDRESS: `db.publicLookup` is ' +
     'READ ONLY and its vocabulary is `certificates` by `code`, while this route locks and ' +

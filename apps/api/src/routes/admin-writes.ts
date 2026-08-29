@@ -281,10 +281,25 @@ export interface AdminWriteBackend {
    * PUBLISH CANNOT PROCEED WITHOUT IT. `CV-01` to `CV-19` are publish-time
    * checks over `rules` and the size rows, and a publish that skipped them
    * would put a plan version in front of buyers that the engine refuses to
-   * resolve. `apps/api` does not declare `@merit/rules-engine` and this
-   * session's fence is one route file, so the validator arrives the same way
-   * the database does: injected, unwired by default, and 503 until somebody
-   * wires it.
+   * resolve.
+   *
+   * THE SENTENCE THAT STOOD HERE WAS "`apps/api` does not declare
+   * `@merit/rules-engine`" AND IT HAS BEEN FALSE SINCE SESSION 252 landed
+   * `routes/payouts.ts`: the dependency is declared in `apps/api/package.json`
+   * and `validatePlan` is exported. `test/wiring.test.ts` recorded the
+   * correction on its own entry (ADR-171 finding 10) and said in the same
+   * breath that the stale copy survived HERE because a handler file was
+   * outside that entry's fence. It is inside this one, so it is repaired at
+   * the source rather than contradicted from another file.
+   *
+   * WHAT IS STILL TRUE IS THE PORT, AND IT IS TRUE FOR A DIFFERENT REASON. The
+   * remaining gap is a PROJECTION rather than a dependency: `validatePlan`
+   * answers a `ValidationResult`, whose `errors` are `CvViolation` values
+   * (`{ id, path, detail, sizeCents }`) and whose failure includes a non-empty
+   * `materialization`, and {@link PlanValidation} is `{ code, message }` with a
+   * boolean. Nothing in this tree performs that projection, so the validator
+   * still arrives the way the database does: injected, unwired by default, and
+   * 503 until somebody writes it.
    */
   validatePlan(rules: unknown, sizes: readonly unknown[]): PlanValidation;
 
@@ -297,12 +312,28 @@ export interface AdminWriteBackend {
    *
    * `accounts.closed_on` is a `date` and the trading day follows the exchange
    * session calendar in CT while storage is UTC, so `new Date().toISOString()`
-   * is wrong for the six hours a day the two disagree. **Nothing in this
-   * workspace maps an instant to a trading day**: `packages/rules-engine`'s
-   * calendar module answers "which day follows which" over a slice and offers
-   * no instant lookup, so a handler that computed one would be inventing the
-   * rule rather than reading it. It is a port for exactly that reason, and the
-   * gap is named in ADR-145 rather than papered over with a UTC date.
+   * is wrong for the hours a day the two disagree.
+   *
+   * "NOTHING IN THIS WORKSPACE MAPS AN INSTANT TO A TRADING DAY" STOOD HERE AND
+   * IS NOW FALSE (ADR-251). `@merit/rules-engine` exports `buildSessionCalendar`
+   * and `tradingDayAt`, which read `trading_calendar`'s stored session bounds
+   * and `trading_calendar_loads`' coverage and answer by CONTAINMENT, comparing
+   * an instant only with an instant and reading the day off the row that
+   * comparison selected. `apps/api` declares that package and holds `db.firm`,
+   * and both tables are `firm` in the registry, so the supplier and the read are
+   * both here.
+   *
+   * WHAT THIS SIGNATURE STILL CANNOT BE HANDED IS A TOTAL FUNCTION, AND THAT IS
+   * NOW THE WHOLE OF THE GAP. `tradingDayAt` answers three ways, because
+   * ADR-042 F-4 requires it to: a day, `not_a_session` for an instant inside
+   * coverage that no session contains (a weekend, a holiday, the gap between
+   * one close and the next open), and `outside_coverage` for an instant the
+   * estate has loaded nothing around. `tradingDay(): string` has one arm for
+   * three answers. AND NO RULING SAYS WHICH DAY AN OPERATOR CLOSE TAKES WHEN
+   * THE INSTANT IS IN NO SESSION, while `accounts_terminal_has_close_date`
+   * requires `closed_on` on every `closed_admin` row. So what is owed here is a
+   * DECISION and no longer a function, and this port keeps its shape until one
+   * exists rather than picking a day on a handler's authority.
    */
   tradingDay(): string;
 }

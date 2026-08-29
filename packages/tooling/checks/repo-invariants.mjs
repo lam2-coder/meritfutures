@@ -2447,7 +2447,7 @@ const CITATIONS_OWNED_ELSEWHERE = [
   //   `detectors/identity.ts:1609`   quotes "flags attach to HUMANS, not to
   //                                  accounts" at `0008_risk.sql:107`, which is
   //                                  BLANK. The sentence is at `:111`
-  //   `provisioning/payload.ts:21`   `scope.ts:909` is `},`, the close of the
+  //   `provisioning/payload.ts:21`   `scope.ts:911` is `},`, the close of the
   //                                  `kycFunnelEvents` entry. The `payload
   //                                  jsonb` sentence it quotes is at `:1226`,
   //                                  inside `provisioningQueue`
@@ -2462,7 +2462,7 @@ const CITATIONS_OWNED_ELSEWHERE = [
   // `nearestName`'s own rule that a suffix path is answered by all of them. That
   // is miss (10) and it is stated rather than tuned away.
   { file: 'apps/worker/src/detectors/identity.ts', cites: '0008_risk.sql:107', name: null },
-  { file: 'apps/worker/src/provisioning/payload.ts', cites: 'scope.ts:909', name: null },
+  { file: 'apps/worker/src/provisioning/payload.ts', cites: 'scope.ts:911', name: null },
 ];
 
 /**

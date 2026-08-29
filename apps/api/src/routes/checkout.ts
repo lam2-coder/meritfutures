@@ -509,25 +509,50 @@ export interface AccountCapRow {
   /** Live accounts this IDENTITY holds. Every plan, not the one being bought. */
   readonly liveAccounts: number;
   /**
-   * The identity's cap. NO IMPLEMENTATION IN THIS TREE CAN PRODUCE ONE.
+   * The identity's cap. THE BASE NOW HAS A ROW AND THIS TRANSACTION STILL
+   * CANNOT REACH IT.
    *
    * THIS DOCBLOCK SAID `max_accounts_override` FOLDED OVER "THE PLAN DEFAULT"
-   * AND ADR-238 RULING 1 RULES THAT SOURCE WRONG RATHER THAN MISSING. The
+   * AND ADR-238 RULING 1 RULED THAT SOURCE WRONG RATHER THAN MISSING. The
    * override half is real and is `identities.max_accounts_override`, the one
-   * line in the migration set that names an account cap at all. The base half
-   * is `limits.max_accounts_per_entity`, which lives in the `plan_versions.rules`
-   * jsonb and is a PER-PLAN-VERSION number, while `liveAccounts` beside it is
-   * this identity's total across every plan. Comparing the two makes an
-   * identity's effective cap the MAXIMUM over every published version, so a
-   * buyer picks their own cap by picking a plan, and on the reset path the
+   * line in the migration set that names a per-entity cap. The base half was
+   * `limits.max_accounts_per_entity` in the `plan_versions.rules` jsonb, a
+   * PER-PLAN-VERSION number, while `liveAccounts` beside it is this identity's
+   * total across every plan; comparing the two makes an identity's effective
+   * cap the MAXIMUM over every published version, and on the reset path the
    * version read is the one an account was PINNED to, which may have been
    * retired years earlier.
    *
-   * SO THE BASE IS THE FIRM'S NUMBER AND NEEDS A FIRM'S ROW, on `price_floors`'
-   * shape: effective dated, superseded rather than updated, carrying its
-   * approver. Registering one is `packages/db/src/schema.ts` and `scope.ts`,
-   * which ADR-238's fence does not reach. Until it lands, an implementation of
-   * `accountCap` has three columns and an invented fourth.
+   * ADR-252 BUILT THE HOME THAT RULING NAMED AND WIRED NOTHING TO IT.
+   * `firm_parameters` (`0074`) holds `base_account_cap` on `price_floors`'
+   * shape, effective dated, superseded rather than updated, its approver a
+   * foreign key into `operators`. It is registered `firm` in
+   * `packages/db/src/scope.ts`, so `ApiDb.firm` reaches it and `FirmTx.rowsWhere`
+   * types against it. WHAT REMAINS IS A DOOR AND NOT A COLUMN, and it is
+   * narrower than what stood here: `accountCap()` is a method of `CheckoutTx`,
+   * which is a SCOPED transaction, and a scoped transaction refuses every firm
+   * key that is not in `CATALOG_TABLE_KEYS`. That list is five members and this
+   * key is deliberately not one of them.
+   *
+   * THE READ CANNOT SIMPLY MOVE OUTSIDE THE TRANSACTION, which is the shortcut
+   * to check before reaching for `db.firm` beside it. `INV-M3-15` requires the
+   * restriction check at the same point in the transaction as the cap and
+   * `gateIdentity` performs both in one call, so a cap read before the
+   * transaction opens is a cap that may have been superseded by the time the
+   * purchase commits. `refuseUncatalogued` in `packages/db/src/scoped-db.ts`
+   * states the admission argument in its own message and this table satisfies
+   * it: a request handler holding an identity must read the row INSIDE its own
+   * transaction. Making that argument is a diff on `packages/db` with an ADR,
+   * and ADR-252 did not make it.
+   *
+   * AND THE TABLE SHIPS EMPTY, WHICH IS THE HALF NO DOOR FIXES. Nothing in this
+   * repository writes a `firm_parameters` row, so an implementation with the
+   * door in hand reads NOTHING. AN ABSENT ROW IS NO CAP AND IT IS NOT AN
+   * UNLIMITED ONE: folding an absent row into `Infinity`, or skipping the
+   * comparison when the read returns nothing, is a control that answers yes to
+   * everybody on the endpoint that sells accounts. Whichever slice writes this
+   * read owes a REFUSAL there, on `IdentityStatus`' precedent elsewhere in this
+   * file, and it owes it before it owes anything else.
    */
   readonly maxAccounts: number;
   /** `identities.status`. INV-M3-15 refuses `restricted`. */
