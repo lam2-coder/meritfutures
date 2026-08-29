@@ -138,7 +138,7 @@
 // `statusCode`, and `server.ts`'s error handler maps an absent status to 500.
 //
 // **THAT 500 IS THE DESIGN AND NOT A DEFECT TO ROUTE AROUND.** `STATUS_CODE`
-// (`server.ts:83`) is closed over API_CONTRACT section 2's canonical table,
+// (`server.ts:98`) is closed over API_CONTRACT section 2's canonical table,
 // which carries NO 503 and no `service_unavailable`, and the handler's own
 // comment says an unmapped status "is reported as an `internal_error` with the
 // real status in the log, which is a defect somebody can find" rather than
