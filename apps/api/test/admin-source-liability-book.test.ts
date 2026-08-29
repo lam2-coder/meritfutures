@@ -466,10 +466,10 @@ describe('reserve, which is ADR-188 clause 4 and needed ADR-199 to be readable',
 });
 
 // -----------------------------------------------------------------------------
-// per_plan, less the CUSUM
+// per_plan, with the CUSUM rendered ABSENT
 // -----------------------------------------------------------------------------
 
-describe('per_plan, which is the loss-ratio breaker and NOT the CUSUM', () => {
+describe('per_plan, which is the loss-ratio breaker and an ABSENT CUSUM', () => {
   it('takes the latest evaluated_on per plan and orders by code', async () => {
     const { result } = await read();
     expect(result?.book.per_plan).toStrictEqual([
@@ -479,6 +479,7 @@ describe('per_plan, which is the loss-ratio breaker and NOT the CUSUM', () => {
         loss_ratio_bp: 900,
         threshold_bp: 6_000,
         sales_paused: false,
+        cusum: null,
       },
       {
         plan_id: PLANS[0]?.id,
@@ -486,13 +487,43 @@ describe('per_plan, which is the loss-ratio breaker and NOT the CUSUM', () => {
         loss_ratio_bp: 6_450,
         threshold_bp: 6_000,
         sales_paused: true,
+        cusum: null,
       },
     ]);
   });
 
-  it('carries no cusum member at all, which is blocker B3 rather than an omission', async () => {
+  // INVERTED BY THE SESSION THAT SPENT THE CLEARING CONDITION. This case read
+  // "carries no cusum member at all, which is blocker B3 rather than an
+  // omission" and asserted the KEY was absent from every plan. ADR-202 ruled the
+  // form of the absence and ADR-203 transcribed it, so the key is present and
+  // carries `null`.
+  it('carries cusum as a null on every plan, which is B3 lifted and not the calibration', async () => {
     const { result } = await read();
-    for (const plan of result?.book.per_plan ?? []) expect('cusum' in plan).toBe(false);
+    const plans = result?.book.per_plan ?? [];
+    expect(plans).toHaveLength(2);
+    for (const plan of plans) {
+      expect('cusum' in plan).toBe(true);
+      expect(plan.cusum).toBeNull();
+    }
+  });
+
+  it('pairs that null with ONE gap naming the path with the index elided', async () => {
+    // ADR-203 ruling 2: one entry per absent FIGURE and not one per null value.
+    // Two plans are null above and the body carries one entry, because the
+    // absence is a property of the CALIBRATION rather than of a plan.
+    const { result } = await read();
+    expect(result?.book.gaps).toStrictEqual([
+      {
+        field: 'per_plan[].cusum',
+        cause: 'awaiting_dependency',
+        awaiting: 'DEP-M6-05',
+        detail: expect.stringContaining('DEP-M6-05') as unknown as string,
+      },
+    ]);
+    // `awaiting` IS NON-NULL EXACTLY WHEN THE CAUSE IS `awaiting_dependency`,
+    // which is the one pairing ADR-203 ruling 4 lets a reader rely on.
+    expect(result?.book.gaps[0]?.awaiting).not.toBeNull();
+    expect(result?.book.gaps[0]?.detail.trim()).not.toBe('');
   });
 
   it('reads sales_paused as state = paused and never as any other state', async () => {
@@ -514,6 +545,17 @@ describe('per_plan, which is the loss-ratio breaker and NOT the CUSUM', () => {
     // nobody ran.
     const { result } = await read({ planBreakerState: [] });
     expect(result?.book.per_plan).toStrictEqual([]);
+  });
+
+  it('writes NO cusum gap when there are no plans, which the validator is what decides', async () => {
+    // **THE CASE A CONSTANT `CUSUM_GAPS` ARRAY WOULD FAIL, AND IT IS TODAY'S
+    // STATE RATHER THAN AN EXOTIC ONE.** `assertLiabilityGapsPaired` builds its
+    // absent set with `per_plan.some(...)`, so over an empty array nothing is
+    // null and an entry naming `per_plan[].cusum` is a gap over a figure this
+    // response is NOT withholding. That is ADR-203 ruling 2's second direction,
+    // which the entry itself calls the worse failure, firing on the first read.
+    const { result } = await read({ planBreakerState: [] });
+    expect(result?.book.gaps).toStrictEqual([]);
   });
 
   it('refuses a breaker row naming a plan no plans row carries', async () => {
@@ -764,37 +806,26 @@ const BLOCKED_LEAVES = [
   // rather than this ruling's, so the group is PRODUCED BY NOTHING and stays
   // here. This list is what is produced and never what is permitted.
   'payout_velocity',
-  // B3: DEP-M6-05's calibration, ADR-167 clause 5, and `ADR-202` ruling 3 is
-  // the form. One leaf, because the absence is a property of the CALIBRATION
-  // and not of the three members, which is that ruling's own second refusal.
-  'per_plan[].cusum',
 ] as const;
 
 /**
- * The four leaves that are DECLARED, PRODUCIBLE, AND ABSENT FROM THE PRODUCED
- * VALUE FOR A THIRD REASON, which `ADR-203` created and which is worth its own
- * list rather than being folded into the one above.
+ * **`EMPTY_ARRAY_LEAVES` IS DELETED AND ITS DELETION IS THE FINDING**, recorded
+ * here rather than by the absence of a constant nobody would notice.
  *
- * `gaps` is `[]` on this book, and {@link leavesOf} cannot walk an empty array:
- * there is no element to descend into. So these four are missing from the
- * produced set WITHOUT being blocked by anything. Nothing in the estate is
- * waiting on them.
+ * It held `gaps[].field`, `gaps[].cause`, `gaps[].awaiting` and `gaps[].detail`:
+ * four leaves that were DECLARED, PRODUCIBLE, and missing from the produced set
+ * for a third reason, because {@link leavesOf} cannot walk an empty array and
+ * `gaps` was `[]`. The docblock's own words for why it was empty were that
+ * `LiabilityBook` said a figure was absent by OMITTING the group while
+ * `LiabilityResponse` said it by NULLING the field and naming it in `gaps`, that
+ * these are two spellings of one fact, and that **a book that still speaks the
+ * first cannot be served as the second**.
  *
- * **AND THE REASON THE ARRAY IS EMPTY IS THE FINDING RATHER THAN THE COST.**
- * `LiabilityBook` says a figure is absent by OMITTING the group, which is what
- * its `Omit` list is; `LiabilityResponse` now says it by NULLING the field and
- * naming it in `gaps`. Those are two spellings of one fact, and a book that
- * still speaks the first cannot be served as the second. That is the same
- * sentence as `IMPLEMENTED_ADMIN_READS` not containing `readLiability`, arriving
- * in the arithmetic.
+ * **THE BOOK SPEAKS THE SECOND NOW.** `per_plan[].cusum` is a `null` with an
+ * entry naming it, so the array has a member, so the four leaves are produced
+ * and the list has no members left. That is the same sentence as `B3` lifting,
+ * arriving in the arithmetic rather than in a comment.
  */
-const EMPTY_ARRAY_LEAVES = [
-  'gaps[].field',
-  'gaps[].cause',
-  'gaps[].awaiting',
-  'gaps[].detail',
-] as const;
-
 describe('the subtraction this whole slice measures', () => {
   it('produces every leaf the contract declares EXCEPT the ones the blockers hold', async () => {
     const declared = await contractLeaves();
@@ -808,33 +839,31 @@ describe('the subtraction this whole slice measures', () => {
     expect(declared.length).toBeGreaterThan(30);
 
     expect(produced).toStrictEqual(
-      [
-        ...declared.filter(
-          (path) =>
-            !BLOCKED_LEAVES.includes(path as never) && !EMPTY_ARRAY_LEAVES.includes(path as never),
-        ),
-      ].sort(),
+      [...declared.filter((path) => !BLOCKED_LEAVES.includes(path as never))].sort(),
     );
   });
 
-  it('holds 7 blocked leaves and 4 empty-array leaves against 39 declared, so 28 are produced', async () => {
+  it('holds 6 blocked leaves against 39 declared, so 33 are produced', async () => {
     // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY, and this
     // is the first session in four in which the PRODUCED COUNT MOVED. `ADR-203`
     // moved the declared count and left production alone, which was that
-    // ruling's own point; `B4` moves production, because `0064` plus session
-    // 387's producer plus the reader in this module is a leaf that has a source
-    // where yesterday it had none. 27 became 28 and 8 blocked became 7.
+    // ruling's own point. Three blockers lifted in this diff and 27 became 33:
+    // one leaf gained a SOURCE (`B4`), one gained a SPELLING FOR ITS ABSENCE
+    // (`B3`), and four more came with that spelling because a `gaps` array with
+    // a member in it is an array {@link leavesOf} can walk.
     const declared = await contractLeaves();
     expect(declared).toHaveLength(39);
-    expect(BLOCKED_LEAVES).toHaveLength(7);
-    expect(EMPTY_ARRAY_LEAVES).toHaveLength(4);
-    for (const leaf of [...BLOCKED_LEAVES, ...EMPTY_ARRAY_LEAVES]) expect(declared).toContain(leaf);
-    // AND THE LEAF THAT MOVED IS NAMED, so a later reader can tell an arithmetic
-    // change from a production change without diffing two revisions of a count.
-    expect(declared).toContain('integrations.recon.last_run_at');
-    expect(BLOCKED_LEAVES).not.toContain('integrations.recon.last_run_at');
+    expect(BLOCKED_LEAVES).toHaveLength(6);
+    for (const leaf of BLOCKED_LEAVES) expect(declared).toContain(leaf);
+    // AND THE LEAVES THAT MOVED ARE NAMED, so a later reader can tell an
+    // arithmetic change from a production change without diffing two revisions
+    // of a count.
+    for (const moved of ['integrations.recon.last_run_at', 'per_plan[].cusum', 'gaps[].cause']) {
+      expect(declared).toContain(moved);
+      expect(BLOCKED_LEAVES).not.toContain(moved);
+    }
     const { result } = await read();
-    expect(leavesOf(result?.book)).toHaveLength(28);
+    expect(leavesOf(result?.book)).toHaveLength(33);
   });
 
   it('reads a contract whose LiabilityResponse block is still the one RI-18 binds', () => {

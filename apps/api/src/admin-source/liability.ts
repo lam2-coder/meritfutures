@@ -98,14 +98,26 @@
 //       already renders that absence in terms -- "absent: blocked on ...
 //       (ADR-167 clause 5, FM-M6-07)" -- so the absence is the answer this tree
 //       already gives on the one surface that has a shape for it.
-//       **AND THE WIRE HAS NO SHAPE FOR IT.** All three declarations of
-//       `LiabilityResponse` type `cusum` as a REQUIRED object of two numbers and
-//       a boolean, so the only two ways to answer are to manufacture a statistic
+//       **THE WIRE HAD NO SHAPE FOR IT AND NOW IT DOES, WHICH IS THE SECOND OF
+//       THE TWO CLEARING CONDITIONS AND NOT THE FIRST.** All three declarations
+//       of `LiabilityResponse` typed `cusum` as a REQUIRED object of two numbers
+//       and a boolean, so the only two answers were to manufacture a statistic
 //       clause 5 refuses or to change a shape `RI-18` binds in three copies.
 //       ADR-167 clause 5's own last sentence -- "the wire shape is `P7-b`'s to
-//       carry, not this entry's to invent" -- is a shape nobody has carried.
-//       CLEARING CONDITION: `DEP-M6-05` lands, or a ruling gives the absence a
-//       wire shape.
+//       carry, not this entry's to invent" -- named a shape nobody had carried.
+//       ADR-202 ruled the form and ADR-203 transcribed it, atomically across the
+//       three copies. So `cusum` is `{...} | null` and {@link readGaps} writes
+//       the reason once on the body.
+//       **THE CALIBRATION HAS NOT LANDED AND THE FIGURE IS EXACTLY AS ABSENT AS
+//       IT WAS.** `DEP-M6-05` is still M06 Wave 4. What the lift bought is that
+//       the response can SAY the figure is missing, name the deliverable that
+//       would supply it, and be refused by `assertLiabilityGapsPaired` if it
+//       ever says so about a figure it is actually carrying. A shape that can
+//       carry an answer is not an answer, and this is the other half of that
+//       sentence: a shape that can carry an ABSENCE is the whole of what an
+//       absence needs.
+//       CLEARING CONDITION, RESTATED: `DEP-M6-05` lands and the three members
+//       become numbers.
 //
 //   B4. `integrations.recon.last_run_at` (1 leaf). **LIFTED, AND THE LEAF IS
 //       PRODUCED.** The paragraph this replaces read "NOTHING IN THIS SCHEMA
@@ -299,8 +311,20 @@ export interface LiabilityTx {
 // The shape this module can fill
 // -----------------------------------------------------------------------------
 
-/** `LiabilityResponse.per_plan`'s element, LESS the CUSUM. Blocker B3. */
-export type LiabilityPlanRow = Omit<LiabilityResponse['per_plan'][number], 'cusum'>;
+/**
+ * `LiabilityResponse.per_plan`'s element, WHOLE, AND THE CUSUM IS A `null`.
+ *
+ * IT WAS AN `Omit<..., 'cusum'>` UNTIL `ADR-203` LANDED and it is an index now,
+ * which is the whole of what B3's lift bought. `ADR-167` clause 5 renders the
+ * field ABSENT until `DEP-M6-05` and said the wire shape was *"`P7-b`'s to
+ * carry, not this entry's to invent"*; `ADR-202` ruled the form and `ADR-203`
+ * transcribed it into all three declarations. So the absence has a spelling now
+ * and this type stops subtracting the member.
+ */
+export type LiabilityPlanRow = LiabilityResponse['per_plan'][number];
+
+/** One entry of `LiabilityResponse.gaps`. `ADR-203` ruling 2. */
+export type LiabilityBookGap = LiabilityResponse['gaps'][number];
 
 /**
  * `LiabilityResponse` MINUS the thirteen leaves nothing in this estate produces.
@@ -312,12 +336,7 @@ export type LiabilityPlanRow = Omit<LiabilityResponse['per_plan'][number], 'cusu
  * type by the rule, and a blocker that lifts is removed from this type by
  * deleting one `Omit`.
  */
-export type LiabilityBook = Omit<
-  LiabilityResponse,
-  'eligible_next_7d' | 'payout_velocity' | 'per_plan'
-> & {
-  readonly per_plan: readonly LiabilityPlanRow[];
-};
+export type LiabilityBook = Omit<LiabilityResponse, 'eligible_next_7d' | 'payout_velocity'>;
 
 /**
  * What the read cost, in rows handed to this module.
@@ -652,7 +671,26 @@ function day(row: unknown, name: string, at: string): string {
 }
 
 /**
- * `per_plan`, LESS the CUSUM, which is blocker B3.
+ * `per_plan`, WITH THE CUSUM RENDERED ABSENT, WHICH IS BLOCKER B3 LIFTED.
+ *
+ * **THE FIGURE IS EXACTLY AS UNAVAILABLE AS IT WAS AND THE RESPONSE CAN SAY SO,
+ * WHICH IS THE DIFFERENCE `ADR-203` MADE AND IS NOT A SMALLER ONE.** `ADR-167`
+ * clause 1 folds `S_t` at read time from a landed series and clause 5 rules the
+ * field ABSENT until `DEP-M6-05` supplies `mu_0` and `sigma`, which `M06` puts
+ * in Wave 4. That did not move. What moved is that clause 5's own last sentence,
+ * *"the wire shape is `P7-b`'s to carry, not this entry's to invent"*, has been
+ * carried: `ADR-202` ruled the form and `ADR-203` put `{...} | null` into all
+ * three declarations with a `gaps` entry carrying the reason.
+ *
+ * **THE `null` IS AT THE OBJECT AND NEVER AT A MEMBER**, which is `ADR-202`
+ * ruling 3's second refusal: `{ statistic: null, threshold: 4, alarm: false }`
+ * is a half-calibrated chart, a shape nothing in the corpus describes. All three
+ * members stay non-nullable and the object is the thing that is absent.
+ *
+ * **AND THE GAP IS ONE ENTRY AND NOT ONE PER PLAN.** The absence is a property
+ * of the CALIBRATION rather than of a plan, so {@link readGaps} writes the path
+ * with the index elided, which is what `assertLiabilityGapsPaired` reads and
+ * what `CUSUM_GAPS` in `routes/admin-breaker.ts` already spells.
  *
  * ONE ROW PER PLAN, THE LATEST `evaluated_on`, AND NO NARROWING ON `metric`.
  * `0016` declares `metric text NOT NULL` with NO CHECK and no document states a
@@ -706,6 +744,10 @@ function readPerPlan(
       loss_ratio_bp: whole(held.row, 'ratioBp', at),
       threshold_bp: whole(held.row, 'thresholdBp', at),
       sales_paused: text(held.row, 'state', at) === 'paused',
+      // ADR-167 clause 5, and it is a VALUE this response asserts rather than a
+      // key it withholds. An omitted key would make "absent, blocked on
+      // DEP-M6-05" and "this deployment did not fill the field" the same body.
+      cusum: null,
     });
   }
   // ORDERED BY CODE, because the accessor returns rows in no promised order and
@@ -861,6 +903,51 @@ function readBatch(rows: readonly unknown[]): LiabilityBook['integrations']['bat
   return { last_success_at: instant(row, 'occurredAt', at), last_duration_ms: durationMs };
 }
 
+/**
+ * `gaps`, WHICH IS `ADR-203` RULING 2 AND IS BUILT FROM THE BOOK RATHER THAN
+ * WRITTEN AS A CONSTANT.
+ *
+ * **`CUSUM_GAPS` IN `routes/admin-breaker.ts` IS A CONSTANT AND THIS IS NOT, AND
+ * THE DIFFERENCE IS A CONTROL RATHER THAN A STYLE.** That endpoint has no
+ * pairing validator; this response has {@link assertLiabilityGapsPaired}, which
+ * refuses BOTH a `null` nothing names AND a name over a figure that is present.
+ * A constant array cannot satisfy the second direction, and the case where it
+ * fails is not exotic:
+ *
+ * **A BOOK WITH NO PLANS HAS NO ABSENT CUSUM, AND THE VALIDATOR IS WHERE THAT IS
+ * DECIDED.** `plan_breaker_state` has never held a row (`ADR-167` finding 9), so
+ * `per_plan` is `[]` today and the validator's `absent` set is built with
+ * `.some(...)`: over an empty array nothing is null, so a gap naming
+ * `per_plan[].cusum` would be a gap over a figure this response is not
+ * withholding. That is the failure `ADR-203` ruling 2's second direction exists
+ * for, arriving on the very first read. So the entry is conditioned on the array
+ * the validator reads and not on the calibration's state.
+ *
+ * **THE PATH ELIDES THE INDEX AND THAT IS THE RULING RATHER THAN A SHORTHAND.**
+ * One entry per absent FIGURE, and the CUSUM is absent on every plan for one
+ * reason, so a per-plan entry would put the identical sentence on the body once
+ * per plan and give an operator a list to read instead of a fact.
+ */
+function readGaps(perPlan: readonly LiabilityPlanRow[]): readonly LiabilityBookGap[] {
+  const gaps: LiabilityBookGap[] = [];
+
+  if (perPlan.some((plan) => plan.cusum === null))
+    gaps.push({
+      field: 'per_plan[].cusum',
+      // A NAMED DELIVERABLE IS OUTSTANDING, which is the one cause `awaiting`
+      // may be non-null for (ADR-203 ruling 4). Nothing in the estate is wrong.
+      cause: 'awaiting_dependency',
+      awaiting: 'DEP-M6-05',
+      detail:
+        'ADR-167 clause 5 renders the CUSUM absent until DEP-M6-05 supplies mu_0 and sigma, ' +
+        'which M06 puts in Wave 4. FM-M6-07: an uncalibrated CUSUM is either constant alarms ' +
+        'or none, which is the same as no chart. The statistic is recomputed at read time and ' +
+        'stored nowhere (ADR-167 clause 1), so no column is owed and nothing is lost by waiting.',
+    });
+
+  return gaps;
+}
+
 // -----------------------------------------------------------------------------
 // The read
 // -----------------------------------------------------------------------------
@@ -936,11 +1023,13 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
         'rather than a field to fill',
     );
 
+  const perPlan = readPerPlan(breakerRows, planRows);
+
   return {
     book: {
       ...readSnapshot(snapshot),
       reserve: readReserve(reserve, anchors[0]),
-      per_plan: readPerPlan(breakerRows, planRows),
+      per_plan: perPlan,
       integrations: {
         mid_health: readMidHealth(midHealthRows),
         // A COUNT OF A STATE AND A CLOCK, WHICH IS `B4` LIFTED. `status =
@@ -950,14 +1039,14 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
         batch,
       },
 
-      // EMPTY, AND THAT IS TRUE OF THIS TYPE RATHER THAN OF THE RESPONSE.
-      // `ADR-203` gives `LiabilityResponse` a way to say a figure is absent and
-      // why; this BOOK says it by OMITTING the group instead, which is what
-      // `LiabilityBook`'s `Omit` list is, so the book carries no null and
-      // therefore no gap. The two spellings are the reason `readLiability` is
-      // still not composed: the day a blocker lifts, the session that lifts it
-      // deletes an `Omit` and writes the gap here rather than dropping a field.
-      gaps: [],
+      // THE BOOK SPEAKS `ADR-203`'s SPELLING NOW AND NO LONGER ITS OWN. It used
+      // to say a figure was absent by OMITTING the group, which is what
+      // `LiabilityBook`'s `Omit` list was, and this array was `[]` because a
+      // book that omits carries no null and therefore no gap. Those were two
+      // spellings of one fact and only one of them can be served. The `Omit`
+      // list is one entry long now and every absence below it is a `null` with
+      // a reason, which is what `assertLiabilityGapsPaired` reads.
+      gaps: readGaps(perPlan),
     },
     cost: {
       liabilitySnapshotsScanned: snapshots.length,
