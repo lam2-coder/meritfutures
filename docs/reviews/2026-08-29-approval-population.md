@@ -1,0 +1,289 @@
+# The approval population, separated and counted: 108 proposed entries, 42 of them carrying money-path code, 2026-08-29
+
+**A review record under [ADR-033](../decisions/ADR-033.md), not a plan and not a ruling.** It sits
+outside the corpus ([`gates.mjs:165`](../../scripts/corpus/gates.mjs) excludes `docs/reviews/` from
+`isCorpusDocument`), so it carries no frontmatter, appears in no INDEX, and binds nothing by
+existing. **The ruling it feeds is [ADR-227](../decisions/ADR-227.md).** This file is the
+measurement and nothing else: every number below is a command and its output, and every command
+names the scope it ran over.
+
+**Tree measured:** `origin/main` at `21afc5d8`, working tree clean of source edits.
+
+**ONE THING ABOUT REPRODUCIBILITY, STATED FIRST BECAUSE IT INVALIDATES A NAIVE RE-RUN.** This
+session's clone arrived **shallow**: `git rev-parse --is-shallow-repository` returned `true` and
+`.git/shallow` held **15** boundary commits. Every git-provenance number in section 3 was derived
+**after** `git fetch --unshallow`, which took the log from **243** commits to **3434**. A re-run in a
+shallow clone silently collapses section 3: the first-parent search returns a boundary merge for
+**89** of the 108 entries rather than each entry's own. That was observed, not theorised, and it is
+recorded because the wrong number looked entirely plausible.
+
+---
+
+## 1. Why the number `111` had to be separated before anything could be ruled
+
+The founder's instruction of 2026-08-29 names *"111 adrs or money path e2 reads"* as one population.
+It is two, and they are different objects wearing the same signature box:
+
+- an **approval line on a ruling**, which attests that a decision was taken with authority, and
+- an **`E2` line-by-line read of a money-path diff**, which the constitution
+  ([`MERIT_BUILD_MASTER_PROMPT.md:392`](../../MERIT_BUILD_MASTER_PROMPT.md)) reserves for a human
+  because a model reviewing model-written code is not a control.
+
+A single count over both cannot be acted on, because the two have opposite remedies. Sections 2 and
+3 separate them.
+
+## 2. The entry population, derived live
+
+```
+$ ls docs/decisions/ADR-*.md | wc -l
+212
+
+$ for f in docs/decisions/ADR-*.md; do head -1 "$f" | grep -o 'status: [a-z]*'; done \
+    | sort | uniq -c
+    104 status: accepted
+    108 status: proposed
+```
+
+**Scope of that claim: 212 files matching `docs/decisions/ADR-*.md` carry a `status:` token in
+their first line; 108 of those tokens read `proposed` and 104 read `accepted`.** The status is read
+from the entry's own heading, which is the same source
+[ADR-088](../decisions/ADR-088.md)'s generated registry span reads, so this count cannot drift from
+[decisions/README.md](../decisions/README.md).
+
+**`111` is therefore three high against the entries today.** No entry was signed by this session and
+none was unsigned by it; the difference is that the founder's number was spoken over a tree that has
+moved, which is itself the argument against a queue measured by hand.
+
+### 2.1 What the 108 say about their own owed read
+
+```
+$ P=$(for f in docs/decisions/ADR-*.md; do head -1 "$f" | grep -q 'status: proposed' && echo "$f"; done)
+$ echo "$P" | xargs grep -li 'read is owed' | wc -l
+61
+```
+
+| Of the 108 `proposed` entries | Count |
+| --- | ---: |
+| contain the string `read is owed` | **61** |
+| do not | **47** |
+
+And within the 61, read at their own sentences:
+
+| Classification, from the entry's own words | Count |
+| --- | ---: |
+| says explicitly that **no** read is owed (`ADR-167`, `ADR-174`, `ADR-211`, `ADR-224`) | **4** |
+| **defers** the read to a diff that does not exist yet (*"owed on the diff that"*, *"on the first caller that"*, *"on the routes these rows produce"*) | **12** |
+| asserts a read owed against something already in the tree | **45** |
+
+**The 12 are the finding of this subsection.** An owed read on an unwritten diff is not a queue
+item, because nothing exists to read. Counting it as one inflates the backlog by items no session
+can ever discharge, and a backlog nobody can drain is the defect this whole exercise exists to
+name.
+
+## 3. The money-path population, derived from git rather than from prose
+
+Section 2 reads what entries **say**. This section reads what they **landed**, because an entry's
+own declaration is prose and [ADR-042](../decisions/ADR-042.md) already ruled that prose is not a
+control.
+
+For each `proposed` entry, the landing merge is the first-parent commit on `origin/main` that added
+the entry file, and the diff taken is that merge against its first parent:
+
+```
+m=$(git log --first-parent --diff-filter=A --format=%H origin/main -- "$f" | tail -1)
+git diff --name-only "$m^1" "$m" | grep -E '^(apps|packages)/' \
+  | grep -vE '/(test|tests)/|\.test\.|/fixtures/'
+```
+
+**79 of the 108** `proposed` entries landed at least one non-test file under `apps/` or `packages/`.
+**29 landed none** and are documentation rulings by construction.
+
+### 3.1 The money-path predicate, written out so it can be argued with
+
+The constitution reserves the read for `rules-engine/`, `payout/`, `ledger/` and auth
+([`:358`](../../MERIT_BUILD_MASTER_PROMPT.md), [`:392`](../../MERIT_BUILD_MASTER_PROMPT.md)).
+Migrations are added because [CLAUDE.md](../../CLAUDE.md) makes them unamendable once merged.
+Transcribed to this tree's layout, the predicate is:
+
+```
+^(packages/(rules-engine|ledger|psp|rail)/
+ |packages/db/migrations/
+ |packages/db/src/(scope|scoped-db)\.ts$
+ |apps/api/src/(auth-backend|csrf|turnstile|db)\.ts$
+ |apps/api/src/routes/(payouts|admin-payouts|checkout|auth)\.ts$
+ |apps/worker/src/(batch|breaker|provisioning)/)
+```
+
+**This predicate is a judgement and it is stated so.** `packages/psp/` and `packages/rail/` are in
+because money enters and settles through them; `packages/db/src/scope.ts` and `scoped-db.ts` are in
+because they are the identity-scoped accessor Appendix `D2` names, and E2's own cited failure class
+is *"access control, authorization bypass, and trust boundaries"*. A reader who disagrees with a
+member changes one line and re-runs.
+
+### 3.2 The result
+
+| Over the 108 `proposed` entries | Count |
+| --- | ---: |
+| landed **at least one money-path file** in their landing merge | **42** |
+| landed **no** money-path file | **66** |
+| **distinct money-path files** landed under a `proposed` entry | **62** |
+
+**So the founder was told 26 money-path reads and the derived figure is 42 entries over 62 files.**
+The queue is larger than the number it was declined at, not smaller. That direction matters: it
+removes "just read them" as an option on arithmetic rather than on preference, and it is the reason
+[ADR-227](../decisions/ADR-227.md) reaches for an assertion rather than for a reader.
+
+The 42, by entry:
+
+```
+ADR-102 ADR-104 ADR-105 ADR-106 ADR-107 ADR-112 ADR-113 ADR-120 ADR-122 ADR-123
+ADR-126 ADR-127 ADR-128 ADR-140 ADR-157 ADR-164 ADR-169 ADR-171 ADR-174 ADR-175
+ADR-176 ADR-177 ADR-180 ADR-183 ADR-186 ADR-187 ADR-189 ADR-191 ADR-192 ADR-193
+ADR-197 ADR-199 ADR-200 ADR-207 ADR-209 ADR-211 ADR-212 ADR-213 ADR-216 ADR-221
+ADR-225 ADR-226
+```
+
+The money-path files most often landed under an unsigned entry, by number of distinct entries:
+
+| File | Entries |
+| --- | ---: |
+| [`apps/api/src/routes/payouts.ts`](../../apps/api/src/routes/payouts.ts) | 8 |
+| [`packages/db/src/scoped-db.ts`](../../packages/db/src/scoped-db.ts) | 7 |
+| [`packages/db/src/scope.ts`](../../packages/db/src/scope.ts) | 7 |
+| [`packages/rail/src/settlement.ts`](../../packages/rail/src/settlement.ts) | 4 |
+| [`apps/api/src/routes/checkout.ts`](../../apps/api/src/routes/checkout.ts) | 4 |
+| [`apps/api/src/routes/auth.ts`](../../apps/api/src/routes/auth.ts) | 4 |
+| [`packages/ledger/src/chart.ts`](../../packages/ledger/src/chart.ts) | 3 |
+| [`apps/api/src/db.ts`](../../apps/api/src/db.ts) | 3 |
+| [`apps/api/src/auth-backend.ts`](../../apps/api/src/auth-backend.ts) | 3 |
+
+**A second, independent count of the same surface**, taken from the migration headers rather than
+from git, and already a generated span in [INDEX](../INDEX.md):
+
+```
+$ grep -l 'E2 READ: MONEY PATH' packages/db/migrations/*.sql | wc -l
+49
+$ ls packages/db/migrations/*.sql | wc -l
+63
+```
+
+**49 of 63 merged migrations declare themselves part of the founder's read set.** **Fifteen of
+those 49 landed under an entry that is still `proposed`**, by section 3.2's derivation, and all
+fifteen carry the header: `0048`, `0049`, `0050`, `0051`, `0052`, `0053`, `0054`, `0055`, `0056`,
+`0057`, `0059`, `0063`, `0065`, `0066`, `0067`. A migration is never edited once merged, so those
+fifteen are the part of the backlog that can only ever be discharged by a read or superseded by
+another migration.
+
+## 4. The residue: where no mechanical assertion is available
+
+[ADR-227](../decisions/ADR-227.md) rules that a money-path approval is earned by a named mechanical
+assertion rather than granted by a reader. The residue is what that leaves: money-path diffs whose
+central claim is a **choice** rather than a checkable property.
+
+The set is derived from the entries' own `What a founder read adds` blocks, which
+`RI-13` already requires on every unsigned entry, so the classifier is the entry's own words:
+
+```
+of the 42 money-path entries, the founder-read block declares an outstanding
+judgement in  30  and declares none in  12
+```
+
+**Thirty, ranked by how much money moves through the diff.** The rank is a judgement about
+consequence, stated so it can be argued with: tier 1 is money leaving the firm, tier 6 is a
+money-path file touched by a decision that is not itself about money movement.
+
+### Tier 1: money leaving the firm (9)
+
+Payout request, payout approval, and rail settlement. A wrong decision here moves an account's whole
+balance to the wrong party or at the wrong time.
+
+| Entry | The judgement it declares |
+| --- | --- |
+| [ADR-176](../decisions/ADR-176.md) | the request path records the approval and does not post it, and the key it must store to make that safe |
+| [ADR-192](../decisions/ADR-192.md) | the thirteen keep their `503` and stop disclosing it before authenticating |
+| [ADR-140](../decisions/ADR-140.md) | the identity-status term of `G-ELIGIBLE` is a named refusal and never a gate result |
+| [ADR-199](../decisions/ADR-199.md) | a figure is owed a column when it cannot be derived, never when it is merely not stored |
+| [ADR-191](../decisions/ADR-191.md) | a row that reaches an identity two different ways is scoped by both, and the sixth class is `either` |
+| [ADR-175](../decisions/ADR-175.md) | an idempotency key names the EVENT and never the DOOR |
+| [ADR-174](../decisions/ADR-174.md) | `LT-07` is a posting whose two legs are on the wrong sides, so no code is minted |
+| [ADR-177](../decisions/ADR-177.md) | four of seven account kinds are ruled and `firm_treasury` is refused |
+| [ADR-212](../decisions/ADR-212.md) | a citation proves the cited line is part of what the sentence names |
+
+### Tier 2: the ledger, the record of what is owed (4)
+
+| Entry | The judgement it declares |
+| --- | --- |
+| [ADR-104](../decisions/ADR-104.md) | the imbalance is unrepresentable, and a halt is only a halt because this code path honours it |
+| [ADR-157](../decisions/ADR-157.md) | a read may narrow by a range and by `IS NULL` and a write may not, and the lock is a row lock |
+| [ADR-183](../decisions/ADR-183.md) | an identity's three ledger positions are opened by the database when the identity is created |
+| [ADR-186](../decisions/ADR-186.md) | the last two codes are both assets, and shape (iii) becomes unrepresentable rather than refused |
+
+### Tier 3: money entering (4)
+
+| Entry | The judgement it declares |
+| --- | --- |
+| [ADR-105](../decisions/ADR-105.md) | the PSP port is the ORDER and the vendor is the mechanics |
+| [ADR-225](../decisions/ADR-225.md) | `zod at every boundary` names a mechanism this workspace has never had |
+| [ADR-123](../decisions/ADR-123.md) | on a genuinely empty production book the nightly self-audit now fails, on day one |
+| [ADR-113](../decisions/ADR-113.md) | the creative-submission row is written from the constraints rather than from the plan's sentence |
+
+### Tier 4: the engine that decides whether a payout is owed at all (3)
+
+| Entry | The judgement it declares |
+| --- | --- |
+| [ADR-207](../decisions/ADR-207.md) | `rule_states` stores `lifetime_settled_cents`, `breached` and `breach_kind`, and the state hash is declined |
+| [ADR-122](../decisions/ADR-122.md) | `input_digest` is taken over the computation's own argument and EXCLUDES the answer |
+| [ADR-127](../decisions/ADR-127.md) | Stryker is admitted under a delegated `VG-12` grant, with no threshold written at all |
+
+### Tier 5: who is allowed to be the party (6)
+
+E2's own named failure class. A wrong decision here does not move money by itself; it lets the wrong
+identity stand where a party should be, and every tier above then behaves correctly for the wrong
+person.
+
+| Entry | The judgement it declares |
+| --- | --- |
+| [ADR-106](../decisions/ADR-106.md) | a row whose subject is a PAIR of identities belongs to both and is scoped to neither |
+| [ADR-102](../decisions/ADR-102.md) | the accessor writes inside a transaction it also produces, and a third door serves rows that belong to nobody |
+| [ADR-112](../decisions/ADR-112.md) | the accessor learns to name ONE ROW, and six writes are removed rather than documented |
+| [ADR-226](../decisions/ADR-226.md) | the Turnstile outage posture is fail closed, and the cost is blocked sign-ins |
+| [ADR-120](../decisions/ADR-120.md) | `apps/api` joins the admission list, and the auth surface is wired |
+| [ADR-171](../decisions/ADR-171.md) | the third door is REFUSED, on a measurement rather than on the argument it was allocated against |
+
+### Tier 6: append-only guarantees, provisioning, and roles (4)
+
+| Entry | The judgement it declares |
+| --- | --- |
+| [ADR-169](../decisions/ADR-169.md) | `cooling_until` is `NOT NULL` because a nullable one fails OPEN |
+| [ADR-128](../decisions/ADR-128.md) | the audited write, and the table `OI-01` has been waiting on |
+| [ADR-164](../decisions/ADR-164.md) | the live cache is reachable only by a fifth role, and the grant is a `REVOKE` against `0026`'s default |
+| [ADR-107](../decisions/ADR-107.md) | the provisioning saga admits nobody it cannot produce evidence for, and five of seven operations have no inverse |
+
+### 4.1 What this list is not
+
+**It is not thirty diffs to read line by line.** Each row is a **decision**, one or two sentences
+long, already written out by the entry that took it. The entry holds the derivation; the row holds
+the question. That is the difference between a queue a founder declines and a list a founder
+answers.
+
+**And it is not final.** Every row leaves the residue the moment somebody writes an assertion that
+fails when the decision is wrong. Tier 4's `ADR-122` is the clearest candidate: *"`input_digest`
+excludes the answer"* is a property a test can hold, and a test that holds it retires the row
+without a reading. **No such assertion was written here**, because writing one is code and this
+row's fence is documentation. How many of the thirty are reachable that way is not measured and is
+deliberately not guessed: the entry that takes each row says whether its own decision is
+falsifiable, and a count asserted here would be the exact thing section 5 warns about.
+
+## 5. What this measurement does not establish
+
+- **It does not say the 42 entries are wrong.** It says no human has read them and no named
+  assertion currently stands in for one.
+- **It reads landing merges, not authorship.** An entry whose landing merge carried a money-path
+  file it did not itself cause is counted in the 42. That direction is deliberate: a false positive
+  is an argument somebody has, and a false negative is a money-path diff nobody looks at.
+- **It does not measure test coverage per file.** A first attempt did, by matching file basenames
+  against test bodies, and the result was noise (`packages/psp/src/port.ts` scored 249). The number
+  is omitted rather than published wrong.
+- **It classifies 30 entries by a regular expression over their own prose.** The block is required
+  by `RI-13`, so the block is always there; whether the sentence inside it names a judgement is read
+  by pattern, and a rewording moves an entry between tiers with nothing failing.
