@@ -818,6 +818,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **20** | `0036`'s session | **allocated.** `0036` lands. **This row was written into the file as a heading and never into this table**, which is the identical omission the `18` row above records one section earlier. Added here by `0042`'s session, which is the third occurrence of the same miss and the reason `OI-24` exists |
 | **21** | `ADR-068`'s session | **allocated.** `0042` lands |
 | **25** | session 148, `0047` ([ADR-087](../../docs/decisions/ADR-087.md)) | **allocated.** `0047` lands. **SECTION 24 IS CLAIMED BY A HEADING AND HAS NO ROW HERE**, which is the fourth time (`18`, `20` and `24` were each written as a heading and never as a row), and it is named rather than added because `24` is session 135's to claim. **This is the first section in the file to record a repair that does NOT close the item it was written for**: `OI-29` goes to PARTLY CLOSED and `OI-29b` opens above |
+| **31** | session 403, `0066` ([ADR-213](../../docs/decisions/ADR-213.md)) | **allocated.** `0066` lands. **Sections 26 and 28 to 30 are claimed by headings and have no row here**, and `27` has no section at all, which is the same omission the `18`, `20` and `24` rows above each record. They are NAMED and not filled in on their authors' behalf, on this table's standing rule that a row written for somebody else is a claim nobody made. **30 is the true maximum, so 31 is the next free number rather than the row count.** |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -1945,3 +1946,100 @@ REJECTION 6   merit_app UPDATE on a new column        -> insufficient_privilege,
 **It does not close `phase`.** Section 9 of the entry says why and says it is the obvious next slice on this table.
 
 **It commits no probe.** The eleven cases above were executed and their transcript is here; `scripts/db/`, `.github/workflows/corpus.yml` and `docs/testing/STRATEGY.md` are all outside this fence, and a probe committed without the workflow row runs nowhere. **It is evidence and not yet a control**, and the remedy is named in the entry's fence section.
+
+---
+
+## 31. `0066` lands, and the record claiming the guard is why nobody looked for it (2026-08-29)
+
+**Session 403, [ADR-213](../../docs/decisions/ADR-213.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `213` and `0066`.** [`0027:260`](migrations/0027_triggers_invariants.sql) creates `plan_versions_published_immutable` and [`0028`](migrations/0028_supersede_plan_version_immutability.sql) replaces its body, so a published `plan_versions` row is pinned to the byte and a retired one is frozen absolutely. **`plan_version_sizes` carried ZERO triggers**, and every published cents value the engine and a payout approval read lives there. `0004`, `0027` and `0028` are untouched on disk; `0066` adds beside them (constitution `E2`).
+
+**AND THE DESIGN RECORD HAD CLAIMED THE MISSING GUARD SINCE THE DAY THE TABLE LANDED.** [`plan_version_sizes.md`](../../docs/architecture/data-model/plan_version_sizes.md) read *"Immutable once the parent version is published (same trigger)."* There was no such trigger. **That sentence is the reason sixty-two migrations went by**: a reader checking whether the grid was protected found a document saying it was. No gate can see the class -- `CI-06i` reconciles the table set, [`data-model-columns.mjs`](../../scripts/corpus/data-model-columns.mjs) reconciles columns, and **nothing reconciles a record's trigger prose against the `CREATE TRIGGER` statements in the migrations.**
+
+### The defect, re-derived from the catalogue rather than taken from the dispatch
+
+`0001`..`0065` applied forward-only under `ON_ERROR_STOP=1` against **PostgreSQL 16**, 61 of 61, then read at `pg_trigger`, `pg_constraint` and `information_schema.role_table_grants`:
+
+| Query | Result |
+|---|---|
+| Non-internal triggers on `plan_version_sizes` | **zero** |
+| Non-internal triggers on any plan table | **four**, all on `plan_versions` or `accounts`: `plan_versions_published_immutable`, `plan_versions_publish_decision_is_sound`, `plan_versions_publish_decision_is_sound_on_publish`, `accounts_plan_version_pinned` |
+| `merit_app`'s privileges on `plan_version_sizes` | `SELECT`, `INSERT`, `UPDATE`, `DELETE`, and no `TRUNCATE`. Granted by `0026:75`'s blanket `GRANT ... ON ALL TABLES`, from which this table is never subtracted |
+| `CHECK` constraints on `plan_version_sizes` | **nine**, of which the seven `> 0` column checks plus `_floor_lock_complete` and `_buffer_clears_lock` (`CV-11`). **`CV-09`, `CV-10`, `CV-12` and `CV-17` have none**, and three of those four read the parent's `rules` jsonb |
+| `buffer_cents` `100000` -> `777777` on a **published** version | **COMMITTED** |
+| that version's whole size grid `DELETE` | **COMMITTED**, 0 rows remain |
+| a fourth size `INSERT`ed into a published version | **COMMITTED** |
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-213` | `plan_version_sizes` | `assert_published_plan_version_size_immutable()` and the `BEFORE INSERT OR UPDATE OR DELETE FOR EACH ROW` trigger `plan_version_sizes_published_immutable`; the table comment `0004` never wrote | 0066 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed**, on `0051`, `0064` and `0065`'s reasoning: this is not a schema delta proposed by an approved module document. **An ADR number was allocated and is taken**, and it carries the ruling a constraint cannot state: the `INSERT` is refused as well as the `UPDATE` and the `DELETE`.
+
+### The `INSERT` is the clause that was decided rather than assumed
+
+**Adding a size takes nothing away from an existing account.** `accounts` pins `plan_version_id` at purchase and resolves exactly one grid row through `plan_version_sizes_version_size_uq`, so no live account's numbers move. **It is refused because nothing validates such a row.** [`validate.ts:45`](../../packages/rules-engine/src/plan/validate.ts): *"eight read `plan_version_sizes` and are evaluated once per size"*, at the publish transition, over the array rather than a row. Of those eight only `CV-11` has a constraint on this table. **A row written after publication is [`validate.ts:463`](../../packages/rules-engine/src/plan/validate.ts)'s own failure mode**: *"two plans wearing one version number, and which of the two an account gets depends on which field a rule happens to read."* The corpus's mechanism for offering a new size is publishing a version, which is what [`0044:243`](migrations/0044_fee_back_and_ladder_unlock.sql) already assumes when it keys an unlock to a `size_cents` rather than to a row id.
+
+### The counterfactual, both directions, from empty and forward-only
+
+[`probe_published_size_grid_immutable.sql`](../../scripts/db/probe_published_size_grid_immutable.sql), seventeen cases, six of them acceptances and they lead. **The dangerous over-correction here is not a missing guard but a TOTAL one**: a guard refusing every write to this table passes all eleven refusals and makes plan authoring impossible, and nothing in `apps/` writes this table today, so nobody would find out.
+
+| | `0001`..`0065` | `0001`..`0066` |
+|---|---|---|
+| the probe | **11 of 17 RED** | **17 of 17 PASS** |
+| `buffer_cents` `100000` -> `777777` on a published version | COMMITTED | **REFUSED**, `check_violation` |
+| the whole grid `DELETE` | COMMITTED, 0 rows remain | **REFUSED**, 2 rows remain |
+| a fourth size `INSERT`ed | COMMITTED | **REFUSED** |
+| a row moved onto a published version | COMMITTED | **REFUSED** |
+| a row moved off a published version | COMMITTED | **REFUSED** |
+| the three retired-version writes | all COMMITTED | all **REFUSED** |
+| a draft grid takes `INSERT`, `UPDATE`, `DELETE` | PASS | **PASS** |
+| a version carrying a grid publishes, and later retires | PASS | **PASS** |
+| a dangling parent is the foreign key's refusal | PASS | **PASS** |
+
+**The six cases passing on both sides are the point of the acceptance half.** They are what a total guard would break.
+
+### The install, from empty, every figure queried rather than counted
+
+`0001`..`0066` applied forward-only under `ON_ERROR_STOP=1` against **PostgreSQL 16**, **62 of 62**.
+
+```
+                                    0065      0066     delta
+pg_tables (public)                   115       115        0
+pg_indexes (public)                  401       401        0
+pg_constraint (public, all)          797       797        0
+pg_trigger (public, not internal)     25        26       +1
+pg_proc (public)                     111       112       +1
+```
+
+### Seven seeds, six red and one green
+
+| # | Seed | Result |
+|---|---|---|
+| 1 | the landing check removed, so only `OLD` is read | **RED, 4 cases** |
+| 2 | the leaving check removed, so only `NEW` is read | **RED, 5 cases** |
+| 3 | the refused set listed as `= 'published'` rather than derived as `<> 'draft'` | **RED, 3 cases.** `0028` item 3's exact defect, one table out |
+| 4 | `BEFORE` changed to `AFTER` | **GREEN.** A measurement: the exception aborts the statement either way, so the probe cannot see the timing. Written into the probe's header |
+| 5 | the `FOUND` test dropped | **RED, 1 case.** A dangling foreign key is then reported as `is <NULL> and its size grid is immutable`, which sends a reader to the wrong file |
+| 6 | the refusal message reworded | **RED, 5 cases.** The refusals are asserted by TEXT, not only by SQLSTATE |
+| 7 | one case deleted from the probe | **RED**, on the row-count sentinel |
+
+**Each was applied to the committed shape and restored from a byte copy with the SHA-256 checked both ways**, `git status --porcelain` empty after every one.
+
+**TWO DEFECTS IN THE PROBE WERE FOUND BY RUNNING IT IN THE DIRECTION NOBODY LOOKS, AND NEITHER WAS REACHABLE FROM THE GREEN SIDE.**
+
+1. **A `unique_violation` escaping its block truncated the run.** Seeded with the landing check neutered, the retired-`INSERT` case collided with the published-`INSERT` case's now-committed row on `plan_version_sizes_version_size_uq`; that class is not `check_violation`, so the exception took the whole `DO` with it and **the run reported zero failing rows while four cases were broken.** The retired `INSERT` takes a size of its own now, and all eight rejection blocks gained a `WHEN OTHERS` leg recording `FAIL: wrong error class <sqlstate>`.
+2. **A `NULL` verdict was invisible to the verdict counter.** Against `0001`..`0065` the move-onto rejection commits, which empties the draft sibling the per-version acceptance then looks for; the value came back `NULL`, the `CASE` returned `NULL`, and `verdict <> 'PASS'` is `NULL` for that row and does not count. **Ten failures were reported where there were eleven.** The value comparisons are total now, the counter reads `IS DISTINCT FROM`, and a row-count sentinel refuses a run producing fewer than seventeen cases. **[`probe_plan_version_immutability.sql:227`](../../scripts/db/probe_plan_version_immutability.sql) carries the same counter**; its `CASE`s are total in practice so nothing is wrong today, and it is another session's control, so it is reported rather than repaired.
+
+### What `0066` does not do
+
+**It does not reach `TRUNCATE`**, which no row-level trigger does. Not reachable by `merit_app`, which holds no `TRUNCATE` here, so the hole is the owner's.
+
+**It does not survive `ALTER TABLE ... DISABLE TRIGGER`.** [`0004:184-185`](migrations/0004_catalog.sql)'s cost, restated rather than hidden. The alternative -- a `REVOKE` plus a `SECURITY DEFINER` write path, `0048`'s shape -- was considered and refused for now: `merit_app` legitimately writes this table while a version is a draft, so that road needs a definer function for ordinary authoring.
+
+**It does not pin `plans`.** Session 401 finding 5, re-derived here and holding: `plans` carries zero triggers and `plans.code` moved. It feeds no cents value into `ResolvedPlan`, so it is registered and open rather than folded in.
+
+**It does not wire `usePayoutBackend`, and it clears one of four grounds.** What `ResolvedPlan` is built from is now pinned on both halves. What still refuses is re-derived in [ADR-213](../../docs/decisions/ADR-213.md) section 8: `PayoutTx` runs every method on one transaction while `subject()` needs a `firm` read, and [ADR-211](../../docs/decisions/ADR-211.md)'s two-transaction remedy is unapplied; `wiring.test.ts`'s `BLOCKED` entry still states the state-half blocker as *"`grep -rn lifetime_settled packages/db/migrations` returns nothing at all"*, **which is false since [`0065:101`](migrations/0065_rule_state_lifetime_and_breach.sql)**; `routes/payouts.ts:438` still states a property the port does not have; and no adapter exists. `apps/**` was outside this fence, so all three are registered.
+
+**It does not say how a published grid is corrected when it is found wrong.** The answer the ruling implies is *publish a new version*, and no route performs one.
