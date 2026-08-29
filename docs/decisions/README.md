@@ -265,6 +265,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-249](ADR-249.md) | the certificate card is rendered on fetch, stored nowhere, addressed by the code and signed by nothing, so the two remaining certificate ports wait on a renderer and no migration is owed (2026-08-29, status: proposed) |
 | [ADR-251](ADR-251.md) | an instant is not a trading day, the gap was narrower than the sentence, and the port that named it asked a three-armed question with one arm (2026-08-29, status: proposed) |
 | [ADR-252](ADR-252.md) | the base account cap gets the firm's row ADR-238 named, its vocabulary is closed at the database, and both ports stay refused for reasons that have stopped being the same reason  (2026-08-29, status: proposed) |
+| [ADR-253](ADR-253.md) | a table the registry cannot name, and the ruling ADR-106 said was owed turns out to be a REFUSAL (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

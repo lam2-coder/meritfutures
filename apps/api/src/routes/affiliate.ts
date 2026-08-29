@@ -63,11 +63,16 @@
 // module's.
 //
 // -----------------------------------------------------------------------------
-// THREE FINDINGS THIS MODULE REPORTS AND DOES NOT REPAIR
+// THREE FINDINGS THIS MODULE REPORTS, AND ONE HALF OF ONE THAT IS NOW REPAIRED
 // -----------------------------------------------------------------------------
-// 1. `affiliate_commissions` AND `affiliate_statements` ARE UNREACHABLE THROUGH
-//    THE SCOPED ACCESSOR, WHICH IS WHAT `GET /affiliate/stats` AND
-//    `GET /affiliate/statements` ARE READS OF.
+// ADR-253 SECTION 5 REPAIRED THE `affiliate_statements` HALF OF FINDING 1 AND
+// RULED ON FINDINGS 2 AND 3. The findings are kept in place rather than deleted,
+// on RI-14's rule that a false sentence removed leaves nothing for the next
+// reader to check: each now says what is true of this tree and what was ruled.
+// -----------------------------------------------------------------------------
+// 1. `affiliate_commissions` IS UNREACHABLE THROUGH THE SCOPED ACCESSOR, WHICH
+//    IS WHAT `GET /affiliate/stats` IS A READ OF. THIS FINDING NAMED TWO TABLES
+//    AND NOW NAMES ONE.
 //
 //    `affiliate_commissions` is unregistered in `packages/db/src/scope.ts`, and
 //    that file states why in its own words: its only path to an identity is
@@ -75,35 +80,64 @@
 //    is registered `pair`, and a derivation through a `pair` parent COMPILES and
 //    then throws, because `scopePredicate` recurses into the via table and a
 //    chain terminates at `owned` or at `root` or it does not terminate.
-//    `affiliate_statements` is absent one step earlier: it is not in
-//    `packages/db/src/schema.ts` at all, so it is not a `TableKey` and no rule
-//    of any class can name it.
+//
+//    `affiliate_statements` IS NO LONGER THE SECOND HALF OF THIS FINDING. It is
+//    declared in `packages/db/src/schema.ts` and registered `derived` through
+//    `affiliates`, so `GET /affiliate/statements` has a door and waits on an
+//    adapter like the other three. The sentence saying otherwise outlived its
+//    obstruction by a wave and was still being SERVED to callers as the reason
+//    the method refused; ADR-253 section 5 repairs it here and at the constant.
 //
 //    Every money figure on `AffiliateStats` (`earned_cents_lifetime`,
 //    `payable_cents`, `paid_cents_lifetime`) is a sum over
 //    `affiliate_commissions`, and `conversions_30d` is a count over
-//    `attributions`. So TWO OF THE FOUR ENDPOINTS BELOW CANNOT BE SERVED BY THE
+//    `attributions`. So ONE OF THE FOUR ENDPOINTS BELOW CANNOT BE SERVED BY THE
 //    ACCESSOR AS IT STANDS. Nothing here registers a table to make a route
-//    possible: registering `affiliate_commissions` needs a ruling about what a
-//    row derived from a two-party row belongs to, and ADR-106 does not make it.
-//    The port fails closed and its message names the obstruction, which is the
-//    honest shape available today.
+//    possible, and ADR-253 has now ruled that NOTHING CAN: no member of the
+//    closed six honestly fits the row, and `firm` -- which is available, and
+//    which every mechanical check in this repository accepts -- would put a
+//    wrong tenancy answer behind a door that RETURNS ROWS. The port fails closed
+//    and its message names the obstruction, which is the honest shape available.
 //
-// 2. `POST /affiliate/links` HAS NO TABLE, AND `affiliate_clicks` IS NOT IT.
+// 2. `POST /affiliate/links` HAS NO TABLE, `affiliate_clicks` IS NOT IT, AND
+//    ADR-253 RULES THAT NO TABLE IS OWED.
 //    `affiliate_clicks` is the only table in this schema carrying a
 //    `click_token`, and it is a record of a CLICK: `clicked_at timestamptz NOT
 //    NULL DEFAULT now()`, and `affiliate_clicks_affiliate_time_idx` is what
 //    `clicks_30d` is counted over. Writing a row at link-issue time would put a
 //    click nobody made into that count, inflate the denominator AS-M8-03's
 //    cookie-stuffing arithmetic is read from, and do it once per press of the
-//    button. So this route mints no click, and where an issued link is persisted
-//    is a seam rather than a write.
+//    button.
+//
+//    A SECOND REFUSAL IS ARITHMETIC AND IS INDEPENDENT OF THAT COUNT.
+//    `affiliate_clicks_token_uq` is UNIQUE on `click_token`, so a token names
+//    AT MOST ONE click row -- which is exactly what `resolveAttribution`'s
+//    docblock leans on when it says it does not sort. One issued link is
+//    clicked many times. A UNIQUE column cannot hold one value across many
+//    rows, so the handle an affiliate is ISSUED and the token a buyer PRESENTS
+//    are two objects, and `CreateLinkResponse.click_token` is not an
+//    `affiliate_clicks.click_token`. That refusal survives any change to how
+//    clicks are counted, which is why it is written down beside the first.
+//
+//    AND NO LINK ROW IS OWED, WHICH IS THE PART THAT IS A RULING RATHER THAN A
+//    MEASUREMENT. Every attribute a link object would carry is already on
+//    `affiliate_clicks` at CLICK grain -- `affiliate_id NOT NULL` and
+//    `landing_path` -- which is the grain `0005` chose; `affiliates.code` is
+//    already `citext NOT NULL UNIQUE` and is what a URL names; and nothing in
+//    this repository ingests a click at all, so a link table's only reader
+//    would be absent, which is the primitive-before-a-caller ADR-120 clause 3
+//    refuses. What this method owes is an ADAPTER and a BASE URL, and neither
+//    is DDL. See ADR-253 section 3.
 //
 // 3. `campaign` REACHES NO COLUMN. `CreateLinkRequest` carries an optional
 //    `campaign` and no table in this schema has one: `grep -n campaign` over
 //    `packages/db/migrations` returns three lines and all three are prose in
 //    `0025_reserved_sequence.sql`. It is validated here and passed to the port,
-//    and where it lands is the same seam as finding 2.
+//    and ADR-253 section 3 rules where it lands: if `campaign` is ever recorded
+//    it belongs beside `landing_path` on `affiliate_clicks`, at CLICK grain,
+//    because that is where this schema already keeps what a link was. It is not
+//    recorded today and nothing reads it, so the column is not taken here: it
+//    belongs to the slice that ingests clicks, which does not exist yet.
 //
 // -----------------------------------------------------------------------------
 // A FOURTH THING, SMALLER, RECORDED WHERE A READER WILL LOOK FOR IT
@@ -436,26 +470,46 @@ const AFFILIATES_READABLE =
 /** The header's finding 1, in the place a caller will actually meet it. */
 const COMMISSIONS_UNREACHABLE =
   'Its figures are sums over `affiliate_commissions`, which is UNREGISTERED in ' +
-  '`packages/db/src/scope.ts`: its only path to an identity is `attribution_id`, `attributions` ' +
-  'is registered `pair`, and a derivation through a `pair` parent throws rather than resolving. ' +
-  'Registering it needs a ruling about what a row derived from a two-party row belongs to, and ' +
-  'ADR-106 does not make one.';
+  '`packages/db/src/scope.ts` and undeclared in `packages/db/src/schema.ts`. ADR-106 said a ' +
+  'ruling was owed about what a row derived from a two-party row belongs to; ADR-253 makes that ' +
+  'ruling and it is a REFUSAL. No member of the closed six fits: the row declares no column ' +
+  'against `identities(id)`, which leaves `owned`, `pair` and `either` nothing to name; all ' +
+  'three of its edges refuse `derived`; and `firm` is available, passes every mechanical check ' +
+  'in this repository, and is FALSE, because a commission is what Merit owes a named affiliate. ' +
+  'So this is not one registration away. It is a seventh class away, and ADR-253 declines to ' +
+  'write one to make a registration compile.';
 
-const STATEMENTS_UNREACHABLE =
-  '`affiliate_statements` is not in `packages/db/src/schema.ts` at all, so it is not a ' +
-  '`TableKey` and no scope rule of any class can name it. It is one registration short of the ' +
-  'position `affiliate_commissions` is in.';
+/**
+ * THE SENTENCE THIS CONSTANT CARRIED WAS RETIRED AND WAS STILL BEING SERVED.
+ * ADR-253 section 5.
+ *
+ * It read that `affiliate_statements` is not in `packages/db/src/schema.ts` at
+ * all. That was true when it was written and has not been true since
+ * `affiliateStatements` was declared and registered `derived` through
+ * `affiliates`. A refusal is the one place a later session reads to find out
+ * what to build, so a refusal quoting a discharged obstruction sends that
+ * session to `packages/db` for work already done.
+ */
+const STATEMENTS_READABLE =
+  '`affiliate_statements` is scope class `derived` through `affiliates` on `affiliate_id`, so ' +
+  'this read has a door and no adapter has been written for it yet. It is the same position ' +
+  '`affiliate` and `submitCreative` are in, and NOT the position `stats` is in.';
 
 const LINK_HAS_NO_TABLE =
-  'No table in this schema records an ISSUED link. `affiliate_clicks` is the only carrier of a ' +
-  '`click_token` and its rows are CLICKS, counted by `clicks_30d`, so minting one here would be ' +
-  'a click nobody made.';
+  'No table in this schema records an ISSUED link, and ADR-253 rules that none is owed. ' +
+  '`affiliate_clicks` is the only carrier of a `click_token`, and its rows are CLICKS: writing ' +
+  'one here is refused TWICE. It is a click nobody made, in the `clicks_30d` denominator ' +
+  "AS-M8-03's cookie-stuffing arithmetic is read from; and `affiliate_clicks_token_uq` is " +
+  'UNIQUE, so one token names at most one click, while one issued link is clicked many times. ' +
+  'The second refusal is arithmetic and survives any change to how clicks are counted. WHAT ' +
+  'THIS METHOD OWES IS AN ADAPTER AND A BASE URL rather than DDL: `affiliates.code` is already ' +
+  '`citext NOT NULL UNIQUE` and is the handle a URL names.';
 
 /** The default, and it fails CLOSED on every method. */
 export const UNWIRED_AFFILIATE_BACKEND: AffiliateBackend = {
   affiliate: unwired('affiliate', AFFILIATES_READABLE),
   stats: unwired('stats', COMMISSIONS_UNREACHABLE),
-  statements: unwired('statements', STATEMENTS_UNREACHABLE),
+  statements: unwired('statements', STATEMENTS_READABLE),
   issueLink: unwired('issueLink', LINK_HAS_NO_TABLE),
   requiredDisclosure: unwired('requiredDisclosure', AFFILIATES_READABLE),
   submitCreative: unwired('submitCreative', AFFILIATES_READABLE),
