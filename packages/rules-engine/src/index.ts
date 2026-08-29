@@ -192,9 +192,43 @@ export { validatePlan } from './plan/validate.ts';
 //   it is that, and not when it is a coverage exercise. This is not a licence
 //   to export a frozen table nothing reads.
 
+// `projectPayout` IS AN EIGHTH NAME AND IT IS ADR-078's TEST APPLIED A THIRD
+// TIME, WITH THE SAME ANSWER `replay` GOT. Section 1.3's rationale is the only
+// thing that decides an export here: "every additional export is a way for a
+// caller to reimplement a rule slightly differently".
+//
+// WITHHOLDING DEFEATS IT, and the caller is already named. `GET /admin/eligible-
+// forecast` is `M01` section 4's endpoint and `eligible_next_7d` is the field
+// `apps/api/src/admin-source/liability.ts` owes; the projection ADR-204 rules is
+// a conjunction over SIX ENGINE GATES, five carried and one recounted from a
+// cadence anchor. A projection this package withheld would be written in the
+// admin-source directory instead, which is `FM-16` by name -- "a gate is
+// evaluated in the API layer instead of the engine", whose blast radius is "two
+// implementations of one rule, which drift" -- and which that directory's own
+// `account.ts` already forbids in terms: "Nothing in this module derives an
+// eligibility, recomputes a gate or summarises one".
+//
+// IT REACHES NO RULE `evaluatePayout` DOES NOT ALREADY REACH. The clamp stayed
+// unexported because `evaluatePayout` reaches it, so no capability was lost. The
+// reverse holds here: nothing exported reaches a FORWARD basis day for R-37, so
+// every caller that needs one writes it, which is the same position
+// `apps/worker/src/batch/replay.ts` was in with its own fold.
+//
+// `PROJECTION_ASSUMPTIONS` AND `PROJECTION_CAVEAT` ARE TABLES AND NOT A SEVENTH
+// RULE, on the reasoning `HASHED_COLUMNS` and `ENGINE_GATE_LEAVES` are exported
+// under. ADR-204 ruling 6 says a producer MAY NOT CHOOSE the five assumptions
+// and ruling 7 says both halves of the figure are stated wherever it is shown;
+// a caller that had to retype them to render them is a caller that can retype
+// them wrongly, which is the drift the rationale is about.
+//
+// `projectEngineGates` IS NOT HERE, and that is the clamp's ruling rather than
+// an oversight: `projectPayout` reaches it, so no capability is lost by
+// withholding it, and it is the half a caller could most easily use to build a
+// second conjunction.
 export { advanceDay, initialState } from './day/advance.ts';
 export { applySettlement } from './payout/settle.ts';
 export { evaluatePayout } from './payout/evaluate.ts';
+export { PROJECTION_ASSUMPTIONS, PROJECTION_CAVEAT, projectPayout } from './payout/project.ts';
 export { replay, ReplayAssertionError } from './replay.ts';
 export {
   canonicalStateSerialization,
@@ -205,6 +239,14 @@ export {
   stateHash,
 } from './hash.ts';
 export type { PayoutContext } from './payout/evaluate.ts';
+export type {
+  PayoutProjection,
+  PayoutProjectionInput,
+  PayoutProjectionOutcome,
+  ProjectedDay,
+  ProjectedPopulation,
+  ProjectionAssumption,
+} from './payout/project.ts';
 export type { SettlementOutput } from './payout/settle.ts';
 export type {
   ExcludedColumn,

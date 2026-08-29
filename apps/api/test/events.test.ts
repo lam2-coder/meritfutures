@@ -95,6 +95,9 @@ const read = (relative: string): string =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8');
 
 const MIGRATION = read('../../../packages/db/migrations/0017_events_and_audit.sql');
+// `0008` IS READ FOR `detector_runs` ALONE, so ADR-205's subject is asserted
+// against the DDL that declares it rather than against this file's belief.
+const MIGRATION_RISK = read('../../../packages/db/migrations/0008_risk.sql');
 const SCHEMA = read('../../../packages/db/src/schema.ts');
 const EVENTS_MD = read('../../../docs/architecture/EVENTS.md');
 const SWEEP_PORTS = read('../../../apps/worker/src/sweeps/ports.ts');
@@ -150,6 +153,7 @@ const ID = {
   evidencePack: '77777777-7777-4777-8777-777777777777',
   ledgerTransaction: '88888888-8888-4888-8888-888888888888',
   riskFlag: '99999999-9999-4999-8999-999999999999',
+  detectorRun: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
 } as const;
 
 const PAYLOADS: Readonly<Record<EventName, Readonly<Record<string, unknown>>>> = {
@@ -248,6 +252,19 @@ const PAYLOADS: Readonly<Record<EventName, Readonly<Record<string, unknown>>>> =
     detector_version: '1.0.0',
     evidence_summary: ['members', 'method', 'statistic', 'threshold'],
   },
+  // ADR-205's ROW. `detector_run_id` is the field clause 1 added to `EVENTS:358`
+  // and the six after it are the six the row always carried, in the document's
+  // order. Nothing here is money, which the last case in section 5b re-derives
+  // from the document rather than trusting this literal.
+  'detector.run_completed': {
+    detector_run_id: ID.detectorRun,
+    detector: 'D-04',
+    detector_version: '2026.08.1',
+    trading_day: '2026-08-27',
+    rows_scanned: 41_233,
+    flags_raised: 2,
+    duration_ms: 8_140,
+  },
 };
 
 const CLOCK = new Date('2026-08-27T21:00:00.000Z');
@@ -266,8 +283,16 @@ const rowOf = (name: EventName): CatalogueRow => EVENT_CATALOGUE[name];
  * row acquiring the shape leaves this set by itself, and the case that DERIVES
  * the untenanted set is what makes that visible rather than quiet.
  */
+// A NAME BUILDS WHERE `assertTenanted` LETS IT THROUGH, and after ADR-205 that
+// is two cases rather than one: a row reaching a tenancy leg, or a row EVENTS
+// marks `**FIRM**`. THE SECOND ARM IS DERIVED FROM THE CATALOGUE AND NOT LISTED,
+// so a row that gains or loses the mark moves this set instead of slipping past
+// it, and `payout.freeze_expiring` -- which has neither -- stays out.
 const BUILDABLE = EVENT_NAMES.filter(
-  (name) => rowOf(name).identityField !== undefined || rowOf(name).accountField !== undefined,
+  (name) =>
+    rowOf(name).identityField !== undefined ||
+    rowOf(name).accountField !== undefined ||
+    rowOf(name).firmLevel === true,
 );
 
 // =============================================================================
@@ -302,8 +327,11 @@ function catalogueText(name: string): string {
 }
 
 describe('every name this producer carries is a row in the catalogue', () => {
-  test('the nine names are the keys, and the array agrees with the record', () => {
-    expect(EVENT_NAMES).toHaveLength(9);
+  test('the ten names are the keys, and the array agrees with the record', () => {
+    // TEN SINCE ADR-205 TRANSCRIBED `detector.run_completed`, which is the tenth
+    // and which section 5b is about. The figure is re-derived on every change to
+    // the record rather than adjusted to fit one.
+    expect(EVENT_NAMES).toHaveLength(10);
     expect([...EVENT_NAMES].sort()).toStrictEqual(Object.keys(EVENT_CATALOGUE).sort());
   });
 
@@ -561,18 +589,33 @@ describe('the tenancy columns come from the payload and from nowhere else', () =
     expect(catalogueText('wallet.withdrawal_halt_released')).not.toContain('account_id');
   });
 
-  test('`payout.freeze_expiring` is the ONE catalogue row that reaches neither, derived', () => {
-    // DERIVED OVER THE EIGHT RATHER THAN ASSERTED ABOUT ONE, because the property
-    // this file's header is about is "how many rows reach neither leg", and a
-    // case naming one name cannot see the second one arrive.
+  test('TWO rows reach neither leg now, and only one of them is refused', () => {
+    // DERIVED OVER THE RECORD RATHER THAN ASSERTED ABOUT ONE NAME, because the
+    // property this file's header is about is "how many rows reach neither leg",
+    // and a case naming one name cannot see the second one arrive. IT DID
+    // ARRIVE: ADR-205 transcribed `detector.run_completed`, which reaches
+    // neither and is admitted, and the difference between the two is the whole
+    // subject of section 5b.
     const untenanted = EVENT_NAMES.filter(
       (name) => rowOf(name).identityField === undefined && rowOf(name).accountField === undefined,
     );
-    expect(untenanted).toStrictEqual(['payout.freeze_expiring']);
-    // And it is a CATALOGUE row rather than this file's choice: the payload
-    // EVENTS declares for it names neither column either.
-    expect(catalogueText('payout.freeze_expiring')).not.toContain('identity_id');
-    expect(catalogueText('payout.freeze_expiring')).not.toContain('account_id');
+    expect([...untenanted].sort()).toStrictEqual([
+      'detector.run_completed',
+      'payout.freeze_expiring',
+    ]);
+    // AND THE MARK IS WHAT SEPARATES THEM, read off the DOCUMENT rather than off
+    // the record, so this file cannot be the thing that decided it.
+    expect(untenanted.filter((name) => rowOf(name).firmLevel === true)).toStrictEqual([
+      'detector.run_completed',
+    ]);
+    expect(catalogueRow('detector.run_completed')).toContain('**FIRM**');
+    expect(catalogueRow('payout.freeze_expiring')).not.toContain('**FIRM**');
+    // And both are CATALOGUE rows rather than this file's choice: the payload
+    // EVENTS declares for each names neither column either.
+    for (const name of untenanted) {
+      expect(catalogueText(name), name).not.toContain('identity_id');
+      expect(catalogueText(name), name).not.toContain('account_id');
+    }
   });
 
   test('building it REFUSES, because a producer that writes an untenanted row must not be quiet', () => {
@@ -655,7 +698,7 @@ describe('the tenancy columns come from the payload and from nowhere else', () =
     expect(catalogueRow('payout.settled')).toMatch(/\bTL\b/);
   });
 
-  test('the other seven build, which is what keeps the refusal from being a blanket one', () => {
+  test('the other nine build, which is what keeps the refusal from being a blanket one', () => {
     // A REFUSAL ASSERTED ONLY IN THE REFUSING DIRECTION is indistinguishable from
     // a producer that refuses everything.
     for (const name of BUILDABLE)
@@ -755,19 +798,17 @@ describe('the two EVENTS rows this producer did not carry', () => {
     expect(row.identityId).toBe(ID.identity);
   });
 
-  test('`detector.run_completed` is deliberately NOT a row here', () => {
-    expect(EVENT_NAMES).not.toContain('detector.run_completed');
-  });
-
-  test('its payload declares no `_id`, so `events.subject_id` has nothing to read', () => {
-    // THE FIRST BLOCKER, DERIVED FROM THE DOCUMENT. `subject_id` is `uuid NOT
-    // NULL` and `CatalogueRow.subjectField` names the payload field it comes
-    // from. This payload has no field that names a row at all, so a
-    // `subjectField` here would be a field EVENTS does not carry -- ADR-159
-    // clause 1's refusal, and the same class of move as the omission that made
-    // this section necessary.
+  test("`detector.run_completed` IS a row here now, and its SEVEN fields are the document's", () => {
+    // THE FIRST BLOCKER, CLEARED BY ADR-205 CLAUSE 1 RATHER THAN BY THIS FILE.
+    // `subject_id` is `uuid NOT NULL` and `CatalogueRow.subjectField` names the
+    // payload field it comes from; the payload declared no field naming a row at
+    // all, so session 382 refused to pick one and the document was amended
+    // instead. THE LIST BELOW IS READ OUT OF `EVENTS.md` AT RUN TIME, so it is
+    // the document that is asserted and never this file's copy of it.
+    expect(EVENT_NAMES).toContain('detector.run_completed');
     const fields = payloadFields('detector.run_completed');
     expect(fields).toStrictEqual([
+      'detector_run_id',
       'detector',
       'detector_version',
       'trading_day',
@@ -775,21 +816,67 @@ describe('the two EVENTS rows this producer did not carry', () => {
       'flags_raised',
       'duration_ms',
     ]);
-    expect(fields.filter((field) => field.endsWith('_id'))).toStrictEqual([]);
+    expect(rowOf('detector.run_completed').subjectField).toBe('detector_run_id');
     expect(MIGRATION).toContain('subject_id');
   });
 
-  test('and it names neither tenancy column, which is a SECOND and independent blocker', () => {
-    // Given a subject it would still be refused by `assertTenanted`, for
-    // `payout.freeze_expiring`'s reason. Its consumers are BI and ALERT, so the
-    // fact is FIRM-level, and `assertTenanted`'s message already names the
-    // repair for that case: a row in EVENTS saying so. No row says it today and
-    // this file invents no field EVENTS does not carry.
-    const cell = payloadCell('detector.run_completed');
-    expect(cell).not.toContain('identity_id');
-    expect(cell).not.toContain('account_id');
-    expect(catalogueRow('detector.run_completed')).toMatch(/\bBI\b/);
+  test('it builds, its subject is the run, and BOTH tenancy columns are null', () => {
+    const row = at('detector.run_completed');
+    // THE SINGULAR OF THE TABLE, on the rule section 1 asserts against
+    // `schema.ts` for every name rather than against this one precedent.
+    expect(row.subjectKind).toBe('detector_run');
+    expect(row.subjectId).toBe(ID.detectorRun);
+    expect(row.identityId).toBeNull();
+    expect(row.accountId).toBeNull();
+    expect(row.actorKind).toBe('system');
+    expect(row.actorId).toBeNull();
+    // AND THE SUBJECT IS A REAL PRIMARY KEY RATHER THAN A FIELD SOMEBODY COINED:
+    // `detector_runs.id` is a `uuid PRIMARY KEY` and `detector_run_id` is
+    // already this schema's spelling for a reference to it.
+    expect(MIGRATION_RISK).toContain('CREATE TABLE detector_runs (');
+    expect(MIGRATION_RISK).toContain('detector_run_id    uuid NULL REFERENCES detector_runs(id)');
+  });
+
+  test('the SECOND blocker is cleared by a MARK IN THE DOCUMENT and by nothing here', () => {
+    // `assertTenanted` IS NOT RELAXED, WHICH IS ADR-205 CLAUSE 5. It refused
+    // every untenanted row because NO row declared; it refuses every untenanted
+    // row that does not declare. The declaration is the frozen registry's, so
+    // the biconditional below is what keeps this file from being the thing that
+    // decided it -- and it is a CLEARING CONDITION IN BOTH DIRECTIONS: a row
+    // that gains the mark in EVENTS without gaining it here goes red, and so
+    // does a row given `firmLevel` here that the document does not mark.
+    for (const name of EVENT_NAMES) {
+      const marked = (catalogueRow(name) ?? '').includes('**FIRM**');
+      expect(rowOf(name).firmLevel === true, name).toBe(marked);
+    }
+    // EXACTLY ONE ROW IN THE WHOLE CATALOGUE CARRIES THE MARK, derived over the
+    // document rather than over this record, so a sweep that marked thirty-three
+    // rows at once would go red here rather than land quietly.
+    const marked = EVENTS_MD.split('\n').filter((line) =>
+      /^\| `[a-z_]+\.[a-z_]+` \*\*FIRM\*\*/.test(line),
+    );
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toContain('detector.run_completed');
+  });
+
+  test('and the guard is not blanket-relaxed: the unmarked untenanted row is still REFUSED', () => {
+    // A PERMISSION ASSERTED ONLY IN THE PERMITTING DIRECTION is indistinguishable
+    // from a guard that was deleted. `payout.freeze_expiring` reaches neither
+    // column, carries no mark, and is a fact about ONE TRADER whose producer
+    // holds a `payout_request_id` that names an account -- ADR-191's write-time
+    // resolution, and the counterexample ADR-205 section 5 refuses the consumer
+    // derivation on.
+    expect(() =>
+      buildEvent(
+        { name: 'payout.freeze_expiring', payload: PAYLOADS['payout.freeze_expiring'] },
+        CLOCK,
+      ),
+    ).toThrow(/reaches neither/);
+    expect(catalogueRow('payout.freeze_expiring')).not.toMatch(/\bTL\b/);
     expect(catalogueRow('detector.run_completed')).not.toMatch(/\bTL\b/);
+    // THE TWO ARE INDISTINGUISHABLE BY CONSUMER AND ARE DECIDED DIFFERENTLY,
+    // which is the whole argument for the mark being explicit.
+    expect(catalogueRow('detector.run_completed')).toMatch(/\bBI\b/);
   });
 
   test('neither row carries money, so ADR-198 does not reach either of them', () => {
@@ -806,8 +893,12 @@ describe('the two EVENTS rows this producer did not carry', () => {
         name,
       ).toStrictEqual([]);
     }
-    // And the encoder is therefore a no-op over the one of them that is a row.
+    // And the encoder is therefore a no-op over BOTH of them, which is now
+    // checkable on the pair rather than on the one that was a row.
     expect(encodeCentsForStorage(PAYLOADS['flag.raised'])).toStrictEqual(PAYLOADS['flag.raised']);
+    expect(encodeCentsForStorage(PAYLOADS['detector.run_completed'])).toStrictEqual(
+      PAYLOADS['detector.run_completed'],
+    );
   });
 });
 
@@ -1493,7 +1584,7 @@ describe('the two rules that together made a money payload unwritable, and ADR-1
   // The three names that could not be written, written
   // ---------------------------------------------------------------------------
 
-  test('exactly three of the eight names carry money, and all three now WRITE', async () => {
+  test('exactly three of the ten names carry money, and all three now WRITE', async () => {
     // DERIVED OVER THE CATALOGUE THIS FILE CARRIES rather than listed, so a name
     // gaining a `_cents` field moves this count instead of slipping past it.
     const carries = (name: EventName): boolean =>

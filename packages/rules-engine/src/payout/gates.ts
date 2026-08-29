@@ -49,6 +49,7 @@ import type {
   MinimumAmountGate,
   ResolvedPlan,
   TradedDaysGate,
+  TradingDay,
   WinDaysGate,
 } from '../types.ts';
 import { capForOrdinal, ordinalForNextPayout } from './clamp.ts';
@@ -286,6 +287,90 @@ function allGatesPass(gates: EngineGateResults): boolean {
     gates.cadenceGap.pass &&
     gates.minimumAmount.pass
   );
+}
+
+/**
+ * ADR-204's PROJECTION, AND IT MOVES EXACTLY ONE GATE.
+ *
+ * M01 section 4 names `evaluatePayout` "projected forward over the calendar" as
+ * the producer behind `GET /admin/eligible-forecast`, and ADR-204 section 1
+ * proves that sentence uncallable as written: `evaluatePayout` takes a
+ * `RuleState`, a `RuleState` for an unclosed day comes only from `advanceDay`,
+ * and `DayInput.mark` is a `DailyMark` R-06 guarantees does not exist. THE WAY
+ * THROUGH IS NOT A FUTURE STATE. It is a future BASIS DAY for the one gate whose
+ * verdict a stored row already fixes for the whole horizon.
+ *
+ * ADR-204 section 2 is that arithmetic: of the eleven conditions eligibility
+ * conjoins, exactly one -- R-37, the cadence gap -- has an input no future fact
+ * is needed for. Its anchor moves only on settlement (R-46) and the days it
+ * counts are published calendar data, so moving the basis day forward is a
+ * question the calendar can already answer.
+ *
+ * THE OTHER FIVE GATES ARE CARRIED, NEVER RECOMPUTED, AND THAT IS WHAT MAKES
+ * ADR-204's A1, A2 AND A5 STRUCTURAL RATHER THAN A PRODUCER'S PROMISE. "No
+ * account trades inside the horizon", "balances are the last closed day's" and
+ * "the pinned `plan_version_id` does not change" are each honoured here by
+ * copying a verdict the fold already reached, so there is no arithmetic in this
+ * function that could honour them approximately. A projection that recomputed
+ * the five would be answering a question DO-9 has already answered, which is the
+ * objection `evaluatePayout`'s own header raises against recomputing gates.
+ *
+ * THE SIX FIELDS ARE LISTED RATHER THAN SPREAD, for `allGatesPass`'s reason and
+ * for `EngineGateResults`'s: SD-08 hashes fields in a fixed declared order, and
+ * a spread makes the order a property of the object that arrived rather than of
+ * this file. Nothing produced here is ever stored or hashed, and the discipline
+ * is kept anyway because the day it is broken is the day something is.
+ *
+ * A BREACHED ROW IS NOT PROJECTED AND THIS FUNCTION IS NOT WHERE THAT IS
+ * DECIDED. R-24 makes breach terminal and `gatesAfterBreach` states a gate set
+ * rather than computing one; feeding those gates back through here would put a
+ * recomputed cadence verdict on a row whose every gate is `false` by ruling.
+ * `projectPayout` short-circuits before it reaches this function, and the test
+ * that pins it says so.
+ */
+export interface EngineGateProjectionInput {
+  /** The last closed day's state. `tradingDay` is READ FOR NOTHING here. */
+  readonly state: GateInputState;
+  /** The gates that state carries, five of which are carried through unchanged. */
+  readonly gates: EngineGateResults;
+  readonly plan: ResolvedPlan;
+  /**
+   * Must cover BOTH `state.cadenceAnchorDay` and `basisTradingDay`, and a slice
+   * that does not answers `refused` rather than passing the gate. The anchor may
+   * be months older than the horizon, so this is a wider window than a day fold
+   * needs, and P2 section 1 already ruled that miss a typed refusal.
+   */
+  readonly calendar: CalendarSlice;
+  /** The projected day R-37 is counted THROUGH. Strictly after `state.tradingDay`. */
+  readonly basisTradingDay: TradingDay;
+}
+
+export function projectEngineGates(input: EngineGateProjectionInput): EngineGatesOutcome {
+  const { state, gates, plan, calendar, basisTradingDay } = input;
+
+  // The ONLY substitution: R-37 counted through the projected day instead of
+  // through the state's own. `cadenceGapGate` is the identical function DO-9
+  // calls, so there is no second implementation of the gap to drift from.
+  const cadence = cadenceGapGate(
+    { ...state, tradingDay: basisTradingDay },
+    plan.funded.cadenceGapTradingDays,
+    calendar,
+  );
+  if (cadence.kind === 'refused') return cadence;
+
+  const projected: EngineGateResults = {
+    tradedDays: gates.tradedDays,
+    winDays: gates.winDays,
+    buffer: gates.buffer,
+    consistency: gates.consistency,
+    cadenceGap: cadence.gate,
+    minimumAmount: gates.minimumAmount,
+  };
+
+  // R-41's conjunction, through the same `allGatesPass` DO-9 uses. INV-15's "no
+  // shortcut path" is not weakened by a projection: the projected verdict is the
+  // conjunction of six terms exactly as the stored one is.
+  return { kind: 'evaluated', gates: projected, engineEligible: allGatesPass(projected) };
 }
 
 type CadenceOutcome =
