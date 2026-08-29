@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->226<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->227<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -9817,3 +9817,31 @@ not in this row's verification list and it mutates the working tree.
 **Measured, not carried**: **33 of 33** gates, **21 of 21** invariants read off the runner's own last line, **261 files / 6,488 passed / 6 skipped** against an `origin/main` baseline of **259 / 6,454 / 6** reproduced before a line changed, a delta of **+2 files and +34 cases** whose arithmetic is stated (30 new, plus 4 dynamic, two per-table assertions for each of the two registrations). Typecheck 0, lint 0, `format:check` clean. **Seven seeds went red and the tree was restored byte-identical after each.**
 
 **`0073` HAS NEVER BEEN APPLIED TO A LIVE POSTGRESQL BY THIS SESSION**, which is where the entry is most likely wrong. The install job runs in CI and this branch has not merged.
+
+---
+
+## 2026-08-29 - Session 432: an ops plane is four different questions, and one of them is a database read whose blocker is a door somebody already ruled ([ADR-242](decisions/ADR-242.md), proposed)
+
+**[ADR-242](decisions/ADR-242.md), `status: proposed`, UNSIGNED. No migration number taken, no shipped source file changed.** `git diff origin/main` touches no line under `apps/api/src`, `apps/worker`, `packages/db` or `packages/queue`.
+
+**ONE PORT HAD FOUR METHODS AND ONE REASON, AND A REASON THAT COVERS FOUR METHODS COVERS WHICHEVER OF THEM IT HAPPENS TO FIT.** `setInternalOpsSource`'s entry said the obstruction is *"an ops plane rather than a database read"*, that three methods are probes of other processes and one commands one, and that *"None of the four is a shape `ApiDb` offers"*. **The four are ruled separately and they split ONE to THREE.**
+
+**`readReconStatus` IS A DATABASE READ AND ITS BLOCKER IS A DOOR SOMEBODY ALREADY RULED.** [`apps/worker/src/recon/sweep.ts`](../apps/worker/src/recon/sweep.ts) writes the rows, every field of `ReconMismatchRow` is a column of [`0014_marks.sql`](../packages/db/migrations/0014_marks.sql), `asOf` is the port's clock by its own docblock, and **the exact filter is already written in this deployable** at [`liability.ts:1193`](../apps/api/src/admin-source/liability.ts). What refuses it is that `reconciliations` is scope class `derived` ([`scope.ts:1339`](../packages/db/src/scope.ts)), so `firm` refuses the key AT COMPILE TIME and `scoped` has no identity on the operator surface. The handle is `SystemTx`, [ADR-171](decisions/ADR-171.md) clause 1 refuses that door until an installable `AdminSessionSource` exists, and [ADR-237](decisions/ADR-237.md) measured that condition as **UNMET**.
+
+**THE DOOR IS NOT TAKEN AND THE SECOND REASON IS INDEPENDENT OF ADR-171.** Its only caller would be `databaseInternalOps`, which cannot be constructed because the other three methods reject. A door whose whole justification is one caller, and which has none, is the primitive-before-a-caller [ADR-120](decisions/ADR-120.md) clause 3 refuses. **A door narrowed to this one table would survive ADR-171 section 5's own test and is still not taken, on the caller rather than on the merits**, and it is recorded as available to whoever holds a slice that can compose the source.
+
+**`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE, SO THE ENTRY'S OWN SENTENCE IS REFUTED.** `firm(fn)` yields a `FirmTx`, which extends `TxCommon` ([`scoped-db.ts:2803`](../packages/db/src/scoped-db.ts)) carrying `sqlExecutor(reason)` ([`scoped-db.ts:3044`](../packages/db/src/scoped-db.ts)) at the one reason `job-enqueue`, and the `SqlExecutor` it returns is structurally `packages/queue`'s `JobTransaction`. **It is blocked on an AUTHORITY and not a shape**: `apps/api` declares no `@merit/queue`, the manifest is the only place that capability can be acquired ([ADR-117](decisions/ADR-117.md) section 5), and **that string is declared as a dependency by ZERO packages in this workspace**. The module's own header always said this; the entry did not carry it, and a wrong reason that retires a question toward *"impossible"* is worse than a short one.
+
+**`readDependencies` AND `readJobs` ARE COMMANDS AND THE ROW WAS RIGHT ABOUT BOTH.** Three of API_CONTRACT section 9's four dependencies are other systems, `apps/api/src` reaches the network in exactly **two** files and they are a CAPTCHA verifier and an OTP vendor, no manifest declares an SFTP library, and `packages/psp` ships a port and two fakes and no vendor adapter. A queue depth lives in the pg-boss schema, which **0 of 67** migrations installs; `JobQueue` declares five methods and none reads a depth; `expected_by` is **a cell of a markdown table** by the field's own docblock and `firing` is the alarm, which is not in this tree. **AND NEITHER ADMITS A PARTIAL ADAPTER**: `renderDeepHealth` throws on a missing probe and `renderJobs` throws on an empty switch list, both by ruling, and both refusals are executed rather than quoted.
+
+**THE PORT STAYS BLOCKED AT ONE READ OUT OF FOUR AND NOTHING IS WIRED.** `usePayoutBackend`'s rule refuses one live arm beside arms that reject, and this port's own docblock refuses it harder: four setters *"would buy the ability to half-wire the operator console, which is not an ability anybody has asked for"*. The triple does not move: `{ declared: 24, wired: 8, blocked: 16 }`. **NO RPC CHANNEL WAS BUILT AND NONE IS PROPOSED**; the ops plane two of these methods need is named as an entry of its own rather than slipped into a wiring slice.
+
+**FOURTEEN EXECUTABLE CASES REPLACE A PARAGRAPH THAT COULD NOT FAIL** ([`test/internal-ops-constructibility.test.ts`](../apps/api/test/internal-ops-constructibility.test.ts)), and the entry is narrowed to name what refuses each method rather than shrunk.
+
+**THE BOUNDARY WITH SESSION 431 WAS NOT CROSSED.** Nothing under `apps/worker/**` is edited and **no assertion in the new test file reads that tree or `packages/db/migrations/**`**, so a concurrent diff cannot be turned red by this one. **WHAT IS NEEDED FROM THE WORKER IS REPORTED RATHER THAN TAKEN: a consumer for the batch queue, and the queue's name.** An enqueue into a queue nothing consumes is `renderBatchRun`'s own refusal moved one layer out.
+
+**ONE CITATION IN THE DISPATCH DID NOT SURVIVE.** Row `242` quotes *"None of the four is a shape `ApiDb` offers"* as sitting at `internal.ts:842-845`; those lines are the message body of `wired()`'s throw and support the OTHER clause of the sentence they sit beside.
+
+**Measured, not carried**: **33 of 33** gates, **21 of 21** invariants read off the runner's own last line, **266 files / 6,548 passed / 6 skipped** against an `origin/main` baseline at `6e8891c` of **265 / 6,534 / 6** reproduced before a line changed, a delta of **+1 file and +14 cases** which is the new test file entire. Typecheck 0, lint 0, `format:check` clean. **Five seeded defects were watched failing on the real tree** and each was restored before the next, and one of them fired in BOTH directions because `tsc` reports an unused `@ts-expect-error`. **`RI-15` caught a citation in this session's own diff** and it is repointed rather than argued with.
+
+**NOTHING HERE HAS MET A DATABASE**, which is where the entry is most likely wrong. Every case executes over source, over the scope registry and over rendering functions handed fixtures.
