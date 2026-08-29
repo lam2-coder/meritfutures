@@ -250,6 +250,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-234](ADR-234.md) | The terminal edge is `cancelled`, because it is the only exit money never travels down, and a rail that cannot report cannot be settled by an operator either  (2026-08-29, status: proposed) |
 | [ADR-235](ADR-235.md) | The code is the only credential, and the corpus asserted its strength in five places while no function in the repository produced one  (2026-08-29, status: proposed) |
 | [ADR-236](ADR-236.md) | The admin read port is behind the SSO purchase after all, its shape reason is retired as measured false for six of seven, and the one read that is genuinely unbuilt waits on a rule-state writer  (2026-08-29, status: proposed) |
+| [ADR-240](ADR-240.md) | a horizon a deployment sets is configuration and a signing key this deployable would hold is not, so one of three ports is wired and the other two have their absences measured (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
