@@ -235,6 +235,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-216](ADR-216.md) | `rule_states.phase` moves onto `account_phase`, and the argument against a `CHECK` is a copy count nobody had taken  (2026-08-29, status: proposed) |
 | [ADR-217](ADR-217.md) | the wallet gains an `error` arm, and the boundary between "we do not serve this" and "this failed" is the contract's 404 ruling  (2026-08-29, status: proposed) |
 | [ADR-219](ADR-219.md) | the portal's first write verb, and the CSRF control it does not mint because the one the corpus already has is on the wrong side of a fence  (2026-08-29, status: proposed) |
+| [ADR-221](ADR-221.md) | the constitution's CSRF control, taken as an Origin check because the cookie the corpus trusted is scoped to a site and the attack is scoped to an origin  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

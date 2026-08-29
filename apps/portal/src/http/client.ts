@@ -503,17 +503,23 @@ export function createApiClient(input: {
 // WHOLE REASON
 // -----------------------------------------------------------------------------
 // THE CORPUS IS NOT SILENT, WHICH IS WHERE THIS HAD TO START.
-// `grep -rn CSRF docs/architecture/SECURITY.md docs/architecture/API_CONTRACT.md` returns nothing,
-// which is what ALLOCATION row 219 measured and what re-running it still shows.
-// BUT THE CONSTITUTION RULES IT IN FOUR WORDS. `MERIT_BUILD_MASTER_PROMPT.md`
-// Appendix D section D2 lists "CSRF on cookie mutations" among the binding
-// application controls, beside Turnstile and the CSP. So the live question is
+// `MERIT_BUILD_MASTER_PROMPT.md` Appendix D section D2 lists "CSRF on cookie
+// mutations" among the binding application controls, beside Turnstile and the
+// CSP. When this file was written the two architecture documents were silent on
+// it; `ADR-221` ended that silence and both now carry the control, SECURITY as
+// `C-29` and API_CONTRACT as a section 1 convention. So the live question was
 // never whether Merit wants the control. It is WHOSE it is, and it is not this
 // file's, for three reasons that are measured rather than argued.
 //
-// ONE. NOTHING ON THE SERVER CHECKS ONE. `grep -rni csrf apps/api packages` returns nothing.
-// A token minted here would be an unread header, and an unread header on a
-// money path is worse than no header: it is a control a later reader counts.
+// ONE. THE SERVER'S CONTROL READS NO TOKEN, SO THERE IS STILL NONE TO SEND.
+// `ADR-221` took an `Origin` check in `apps/api/src/csrf.ts` and not a minted
+// value: it compares the request's `Origin` hostname to the request's own
+// `Host` and refuses a mismatch on every unsafe method. A token minted here
+// would still be an unread header, and an unread header on a money path is
+// worse than no header: it is a control a later reader counts. THIS CLIENT
+// SATISFIES `C-29` BY SENDING NO `Origin` AT ALL, which is what a Node `fetch`
+// does and what the check's second clause admits by design, so the portal owes
+// that control nothing and gains no header from it.
 //
 // TWO. THE REQUEST THIS CLIENT MAKES IS NOT THE REQUEST CSRF DEFENDS AGAINST.
 // Section 2 established that the browser never calls the API at all and that the
@@ -543,8 +549,9 @@ export function createApiClient(input: {
 // `meritfutures.com` and `app.meritfutures.com` are the SAME SITE, so a request
 // issued by a page on the marketing origin to the API is same-site, `Lax`
 // permits it, and the host-only `merit_session` cookie is sent because the
-// destination host matches. AN INJECTION ON THE MARKETING SITE IS A FULLY
-// AUTHENTICATED WRITE AGAINST A TRADER'S MONEY, AND `Lax` DOES NOTHING ABOUT IT.
+// destination host matches. AN INJECTION ON THE MARKETING SITE WOULD BE A FULLY
+// AUTHENTICATED WRITE AGAINST A TRADER'S MONEY, AND `Lax` DOES NOTHING ABOUT
+// IT. `C-29` is what refuses it, at the API, on the request's hostname.
 //
 // THE CORPUS ALREADY REASONS THIS WAY ONE ORIGIN OVER, WHICH IS WHY THE GAP IS
 // AN OVERSIGHT RATHER THAN A TRADE. `INFRA` section 3 hard rule 3 puts the
@@ -560,11 +567,14 @@ export function createApiClient(input: {
 // script running on the origin itself, where `httpOnly` is the control and a
 // token in a readable cookie would be no control at all.
 //
-// SO THE OBLIGATION IS REGISTERED RATHER THAN DISCHARGED, AND IT IS
-// `apps/api`'s. That package is outside this fence by ADR-219's own terms. The
-// shape a founder has to choose between is in ADR-219 section 4 and this file
-// does not pick one, because a client that starts sending a header before the
-// server decides which header it reads has made the decision by shipping.
+// THE OBLIGATION WAS REGISTERED HERE AND DISCHARGED IN `apps/api` BY `ADR-221`,
+// which is the order this file argued for: the server decided which header it
+// reads before any client sent one. It chose to read `Origin` and to mint
+// nothing, so THIS FILE'S RULING IS UNCHANGED BY THE DISCHARGE rather than
+// merely still standing. What a portal page would owe if a browser-side write
+// were ever admitted is one line: nothing, because `portal` and `api` share
+// `app.meritfutures.com`, so the browser's own `Origin` matches the API's
+// `Host` and `C-29`'s third clause admits it with no header written by hand.
 //
 // -----------------------------------------------------------------------------
 // 6.2 THE UNSAFE-METHOD COOKIE POLICY, AGAINST C-02 AS WRITTEN

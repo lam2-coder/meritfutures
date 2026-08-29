@@ -320,12 +320,15 @@ function write(over: Partial<WriteRequest> = {}): WriteRequest {
 
 // 6.1 THE CSRF POSTURE, ASSERTED AGAINST THE TWO FACTS IT RESTS ON -------------
 
-test('the write sends no CSRF token, because nothing on the server reads one', async () => {
-  // THE RULING'S FIRST LEG, WATCHED. ADR-219 clause 1 mints no token on the
-  // ground that `apps/api` has no CSRF control at all, so a header sent here
-  // would be an unread header that a later reader counts as a control. THE DAY
-  // THE API GROWS ONE THIS GOES RED, which is the direction it should fail in:
-  // the client would then be the half that is missing.
+test("the write sends no CSRF token, because the API's control reads none", async () => {
+  // THE RULING'S FIRST LEG, REPAIRED BY THE SESSION THAT REFUTED ITS REASON AND
+  // NOT BY ONE THAT FOUND IT STALE. ADR-219 clause 1 minted no token on the
+  // ground that `apps/api` had no CSRF control at all, and said in terms that
+  // the day the API grew one this would go red. ADR-221 IS THAT DAY. The
+  // conclusion survives and its reason is now stronger: the control the API
+  // took is an `Origin` check, it reads NO token, and this client satisfies it
+  // by sending no `Origin` at all, which is what a Node `fetch` does. A token
+  // header here would still be an unread header a later reader counts.
   const files: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
@@ -336,8 +339,14 @@ test('the write sends no CSRF token, because nothing on the server reads one', a
   };
   walk(join(REPO, 'apps', 'api', 'src'));
 
-  const matched = files.filter((file) => /csrf/i.test(readFileSync(file, 'utf8')));
-  expect(matched, 'apps/api/src carries no CSRF control').toEqual([]);
+  const control = files.filter((file) => /csrf/i.test(readFileSync(file, 'utf8')));
+  expect(control.length, 'apps/api/src carries the CSRF control ADR-221 added').toBeGreaterThan(0);
+
+  // AND IT READS NO TOKEN, which is the half that keeps this client's refusal
+  // right. If a token header ever appears over there, this goes red and the
+  // portal is the missing half of a control it was never told about.
+  const readers = files.filter((file) => /x-csrf|csrf[-_]?token/i.test(readFileSync(file, 'utf8')));
+  expect(readers, 'and it reads no token, so this client owes none').toEqual([]);
 
   // And the client sends nothing that could be one.
   const { calls, client } = writer(json({ ok: true }, 201));
