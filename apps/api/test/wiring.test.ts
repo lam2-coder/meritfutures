@@ -550,10 +550,46 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'port already holds `productionAffiliateDeps` at module scope (`affiliate.ts:478`), so ' +
     'calling the setter here would install what is already installed. That is not a wiring.',
   setInternalOpsSource:
-    'an ops plane rather than a database read. `readDependencies`, `readJobs` and ' +
-    '`readReconStatus` are probes of other processes, and `runBatch` COMMANDS one. None of the ' +
-    'four is a shape `ApiDb` offers, and `routes/internal.ts:842-845` says a retry against this ' +
-    'process will never succeed.',
+    'FOUR METHODS, AND ADR-242 RULES THEM ONE AT A TIME BECAUSE ONE REASON COVERED WHICHEVER OF ' +
+    'THEM IT HAPPENED TO FIT. This entry read: "an ops plane rather than a database read. ' +
+    '`readDependencies`, `readJobs` and `readReconStatus` are probes of other processes, and ' +
+    '`runBatch` COMMANDS one. None of the four is a shape `ApiDb` offers." The last sentence is ' +
+    "REWRITTEN RATHER THAN DELETED, on RI-14's rule that a false sentence removed leaves nothing " +
+    'for the next reader to check: it is TRUE of two methods, true for the WRONG REASON of a ' +
+    'third, and FALSE of the fourth. ' +
+    '`readDependencies` IS A COMMAND AND NO PARTIAL ADAPTER EXISTS. Three of API_CONTRACT ' +
+    "section 9's four dependencies are other systems, `apps/api/src` reaches the network in " +
+    'exactly two files and they are a CAPTCHA verifier and an OTP vendor, `packages/psp` ships a ' +
+    'port and two fakes and no vendor adapter, and no manifest in this workspace declares an ' +
+    'SFTP library. `renderDeepHealth` throws on a missing probe by ruling, so an adapter that ' +
+    'probed `db` and omitted the other three could not render a response. ' +
+    '`readJobs` IS A COMMAND ON THE HALF THAT DECIDES. A queue depth lives in the pg-boss ' +
+    'schema, which NO migration installs; `JobQueue` declares five methods and none reads a ' +
+    "depth; `expected_by` is a CELL OF A MARKDOWN TABLE by the field's own docblock; and " +
+    '`firing` is the alarm, which is not in this tree. `renderJobs` throws on an empty dead-man ' +
+    'list, so the queue half alone cannot render either. ' +
+    '`readReconStatus` IS A DATABASE READ AND THE ENTRY WAS RIGHT ABOUT IT FOR THE WRONG REASON. ' +
+    '`apps/worker/src/recon/sweep.ts` writes the rows, every field maps to a column of ' +
+    '`0014_marks.sql`, and the exact filter is ALREADY WRITTEN in this deployable at ' +
+    '`admin-source/liability.ts:1193`. What refuses it is THE DOOR: `reconciliations` is scope ' +
+    'class `derived` (`packages/db/src/scope.ts:1339`), so `firm` refuses the key AT COMPILE ' +
+    'TIME and `scoped` has no identity on this surface, and ADR-171 clause 1 refuses the ' +
+    '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
+    'measured that condition as UNMET. ' +
+    '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3044`) at the one reason ' +
+    '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
+    'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
+    'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +
+    'sit a job store with no schema and a consumer that does not run. ' +
+    'THE PORT STAYS BLOCKED ON ONE READ OUT OF FOUR, and that is a ruling rather than a ' +
+    "shortfall: `usePayoutBackend`'s rule refuses one live arm beside arms that reject, and this " +
+    'port\'s OWN docblock refuses it harder -- four setters "would buy the ability to half-wire ' +
+    'the operator console, which is not an ability anybody has asked for". ' +
+    '`routes/internal.ts:844` still says a retry against this process will never succeed, and ' +
+    'that citation was always for THIS clause rather than for the `ApiDb` one beside it. ' +
+    'EVERY ABSENCE ABOVE IS EXECUTED in `test/internal-ops-constructibility.test.ts` rather than ' +
+    'stated here, so the day any of them lifts a case goes red and this entry expires.',
   useCertificateBackend:
     'ITS SIGNER, AND NOT ITS READ, AND ADR-240 SPLITS THE SIGNER CLAUSE IN TWO BECAUSE ONLY ONE ' +
     'HALF WAS EVER A CONFIGURATION. `databaseCertificateBackend` still exists ' +

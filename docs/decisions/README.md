@@ -255,6 +255,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-239](ADR-239.md) | The API reads a rule state the worker wrote, and the reason this deployment can produce none is that nothing runs the worker at all  (2026-08-29, status: proposed) |
 | [ADR-240](ADR-240.md) | a horizon a deployment sets is configuration and a signing key this deployable would hold is not, so one of three ports is wired and the other two have their absences measured (2026-08-29, status: proposed) |
 | [ADR-241](ADR-241.md) | the worker is a one-shot job whose exit code is its only signal, the schedule is external, and the first `BatchPorts` value over Postgres serves four of ten methods and refuses six by name  (2026-08-29, status: proposed) |
+| [ADR-242](ADR-242.md) | an ops plane is four different questions, and one of them is a database read whose blocker is a door somebody already ruled (2026-08-29, status: proposed) |
 | [ADR-243](ADR-243.md) | four money-path approvals are earned rather than granted, and the classifier that sized the queue is over-inclusive at the tier that matters most  (2026-08-29, status: proposed) |
 <!--/gen-->
 
