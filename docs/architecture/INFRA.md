@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, OVERVIEW.md, SECURITY.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/CLAUDE_CODE_PLAYBOOK.md]
-last_updated: 2026-08-24
+last_updated: 2026-08-29
 ---
 
 # Infrastructure (Constitution §2, D3, Appendix E doctrine)
@@ -142,7 +142,7 @@ The drill is the gate, not the backup. It restores to staging, replays the [nigh
 - Stored only in the platform vault, injected as environment variables at runtime, scoped per service. The worker holds the SFTP keypair and the Rise key; the web services never see either.
 - **90 day rotation calendar** for every credential: SFTP keypair, Rise API key, PSP keys, KYC provider key, webhook signing secrets, database roles.
 - Rotation is a runbook with a dual-control requirement on treasury-adjacent credentials (C-10) and a delay window before the old credential is revoked, so a rotation cannot itself become an outage.
-- `.env` files are gitignored and CI verifies it rather than trusting it (VG-1).
+- **`.env` files are gitignored and a check proves the rule rather than trusting the entry ([ADR-224](../decisions/ADR-224.md)).** `.gitignore` ignores `.env` and `.env.*` by basename at any depth and re-includes `.env.example` alone, and `RI-21` in `packages/tooling/checks/repo-invariants.mjs` asks `git check-ignore` what that rule says about representative paths and `git ls-files` whether any such file is already tracked. It runs in **CI-01**, the lint-and-types stage, in the repository-invariants step. **`VG-1` does not verify this and never did**: gitleaks reads file content for secret-shaped strings and reads no `.gitignore`, so a `DATABASE_URL` or a vendor base URL would pass it. This line asserted both halves before that entry, and both were false.
 
 ## 8. Observability
 
