@@ -6,7 +6,7 @@
 //
 // `provisioning_queue.operation` is bare `text` with a SEVEN-VALUE CHECK and
 // `provisioning_queue.status` is the `provisioning_status` ENUM. The asymmetry
-// is `0007`'s and `schema.ts:3867` transcribes it as found; it is inherited
+// is `0007`'s and `schema.ts:3878` transcribes it as found; it is inherited
 // here for the same reason, because a module that "tidied" one of the two into
 // the other's shape would be a module disagreeing with the column it writes.
 //

@@ -127,21 +127,24 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   is reached. Each carries at least one further blocker of its own.
   //
   //   `setAdminReadSource` says in its own header that what it is missing "is not
-  //   an authority, it is a shape" (`routes/admin-reads.ts:667`).
+  //   an authority, it is a shape" (`routes/admin-reads.ts:961`).
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
-  // (`packages/db/src/scoped-db.ts:197`) and ADR-165 ruled it gains no member, so
+  // (`packages/db/src/scoped-db.ts:248`) and ADR-165 ruled it gains no member, so
   // the vocabulary was never the obstacle either. ADR-171 section 9 states the
   // condition under which the door becomes takeable: the slice that lands an
   // `AdminSessionSource` a deployment can install, because that is the first
   // moment the door has a caller that reaches a row.
   // ---------------------------------------------------------------------------
   setAdminReadSource:
-    'A READ SHAPE, and the door second. `routes/admin-reads.ts:667` states it: "WHAT IS MISSING ' +
-    'IS NOT AN AUTHORITY, IT IS A SHAPE ... There is no join and no aggregate to reach for." ' +
+    'A READ SHAPE, and the door second. `routes/admin-reads.ts:961` states it: "WHAT IS MISSING ' +
+    'IS NOT AN AUTHORITY, IT IS A SHAPE", and `:967` "There is no join and no aggregate to ' +
+    'reach for." ' +
     'None of the six methods is a projection of one table: `LiabilityResponse` needs a seven-day ' +
     'forecast, a payout velocity, a reserve and a per-plan loss ratio, and `liability_snapshots` ' +
-    'carries `as_of`, `open_liability_cents`, `funded_accounts` and three exposure columns -- ' +
+    '(`packages/db/migrations/0009_ledger.sql:164`) carries `as_of`, `open_liability_cents` and ' +
+    'four exposure columns, plus `funded_accounts` ' +
+    '(`packages/db/migrations/0049_reserve_coverage_snapshots.sql:135`) -- ' +
     'and is scope class `firm` (`packages/db/src/scope.ts:756`), so the EXISTING `firm` door ' +
     'already reaches every column it has. A live adapter today would have to reach `sqlExecutor` ' +
     'to smuggle in SQL the accessor deliberately does not offer, which the port refuses by name.',
@@ -165,7 +168,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'unfinished deployment as a caller who is not an operator, on the endpoint that releases ' +
     'held payouts. MONEY PATH.',
   useAdminWalletBackend:
-    '`principal(request)` (`routes/admin-wallet.ts:538`), blocked on `setAdminSessionSource` ' +
+    '`principal(request)` (`routes/admin-wallet.ts:601`), blocked on `setAdminSessionSource` ' +
     'above, AND TWO METHODS THAT WIRING DOES NOT REACH. `writeCorrection` is refused on four ' +
     'constraints: `0038` is the built door for a wallet correction and ADR-158 never read it, so ' +
     'no column holds which entry a correction corrects (ADR-173). `reconcile` is refused on ' +
@@ -206,32 +209,81 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // moved, and it is a READ rather than a write. `useCheckoutBackend` is
   // untouched by that ruling and still names the ledger among its blockers,
   // because nothing has ruled where a CHECKOUT posting happens.
+  //
+  // AND THEN THE REWRITE ITSELF WENT STALE INSIDE ONE NIGHT, WHICH IS WHY RI-20
+  // EXISTS. The entry below read "A `RuleState` NO MIGRATION IN THIS TREE CAN
+  // STORE", that "`0015_rule_states.sql` declares NONE of the three", and that a
+  // recursive grep for lifetime_settled over the migrations directory returned
+  // nothing at all. ALL THREE WERE FALSE by the time the next session read them:
+  // `0065` landed `lifetime_settled_cents`, `breached` and `breach_kind`,
+  // session 400 landed the writer, and the entry's OWN CITED GREP returns seven
+  // lines.
+  //
+  // THAT THIRD SENTENCE IS WRITTEN OUT OF COMMAND GRAMMAR ON PURPOSE AND ADR-212
+  // IS WHY. A backticked command beside a stated result is a claim about THIS
+  // tree, so a command quoted as HISTORY must not wear the shape that says run
+  // me -- which is the rule ADR-212 already made for `file:line` pointers, and
+  // `useWithdrawalBackend`'s entry below spells two dead line numbers out in
+  // words for the same reason. RI-20 has no refuted-claim escape and must not
+  // grow one: the escape RI-14 needs is safe because a name is inert, and a
+  // command is not.
+  //
+  // NO GATE COULD SEE IT AND THAT WAS A BOUNDARY RATHER THAN A BUG. RI-14 reads
+  // EXPORTS, and a migration COLUMN is not an export, so the one class of claim
+  // this file makes most often about the database was outside every check in the
+  // tree. ADR-214 rules that a reason's existence claim DOES reach schema
+  // objects and that a runner cannot tell a column name from prose -- measured,
+  // not assumed -- so a reason claiming a schema fact QUOTES THE COMMAND THAT
+  // SETTLES IT and `RI-20` runs the command. The grep below is live: it is
+  // executed on every CI-01 run and the number beside it is checked.
+  //
+  // THE PER-FILE CLAIM WAS A GRAIN ERROR AND IT IS WORTH NAMING. "`0015` declares
+  // none of the three" was TRUE the day it was written and is true today, and it
+  // was still the wrong question: a merged migration is never edited, only
+  // superseded (constitution E2), so what a TABLE can store is never a fact about
+  // one file. An entry asking a per-file question about a per-table fact is stale
+  // the moment the next `ALTER TABLE` lands, by construction.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
-    'A `RuleState` NO MIGRATION IN THIS TREE CAN STORE, AND NOT THE LEDGER HANDLE THIS ENTRY ' +
-    'USED TO NAME (ADR-176). The old reason was `PayoutTx.ledger`, a non-nullable `LedgerTx`; ' +
-    'ADR-176 applied ADR-172 clause 2 and DELETED that member, so the port no longer asks for a ' +
-    'handle any door refuses. WHAT REFUSES NOW IS A READ. `PayoutTx.subject` returns ' +
-    '`PayoutSubject` (`routes/payouts.ts:329`) whose `state` is the engine`s own `RuleState` ' +
-    '(`:331`), and `RuleState` requires `lifetimeSettledCents` ' +
-    '(`packages/rules-engine/src/types.ts:1004`), `breached` (`:1009`) and `breachKind` ' +
-    '(`:1010`). `0015_rule_states.sql` declares NONE of the three; ' +
-    '`grep -rn lifetime_settled packages/db/migrations` returns nothing at all, and no migration ' +
-    'names any member of `BreachKind` (`types.ts:789`). THIS IS THE SAME BLOCKER A WIRED ' +
-    'SIBLING ALREADY CARRIES: `databaseAccountReads` is installed and its `readEligibility` ' +
-    'rejects on `ELIGIBILITY_BLOCKER` (`routes/account-reads.ts:851`) for these exact three ' +
-    'fields, and `INV-M5-02` is what binds the two, because it requires both payout endpoints ' +
-    'to call `evaluatePayout` with identical inputs. SECOND, AND INDEPENDENT: `PayoutSubject' +
-    '.plan` (`:331`) is a `ResolvedPlan`, which M01 section 1.3 builds from `plan_versions' +
-    '.rules` and a `plan_version_sizes` row; both tables are scope class `firm` -- ' +
-    '`planVersions` (`packages/db/src/scope.ts:702`) and `planVersionSizes` ' +
+    'A `firm` READ ON A ONE-TRANSACTION PORT, AND NOT THE STORABILITY OF A `RuleState` THIS ' +
+    'ENTRY USED TO NAME. IT READ "A `RuleState` NO MIGRATION IN THIS TREE CAN STORE" AND THAT ' +
+    'IS FALSE. `lifetime_settled_cents` ' +
+    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:101`), `breached` ' +
+    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:107`) and `breach_kind` ' +
+    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:118`) are all three ' +
+    'columns of `rule_states`, and the constraint ' +
+    '`rule_states_breach_kind_is_a_breach_kind` ' +
+    '(`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:126`) enumerates every ' +
+    'member of `BreachKind` (`packages/rules-engine/src/types.ts:789`) in its `IN` list. ' +
+    'Session 400 landed the writer, so `RULE_STATE_WRITE_COLUMNS` ' +
+    '(`apps/worker/src/batch/state-writer.ts:232`) carries them. THE ' +
+    'ENTRY ALSO SAID `0015_rule_states.sql` DECLARES NONE OF THE THREE, WHICH IS TRUE AND WAS ' +
+    'THE WRONG QUESTION: a merged migration is never edited, only superseded (E2), so what a ' +
+    'TABLE can store is not a fact about one file. THE GREP IT QUOTED IS NOW LIVE AND RI-20 ' +
+    'RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 lines. WHAT REFUSES ' +
+    'NOW, RE-DERIVED ON THIS TREE RATHER THAN INHERITED. FIRST, A `firm` READ INSIDE A PORT ' +
+    'THAT RUNS EVERY METHOD ON ONE TRANSACTION: `PayoutTx.subject` returns `PayoutSubject` ' +
+    '(`routes/payouts.ts:329`) whose `plan` (`:332`) is a `ResolvedPlan`, which M01 section 1.3 ' +
+    'builds from `plan_versions.rules` and a `plan_version_sizes` row; both tables are scope ' +
+    'class `firm` -- `planVersions` (`packages/db/src/scope.ts:702`) and `planVersionSizes` ' +
     '(`packages/db/src/scope.ts:707`) -- and `ScopedTableKey` is ' +
     '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1423`), so no `ScopedTx` read ' +
-    'reaches either, while `PayoutTx` runs every method on ONE transaction. A PARTIAL BACKEND ' +
-    'IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are both constructible ' +
-    'today (`payoutRequests` is `owned`, `scope.ts:1056`, and `databaseIdempotencyStore` exists ' +
-    'at `src/idempotency-store.ts:144`), and installing them beside a `transact` that rejects ' +
-    'would put a live-looking route in front of the arm that approves payouts. MONEY PATH.',
+    'reaches either. ADR-211 clause 2 RULED THE REMEDY AND NOTHING HAS APPLIED IT: two ' +
+    'transactions, scoped first, the catalogue read a SECOND PORT beside `PayoutTx` rather ' +
+    'than a member of it. That is a change to `routes/payouts.ts`. THE MUTABILITY HALF OF ' +
+    "ADR-211 CLAUSE 3 IS SPENT AND ONLY THAT HALF: ADR-213's `0066` pins a published " +
+    "version's size grid (`0066_published_size_grid_immutable.sql:212`) beside `0027`'s " +
+    '`plan_versions_published_immutable` (`0027_triggers_invariants.sql:260`), so the crossing ' +
+    'is safe and the crossing is still not built. SECOND: NOTHING IN THIS TREE IMPLEMENTS ' +
+    '`PayoutTx`. THIRD, AND REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:438-439` states ' +
+    '"no member of this interface that a scoped door cannot serve" while `subject()` returns a ' +
+    '`ResolvedPlan` no scoped door reaches. Session 401 registered it, ADR-213 section 8 ' +
+    'registered it again, and `routes/payouts.ts` is a handler file outside this fence. A ' +
+    'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
+    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1056`, and ' +
+    '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
+    'beside a `transact` that rejects would put a live-looking route in front of the arm that ' +
+    'approves payouts. MONEY PATH.',
   useCheckoutBackend:
     '`CheckoutTx.insertAttribution` (`routes/checkout.ts:878`) writes `attributions`, which is ' +
     'scope class `pair` and which no authority in `packages/db` admits a request handler ' +
@@ -257,21 +309,37 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'both null, so calling the setter here would install what is already installed. That is not ' +
     'a wiring.',
   useAffiliateDeps:
-    'adapters for reads the accessor cannot reach. `AffiliateBackend` names four obstructions in ' +
-    'its own defaults (`routes/affiliate.ts:432-450`): `affiliate_commissions` is UNREGISTERED ' +
-    'in `packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
-    'which is `pair`; `affiliate_statements` is not in `schema.ts` at all; and no table records ' +
-    'an ISSUED link. THREE of the six methods do have a door -- `affiliates` is `owned` -- and ' +
-    'are an adapter somebody can write. NOTE: this port already holds ' +
-    '`productionAffiliateDeps` at module scope (`affiliate.ts:478`), so calling the setter here ' +
-    'would install what is already installed. That is not a wiring.',
+    'TWO obstructions, and this entry used to name THREE. `AffiliateBackend` states them in its ' +
+    'own defaults (`routes/affiliate.ts:432-450`): `affiliate_commissions` is UNREGISTERED in ' +
+    '`packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
+    'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
+    'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
+    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2686`) declares it while ' +
+    '`affiliateStatements` (`packages/db/src/scope.ts:1046`) registers it `derived` through ' +
+    '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
+    '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
+    'and now `statements` -- and all four are an adapter somebody can write. REGISTERED RATHER ' +
+    "THAN REPAIRED: the route module's own `STATEMENTS_UNREACHABLE` " +
+    '(`routes/affiliate.ts:444`) still carries the retired sentence and serves it to a caller as ' +
+    'the reason `statements` refuses. That is a handler file and outside this fence. NOTE: this ' +
+    'port already holds `productionAffiliateDeps` at module scope (`affiliate.ts:478`), so ' +
+    'calling the setter here would install what is already installed. That is not a wiring.',
   setEconomicCalendarSource:
-    'TWO THINGS, AND THE FIRST IS A REGISTRY ENTRY RATHER THAN AN ADAPTER. The port reads ' +
-    '`economic_calendar_current` and NEVER `economic_calendar` (`routes/economic-calendar.ts:188`), ' +
-    'and that view is in neither `packages/db/src/schema.ts` nor `scope.ts`, so it is not a ' +
-    '`TableKey` and no door can name it. Second, `freshness.stale` is decided against a ' +
-    'CONFIGURED HORIZON that lives with the alarm and not in this deployable; a route that ' +
-    'reached for a clock would compare a UTC date against an exchange trading day.',
+    'ONE THING, AND THIS ENTRY USED TO NAME TWO. It read that the view the port reads is in ' +
+    'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
+    'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
+    '(`packages/db/src/schema.ts:2379`) declares `economic_calendar_current` and ' +
+    '`economicCalendarCurrent` (`packages/db/src/scope.ts:963`) classes it `firm`, so it is a ' +
+    '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
+    '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +
+    'not in this deployable. The port says so at `routes/economic-calendar.ts:166`, "the answer ' +
+    'the deployment already computed against the configured horizon", and the module header at ' +
+    '`:58` puts the horizon with the alarm. A route that reached for a clock instead would ' +
+    'compare a UTC date against an exchange trading day. THE READ ARM ALONE IS NOW ' +
+    'CONSTRUCTIBLE AND THE PORT IS ONE METHOD (`routes/economic-calendar.ts:194`), so there is ' +
+    'no partial backend available here: `readPanel` returns the panel AND its freshness ' +
+    '(`routes/economic-calendar.ts:177`) in one value, and a backend answering it would have to ' +
+    'invent the half it cannot compute.',
   setInternalOpsSource:
     'an ops plane rather than a database read. `readDependencies`, `readJobs` and ' +
     '`readReconStatus` are probes of other processes, and `runBatch` COMMANDS one. None of the ' +
@@ -338,8 +406,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // THE PORT IS STILL BLOCKED AND THE TRUE REASON IS WORSE THAN THE FALSE ONE.
   // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
-  // drives `requested --> approved` or `cooling --> approved`, and `:283-288`
-  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES`, on
+  // drives `requested --> approved` or `cooling --> approved`, and `:287-292`
+  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES` (the
+  // array is `wallet-withdrawals.ts:287-292`; :283-288 was the docblock above
+  // it), on
   // which `gateNoInFlight` (`:1254`) refuses. So a wired endpoint writes a row
   // nothing will ever advance and then refuses that identity's every later
   // withdrawal, permanently, behind a screen saying a withdrawal is in flight.
