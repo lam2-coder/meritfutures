@@ -140,7 +140,7 @@
 // down: F-2 asks for a gate binding a DRAWING to the registry, and this binds a
 // PRODUCER to it.
 //
-// THE SET IS THE NAMES THIS TREE HAS A PRODUCER FOR, AND IT IS NINE. The
+// THE SET IS THE NAMES THIS TREE HAS A PRODUCER FOR, AND IT IS TEN. The
 // catalogue's payout and wallet families are far larger; a producer table
 // carrying names no code emits is a table whose rows nothing asserts, and the
 // first one that turns out to be wrong will be wrong quietly. The four
@@ -159,25 +159,38 @@
 // reads like an accusation against the caller. `flag.raised` is transcribed
 // below, field for field from `EVENTS:354`.
 //
-// AND `detector.run_completed` IS NOT TRANSCRIBED, WHICH IS A FINDING RATHER
-// THAN A SECOND OVERSIGHT. `EVENTS:358` gives its payload as `{ detector,
-// detector_version, trading_day, rows_scanned, flags_raised, duration_ms }` and
-// THAT LIST CARRIES NO `_id` FIELD AT ALL. `events.subject_id` is `uuid NOT
-// NULL` and {@link CatalogueRow.subjectField} names the payload field it is read
-// from, so this row has no field to name and picking one would be this file
-// inventing a field the registry does not carry, which is precisely what
-// ADR-159 clause 1 refuses. A SECOND AND INDEPENDENT BLOCKER SITS BEHIND IT: the
-// same payload names neither `identity_id` nor `account_id`, so even given a
-// subject the row would be refused by `assertTenanted` below, for
-// `payout.freeze_expiring`'s reason and by `payout.freeze_expiring`'s argument.
-// Its consumers are BI and ALERT, which is to say the fact is FIRM-level, and
-// `assertTenanted`'s message already names the repair for that case: a row in
-// EVENTS saying so. No row says it today. BOTH REPAIRS ARE EVENTS' AND EVENTS IS
-// FROZEN, so each moves by an ADR and neither is a commit. The absence is pinned
-// by a case in `test/events.test.ts` that goes red the day either half lands.
+// AND `detector.run_completed` IS THE TENTH, TRANSCRIBED ONLY AFTER THE DOCUMENT
+// MOVED TWICE. Session 382 refused it and was right to. `EVENTS:358` gave its
+// payload as `{ detector, detector_version, trading_day, rows_scanned,
+// flags_raised, duration_ms }` and THAT LIST CARRIED NO `_id` FIELD AT ALL,
+// while `events.subject_id` is `uuid NOT NULL` and
+// {@link CatalogueRow.subjectField} names the payload field it is read from; a
+// second and independent blocker sat behind it, because the same payload names
+// neither `identity_id` nor `account_id`.
+//
+// ADR-205 ESTABLISHED THAT THOSE ARE TWO DIFFERENT DEFECTS AND RULED EACH. The
+// first was a PLAIN OMISSION in one row -- the run has a real `uuid PRIMARY KEY`
+// at `0008:61` and the payload simply failed to name it -- and clause 1 adds
+// `detector_run_id` to `EVENTS:358`, whose spelling is already this schema's at
+// `0008:134` and `0008:216`. The second was NOT A DEFECT IN THAT ROW AT ALL: the
+// catalogue had no way for ANY row to say its fact belongs to the firm, so this
+// file could not tell an untenanted firm fact from an untenanted trader fact and
+// correctly refused both. Clause 2 gives the catalogue the `**FIRM**` mark
+// (EVENTS section 14) and clause 5 makes `assertTenanted` READ it rather than
+// relax. So this row is a transcription in both halves and this file still
+// invents nothing: the field is EVENTS' and the mark is EVENTS'.
+//
+// WHAT THAT DOES NOT MAKE TRUE, BECAUSE A READER OF THIS RECORD WILL WANT IT TO.
+// `apps/worker` still cannot reach this producer (RI-04 plus `node-linker=
+// isolated`, session 379), and the one call site that emits this name --
+// `detectors/runner.ts` -- still sends the SIX-field payload, so its emit would
+// now be refused at `subjectField` rather than at the name. THE REFUSAL MOVED
+// AND DID NOT LIFT. That one-line repair is `apps/worker/src`'s fence and is
+// registered in ADR-205 section 7 rather than taken here.
 //
 // NEITHER OF THE TWO ROWS CARRIES MONEY, SO ADR-198 DOES NOT REACH THEM, AND
-// THAT WAS CHECKED RATHER THAN ASSUMED. `flag.raised` carries two ids, a type, a
+// THAT WAS CHECKED AGAIN AFTER THE AMENDMENT RATHER THAN CARRIED FORWARD:
+// `detector_run_id` is a uuid and neither ends `_cents` nor ends `_bp`. `flag.raised` carries two ids, a type, a
 // severity, a detector, a version and an evidence summary;
 // `detector.run_completed` carries a detector, a version, a trading day and
 // three counts. No `_cents` field and no `_bp` field on either, so
@@ -305,14 +318,28 @@ export interface CatalogueRow {
   };
   /** The producer, as EVENTS' own Producer column names it. Prose, for the reader. */
   readonly producer: string;
+  /**
+   * The row's fact belongs to the FIRM and to no trader, so it reaches neither
+   * tenancy column and {@link assertTenanted} lets it through.
+   *
+   * THIS IS A TRANSCRIPTION AND NEVER A PRODUCER'S CHOICE. It is present here
+   * exactly where EVENTS marks the row `**FIRM**` after its event name, which
+   * ADR-205 clause 2 rules and EVENTS section 14 defines, and the suite asserts
+   * the biconditional against the document read as text. A row that set this
+   * without the mark would be this file granting itself permission to write an
+   * untenanted row on an append-only table, which is ADR-159 clause 1's refusal
+   * wearing a different field name.
+   */
+  readonly firmLevel?: true;
 }
 
 /**
- * The nine names, each a row in EVENTS and each with a producer in this tree.
+ * The ten names, each a row in EVENTS and each with a producer in this tree.
  *
  * ORDERED AS THE CATALOGUE ORDERS THEM, so a reader comparing the two reads down
- * both at once. `flag.raised` is last because EVENTS puts it last: the eight
- * above it are section 6's and it is section 8's.
+ * both at once. The last two are section 8's and the eight above them are
+ * section 6's, and `flag.raised` precedes `detector.run_completed` because
+ * `EVENTS:354` precedes `EVENTS:358`.
  */
 export const EVENT_CATALOGUE = {
   // --- EVENTS section 6, produced by `routes/payouts.ts` ---
@@ -438,6 +465,31 @@ export const EVENT_CATALOGUE = {
     // the engine decided and no human did.
     actorKind: 'system',
     producer: 'Detector',
+  },
+  'detector.run_completed': {
+    // THE SINGULAR OF `detector_runs`, ON `flag.raised`'S RULE ONE ROW UP, and
+    // the suite asserts it against `schema.ts` rather than against that
+    // precedent.
+    subjectKind: 'detector_run',
+    // ADDED TO `EVENTS:358` BY ADR-205 CLAUSE 1 AND TRANSCRIBED FROM IT HERE,
+    // in that order and never the other one. `detector_runs.id` is a
+    // `uuid PRIMARY KEY` (`0008:61`) and `detector_run_id` is already this
+    // schema's spelling for a reference to it (`0008:134`, `0008:216`), so
+    // neither the field nor its name is invented in this file. Session 382
+    // refused this row precisely because the document carried no such field,
+    // and the document carries it now.
+    subjectField: 'detector_run_id',
+    // NEITHER TENANCY COLUMN, ON PURPOSE, AND THE ROW SAYS SO RATHER THAN
+    // LEAVING IT TO BE INFERRED. `detector_runs` declares no column against
+    // `identities(id)` and a sweep over the whole population has no owner to
+    // resolve; the accounts it disagreed with are its OUTPUT, on `risk_flags`.
+    // ADR-191's write-time resolution is exhausted here rather than unused,
+    // which is the difference between this row and `payout.freeze_expiring`.
+    firmLevel: true,
+    // A DETECTOR IS NOT A PERSON, which is `flag.raised`'s sentence and holds
+    // for the same closed CHECK.
+    actorKind: 'system',
+    producer: 'Worker',
   },
 } as const satisfies Readonly<Record<string, CatalogueRow>>;
 
@@ -619,7 +671,7 @@ export function buildEvent(spec: EmitSpec, defaultOccurredAt: Date): EventEnvelo
 
   const identityId = tenancy(spec, row.identityField, 'identity_id');
   const accountId = tenancy(spec, row.accountField, 'account_id');
-  assertTenanted(spec.name, identityId, accountId);
+  assertTenanted(spec.name, row, identityId, accountId);
   const { actorKind, actorId } = actor(spec, row);
 
   return {
@@ -668,22 +720,35 @@ export function buildEvent(spec: EmitSpec, defaultOccurredAt: Date): EventEnvelo
  * section 1's rule is that an event exists if and only if the fact does, and a
  * row nobody can reach is not the honest half of that pair.
  *
- * WHAT THIS IS NOT. It is not a claim that every event belongs to somebody: 35
+ * WHAT THIS IS NOT. It is not a claim that every event belongs to somebody: 34
  * of the 102 catalogue rows whose payload can be read name neither column, and
- * 34 of those are consumed only by firm-level readers, where an untenanted row
- * is exactly right. A producer for one of those would DECLARE the row
- * firm-level and this would read the declaration. NO ROW IN EVENTS DECLARES ONE
- * TODAY, so the field is not invented here, on ADR-159 clause 1's rule that a
- * name is a row on the registry's authority and no other; the message below
- * names that as the second repair rather than leaving the next reader to work
- * out why the refusal is total.
+ * 33 of those have no `TL` consumer. BOTH FIGURES WERE 35 AND 34 AND ARE
+ * RE-DERIVED HERE RATHER THAN ADJUSTED (ADR-205 section 9); the one row of the
+ * 34 that a `TL` reads is `payout.settled`, whose payload carries a
+ * `payout_request_id` and which is therefore ADR-191's write-time resolution
+ * rather than a firm fact.
+ *
+ * A PRODUCER FOR ONE OF THOSE DECLARES THE ROW FIRM-LEVEL AND THIS READS THE
+ * DECLARATION, which is ADR-205 clause 5 and is no longer a hypothetical: EXACTLY
+ * ONE ROW IN EVENTS CARRIES THE `**FIRM**` MARK TODAY and it is
+ * `detector.run_completed`. The other 33 stay refused, because an unmarked
+ * untenanted row is UNDECIDED rather than a trader's. The mark is never inferred
+ * from the consumer cell: `payout.freeze_expiring` has no `TL` either and is a
+ * fact about one trader, so the derivation that looked available would have
+ * written that warning untenanted forever (ADR-205 section 5).
  */
 function assertTenanted(
   name: EventName,
+  row: CatalogueRow,
   identityId: string | null,
   accountId: string | null,
 ): void {
   if (identityId !== null || accountId !== null) return;
+  // THE DECLARATION, READ RATHER THAN DECIDED. ADR-205 clause 5: this guard is
+  // not relaxed, it learns to read a mark the frozen registry carries. It
+  // refused every untenanted row because NO row declared; it refuses every
+  // untenanted row that does not declare.
+  if (row.firmLevel === true) return;
   throw new EventError(
     `${name} reaches neither \`events.identity_id\` nor \`events.account_id\`, so the row it ` +
       'would write belongs to no identity and to no account. ADR-191 registered `events` under ' +
@@ -695,8 +760,8 @@ function assertTenanted(
       '`account_id` through `reference_id` AT WRITE TIME, and a producer holding a ' +
       '`payout_request_id` holds something that names an account. Give the catalogue row a ' +
       'field to read the tenancy from, or, where the event genuinely belongs to the firm rather ' +
-      'than to a trader, say so on its row in EVENTS. No row says that today and this file ' +
-      'invents no field EVENTS does not carry',
+      'than to a trader, mark its row `**FIRM**` in EVENTS (section 14, ADR-205 clause 2). This ' +
+      'file reads that mark and invents no field EVENTS does not carry',
   );
 }
 

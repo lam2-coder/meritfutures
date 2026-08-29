@@ -33,16 +33,18 @@
 // fence and declared the slice done would have wired the rest and broken those
 // three, and nothing in either tree would have said so.
 //
-// THE COUNT READ FOUR UNTIL THE PRODUCER'S CATALOGUE GAINED `flag.raised`, AND
-// SECTION 4 IS WHY IT MOVED RATHER THAN DRIFTED. That commit turned this case
-// red, which is what it was written to do: the split is DERIVED from the other
+// THE COUNT HAS READ FOUR AND THEN FIVE, AND SECTION 4 IS WHY IT MOVED RATHER
+// THAN DRIFTED. Each time the producer's catalogue grew, this case went red,
+// which is what it was written to do: the split is DERIVED from the other
 // deployable's file rather than named here, so the figures below are re-derived
-// rather than adjusted. Nothing in `apps/worker` changed and nothing here was
-// widened. The two EVENTS rows this deployable's refusals were pointing at are
-// `flag.raised` (`EVENTS:354`) and `detector.run_completed` (`EVENTS:358`); the
-// first is a row in the producer now and the second cannot become one, because
-// its payload declares no `_id` for `events.subject_id` and neither tenancy
-// column, so both of its repairs are amendments to a frozen document.
+// rather than adjusted. Nothing in `apps/worker/src` changed on either
+// occasion and nothing here was widened. The two EVENTS rows this deployable's
+// refusals were pointing at are `flag.raised` (`EVENTS:354`) and
+// `detector.run_completed` (`EVENTS:358`); the first became a row in the
+// producer when session 382 transcribed it, and the second when ADR-205 moved
+// the document its payload declared no `_id` and no tenancy column in. SECTION
+// 4b IS WHAT DID NOT MOVE: this deployable's own emit is a field short of the
+// amended row, so the name is accepted and the emit would still be refused.
 //
 //   apps/api/src/events.ts               EVENT_CATALOGUE's keys, read as text
 //   apps/worker/src/**                   the call sites and the specifiers
@@ -180,12 +182,12 @@ test('no relative specifier under src resolves outside apps/worker', () => {
 });
 
 // -----------------------------------------------------------------------------
-// 4. The producer's catalogue, read as text, holds four of the seven
+// 4. The producer's catalogue, read as text, holds five of the seven
 // -----------------------------------------------------------------------------
 // `RI-04` FORBIDS THE IMPORT, so the catalogue is parsed out of the file. THE
 // PARSE IS ASSERTED BEFORE IT IS USED, because a parse that quietly returns
 // nothing turns this case into a case that passes over an empty set: the
-// catalogue's own docblock says it carries nine names and the count is checked
+// catalogue's own docblock says it carries ten names and the count is checked
 // against that sentence, so a reshape of that file fails loudly here rather
 // than blinding the assertion below it.
 
@@ -204,43 +206,72 @@ function catalogueNames(): string[] {
   return names;
 }
 
-test('the producer one deployable over would accept four of these seven names', () => {
+test('the producer one deployable over would accept five of these seven names', () => {
   const catalogue = catalogueNames();
   // The parse, checked before anything rests on it.
-  expect(catalogue).toHaveLength(9);
+  expect(catalogue).toHaveLength(10);
   expect(catalogue).toContain('payout.requested');
 
   const emitted = Object.keys(EMITTED);
   const accepted = emitted.filter((name) => catalogue.includes(name)).sort();
   const refused = emitted.filter((name) => !catalogue.includes(name)).sort();
 
-  // `flag.raised` JOINED THIS LIST WHEN THE PRODUCER TRANSCRIBED `EVENTS:354`,
-  // AND ACCEPTING THE NAME IS NOT THE SAME AS WRITING A ROW. Nothing in this
-  // deployable can reach the producer, so no call site here writes anything
-  // today; what moved is that `buildEvent` would no longer throw at this name.
+  // `detector.run_completed` JOINED THIS LIST WHEN ADR-205 MOVED `EVENTS:358`
+  // AND THE PRODUCER TRANSCRIBED IT, which is the blocker this file's previous
+  // shape was written to notice lifting. `flag.raised` joined it one session
+  // earlier off `EVENTS:354`.
+  //
+  // ACCEPTING A NAME IS NOT WRITING A ROW AND IT IS NOT EVEN AN EMIT THAT WOULD
+  // SUCCEED. Nothing in this deployable can reach the producer at all (`RI-04`
+  // plus `node-linker=isolated`), and for `detector.run_completed` there is a
+  // SECOND thing in the way that this file can see: section 4b.
   expect(accepted).toEqual([
+    'detector.run_completed',
     'flag.raised',
     'payout.freeze_expiring',
     'payout.hold_released',
     'wallet.withdrawal_halt_released',
   ]);
 
-  // THE THREE THAT WOULD STILL THROW, AND THEY ARE NOW ONE KIND OF GAP RATHER
-  // THAN TWO. `detector.run_degraded` and `breaker.state_changed` have no row in
-  // EVENTS at all -- their payloads are M07 section 5's and M06's --  and
-  // `detector.run_completed` HAS a row whose payload declares no `_id` for
-  // `events.subject_id` and neither tenancy column, so it cannot be transcribed
-  // either. All three now need an amendment to a frozen document and an ADR
-  // before any producer may carry them, and no repair is inside this deployable.
-  expect(refused).toEqual([
-    'breaker.state_changed',
-    'detector.run_completed',
-    'detector.run_degraded',
-  ]);
+  // THE TWO THAT WOULD STILL THROW AT THE NAME, AND THEY ARE ONE KIND OF GAP.
+  // Neither has a row in EVENTS at all: `detector.run_degraded`'s payload is
+  // M07 section 5's and `breaker.state_changed`'s is M06's, both registered by
+  // sessions 300 and 320. Each needs an amendment to a frozen document and an
+  // ADR before any producer may carry it, and neither repair is inside this
+  // deployable.
+  expect(refused).toEqual(['breaker.state_changed', 'detector.run_degraded']);
 });
 
 // -----------------------------------------------------------------------------
-// 5. And one of the three is refused by tenancy, which is expected and correct
+// 4b. AND THE ONE THAT JUST BECAME ACCEPTABLE STILL COULD NOT BE EMITTED FROM
+//     HERE, BECAUSE THIS DEPLOYABLE'S PAYLOAD IS ONE FIELD SHORT
+// -----------------------------------------------------------------------------
+// ADR-205 clause 1 added `detector_run_id` to `EVENTS:358` and the producer's
+// `subjectField` reads it, so `buildEvent` would now accept the NAME and refuse
+// at the SUBJECT. THE REFUSAL MOVED AND DID NOT LIFT, and a reader of the
+// `accepted` list above must not read it as a write.
+//
+// THE VALUE IS ALREADY IN SCOPE AT THE CALL SITE, which is what makes this a
+// one-line repair rather than a design question: `runner.ts` binds the run's id
+// from `insertRun` and calls `emitRunEvents` inside that same closure. It is
+// still a `src/` change in a deployable no fence holds today, so ADR-205
+// section 7 registers it rather than taking it, and this case is the pin.
+
+test('the runner emits detector.run_completed WITHOUT the subject the catalogue now names', () => {
+  const text = withoutComments(readFileSync(join(SRC, 'detectors', 'runner.ts'), 'utf8'));
+  const start = text.indexOf("name: 'detector.run_completed'");
+  expect(start).toBeGreaterThan(-1);
+  const payload = text.slice(start, text.indexOf('};', start));
+
+  expect(payload).toContain('detector:');
+  expect(payload).toContain('duration_ms:');
+  // THE CLEARING CONDITION. The day `runner.ts` carries the field, this goes red
+  // and the session holding that fence records that the emit would build.
+  expect(payload).not.toContain('detector_run_id');
+});
+
+// -----------------------------------------------------------------------------
+// 5. And one of the five ACCEPTED names is refused by tenancy, which is expected
 // -----------------------------------------------------------------------------
 // `payout.freeze_expiring`'s payload is `{ payout_request_id, flag_id,
 // expires_at, lead_hours }` and names NEITHER tenancy column, so `assertTenanted`
@@ -248,6 +279,13 @@ test('the producer one deployable over would accept four of these seven names', 
 // 9's registered open item reaching this deployable, and it is asserted here as
 // a property of the PAYLOAD rather than repaired: widening anything to admit it
 // would write a row that falls out of every scoped read of an append-only table.
+//
+// ADR-205 DID NOT LIFT THIS AND THAT IS THE POINT OF ITS SECTION 5.
+// `detector.run_completed` reaches neither column either and is admitted, on a
+// `**FIRM**` mark EVENTS carries for it and does NOT carry for this name. The
+// two are indistinguishable by consumer -- neither has a `TL` -- and are
+// decided differently, because this one is a fact about ONE TRADER whose
+// producer holds a `payout_request_id` that names an account.
 
 test('the freeze warning names neither tenancy column, which is why it is refused', () => {
   const text = withoutComments(readFileSync(join(SRC, 'sweeps', 'expiry.ts'), 'utf8'));
