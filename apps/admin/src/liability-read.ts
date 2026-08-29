@@ -294,6 +294,7 @@ function record(value: unknown, path: string): Readonly<Record<string, unknown>>
 
 function describe(value: unknown): string {
   if (value === null) return 'null';
+  if (value === undefined) return 'absent';
   if (Array.isArray(value)) return 'an array';
   return `a ${typeof value}`;
 }
