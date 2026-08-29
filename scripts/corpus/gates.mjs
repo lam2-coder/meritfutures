@@ -1681,7 +1681,7 @@ const ci06h = {
       [
         'probe_published_size_grid_immutable.sql',
         "0066's published size grid guard is no longer probed, so nothing " +
-          'asserts that session 401\'s measured mutation stays refused, that ' +
+          "asserts that session 401's measured mutation stays refused, that " +
           'an INSERT into a published version is refused as well as an UPDATE ' +
           'and a DELETE, that a row cannot be moved onto or off a published ' +
           'version, or that a draft grid, the publish transition and the one ' +
