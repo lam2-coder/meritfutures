@@ -215,11 +215,25 @@ export type {
 // silent stubs would be a batch whose audit channel is a no-op, so no such
 // composition exists and this leg exports the one method it can serve.
 //
-// **TERM 2 IS UNCLEARED AND THE SEAM IS ITS SHAPE.** No primary source declares
-// what `rule_states.engine_gates` holds: `EngineGateResults` types four leaves
-// `bigint`, which JSON cannot carry, and `state-hash.ts` says in terms that its
-// canonical serialization is NOT the column. So `RuleStateWriterIo` takes the
-// encoding as a parameter and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name.
+// **TERM 2 WAS UNCLEARED WHEN THIS LEG WAS WRITTEN AND IS CLEARED NOW. THE SEAM
+// IS STILL RIGHT AND THAT IS THE POINT OF SAYING SO.** This paragraph read "no
+// primary source declares what `rule_states.engine_gates` holds"; `ADR-206`
+// (session 394) landed while this session was running and declares it, at
+// `docs/architecture/data-model/rule_states.md`: the engine's own
+// `EngineGateResults`, six groups and twenty-five leaves at `ENGINE_GATE_LEAVES`'
+// dotted paths, cents as base-10 strings. **WHAT IS DECLARED IS NOT YET
+// IMPLEMENTED**: no adapter in this tree encodes to that shape, `ADR-206` is
+// `proposed` and UNSIGNED, and so `RuleStateWriterIo` still takes the encoding as
+// a parameter and `UNWIRED_RULE_STATE_WRITER_IO` still refuses it by name. A port
+// that refuses is the correct state until an encoder exists.
+//
+// **AND THE NUMBER IN THIS PARAGRAPH WAS WRONG IN BOTH COPIES.** It read
+// "`EngineGateResults` types four leaves `bigint`". **SEVEN** of the
+// twenty-five are `Cents`, derived by counting what `ENGINE_GATE_LEAVES` renders
+// through `money()`. The four came from `packages/rules-engine/src/hash.ts`,
+// which said four for the same reason and is repaired in the same commit.
+// `state-hash.ts` still says in terms that its canonical serialization is NOT the
+// column, which is what makes the encoding a separate declaration at all.
 export {
   RULE_STATE_WRITE_COLUMNS,
   RULE_STATE_WRITE_TABLES,
