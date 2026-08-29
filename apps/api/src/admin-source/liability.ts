@@ -177,13 +177,21 @@
 //       date lives in `rule_states.engine_gates`, a `jsonb NOT NULL` bag, and
 //       **NOTHING IN THIS TREE WRITES IT**: `writeRuleState` is a port
 //       (`apps/worker/src/batch/ports.ts`) whose only implementations are test
-//       doubles and `scripts/demo/world.ts`, which REFUSES. Its JSON encoding is
-//       fixed by no document either -- `EngineGateResults` types every cents
-//       member `bigint`, which JSON cannot carry, and `0015`'s own column comment
-//       names EIGHT gates ("profit target, drawdown, win days, minimum days,
-//       consistency, cadence, cap, minimum payout") where the engine produces
-//       six. So the path `engine_gates.cadenceGap.nextEligibleTradingDay` is one
-//       no primary source declares and no producer writes. **THIS IS NOT
+//       doubles and `scripts/demo/world.ts`, which REFUSES. **ITS ENCODING IS
+//       NOW DECLARED AND THAT HALF OF THIS PARAGRAPH IS SPENT.** It read "fixed
+//       by no document either", and ADR-206 fixes it: the bag is the engine's
+//       own `EngineGateResults`, six groups and twenty-five leaves at
+//       `ENGINE_GATE_LEAVES`' dotted paths, cents as base-10 strings, declared
+//       at `docs/architecture/data-model/rule_states.md`. The two facts that
+//       paragraph offered as evidence are unchanged and are now the ruling's
+//       subject rather than its absence: `EngineGateResults` types every cents
+//       member `bigint`, which is why the ruling makes them strings, and
+//       `0015`'s own column comment names EIGHT gates ("profit target,
+//       drawdown, win days, minimum days, consistency, cadence, cap, minimum
+//       payout") where the engine produces six, which is why the design record
+//       is corrected and the merged migration is superseded rather than edited.
+//       So the path `engine_gates.cadenceGap.nextEligibleTradingDay` is one a
+//       primary source NOW declares and no producer writes. **THIS IS NOT
 //       `integrations.batch`'s CASE AND THE CONTRAST IS THE POINT**: EVENTS
 //       section 5 DECLARES the `batch.completed` body in the approved catalogue,
 //       which is why ADR-199 clause 4 could rule those two figures readable off
@@ -242,11 +250,15 @@
 //            holds no rows, which session 392 measured on a live database over
 //            all 60 migrations: **ZERO**. `apps/worker/**` and `packages/**`.
 //         2. A PRIMARY SOURCE DECLARING THE STORED `engine_gates` ENCODING.
-//            `EngineGateResults` types every cents member `bigint`, which JSON
-//            cannot carry, and `0015`'s column comment names EIGHT gates where
-//            the engine produces six. Without it a reader here would FIX the
-//            encoding from the read side, which is the trade `ADR-199` section 7
-//            refuses. An ADR.
+//            **CLEARED by `ADR-206` (session 394), and it is the ONLY term of
+//            the three that has moved.** The trade this term existed to refuse
+//            -- a reader here FIXING the encoding from the read side, which is
+//            what `ADR-199` section 7 refuses -- is refused by a ruling instead:
+//            the bag is the engine's own value, six groups and twenty-five
+//            leaves, cents as base-10 strings, declared at
+//            `docs/architecture/data-model/rule_states.md`. **THE GROUP IS
+//            STILL BLOCKED**, because terms 1 and 3 stand and EC-074 makes it
+//            whole or nothing.
 //         3. `eligible_next_7d: EligibleNext7d | null`, so the response can
 //            decline where the horizon has no answer (`ADR-204` ruling 9,
 //            `ADR-203`). **`RI-18` MAKES THIS ONE ATOMIC ACROSS THREE FILES** --

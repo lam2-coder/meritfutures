@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import {
   CHECKS,
   COVERAGE_NEEDLES,
+  clearingConditionPairs,
   DB_ADMITTED,
   DEPLOYABLES,
   REPO_ROOT,
@@ -333,6 +334,35 @@ function cleanTree(): string {
         '};\n',
     );
   }
+  // RI-19'S PAIR, AND THE FIXTURE STATES THE CONDITION TWICE ON PURPOSE. The
+  // check compares a module's enumeration against the case that restates it, so
+  // a fixture with one statement would make its non-vacuity guard throw on every
+  // case in this file -- the guard working and the fixture wrong, which is the
+  // trap RI-14's, RI-15's, RI-16's and RI-18's inputs each set once while they
+  // were being written.
+  //
+  // THE SPELLING IS `B5`'s OWN, so the seeded cases below read like the defect
+  // they stand for rather than like an alphabet. The module enumerates the three
+  // terms and the case restates them in one sentence, which is exactly the shape
+  // session 392 left on the real tree after it found the two statements carrying
+  // two of three terms each.
+  write(
+    root,
+    'apps/api/src/admin-source/blocked-read.ts',
+    '// B9. The group is blocked and the condition is stated ONCE, here.\n' +
+      '//\n' +
+      '// **CLEARING CONDITION, ALL THREE TERMS:**\n' +
+      '//   1. A `writeRuleState` IMPLEMENTATION lands.\n' +
+      '//   2. A primary source declares the stored `engine_gates` ENCODING.\n' +
+      '//   3. `eligible_next_7d` gains its `| null`.\n',
+  );
+  write(
+    root,
+    'apps/api/test/admin-source-blocked-read.test.ts',
+    '// CLEARING CONDITION, ALL THREE TERMS: a `writeRuleState` implementation\n' +
+      '// lands, AND a primary source declares the stored `engine_gates` ENCODING,\n' +
+      '// AND `eligible_next_7d` gains its `| null`.\n',
+  );
   return root;
 }
 
@@ -1862,4 +1892,201 @@ test('needle assembles a pattern without spelling it', () => {
   const spelled = 'cover' + 'ageThreshold: 90';
   expect(needle('cover', 'ageThreshold').test(spelled)).toBe(true);
   expect(needle('cover', 'ageThreshold').test('coverage is reported as a trend')).toBe(false);
+});
+
+// -----------------------------------------------------------------------------
+// RI-19, whose subject is the clearing-condition pattern itself
+// -----------------------------------------------------------------------------
+// EVERY SEED BELOW IS THE DEFECT THAT ACTUALLY HAPPENED OR ONE STEP FROM IT.
+// `B5`'s condition was stated in `apps/api/src/admin-source/liability.ts` and in
+// `apps/api/test/admin-source-liability.test.ts` WITH TWO OF ITS THREE TERMS
+// EACH, and each statement was individually true, so four sessions in a row read
+// a two-term condition off a three-term blocker. The first two cases are that
+// defect in each of its two directions.
+//
+// THE LAST TWO CASES ARE THE REACH RATHER THAN THE CATCH. A check that claims
+// more than it does is the defect class this corpus found four times on
+// 2026-08-28, and adding a fifth inside the invariant written to prevent one
+// would be a poor joke. What RI-19 does NOT see is asserted here, in the suite,
+// where it cannot quietly stop being true.
+describe('RI-19 binds the two statements of one clearing condition', () => {
+  const CONDITION = 'apps/api/test/admin-source-blocked-read.test.ts';
+
+  test('it catches the case dropping a term the module enumerates, which is `B5` exactly', () => {
+    // SESSION 392's OWN PRE-REPAIR TEXT. The case named the `| null` and not the
+    // `engine_gates` ENCODING; the module named the encoding and not the
+    // `| null`. Neither named the other's second term and no control compared
+    // them. This is the half a reader of the CASE would have been missing.
+    const root = cleanTree();
+    write(
+      root,
+      CONDITION,
+      '// CLEARING CONDITION, ALL THREE TERMS: a `writeRuleState` implementation\n' +
+        '// lands, AND `eligible_next_7d` gains its `| null`.\n',
+    );
+    const found = findings('RI-19', root);
+    expect(found.join('\n')).toContain('term 2 of the condition');
+    expect(found.join('\n')).toContain('NAMED NOWHERE IN THE CASE');
+    // AND IT NAMES THE TERM BY ITS OWN IDENTIFIER, which is what makes the
+    // finding actionable rather than a count that went red.
+    expect(found.join('\n')).toContain('`engine_gates`');
+  });
+
+  test('it catches the case holding a term the module has dropped, the other direction', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/admin-source/blocked-read.ts',
+      '// **CLEARING CONDITION, ALL TWO TERMS:**\n' +
+        '//   1. A `writeRuleState` IMPLEMENTATION lands.\n' +
+        '//   2. A primary source declares the stored `engine_gates` ENCODING.\n',
+    );
+    const found = findings('RI-19', root).join('\n');
+    expect(found).toContain('the case names `eligible_next_7d`');
+    expect(found).toContain('NO TERM OF THE MODULE CARRIES IT');
+    // The count arm fires on the same seed and reports the disagreement from the
+    // case's side, because the two statements now differ about how many terms
+    // the blocker has. Both readings of one drift, which is the point.
+    expect(found).toContain('says ALL THREE TERMS where');
+  });
+
+  test('it catches a module whose spelled count has stopped agreeing with its own items', () => {
+    // RI-04's failure arriving on the condition itself: its literal held four
+    // names where the tree had five, and it passed green for three sessions.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/admin-source/blocked-read.ts',
+      '// **CLEARING CONDITION, ALL FOUR TERMS:**\n' +
+        '//   1. A `writeRuleState` IMPLEMENTATION lands.\n' +
+        '//   2. A primary source declares the stored `engine_gates` ENCODING.\n' +
+        '//   3. `eligible_next_7d` gains its `| null`.\n',
+    );
+    expect(findings('RI-19', root).join('\n')).toContain('says ALL FOUR TERMS and enumerates 3');
+  });
+
+  test('it reports a module that declares terms and enumerates none, rather than passing', () => {
+    // The enumeration IS the term set. A statement with no `1.` item binds
+    // nothing, and reporting PASS over it would be this check asserting the
+    // agreement of a list it never read.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/admin-source/blocked-read.ts',
+      '// **CLEARING CONDITION, ALL THREE TERMS:** a `writeRuleState` lands, and\n' +
+        '// the rest of it is prose.\n',
+    );
+    expect(findings('RI-19', root).join('\n')).toContain('ENUMERATES NONE');
+  });
+
+  test('it reports a term that shares every identifier with a sibling, rather than passing', () => {
+    // A CHECK NEVER RETURNS PASS FOR SOMETHING IT DID NOT LOOK AT, which is this
+    // runner's rule 1. Two terms naming only `writeRuleState` are two terms RI-19
+    // cannot tell apart, and silence there would be the check covering less than
+    // its own words claim.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/admin-source/blocked-read.ts',
+      '// **CLEARING CONDITION, ALL THREE TERMS:**\n' +
+        '//   1. A `writeRuleState` IMPLEMENTATION lands.\n' +
+        '//   2. A second `writeRuleState` thing happens.\n' +
+        '//   3. `eligible_next_7d` gains its `| null`.\n',
+    );
+    expect(findings('RI-19', root).join('\n')).toContain('shares every identifier it names');
+  });
+
+  test('it THROWS when the form it binds has left the tree, rather than reporting agreement', () => {
+    // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. Zero declarations means
+    // the marker was reworded, and every restatement in the tree is unbound the
+    // moment that happens. Reporting PASS there is RI-04's three green sessions.
+    const root = cleanTree();
+    write(root, 'apps/api/src/admin-source/blocked-read.ts', '// nothing is blocked.\n');
+    write(root, CONDITION, '// nothing is blocked.\n');
+    expect(() => findings('RI-19', root)).toThrow(/found NO clearing condition/);
+  });
+
+  test('it THROWS rather than guessing which restatement belongs to which condition', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/admin-source/blocked-read.ts',
+      '// **CLEARING CONDITION, ALL ONE TERMS:**\n' +
+        '//   1. A `writeRuleState` IMPLEMENTATION lands.\n' +
+        '//\n' +
+        '// **CLEARING CONDITION, ALL ONE TERMS:**\n' +
+        '//   1. A `readRuleState` IMPLEMENTATION lands.\n',
+    );
+    expect(() => findings('RI-19', root)).toThrow(/pairs them BY FILE/);
+  });
+
+  test('a restatement spelling an identifier in another case holds, which is prose and not drift', () => {
+    // The comparison is case-folded on purpose. `EngineGates` and `engineGates`
+    // are one term written by two hands, and a check that went red on that would
+    // be teaching sessions to ignore it.
+    const root = cleanTree();
+    write(
+      root,
+      CONDITION,
+      '// CLEARING CONDITION, ALL THREE TERMS: a `WRITERULESTATE` lands, AND a\n' +
+        '// source declares the stored `Engine_Gates` ENCODING, AND\n' +
+        '// `ELIGIBLE_NEXT_7D` gains its `| NULL`.\n',
+    );
+    expect(findings('RI-19', root)).toEqual([]);
+  });
+
+  test('IT IS BLIND TO A TERM WHOSE MEANING INVERTS WHILE ITS IDENTIFIERS STAY PUT', () => {
+    // THE LIMIT, ASSERTED RATHER THAN DESCRIBED. RI-19 reads identifiers and not
+    // prose, so "gains its `| null`" and "LOSES its `| null`" are the same term
+    // to it. This case exists so the next reader learns that from a green
+    // assertion here instead of from a condition that drifted past a check
+    // whose `covers` they took at its word.
+    const root = cleanTree();
+    write(
+      root,
+      CONDITION,
+      '// CLEARING CONDITION, ALL THREE TERMS: a `writeRuleState` implementation\n' +
+        '// is REMOVED, AND nothing declares the stored `engine_gates` ENCODING,\n' +
+        '// AND `eligible_next_7d` LOSES its `| null`.\n',
+    );
+    expect(findings('RI-19', root)).toEqual([]);
+  });
+
+  test('IT IS BLIND TO A RESTATEMENT THAT DOES NOT DECLARE ITS OWN TERM COUNT', () => {
+    // THE SECOND LIMIT, AND IT IS THE LARGER ONE. The corpus states clearing
+    // conditions in many other forms and RI-19 reads none of them: it binds the
+    // form session 392 established and makes it load-bearing. A case that
+    // restates the condition WITHOUT the marker is not in any pair, and the two
+    // statements are then free to drift exactly as `B5`'s did.
+    const root = cleanTree();
+    write(
+      root,
+      CONDITION,
+      '// CLEARING CONDITION, RESTATED: a `writeRuleState` implementation lands,\n' +
+        '// AND `eligible_next_7d` gains its `| null`.\n',
+    );
+    // Two of three terms, no control, and RI-19 says nothing. This is the hole.
+    expect(findings('RI-19', root)).toEqual([]);
+  });
+});
+
+describe('RI-19 is about a real pair on the real tree, which is separate from its verdict', () => {
+  test('it binds `B5`s condition across `liability.ts` and its case, with three terms', () => {
+    // "IT RETURNED AN EMPTY ARRAY" IS NOT EVIDENCE THAT IT LOOKED. RI-04 passed
+    // green for three sessions while checking nothing, so this case asserts the
+    // SUBJECT: the pair RI-19 found, which side is canonical, and how many terms
+    // it derived. Every number here is read out of the tree at run time.
+    const { pairs, declared } = clearingConditionPairs(REPO_ROOT);
+    expect(declared).toBeGreaterThanOrEqual(2);
+    const b5 = pairs.get('apps/api::admin-source-liability');
+    expect(b5).toBeDefined();
+    expect(b5?.module.map((m) => m.file)).toEqual(['apps/api/src/admin-source/liability.ts']);
+    expect(b5?.case.map((c) => c.file)).toEqual(['apps/api/test/admin-source-liability.test.ts']);
+    // THE MODULE ENUMERATES AND THE CASE RESTATES, which is session 392's repair
+    // in its own words: the condition is written ONCE, in the module.
+    expect(b5?.module[0]?.terms.length).toBe(3);
+    expect(b5?.module[0]?.count).toBe(3);
+    expect(b5?.case[0]?.count).toBe(3);
+    expect(b5?.case[0]?.terms.length).toBe(0);
+  });
 });
