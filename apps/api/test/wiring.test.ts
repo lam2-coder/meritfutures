@@ -127,7 +127,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   is reached. Each carries at least one further blocker of its own.
   //
   //   `setAdminReadSource` says in its own header that what it is missing "is not
-  //   an authority, it is a shape" (`routes/admin-reads.ts:667`).
+  //   an authority, it is a shape" (`routes/admin-reads.ts:961`).
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
   // (`packages/db/src/scoped-db.ts:197`) and ADR-165 ruled it gains no member, so
@@ -137,11 +137,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // moment the door has a caller that reaches a row.
   // ---------------------------------------------------------------------------
   setAdminReadSource:
-    'A READ SHAPE, and the door second. `routes/admin-reads.ts:667` states it: "WHAT IS MISSING ' +
-    'IS NOT AN AUTHORITY, IT IS A SHAPE ... There is no join and no aggregate to reach for." ' +
+    'A READ SHAPE, and the door second. `routes/admin-reads.ts:961` states it: "WHAT IS MISSING ' +
+    'IS NOT AN AUTHORITY, IT IS A SHAPE", and `:967` "There is no join and no aggregate to ' +
+    'reach for." ' +
     'None of the six methods is a projection of one table: `LiabilityResponse` needs a seven-day ' +
     'forecast, a payout velocity, a reserve and a per-plan loss ratio, and `liability_snapshots` ' +
-    'carries `as_of`, `open_liability_cents`, `funded_accounts` and three exposure columns -- ' +
+    '(`packages/db/migrations/0009_ledger.sql:164`) carries `as_of`, `open_liability_cents` and ' +
+    'four exposure columns, plus `funded_accounts` ' +
+    '(`packages/db/migrations/0049_reserve_coverage_snapshots.sql:135`) -- ' +
     'and is scope class `firm` (`packages/db/src/scope.ts:756`), so the EXISTING `firm` door ' +
     'already reaches every column it has. A live adapter today would have to reach `sqlExecutor` ' +
     'to smuggle in SQL the accessor deliberately does not offer, which the port refuses by name.',
@@ -165,7 +168,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'unfinished deployment as a caller who is not an operator, on the endpoint that releases ' +
     'held payouts. MONEY PATH.',
   useAdminWalletBackend:
-    '`principal(request)` (`routes/admin-wallet.ts:538`), blocked on `setAdminSessionSource` ' +
+    '`principal(request)` (`routes/admin-wallet.ts:601`), blocked on `setAdminSessionSource` ' +
     'above, AND TWO METHODS THAT WIRING DOES NOT REACH. `writeCorrection` is refused on four ' +
     'constraints: `0038` is the built door for a wallet correction and ADR-158 never read it, so ' +
     'no column holds which entry a correction corrects (ADR-173). `reconcile` is refused on ' +
@@ -306,21 +309,37 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'both null, so calling the setter here would install what is already installed. That is not ' +
     'a wiring.',
   useAffiliateDeps:
-    'adapters for reads the accessor cannot reach. `AffiliateBackend` names four obstructions in ' +
-    'its own defaults (`routes/affiliate.ts:432-450`): `affiliate_commissions` is UNREGISTERED ' +
-    'in `packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
-    'which is `pair`; `affiliate_statements` is not in `schema.ts` at all; and no table records ' +
-    'an ISSUED link. THREE of the six methods do have a door -- `affiliates` is `owned` -- and ' +
-    'are an adapter somebody can write. NOTE: this port already holds ' +
-    '`productionAffiliateDeps` at module scope (`affiliate.ts:478`), so calling the setter here ' +
-    'would install what is already installed. That is not a wiring.',
+    'TWO obstructions, and this entry used to name THREE. `AffiliateBackend` states them in its ' +
+    'own defaults (`routes/affiliate.ts:432-450`): `affiliate_commissions` is UNREGISTERED in ' +
+    '`packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
+    'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
+    'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
+    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2665`) declares it while ' +
+    '`affiliateStatements` (`packages/db/src/scope.ts:1046`) registers it `derived` through ' +
+    '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
+    '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
+    'and now `statements` -- and all four are an adapter somebody can write. REGISTERED RATHER ' +
+    "THAN REPAIRED: the route module's own `STATEMENTS_UNREACHABLE` " +
+    '(`routes/affiliate.ts:445`) still carries the retired sentence and serves it to a caller as ' +
+    'the reason `statements` refuses. That is a handler file and outside this fence. NOTE: this ' +
+    'port already holds `productionAffiliateDeps` at module scope (`affiliate.ts:478`), so ' +
+    'calling the setter here would install what is already installed. That is not a wiring.',
   setEconomicCalendarSource:
-    'TWO THINGS, AND THE FIRST IS A REGISTRY ENTRY RATHER THAN AN ADAPTER. The port reads ' +
-    '`economic_calendar_current` and NEVER `economic_calendar` (`routes/economic-calendar.ts:188`), ' +
-    'and that view is in neither `packages/db/src/schema.ts` nor `scope.ts`, so it is not a ' +
-    '`TableKey` and no door can name it. Second, `freshness.stale` is decided against a ' +
-    'CONFIGURED HORIZON that lives with the alarm and not in this deployable; a route that ' +
-    'reached for a clock would compare a UTC date against an exchange trading day.',
+    'ONE THING, AND THIS ENTRY USED TO NAME TWO. It read that the view the port reads is in ' +
+    'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
+    'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
+    '(`packages/db/src/schema.ts:2358`) declares `economic_calendar_current` and ' +
+    '`economicCalendarCurrent` (`packages/db/src/scope.ts:963`) classes it `firm`, so it is a ' +
+    '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
+    '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +
+    'not in this deployable. The port says so at `routes/economic-calendar.ts:166`, "the answer ' +
+    'the deployment already computed against the configured horizon", and the module header at ' +
+    '`:58` puts the horizon with the alarm. A route that reached for a clock instead would ' +
+    'compare a UTC date against an exchange trading day. THE READ ARM ALONE IS NOW ' +
+    'CONSTRUCTIBLE AND THE PORT IS ONE METHOD (`routes/economic-calendar.ts:194`), so there is ' +
+    'no partial backend available here: `readPanel` returns the panel AND its freshness ' +
+    '(`routes/economic-calendar.ts:177`) in one value, and a backend answering it would have to ' +
+    'invent the half it cannot compute.',
   setInternalOpsSource:
     'an ops plane rather than a database read. `readDependencies`, `readJobs` and ' +
     '`readReconStatus` are probes of other processes, and `runBatch` COMMANDS one. None of the ' +
@@ -387,8 +406,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // THE PORT IS STILL BLOCKED AND THE TRUE REASON IS WORSE THAN THE FALSE ONE.
   // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
-  // drives `requested --> approved` or `cooling --> approved`, and `:283-288`
-  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES`, on
+  // drives `requested --> approved` or `cooling --> approved`, and `:287-292`
+  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES` (the
+  // array is `wallet-withdrawals.ts:287-292`; :283-288 was the docblock above
+  // it), on
   // which `gateNoInFlight` (`:1254`) refuses. So a wired endpoint writes a row
   // nothing will ever advance and then refuses that identity's every later
   // withdrawal, permanently, behind a screen saying a withdrawal is in flight.

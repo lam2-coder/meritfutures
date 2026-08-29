@@ -2346,18 +2346,20 @@ function citedReasonFiles(tree) {
  * COULD NOT REPAIR, enumerated here rather than dropped and rather than answered
  * with a wider window.
  *
- * `wiring.test.ts:168` cites `routes/admin-wallet.ts:538` for `principal(request)`
- * and `principal(request)` is declared at `:601`. IT WAS TRUE THE DAY IT WAS
- * WRITTEN: commit `563ac3d` wrote it against a tree where `principal` WAS on
- * :538, and commit `224fe5b` then inserted 63 lines above it. That is a FIFTH
- * false citation in that file, live on `main`, found by the check on its first
- * run over the file it was built for.
+ * THE ENTRY THIS REGISTER WAS OPENED FOR IS DISCHARGED AND GONE, WHICH IS THE
+ * MECHANISM WORKING. `wiring.test.ts` cited `routes/admin-wallet.ts:538` for
+ * `principal(request)` while `principal(request)` was declared at `:601`. It was
+ * true the day it was written -- commit `563ac3d` wrote it against a tree where
+ * `principal` WAS on :538, and `224fe5b` then inserted 63 lines above it -- and
+ * it stayed live on `main` through the sessions that found it and did not own
+ * the file. ADR-214's session owned it, repointed the citation, and the register
+ * entry went with the repair rather than outliving it.
  *
- * IT IS NOT FIXED HERE BECAUSE THIS SESSION DOES NOT OWN THAT FILE. Session 322
- * does, this wave. Dropping `wiring.test.ts` from the list to get green would
- * blind the check to the one file it exists for; widening the window to 63 lines
- * would blind it everywhere. Naming the single citation is the narrowest thing
- * that keeps both.
+ * THE REGISTER SHRINKS ONLY, and this is the first entry to leave by being
+ * fixed. Dropping `wiring.test.ts` from the list to get green would have blinded
+ * the check to the one file it exists for; widening the window to 63 lines would
+ * have blinded it everywhere. Naming the single citation kept both, and cost one
+ * line to retire.
  *
  * THE ENTRY IS EXACT AND IT EXPIRES BY ITSELF: file, cited pointer and name all
  * three must match, so it covers this citation and no other, and the day the
@@ -2417,7 +2419,6 @@ function citedReasonFiles(tree) {
  * @type {readonly {file: string, cites: string, name: string | null}[]}
  */
 const CITATIONS_OWNED_ELSEWHERE = [
-  { file: 'apps/api/test/wiring.test.ts', cites: 'routes/admin-wallet.ts:538', name: 'principal' },
   {
     file: 'apps/admin/src/index.ts',
     cites: '../../api/src/admin-source/index.ts:178',
@@ -3242,12 +3243,14 @@ const ri15 = {
     'means and not in the other ten -- is NOT raised. ' +
     `${CITATIONS_OWNED_ELSEWHERE.length} CITATION(S) ARE NAMED AND NOT ENFORCED, in ` +
     'CITATIONS_OWNED_ELSEWHERE, each exact on file, pointer and name so that it ' +
-    'covers one citation and expires by itself. `wiring.test.ts:168` cites ' +
-    '`routes/admin-wallet.ts:538` for `principal(request)`, which is declared at ' +
-    '`:601`; the other seven arrived with the derived input set, four of them a ' +
-    'pointer that no longer lands and three the wrong noun beside a true ' +
-    'pointer, and NONE is in a file this fence holds. The register SHRINKS ' +
-    'ONLY: an entry matching no finding on this ref is itself a finding.',
+    'covers one citation and expires by itself. The `wiring.test.ts` entry this ' +
+    'register was opened for -- `routes/admin-wallet.ts:538` for ' +
+    '`principal(request)`, declared at `:601` -- was REPAIRED by ADR-214s ' +
+    'session and left with the repair, which is the first entry to expire by ' +
+    'being fixed rather than by a rename. The rest arrived with the derived ' +
+    'input set, some a pointer that no longer lands and some the wrong noun ' +
+    'beside a true pointer, and NONE is in a file this fence holds. The register ' +
+    'SHRINKS ONLY: an entry matching no finding on this ref is itself a finding.',
   run(root) {
     /** @type {string[]} */
     const findings = [];

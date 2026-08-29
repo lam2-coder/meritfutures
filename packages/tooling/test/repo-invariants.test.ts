@@ -100,7 +100,7 @@ function cleanTree(): string {
       '  useRailBackend:\n' +
       "    'a vendor adapter this workspace does not ship, named in no package.json.',\n" +
       '};\n' +
-      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:538`).\n' +
+      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:601`).\n' +
       // RI-20 READS THESE FILES BY NAME AND THROWS WHEN IT FINDS NO COMMAND
       // CLAIM IN ANY OF THEM, so the fixture carries one in each direction and
       // both are TRUE against this tree. A fixture without them makes the
@@ -282,7 +282,10 @@ function cleanTree(): string {
     "export default [{ rules: { 'merit/engine-purity': 'error' } }];\n",
   );
   // RI-15's REGISTER SHRINKS ONLY, so the fixture reproduces every one of its
-  // eight entries. An entry matching nothing here would be a finding on EVERY
+  // entries -- SEVEN since ADR-214, because the `routes/admin-wallet.ts:538`
+  // entry was repaired at its source and left with the repair. The fixture
+  // mirrors the repair rather than the defect: `principal` is at 601 and the
+  // citation says 601. An entry matching nothing here would be a finding on EVERY
   // case in this file -- the guard working and the fixture wrong, which is the
   // trap RI-14's three files and the six-file list this check used to carry set
   // twice while they were being written. Each seed reproduces the REAL distance,
@@ -2395,7 +2398,7 @@ describe('RI-15 can anchor a citation on a column a migration ADDS', () => {
     write(
       root,
       'apps/api/test/wiring.test.ts',
-      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:538`).\n' +
+      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:601`).\n' +
         '// `grep -rn zzznosuchtoken packages/db/migrations` returns nothing.\n' +
         '// `grep -rln risk packages/db/migrations` returns 1 line.\n' +
         '// `lifetime_settled_cents`\n' +
