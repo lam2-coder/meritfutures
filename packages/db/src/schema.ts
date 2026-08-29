@@ -5076,3 +5076,73 @@ export const payoutDestinations = pgTable(
   },
   (table) => [primaryKey({ columns: [table.identityId, table.destinationRef] })],
 );
+
+// -----------------------------------------------------------------------------
+// operators -- 0073_operator_directory.sql. FIRM.
+// -----------------------------------------------------------------------------
+// MERIT'S RECORD OF WHO MAY ACT ON ITS OWN SURFACE, and the referent
+// `admin_actions.actor` did not have until ADR-237. `0017` declares that column
+// `text NOT NULL` with no foreign key, so "NO UNEXPLAINED ADMIN ACTION, EVER"
+// rested on a `NOT NULL` any string satisfies; `0073` adds
+// `admin_actions_actor_is_an_operator` against `actor` below.
+//
+// NO COLUMN AUTHENTICATES ANYBODY AND THAT IS THE TABLE'S DESIGN. There is no
+// password, no secret and no local credential here or anywhere in this schema
+// (`0002:280`, ADR-039). `idpIssuer` and `idpSubject` are what a VERIFIED
+// assertion is matched against, which is a lookup key rather than a credential:
+// possession of a subject claim proves nothing to anything.
+//
+// `idpSubject` IS NULLABLE AND THE NULL IS NOT A HOLE. The pair is unique only
+// where it is present (`operators_idp_identity_idx`, partial), the seam resolves
+// by equality, and SQL equality never matches NULL, so a NULL row is unreachable
+// rather than claimable. It is the correct state for an operator provisioned
+// before the provider has seen them and for an actor that must be nameable in
+// the audit trail without ever holding a session.
+//
+// THE `CHECK` CONSTRAINTS ARE NOT TRANSCRIBED, on this file's own rule about
+// `ADD CONSTRAINT`. The role vocabulary is asserted against the DDL and against
+// API_CONTRACT by `test/operator-role-vocabulary.test.ts` instead, which reads
+// all three and carries no list of its own.
+export const operators = pgTable('operators', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  actor: text('actor').notNull(),
+  role: text('role').notNull(),
+  status: text('status').notNull().default('active'),
+  displayName: text('display_name').notNull(),
+  idpIssuer: text('idp_issuer'),
+  idpSubject: text('idp_subject'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// operator_sessions -- 0073_operator_directory.sql. FIRM.
+// -----------------------------------------------------------------------------
+// WHAT A VERIFIED ASSERTION TURNS INTO, AND NOTHING IN THIS REPOSITORY WRITES A
+// ROW HERE. The minter needs the C-08 identity provider, which is a purchase
+// rather than a slice, so this transcription describes a shape with no producer
+// and says so rather than reading as an unused accessor.
+//
+// `idpAssertionId` IS `.notNull()` AND IT IS THE CONTROL RATHER THAN A LABEL.
+// A row has to name the assertion it came from, so a session nobody proved has
+// nothing to write there. That column is the whole difference between this
+// table and a login.
+//
+// THE HASH, NEVER THE TOKEN, which is `sessions.refreshTokenHash`'s declaration
+// and `impersonationSessions.tokenHash`'s in the same shape.
+export const operatorSessions = pgTable('operator_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  operatorId: uuid('operator_id')
+    .notNull()
+    .references(() => operators.id),
+  tokenHash: bytea('token_hash').notNull(),
+  idpAssertionId: text('idp_assertion_id').notNull(),
+  issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdIp: inet('created_ip'),
+  createdUserAgent: text('created_user_agent'),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+  lastSeenIp: inet('last_seen_ip'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

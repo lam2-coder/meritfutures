@@ -120,6 +120,23 @@ BEGIN
     VALUES ('oi128-probe.csv', sha256('oi128'::bytea), 'fills', 1)
     RETURNING id INTO v_file;
 
+  -- ADR-237, `0073`. THE ACTOR HAS A REFERENT NOW AND A FIXTURE HAS TO SUPPLY IT.
+  -- `admin_actions_actor_is_an_operator` is a foreign key onto `operators(actor)`,
+  -- so an audit row naming an operator this database does not hold is unwritable,
+  -- which is the whole point of the constraint and is what this INSERT satisfies.
+  --
+  -- `idp_issuer` AND `idp_subject` ARE LEFT NULL AND THAT IS THE CORRECT STATE
+  -- HERE RATHER THAN A SHORTCUT: `0073` uses NULL for an operator who cannot sign
+  -- in at all, a probe database has no identity provider, and the pair is
+  -- unreachable by equality rather than claimable.
+  --
+  -- ON CONFLICT DO NOTHING because every probe in this directory ends in
+  -- ROLLBACK, so the row is this transaction's alone; the clause is what keeps a
+  -- second block in the same file from failing on the first one's row.
+  INSERT INTO operators (actor, role, display_name)
+    VALUES ('founder', 'owner', 'Founder (probe fixture)')
+    ON CONFLICT (actor) DO NOTHING;
+
   -- B.4 step 3's approval. `initiative` is 0043's column and 'operational' is
   -- the value that says Merit acted of its own motion, which an engine upgrade
   -- is; `trader_request` would require on_behalf_of_identity_id.
@@ -895,6 +912,58 @@ BEGIN
   RAISE NOTICE 'REJECTION 14: %', msg;
 END $$;
 
-\echo 'probe_audited_writes: 8 successes and 15 rejections hold against the applied schema.'
+-- ---------------------------------------------------------------------------
+-- REJECTION 15: an admin action naming an actor who is in no directory
+-- ---------------------------------------------------------------------------
+-- ADR-237, `0073`. 0017 declares "NO UNEXPLAINED ADMIN ACTION, EVER. NOT NULL
+-- is the whole control" over `reason`, one column away from an `actor text NOT
+-- NULL` that carried no foreign key, so any string satisfied it INCLUDING A
+-- STRING NAMING NOBODY. `admin_actions_actor_is_an_operator` is the half 0017
+-- could not write, because no directory existed to point at.
+--
+-- THE PERMIT DIRECTION IS ALREADY EXERCISED BY THIS FILE'S OWN SETUP, which
+-- inserts the `operators` row and then the audit row that names it. This case
+-- is the refusal, and it is here rather than in a new probe because a
+-- constraint nobody has seen reject anything is a constraint nobody knows is
+-- wired up, and this file already holds the table.
+DO $$
+DECLARE
+  v_account uuid := (SELECT v FROM probe_ids WHERE k = 'account');
+  fired     boolean := false;
+  msg       text    := '';
+BEGIN
+  BEGIN
+    INSERT INTO admin_actions (actor, action, subject_kind, subject_id, reason,
+                               before, after, initiative)
+      VALUES ('someone.who.does.not.work.here', 'replay.rewrite_approved',
+              'account', v_account, 'a reason that explains nothing about who',
+              '{}'::jsonb, '{}'::jsonb, 'operational');
+  EXCEPTION WHEN foreign_key_violation THEN fired := true; msg := SQLERRM;
+  END;
+  IF NOT fired THEN
+    RAISE EXCEPTION 'REJECTION 15 FAILED: an audit row named an actor in no directory';
+  END IF;
+  IF position('admin_actions_actor_is_an_operator' in msg) = 0 THEN
+    RAISE EXCEPTION 'REJECTION 15 fired for the wrong reason: %', msg;
+  END IF;
+
+  -- A SUSPENDED OPERATOR IS STILL A REFERENT AND THIS CONSTRAINT DOES NOT READ
+  -- THE STATUS, which is stated here so a later reader does not mistake the
+  -- foreign key for an authorization control. Refusing a suspended operator is
+  -- `resolveOperatorSession`'s job at the door; the database's job is that the
+  -- name resolves at all, and an operator who acted and was later suspended
+  -- must keep every row they wrote.
+  UPDATE operators SET status = 'suspended' WHERE actor = 'founder';
+  INSERT INTO admin_actions (actor, action, subject_kind, subject_id, reason,
+                             before, after, initiative)
+    VALUES ('founder', 'replay.rewrite_approved', 'account', v_account,
+            'a suspended operator keeps the rows they already wrote',
+            '{}'::jsonb, '{}'::jsonb, 'operational');
+  UPDATE operators SET status = 'active' WHERE actor = 'founder';
+
+  RAISE NOTICE 'REJECTION 15: %', msg;
+END $$;
+
+\echo 'probe_audited_writes: 8 successes and 16 rejections hold against the applied schema.'
 
 ROLLBACK;

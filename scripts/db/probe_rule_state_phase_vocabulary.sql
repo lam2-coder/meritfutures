@@ -172,6 +172,23 @@ DECLARE v_admin bigint;
         v_row   rule_states;
         v_after account_phase;
 BEGIN
+  -- ADR-237, `0073`. THE ACTOR HAS A REFERENT NOW AND A FIXTURE HAS TO SUPPLY IT.
+  -- `admin_actions_actor_is_an_operator` is a foreign key onto `operators(actor)`,
+  -- so an audit row naming an operator this database does not hold is unwritable,
+  -- which is the whole point of the constraint and is what this INSERT satisfies.
+  --
+  -- `idp_issuer` AND `idp_subject` ARE LEFT NULL AND THAT IS THE CORRECT STATE
+  -- HERE RATHER THAN A SHORTCUT: `0073` uses NULL for an operator who cannot sign
+  -- in at all, a probe database has no identity provider, and the pair is
+  -- unreachable by equality rather than claimable.
+  --
+  -- ON CONFLICT DO NOTHING because every probe in this directory ends in
+  -- ROLLBACK, so the row is this transaction's alone; the clause is what keeps a
+  -- second block in the same file from failing on the first one's row.
+  INSERT INTO operators (actor, role, display_name)
+    VALUES ('founder', 'owner', 'Founder (probe fixture)')
+    ON CONFLICT (actor) DO NOTHING;
+
   INSERT INTO admin_actions (actor, action, subject_kind, subject_id, reason,
                              before, after, initiative)
     VALUES ('founder', 'replay.rewrite_approved', 'account',

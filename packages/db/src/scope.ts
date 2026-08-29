@@ -90,6 +90,8 @@ import {
   notifications,
   offerExperiments,
   offers,
+  operators,
+  operatorSessions,
   otpChallenges,
   otpSendBudget,
   pageRevalidations,
@@ -144,7 +146,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * ONE HUNDRED AND TWELVE KEYS: 111 OF THE 115 TABLES, PLUS ONE VIEW, AND THE
+ * ONE HUNDRED AND FOURTEEN KEYS: 113 OF THE 117 TABLES, PLUS ONE VIEW, AND THE
  * SET IS NOT A PHASE'S. ADR-092 makes the owner the RELATION: it is registered
  * ONCE by the first session that needs it, the registration is never re-argued,
  * and a session computes its own slice from `TABLE_KEYS` on the tree it opened
@@ -464,6 +466,28 @@ export const TABLES = {
   // taken. It clears the FIRST of `useAffiliateDeps`' obstructions and leaves
   // the other three standing.
   affiliateStatements,
+  // ADR-237. THE OPERATOR DIRECTORY, AND BOTH KEYS ARE REGISTERED BY THE
+  // SESSION THAT WROTE THE DDL, which is `payout_destinations`' and
+  // `reconciliation_runs`' shape rather than `live_account_state`'s. The
+  // argument for taking it now rather than leaving it to the reader is stated
+  // rather than assumed: the next slice on this path is the one that mints an
+  // operator session, it needs BOTH relations on its first line, and leaving
+  // them unregistered would make it open `packages/db` for a transcription this
+  // session has already done.
+  //
+  // FIRM ON BOTH, AND THE DDL SETTLES IT ON ADR-199's PREDICATE rather than on
+  // a fresh argument: no column of either row is declared against
+  // `identities(id)` or `accounts(id)`, so `owned`, `pair` and `either` have
+  // nothing to name and `root` is `identities`' alone.
+  //
+  // THE AVAILABLE MISTAKE IS `derived via users` ON `operators`, AND `0042`
+  // IS WHAT SUGGESTS IT: `impersonation_sessions.admin_user_id` REFERENCES
+  // `users(id)`, so the estate already contains one modelling of an operator as
+  // a trader-side row. `0073` declares no such column and ADR-237 section 6
+  // refuses the edge, so there is nothing here for a derived rule to traverse
+  // and a rule written through it would not compile.
+  operators,
+  operatorSessions,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -1466,6 +1490,16 @@ export const SCOPE_RULES = {
   reserveCoverageSnapshots: {
     class: 'firm',
     why: "THE FIRM'S RESERVE AGAINST THE FIRM'S OWN FLOOR (0049_reserve_coverage_snapshots.sql, ADR-128, ADR-199). `reserve / CVaR99 at rho = 0.30`, the ratio that pauses NEW SALES below 1.0 and never pauses payouts, and it is `liability_snapshots`' reason arriving on a different surface: a per-identity slice of a firm-wide coverage RATIO is not a smaller version of it, because the denominator is one CVaR99 computed over the whole book and dividing a person's share by it produces a number nothing in the corpus defines. THE CLASS IS SETTLED BY THE DDL RATHER THAN BY THAT ARGUMENT: the row declares NO column against `identities(id)` at all, which is what the suite's own firm assertion reads, so `owned`, `pair` and `either` have no column to name and `root` is `identities`' alone. `treasury_account_code`/`treasury_as_of` ARE THE AVAILABLE MISTAKE AND THEY ARE REFUSED THREE TIMES OVER. They are the only edge off this row, and a `derived` rule through them CANNOT BE WRITTEN, because `reserve_coverage_snapshots_anchor_fk` is COMPOSITE -- `(treasury_account_code, treasury_as_of)` against `treasury_balances(account_code, as_of)` -- and `DerivedRule` names ONE `localColumn` against ONE `foreignColumn`, which is `correlation_groups`' `uuid[]` objection arriving from the other direction. Naming the code alone would compile and MULTIPLY ROWS, since `account_code` is one half of that table's key and repeats once per attestation instant. And it would terminate nowhere in any case: `treasury_balances` is itself `firm`, so the chain ends at a table with no identity, which is `affiliate_commissions`' refusal in a second dress. REGISTERING THE TABLE MAKES IT READABLE AND NOTHING ELSE, which is `events`' sentence on the first table whose content is a DISCLOSURE hazard rather than a tenancy one: M12's `AS-M12-04` rules the coverage ratio unpublishable because a falling RCR is a bank-run mechanic, and that is a PROJECTION and never this rule, exactly as ADR-191 section 6 divides them. WHAT `firmDb()` READS IT WITH IS NARROWER THAN THE RULE, and 0050's lesson applies to a table that IS readable: `0049` REVOKEs UPDATE and DELETE from `merit_app` and PUBLIC, so the role holds SELECT and INSERT and a correctly classed DELETE still fails at the database; `merit_analytics` is deliberately granted nothing, so the firm's reserve position is off M13's surface until a consumer names itself.",
+  },
+
+  operators: {
+    class: 'firm',
+    why: "MERIT'S RECORD OF ITS OWN OPERATORS, ONE ROW PER PERSON WHO MAY ACT ON THE ADMIN SURFACE (0073_operator_directory.sql, ADR-237). The DDL settles the class and no judgement is added to it: the row declares NO column against `identities(id)` and none against `accounts(id)`, so `owned`, `pair` and `either` have nothing to name and `root` is `identities`' alone. THE ROW IS ABOUT AN EMPLOYEE OF THE FIRM AND NEVER ABOUT A TRADER, which is `admin_actions`' own rule one table over: the audience for a record of who Merit let act is an auditor, and a scoped read that returned an operator to the identity they acted upon would answer a question nobody asked with a name nobody may have. THE AVAILABLE MISTAKE IS `derived` VIA `users` AND `0042` IS WHAT SUGGESTS IT: `impersonation_sessions.admin_user_id uuid NOT NULL REFERENCES users(id)` already models an operator as a trader-side row, so a reader arriving from that table expects the same edge here. IT IS REFUSED IN THE DDL RATHER THAN IN REVIEW: `0073` declares no `user_id`, ADR-237 section 6 states why (a `users` row is authenticable by an emailed OTP, which is a login this deployable can mint at the C-08 door), and `DerivedRule` therefore has no edge to name. `idp_issuer` and `idp_subject` reach a provider rather than a person in this schema, and `actor` is the string `admin_actions` carries, not a key into any identity table.",
+  },
+
+  operatorSessions: {
+    class: 'firm',
+    why: "ONE OPERATOR SESSION, AND IT REACHES THE FIRM'S OWN DIRECTORY RATHER THAN ANY IDENTITY (0073_operator_directory.sql, ADR-237). `operator_id uuid NOT NULL REFERENCES operators(id)` is the only foreign key on the row and `operators` is FIRM, so a `derived` rule through it would compile at every call site -- `DerivedRule.via` is `TableKey` and includes every firm key -- and throw the first time anybody read the table, which is `raw_ingest_rows`' trap on a second estate. The row declares no column against `identities(id)` or `accounts(id)` at all. THE SHAPE IS `sessions`' AND THE CLASS IS THE OPPOSITE ONE, which is the distinction worth writing down: `sessions` is `derived` via `users` because a trader session belongs to a login that belongs to a person, and an operator session belongs to an employee, so the identical column layout carries opposite tenancy. NOTHING IN THIS REPOSITORY WRITES A ROW HERE and registering the relation does not change that: the minter needs the C-08 identity provider, and a registration makes a table READABLE rather than fillable.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
