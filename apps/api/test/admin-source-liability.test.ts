@@ -784,7 +784,7 @@ describe('blocker B3: per_plan[].cusum, ruled ABSENT and given a wire shape for 
   });
 });
 
-describe('blocker B4: integrations.recon.last_run_at, a run nothing records', () => {
+describe('blocker B4: integrations.recon.last_run_at, LIFTED -- a run IS recorded and IS read', () => {
   it('has per-account recon events and no run event, which is the fold ADR-199 refuses', () => {
     // ADR-199 section 5 refuses `max(rule_states.computed_at)` for the batch
     // because OVERVIEW section 5.2 makes the run resumable at the account
@@ -834,21 +834,47 @@ describe('blocker B4: integrations.recon.last_run_at, a run nothing records', ()
     );
   });
 
-  // WHAT B4 STILL HOLDS, AND IT IS NOT THE SCHEMA. Two things stand between this
-  // record and a produced `last_run_at`, and neither is a migration: a producer
-  // that writes the row (`apps/worker`, which reaches neither this package's
-  // producer nor this adapter today), and the reader here. The event named in
-  // the case above is a THIRD thing and is owed to a frozen document rather than
-  // to this field: the data-model README section 1 says a mutable table emits an
-  // event on every meaningful transition, and EVENTS section 5.3 has no
-  // `recon.completed` to emit.
+  // **B4 IS LIFTED AND THIS CASE IS INVERTED IN THE DIFF THAT LIFTED IT.** It
+  // read "is still blocked on a reader, which is what the record does not
+  // supply", and it asserted the adapter named no `reconciliationRuns` and
+  // carried `'last_run_at'` only as a string inside a type subtraction. Session
+  // 374 named two things standing between the record and the field, neither of
+  // them a migration: a PRODUCER that writes the row, and the READER here.
+  // Session 387 wrote the producer (`apps/worker/src/recon/sweep.ts`); this
+  // session wrote the reader. A clearing condition fires ONCE and the session
+  // that lifts the blocker spends it.
   //
-  // THIS CASE IS THE NEXT CLEARING CONDITION and it goes red the day the adapter
-  // produces the field, which is the day this whole describe block should be
-  // re-derived rather than edited.
-  it('is still blocked on a reader, which is what the record does not supply', () => {
+  // WHAT THE CASE HOLDS NOW IS THE PROPERTY WORTH HOLDING AFTER THE LIFT, and it
+  // is not "a reader exists". It is that the reader takes the newest COMPLETED
+  // run, which is `reconciliation_runs_completed_is_whole`'s own stated reader
+  // and the only reading under which `0064` clears what `max(reconciliations.
+  // created_at)` could not. A later edit that drops the predicate would put the
+  // `started_at` of a sweep that died at account 2,341 of 5,000 on the panel
+  // P-M6-09 gates the page with, and it fails here.
+  it('has a reader now, and the reader takes the newest COMPLETED run', () => {
     const book = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
-    expect(book).toContain("'last_run_at'");
-    expect(book).not.toContain('reconciliationRuns');
+    expect(book).toContain('reconciliationRuns');
+    expect(book).toContain("rowsWhere('reconciliationRuns', { status: 'completed' })");
+    expect(book).toContain("latestInstant(completedRuns, 'startedAt'");
+    // AND THE COLUMN IS THE ONE `0064` NAMES FOR THIS FIELD, which is the half a
+    // reader of the predicate alone would not check. `finished_at` is a
+    // different instant and the index the migration attaches to the panel's read
+    // is on `started_at`.
+    expect(readFileSync(join(MIGRATIONS, '0064_reconciliation_runs.sql'), 'utf8')).toContain(
+      "-- The panel's read, which is `integrations.recon.last_run_at`: the newest run,",
+    );
+    expect(book).not.toContain("latestInstant(completedRuns, 'finishedAt'");
+  });
+
+  // THE EVENT IS A THIRD THING AND IT IS STILL OWED, which is stated as its own
+  // case so the lift above does not read as closing it. `data-model/README`
+  // section 1 says a mutable table emits an event on every meaningful
+  // transition; EVENTS section 5.3 has no `recon.completed` to emit. That is an
+  // amendment to a frozen document and therefore an ADR, and it blocks no field
+  // on this response.
+  it('CLEARING CONDITION: `recon.completed` reaches EVENTS section 5.3', () => {
+    expect(readFileSync(join(ROOT, 'docs/architecture/EVENTS.md'), 'utf8')).not.toContain(
+      'recon.completed',
+    );
   });
 });
