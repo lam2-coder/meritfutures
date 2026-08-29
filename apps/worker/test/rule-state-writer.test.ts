@@ -53,6 +53,7 @@ import type { EngineGateResults } from '@merit/rules-engine';
 
 import { foldAccountDay } from '../src/batch/nightly.ts';
 import type { RuleStateRow } from '../src/batch/ports.ts';
+import { ENGINE_GATE_LEAVES } from '../src/batch/state-hash.ts';
 import {
   RULE_STATE_WRITE_COLUMNS,
   RULE_STATE_WRITE_TABLES,
@@ -60,6 +61,7 @@ import {
   RuleStateEncodingRefusal,
   RuleStateWriterUnwired,
   UNWIRED_RULE_STATE_WRITER_IO,
+  encodeEngineGates,
   refuseUnstorableJson,
   ruleStateValues,
   writeRuleStateVia,
@@ -100,13 +102,6 @@ function foldedRow(): RuleStateRow {
   return fold.row;
 }
 
-/** A stand-in encoding. NOT A RULING and deliberately not the only one used. */
-const ENCODE_FLAT = (gates: EngineGateResults): unknown => ({
-  'tradedDays.pass': gates.tradedDays.pass,
-  'buffer.needCents': gates.buffer.needCents.toString(10),
-  'cadenceGap.nextEligibleTradingDay': gates.cadenceGap.nextEligibleTradingDay,
-});
-
 interface Recorded {
   readonly key: string;
   readonly values: RuleStateValues;
@@ -137,7 +132,6 @@ function recorder(options: {
         state.transactions += 1;
         return fn(tx);
       },
-      encodeEngineGates: options.encode ?? ENCODE_FLAT,
     },
     inserts,
     get transactions() {
@@ -200,7 +194,7 @@ describe('1. the column set is the schema’s and not this writer’s', () => {
   });
 
   test('1.3 the values object names those columns and no others', () => {
-    const values = ruleStateValues(foldedRow(), ENCODE_FLAT);
+    const values = ruleStateValues(foldedRow());
     expect(Object.keys(values).sort()).toEqual([...RULE_STATE_WRITE_COLUMNS].sort());
     expect(RULE_STATE_WRITE_COLUMNS).toHaveLength(23);
   });
@@ -217,7 +211,7 @@ describe('1. the column set is the schema’s and not this writer’s', () => {
 describe('2. the mapping carries the fold’s values through unchanged', () => {
   test('2.1 the eighteen plain columns are the row’s own values, by identity', () => {
     const row = foldedRow();
-    const values = ruleStateValues(row, ENCODE_FLAT);
+    const values = ruleStateValues(row);
     expect(values.accountId).toBe(row.accountId);
     expect(values.tradingDay).toBe(row.tradingDay);
     expect(values.phase).toBe(row.phase);
@@ -240,7 +234,7 @@ describe('2. the mapping carries the fold’s values through unchanged', () => {
   });
 
   test('2.2 every cents column stays a bigint, so no money crosses through a float', () => {
-    const values = ruleStateValues(foldedRow(), ENCODE_FLAT);
+    const values = ruleStateValues(foldedRow());
     for (const column of [
       'floorCents',
       'floorOpenCents',
@@ -259,13 +253,13 @@ describe('2. the mapping carries the fold’s values through unchanged', () => {
     // from a round trip is a different serializer. Identity is the strongest
     // form of that: a re-derivation would be equal and not the same object.
     const row = foldedRow();
-    expect(ruleStateValues(row, ENCODE_FLAT).stateHash).toBe(row.stateHash);
+    expect(ruleStateValues(row).stateHash).toBe(row.stateHash);
     expect(row.stateHash).toHaveLength(32);
   });
 
   test('2.4 contextGates goes to the column as it stands, and it is the engine’s five', () => {
     const row = foldedRow();
-    const values = ruleStateValues(row, ENCODE_FLAT);
+    const values = ruleStateValues(row);
     expect(values.contextGates).toBe(row.contextGates);
     // `0015`'s column comment names FOUR ("freeze, recon_blocked, KYC,
     // in-flight") and `ports.ts` rules the engine's five stored instead. The
@@ -281,29 +275,18 @@ describe('2. the mapping carries the fold’s values through unchanged', () => {
 
   test('2.5 calendarRevisionId becomes the column’s own type, and null stays null', () => {
     const row = foldedRow();
-    expect(ruleStateValues(row, ENCODE_FLAT).calendarRevisionId).toBe(1n);
-    expect(
-      ruleStateValues({ ...row, calendarRevisionId: null }, ENCODE_FLAT).calendarRevisionId,
-    ).toBeNull();
+    expect(ruleStateValues(row).calendarRevisionId).toBe(1n);
+    expect(ruleStateValues({ ...row, calendarRevisionId: null }).calendarRevisionId).toBeNull();
     // A fractional revision id is refused at the boundary rather than sent.
     // `0035` makes `null` mean "the calendar had never been corrected", which
     // is NOT "unknown", so a value that cannot be a revision must not become
     // one.
-    expect(() => ruleStateValues({ ...row, calendarRevisionId: 1.5 }, ENCODE_FLAT)).toThrow(
-      RangeError,
-    );
+    expect(() => ruleStateValues({ ...row, calendarRevisionId: 1.5 })).toThrow(RangeError);
   });
 
-  test('2.6 the encoder is CALLED with the fold’s gates and its result is what lands', () => {
+  test('2.6 the fold’s own gates are what the mapping encodes', () => {
     const row = foldedRow();
-    const seen: EngineGateResults[] = [];
-    const values = ruleStateValues(row, (gates) => {
-      seen.push(gates);
-      return { marker: 'this encoding is a stand-in' };
-    });
-    expect(seen).toEqual([row.engineGates]);
-    expect(seen[0]).toBe(row.engineGates);
-    expect(values.engineGates).toEqual({ marker: 'this encoding is a stand-in' });
+    expect(ruleStateValues(row).engineGates).toEqual(encodeEngineGates(row.engineGates));
   });
 });
 
@@ -401,12 +384,129 @@ describe('3. the guard refuses what JSON.stringify throws on, drops or changes',
     } as unknown as RuleStateRow;
     let raised: unknown;
     try {
-      ruleStateValues(poisoned, ENCODE_FLAT);
+      ruleStateValues(poisoned);
     } catch (error) {
       raised = error;
     }
     expect(raised).toBeInstanceOf(RuleStateEncodingRefusal);
     expect((raised as RuleStateEncodingRefusal).column).toBe('context_gates');
+  });
+});
+
+// =============================================================================
+// 3b. `ADR-206`: THE RULED ENCODING
+// =============================================================================
+// Term 2 of `B5` landed while this branch was open. These cases are the ruling
+// as assertions, and the first is the one this module cannot make about itself.
+
+/** Every dotted leaf path of a bag, deepest-first order irrelevant. */
+function dottedLeaves(value: unknown, prefix = ''): string[] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return [prefix];
+  return Object.entries(value).flatMap(([key, member]) =>
+    dottedLeaves(member, prefix === '' ? key : `${prefix}.${key}`),
+  );
+}
+
+describe('3b. the stored bag is ADR-206’s, leaf for leaf', () => {
+  test('3b.1 THE LEAF SET IS `ENGINE_GATE_LEAVES`, IN BOTH DIRECTIONS', () => {
+    // `ADR-206` ruling 1: the leaves "are exactly `ENGINE_GATE_LEAVES`' dotted
+    // paths". THE ENCODER IS WRITTEN OUT LEAF BY LEAF, on `M01` section 1.4's
+    // ban on key iteration that affects output, so nothing inside that function
+    // can notice a leaf added to a gate interface. This case is what does: a
+    // new member of `WinDaysGate` appears in the hash's list and not in the bag,
+    // and the column would sit one field short of the `state_hash` beside it.
+    const produced = dottedLeaves(encodeEngineGates(foldedRow().engineGates)).sort();
+    const declared = ENGINE_GATE_LEAVES.map((leaf) => leaf.path).sort();
+    // NON-VACUITY: twenty-five is the count `ADR-206` and `hash.ts` both state.
+    expect(declared).toHaveLength(25);
+    expect(produced).toEqual(declared);
+  });
+
+  test('3b.2 the SEVEN cents leaves are base-10 strings and nothing else is', () => {
+    // Ruling 3, and the seven are named in it. A JSON number here round-trips
+    // through the read port and loses its low digits past 2^53 - 1, which is
+    // that entry's section 5 measured on a real row.
+    const bag = encodeEngineGates(foldedRow().engineGates);
+    const strings = dottedLeaves(bag).filter((path) => path.endsWith('Cents'));
+    expect(strings.sort()).toEqual(
+      [
+        'buffer.haveCents',
+        'buffer.needCents',
+        'consistency.profitNeededToDiluteCents',
+        'minimumAmount.capCents',
+        'minimumAmount.minPayoutCents',
+        'minimumAmount.withdrawableCents',
+        'winDays.floorCents',
+      ].sort(),
+    );
+    expect(typeof bag.buffer.needCents).toBe('string');
+    expect(typeof bag.minimumAmount.capCents).toBe('string');
+    expect(bag.buffer.needCents).toBe(foldedRow().engineGates.buffer.needCents.toString(10));
+  });
+
+  test('3b.3 a Cents past 2^53 - 1 survives the encoding EXACTLY', () => {
+    // THE WHOLE REASON RULING 3 CHOSE STRINGS, as a value rather than as an
+    // argument. `Number(9_007_199_254_740_993n)` is 9007199254740992.
+    const row = foldedRow();
+    const huge = 9_007_199_254_740_993n;
+    const bag = encodeEngineGates({
+      ...row.engineGates,
+      minimumAmount: { ...row.engineGates.minimumAmount, capCents: huge },
+    });
+    expect(bag.minimumAmount.capCents).toBe('9007199254740993');
+    expect(BigInt(bag.minimumAmount.capCents)).toBe(huge);
+    // The direction ruling 3 refuses, shown losing the value on the same input.
+    expect(BigInt(Number(huge))).not.toBe(huge);
+  });
+
+  test('3b.4 `null` is JSON null and never the hash’s sentinel', () => {
+    // Ruling 4. `hash.ts` renders an absent leaf as a sentinel because a hash
+    // needs one; a `jsonb` bag has a real null and using the sentinel would
+    // store the string that means "absent" as a value.
+    const row = foldedRow();
+    const bag = encodeEngineGates({
+      ...row.engineGates,
+      consistency: { ...row.engineGates.consistency, bestDayShareBp: null, maxDayShareBp: null },
+      cadenceGap: {
+        ...row.engineGates.cadenceGap,
+        tradingDaysSinceLastPayout: null,
+        nextEligibleTradingDay: null,
+      },
+    });
+    expect(bag.consistency.bestDayShareBp).toBeNull();
+    expect(bag.cadenceGap.nextEligibleTradingDay).toBeNull();
+    expect(JSON.stringify(bag)).not.toContain('~null');
+    expect(JSON.parse(JSON.stringify(bag))).toEqual(bag);
+  });
+
+  test('3b.5 `skipped` is on THREE groups and no others, and no context gate is here', () => {
+    // Ruling 5 is the interface's shape rather than an omission: `CV-19` gives
+    // a not-evaluated gate `pass: true, skipped: true`, and the other three
+    // groups are always evaluated. And `INV-23` is why the four `R-40` context
+    // gates are absent: `SD-06` split the column in two so the replayed half
+    // carries nothing that "was true on the day and may not be true now".
+    const bag = encodeEngineGates(foldedRow().engineGates);
+    expect(
+      dottedLeaves(bag)
+        .filter((p) => p.endsWith('.skipped'))
+        .sort(),
+    ).toEqual(['cadenceGap.skipped', 'consistency.skipped', 'tradedDays.skipped']);
+    expect(Object.keys(bag).sort()).toEqual([
+      'buffer',
+      'cadenceGap',
+      'consistency',
+      'minimumAmount',
+      'tradedDays',
+      'winDays',
+    ]);
+    for (const contextGate of ['accountActive', 'kycVerified', 'notFrozen', 'reconClear'])
+      expect(JSON.stringify(bag)).not.toContain(contextGate);
+  });
+
+  test('3b.6 the bag the guard sees is storable, which is the two rulings meeting', () => {
+    expect(() => {
+      refuseUnstorableJson('engine_gates', encodeEngineGates(foldedRow().engineGates));
+    }).not.toThrow();
   });
 });
 
@@ -427,27 +527,20 @@ describe('4. the write names one table, takes one transaction, and checks it hap
     const row = foldedRow();
     const rec = recorder({});
     await writeRuleStateVia(rec.io)(row);
-    expect(rec.inserts[0]?.values).toEqual(ruleStateValues(row, ENCODE_FLAT));
+    expect(rec.inserts[0]?.values).toEqual(ruleStateValues(row));
   });
 
-  test('4.3 TWO callers with TWO encodings both write, and the writer chooses NEITHER', async () => {
-    // **THE CASE THAT SAYS WHAT THIS SLICE DID NOT DO.** `B5` term 2 is a
-    // primary source declaring the stored `engine_gates` encoding and this
-    // session held no number for it. A writer that had quietly picked one would
-    // pass every other case in this file.
+  test('4.3 what reaches the column is `ADR-206`s bag, unchanged by the write path', async () => {
+    // **THIS CASE USED TO SAY THE OPPOSITE AND THE INVERSION IS RECORDED.** It
+    // read "TWO callers with TWO encodings both write, and the writer chooses
+    // NEITHER", and it drove the writer twice through an injected encoder to
+    // prove this slice had not pre-empted `B5` term 2. `ADR-206` ruled the
+    // encoding while the branch was open, so what has to be asserted now is the
+    // opposite: that the ONE ruled bag is what the transaction sees.
     const row = foldedRow();
-    const flat = recorder({ encode: ENCODE_FLAT });
-    const nested = recorder({
-      encode: (g) => ({ buffer: { need_cents: Number(g.buffer.needCents) } }),
-    });
-    await writeRuleStateVia(flat.io)(row);
-    await writeRuleStateVia(nested.io)(row);
-    expect(flat.inserts[0]?.values.engineGates).not.toEqual(nested.inserts[0]?.values.engineGates);
-    // And every OTHER column is identical across the two, which is what makes
-    // the difference the encoding rather than the row.
-    for (const column of RULE_STATE_WRITE_COLUMNS)
-      if (column !== 'engineGates')
-        expect(flat.inserts[0]?.values[column]).toEqual(nested.inserts[0]?.values[column]);
+    const rec = recorder({});
+    await writeRuleStateVia(rec.io)(row);
+    expect(rec.inserts[0]?.values.engineGates).toEqual(encodeEngineGates(row.engineGates));
   });
 
   test('4.4 an insert that wrote no row is a refusal, not a success', async () => {
@@ -455,12 +548,21 @@ describe('4. the write names one table, takes one transaction, and checks it hap
     await expect(writeRuleStateVia(rec.io)(foldedRow())).rejects.toThrow(/returned 0 rows/);
   });
 
-  test('4.5 a bad encoding stops BEFORE the transaction opens', async () => {
+  test('4.5 an unstorable bag stops BEFORE the transaction opens', async () => {
     // The guard runs in the mapping and the mapping runs before `transact`, so
-    // a deployment with a broken encoder never reaches the database at all.
-    // Measured live as well: rows before 3, rows after 3.
-    const rec = recorder({ encode: (g) => ({ leak: g.buffer.needCents }) });
-    await expect(writeRuleStateVia(rec.io)(foldedRow())).rejects.toBeInstanceOf(
+    // a row the column cannot hold never reaches the database at all. Measured
+    // live as well, when the encoding was still injected: rows before 3, after 3.
+    //
+    // THE SEED IS ON `context_gates`, WHICH IS THE HALF STILL REACHED WITHOUT AN
+    // ENCODER. `engine_gates` is now `ADR-206`'s and case 3.x seeds the guard
+    // directly; this case is about the ORDER of the two steps.
+    const row = foldedRow();
+    const poisoned = {
+      ...row,
+      contextGates: { ...row.contextGates, leakedCents: 1n },
+    } as unknown as RuleStateRow;
+    const rec = recorder({});
+    await expect(writeRuleStateVia(rec.io)(poisoned)).rejects.toBeInstanceOf(
       RuleStateEncodingRefusal,
     );
     expect(rec.transactions).toBe(0);
@@ -538,40 +640,35 @@ describe('5. every refusal is typed and names what a reader needs', () => {
     await expect(writeRuleStateVia(rec.io)(foldedRow())).rejects.toBe(b);
   });
 
-  test('5.5 the unwired default serves neither member, and both are typed', async () => {
+  test('5.5 the unwired default serves nothing, and the refusal is typed', async () => {
     await expect(
       writeRuleStateVia(UNWIRED_RULE_STATE_WRITER_IO)(foldedRow()),
     ).rejects.toBeInstanceOf(RuleStateWriterUnwired);
-    // AND THE ENCODER IS THE ONE THAT REFUSES FIRST, which is the whole point:
-    // a deployment that installed a door and no encoding must not write.
-    expect(() => UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates(foldedRow().engineGates)).toThrow(
-      /encodeEngineGates/,
-    );
     await expect(UNWIRED_RULE_STATE_WRITER_IO.transact(async () => 1)).rejects.toThrow(/transact/);
+    // ONE MEMBER, AND IT USED TO BE TWO. `encodeEngineGates` was on this `Io`
+    // while `B5` term 2 was open; `ADR-206` ruled the encoding and the seam is
+    // gone rather than left standing with a supplier it declines to use.
+    expect(Object.keys(UNWIRED_RULE_STATE_WRITER_IO)).toEqual(['transact']);
   });
 
-  test('5.6 no encoding for engine_gates ships in this deployable’s source', async () => {
-    // `B5` TERM 2 IS NOT CLEARED HERE AND THIS IS THE MECHANICAL FORM OF THAT.
-    // The only `encodeEngineGates` implementation under `src/` is the unwired
-    // refusal; every other one in this workspace is a test's or a probe's.
-    // THE PREDICATE IS "HOW MANY `RuleStateWriterIo` VALUES DOES THIS
-    // DEPLOYABLE'S SOURCE HOLD", swept over `src/` rather than over this one
-    // file, because the file an encoder would arrive in is the file nobody has
-    // written yet. A COUNT OF THE WORD `encodeEngineGates` WAS THE FIRST DRAFT
-    // AND IT WAS WRONG IN BOTH DIRECTIONS: it counted the mapping's own
-    // parameter, which is where an encoding ARRIVES rather than where one is
-    // written, and it would have missed an installed `Io` assembled field by
-    // field.
+  test('5.6 there is ONE engine_gates encoding in this deployable and it is not injectable', () => {
+    // **THE PREDICATE INVERTED WITH `ADR-206` AND THE OLD ONE IS RECORDED.** It
+    // read "no encoding for `engine_gates` ships in this deployable's source"
+    // and swept `src/` for a second `RuleStateWriterIo` value, because while
+    // term 2 was open the correct number of encodings here was ZERO. It is now
+    // exactly ONE, and what matters is that nothing can supply a second: an
+    // `Io` member would let a deployment install one, and there is no longer a
+    // member to install it into.
     const declarations: string[] = [];
     for (const file of sourceFiles())
       for (const match of readFileSync(file, 'utf8').matchAll(
-        /export const (\w+): RuleStateWriterIo =/g,
+        /export function (\w+)\(gates: EngineGateResults\)/g,
       ))
         declarations.push(match[1] ?? '');
-    expect(declarations, 'a second RuleStateWriterIo value ships in src/').toEqual([
-      'UNWIRED_RULE_STATE_WRITER_IO',
+    expect(declarations, 'a second engine_gates encoder ships in src/').toEqual([
+      'encodeEngineGates',
     ]);
-    expect(readFileSync(WRITER, 'utf8')).toContain('throw new RuleStateWriterUnwired');
+    expect(readFileSync(WRITER, 'utf8')).not.toContain('encodeEngineGates:');
   });
 });
 

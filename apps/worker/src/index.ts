@@ -215,11 +215,16 @@ export type {
 // silent stubs would be a batch whose audit channel is a no-op, so no such
 // composition exists and this leg exports the one method it can serve.
 //
-// **TERM 2 IS UNCLEARED AND THE SEAM IS ITS SHAPE.** No primary source declares
-// what `rule_states.engine_gates` holds: `EngineGateResults` types four leaves
-// `bigint`, which JSON cannot carry, and `state-hash.ts` says in terms that its
-// canonical serialization is NOT the column. So `RuleStateWriterIo` takes the
-// encoding as a parameter and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name.
+// **TERM 2 WAS UNCLEARED WHILE THIS LEG WAS WRITTEN AND `ADR-206` CLEARED IT
+// WHILE THE BRANCH WAS OPEN.** This paragraph read: "No primary source declares
+// what `rule_states.engine_gates` holds ... So `RuleStateWriterIo` takes the
+// encoding as a parameter and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by
+// name." **THE PREMISE WAS TRUE AND IS SPENT.** `ADR-206` rules the bag to be
+// the engine's own value, six groups and twenty-five leaves in the engine's
+// names with every cents leaf a base-10 string, so `encodeEngineGates` below is
+// that ruling as code and the `Io` is down to one member. The leaf set is bound
+// to `ENGINE_GATE_LEAVES` by a case rather than re-typed, on ruling 1's own
+// words.
 export {
   RULE_STATE_WRITE_COLUMNS,
   RULE_STATE_WRITE_TABLES,
@@ -227,6 +232,7 @@ export {
   RuleStateEncodingRefusal,
   RuleStateWriterUnwired,
   UNWIRED_RULE_STATE_WRITER_IO,
+  encodeEngineGates,
   refuseUnstorableJson,
   ruleStateValues,
   writeRuleStateVia,
@@ -237,6 +243,7 @@ export type {
   RuleStateWriteColumn,
   RuleStateWriteTable,
   RuleStateWriterIo,
+  StoredEngineGates,
 } from './batch/state-writer.ts';
 
 // INV-04's comparison. `ENGINE_GATE_LEAVES` is exported above beside it because
