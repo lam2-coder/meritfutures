@@ -349,7 +349,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
     'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
     'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
-    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2686`) declares it while ' +
+    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2693`) declares it while ' +
     '`affiliateStatements` (`packages/db/src/scope.ts:1046`) registers it `derived` through ' +
     '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
     '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
@@ -363,7 +363,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ONE THING, AND THIS ENTRY USED TO NAME TWO. It read that the view the port reads is in ' +
     'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
     'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
-    '(`packages/db/src/schema.ts:2379`) declares `economic_calendar_current` and ' +
+    '(`packages/db/src/schema.ts:2386`) declares `economic_calendar_current` and ' +
     '`economicCalendarCurrent` (`packages/db/src/scope.ts:963`) classes it `firm`, so it is a ' +
     '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
     '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +
@@ -388,9 +388,21 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'SECTION of the contract. Composing a string here would invent both the origin ADR-012 keeps ' +
     'out of this repository and a path no approved document defines.',
   useCertificateImageSource:
-    'a door neither of the two serves. The row is read UNAUTHENTICATED, so `scoped` has no ' +
-    'identity to open with, and `certificates` is scope class `owned`, so `firm` refuses the key ' +
-    'AT COMPILE TIME. The port states this itself at `routes/certificates.ts:944-948`.',
+    'THE REASON HERE WAS THE DOOR AND ADR-231 BUILT IT, so the entry is REPLACED rather than ' +
+    'deleted and the obstruction that remains is a different one. It read: "a door neither of ' +
+    'the two serves. The row is read UNAUTHENTICATED, so `scoped` has no identity to open with, ' +
+    'and `certificates` is scope class `owned`, so `firm` refuses the key AT COMPILE TIME." ' +
+    'THAT IS NO LONGER THE BLOCKER. `db.publicLookup` reads `certificates` by `code` for a ' +
+    'caller who will never be anybody (`PUBLIC_LOOKUP_ADDRESS`), and `GET /verify/:code` is ' +
+    "wired over it in `start.ts` today, so BOTH of this port's database arms are " +
+    'constructible: `record` writes `certificate_verifications`, scope class `firm`, exactly as ' +
+    '`databaseVerifySource` does. WHAT BLOCKS THIS ROW IS THAT ITS ANSWER IS NOT A ROW, IT IS ' +
+    'BYTES. `CertificateLookup.card` carries `image/png` bytes ' +
+    '(`routes/certificates.ts:909-923`) and this file\'s own header says the renderer "is not ' +
+    'in this repository" (`routes/certificates.ts:44`). An adapter written here would have to ' +
+    'invent a card, and a public endpoint serving an invented card is a worse failure than a ' +
+    "503: it puts Merit's name on an artefact Merit did not render. When a renderer lands this " +
+    'entry goes rather than shrinking.',
   useCertificateRevokeBackend:
     'TWO OBSTRUCTIONS, AND THE SECOND IS A CIRCULARITY RATHER THAN A MISSING DOOR. ' +
     '`principal(request)` (`routes/admin-certificates.ts:353`) resolves only through ' +
@@ -404,27 +416,17 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
     '(`packages/db/src/scope.ts:939`), so the audit half alone has a door and the subject half ' +
-    'does not, which is the same one-live-arm shape `useVerifySource` below refuses. THIRD, AND ' +
+    "does not, which is the one-live-arm shape this file refuses on `usePayoutBackend`'s stated " +
+    'rule. ADR-231 DOES NOT REACH THIS ONE AND THE REASON IS THE ADDRESS: `db.publicLookup` is ' +
+    'READ ONLY and its vocabulary is `certificates` by `code`, while this route locks and ' +
+    'updates, and addresses by `certificates.id`, which `PUBLIC_LOOKUP_ADDRESS` refuses ' +
+    'deliberately because `0020` keeps the two columns distinct so the public token can be ' +
+    'rotated. THIRD, AND ' +
     'it is configuration rather than a door: `presentation()` ' +
     "(`routes/admin-certificates.ts:363`) is `GET /verify/:code`'s copy, and the " +
     "`account_enforced` sentence is `OQ-M11-02`, still open. THIS ROUTE REVOKES A TRADER'S " +
     'PUBLIC PROOF; a backend that answered plausibly would be a fixture doing that to real ' +
     'people.',
-  useVerifySource:
-    'ONE ARM OF THREE, AND THE OTHER TWO ARE CONSTRUCTIBLE TODAY, WHICH IS WHY THIS ENTRY EXISTS ' +
-    'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:596`) reads `certificates`, ' +
-    'and `GET /verify/:code` is UNAUTHENTICATED, so `db.scoped` has no identity to open with; ' +
-    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:790`), and ' +
-    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1390-1392`), so ' +
-    '`db.firm` refuses that key AT COMPILE TIME. THE OTHER TWO ARMS HAVE WHAT THEY NEED: ' +
-    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1305`), so the ' +
-    '`record` arm is writable through `db.firm` now, and `presentation` is deployment ' +
-    'configuration rather than a read. A BACKEND WITH ONE LIVE ARM AND ONE THAT REJECTS IS ' +
-    "REFUSED HERE, on `usePayoutBackend`'s stated rule: it would put a live-looking public " +
-    "route in front of the arm that answers the caller, and this route answers `INV-M11-03`'s " +
-    '"no certificate with this code", which is a claim about Merit\'s book rather than about a ' +
-    'deployment. When `lookup` gets a door this entry shrinks to the copy rather than being ' +
-    'rewritten.',
   // ---------------------------------------------------------------------------
   // The cash door. THE REASON THAT STOOD HERE WAS FALSE AND IS REPLACED RATHER
   // THAN DELETED, because it was true when it was written. ADR-172.
@@ -562,5 +564,5 @@ test('the wired count is reported, so a regression is a number and not a paragra
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 24, wired: 6, blocked: 18 });
+  }).toStrictEqual({ declared: 24, wired: 7, blocked: 17 });
 });

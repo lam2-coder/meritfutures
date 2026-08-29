@@ -63,6 +63,7 @@ import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.t
 import { useAuthBackend } from './routes/auth.ts';
 import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
 import { databaseMethodDefinitions, setMethodDefinitionSource } from './routes/public-methods.ts';
+import { databaseVerifySource, useVerifySource } from './routes/verify.ts';
 import { databaseWalletBackend, useWalletBackend } from './routes/wallet.ts';
 
 useAuthBackend(databaseAuthBackend(LIVE_DB));
@@ -104,5 +105,29 @@ useWalletBackend(databaseWalletBackend(LIVE_DB));
 // compile with that key. Nothing is withheld here because there is no field an
 // identity filter would have had to remove.
 setMethodDefinitionSource(databaseMethodDefinitions(LIVE_DB));
+
+// `GET /verify/:code`, over the FIFTH DOOR and the FIRM one. ADR-231.
+//
+// THE PAGE A FUNDED TRADER SHOWS THE WORLD, and it answered 503 until the scope
+// system had a word for a public read of a row an identity owns. It has one now
+// and it is narrow on purpose: `db.publicLookup` reaches `certificates` by
+// `code` and nothing else, ever, by type. The trade this line does NOT make is
+// resolving the identity from the code and opening `db.scoped` with it, which
+// would have put an authority over that trader's payouts, accounts and wallet
+// behind an unauthenticated route in exchange for one column of one row.
+//
+// THE COPY AND THE FLOOR COME FROM THE ENVIRONMENT AND NOTHING IS DEFAULTED. A
+// deployment that has not set the seven variables answers 503 for every code
+// identically, before the lookup, which is `readPresentation`'s own reason: a
+// copy table read lazily would answer `unknown` in milliseconds and `valid` in a
+// refusal, and that is a hit-versus-miss oracle built out of a configuration
+// error. `INV-M11-03`'s unknown wording is NOT among them and cannot be set.
+//
+// THE CODE'S OWN STRENGTH IS NOT SETTLED BY THIS LINE and ADR-231 section 6 is
+// the finding: `certificates.code` carries no length or alphabet bound in DDL,
+// nothing in this repository issues a certificate, and `INV-M11-05`'s 128 bits
+// is a corpus commitment with no enforcement in this tree. This route is the
+// surface that would pay for that, and the fix lands where a code is minted.
+useVerifySource(databaseVerifySource(LIVE_DB));
 
 await main();
