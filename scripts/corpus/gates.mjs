@@ -1699,6 +1699,25 @@ const ci06h = {
           'the row closing a run, or that reconciliation health stays off the ' +
           'merit_analytics surface',
       ],
+      // 0067, ADR-216. THE VOCABULARY THIS COLUMN DID NOT HAVE FOR FIFTY-TWO
+      // MIGRATIONS. Deleting this step deletes the only assertion that
+      // rule_states.phase is still account_phase and not bare text again, and
+      // it takes FIVE ACCEPTANCE CASES with it. The failure mode here is the
+      // one an inventory of rejections cannot see: a vocabulary that fell
+      // behind a fifth Phase member makes a legitimate row unwritable while
+      // every refusal below still fires. Nothing in apps/ writes this table
+      // today -- B5 term 1 is still owed -- so nobody would find out.
+      [
+        'probe_rule_state_phase_vocabulary.sql',
+        "0067's phase vocabulary is no longer probed, so nothing asserts that " +
+          'rule_states.phase is still account_phase rather than bare text ' +
+          '(ADR-216), that all four engine Phase members are still writable, ' +
+          'that a nonsense phase, an empty phase and a case variant are each ' +
+          "refused, that 0048's rewrite_rule_state still writes this column " +
+          'through a rowtype, that account_phase still holds exactly the four ' +
+          'members in declaration order, or that no CHECK has re-listed a ' +
+          'vocabulary the type already carries',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);

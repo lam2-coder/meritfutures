@@ -786,18 +786,28 @@ export const dailyMarks = pgTable('daily_marks', {
 // `0035_rule_states_calendar_revision.sql` adds `calendar_revision_id`, which is
 // why this table needed ADR-094 before it could be registered at all.
 //
-// TWO COLUMNS ARE DELIBERATELY NOT AN ENUM AND NOT A NUMBER. `phase` is `text`
-// in the DDL even though `account_phase` exists as a type, and `state_hash` is
-// `bytea` with a CHECK that its length is 32. The transcription follows the DDL
-// in both cases; where the DDL and a neighbouring type disagree, the DDL wins,
-// because the DDL is the source and this file is the transcription.
+// `phase` IS `account_phase` FROM `0067` (ADR-216) AND WAS BARE `text` BEFORE
+// IT. This comment said the DDL and the type disagreed and that the DDL wins;
+// what it recorded was a DEFECT rather than a decision. `0001:45` had declared
+// `account_phase` as exactly the engine's four `Phase` members since the estate
+// began and `0015:47` typed this column `text` with no CHECK, so the table
+// replay compares against admitted ANY STRING as a phase, on a column that is
+// hash input 3. `0067` moves the column onto the type it should always have
+// carried; `0015` is not edited (constitution E2). The type IS the vocabulary
+// and there is no second copy of it here.
+//
+// `state_hash` IS STILL DELIBERATELY NOT A NUMBER OR AN ENUM: it is `bytea`
+// with a CHECK that its length is 32. There the transcription does follow the
+// DDL, which is the source and which this file transcribes.
 export const ruleStates = pgTable('rule_states', {
   id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
   accountId: uuid('account_id')
     .notNull()
     .references(() => accounts.id),
   tradingDay: date('trading_day').notNull(),
-  phase: text('phase').notNull(),
+  // 0067, ADR-216. `account_phase`, the type 0001:45 declares as the engine
+  // `Phase` union; `text` until then, admitting any string.
+  phase: accountPhase('phase').notNull(),
   floorCents: bigint('floor_cents', { mode: 'bigint' }).notNull(),
   floorLocked: boolean('floor_locked').notNull().default(false),
   floorOpenCents: bigint('floor_open_cents', { mode: 'bigint' }).notNull(),
