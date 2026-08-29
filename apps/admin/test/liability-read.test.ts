@@ -126,7 +126,7 @@ describe('M6-A-80: the narrowing is structural, and it names the field that fail
     expect(response.as_of).toBe('2026-08-28T00:00:00.000Z');
     expect(response.open_liability_cents).toBe(750_000);
     expect(response.absorbed_corrections_cents).toBe(-2_500);
-    expect(response.eligible_next_7d.by_day).toHaveLength(1);
+    expect(response.eligible_next_7d?.by_day).toHaveLength(1);
     expect(response.payout_velocity?.ratio_bp).toBe(13_333);
     expect(response.per_plan[0]?.cusum?.statistic).toBe(1.5);
     expect(response.reserve.treasury_source).toBe('provider_api');
@@ -402,7 +402,7 @@ describe('M6-A-83: what the projection supplies, and what it will not', () => {
     // DEP-M6-01's projection, which is the move `api/types.ts` argues against one
     // field down for `reserve`.
     expect(input.eligibleNextSevenDays).toBeUndefined();
-    expect(narrowLiabilityResponse(BODY()).eligible_next_7d.total_cents).toBe(300_000);
+    expect(narrowLiabilityResponse(BODY()).eligible_next_7d?.total_cents).toBe(300_000);
   });
 
   test('no trust signal is supplied, and the verdict is red on five missing', () => {

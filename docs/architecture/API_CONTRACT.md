@@ -901,7 +901,7 @@ type LiabilityResponse = {
   remaining_ladder_exposure_cents: number;       // AS-M6-04's third number, the upper bound on lifetime commitment
   absorbed_corrections_cents: number;            // P-M6-10. SIGNED, and the only signed figure on this response
   funded_accounts: number;
-  eligible_next_7d: { total_cents: number; account_count: number; by_day: Array<{ trading_day: string; cents: number; accounts: number }> };
+  eligible_next_7d: { total_cents: number; account_count: number; by_day: Array<{ trading_day: string; cents: number; accounts: number }> } | null;  // ADR-203 ruling 8, ADR-204 ruling 9. null when the horizon has no answer
   payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean } | null;
   reserve: { as_of: string; reserve_cents: number; cvar99_cents: number; rcr_bp: number; breaker_armed: boolean; treasury_account_code: string; treasury_as_of: string; treasury_source: "provider_api" | "manual_attestation" };
   per_plan: Array<{ plan_id: string; code: string; loss_ratio_bp: number; threshold_bp: number; sales_paused: boolean; cusum: { statistic: number; threshold: number; alarm: boolean } | null }>;
@@ -924,13 +924,23 @@ type LiabilityResponse = {
 
 **`reserve` carries its OWN `as_of` because it is a different table on a different clock.** `reserve_coverage_snapshots` is a ratio of the rail's balance ([M05](../plans/M05-payout-system.md) `SD-M5-03`) against ours, and [`data-model/liability_snapshots.md`](data-model/liability_snapshots.md) records that as the second reason the two were not one table: *"one row forces one `as_of` on two sources that do not move together"*. A response that dated both with the top-level `as_of` would re-collapse in the payload what the schema separated. `treasury_account_code`, `treasury_as_of` and `treasury_source` are the anchor `0049` stores as a reference; `P-M6-07` requires *"attestation staleness shown when the balance is a manual attestation"*, and `treasury_source` is the only field on this response that answers which of the two it is.
 
-#### A figure that is not there is a `null` whose reason is on the body ([ADR-203](../decisions/ADR-203.md), **AMENDED**)
+#### A figure that is not there is a `null` whose reason is on the body ([ADR-203](../decisions/ADR-203.md), **AMENDED**; [ADR-208](../decisions/ADR-208.md))
 
 **`payout_velocity` and `per_plan[].cusum` gained `| null`, and `gaps` was added.** Two producers now
 exist that understand their figure and cannot express it in the shape declared above, which is
 [ADR-203](../decisions/ADR-203.md)'s subject. The amendment is additive in the only direction that
 matters to a reader: no field is removed, no field is renamed, no member of a present object changes
 type, and the sum [ADR-188](../decisions/ADR-188.md) refuses to send is still not sent.
+
+**`eligible_next_7d` IS THE THIRD, AND [ADR-203](../decisions/ADR-203.md) RULING 8 NAMED IT WITHOUT
+MOVING IT.** That ruling reads *"`eligible_next_7d` TAKES THIS SHAPE -- `{...} | null` with a `gaps`
+entry naming it -- AND THE TWO CAUSES IT NEEDS ARE ALREADY IN THE VOCABULARY"*, and
+[ADR-208](../decisions/ADR-208.md) is the entry that makes the edit. The two causes are
+`insufficient_history` for an exhausted calendar and `estate_uncovered` for one that covers nothing,
+and they stay distinct on [ADR-042](../decisions/ADR-042.md) F-4's rule that only one of them is
+somebody's job today. **Neither is `awaiting_dependency`, so `awaiting` is `null` on this field's
+gap.** [ADR-204](../decisions/ADR-204.md) ruling 9 is what requires the shape: *"WHERE THE HORIZON HAS
+NO ANSWER, THE FIELD HAS NO VALUE"*.
 
 **THE KEY IS ALWAYS PRESENT AND `null` IS THE ABSENCE.** An optional key would make *"this figure is
 blocked and here is why"* and *"this deployment did not fill the field"* the same response, which is
@@ -1011,6 +1021,20 @@ outside the tree.
 
 ### GET /admin/eligible-forecast
 The eligible-payout forecast, projecting `LiabilityResponse.eligible_next_7d`. **Registered.**
+
+**IT DECLINES WITH A BODY AND NEVER WITH A 404** ([ADR-208](../decisions/ADR-208.md)). The field it
+projects is `| null` above, so this projection can be absent, and when it is the body carries the
+`null` together with the `gaps` entry explaining it, forwarded from `GET /admin/liability` rather than
+rebuilt. **The 404 is refused on this heading's own paragraph**: the two projections below are
+*"registered by nothing"* and answer 404 today, so on these three paths a 404 already means a route
+nobody has built, and *"the estate records no opinion about this period"* is the answer an operator
+has to act on rather than wait out.
+
+**The response body is deliberately NOT restated here.** It is `as_of`, the projected field and
+`gaps`, all three declared once in [`admin-reads.ts`](../../apps/api/src/routes/admin-reads.ts); a
+second copy in this document would be a shape no invariant binds, which is `RI-18`'s own subject and
+[ADR-185](../decisions/ADR-185.md)'s general form. This heading points at `LiabilityResponse` and that
+declaration is the one place the shape is fixed.
 
 ### GET /admin/loss-ratios
 Per-plan loss ratios, projecting the `loss_ratio_bp`, `threshold_bp` and `sales_paused` fields of
