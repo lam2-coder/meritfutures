@@ -178,7 +178,11 @@ import {
  * answer -- see the `EitherRule` docblock below.
  *
  * `identity_links`, `dedupe_matches` AND `attributions` ARE REGISTERED `pair`
- * AND ARE STILL UNREACHABLE THROUGH THE SCOPED ACCESSOR. Their absence from
+ * AND ARE STILL UNREADABLE THROUGH THE SCOPED ACCESSOR. THIS PARAGRAPH SAID
+ * "UNREACHABLE" AND ADR-230 IS WHY THE WORD MOVED: `attributions` is now
+ * WRITABLE by the buyer through `insertAsParty`, and the paragraph below is
+ * about what a read RETURNS, which is untouched. The other two are unreachable
+ * in both directions and their `writer` field says so with a reason. Their absence from
  * `ScopedTableKey` is now a CLASSIFICATION rather than a hole: they were
  * unregistered for four sessions because an `owned` rule names ONE column and
  * either choice returns a strict subset of a person's own rows, selected by
@@ -568,6 +572,37 @@ export interface DerivedRule {
  * detectors -- the only readers of `identity_links` the corpus names -- had no
  * door. They have `systemDb('operator-console')` now, and traders still have
  * none.
+ *
+ * ADR-230 ADDS A WRITE AND LEAVES EVERY SENTENCE ABOVE STANDING, AND THAT
+ * ASYMMETRY IS THE WHOLE OF THE NEW RULING. Everything above is about what a
+ * query RETURNS: the disclosure is the OTHER party's identity uuid arriving in a
+ * reader's hands out of a `NOT NULL` column. An INSERT hands the caller nothing
+ * -- the door is `Promise<void>` and builds no `RETURNING` clause at all -- and
+ * the counterparty it writes is a value the caller already held before it opened
+ * the transaction. So ADR-106's ground is not outweighed here, it is ABSENT,
+ * which is the shape ADR-191 already used to admit `either` to a key set `pair`
+ * is excluded from. `scopePredicate`'s `pair` branch still throws and
+ * `ScopedTableKey` still excludes every key in this class.
+ *
+ * `writer` IS THE PER-TABLE RULING AND IT IS REQUIRED, so a `pair` table
+ * registered after this one cannot acquire a write door by saying nothing. Two
+ * arms, both carrying a reason rather than a flag: `by: 'nobody'` leaves the
+ * table exactly where ADR-106 left it, and `by: 'party'` names WHICH of the two
+ * columns the writer must be. That column is STAMPED by the accessor out of the
+ * handle's own identity and REFUSED to the caller, which is
+ * `scopedInsertStatement`'s construction arriving on the one class that has a
+ * second identity column beside the stamped one. Every row the door can write
+ * therefore names the writer as a party, and a handler party to one pair cannot
+ * write a row for another -- not because it is checked, but because there is no
+ * parameter through which the writer's own column could be supplied.
+ *
+ * THE COUNTERPARTY IS THE CALLER'S AND THE DOOR VALIDATES NOTHING ABOUT IT,
+ * which is stated here rather than left to be assumed: this construction proves
+ * WHO IS WRITING and never who is being written about. `attributions` is where
+ * that matters twice, because its two columns MAY name one person on a voided
+ * row under `attributions_literal_self_deal_is_void` -- so a door that refused a
+ * counterparty equal to the writer would make the literal self-deal row
+ * UNWRITABLE and destroy the evidence SD-M8-05 exists to keep.
  */
 export interface PairRule {
   readonly class: 'pair';
@@ -575,8 +610,43 @@ export interface PairRule {
   readonly columnA: string;
   /** The other. Asserted DISTINCT from `columnA`, and both against the DDL. */
   readonly columnB: string;
+  /**
+   * WHETHER A REQUEST HANDLER MAY WRITE ONE OF THESE ROWS, AND AS WHICH PARTY.
+   * ADR-230.
+   *
+   * REQUIRED, on this file's own totality rule: a `pair` table registered after
+   * this entry answers the question or does not compile. The answer is not
+   * derivable from the DDL -- both columns are `uuid NOT NULL REFERENCES
+   * identities(id)` on all three members and the DDL says nothing about who
+   * authors the row -- so it is declared, like every other rule here, and it
+   * carries its own reason.
+   */
+  readonly writer: PairWriter;
   readonly why: string;
 }
+
+/**
+ * Who may write a `pair` row through a scoped handle. ADR-230.
+ *
+ * `column` IS ASSERTED TO BE `columnA` OR `columnB` rather than left to a
+ * reader's care: the suite checks it against the rule it sits in and against the
+ * DDL, and `pairInsertStatement` checks it again before it stamps, because a
+ * third column name here would be a stamp into a column no identity is declared
+ * on.
+ */
+export type PairWriter =
+  | {
+      readonly by: 'nobody';
+      /** Why no party to this row is its author. */
+      readonly why: string;
+    }
+  | {
+      readonly by: 'party';
+      /** Which of the two identity columns the WRITER is. Stamped, never supplied. */
+      readonly column: string;
+      /** Why that party, and why writing it discloses nothing. */
+      readonly why: string;
+    };
 
 /**
  * A ROW THAT REACHES AN IDENTITY TWO DIFFERENT WAYS, AND WHICH WAY IS A FACT
@@ -1330,6 +1400,10 @@ export const SCOPE_RULES = {
     class: 'pair',
     columnA: 'identity_a',
     columnB: 'identity_b',
+    writer: {
+      by: 'nobody',
+      why: "NEITHER PARTY AUTHORS AN EDGE ABOUT THEMSELVES. An `identity_links` row is MERIT'S assertion that two people are related, produced by M07's D-03 and D-12 as detector output with `evidence jsonb NOT NULL` beside it; a party who could write one could assert an edge to anybody, and `identity_links_canonical_order` means they could not even choose which column they landed in. M07 section 6 puts the one legitimate mutation -- the suppression pair -- `through the SECURITY DEFINER function that arrives with this module, never by the application role`, which is this answer already written in DDL terms one module over.",
+    },
     why: "THE ENTITY GRAPH'S EDGES, AND AN EDGE IS A STATEMENT ABOUT TWO PEOPLE (0002_identity.sql). `identity_a` and `identity_b` are both `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT`, both indexed, and `identity_links_canonical_order` CHECKs `identity_a < identity_b` -- so an edge is stored once and WHICH COLUMN A PERSON LANDS IN IS DECIDED BY UUID ORDERING. An `owned` rule on either column returns a strict subset of a person's own edges chosen by that ordering, which is a wrong answer that returns rows rather than an error. THE DISJUNCTION IS NOT WRITTEN AND THAT IS THE RULING RATHER THAN A LIMITATION: `evidence jsonb NOT NULL` is a detector's output and the counterparty column is another identity's uuid, and INV-M4-06 is that the portal `never receives detector internals or other identities' ids`. THE CORPUS NAMES NO TRADER-FACING READER: M06 section 3 renders the tier from `confidence_bp` on the ADMIN console, M07's D-03 and D-12 read it as detectors, and M07 section 6 writes the suppression pair `through the SECURITY DEFINER function that arrives with this module, never by the application role`. INV-M7-09 IS THE ONE THAT LOOKS LIKE A COUNTER-EXAMPLE AND IS NOT: it says a trader may CONTEST a link and that the contested link is visible TO THE ADMIN WHO ACTS ON IT, which is an admin surface and a support path rather than a scoped read. A SUPPRESSED EDGE IS STILL AN EDGE: `identity_links_live_idx` is partial on `NOT suppressed` and the row is never deleted, because SD-M7-04's own comment is that `we decided this edge was wrong` is itself evidence.",
   },
 
@@ -1337,6 +1411,10 @@ export const SCOPE_RULES = {
     class: 'pair',
     columnA: 'identity_a',
     columnB: 'identity_b',
+    writer: {
+      by: 'nobody',
+      why: 'NEITHER PARTY AUTHORS A BIOMETRIC MATCH, AND THE ENFORCEMENT WEIGHT IS WHY THE ANSWER IS NOT MILDER HERE THAN ON `identity_links`. ADR-022 makes a dedupe hit a HARD LINK THAT AUTO-ENFORCES, so the row bans an account before a human has looked; a subject who could write one could ban somebody, and a subject who could write their own could write it at a strength that clears. The author is the provider, through the KYC path, and `disposition` starts at `open` precisely because no party has yet been believed.',
+    },
     why: "THE AUTHORITATIVE BIOMETRIC DEDUPE LINK (0003_kyc.sql, SD-M19-04, ADR-029), and 0003's own header states the shape this class exists for: `A match is a RELATIONSHIP BETWEEN TWO IDENTITIES, not a property of one`. `identity_a` and `identity_b` are both `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` under `dedupe_matches_canonical_order`, which is `identity_links`' shape exactly, so the same ordering accident decides the same wrong answer. THE ENFORCEMENT WEIGHT IS WHY THE REFUSAL IS NOT MILDER HERE: ADR-022 makes a dedupe hit a HARD LINK THAT AUTO-ENFORCES, so the row bans an account before a human has looked, and `disposition` starts at `open` precisely because the review has not happened. Returning that row to either party would hand a person the uuid of whoever a provider thought they were, with `match_strength` and `evidence_snapshot jsonb` beside it, before anyone has decided whether the match is real. `evidence_snapshot` holds the provider's decision metadata and NEVER images (AS-M19-07, VG-10), which is what makes the enforcement survive the provider relationship ending and is not a reason a trader may read it.",
   },
 
@@ -1344,6 +1422,11 @@ export const SCOPE_RULES = {
     class: 'pair',
     columnA: 'buyer_identity_id',
     columnB: 'affiliate_identity_id',
+    writer: {
+      by: 'party',
+      column: 'buyer_identity_id',
+      why: "THE BUYER, BECAUSE THE BUYER IS THE ONE WHOSE ACT CREATES THE ROW. M08 section 3.1 rules that `RESOLUTION HAPPENS AT CHECKOUT START, in the same step that pins the plan version` and that `IT HAPPENS ONCE`, so this row is written inside one identity's checkout transaction and by nothing else in the estate: the affiliate is asleep, and a row written when they were not is not theirs to author. THE AFFILIATE HALF IS NOT A SECOND AUTHOR AND MUST NOT BECOME ONE -- an affiliate who could write this row could mint a referral over somebody else's purchase, which is the fraud `purchase_id uuid NOT NULL UNIQUE` (`0012_disputes_and_affiliate_settlement.sql:77`) and `INV-M8-01` bound from the other direction, one sale at a time. WHAT THE BUYER LEARNS BY WRITING IS NOTHING THEY DID NOT BRING: the affiliate identity in the row comes out of `resolveAttribution`, whose inputs are the coupon the buyer typed and the click token the buyer presented, and the door builds no `RETURNING`, so the transaction hands back no column at all. THE SELF-DEAL ROW IS WRITABLE AND THAT IS DELIBERATE: `attributions_literal_self_deal_is_void` permits the two columns to name one person on a voided row, so the door must not refuse a counterparty equal to the writer, and it does not.",
+    },
     why: "WHO REFERRED WHOM, AT THE MOMENT OF PURCHASE (0012_disputes_and_affiliate_settlement.sql, SD-M8-05). Both columns are `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT`, and 0012's own comment says why both are STORED rather than joined: the row is a statement about the two of them at that moment, and an affiliate can be reassigned or an identity merged afterwards. Naming the buyer hides the referral from the affiliate who earned it; naming the affiliate returns a buyer's own purchase attribution to somebody else, which returns rows, raises nothing, and is ADR-008's BOLA failure. THE PAIR MAY COLLAPSE HERE AND IT DOES NOT ON THE OTHER TWO, WHICH IS THE ONE PER-TABLE DIFFERENCE THIS CLASS HAS: `attributions_literal_self_deal_is_void` is `buyer_identity_id <> affiliate_identity_id OR voided = true`, so the two columns MAY name one person on a voided row -- and that row is the self-deal the constraint exists to record rather than an exception to the class. THE CONTRACT ALREADY REFUSES THE ROW-LEVEL READ THIS CLASS REFUSES: `GET /affiliate/stats` returns counts and cents -- `clicks_30d`, `conversions_30d`, `earned_cents_lifetime`, `payable_cents` -- and no referral row and no buyer, so nothing in API_CONTRACT wants the disjunction. `affiliate_id` IS THE AVAILABLE MISTAKE AND ADR-101 CLAUSE 1 REFUSES IT MECHANICALLY: it is `uuid NOT NULL REFERENCES affiliates(id)` and `affiliates` carries the identity, so a `derived` hop through it resolves and terminates -- and it stands on a row that declares its own identity columns, which is the shape that clause was written for.",
   },
 
@@ -1399,7 +1482,15 @@ export type FirmTableKey = {
  * party discloses the other, and they are excluded from `FirmTableKey` because
  * `firmDb()` takes no reason on the ground that no identity is at risk, which is
  * false here twice over. `systemDb(reason)` is generic over `TableKey` and is
- * the only door left.
+ * the only door left FOR A READ, which is the whole of what this type governs.
+ *
+ * ADR-230 DOES NOT MOVE THIS TYPE AND ADDS A WRITE BESIDE IT. `insertAsParty` on
+ * a scoped handle can INSERT one row of a `pair` table whose rule declares
+ * `writer.by === 'party'`, stamping the writer's own identity into the column
+ * that rule names. It builds no `RETURNING`, so nothing this type exists to
+ * withhold comes back through it, and every membership above is unchanged: these
+ * keys are still absent from `ScopedTableKey` and from `FirmTableKey`, and
+ * `scopePredicate` still throws on all of them.
  */
 export type PairTableKey = {
   [K in TableKey]: (typeof SCOPE_RULES)[K]['class'] extends 'pair' ? K : never;
