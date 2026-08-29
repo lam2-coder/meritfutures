@@ -659,14 +659,24 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ADR-170, `routes/verify.ts` implements it, and `start.ts` wires `databaseVerifySource(LIVE_DB)` ' +
     'today. What that half waits on is an ORIGIN, which is a deployment fact ADR-012 keeps out of ' +
     'this repository and which one named environment variable would close. ' +
-    'WHAT STILL REFUSES IS `image_url`, AND IT IS THE CARD RATHER THAN THE SIGNER. ADR-240 ruled ' +
-    'the URL signing key out of this deployable and named where it belongs (the object store or ' +
-    'the edge, INFRA section 2), and ADR-246 read that ruling forward: a signer signs an address, ' +
-    'an address addresses an object, and the object is a card THIS REPOSITORY HAS NO RENDERER ' +
-    'FOR. `certificates` (`0020_public_surface.sql`) carries seventeen columns and none ' +
-    'of them is an image location, so there is not even a stored value to sign, and no migration ' +
-    'in the set alters the table. `test/certificate-ports.test.ts` executes the column set and ' +
-    'the sweep, so the day either moves this entry goes red. ' +
+    'WHAT STILL REFUSES IS `image_url`, AND ADR-249 NARROWED IT TO ONE THING. It is no longer ' +
+    'the signer, the column and the renderer: it is the RENDERER, alone. ADR-249 ruled that this ' +
+    'card carries NO SIGNATURE AT ALL, so the key ADR-240 placed outside this deployable is a key ' +
+    'nothing in the design asks for, and that `image_url` is `origin` plus the path this file ' +
+    'already serves, DERIVED FROM `code` at projection time. `projectCertificate` hands `links` ' +
+    'the code and no other field of the row can reach the address, which is executed in ' +
+    '`test/certificate-card-home.test.ts` rather than argued here, so `certificates` needs no ' +
+    'image-location column and ADR-249 RESERVED NO MIGRATION NUMBER AND TOOK NONE. The table ' +
+    'still carries seventeen columns and none is an image location and no migration in the set ' +
+    'alters it (`0020_public_surface.sql`), and that is now a RULING that it needs none rather ' +
+    'than a measurement of an absence. `test/certificate-ports.test.ts` executes the column set ' +
+    'and the sweep, so the day either moves this entry goes red. ' +
+    'SO THIS PORT WAITS ON THE ENDPOINT ITS OWN FIELD WOULD ADDRESS, and on an origin. Publishing ' +
+    'a link to a trader is publishing a promise that bytes are there, and until ' +
+    '`useCertificateImageSource` has a renderer the address would resolve to a 503. ADR-240 ' +
+    'clause 10 still declines to name the origin variable, for a ground ADR-249 CHANGED rather ' +
+    'than repeated: it is no longer that the sibling field can never be built, it is that the ' +
+    'row it addresses does not answer yet. ' +
     'AND THE HALF-WIRING IS REFUSED ON A SECOND GROUND THAT IS NOT A MISSING PIECE AT ALL: ' +
     '`projectCertificate` never calls `links` for a deferred row (ADR-168 foreclosure 4), so a ' +
     'backend with a live read and a refusing signer answers 200 to a trader whose certificates ' +
@@ -704,9 +714,20 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'beside it are a renderer no deployment can set. ADR-240 declines to name the first while ' +
     'the second has no producer, because a variable whose only consumer refuses is a name ' +
     'nothing reads. ' +
-    'ADR-246 ADDS THE SET READING AND NOTHING ELSE: the bytes this port owes and the `image_url` ' +
+    'ADR-246 ADDED THE SET READING: the bytes this port owes and the `image_url` ' +
     '`useCertificateBackend` owes are ONE deliverable, so the two entries expire together or ' +
-    'not at all, and a session dispatched at either is dispatched at the card.',
+    'not at all, and a session dispatched at either is dispatched at the card. ' +
+    'AND ADR-249 RULED WHERE THAT CARD COMES FROM, WHICH LEAVES THIS ENTRY WAITING ON A ' +
+    'RENDERER AND ON NOTHING ELSE. It is rendered ON FETCH, from the live row, by whatever ' +
+    "answers this deployable's own image row, and it is stored NOWHERE DURABLE: `INV-M11-08` " +
+    'says a rendered image "is re-generated on fetch from the live row" and is "never a static ' +
+    'artifact Merit keeps serving after the row changed", and `imageHandler` already enforces it ' +
+    'by refusing a non-deferred lookup that carries no card. Every value the card draws is ' +
+    'already a column of `certificates`, so the renderer this port waits on needs NO MIGRATION, ' +
+    "and `FM-M11-05`'s cache key `(code, row_version)` names a column that does not exist and " +
+    'that ADR-249 rules DERIVED rather than stored. Both halves are executed in ' +
+    '`test/certificate-card-home.test.ts`. THE RENDERER IS STILL ABSENT AND THAT IS THE WHOLE ' +
+    'OF WHAT REFUSES HERE.',
   useCertificateRevokeBackend:
     'READ BY ADR-246 AS THE THIRD OF THE THREE CERTIFICATE PORTS AND LEFT EXACTLY WHERE IT ' +
     'STOOD: it is the one of the three that is NOT about the card, so the card landing does ' +

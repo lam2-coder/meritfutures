@@ -363,17 +363,17 @@ export interface CertificateListResponse {
  * EXISTED. API_CONTRACT section 6.3 states of `GET /certificates/:code/image.png`:
  * "Request: the path token only, no query, no body". A signature and an expiry
  * have no slot in that URL and `imageHandler` below reads nothing but `:code`,
- * so an `image_url` pointing here is unsigned however it is dressed. Whatever
- * serves those bytes is what verifies the signature, and that is an object
- * store or the edge -- both already in INFRA section 2 -- rather than this
- * process. THE KEY BELONGS WITH THE VERIFIER AND NEVER WITH THIS DEPLOYABLE:
- * `apps/api` is the internet-facing surface with the largest reachable code
- * path in the estate, and a URL-signing key held here would be one an
- * application compromise mints cards with, under a rotation calendar M11
- * section 3.3 wrote for a different key entirely. That other key is the CLAIM
- * signer, it is the WORKER's (M11 section 3.2's issuer talks to a Vault), and
- * this deployable already reads its output out of a column without ever holding
- * it. See ADR-240.
+ * so an `image_url` pointing here is unsigned however it is dressed. ADR-240
+ * ruled the key that would sign it out of this deployable and put a signer with
+ * whatever verifies it, an object store or the edge (INFRA section 2), because
+ * a key held here is one an application compromise mints cards with. The CLAIM
+ * signer is a different key, it is the WORKER's (M11 section 3.2), and this
+ * deployable reads it out of a column. ADR-249 RULES THAT THERE IS NO URL
+ * SIGNER TO PLACE AT ALL, leaving ADR-240 standing rather than overturning it:
+ * `PUBLIC_LOOKUP_ADDRESS` is already this estate's assertion that `code` alone
+ * is the whole predicate on an unauthenticated read of this row, so a signature
+ * is a second credential on a door ruled open to the first. `image_url` is
+ * `origin` plus the path below, and `certificates` needs no address column.
  */
 export interface CertificateLinks {
   readonly verify_url: string;
@@ -628,16 +628,16 @@ export class CertificateBackendUnwired extends Error {
 /**
  * What the list endpoint needs from the world.
  *
- * ONE READ AND ONE SIGNER. The read is the caller's whole set, because the
- * accessor this file may reach has no ordering, no limit and no cursor term
- * (`ScopedTx.rows` takes a key and nothing else), so the page is composed in
+ * ONE READ AND ONE ADDRESS (ADR-249; it read "ONE SIGNER"). The read is the
+ * caller's whole set, because the accessor here has no ordering, no limit and
+ * no cursor term (`ScopedTx.rows` takes a key only), so the page is composed in
  * memory; that is `catalog.ts`' `GET /purchases` shape and `wallet.ts`'
  * `GET /wallet/entries` shape, both of which record the same cost.
  *
- * `links` IS SYNCHRONOUS AND IS CALLED PER RENDERED ROW rather than being a
- * field on the row, because `image_url` is signed and TIME-LIMITED: a URL
- * carried on the row would be minted once and rendered whenever, which is the
- * one property the contract's "signed, time-limited" forbids.
+ * `links` IS SYNCHRONOUS AND IS CALLED PER RENDERED ROW rather than a field on
+ * the row, AND ADR-249 CHANGED WHY: it read that a URL on the row is minted
+ * once and rendered whenever, which "signed, time-limited" forbids. The card is
+ * unsigned, so the ground is that the address is a function of `code` alone.
  */
 export interface CertificateBackend {
   /** Every `certificates` row of this identity's, deferred ones included. */
