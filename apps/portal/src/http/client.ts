@@ -511,7 +511,7 @@ export function createApiClient(input: {
 // never whether Merit wants the control. It is WHOSE it is, and it is not this
 // file's, for three reasons that are measured rather than argued.
 //
-// ONE. NOTHING ON THE SERVER CHECKS ONE. `grep -rni csrf apps packages` returns nothing.
+// ONE. NOTHING ON THE SERVER CHECKS ONE. `grep -rni csrf apps/api packages` returns nothing.
 // A token minted here would be an unread header, and an unread header on a
 // money path is worse than no header: it is a control a later reader counts.
 //

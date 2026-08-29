@@ -453,7 +453,10 @@ test('the header name is the one `apps/api` reads off the request', () => {
 });
 
 test('a key that is not a legal header value is refused before anything is sent', async () => {
-  const illegal = ['', ' key', 'key ', 'a\r\nx-injected: 1', 'a\nb', 'a b', 'k\tey'];
+  // Every one written as an ESCAPE rather than a literal, so no control byte
+  // ever lands in this file. One did during drafting, turning an intended
+  // internal space into a NUL and making this case pass for the wrong reason.
+  const illegal = ['', ' key', 'key ', 'a\r\nx-injected: 1', 'a\nb', 'k\tey', 'a\u0000b'];
 
   for (const key of illegal) {
     const { calls, client } = writer(json({ ok: true }));
@@ -465,10 +468,16 @@ test('a key that is not a legal header value is refused before anything is sent'
   }
 
   // THE ACCEPTANCE DIRECTION, which is the half a refuse-everything guard would
-  // pass without. A ULID, a UUID and a base64 key all reach the socket.
-  const { calls, client } = writer(json({ ok: true }));
-  await client.post(write({ idempotencyKey: '01J8Z04F2C9AB3CDEF+/=-_' }));
-  expect(calls.length).toBe(1);
+  // pass without. A ULID, a UUID and a base64 key all reach the socket, and so
+  // does an INTERNAL space: RFC 9110 permits one inside a field value and it is
+  // only the ends that are trimmed, so the boundary is asserted rather than
+  // guessed at.
+  for (const key of ['01J8Z04F2C9AB3CDEF', 'a1b2-c3d4/e5+f6=', 'two words']) {
+    const { calls, client } = writer(json({ ok: true }));
+    await client.post(write({ idempotencyKey: key }));
+    expect(calls.length, key).toBe(1);
+    expect((calls[0]?.init.headers as Record<string, string>)['idempotency-key']).toBe(key);
+  }
 });
 
 // 6.4 THE BODY, THE 204, AND THE SHARED MAPPING --------------------------------
