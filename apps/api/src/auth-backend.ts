@@ -586,9 +586,9 @@ export const OTP_MAX_ATTEMPTS = 5;
 //
 // THE ONE THAT IS DELIBERATELY ABSENT IS THE PER-IP LIMIT. API_CONTRACT section
 // 11 rows the email channel as "5/hour/IP, 5/hour/email" and only the second
-// half is enforced here, because `server.ts` builds Fastify as
-// `Fastify({ logger })` and `trustProxy` appears in no file under
-// `apps/api/src`, so `request.ip` is the IMMEDIATE PEER. Behind Cloudflare that
+// half is enforced here, because `server.ts:155` builds the instance as
+// `Fastify({ logger: options.logger ?? false })` and CONFIGURES no `trustProxy`
+// anywhere, so `request.ip` is the IMMEDIATE PEER. Behind Cloudflare that
 // is one edge address for every trader at once, and a five-per-hour limit
 // counted on it is a five-per-hour limit for the whole product. INFRA section 2
 // puts rate limiting at the edge, which is the one place the address is the
