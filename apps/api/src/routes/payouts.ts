@@ -92,10 +92,10 @@
 // `INV-M5-06` SURVIVES THE MOVE BY CONSTRUCTION, WHICH IS WHY THE MOVE IS SAFE.
 // `ledger_transactions.idempotency_key` is `text NOT NULL UNIQUE` and every
 // door that posts `LT-01` builds `` `${PAYOUT_ENDPOINT} ${key}` `` from the
-// REQUEST ROW'S OWN STORED KEY: `admin-payouts.ts:916` and
-// `apps/worker/src/sweeps/expiry.ts:305` are both `releaseLedgerKey`, and both
+// REQUEST ROW'S OWN STORED KEY: `admin-payouts.ts:928` and
+// `apps/worker/src/sweeps/expiry.ts:313` are both `releaseLedgerKey`, and both
 // call sites pass `held.idempotencyKey` off the locked row
-// (`admin-payouts.ts:1185`, `expiry.ts:667`). The key is therefore a property
+// (`admin-payouts.ts:1215`, `expiry.ts:674`). The key is therefore a property
 // of the APPROVAL and not of the DOOR, so removing one of the doors that mint
 // the identical string cannot produce a second posting, and the DATABASE
 // refuses a duplicate rather than application memory that forgets on restart.
@@ -363,7 +363,7 @@ export interface PayoutRequestInsert {
    * COULD WRITE IT. With the posting moved to a system authority (ADR-172
    * clause 2), the driver has no other place to read it from: it rebuilds
    * `` `${PAYOUT_ENDPOINT} ${idempotency_key}` `` off the stored row, exactly as
-   * `admin-payouts.ts:809,1185` and `apps/worker/src/sweeps/expiry.ts:667`
+   * `admin-payouts.ts:817,1215` and `apps/worker/src/sweeps/expiry.ts:674`
    * already do off the same column. AN APPROVAL COMMITTED WITHOUT THIS VALUE IS
    * AN APPROVAL NO DOOR CAN EVER POST.
    *

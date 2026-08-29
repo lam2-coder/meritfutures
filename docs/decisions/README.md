@@ -225,8 +225,10 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-204](ADR-204.md) | the per-account eligibility forecast is a projection of ONE gate under five stated assumptions, because ten of the eleven conditions that decide eligibility have inputs no stored row can know seven days out  (2026-08-28, status: proposed) |
 | [ADR-205](ADR-205.md) | `detector.run_completed` is blocked by two DIFFERENT defects, and only one of them is its own row's  (2026-08-28, status: proposed) |
 | [ADR-206](ADR-206.md) | `engine_gates` stores the engine's own value in the engine's own names, with cents as base-10 strings, because the storage constrains nothing and the three shapes already in this tree disagree  (2026-08-29, status: proposed) |
+| [ADR-207](ADR-207.md) | `rule_states` stores `lifetime_settled_cents`, `breached` and `breach_kind`, and the state hash is the question this entry declines to answer  (2026-08-29, status: proposed) |
 | [ADR-208](ADR-208.md) | `GET /admin/eligible-forecast` declines with a body and never with a 404, because on its own heading a 404 already means a route nobody has built  (2026-08-29, status: proposed) |
 | [ADR-209](ADR-209.md) | a `TableKey` may name a VIEW, its scope class is the class of the relation it PROJECTS, and it is never addressable -- so `economic_calendar_current` is registered and `affiliate_statements` needed no ruling at all  (2026-08-29, status: proposed) |
+| [ADR-211](ADR-211.md) | one transaction does not make two reads consistent, so the crossing is two transactions keyed by the scoped result -- and the payout port stays blocked anyway, because nothing in this database pins the numbers `ResolvedPlan` is built from  (2026-08-29, status: proposed) |
 | [ADR-212](ADR-212.md) | a citation proves the cited line is PART OF WHAT THE SENTENCE NAMES, so `RI-15` gains an anchor, a vacancy rule and the comma list -- and the window it was built on turns out to move nothing at all  (2026-08-29, status: proposed) |
 <!--/gen-->
 

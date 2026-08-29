@@ -195,7 +195,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // ADR-172 clause 2 ruled that the handle is not the missing thing: the only
   // value satisfying `LedgerTx` is generic over EVERY TABLE IN THE ESTATE
-  // (`scoped-db.ts:1802`, `insert<K extends TableKey>`), so a door in `apps/api`
+  // (`scoped-db.ts:2167`, `insert<K extends TableKey>`), so a door in `apps/api`
   // returning one would be `systemDb` renamed. ADR-176 applied that to
   // `routes/payouts.ts`: `PayoutTx.ledger` is DELETED, the `LT-01` posting is
   // performed at a system authority, and the request path records the approval
