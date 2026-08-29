@@ -71,10 +71,15 @@
 // THIS FILE IMPORTS NO DATABASE ACCESSOR AND THAT IS A FENCE FACT WITH A FINDING
 // BEHIND IT
 // -----------------------------------------------------------------------------
-// `apps/api` declares no `@merit/db` and this slice does not add one, so
-// checkout reaches its rows through `CheckoutTx`, exactly as
+// THIS PARAGRAPH SAID `apps/api` DECLARES NO `@merit/db` AND THAT HAS BEEN
+// FALSE SINCE ADR-120 (ADR-238 finding 4). The manifest carries the dependency,
+// `src/db.ts` imports `scopedDb`, `firmDb` and four more, and the sentence
+// survived here because nothing checks a manifest claim written in prose. What
+// is TRUE, and is what the paragraph was for, is that THIS FILE imports no
+// accessor: checkout reaches its rows through `CheckoutTx`, exactly as
 // `routes/webhooks-psp.ts` reaches its rows through `PspWebhookTx` and
-// `routes/auth.ts` reaches its rows through `AuthBackend`.
+// `routes/auth.ts` reaches its rows through `AuthBackend`. The port is the
+// fence, and after ADR-120 the manifest is not one.
 //
 // THE WALL THIS PARAGRAPH NAMED HAS COME DOWN, AND WHAT IT WAS HIDING IS WORTH
 // MORE THAN THE WALL WAS. It read that a wiring session "MEETS A WALL THAT IS
@@ -92,17 +97,30 @@
 // checkout transaction is already bound to. Reading a `pair` row is refused
 // exactly as it was: `scopePredicate` still throws on every key in the class.
 //
-// SO THE PARAGRAPH IS REPLACED RATHER THAN DELETED, because the three
-// obstructions it was standing in front of are the ones a wiring session
-// actually meets, and only the first was ever written down:
+// SO THE PARAGRAPH IS REPLACED RATHER THAN DELETED, because the obstructions it
+// was standing in front of are the ones a wiring session actually meets.
 //
-//   1. A `firm` READ ON A ONE-TRANSACTION PORT. FIVE methods below read `firm`
-//      tables -- `publishedPlanVersion`, `planVersionSize`, `couponByCode`,
-//      `geoDecision` and `midCandidates` -- and `ScopedTableKey` excludes every
-//      `firm` key, so no `ScopedTx` reads one. This is `usePayoutBackend`'s
-//      stated blocker arriving on a second money route, and unlike there it
-//      blocks EVERY request rather than one arm: two of the five are on the
-//      unconditional path of both handlers.
+// THE FIRST ONE THIS LIST CARRIED IS DISCHARGED AND IS DELETED RATHER THAN KEPT
+// BESIDE A DOOR THAT LANDED. It read that FIVE methods below reach `firm` tables
+// -- `publishedPlanVersion`, `planVersionSize`, `couponByCode`, `geoDecision`
+// and `midCandidates` -- and that `ScopedTableKey` excludes every `firm` key, so
+// no `ScopedTx` reads one. ADR-233 built `catalogRows`, `catalogRowsWhere` and
+// `catalogRowAt` over `CATALOG_TABLE_KEYS`, whose five members are exactly the
+// five tables those five methods read.
+//
+// THE ONE UNDERNEATH IT WAS NEVER IN THIS LIST, AND IT IS THE FIRST LINE OF BOTH
+// HANDLERS, which is the second time this file has named its second-cheapest
+// blocker and missed its cheapest (ADR-238 ruling 1). Three remain:
+//
+//   1. A CAP WITH NO SOURCE. `accountCap()` runs before anything else on the
+//      purchase path and on the reset path alike, and its `maxAccounts` has no
+//      column in any migration: the one line a search for the name reaches is
+//      `identities.max_accounts_override`, the per-entity EXCEPTION.
+//      `databaseAuthBackend` refuses `readMe` for the identical finding about
+//      the same number on `GET /me`. ADR-238 ruling 1 rules the BASE cap the
+//      firm's number rather than a plan's, and rules that it is not read from
+//      `plan_versions.rules` in any of the three forms available. Nothing in
+//      this tree holds it yet.
 //
 //   2. A ROW OF SOMEBODY ELSE'S THAT THE BUYER MUST SEE. `clickByToken` returns
 //      a `ClickRef` carrying an `AffiliateRef`, and `couponByCode` returns one
@@ -110,10 +128,13 @@
 //      AFFILIATE. A buyer-scoped read of it returns nothing, silently, and
 //      `resolveAttribution` would then fold an organic sale over every referral.
 //      That is a wrong answer that returns rows, which is what this whole
-//      registry exists to make unavailable, and it needs a ruling rather than a
-//      door.
+//      registry exists to make unavailable. ADR-233 section 5 refused the grant
+//      and ADR-238 ruling 2 refuses it again and names what the port must do
+//      instead, which is a door that resolves the affiliate INSIDE
+//      `packages/db` and hands this file a bit rather than a uuid.
 //
-//   3. THE LEDGER ARM, UNCHANGED. See `ledger` below.
+//   3. THE LEDGER ARM, UNCHANGED. See `ledger` below, and ADR-238 ruling 3 for
+//      why ADR-176's remedy for `LT-01` does not transfer to `LT-08`.
 //
 // -----------------------------------------------------------------------------
 // A THIRD PARTY IS CALLED INSIDE AN OPEN TRANSACTION AND THE COST IS STATED
@@ -485,9 +506,29 @@ export interface GeoDecisionRow {
 
 /** What the cap check reads. INV-M3-08: per resolved identity, never per email. */
 export interface AccountCapRow {
-  /** Live accounts this IDENTITY holds. */
+  /** Live accounts this IDENTITY holds. Every plan, not the one being bought. */
   readonly liveAccounts: number;
-  /** The identity's cap, `max_accounts_override` folded over the plan default. */
+  /**
+   * The identity's cap. NO IMPLEMENTATION IN THIS TREE CAN PRODUCE ONE.
+   *
+   * THIS DOCBLOCK SAID `max_accounts_override` FOLDED OVER "THE PLAN DEFAULT"
+   * AND ADR-238 RULING 1 RULES THAT SOURCE WRONG RATHER THAN MISSING. The
+   * override half is real and is `identities.max_accounts_override`, the one
+   * line in the migration set that names an account cap at all. The base half
+   * is `limits.max_accounts_per_entity`, which lives in the `plan_versions.rules`
+   * jsonb and is a PER-PLAN-VERSION number, while `liveAccounts` beside it is
+   * this identity's total across every plan. Comparing the two makes an
+   * identity's effective cap the MAXIMUM over every published version, so a
+   * buyer picks their own cap by picking a plan, and on the reset path the
+   * version read is the one an account was PINNED to, which may have been
+   * retired years earlier.
+   *
+   * SO THE BASE IS THE FIRM'S NUMBER AND NEEDS A FIRM'S ROW, on `price_floors`'
+   * shape: effective dated, superseded rather than updated, carrying its
+   * approver. Registering one is `packages/db/src/schema.ts` and `scope.ts`,
+   * which ADR-238's fence does not reach. Until it lands, an implementation of
+   * `accountCap` has three columns and an invented fourth.
+   */
   readonly maxAccounts: number;
   /** `identities.status`. INV-M3-15 refuses `restricted`. */
   readonly identityStatus: IdentityStatus;
@@ -749,7 +790,19 @@ export interface CheckoutTx {
    */
   claimCoupon(couponId: string, purchaseId: string): Promise<'claimed' | 'already_claimed'>;
 
-  /** The click this token names, or `null`. `affiliate_clicks_token_uq`. */
+  /**
+   * The click this token names, or `null`. `affiliate_clicks_token_uq`.
+   *
+   * REFUSED TWICE AND NOT MERELY UNBUILT. The `ClickRef` carries an
+   * `AffiliateRef` and an `AffiliateRef` carries `affiliates.identity_id`, so
+   * this method reads ACROSS a tenancy boundary for a caller who proved a
+   * different identity. ADR-233 section 5 refused the grant and ADR-238
+   * ruling 2 refuses it again on ground ADR-233's does not supply: a `firm`
+   * row belongs to nobody and these rows belong to somebody, so the disclosure
+   * objection that is ABSENT there is fully PRESENT here. A buyer-scoped read
+   * returns the empty set silently and folds every referral as organic, which
+   * is a wrong answer that returns rows.
+   */
   clickByToken(token: string): Promise<ClickRef | null>;
 
   /** The account a reset targets, or `null` when it is not this caller's. */
@@ -902,6 +955,16 @@ export interface CheckoutTx {
    * interface's `enrichment` property one method down, for the same reason.
    * The wallet arm answers 503 when it is `null`, and NOTHING HERE WIDENS
    * `SystemReason`.
+   *
+   * AND ADR-176's REMEDY FOR THE SAME OBSTRUCTION DOES NOT TRANSFER HERE, which
+   * ADR-238 ruling 3 re-derived rather than assumed. That entry cleared
+   * `PayoutTx.ledger` by DELETING it: the `LT-01` posting moved out of the
+   * request path to a system authority and the handler stored the client's key
+   * for the door that posts it. `LT-08` cannot follow, because M20 pins it to
+   * the purchase transaction by name and `DEP-M20-02` states the consequence of
+   * moving it, which is that the wallet becomes a transfer instrument. So the
+   * arm waits on a ruling in `packages/ledger` and `packages/db` rather than on
+   * a wiring here.
    */
   readonly ledger: LedgerTx | null;
 
@@ -910,8 +973,10 @@ export interface CheckoutTx {
    *
    * THIS DOCBLOCK SAID `packages/db` ADMITS NO REQUEST HANDLER WRITING A `pair`
    * ROW AND ADR-230 MADE THAT FALSE. It is still a port, for the reason every
-   * method here is one -- `apps/api` declares no `@merit/db` and this file
-   * imports no accessor -- and not for want of an authority any more:
+   * method here is one, which is that THIS FILE imports no accessor and not
+   * that the deployable could not (ADR-238 finding 4: the manifest has carried
+   * `@merit/db` since ADR-120 and this docblock said otherwise), and not for
+   * want of an authority any more:
    * `ScopedTx.insertAsParty` stamps the buyer's own identity into
    * `attributions.buyer_identity_id` and refuses a caller naming it, so an
    * implementation is one call and needs no reason word.
