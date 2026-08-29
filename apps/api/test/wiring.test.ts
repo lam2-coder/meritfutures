@@ -220,11 +220,28 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'held payouts. MONEY PATH.',
   useAdminWalletBackend:
     '`principal(request)` (`routes/admin-wallet.ts:679`), blocked on `setAdminSessionSource` ' +
-    'above, AND TWO METHODS THAT WIRING DOES NOT REACH. `writeCorrection` is refused on four ' +
-    'constraints: `0038` is the built door for a wallet correction and ADR-158 never read it, so ' +
-    'no column holds which entry a correction corrects (ADR-173). `reconcile` is refused on ' +
-    'ADR-157 clause 6, which needs a join and an aggregate. Installing a backend would not ' +
-    'resolve either finding and must not paper over them. MONEY PATH.',
+    'above, AND TWO METHODS THAT WIRING DOES NOT REACH. `writeCorrection` is refused on THREE ' +
+    'constraints, each a CHECK on `account_adjustments` that no draft this module composes can ' +
+    'satisfy. (1) A correcting DEBIT is unwritable unless it exactly reverses a prior adjustment ' +
+    'CREDIT: `account_adjustments_debit_is_a_reversal` is a biconditional and the wire carries ' +
+    'no `reverses_adjustment_id`. (2) Dual control needs a `dual_control_approvals` row and ' +
+    'nothing in this tree writes one; ADR-228 supplied the THRESHOLD and not the approval, which ' +
+    'is the half that moved. (3) `reason_code` is NOT NULL over a closed three-member vocabulary ' +
+    'the wire has no field for. `routes/admin-wallet.ts` has named exactly these three since ' +
+    'session 298 and THIS ENTRY DID NOT. IT READ: "`0038` is the built door for a wallet ' +
+    'correction and ADR-158 never read it, so no column holds which entry a correction ' +
+    'corrects". Every clause of that WAS TRUE WHEN WRITTEN and the schema half is true today; ' +
+    'ADR-158 really does never name `0038`. What was wrong is the JOB it was doing here, because ' +
+    'ADR-173 clause 3 ruled that no such column is OWED, API_CONTRACT carries that ruling in the ' +
+    'endpoint row, and the durable record is `admin_actions.before.corrected_entry`. So the ' +
+    'entry named the ONE of session 298 four disagreements that ADR-173 DISCHARGED and left the ' +
+    'three that stand unnamed. It is quoted rather than deleted because a reader who deletes it ' +
+    'finds `reverses_adjustment_id` (`0038:185`) and concludes the reason was discharged: that ' +
+    'column references `account_adjustments` and not `wallet_entries`, and exists exactly on ' +
+    'DEBITS, so it is constraint (1) above rather than an answer to any of them. ADR-255, ' +
+    'asserted in `test/wallet-correction-linkage.test.ts`. `reconcile` is refused on ADR-157 ' +
+    'clause 6, which needs a join and an aggregate. Installing a backend would not resolve any ' +
+    'of these findings and must not paper over them. MONEY PATH.',
   useAdminWriteBackend:
     'TWO SUPPLIERS AND NEITHER OF THEM IS A DOOR. THIS ENTRY NAMED THREE AND THE THIRD IS ' +
     'DISCHARGED (ADR-251). `principal(request)` (`routes/admin-writes.ts:276`), blocked on ' +
