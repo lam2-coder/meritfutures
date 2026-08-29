@@ -332,8 +332,12 @@ test('the agent vocabulary is closed and its ORDER is the trap', () => {
 });
 
 // -----------------------------------------------------------------------------
-// The twelve refusals
+// The refusals
 // -----------------------------------------------------------------------------
+// THIS HEADING NAMED A COUNT AND THE COUNT WAS TWELVE while the case fifteen
+// lines below asserted eleven, in this file, green. `routes/auth.ts`'s port
+// docblock states the partition once and quotes the commands that settle it
+// against `auth-backend.ts`; nothing here restates it.
 
 /**
  * The five wired, named once so the partition below is checkable.
@@ -433,7 +437,7 @@ test('the refusals name what is actually missing rather than saying "not impleme
 test('no refusal in this file cites the OTP digest as unspecified', async () => {
   // ADR-197 RULED IT, so a method still claiming `otp_challenges.code_hash` has
   // no digest is the same class of stale sentence the case above repairs. Every
-  // one of the twelve is read, not just the ones that used to cite it.
+  // method on the object is read, not just the ones that used to cite it.
   const backend = databaseAuthBackend(recordingDb().db, clock);
   const methods: Array<[string, () => Promise<unknown>]> = [
     [
