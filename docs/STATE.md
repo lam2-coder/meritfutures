@@ -29,9 +29,9 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->229<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->230<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->229<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->230<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -9899,3 +9899,33 @@ not in this row's verification list and it mutates the working tree.
 **NOTHING HERE HAS MET A DATABASE**, which is where the entry is most likely wrong. Every case executes over source, over the scope registry and over rendering functions handed fixtures.
 
 **MERGED WITH `origin/main` AT `26423be` AFTER THOSE COUNTS WERE TAKEN.** Main moved by **two documentation files and no code** ([ADR-240](decisions/ADR-240.md)'s merge record and [session 430](sessions/2026-08-29-session-430.md)'s log). **The merge was CLEAN, with zero conflict hunks**, and `gates.mjs generate` produced no change on the merged tree. **Re-derived on the merge**: **33 of 33** gates, **21 of 21** invariants, **266 files / 6,548 passed / 6 skipped**, typecheck 0, lint 0, `format:check` clean, identical to the pre-merge run because main brought no executable line.
+
+---
+
+## 2026-08-29 - Session 435: the worker landing closed two of the payout port's four links and moved neither of the other two, and `PayoutSubject`'s third field has never had a clause ([ADR-245](decisions/ADR-245.md), proposed)
+
+**THE ROW ASKED WHETHER `usePayoutBackend` STILL REFUSES NOW THAT THE WORKER RUNS. IT DOES, AND WHAT REFUSES IS NO LONGER THE WORKER.** [ADR-239](decisions/ADR-239.md) put four links between this tree and one row of `rule_states`; [ADR-241](decisions/ADR-241.md) closed one and moved another and left the other two exactly where they were.
+
+**LINK 1 IS MEASURED CLOSED RATHER THAN READ CLOSED.** On this branch `pnpm --filter @merit/worker start` exits **1**, with a stack running from `start.ts`'s top-level statement through `main` and `resolveTradingDay` into `readLastClosedTradingDay` and out at the door, where ADR-239 measured no output and exit **0**. The frames are the evidence and the status is the property: the process reached the first thing the job needs and refused there.
+
+**LINK 2 IS PARTIAL AND LINKS 3 AND 4 ARE UNMOVED.** `postgresBatchPorts` serves four of ten and refuses `loadAccountDay` by name, so `runNightlyBatch` reaches its per-account loop and throws; the write port is still composed on `UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates`, the only `RuleStateWriterIo` under any `src/`; and the table holds nothing.
+
+**THE STANDING `BLOCKED` ENTRY IS NEITHER DELETED NOR REWRITTEN FOR THE WORKER, AND THAT IS THE FIRST RULING.** Session 431 had already rewritten it and **all five of its clauses re-derive true on this tree**, each checked at its own source. Restating a true sentence in new words is not a session's output.
+
+**THE FINDING IS UNDERNEATH THE FOUR LINKS AND IS DOWNSTREAM OF NONE OF THEM.** `PayoutSubject` carries `state`, `plan` and `gates`. Links 1 to 4 are the first, [ADR-233](decisions/ADR-233.md) discharged the second, and **eleven revisions of this reason have never carried a clause about the third**. Measured comment-stripped over every `.ts` under every `apps/*/src` and `packages/*/src`, **no `ExternalGates` value is resolved from a row anywhere**: the object key appears in the interface that declares it and in a Monte Carlo loop that raises one member on a value its caller supplied, and every constructed value in the repository is a fixture. **The five facts all have columns and every table is registered**, so what is missing is a function rather than a schema, and this is not a second ADR-233.
+
+**AND ONE LEG CANNOT BE A TOTAL MAP.** `account_status` declares **seven** members and the engine's `AccountStatus` takes **six**, the difference being `provisioning_pending` in that direction only, and `M01:203` carries the same six, so the engine transcribed its source correctly and the gap is the corpus's. The resolver owes a **refusal** on `IdentityStatus`'s own precedent one file over. **That ruling is registered and deliberately not made here**, because the slice that writes the resolver should meet it.
+
+**SO ADR-239 SECTION 6's THREE SLICES ARE FOUR.** The new one is the cheapest, is independent of the other three, and is the one whose absence nobody would have found until the other three were spent: a session landing the codec, the adapter and the schedule arrives at `subject()` with a `RuleState` in hand and no third argument for it.
+
+**BOTH HALVES ARE PREDICATES AND BOTH WERE MEASURED IN BOTH DIRECTIONS.** A seeded `ExternalGates` literal in `routes/payouts.ts` fails the census and a seeded `provisioning_pending` in the engine's union fails the arity case, each restored with `git status` clean after it.
+
+**THE PORT IS NOT WIRED AND A PARTIAL BACKEND IS STILL REFUSED.** `usePayoutBackend` is not called, `apps/api/src/start.ts` and `apps/api/src/routes/payouts.ts` are unchanged, and the route answers 503. **`apps/worker` is untouched in fact**, `git status --porcelain apps/worker` reporting zero, and the port needed no shape the worker does not export, so the row's stop-and-report condition was never reached.
+
+**ONE CITATION REPAIR TAKEN, AT A FOURTH SITE ADR-239's TABLE OF THREE DID NOT NAME.** `packages/db/src/schema.ts`'s `ruleStates` comment carried the retired "corpus amendment rather than a line of code" price and, since ADR-241, a second clause that had gone outright false. Repaired in a file the fence names; no executable line of `packages/db` changes. **ADR-239 finding 2 is still open and is reported again**: `ELIGIBILITY_BLOCKER` clause 2 carries the same retired sentence, `routes/account-reads.ts` is outside this fence, and `INV-M5-02`'s one blocker across two endpoints still reads two ways.
+
+**A THIRD FINDING, NAMED BECAUSE THE NEXT SESSION WILL MEET IT.** The batch completes and exits 0 on a database with no account carrying a live mark, having written nothing, so a log-based dead-man switch reading only for a completion line sees a healthy night on an estate that folded nobody. `CRON_INVENTORY` owns it and is outside this fence.
+
+**Measured, not carried**: **33 of 33** gates, **21 of 21** invariants read off the runner's own last line, **268 files / 6,570 passed / 6 skipped** against an `origin/main` baseline of **268 / 6,568 / 6** reproduced before a line changed, a delta of **+2 cases and no new file**, which is section 5 of the producibility file entire. Typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**: it is not in this row's verification list and it mutates the working tree.
+
+**WHERE THIS IS MOST LIKELY WRONG**, named rather than left to be found: the census searches for a NAME and for an object KEY, so a producer written in a third spelling would be invisible to it. That no such value exists in either spelling this repository has used is measured; that no third spelling exists is a judgement about how this codebase writes records.
