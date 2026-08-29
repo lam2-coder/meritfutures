@@ -3,19 +3,25 @@
 // =============================================================================
 // `GET /admin/liability`'s ROWS, AND IT IS NOT `AdminReadSource.readLiability`.
 //
-// THE DISTINCTION IS THE WHOLE POINT OF THIS FILE AND IT IS STATED FIRST.
-// `LiabilityResponse` projects 40 leaf paths under 10 containers. This module
-// produces 27 of the 40 from live rows through ADR-112's keyed accessor. The
-// other 13 are FIVE SEPARATE BLOCKERS, none of which is a missing column and
-// none of which this fence can clear. **B1 IS LIFTED AND THE COUNT DID NOT MOVE**,
-// which is the finding session 380 landed: it was one of TWO blockers on the same
-// five leaves and only the second had ever been looked for. **B2 IS LIFTED TOO,
-// BY ADR-201, AND THE COUNT DID NOT MOVE THERE EITHER**, for the same reason and
-// not for a new one: a ruling clears a blocker and leaves the fold unwritten.
-// **THE BLOCKED-LEAF COUNT IS WHAT IS PRODUCED AND NEVER WHAT IS PERMITTED**, and
-// the suite derives it from API_CONTRACT rather than from this comment. So the method is NOT composed, the array
-// `IMPLEMENTED_ADMIN_READS` does not name it, and `composeAdminReadSource` still
-// fills the gap with `AdminSourceNotComposed('readLiability')`.
+// THE DISTINCTION IS THE WHOLE POINT OF THIS FILE AND IT IS STATED FIRST. This
+// module produces most of `LiabilityResponse` from live rows through ADR-112's
+// keyed accessor and NOT ALL OF IT, and **NO NUMERAL IS WRITTEN HERE**:
+// `test/admin-source-liability-book.test.ts` derives the declared, blocked and
+// produced counts from API_CONTRACT through `RI-18`'s own reader, every count in
+// this header went stale at least once, and a numeral in a comment beside a
+// derivation is the derivation's reader believing the comment.
+//
+// **THE BLOCKED-LEAF COUNT IS WHAT IS PRODUCED AND NEVER WHAT IS PERMITTED.**
+// B1 lifted and the count did not move (session 380: it was one of TWO blockers
+// on the same five leaves). B2 lifted by ADR-201 and the count did not move
+// either. ADR-203 moved the DECLARED count and left production alone, which was
+// that ruling's own point. **B4 IS THE FIRST BLOCKER IN FOUR SESSIONS WHOSE LIFT
+// MOVED PRODUCTION**, because `0064` plus session 387's producer plus
+// {@link readRecon} is a leaf with a source where yesterday it had none.
+//
+// So the method is NOT composed, the array `IMPLEMENTED_ADMIN_READS` does not
+// name it, and `composeAdminReadSource` still fills the gap with
+// `AdminSourceNotComposed('readLiability')`.
 //
 // -----------------------------------------------------------------------------
 // WHY A MODULE THAT COMPOSES NOTHING EXISTS AT ALL, WHICH SESSION 363 ARGUED
@@ -28,11 +34,11 @@
 // have been the seven top-level fields alone.
 //
 // ADR-199 moved the count. `reserve` is a keyed read now, and `integrations.batch`
-// turned out to be an EVENT rather than an owed column. What is left is 27 of 40,
-// and the balance of that argument moves with the number: a reader that produces
-// 27 leaves and MEASURES the 13 it cannot is worth more than a paragraph saying
-// the same thing, because the 27 are RUN and the 13 are pinned with clearing
-// conditions rather than asserted.
+// turned out to be an EVENT rather than an owed column. Most of the response is
+// what is left, and the balance of that argument moves with the number: a reader
+// that produces the leaves it can and MEASURES the ones it cannot is worth more
+// than a paragraph saying the same thing, because the produced ones are RUN and
+// the blocked ones are pinned with clearing conditions rather than asserted.
 //
 // **AND THE TYPE STATES THE GAP RATHER THAN THIS COMMENT.** {@link LiabilityBook}
 // is `LiabilityResponse` minus exactly the blocked paths, written as a mechanical
@@ -101,20 +107,28 @@
 //       CLEARING CONDITION: `DEP-M6-05` lands, or a ruling gives the absence a
 //       wire shape.
 //
-//   B4. `integrations.recon.last_run_at` (1 leaf). NOTHING IN THIS SCHEMA RECORDS
-//       A RECONCILIATION RUN. `reconciliations` (0014) is one row per account per
-//       trading day, and EVENTS section 5 carries `recon.mismatch_detected` and
-//       `recon.resolved`, both per account, and no `recon.completed`. The
-//       available fold is `max(reconciliations.created_at)`, and IT IS THE FOLD
-//       ADR-199 SECTION 5 REFUSES ONE FIELD TO THE RIGHT: it refuses
-//       `max(rule_states.computed_at)` for the batch because OVERVIEW section 5.2
-//       makes the run resumable at the account boundary, "so a fold over
-//       per-account clocks reports a SUCCESS for a run that crashed". The
-//       reconciliation sweep is per account too. Taking the fold here would
-//       overturn that reasoning by writing code, one field from where the entry
-//       wrote it down. `mismatches_open` is a COUNT of a state rather than a
-//       clock and is produced.
-//       CLEARING CONDITION: a `recon.completed` event or a run record.
+//   B4. `integrations.recon.last_run_at` (1 leaf). **LIFTED, AND THE LEAF IS
+//       PRODUCED.** The paragraph this replaces read "NOTHING IN THIS SCHEMA
+//       RECORDS A RECONCILIATION RUN", and it was true of a 59-migration schema:
+//       `reconciliations` (0014) is one row per account per trading day, so the
+//       only fold across it is `max(created_at)`, and that is the fold ADR-199
+//       section 5 refuses one field to the left, because OVERVIEW section 5.2
+//       makes the nightly run resumable at the account boundary and "a fold over
+//       per-account clocks reports a SUCCESS for a run that crashed".
+//       **THE CLEARING CONDITION WAS "a `recon.completed` event OR A RUN
+//       RECORD", AND THE SECOND HALF ARRIVED IN TWO PIECES**: `0064` created
+//       `reconciliation_runs`, and session 387 wrote its first producer in
+//       `apps/worker/src/recon/sweep.ts`. This module is the third piece and the
+//       last one: {@link readRecon} dates the field off the newest COMPLETED
+//       run's `started_at`, which is the column `0064`'s own index comment names
+//       for this field and the predicate `reconciliation_runs_completed_is_whole`
+//       names for its reader.
+//       **THE `recon.completed` EVENT IS STILL OWED AND IS NOT THIS FIELD'S.**
+//       EVENTS section 5.3 carries `recon.mismatch_detected` and `recon.resolved`
+//       and no completion event, and data-model/README section 1 says a mutable
+//       table emits one on every meaningful transition. That is an amendment to a
+//       frozen document and therefore an ADR; it is REPORTED here and it blocks
+//       nothing on this response.
 //
 //   B5. `eligible_next_7d` AGAIN (the same 5 leaves), AND IT IS THE HALF NOBODY
 //       HAD LOOKED AT. The group is a FORECAST: "which accounts clear their
@@ -257,6 +271,7 @@ export const LIABILITY_READ_TABLES = [
   'midHealth',
   'planBreakerState',
   'plans',
+  'reconciliationRuns',
   'reconciliations',
   'reserveCoverageSnapshots',
   'tradingCalendar',
@@ -287,11 +302,6 @@ export interface LiabilityTx {
 /** `LiabilityResponse.per_plan`'s element, LESS the CUSUM. Blocker B3. */
 export type LiabilityPlanRow = Omit<LiabilityResponse['per_plan'][number], 'cusum'>;
 
-/** `LiabilityResponse.integrations`, LESS the reconciliation clock. Blocker B4. */
-export type LiabilityIntegrations = Omit<LiabilityResponse['integrations'], 'recon'> & {
-  readonly recon: Omit<LiabilityResponse['integrations']['recon'], 'last_run_at'>;
-};
-
 /**
  * `LiabilityResponse` MINUS the thirteen leaves nothing in this estate produces.
  *
@@ -304,10 +314,9 @@ export type LiabilityIntegrations = Omit<LiabilityResponse['integrations'], 'rec
  */
 export type LiabilityBook = Omit<
   LiabilityResponse,
-  'eligible_next_7d' | 'payout_velocity' | 'per_plan' | 'integrations'
+  'eligible_next_7d' | 'payout_velocity' | 'per_plan'
 > & {
   readonly per_plan: readonly LiabilityPlanRow[];
-  readonly integrations: LiabilityIntegrations;
 };
 
 /**
@@ -324,6 +333,7 @@ export interface LiabilityReadCost {
   readonly plansScanned: number;
   readonly midHealthRowsScanned: number;
   readonly openMismatchesScanned: number;
+  readonly completedReconRunsScanned: number;
   readonly batchCompletedScanned: number;
 }
 
@@ -474,6 +484,41 @@ function latestBy(rows: readonly unknown[], column: string, at: string): unknown
         'there can be one. Rendering either would answer an operator with a figure chosen by ' +
         'row order',
     );
+  return best;
+}
+
+/**
+ * The greatest value of one `timestamptz` column, as the INSTANT and never as
+ * the row that carries it, or `null` when there are no rows.
+ *
+ * {@link latestBy} REFUSES A TIE AND THIS ONE MUST NOT, and the difference is a
+ * property of the tables rather than a relaxation. `latestBy`'s refusal is
+ * argued from `liability_snapshots_as_of_uq` and `reserve_coverage_snapshots_as_of_uq`:
+ * on those tables one instant IS one row, so two rows at one instant is the
+ * database disagreeing with its own unique index. `reconciliation_runs` carries
+ * no unique index at all and the absence is RULED rather than forgotten --
+ * `0064`'s second E2 note refuses one because `RB-02` section A sends a
+ * quarantined day to REDELIVERY and a redelivered day is reconciled again -- so
+ * two runs sharing an instant is a state this schema admits and refusing it
+ * here would be this module inventing a constraint the database declines.
+ *
+ * AND THE TIE COSTS NOTHING BECAUSE NO ROW IS SELECTED. The answer is a max over
+ * one column, so two rows sharing the greatest `started_at` yield one answer
+ * rather than an arbitrary one. That is exactly what `latestBy` cannot do: it
+ * returns a ROW, and every other field of that row would then be picked by
+ * accessor order.
+ */
+function latestInstant(rows: readonly unknown[], column: string, at: string): string | null {
+  let best: string | null = null;
+  let bestAt = Number.NEGATIVE_INFINITY;
+  for (const row of rows) {
+    const when = instant(row, column, at);
+    const ms = Date.parse(when);
+    if (ms > bestAt) {
+      best = when;
+      bestAt = ms;
+    }
+  }
   return best;
 }
 
@@ -700,6 +745,73 @@ function readMidHealth(rows: readonly unknown[]): LiabilityBook['integrations'][
 }
 
 /**
+ * `integrations.recon`, WHICH IS NOW A CLOCK AS WELL AS A COUNT. Blocker `B4`,
+ * lifted, and the half that lifted it is not in this file.
+ *
+ * **THE BLOCKER WAS NEVER A COLUMN AND IT WAS NEVER A SHAPE.** Session 374 read
+ * it as `NOTHING IN THIS SCHEMA RECORDS A RECONCILIATION RUN`, and it was right:
+ * `reconciliations` is one row per account per trading day, so the only fold
+ * across it is `max(created_at)`, which is the fold `ADR-199` section 5 refuses
+ * one field to the left because `OVERVIEW` section 5.2 leaves the nightly run
+ * *"resumable at the account boundary"* and a fold over per-account clocks
+ * *"reports a SUCCESS for a run that crashed"*. `0064_reconciliation_runs.sql`
+ * is the row that fold was missing and session 387 wrote its first producer
+ * (`apps/worker/src/recon/sweep.ts`). What was left after those two is the
+ * READER, which is this function.
+ *
+ * -----------------------------------------------------------------------------
+ * TWO PRIMARY SOURCES FIX THIS READ AND NEITHER OF THEM IS A JUDGEMENT MADE HERE
+ * -----------------------------------------------------------------------------
+ * **THE COLUMN IS `started_at`.** `0064`'s index comment names this very field:
+ * *"The panel's read, which is `integrations.recon.last_run_at`: the newest run,
+ * one index scan"*, over `reconciliation_runs_latest_idx (started_at DESC)`, and
+ * `data-model/reconciliation_runs.md` says it a second time. `finished_at` is
+ * NOT taken and the field name is the reason -- `last_run_at` is when the run
+ * WAS, and the run is what `started_at` dates.
+ *
+ * **THE PREDICATE IS `status = 'completed'`, AND IT IS THE CONTROL RATHER THAN A
+ * FILTER.** `reconciliation_runs_completed_is_whole` states its own reader in
+ * terms: *"a reader taking the latest completed run gets a sweep that actually
+ * covered the book"*. Without the predicate this clock reads the `started_at` of
+ * a sweep that died at account 2,341 of 5,000 -- `OVERVIEW` section 5.2 makes
+ * that ORDINARY rather than exotic -- and reports it as a reconciliation that
+ * happened. That is `ADR-199` section 5's refusal reproduced inside the table
+ * built to answer it, and it is `FM-M6-01` on the panel `P-M6-09` gates every
+ * other number with: *"The page must refuse to look healthy while data trust is
+ * red"*. A `running` row hours old and a `failed` row are both visible through
+ * `reconciliation_runs_unhealthy_idx`; neither is a run this field may date.
+ *
+ * **AND THE TWO NUMBERS BESIDE EACH OTHER ARE DELIBERATELY NOT THE SAME NUMBER.**
+ * `mismatches_open` is a count of the CURRENT state of `reconciliations` and
+ * moves when a human resolves one; `reconciliation_runs.mismatches_found` is
+ * what one run saw and nothing may change it afterwards (`0064`'s fifth E2
+ * note). This response carries the first, so the run row is read for its clock
+ * and for nothing else.
+ *
+ * **NO COMPLETED RUN IS A REFUSAL AND NOT A FIELD TO FILL**, which is
+ * {@link readBatch}'s answer two lines down and for the same reason. All three
+ * declarations of `LiabilityResponse` type `last_run_at` a required `string`,
+ * `ADR-203` puts an absence at a NULLABLE FIGURE and this member is not one, and
+ * `ADR-202` ruling 3's second refusal forbids the alternative of a half-null
+ * object. An estate that has never completed a reconciliation is `P-M6-09` red
+ * rather than a panel with a blank on it.
+ */
+function readRecon(
+  completedRuns: readonly unknown[],
+  openMismatches: readonly unknown[],
+): LiabilityBook['integrations']['recon'] {
+  const lastRunAt = latestInstant(completedRuns, 'startedAt', 'a completed reconciliation run');
+  if (lastRunAt === null)
+    throw new AdminReadError(
+      'no reconciliation run has ever completed, so `integrations.recon.last_run_at` has no ' +
+        'source. 0064 records the sweep and reconciliation_runs_completed_is_whole is what makes ' +
+        'a completed row trustworthy; an estate holding none has not reconciled, which P-M6-09 ' +
+        'renders above every figure on this page rather than beside one',
+    );
+  return { last_run_at: lastRunAt, mismatches_open: openMismatches.length };
+}
+
+/**
  * `integrations.batch`, off the EVENT rather than off a column (ADR-199 clause 4).
  *
  * `last_success_at` is the `occurred_at` of the latest `batch.completed` row and
@@ -803,11 +915,15 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
         'state this schema admits',
     );
 
-  const [breakerRows, planRows, midHealthRows, openMismatches, batchRows] = [
+  const [breakerRows, planRows, midHealthRows, openMismatches, completedRuns, batchRows] = [
     await tx.rows('planBreakerState'),
     await tx.rows('plans'),
     await tx.rows('midHealth'),
     await tx.rowsWhere('reconciliations', { status: 'mismatch' }),
+    // THE PREDICATE IS THE CONTROL AND IT IS APPLIED AT THE ACCESSOR. A typed
+    // equality on a closed column, which is what ADR-157 admits on the read
+    // path, and it is the same shape as the two reads either side of it.
+    await tx.rowsWhere('reconciliationRuns', { status: 'completed' }),
     await tx.rowsWhere('events', { eventName: 'batch.completed' }),
   ];
 
@@ -827,10 +943,10 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
       per_plan: readPerPlan(breakerRows, planRows),
       integrations: {
         mid_health: readMidHealth(midHealthRows),
-        // A COUNT OF A STATE AND NEVER A CLOCK. Blocker B4 is the clock beside
-        // it: `status = 'mismatch'` is what `0014` declares open, and `resolved`
-        // and `match` are the other two.
-        recon: { mismatches_open: openMismatches.length },
+        // A COUNT OF A STATE AND A CLOCK, WHICH IS `B4` LIFTED. `status =
+        // 'mismatch'` is what `0014` declares open and `resolved` and `match`
+        // are the other two; the clock is the newest COMPLETED run of `0064`.
+        recon: readRecon(completedRuns, openMismatches),
         batch,
       },
 
@@ -851,6 +967,7 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
       plansScanned: planRows.length,
       midHealthRowsScanned: midHealthRows.length,
       openMismatchesScanned: openMismatches.length,
+      completedReconRunsScanned: completedRuns.length,
       batchCompletedScanned: batchRows.length,
     },
   };

@@ -201,6 +201,71 @@ const RECONCILIATIONS = [
   { id: 4n, status: 'resolved' },
 ];
 
+/**
+ * `reconciliation_runs`, AND THE FIXTURE IS THE ASSERTION.
+ *
+ * FOUR ROWS AND ONLY TWO OF THEM MAY DATE THE PANEL. A `running` row and a
+ * `failed` row both sit LATER than the newest completed one, so a reader that
+ * folded `max(started_at)` over the table would return `2026-08-28T05:40` --
+ * the sweep that is still running -- and a reader that dropped the predicate
+ * only from the `failed` case would return `2026-08-28T05:12`. Both are runs
+ * `reconciliation_runs_completed_is_whole` exists to keep off this clock, and a
+ * fixture holding only completed rows cannot tell any of the three readers
+ * apart.
+ *
+ * THE COUNTERS ARE THE CONSTRAINT'S AND NOT DECORATION. `accounts_done =
+ * accounts_total` on both completed rows, `accounts_done < accounts_total` on
+ * the failed one: that is `reconciliation_runs_completed_is_whole` and
+ * `reconciliation_runs_done_within_total` satisfied by the shape rather than by
+ * assertion, so this fixture is a set of rows the live table would accept.
+ */
+const RECON_RUNS = [
+  {
+    id: 'run-a',
+    batchRunId: '2b2f6f4c-0000-4000-8000-00000000000a',
+    tradingDay: '2026-08-26',
+    startedAt: new Date('2026-08-27T05:08:00.000Z'),
+    finishedAt: new Date('2026-08-27T05:19:00.000Z'),
+    accountsTotal: 4_812,
+    accountsDone: 4_812,
+    mismatchesFound: 0,
+    status: 'completed',
+  },
+  {
+    id: 'run-b',
+    batchRunId: '2b2f6f4c-0000-4000-8000-00000000000b',
+    tradingDay: '2026-08-27',
+    startedAt: new Date('2026-08-28T05:04:00.000Z'),
+    finishedAt: new Date('2026-08-28T05:21:00.000Z'),
+    accountsTotal: 4_836,
+    accountsDone: 4_836,
+    mismatchesFound: 2,
+    status: 'completed',
+  },
+  {
+    id: 'run-c',
+    batchRunId: '2b2f6f4c-0000-4000-8000-00000000000c',
+    tradingDay: '2026-08-27',
+    startedAt: new Date('2026-08-28T05:12:00.000Z'),
+    finishedAt: new Date('2026-08-28T05:13:00.000Z'),
+    accountsTotal: 4_836,
+    accountsDone: 311,
+    mismatchesFound: 0,
+    status: 'failed',
+  },
+  {
+    id: 'run-d',
+    batchRunId: '2b2f6f4c-0000-4000-8000-00000000000d',
+    tradingDay: '2026-08-28',
+    startedAt: new Date('2026-08-28T05:40:00.000Z'),
+    finishedAt: null,
+    accountsTotal: 4_840,
+    accountsDone: 96,
+    mismatchesFound: 0,
+    status: 'running',
+  },
+];
+
 const BATCH_EVENTS = [
   {
     id: 10n,
@@ -225,6 +290,7 @@ function estate(overrides: Rows = {}): Rows {
     plans: PLANS,
     midHealth: MID_HEALTH,
     reconciliations: RECONCILIATIONS,
+    reconciliationRuns: RECON_RUNS,
     events: BATCH_EVENTS,
     ...overrides,
   };
@@ -241,10 +307,16 @@ async function read(overrides: Rows = {}) {
 // -----------------------------------------------------------------------------
 
 describe('the tables this module may reach', () => {
-  it('names ten real TableKeys, sorted, and no others', () => {
+  it('names eleven real TableKeys, sorted, and no others', () => {
     for (const key of LIABILITY_READ_TABLES) expect(TABLE_KEYS).toContain(key);
     expect([...LIABILITY_READ_TABLES]).toStrictEqual([...LIABILITY_READ_TABLES].sort());
-    expect(LIABILITY_READ_TABLES).toHaveLength(10);
+    expect(LIABILITY_READ_TABLES).toHaveLength(11);
+    // `reconciliationRuns` IS THE ONE THIS SESSION ADDED AND `B4` IS WHY. It is
+    // `0064`'s table, registered `firm`, and it is a DIFFERENT key from
+    // `reconciliations`: the count of open mismatches and the clock of the last
+    // completed sweep are two reads of two tables.
+    expect([...LIABILITY_READ_TABLES]).toContain('reconciliationRuns');
+    expect([...LIABILITY_READ_TABLES]).toContain('reconciliations');
   });
 
   it('NOW names trading_calendar, which is the whole of what B1 bought', () => {
@@ -467,22 +539,73 @@ describe('integrations.mid_health, one row per PSP', () => {
   });
 });
 
-describe('integrations.recon, which is a COUNT and not a clock', () => {
+describe('integrations.recon, which is a COUNT and, since B4 lifted, a CLOCK', () => {
   it('counts open mismatches at the accessor rather than in memory', async () => {
     const { result, calls } = await read();
-    expect(result?.book.integrations.recon).toStrictEqual({ mismatches_open: 2 });
+    expect(result?.book.integrations.recon.mismatches_open).toBe(2);
     expect(calls.find((call) => call.key === 'reconciliations')?.where).toStrictEqual({
       status: 'mismatch',
     });
   });
 
-  it('carries no last_run_at, which is blocker B4', async () => {
-    // Nothing in this schema records a reconciliation RUN. The available fold is
-    // `max(reconciliations.created_at)`, which is the fold ADR-199 section 5
-    // refuses one field to the right, because a sweep resumable at the account
-    // boundary reports a success for a run that crashed.
+  // INVERTED BY THE SESSION THAT SPENT THE CLEARING CONDITION. This case read
+  // "carries no last_run_at, which is blocker B4" and asserted the KEY was
+  // absent. B4's condition was "a `recon.completed` event or a run record";
+  // `0064` is the record, session 387 wrote its producer, and the reader is this
+  // module. A clearing condition fires ONCE and the session that lifts the
+  // blocker spends it, which is this file's rule throughout.
+  it('dates the panel off the newest COMPLETED run, which is the record half of B4', async () => {
+    const { result, calls } = await read();
+    expect(result?.book.integrations.recon).toStrictEqual({
+      last_run_at: '2026-08-28T05:04:00.000Z',
+      mismatches_open: 2,
+    });
+    // AND THE PREDICATE IS AT THE ACCESSOR, which is the half a returned value
+    // cannot show: a module that read every run and filtered in memory answers
+    // identically here and scans the whole table on the panel's hot path.
+    expect(calls.find((call) => call.key === 'reconciliationRuns')?.where).toStrictEqual({
+      status: 'completed',
+    });
+  });
+
+  it('is NOT max(started_at), which is the run that crashed reporting a success', async () => {
+    // THE TWO ROWS THIS CASE EXISTS FOR. `run-d` is `running` and started at
+    // 05:40, `run-c` is `failed` at 05:12, and both are LATER than the newest
+    // completed run. `reconciliation_runs_completed_is_whole` is the constraint
+    // and this is the reader it names: "a reader taking the latest completed run
+    // gets a sweep that actually covered the book".
     const { result } = await read();
-    expect('last_run_at' in (result?.book.integrations.recon ?? {})).toBe(false);
+    const clock = result?.book.integrations.recon.last_run_at;
+    expect(clock).not.toBe('2026-08-28T05:40:00.000Z');
+    expect(clock).not.toBe('2026-08-28T05:12:00.000Z');
+    // NON-VACUITY: the rows really are in the fixture and really are later.
+    const later = RECON_RUNS.filter((run) => run.startedAt > new Date('2026-08-28T05:04:00.000Z'));
+    expect(later.map((run) => run.status)).toStrictEqual(['failed', 'running']);
+  });
+
+  it('takes a TIE on started_at without refusing it, because 0064 declares no unique index', async () => {
+    // `latestBy` REFUSES A TIE AND THIS FOLD MUST NOT. That refusal is argued
+    // from `liability_snapshots_as_of_uq`; `0064`'s second E2 note rules OUT a
+    // unique key here, because RB-02 section A sends a quarantined day to
+    // redelivery and a redelivered day is reconciled again. Two completed runs
+    // at one instant is a state this schema admits, and the answer is a max over
+    // one column rather than a row, so the tie costs nothing.
+    const twin = { ...RECON_RUNS[1], id: 'run-b2', tradingDay: '2026-08-26' };
+    const { result } = await read({ reconciliationRuns: [...RECON_RUNS, twin] });
+    expect(result?.book.integrations.recon.last_run_at).toBe('2026-08-28T05:04:00.000Z');
+  });
+
+  it('refuses a book when no run has ever completed, rather than blanking the clock', async () => {
+    // `last_run_at` is a required `string` in all three declarations of
+    // `LiabilityResponse`, ADR-203 puts an absence at a NULLABLE FIGURE and this
+    // member is not one, and ADR-202 ruling 3 refuses a half-null object. So the
+    // refusal is the answer, which is `readBatch`'s two lines down.
+    await expect(read({ reconciliationRuns: [] })).rejects.toThrow(/P-M6-09/);
+    // AND A TABLE HOLDING ONLY UNFINISHED RUNS IS THE SAME ANSWER, which is the
+    // case an unpredicated reader would have rendered as a fresh panel.
+    await expect(
+      read({ reconciliationRuns: RECON_RUNS.filter((run) => run.status !== 'completed') }),
+    ).rejects.toThrow(/P-M6-09/);
   });
 });
 
@@ -543,23 +666,24 @@ describe('what the read costs, which the composition would drop', () => {
       plansScanned: 2,
       midHealthRowsScanned: 3,
       openMismatchesScanned: 2,
+      completedReconRunsScanned: 2,
       batchCompletedScanned: 2,
     });
   });
 
-  it('reads eight of the ten tables, and the other two are the horizon`s', async () => {
+  it('reads nine of the eleven tables, and the other two are the horizon`s', async () => {
     // THE ARRAY IS THE MODULE'S AND THE READ IS THE BOOK'S, and they stopped
     // being the same list the moment the calendar arrived. `readLiabilityBook`
-    // reads eight; `readTradingHorizon` reads the two the book does not, which
-    // its own case above asserts from the other side.
+    // reads nine as of B4; `readTradingHorizon` reads the two the book does not,
+    // which its own case above asserts from the other side.
     const { calls } = await read();
-    const read8 = [...new Set(calls.map((call) => call.key))].sort();
-    expect(read8).toStrictEqual(
+    const readByBook = [...new Set(calls.map((call) => call.key))].sort();
+    expect(readByBook).toStrictEqual(
       [...LIABILITY_READ_TABLES].filter(
         (key) => key !== 'tradingCalendar' && key !== 'tradingCalendarLoads',
       ),
     );
-    expect(read8).toHaveLength(8);
+    expect(readByBook).toHaveLength(9);
   });
 });
 
@@ -644,8 +768,6 @@ const BLOCKED_LEAVES = [
   // the form. One leaf, because the absence is a property of the CALIBRATION
   // and not of the three members, which is that ruling's own second refusal.
   'per_plan[].cusum',
-  // B4: nothing records a reconciliation RUN.
-  'integrations.recon.last_run_at',
 ] as const;
 
 /**
@@ -695,22 +817,24 @@ describe('the subtraction this whole slice measures', () => {
     );
   });
 
-  it('holds 8 blocked leaves and 4 empty-array leaves against 39 declared, so 27 are produced', async () => {
-    // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY, which
-    // matters more after `ADR-203` than before it: three of the four moved and
-    // the produced count did not. 40 declared became 39 (seven object members
-    // out, two nullable containers and four `gaps` members in), 13 blocked
-    // became 8, and 27 PRODUCED IS UNCHANGED. That last equality is the claim
-    // worth holding. A wire shape that could say "absent" was added to this
-    // response and NOT ONE FIGURE became more or less available because of it,
-    // which is what it means for a shape ruling to be a shape ruling.
+  it('holds 7 blocked leaves and 4 empty-array leaves against 39 declared, so 28 are produced', async () => {
+    // THE NUMBERS ARE DERIVED HERE AND ARE NOT CARRIED FROM AN ENTRY, and this
+    // is the first session in four in which the PRODUCED COUNT MOVED. `ADR-203`
+    // moved the declared count and left production alone, which was that
+    // ruling's own point; `B4` moves production, because `0064` plus session
+    // 387's producer plus the reader in this module is a leaf that has a source
+    // where yesterday it had none. 27 became 28 and 8 blocked became 7.
     const declared = await contractLeaves();
     expect(declared).toHaveLength(39);
-    expect(BLOCKED_LEAVES).toHaveLength(8);
+    expect(BLOCKED_LEAVES).toHaveLength(7);
     expect(EMPTY_ARRAY_LEAVES).toHaveLength(4);
     for (const leaf of [...BLOCKED_LEAVES, ...EMPTY_ARRAY_LEAVES]) expect(declared).toContain(leaf);
+    // AND THE LEAF THAT MOVED IS NAMED, so a later reader can tell an arithmetic
+    // change from a production change without diffing two revisions of a count.
+    expect(declared).toContain('integrations.recon.last_run_at');
+    expect(BLOCKED_LEAVES).not.toContain('integrations.recon.last_run_at');
     const { result } = await read();
-    expect(leavesOf(result?.book)).toHaveLength(27);
+    expect(leavesOf(result?.book)).toHaveLength(28);
   });
 
   it('reads a contract whose LiabilityResponse block is still the one RI-18 binds', () => {
