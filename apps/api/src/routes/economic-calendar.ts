@@ -67,6 +67,41 @@
 // the empty panel, it is the confident one".
 //
 // -----------------------------------------------------------------------------
+// THE DEPLOYMENT THAT ANSWERS IS `databaseEconomicCalendar` BELOW, AND ADR-240
+// IS WHERE THE HORIZON STOPPED BEING A SENTENCE
+// -----------------------------------------------------------------------------
+// The paragraph above says the SERVER answers and not this file, and until
+// ADR-240 no server did: the port had no implementation, so `stale` was a field
+// nothing in this repository could produce and the horizon was a word in a
+// runbook. The adapter at the foot of this file is that server, and it is
+// separated from the HANDLER by exactly the line ADR-146 clause 4 draws.
+//
+// THE HANDLER STILL READS NO CLOCK AND STILL DERIVES NO DAY. What the adapter
+// reads is `MERIT_ECONOMIC_CALENDAR_HORIZON_TRADING_DAYS`, which the deployment
+// sets and this repository never values (ADR-012); an absent one is
+// `unconfigured` and answers 503, on ADR-226's rule that an absent
+// configuration REFUSES rather than switching a control off. There is no
+// default, because a defaulted horizon is a freshness verdict nobody decided.
+//
+// AND IT COMPARES AN INSTANT WITH AN INSTANT, WHICH IS THE WHOLE OF WHY CLAUSE
+// 4 SURVIVES IT. The adapter never converts a timestamp into a day. It counts
+// the `trading_calendar` rows whose session has NOT YET OPENED at the moment of
+// the read and whose `trading_day` is at or before `covered_through_day`, and
+// compares that COUNT with the horizon. `session_open_at` is a `timestamptz`
+// and so is the clock, `trading_day` is a day and so is `coverage_end_day`, and
+// no value ever crosses from one vocabulary to the other. The failure clause 4
+// forbids -- `new Date()` yielding a UTC calendar date and being compared with
+// an exchange CT trading day -- has no site here to happen at.
+//
+// A HOLIDAY AND A WEEKEND NEED NO RULING UNDER THAT SHAPE, and that is the
+// reason it was taken over the obvious one. "What is today's trading day" has
+// no answer at 03:00 on a Saturday, and a route serving a dashboard is asked
+// the question at 03:00 on a Saturday; a COUNT OF SESSIONS STILL AHEAD is
+// defined at every instant. `0032` made a holiday's `session_open_at` NULL, and
+// `NULL >= $1` is not true, so a holiday is excluded by the comparison rather
+// than by a branch somebody has to remember to write.
+//
+// -----------------------------------------------------------------------------
 // THE ORDER IS THE QUERY'S AND THIS FILE DOES NOT SORT
 // -----------------------------------------------------------------------------
 // `economic_calendar_release_idx` is `0039`'s "the panel's read: upcoming
@@ -102,7 +137,13 @@
 // declaration is what the endpoint requires; the row is nobody's either way.
 // =============================================================================
 
+import { atLeast, atMost } from '@merit/db';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+
+import type { ApiDb } from '../db.ts';
 import { defineRoutes } from '../registry.ts';
+import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
+import type { Environment } from '../surface.ts';
 import { requiredFactorTable, toRoutes, withSessionContext } from './auth.ts';
 import type { EndpointSpec } from './auth.ts';
 
@@ -206,6 +247,47 @@ export class EconomicCalendarError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'EconomicCalendarError';
+  }
+}
+
+/**
+ * Raised when no source is wired. Answered 503, never a 500.
+ *
+ * IT USED TO BE AN `EconomicCalendarError` AND THEREFORE A 500, and ADR-240
+ * separates the two because they are two different facts. Every other case of
+ * that class is a row the source handed over that cannot be rendered, which is
+ * a defect; this one is a deployment nobody finished, which is the sentence
+ * `VerifySourceUnwired` and `CertificateBackendUnwired` both already carry on
+ * their own ports. A 500 tells an operator to look for a bug and a 503 tells
+ * them to look at the deployment, and only one of those is true here.
+ */
+export class EconomicCalendarUnwired extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EconomicCalendarUnwired';
+  }
+}
+
+/**
+ * Raised when the source is wired and the DEPLOYMENT supplied no horizon.
+ *
+ * A SEPARATE CLASS FROM {@link EconomicCalendarUnwired} AND THE SAME STATUS
+ * CODE, on `verify.ts`'s split between `VerifySourceUnwired` and
+ * `VerifyPresentationError`: the caller is told the same thing either way and
+ * an operator is told which half to go and fix. Both are a deploy that has not
+ * been finished; one is missing a line in `start.ts` and the other is missing a
+ * variable in a vault.
+ *
+ * THERE IS NO OUTCOME UNDER WHICH AN ABSENT HORIZON RENDERS A PANEL.
+ * `freshness.stale` would have to be answered, and both answers are wrong: a
+ * `false` is `DEP-M4-09`'s confident failure and a `true` is a permanent alarm
+ * a deployment cannot switch off by configuring the thing it forgot. ADR-226:
+ * an absent configuration refuses rather than switching the control off.
+ */
+export class EconomicCalendarUnconfigured extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EconomicCalendarUnconfigured';
   }
 }
 
@@ -371,6 +453,305 @@ export function renderEconomicCalendar(panel: EconomicCalendarPanel): EconomicCa
   };
 }
 
+// -----------------------------------------------------------------------------
+// The adapter (ADR-240)
+// -----------------------------------------------------------------------------
+
+/**
+ * The variable a deployment sets to supply the staleness horizon.
+ *
+ * NAMED HERE AND VALUED NOWHERE IN THIS REPOSITORY (ADR-012), exactly as
+ * `MERIT_TURNSTILE_SECRET` (ADR-226) and `MERIT_POSTMARK_SERVER_TOKEN`
+ * (ADR-229) are. It is not a credential, so INFRA section 7's vault scoping is
+ * not what governs it; INFRA section 8 rows it beside the alarm that reads the
+ * same column, which is where CRON_INVENTORY already puts the horizon.
+ *
+ * THE UNIT IS IN THE NAME AND THAT IS THE POINT RATHER THAN A STYLE. ADR-146
+ * exists because two date vocabularies met on one object and nothing said which
+ * was which. `..._HORIZON_DAYS` would have been the same defect in a variable
+ * name: a deployment setting `10` would have no way to know whether it had
+ * bought ten calendar days or ten sessions, and the two differ by every weekend
+ * and every holiday in the window. The value is a number of TRADING DAYS.
+ *
+ * NO NUMBER IS WRITTEN HERE AND ADR-146 CLAUSE 7 IS WHY. That clause found no
+ * horizon value anywhere in the corpus and refused to invent one in a route.
+ * ADR-240 does not overturn it: the value is still not in this repository, and
+ * what lands is the NAME the deployment sets it under.
+ */
+export const ECONOMIC_CALENDAR_HORIZON_VAR = 'MERIT_ECONOMIC_CALENDAR_HORIZON_TRADING_DAYS';
+
+/**
+ * What {@link resolveEconomicCalendarHorizon} answers.
+ *
+ * A RESULT RATHER THAN A THROW, on `resolveOtpSmsPriceCents`' shape: the caller
+ * decides what a refusal becomes, and here it becomes
+ * {@link EconomicCalendarUnconfigured} and a 503.
+ */
+export type EconomicCalendarHorizon =
+  { readonly tradingDays: number } | { readonly refusal: string };
+
+/**
+ * The horizon a deployment configured, or the reason there is none.
+ *
+ * STRICT, AND EVERY REFUSAL BELOW IS A VALUE THAT WOULD HAVE MADE THE PANEL LIE
+ * RATHER THAN FAIL.
+ *
+ *   - AN ABSENT VALUE IS A REFUSAL AND NEVER A DEFAULT. A defaulted horizon is
+ *     a freshness verdict nobody decided, published to a trader as the server's
+ *     own answer against its own threshold. ADR-226's rule, on a threshold
+ *     instead of a secret.
+ *   - A DECIMAL POINT IS REFUSED RATHER THAN ROUNDED. A session is a row and
+ *     half a row is not a quantity this comparison has; `resolveOtpSmsPriceCents`
+ *     refuses the same shape for the same reason one vocabulary over.
+ *   - ZERO IS REFUSED, because a horizon of zero is satisfied by a calendar
+ *     covering nothing ahead at all, which is a staleness check that can never
+ *     fire -- the fail-open dressed as a configured control.
+ *   - A NEGATIVE IS REFUSED, and it would be satisfied by every calendar there
+ *     is, including one whose coverage ended last year.
+ */
+export function resolveEconomicCalendarHorizon(env: Environment): EconomicCalendarHorizon {
+  const raw = env[ECONOMIC_CALENDAR_HORIZON_VAR];
+  if (raw === undefined || raw.trim() === '')
+    return {
+      refusal:
+        `no \`${ECONOMIC_CALENDAR_HORIZON_VAR}\` is set, so \`freshness.stale\` has no threshold ` +
+        'to be decided against. There is deliberately no default: a horizon nobody chose is a ' +
+        "freshness verdict published as the server's own answer against a threshold nobody " +
+        'wrote down. ADR-240, and ADR-146 clause 7 is why no number lives in this file',
+    };
+  const value = raw.trim();
+  // WHOLE DIGITS ONLY, CHECKED BEFORE THE NUMBER IS READ. `Number(' 7 ')` and
+  // `Number('7.5')` both succeed and neither is a count of sessions, so the
+  // SHAPE is refused first rather than after a coercion has hidden it.
+  if (!/^\d+$/.test(value))
+    return {
+      refusal:
+        `\`${ECONOMIC_CALENDAR_HORIZON_VAR}\` is not a whole number of trading days. The ` +
+        'horizon counts SESSIONS, which are rows of `trading_calendar`, and a fraction of a ' +
+        'session is not a quantity this comparison has',
+    };
+  const tradingDays = Number(value);
+  if (!Number.isSafeInteger(tradingDays) || tradingDays <= 0)
+    return {
+      refusal:
+        `\`${ECONOMIC_CALENDAR_HORIZON_VAR}\` must be a positive whole number of trading days. ` +
+        'A horizon of zero is satisfied by a calendar that covers nothing ahead at all, which ' +
+        'is a staleness check that can never fire',
+    };
+  return { tradingDays };
+}
+
+function asRow(value: unknown, key: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new EconomicCalendarError(`a \`${key}\` row is not an object`);
+  return value as Record<string, unknown>;
+}
+
+function column(row: Record<string, unknown>, field: string, key: string): string {
+  const value = row[field];
+  if (typeof value !== 'string')
+    throw new EconomicCalendarError(
+      `\`${key}.${field}\` is not a string on the row the accessor returned`,
+    );
+  return value;
+}
+
+function count(row: Record<string, unknown>, field: string, key: string): number {
+  const value = row[field];
+  if (typeof value === 'number') return value;
+  // `pg` HANDS `bigint` BACK AS A STRING and `smallint` and `integer` back as
+  // numbers, so both spellings are read. `tier` and `revision` are `smallint`
+  // and `integer`; nothing here is money, and `renderEconomicCalendar` is what
+  // holds each to its own CHECK.
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) return Number(value);
+  throw new EconomicCalendarError(`\`${key}.${field}\` is not an integer`);
+}
+
+/**
+ * One `economic_calendar_current` row, off the accessor.
+ *
+ * `scheduled_release_at` IS A `Date` AND `release_trading_day` IS A STRING, and
+ * that asymmetry is the two column types rather than an inconsistency: `pg`
+ * hands a `timestamptz` back as a `Date` and drizzle's `date()` hands a `date`
+ * back as the `YYYY-MM-DD` text the column holds. THE DAY IS NEVER BUILT FROM
+ * THE INSTANT. `toISOString()` renders the instant and the day is copied
+ * across, so the two fields of the response come from the two columns of the
+ * row and neither is a function of the other (ADR-146 clause 1).
+ */
+function toEconomicCalendarRow(value: unknown): EconomicCalendarRow {
+  const row = asRow(value, 'economicCalendarCurrent');
+  const releaseAt = row['scheduledReleaseAt'];
+  if (!(releaseAt instanceof Date) || Number.isNaN(releaseAt.getTime()))
+    throw new EconomicCalendarError(
+      '`economicCalendarCurrent.scheduledReleaseAt` is not a Date. The column is `timestamptz`, ' +
+        "and a value that is not one cannot be rendered as section 1's RFC 3339 UTC string",
+    );
+  const reason = row['revisionReason'];
+  if (reason !== null && reason !== undefined && typeof reason !== 'string')
+    throw new EconomicCalendarError(
+      '`economicCalendarCurrent.revisionReason` is neither text nor null',
+    );
+  return {
+    event_key: column(row, 'eventKey', 'economicCalendarCurrent'),
+    occurrence_key: column(row, 'occurrenceKey', 'economicCalendarCurrent'),
+    tier: count(row, 'tier', 'economicCalendarCurrent'),
+    scheduled_release_at: releaseAt.toISOString(),
+    release_trading_day: column(row, 'releaseTradingDay', 'economicCalendarCurrent'),
+    revision: count(row, 'revision', 'economicCalendarCurrent'),
+    revision_reason: reason === undefined ? null : reason,
+  };
+}
+
+/**
+ * The newest day any load covers, or `null` when nothing has ever been loaded.
+ *
+ * THE MAXIMUM IS LEXICOGRAPHIC AND THAT IS SOUND HERE WHERE IT WOULD NOT BE ON
+ * AN INSTANT. ADR-146 finding 8: a zero-padded ISO DAY has one spelling, so
+ * string order is chronological order with no arithmetic; an RFC 3339 instant
+ * has more than one and that is why `renderEconomicCalendar` refuses to sort.
+ * `coverage_end_day` is a `date`, so it is the first case and not the second.
+ *
+ * THE FOLD IS IN MEMORY BECAUSE THE ACCESSOR OFFERS NO AGGREGATE, which is
+ * `catalog.ts`' and `wallet.ts`' recorded cost on their own pages. The read
+ * grows with the number of loads rather than with the calendar, one row per
+ * ingested publication, and it is stated here rather than discovered: an
+ * aggregate is the shape `ScopedTx` and `FirmTx` deliberately do not offer, and
+ * inventing one is `packages/db`'s diff and not a route's.
+ */
+export function newestCoverageDay(loads: readonly unknown[]): string | null {
+  let newest: string | null = null;
+  for (const load of loads) {
+    const day = column(
+      asRow(load, 'economicCalendarLoads'),
+      'coverageEndDay',
+      'economicCalendarLoads',
+    );
+    if (newest === null || day > newest) newest = day;
+  }
+  return newest;
+}
+
+/**
+ * The source, reading through the accessor.
+ *
+ * `db.firm` AND NOTHING ELSE, ON ALL THREE READS. `economic_calendar_current`,
+ * `economic_calendar_loads` and `trading_calendar` are each scope class `firm`
+ * in `packages/db/src/scope.ts`, which is the same fact in three places: a
+ * release, a load and a session belong to nobody. The endpoint declares
+ * `session` anyway (ADR-111 clause 3) and the handler reads nothing out of it,
+ * so no identity reaches this function and there is none for it to filter on.
+ *
+ * IT READS `economicCalendarCurrent` AND NEVER `economicCalendar`. `0039` calls
+ * the view "the only definition of that anywhere", and an adapter over the base
+ * table would re-derive the maximum revision in TypeScript, which is the
+ * second-source-of-truth failure `FM-M7-08` guards and the exact thing the view
+ * was created to make impossible.
+ *
+ * THE WINDOW IS UPCOMING RELEASES AND THE INDEX IS WHERE THAT WAS ALREADY
+ * DECIDED. `economic_calendar_release_idx` is `0039`'s "the panel's read:
+ * upcoming releases by instant", and the port's own doc says which window is
+ * rendered is the QUERY's decision. This is the query. `atLeast(now)` is an
+ * instant compared with an instant, which is the only comparison ADR-146 leaves
+ * open on an `*_at`.
+ *
+ * @param env   where {@link ECONOMIC_CALENDAR_HORIZON_VAR} is read from, PER
+ *              READ. A parameter for `cloudflareTurnstileVerifier`'s reason: a
+ *              suite that could not vary the environment could assert none of
+ *              the configuration behaviour.
+ * @param clock the instant both comparisons are made at. Injected so a suite
+ *              can put the read on either side of a session open without
+ *              waiting for one, and so that one read uses ONE instant: a
+ *              function calling `new Date()` twice could count a session as
+ *              ahead in the first comparison and behind in the second.
+ *
+ * THE CONFIGURATION IS READ PER CALL AND NOT MEMOISED, for `resolveOtpMacKeys`'
+ * reason: a value captured at import is a value a rotation cannot reach.
+ */
+export function databaseEconomicCalendar(
+  db: ApiDb,
+  env: Environment = process.env,
+  clock: () => Date = () => new Date(),
+): EconomicCalendarSource {
+  return {
+    async readPanel(): Promise<EconomicCalendarPanel> {
+      // THE HORIZON IS RESOLVED BEFORE THE DOOR IS OPENED. An unconfigured
+      // deployment refuses without spending a connection, and the refusal is
+      // identical whatever the calendar holds.
+      const horizon = resolveEconomicCalendarHorizon(env);
+      if ('refusal' in horizon) throw new EconomicCalendarUnconfigured(horizon.refusal);
+
+      // ONE INSTANT FOR THE WHOLE READ. See `clock` above.
+      const now = clock();
+
+      return await db.firm(async (tx) => {
+        const occurrences = (
+          await tx.rowsWhere('economicCalendarCurrent', { scheduledReleaseAt: atLeast(now) })
+        ).map(toEconomicCalendarRow);
+
+        const coveredThroughDay = newestCoverageDay(await tx.rows('economicCalendarLoads'));
+
+        // NOTHING EVER LOADED IS STALE, AND IT IS THE ONE BRANCH THAT NEEDS NO
+        // HORIZON. `DEP-M4-09`: the dangerous failure is the confident one, and
+        // `renderEconomicCalendar` refuses the opposite pair outright, so this
+        // is the source agreeing with the renderer rather than being caught by
+        // it.
+        if (coveredThroughDay === null)
+          return { freshness: { stale: true, covered_through_day: null }, occurrences };
+
+        // THE SESSIONS STILL AHEAD AND STILL COVERED. `session_open_at >= now`
+        // is an instant against an instant and `trading_day <= covered_through_day`
+        // is a day against a day; a holiday's `session_open_at` is NULL since
+        // `0032` and `NULL >= $1` is not true, so holidays fall out of the
+        // count without a branch. See this file's header.
+        const ahead = await tx.rowsWhere('tradingCalendar', {
+          sessionOpenAt: atLeast(now),
+          tradingDay: atMost(coveredThroughDay),
+        });
+
+        return {
+          freshness: {
+            stale: ahead.length < horizon.tradingDays,
+            covered_through_day: coveredThroughDay,
+          },
+          occurrences,
+        };
+      });
+    },
+  };
+}
+
+/**
+ * An unfinished deployment is a 503 and never a 500. Anything else is the
+ * transport's.
+ *
+ * TWO CLASSES AND ONE STATUS CODE, and an `EconomicCalendarError` IS NOT IN THE
+ * SET. That class is a row the source handed over that this file cannot render:
+ * a tier of four, two rows for one occurrence, a `*_day` carrying an instant.
+ * Every one of those is a defect somebody has to fix in code, and this endpoint
+ * takes no input at all, so a caller can cause none of them. They keep their
+ * 500 through `server.ts`'s error handler, which is this file's own rule at
+ * {@link EconomicCalendarError} and is unchanged by ADR-240.
+ *
+ * THE REFUSAL CARRIES NO DETAIL, on section 2's rule that a problem document
+ * "never leaks internals". Which half is unfinished reaches the LOG, which is
+ * where an operator reads it, and `turnstile.ts`'s outcome union is the same
+ * split: three refusals kept apart for the operator and collapsed for the
+ * caller.
+ */
+function unfinishedOrThrow(
+  err: unknown,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): FastifyReply {
+  if (!(err instanceof EconomicCalendarUnwired) && !(err instanceof EconomicCalendarUnconfigured))
+    throw err;
+  request.log.error({ err }, 'economic calendar source is not wired or is not configured');
+  return reply
+    .code(503)
+    .type(PROBLEM_MEDIA_TYPE)
+    .send({ ...problem('service_unavailable', 503, request.id), title: 'Service unavailable' });
+}
+
 /**
  * API_CONTRACT section 6.1, one row.
  *
@@ -384,15 +765,19 @@ export const ECONOMIC_CALENDAR_ENDPOINTS: readonly EndpointSpec[] = [
     method: 'GET',
     path: ECONOMIC_CALENDAR_PATH,
     required: 'session',
-    handle: withSessionContext(async () => {
-      const wired = source;
-      if (wired === null)
-        throw new EconomicCalendarError(
-          'no economic calendar source is wired, so `GET /economic-calendar` cannot read the ' +
-            'panel it renders. This is a deployment that has not been finished rather than a ' +
-            'request that failed: the process that builds this server is what supplies one',
-        );
-      return renderEconomicCalendar(await wired.readPanel());
+    handle: withSessionContext(async ({ request, reply }) => {
+      try {
+        const wired = source;
+        if (wired === null)
+          throw new EconomicCalendarUnwired(
+            'no economic calendar source is wired, so `GET /economic-calendar` cannot read the ' +
+              'panel it renders. This is a deployment that has not been finished rather than a ' +
+              'request that failed: the process that builds this server is what supplies one',
+          );
+        return renderEconomicCalendar(await wired.readPanel());
+      } catch (err) {
+        return unfinishedOrThrow(err, request, reply);
+      }
     }),
   },
 ];

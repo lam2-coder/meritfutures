@@ -451,34 +451,36 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'the reason `statements` refuses. That is a handler file and outside this fence. NOTE: this ' +
     'port already holds `productionAffiliateDeps` at module scope (`affiliate.ts:478`), so ' +
     'calling the setter here would install what is already installed. That is not a wiring.',
-  setEconomicCalendarSource:
-    'ONE THING, AND THIS ENTRY USED TO NAME TWO. It read that the view the port reads is in ' +
-    'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
-    'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
-    '(`packages/db/src/schema.ts:2418`) declares `economic_calendar_current` and ' +
-    '`economicCalendarCurrent` (`packages/db/src/scope.ts:1033`) classes it `firm`, so it is a ' +
-    '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
-    '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +
-    'not in this deployable. The port says so at `routes/economic-calendar.ts:166`, "the answer ' +
-    'the deployment already computed against the configured horizon", and the module header at ' +
-    '`:58` puts the horizon with the alarm. A route that reached for a clock instead would ' +
-    'compare a UTC date against an exchange trading day. THE READ ARM ALONE IS NOW ' +
-    'CONSTRUCTIBLE AND THE PORT IS ONE METHOD (`routes/economic-calendar.ts:194`), so there is ' +
-    'no partial backend available here: `readPanel` returns the panel AND its freshness ' +
-    '(`routes/economic-calendar.ts:177`) in one value, and a backend answering it would have to ' +
-    'invent the half it cannot compute.',
   setInternalOpsSource:
     'an ops plane rather than a database read. `readDependencies`, `readJobs` and ' +
     '`readReconStatus` are probes of other processes, and `runBatch` COMMANDS one. None of the ' +
     'four is a shape `ApiDb` offers, and `routes/internal.ts:842-845` says a retry against this ' +
     'process will never succeed.',
   useCertificateBackend:
-    'ITS SIGNER, AND NOT ITS READ. `databaseCertificateBackend` already exists ' +
-    '(`routes/certificates.ts:646`) and its second parameter has no supplier: `image_url` is ' +
-    '"signed, time-limited" and this deployable holds no signing key, and `verify_url` addresses ' +
-    '`GET /verify/:code`, which ADR-168 foreclosure 1 records as named by M11 and DEFINED BY NO ' +
-    'SECTION of the contract. Composing a string here would invent both the origin ADR-012 keeps ' +
-    'out of this repository and a path no approved document defines.',
+    'ITS SIGNER, AND NOT ITS READ, AND ADR-240 SPLITS THE SIGNER CLAUSE IN TWO BECAUSE ONLY ONE ' +
+    'HALF WAS EVER A CONFIGURATION. `databaseCertificateBackend` still exists ' +
+    '(`routes/certificates.ts:654`) and its second parameter still has no supplier. ' +
+    "THE `verify_url` CLAUSE IS DISCHARGED AND IS REWRITTEN RATHER THAN DELETED, on RI-14's " +
+    'rule that a false sentence removed leaves nothing for the next reader to check. It read ' +
+    'that the path is "named by M11 and DEFINED BY NO SECTION of the contract" (ADR-168 ' +
+    'foreclosure 1), and API_CONTRACT section 6.3 has carried a `GET /verify/:code` row since ' +
+    'ADR-170 (`docs/architecture/API_CONTRACT.md:786`), `routes/verify.ts` implements it, and ' +
+    '`start.ts` wires `databaseVerifySource(LIVE_DB)` today. What that half now waits on is an ' +
+    'ORIGIN, which is a deployment fact ADR-012 keeps out of this repository and which one ' +
+    'named environment variable would close. ' +
+    "THE `image_url` CLAUSE STANDS AND IS NOT A SECRET, WHICH IS ADR-240'S RULING. " +
+    'API_CONTRACT section 6 types it "signed, time-limited" and its section 6.3 image row states ' +
+    '"Request: the path token only, no query, no body" ' +
+    '(`docs/architecture/API_CONTRACT.md:776`), so a signature and an expiry have nowhere to ' +
+    'ride on the URL of `GET /certificates/:code/image.png` and `imageHandler` verifies none: ' +
+    '`test/certificate-links.test.ts` asserts that the endpoint answers identically with and ' +
+    'without signature-shaped query parameters. THREE THINGS ARE MISSING AND ONLY ONE IS ' +
+    'CONFIGURATION, and `routes/account-reads.ts` reached the same finding independently on its ' +
+    'own `/certificate` row: "the card renderer, the CDN origin and the URL signer are all M11 ' +
+    'and none exists", and `certificates` (`0020_public_surface.sql`) carries `signature` and ' +
+    '`signing_key_id` and NO image location column, "so there is not even a stored value to ' +
+    'sign". A VARIABLE NAMED HERE WOULD CLOSE THE ORIGIN AND NEITHER OF THE OTHER TWO, so this ' +
+    'port is NOT the shape ADR-226 and ADR-229 wired and it is not wired on their precedent.',
   useCertificateImageSource:
     'THE REASON HERE WAS THE DOOR AND ADR-231 BUILT IT, so the entry is REPLACED rather than ' +
     'deleted and the obstruction that remains is a different one. It read: "a door neither of ' +
@@ -490,11 +492,22 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'constructible: `record` writes `certificate_verifications`, scope class `firm`, exactly as ' +
     '`databaseVerifySource` does. WHAT BLOCKS THIS ROW IS THAT ITS ANSWER IS NOT A ROW, IT IS ' +
     'BYTES. `CertificateLookup.card` carries `image/png` bytes ' +
-    '(`routes/certificates.ts:909-923`) and this file\'s own header says the renderer "is not ' +
+    '(`routes/certificates.ts:918-938`) and this file\'s own header says the renderer "is not ' +
     'in this repository" (`routes/certificates.ts:44`). An adapter written here would have to ' +
     'invent a card, and a public endpoint serving an invented card is a worse failure than a ' +
-    "503: it puts Merit's name on an artefact Merit did not render. When a renderer lands this " +
-    'entry goes rather than shrinking.',
+    "503: it puts Merit's name on an artefact Merit did not render. " +
+    "ADR-240 MEASURED THE MISSING RENDERER RATHER THAN RESTATING IT, on ADR-235's rule that an " +
+    'absent producer reads as a satisfied specification: over every directory in this ' +
+    'repository holding shipped source, `CertificateCard` is named in ONE file and that file is ' +
+    "the port's own declaration, and the string `image/png` appears in ONE file too. " +
+    '`test/certificate-links.test.ts` executes both counts, so the day a renderer lands this ' +
+    'entry goes red rather than waiting to be noticed. ' +
+    'AND ONE HALF OF THE CARD IS CONFIGURATION WHILE THE OTHER IS NOT, which is why naming a ' +
+    'variable does not close this port either: `cache_max_age_seconds` is "config rather than a ' +
+    'number stated here" (API_CONTRACT section 6.3), so a deployment supplies it, and the BYTES ' +
+    'beside it are a renderer no deployment can set. ADR-240 declines to name the first while ' +
+    'the second has no producer, because a variable whose only consumer refuses is a name ' +
+    'nothing reads.',
   useCertificateRevokeBackend:
     'TWO OBSTRUCTIONS, AND THE SECOND IS A CIRCULARITY RATHER THAN A MISSING DOOR. ' +
     '`principal(request)` (`routes/admin-certificates.ts:353`) resolves only through ' +
@@ -702,5 +715,5 @@ test('the wired count is reported, so a regression is a number and not a paragra
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 24, wired: 7, blocked: 17 });
+  }).toStrictEqual({ declared: 24, wired: 8, blocked: 16 });
 });
