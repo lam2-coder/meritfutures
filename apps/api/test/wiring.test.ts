@@ -314,7 +314,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`packages/db/src/scope.ts` and its only path to an identity runs through `attributions`, ' +
     'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
     'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
-    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2665`) declares it while ' +
+    'all, and `affiliateStatements` (`packages/db/src/schema.ts:2686`) declares it while ' +
     '`affiliateStatements` (`packages/db/src/scope.ts:1046`) registers it `derived` through ' +
     '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
     '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
@@ -328,7 +328,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ONE THING, AND THIS ENTRY USED TO NAME TWO. It read that the view the port reads is in ' +
     'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
     'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
-    '(`packages/db/src/schema.ts:2358`) declares `economic_calendar_current` and ' +
+    '(`packages/db/src/schema.ts:2379`) declares `economic_calendar_current` and ' +
     '`economicCalendarCurrent` (`packages/db/src/scope.ts:963`) classes it `firm`, so it is a ' +
     '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
     '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +

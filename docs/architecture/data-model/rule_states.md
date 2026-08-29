@@ -6,7 +6,7 @@ Per account **per trading day**, not a single current row. Roughly 250 rows per 
 | `id` | bigint | pk, generated always as identity | |
 | `account_id` | uuid | fk accounts, not null, on delete restrict | |
 | `trading_day` | date | not null | **Unit: trading day**, the day this state closes. |
-| `phase` | text | not null | phase as of end of this day |
+| `phase` | account_phase | not null | phase as of end of this day. **[ADR-216](../../decisions/ADR-216.md), `0067`.** `text` with **no vocabulary constraint at all** until then, while [`0001:45`](../../../packages/db/migrations/0001_extensions_and_enums.sql) had declared `account_phase` as exactly the engine `Phase` union since the estate began: the table replay compares against admitted any string as a phase, on hash input 3. **The type IS the vocabulary and there is no second copy of it here** -- a `CHECK` would have been a seventh literal copy of four members that already have six and no comparator, which is why the answer differs from [ADR-207](../../decisions/ADR-207.md)'s for `breach_kind`. Nothing binds this column to `accounts.phase` and nothing should: a per-day snapshot legitimately disagrees with the account's phase now |
 | `floor_cents` | bigint | not null | the [floor](../../GLOSSARY.md#floor) that **survived** this day |
 | `floor_locked` | boolean | not null default false | |
 | `floor_open_cents` | bigint | not null | **`SD-04`.** The floor the day was **judged against**. On any day where the floor moved the two differ, and the evidence pack must be able to show which one produced a breach decision (EC-035). Without it, a breach explanation reads "your low was below the floor" while showing a floor the low was never compared to |

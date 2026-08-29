@@ -786,18 +786,28 @@ export const dailyMarks = pgTable('daily_marks', {
 // `0035_rule_states_calendar_revision.sql` adds `calendar_revision_id`, which is
 // why this table needed ADR-094 before it could be registered at all.
 //
-// TWO COLUMNS ARE DELIBERATELY NOT AN ENUM AND NOT A NUMBER. `phase` is `text`
-// in the DDL even though `account_phase` exists as a type, and `state_hash` is
-// `bytea` with a CHECK that its length is 32. The transcription follows the DDL
-// in both cases; where the DDL and a neighbouring type disagree, the DDL wins,
-// because the DDL is the source and this file is the transcription.
+// `phase` IS `account_phase` FROM `0067` (ADR-216) AND WAS BARE `text` BEFORE
+// IT. This comment said the DDL and the type disagreed and that the DDL wins;
+// what it recorded was a DEFECT rather than a decision. `0001:45` had declared
+// `account_phase` as exactly the engine's four `Phase` members since the estate
+// began and `0015:47` typed this column `text` with no CHECK, so the table
+// replay compares against admitted ANY STRING as a phase, on a column that is
+// hash input 3. `0067` moves the column onto the type it should always have
+// carried; `0015` is not edited (constitution E2). The type IS the vocabulary
+// and there is no second copy of it here.
+//
+// `state_hash` IS STILL DELIBERATELY NOT A NUMBER OR AN ENUM: it is `bytea`
+// with a CHECK that its length is 32. There the transcription does follow the
+// DDL, which is the source and which this file transcribes.
 export const ruleStates = pgTable('rule_states', {
   id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
   accountId: uuid('account_id')
     .notNull()
     .references(() => accounts.id),
   tradingDay: date('trading_day').notNull(),
-  phase: text('phase').notNull(),
+  // 0067, ADR-216. `account_phase`, the type 0001:45 declares as the engine
+  // `Phase` union; `text` until then, admitting any string.
+  phase: accountPhase('phase').notNull(),
   floorCents: bigint('floor_cents', { mode: 'bigint' }).notNull(),
   floorLocked: boolean('floor_locked').notNull().default(false),
   floorOpenCents: bigint('floor_open_cents', { mode: 'bigint' }).notNull(),
@@ -832,8 +842,19 @@ export const ruleStates = pgTable('rule_states', {
   calendarRevisionId: bigint('calendar_revision_id', { mode: 'bigint' }),
   // 0065_rule_state_lifetime_and_breach.sql, ADR-207. THE THREE FIELDS
   // `RuleState` REQUIRES AND `0015` NEVER DECLARED. Until 0065 the engine's own
-  // type was not persistable in this schema, which is why `readEligibility`
-  // rejects in production today.
+  // type was not persistable in this schema.
+  //
+  // `readEligibility` STILL REJECTS AND THIS IS NO LONGER WHY. Session 405
+  // measured it and left the repair to this fence: the storage gap 0065 closed
+  // is spent, and the refusal survives on grounds this file is not the record
+  // of. `rule_states` holds ZERO rows and no deployable schedules the batch
+  // that would write one; `RuleStateWriterIo.encodeEngineGates` has no
+  // implementation and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name
+  // (`apps/worker/src/batch/state-writer.ts`); and the same absence binds the
+  // READ side, because `RuleState.engineGates` is `EngineGateResults` while
+  // `engine_gates` above is `jsonb`, so an adapter handed a row would have to
+  // INVENT a decoding. That encoding is `B5` term 2 and is a corpus amendment
+  // rather than a line of code.
   //
   // `breached` IS DERIVABLE FROM `breachKind` AND IS STORED ANYWAY. The pair is
   // bound by `rule_states_breach_flag_matches_kind`, so a mapping that carries

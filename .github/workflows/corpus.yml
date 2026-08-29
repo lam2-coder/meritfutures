@@ -671,6 +671,28 @@ jobs:
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_published_size_grid_immutable.sql
 
+      # 0067, ADR-216. THE VOCABULARY rule_states.phase DID NOT HAVE. `0001:45`
+      # declared `account_phase` as exactly the engine `Phase` union before any
+      # other table existed and `0015:47` typed this column `text` with no
+      # CHECK, so for fifty-two migrations the table replay compares against
+      # admitted ANY STRING as a phase, on a column that is hash input 3.
+      #
+      # IT LEADS WITH FIVE ACCEPTANCES AND THAT IS THE HALF THAT MATTERS. A
+      # probe that only ever attempts forbidden things passes against a guard
+      # that rejects everything, and the failure mode of a vocabulary is exactly
+      # that: a fifth member added to `Phase` and not to `account_phase` makes a
+      # legitimate row unwritable while all six rejections still fire.
+      #
+      # ACCEPTANCE 5 EXECUTES `0048`'s `rewrite_rule_state`, which writes this
+      # column through a `rule_states` ROWTYPE rather than a column list. It is
+      # type-transparent by construction, and `0027` installed a function that
+      # was wrong and still installed cleanly, so it is run rather than reasoned
+      # about.
+      - name: Probe the rule_states phase vocabulary (0067)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_rule_state_phase_vocabulary.sql
+
       # OI-03, ADR-128. THE APPEND-ONLY SET, ASSERTED AGAINST THE DOCUMENT.
       #
       # OI-03 is not a prediction and it had already happened three times when
