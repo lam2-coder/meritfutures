@@ -187,6 +187,8 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   payoutDestinations: 'payout_destinations',
   events: 'events',
   reserveCoverageSnapshots: 'reserve_coverage_snapshots',
+  economicCalendarCurrent: 'economic_calendar_current',
+  affiliateStatements: 'affiliate_statements',
 };
 
 /**
@@ -195,7 +197,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
  * cover is the set the registry declares, by construction rather than by
  * anyone remembering.
  */
-const DDL_NAMES: ReadonlyArray<readonly [TableKey, string]> = TABLE_KEYS.map(
+const ALL_REGISTERED: ReadonlyArray<readonly [TableKey, string]> = TABLE_KEYS.map(
   (key) => [key, SQL_NAME[key]] as const,
 );
 
@@ -216,6 +218,36 @@ const allMigrationSql = (): string =>
   migrationFiles()
     .map((f) => readFileSync(join(MIGRATIONS, f), 'utf8'))
     .join('\n');
+
+/**
+ * The relation names the migrations create with `CREATE VIEW`, DERIVED from the
+ * SQL rather than listed here.
+ *
+ * ADR-209 IS WHY THIS SET EXISTS AND WHY IT IS NOT A CONSTANT. Every drift
+ * assertion below reads a `CREATE TABLE` body, and one registered relation has
+ * none: `economic_calendar_current` is `0039`'s view and the only `CREATE VIEW`
+ * in the migration set. A hand-written exclusion list would be the registry's
+ * own defect one level down -- a second statement of which relations are views,
+ * with nothing comparing it to the migrations -- so the split is computed from
+ * the same text the fold reads, and `every registered relation is created
+ * exactly once, as exactly one KIND` below is what stops it silently emptying.
+ */
+const VIEWS_IN_MIGRATIONS = (): ReadonlySet<string> =>
+  new Set(
+    [...allMigrationSql().matchAll(/^\s*CREATE\s+VIEW\s+([a-z_]+)/gim)].map((m) =>
+      (m[1] as string).toLowerCase(),
+    ),
+  );
+
+/** The registered relations the migrations create as a TABLE. */
+const DDL_NAMES: ReadonlyArray<readonly [TableKey, string]> = ALL_REGISTERED.filter(
+  ([, sqlName]) => !VIEWS_IN_MIGRATIONS().has(sqlName),
+);
+
+/** The registered relations the migrations create as a VIEW (ADR-209). */
+const VIEW_NAMES: ReadonlyArray<readonly [TableKey, string]> = ALL_REGISTERED.filter(
+  ([, sqlName]) => VIEWS_IN_MIGRATIONS().has(sqlName),
+);
 
 /**
  * The column names inside one `CREATE TABLE` body, read out of the SQL.
@@ -397,13 +429,21 @@ describe('the registry is total', () => {
   // table "cannot be registered". A REFUSAL IN A COMMENT OUTLIVES THE RULING
   // THAT SUPERSEDED IT, which is this registration's only general lesson, and
   // the block near the end of this file is the argument from the DDL.
-  test('110 declared tables, 110 scope rules, 0 reachable without one', () => {
+  // 111 AND 112 ARE ADR-209's SLICE AND THEY WENT IN FOR DIFFERENT REASONS.
+  // `affiliate_statements` is `derived` via `affiliates` on `affiliate_id` and
+  // needed NO ruling: `0012` declares the identical edge `affiliate_creatives`
+  // and `affiliate_clicks` were registered on, so it is the third table on one
+  // shape and the ADR does not rule on it. `economic_calendar_current` is the
+  // one that needed the number, and its obstruction was its KIND rather than
+  // its tenancy: it is `0039`'s view, the only `CREATE VIEW` in the migration
+  // set, and every drift assertion in this file read a `CREATE TABLE` body.
+  test('112 declared relations, 112 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(110);
-    expect(rules).toBe(110);
+    expect(declared).toBe(112);
+    expect(rules).toBe(112);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, AND IT IS
@@ -646,9 +686,19 @@ describe('a scope rule is checked against the DDL, not against itself', () => {
     }
   });
 
+  // A VIEW IS SKIPPED HERE AND IS NOT UNCHECKED, WHICH IS THE DIFFERENCE THIS
+  // COMMENT EXISTS TO KEEP. `ddlColumnDefs` reads a `CREATE TABLE` body and
+  // THROWS when there is none, so a registered view would have taken this
+  // assertion down rather than passed it. The same claim about a view is made
+  // one describe block down and is made STRONGER: a view declares no column of
+  // its own at all, so the question is whether the relation it PROJECTS reaches
+  // identities, and that relation is asserted to be registered and to carry the
+  // same class -- at which point this loop has already read it (ADR-209).
   test('no firm table carries a column referencing identities, so the class is not hiding one', () => {
+    const views = VIEWS_IN_MIGRATIONS();
     for (const key of TABLE_KEYS) {
       if (SCOPE_RULES[key].class !== 'firm') continue;
+      if (views.has(SQL_NAME[key])) continue;
       const defs = [...ddlColumnDefs(sqlText, SQL_NAME[key]).values()];
       const reaching = defs.filter((d) => /REFERENCES\s+identities\s*\(/i.test(d));
       expect(reaching, `${SQL_NAME[key]} reaches identities directly`).toEqual([]);
@@ -1076,11 +1126,32 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
     ).toBeGreaterThan(0);
   });
 
-  test('every registered table is created exactly once, so there is one CREATE to fold onto', () => {
-    for (const [, sqlName] of DDL_NAMES) {
-      const matches = allMigrationSql().match(new RegExp(`CREATE TABLE ${sqlName} \\(`, 'gi'));
-      expect(matches?.length, sqlName).toBe(1);
+  // WIDENED BY ADR-209 FROM "one CREATE TABLE" TO "one CREATE, OF ONE KIND",
+  // over every registered relation rather than over the table half. This is what
+  // stops the table/view split above emptying silently: a relation that is
+  // neither created as a table nor as a view falls out of BOTH iterations and
+  // out of every per-relation drift assertion with them, which is the failure
+  // `SQL_NAME`'s own header records happening once already, on a hand-maintained
+  // second copy of the same pairs.
+  test('every registered relation is created exactly once, as exactly one KIND', () => {
+    const sql = allMigrationSql();
+    for (const [, sqlName] of ALL_REGISTERED) {
+      const asTable = sql.match(new RegExp(`CREATE TABLE ${sqlName} \\(`, 'gi'))?.length ?? 0;
+      const asView = sql.match(new RegExp(`CREATE VIEW ${sqlName}\\b`, 'gi'))?.length ?? 0;
+      expect(asTable + asView, `${sqlName}: CREATE statements in the migration set`).toBe(1);
     }
+  });
+
+  // THE SPLIT IS NON-VACUOUS IN BOTH HALVES, asserted rather than assumed. A
+  // `VIEWS_IN_MIGRATIONS` that returned the empty set would send the view back
+  // through the table assertions and take them down loudly, but one that
+  // returned EVERY name would empty `DDL_NAMES` and every per-table drift
+  // assertion with it, and the suite would go green on a smaller test count --
+  // which is exactly the direction `SQL_NAME`'s header says went unnoticed once.
+  test('the table half and the view half are both non-empty and together are the registry', () => {
+    expect(VIEW_NAMES.length, 'registered relations created as a VIEW').toBeGreaterThan(0);
+    expect(DDL_NAMES.length, 'registered relations created as a TABLE').toBeGreaterThan(0);
+    expect(DDL_NAMES.length + VIEW_NAMES.length).toBe(ALL_REGISTERED.length);
   });
 });
 
@@ -1613,7 +1684,14 @@ describe('a row that reaches an identity two ways is scoped by BOTH', () => {
   // assertion that would have refused the wrong answer two sessions declined to
   // write, and it reads the DDL rather than the rule.
   test('a row with a NULLABLE identity column beside an account edge is registered either, never owned', () => {
+    const views = VIEWS_IN_MIGRATIONS();
     for (const key of TABLE_KEYS) {
+      // A VIEW HAS NO COLUMN OF ITS OWN AND SO HAS NO SHAPE TO READ HERE.
+      // `eitherShaped` folds a `CREATE TABLE` body and THROWS without one. The
+      // question it asks IS asked of a view, one relation along: the ADR-209
+      // block asserts a view projects a REGISTERED relation and carries that
+      // relation's class, and the projected relation is in this same loop.
+      if (views.has(SQL_NAME[key])) continue;
       if (!eitherShaped(SQL_NAME[key])) continue;
       expect(
         SCOPE_RULES[key].class,
@@ -2211,6 +2289,110 @@ const TYPE_VOCABULARY: readonly string[] = [
   'uuid',
 ];
 
+// =============================================================================
+// ADR-209. A REGISTERED RELATION THAT IS NOT A TABLE.
+// =============================================================================
+// `economic_calendar_current` is the first `TableKey` the migrations do not
+// create with `CREATE TABLE`, and every drift assertion above reads a
+// `CREATE TABLE` body. What replaces them here is NOT a weaker check. A view
+// declares no column type, no nullability, no key and no foreign key of its own,
+// so there is nothing on the view to compare a transcription against -- and the
+// thing that DOES decide those facts is the relation the view projects. So the
+// comparison runs in two legs and both of them bite:
+//
+//   1. THE TRANSCRIBED COLUMN SET IS THE VIEW'S OWN SELECT LIST, read out of
+//      `CREATE VIEW`. Renaming, adding or dropping a projected column is red.
+//   2. EVERY PROJECTED COLUMN IS A COLUMN OF THE PROJECTED RELATION, with that
+//      relation's folded TYPE and NULLABILITY. Changing the base column's type
+//      in a later migration is red HERE as well as on the base table, which is
+//      the drift a view is otherwise the perfect place to hide.
+//
+// LEG 2 IS ONLY SOUND WHILE THE PROJECTION IS BARE, and that is asserted rather
+// than assumed: a computed expression, a cast or an `AS` alias would make "the
+// base column's type" a guess, so the reader REFUSES such a list instead of
+// reading past it. The day a view carries one, this goes red and the session
+// that wrote it rules on what the type of a computed view column is.
+const viewProjection = (
+  sqlText: string,
+  view: string,
+): { readonly columns: readonly string[]; readonly from: string } => {
+  const body = sqlText.replace(/--[^\n]*/g, '');
+  const at = body.search(new RegExp(`CREATE VIEW ${view}\\s+AS\\b`, 'i'));
+  if (at < 0) throw new Error(`no CREATE VIEW for ${view}`);
+  const statement = body.slice(at, body.indexOf(';', at));
+  const select = /\bSELECT\b(?:\s+DISTINCT\s+ON\s*\([^)]*\))?([\s\S]*?)\bFROM\b\s+([a-z_]+)/i.exec(
+    statement,
+  );
+  if (select === null) throw new Error(`${view}: no SELECT ... FROM this reader can read`);
+
+  const columns = (select[1] as string)
+    .split(',')
+    .map((piece) => piece.trim())
+    .filter((piece) => piece.length > 0);
+  for (const piece of columns) {
+    if (!/^[a-z_][a-z0-9_]*$/i.test(piece)) {
+      throw new Error(
+        `${view}: projected item "${piece}" is not a bare column, so its type is not the ` +
+          `base relation's and ADR-209 leg 2 does not hold for it`,
+      );
+    }
+  }
+  return { columns: [...columns].sort(), from: (select[2] as string).toLowerCase() };
+};
+
+describe('a registered VIEW is checked against its own projection and against what it projects', () => {
+  for (const [key, sqlName] of VIEW_NAMES) {
+    test(`${sqlName}: the transcribed column set is the view's SELECT list`, () => {
+      expect(sqlNames(key)).toEqual(viewProjection(allMigrationSql(), sqlName).columns);
+    });
+
+    test(`${sqlName}: every projected column is the base relation's, type and nullability`, () => {
+      const { from } = viewProjection(allMigrationSql(), sqlName);
+      const defs = foldTableDefs(from);
+      for (const column of Object.values(columnsOf(key))) {
+        const def = defs.get(column.name);
+        expect(def, `${sqlName}.${column.name} is not a column of ${from}`).toBeDefined();
+        expect(
+          tsType(column),
+          `${sqlName}.${column.name} is transcribed as a different TYPE from the one ${from} ` +
+            `declares for it. Its DDL is: ${def ?? ''}`,
+        ).toBe(ddlType(def ?? ''));
+        expect(
+          column.notNull,
+          `${sqlName}.${column.name} is transcribed as ` +
+            `${column.notNull ? 'NOT NULL' : 'nullable'} and ${from} declares it ` +
+            `${declaredNotNull(def) ? 'NOT NULL' : 'nullable'}. Its DDL is: ${def ?? ''}`,
+        ).toBe(declaredNotNull(def));
+      }
+    });
+
+    // THE CLASS IS THE PROJECTION'S, WHICH IS ADR-209's SECOND CLAUSE MADE
+    // MECHANICAL. A view has no column of its own for `owned` to name, no
+    // declared foreign key for `derived` to traverse and no constraint for the
+    // pair readers to find, so the only relation whose tenancy can decide a
+    // view's is the one it selects from. A view over an unregistered relation
+    // fails here rather than being registered on a judgement nobody wrote down.
+    test(`${sqlName}: projects a REGISTERED relation, and carries that relation's class`, () => {
+      const { from } = viewProjection(allMigrationSql(), sqlName);
+      const base = ALL_REGISTERED.find(([, name]) => name === from);
+      expect(base, `${sqlName} projects ${from}, which is not a registered relation`).toBeDefined();
+      expect(SCOPE_RULES[key].class, `${sqlName} against ${from}`).toBe(
+        SCOPE_RULES[(base as readonly [TableKey, string])[0]].class,
+      );
+    });
+
+    // AND IT IS NOT ADDRESSABLE, WHICH IS THE CLAUSE A READER IS MOST LIKELY TO
+    // ASSUME THE OTHER WAY. `economic_calendar.id` is a PRIMARY KEY and the view
+    // projects it, so a transcription that carried `.primaryKey()` across would
+    // compile, would look faithful, and would offer an addressed write into a
+    // `DISTINCT ON` view that Postgres refuses as not auto-updatable. The view
+    // declares no key, so neither does the transcription.
+    test(`${sqlName}: declares no key, so every addressed write is refused before the database`, () => {
+      expect(uniqueKeys(key), `${sqlName} declares a unique key it does not have`).toEqual([]);
+    });
+  }
+});
+
 describe('the transcription states the DDL type and nullability, not only the column names', () => {
   for (const [key, sqlName] of DDL_NAMES) {
     test(`${sqlName}: every column's TYPE and NULLABILITY equal the DDL as of the LAST migration`, () => {
@@ -2258,7 +2440,13 @@ describe('the transcription states the DDL type and nullability, not only the co
         read++;
       }
     }
-    const declared = TABLE_KEYS.reduce((n, key) => n + Object.keys(columnsOf(key)).length, 0);
+    // OVER THE TABLE HALF, BECAUSE THE LOOP ABOVE IS. A registered VIEW's
+    // columns are visited by the ADR-209 block, against the fold of the relation
+    // it projects, and counting them here would make this guard demand that the
+    // table loop visit columns it never sees -- a red that says nothing about
+    // the reader. The two halves are asserted to be the whole registry where the
+    // split is defined, so neither can quietly shrink.
+    const declared = DDL_NAMES.reduce((n, [key]) => n + Object.keys(columnsOf(key)).length, 0);
     expect(read, 'the comparison did not visit every column the transcription declares').toBe(
       declared,
     );

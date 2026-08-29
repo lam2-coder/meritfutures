@@ -835,15 +835,37 @@ describe('the firm, pair and scoped partitions cover the registry exactly', () =
   // rather than a write it would not have bounded being allowed. `schema.ts` is
   // outside session 227's fence, so the gap is asserted here and the repair is
   // one line in that file, at which point this test names the next one or none.
-  test('a table whose schema declares no unique key has no addressed write, and it is treasury_balances', async () => {
+  // IT IS TWO RELATIONS NOW AND THEY ARE HERE FOR OPPOSITE REASONS, which is
+  // why this test names both rather than counting them. `treasury_balances` is a
+  // GAP: `0009_ledger.sql` gives it `PRIMARY KEY (account_code, as_of)` and
+  // `schema.ts` transcribes no key, so ADR-112 refuses an address the database
+  // would have bounded, and the repair is still one line in that file.
+  // `economic_calendar_current` is NOT a gap and must never be repaired into
+  // one: it is `0039`'s view (ADR-209), a view declares no key at all, and the
+  // `id` it projects is `economic_calendar`'s PRIMARY KEY rather than its own.
+  // Transcribing that `.primaryKey()` across would compile and would offer an
+  // addressed write into a `DISTINCT ON` view Postgres refuses as not
+  // auto-updatable, so the refusal below is the DDL rather than an omission.
+  // BOTH REFUSALS ARE WATCHED FIRING and they are the same refusal, which is the
+  // point: the accessor asks the transcription for a key and neither has one.
+  test('the relations schema.ts declares no unique key for have no addressed write, and they are two', async () => {
     expect(
-      TABLE_KEYS.filter((key) => uniqueKeys(key).length === 0),
-      'the set of tables schema.ts declares no unique key for',
-    ).toEqual(['treasuryBalances']);
+      TABLE_KEYS.filter((key) => uniqueKeys(key).length === 0).sort(),
+      'the set of relations schema.ts declares no unique key for',
+    ).toEqual(['economicCalendarCurrent', 'treasuryBalances']);
 
     const { source, conn } = { ...recording(), ...recordingConn() };
     await expect(
       firmTx(source, conn).updateAt('treasuryBalances', { balanceCents: 1n }, { source: 'x' }),
+    ).rejects.toThrow(/declares no PRIMARY KEY or UNIQUE in schema\.ts/);
+
+    const view = { ...recording(), ...recordingConn() };
+    await expect(
+      firmTx(view.source, view.conn).updateAt(
+        'economicCalendarCurrent',
+        { revision: 1 },
+        { eventKey: 'US.CPI.MOM' },
+      ),
     ).rejects.toThrow(/declares no PRIMARY KEY or UNIQUE in schema\.ts/);
   });
 });
