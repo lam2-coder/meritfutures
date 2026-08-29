@@ -18,7 +18,7 @@
 // SIMPLIFICATION
 // -----------------------------------------------------------------------------
 // `0007:266` says `payload jsonb NOT NULL, -- the exact field values rendered
-// into CSV`, and `scope.ts:909` repeats it: "`payload jsonb` HOLDS THE FIELD
+// into CSV`, and `scope.ts:911` repeats it: "`payload jsonb` HOLDS THE FIELD
 // VALUES RENDERED INTO CSV FOR THIS ACCOUNT". A CSV row is flat by
 // construction. So `ProvisioningPayload` is a flat map, the canonicalization
 // below is total with no recursion, and a nested value is a THROW rather than a

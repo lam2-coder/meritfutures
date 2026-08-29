@@ -1515,13 +1515,29 @@ export function databaseAuthBackend(
         'source. The keyed write itself lands; the response does not',
     ),
 
+    // THE SOURCE HALF OF THIS REFUSAL IS DISCHARGED AND THE REFUSAL SURVIVES,
+    // WHICH IS A NARROWING RATHER THAN A REWRITE. ADR-252 built
+    // `firm_parameters` (`0074`) and registered it `firm`, so the base cap has
+    // a row and `ApiDb.firm` is a door this backend already holds. What is left
+    // is a table with nothing in it, and the ruled reading of that emptiness.
+    //
+    // THIS IS NOT `useCheckoutBackend`'s REMAINING BLOCKER even though it is
+    // the same number. That port reads the cap inside a SCOPED transaction and
+    // is stopped by `CATALOG_TABLE_KEYS`; `readMe` is not, because `db.firm`
+    // needs no catalogue admission. The two refusals were identical for as long
+    // as neither had a source and they stopped being identical here.
     readMe: blocked(
       'readMe',
-      '`Me.max_accounts` has no source. `identities.max_accounts_override` is the per-entity ' +
-        'exception and the BASE cap appears in no table in any of the 47 migrations, so it is a ' +
-        'plan parameter -- and no plan parameter is stated in application code. Every other field ' +
-        'of `Me` is reachable through the scoped door, which is what makes this one worth ' +
-        'reporting rather than working around',
+      '`Me.max_accounts` has a source and has no ROW. `identities.max_accounts_override` is the ' +
+        "per-entity exception, and ADR-238 ruling 1 ruled the BASE the firm's number rather " +
+        'than a plan parameter; ADR-252 built it as `firm_parameters.base_account_cap` in ' +
+        '`0074_firm_parameters.sql` and registered it `firm`, which `ApiDb.firm` reaches. ' +
+        'NOTHING IN THIS REPOSITORY WRITES A ROW THERE and nothing writes the `operators` row ' +
+        'its `approved_by` references either, so the read returns nothing on every deployment ' +
+        'this tree can produce. AN ABSENT ROW IS NO CAP AND NOT AN UNLIMITED ONE, so answering ' +
+        '`Me.max_accounts` from one would put a number nobody approved on the response that ' +
+        'quotes the buyer their own limit. Every other field of `Me` is reachable through the ' +
+        'scoped door, which is what makes this one worth reporting rather than working around',
     ),
   };
 }
