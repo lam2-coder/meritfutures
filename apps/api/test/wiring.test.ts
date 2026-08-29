@@ -331,6 +331,22 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // `rule_states`. The alternative, an API that folds its own, puts the engine on
   // two paths and only one of them is audited, which is the divergence ADR-026
   // C-07's `state_hash` exists to make detectable.
+  //
+  // AND SESSION 435 WAS DISPATCHED TO ASK WHETHER THE WORKER LANDING DISCHARGED
+  // THIS ENTRY, FOUND THAT IT DID NOT, AND FOUND A CLAUSE UNDER THE ONES IT WAS
+  // SENT TO RE-DERIVE. Every clause above re-derives true on this tree and the
+  // entry is not rewritten for the worker: link 1 is measured CLOSED (the
+  // deployable now exits NON-ZERO where ADR-239 measured no output and exit 0),
+  // link 2 is a real adapter serving four of ten, and links 3 and 4 are exactly
+  // where ADR-239 left them. ADR-245 records the measurement.
+  //
+  // THE SIXTH CLAUSE IS THE FINDING AND IT IS THIS ENTRY'S OWN DEFECT FOR THE
+  // THIRD TIME. `PayoutSubject` has THREE fields and eleven revisions of this
+  // reason have named two. `gates` is not downstream of the worker, not
+  // downstream of the codec and not downstream of a row, so every session that
+  // clears links 1 to 4 still arrives at `subject()` unable to call it. A reason
+  // that names the second-cheapest blocker retires the question for every reader
+  // after it, and this list exists to make that expire.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -373,7 +389,28 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
     "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
-    'detectable, computed on the one path no replay audit reads. THE FIRM-READ CLAUSE IS ' +
+    'detectable, computed on the one path no replay audit reads. SIXTH, AND IT IS NOT UNDER THE ' +
+    '`RuleState` AT ALL: `PayoutSubject` (`routes/payouts.ts:329`) CARRIES THREE FIELDS AND THIS ' +
+    'ENTRY HAS ONLY EVER NAMED TWO. `state` is clauses one to four and `plan` was discharged by ' +
+    'ADR-233; `gates` is an `ExternalGates` (`routes/payouts.ts:333`) and NO VALUE OF IT IS ' +
+    'RESOLVED FROM A ROW ANYWHERE UNDER A `src/`. Swept comment-stripped over every `.ts` under ' +
+    'every `apps/*/src` and `packages/*/src`, the object key `hasPayoutInFlight:` appears in ' +
+    'TWO files: `packages/rules-engine/src/types.ts`, which DECLARES the field, and ' +
+    '`packages/harness/src/trial.ts`, which raises one member on a value its caller handed it ' +
+    'inside a Monte Carlo loop whose package declares no database. Every constructed value is a ' +
+    'fixture or `scripts/demo/fold.ts`. THE FIVE FACTS ALL HAVE COLUMNS AND THE RESOLVER IS ' +
+    'WHAT IS MISSING: `identities.payouts_frozen` (`0002_identity.sql:50`), ' +
+    '`accounts.payouts_frozen` (`0007_accounts.sql:83`), `accounts.recon_blocked` ' +
+    '(`0007_accounts.sql:87`), the ' +
+    '`kyc_status` enum (`0001_extensions_and_enums.sql:29`) and R-38s in-flight leg off ' +
+    '`payout_requests`. AND THE ACCOUNT-STATUS LEG CANNOT BE A TOTAL MAP: `account_status` ' +
+    'declares SEVEN members (`0001_extensions_and_enums.sql:47`) and `AccountStatus` ' +
+    '(`packages/rules-engine/src/types.ts:891`) takes SIX, the difference being ' +
+    '`provisioning_pending`, and `M01:203` carries the same six, so the engine transcribed its ' +
+    'source correctly and the resolver owes a REFUSAL rather than a widened union. THIS CLAUSE ' +
+    'DID NOT MOVE WHEN THE WORKER LANDED because nothing ADR-241 built touches it, which is why ' +
+    'a session that lands the codec and the adapter would arrive at `subject()` with a ' +
+    '`RuleState` in hand and no third argument for it. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +

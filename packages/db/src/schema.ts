@@ -870,14 +870,14 @@ export const ruleStates = pgTable('rule_states', {
   // `readEligibility` STILL REJECTS AND THIS IS NO LONGER WHY. Session 405
   // measured it and left the repair to this fence: the storage gap 0065 closed
   // is spent, and the refusal survives on grounds this file is not the record
-  // of. `rule_states` holds ZERO rows and no deployable schedules the batch
-  // that would write one; `RuleStateWriterIo.encodeEngineGates` has no
-  // implementation and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name
+  // of. `rule_states` holds ZERO rows; `RuleStateWriterIo.encodeEngineGates`
+  // has no implementation and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name
   // (`apps/worker/src/batch/state-writer.ts`); and the same absence binds the
   // READ side, because `RuleState.engineGates` is `EngineGateResults` while
   // `engine_gates` above is `jsonb`, so an adapter handed a row would have to
-  // INVENT a decoding. That encoding is `B5` term 2 and is a corpus amendment
-  // rather than a line of code.
+  // INVENT a decoding. TWO CLAUSES HERE WENT FALSE ELSEWHERE AND ADR-245
+  // REPAIRS THEM: ADR-241 made this deployable RUN the batch, and ADR-206 ruled
+  // the encoding, so link 3 is a module nobody typed and not an amendment owed.
   //
   // `breached` IS DERIVABLE FROM `breachKind` AND IS STORED ANYWAY. The pair is
   // bound by `rule_states_breach_flag_matches_kind`, so a mapping that carries
