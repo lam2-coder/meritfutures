@@ -14,7 +14,7 @@
 // -----------------------------------------------------------------------------
 // `idempotency_keys.key` is the PRIMARY KEY (`0017_events_and_audit.sql:103`)
 // and `idempotency_keys` is scope class `owned` on `identity_id`
-// (`scope.ts:1310`), so a keyed write through `scopedTx` renders
+// (`scope.ts:1380`), so a keyed write through `scopedTx` renders
 //
 //   WHERE identity_id = $1 AND key = $2
 //

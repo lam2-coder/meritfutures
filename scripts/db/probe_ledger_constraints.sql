@@ -409,10 +409,16 @@ BEGIN;
 -- the trader_wallet position these entries post against.
 INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
   ON CONFLICT DO NOTHING;
+-- `approved_at` IS SUPPLIED BECAUSE `0070` MADE THIS ROW UNREPRESENTABLE
+-- WITHOUT IT, and the fixture was already claiming the approval one statement
+-- down: `transferring` is reachable only through `approved`, and the LT-06 this
+-- block posts IS the approval posting. `approved_by` stays NULL, which is the
+-- machine arm and takes no dual control (ADR-232 section 3).
 INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
-                                idempotency_key, source_provenance_summary, earliest_credit_at)
+                                idempotency_key, source_provenance_summary, earliest_credit_at,
+                                approved_at)
   VALUES ('22222222-0000-0000-0000-00000000000f','11111111-1111-1111-1111-111111111111',
-          25000,'probe-dest','transferring','probe-k5','{"payout":25000}'::jsonb, now());
+          25000,'probe-dest','transferring','probe-k5','{"payout":25000}'::jsonb, now(), now());
 INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
   VALUES ('ffffffff-0000-0000-0000-000000000001','wallet_withdrawal_approval','wallet_withdrawal',
           '22222222-0000-0000-0000-00000000000f','probe-k5-lt06');
@@ -447,10 +453,16 @@ BEGIN;
 -- the trader_wallet position these entries post against.
 INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
   ON CONFLICT DO NOTHING;
+-- `approved_at` IS SUPPLIED BECAUSE `0070` MADE THIS ROW UNREPRESENTABLE
+-- WITHOUT IT, and the fixture was already claiming the approval one statement
+-- down: `transferring` is reachable only through `approved`, and the LT-06 this
+-- block posts IS the approval posting. `approved_by` stays NULL, which is the
+-- machine arm and takes no dual control (ADR-232 section 3).
 INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
-                                idempotency_key, source_provenance_summary, earliest_credit_at)
+                                idempotency_key, source_provenance_summary, earliest_credit_at,
+                                approved_at)
   VALUES ('22222222-0000-0000-0000-00000000000e','11111111-1111-1111-1111-111111111111',
-          25000,'probe-dest-2','transferring','probe-k5b','{"payout":25000}'::jsonb, now());
+          25000,'probe-dest-2','transferring','probe-k5b','{"payout":25000}'::jsonb, now(), now());
 INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
   VALUES ('ffffffff-0000-0000-0000-000000000002','wallet_withdrawal_approval','wallet_withdrawal',
           '22222222-0000-0000-0000-00000000000e','probe-k5b-lt06');
@@ -500,10 +512,16 @@ ROLLBACK;
 BEGIN;
 INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
   ON CONFLICT DO NOTHING;
+-- `approved_at` IS SUPPLIED BECAUSE `0070` MADE THIS ROW UNREPRESENTABLE
+-- WITHOUT IT, and the fixture was already claiming the approval one statement
+-- down: `transferring` is reachable only through `approved`, and the LT-06 this
+-- block posts IS the approval posting. `approved_by` stays NULL, which is the
+-- machine arm and takes no dual control (ADR-232 section 3).
 INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
-                                idempotency_key, source_provenance_summary, earliest_credit_at)
+                                idempotency_key, source_provenance_summary, earliest_credit_at,
+                                approved_at)
   VALUES ('22222222-0000-0000-0000-00000000000d','11111111-1111-1111-1111-111111111111',
-          25000,'probe-dest-3','transferring','probe-k5c','{"payout":25000}'::jsonb, now());
+          25000,'probe-dest-3','transferring','probe-k5c','{"payout":25000}'::jsonb, now(), now());
 DO $$
 BEGIN
   BEGIN
@@ -543,10 +561,16 @@ ROLLBACK;
 BEGIN;
 INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
   ON CONFLICT DO NOTHING;
+-- `approved_at` IS SUPPLIED BECAUSE `0070` MADE THIS ROW UNREPRESENTABLE
+-- WITHOUT IT, and the fixture was already claiming the approval one statement
+-- down: `transferring` is reachable only through `approved`, and the LT-06 this
+-- block posts IS the approval posting. `approved_by` stays NULL, which is the
+-- machine arm and takes no dual control (ADR-232 section 3).
 INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
-                                idempotency_key, source_provenance_summary, earliest_credit_at)
+                                idempotency_key, source_provenance_summary, earliest_credit_at,
+                                approved_at)
   VALUES ('22222222-0000-0000-0000-00000000000c','11111111-1111-1111-1111-111111111111',
-          25000,'probe-dest-4','transferring','probe-k6','{"payout":25000}'::jsonb, now());
+          25000,'probe-dest-4','transferring','probe-k6','{"payout":25000}'::jsonb, now(), now());
 INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
   VALUES ('eeeeeeee-0000-0000-0000-000000000001','wallet_withdrawal_approval','wallet_withdrawal',
           '22222222-0000-0000-0000-00000000000c','probe-k6-lt06');

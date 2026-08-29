@@ -76,15 +76,44 @@
 // `routes/webhooks-psp.ts` reaches its rows through `PspWebhookTx` and
 // `routes/auth.ts` reaches its rows through `AuthBackend`.
 //
-// THE WIRING SESSION THAT BINDS THIS PORT MEETS A WALL THAT IS STILL STANDING,
-// and it is named here rather than discovered there. `attributions` is scope
-// class `pair` (ADR-106): a `pair` key is in NEITHER the scoped key set NOR the
-// firm one, so the only remaining door is `systemDb(reason)`, whose vocabulary
-// is `'nightly-batch' | 'operator-console'`. A checkout request handler is
-// neither. Session 216 reported it, session 215 attached `attributions` to it,
-// and ADR-112 -- which gave the accessor an ADDRESS -- says in its own section
-// 10 that it did not move the AUTHORITY. `insertAttribution` below is where
-// that decision lands and it is a port until somebody takes it.
+// THE WALL THIS PARAGRAPH NAMED HAS COME DOWN, AND WHAT IT WAS HIDING IS WORTH
+// MORE THAN THE WALL WAS. It read that a wiring session "MEETS A WALL THAT IS
+// STILL STANDING": `attributions` is scope class `pair` (ADR-106), a `pair` key
+// is in NEITHER the scoped key set NOR the firm one, so the only remaining door
+// was `systemDb(reason)` and a checkout request handler is neither of its two
+// words. Session 216 reported it, session 215 attached `attributions` to it, and
+// ADR-112 said in its own section 10 that giving the accessor an ADDRESS did not
+// move the AUTHORITY.
+//
+// ADR-230 MOVED THE AUTHORITY, AND ONLY FOR THE WRITE. `ScopedTx.insertAsParty`
+// inserts one row of a `pair` table whose registry rule declares
+// `writer.by === 'party'`, stamping the handle's own identity into the column
+// that rule names; `attributions`' writer is the BUYER, which is the identity a
+// checkout transaction is already bound to. Reading a `pair` row is refused
+// exactly as it was: `scopePredicate` still throws on every key in the class.
+//
+// SO THE PARAGRAPH IS REPLACED RATHER THAN DELETED, because the three
+// obstructions it was standing in front of are the ones a wiring session
+// actually meets, and only the first was ever written down:
+//
+//   1. A `firm` READ ON A ONE-TRANSACTION PORT. FIVE methods below read `firm`
+//      tables -- `publishedPlanVersion`, `planVersionSize`, `couponByCode`,
+//      `geoDecision` and `midCandidates` -- and `ScopedTableKey` excludes every
+//      `firm` key, so no `ScopedTx` reads one. This is `usePayoutBackend`'s
+//      stated blocker arriving on a second money route, and unlike there it
+//      blocks EVERY request rather than one arm: two of the five are on the
+//      unconditional path of both handlers.
+//
+//   2. A ROW OF SOMEBODY ELSE'S THAT THE BUYER MUST SEE. `clickByToken` returns
+//      a `ClickRef` carrying an `AffiliateRef`, and `couponByCode` returns one
+//      too, so both reach `affiliates.identity_id` -- a row `owned` by the
+//      AFFILIATE. A buyer-scoped read of it returns nothing, silently, and
+//      `resolveAttribution` would then fold an organic sale over every referral.
+//      That is a wrong answer that returns rows, which is what this whole
+//      registry exists to make unavailable, and it needs a ruling rather than a
+//      door.
+//
+//   3. THE LEDGER ARM, UNCHANGED. See `ledger` below.
 //
 // -----------------------------------------------------------------------------
 // A THIRD PARTY IS CALLED INSIDE AN OPEN TRANSACTION AND THE COST IS STATED
@@ -879,9 +908,18 @@ export interface CheckoutTx {
   /**
    * INSERT the attribution. INV-M8-01's unique `purchase_id` is the control.
    *
-   * SEE THIS FILE'S HEADER FOR WHY THIS METHOD IS STILL A PORT. `attributions`
-   * is a `pair` table and no authority in `packages/db` admits a request
-   * handler writing one.
+   * THIS DOCBLOCK SAID `packages/db` ADMITS NO REQUEST HANDLER WRITING A `pair`
+   * ROW AND ADR-230 MADE THAT FALSE. It is still a port, for the reason every
+   * method here is one -- `apps/api` declares no `@merit/db` and this file
+   * imports no accessor -- and not for want of an authority any more:
+   * `ScopedTx.insertAsParty` stamps the buyer's own identity into
+   * `attributions.buyer_identity_id` and refuses a caller naming it, so an
+   * implementation is one call and needs no reason word.
+   *
+   * WHAT AN IMPLEMENTATION MUST NOT DO IS PASS `row.buyerIdentityId` THROUGH.
+   * The door refuses that key in both spellings, deliberately: the handle
+   * supplies the buyer and a value the fold computed is a second statement of
+   * the same fact. Assert the two agree if you like, then drop it.
    */
   insertAttribution(purchaseId: string, row: AttributionRow): Promise<void>;
 

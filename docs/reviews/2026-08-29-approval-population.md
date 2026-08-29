@@ -444,3 +444,41 @@ decision by any reading, and the first classifier scored it as declaring no judg
 **And `ADR-228` section 5 carries a finding this review did not go looking for**, quoted because it
 belongs in front of whoever reads the residue: **no payout path in this tree carries dual control at
 any amount.**
+
+## 9. Re-derived against `bfe690fb`
+
+**`main` moved a third time**, carrying [ADR-230](../decisions/ADR-230.md) (the `pair` class write
+door) and [ADR-232](../decisions/ADR-232.md) (the withdrawal approval edge). Merged in, not rebased.
+**Only `STATE.md` conflicted, and it was resolved by taking MAIN'S side rather than keeping both**:
+`main` had deliberately collapsed six duplicate copies of the generated header line into one, under
+`RI-12`, and a keep-both would have re-inflated exactly what that repair removed.
+
+**THAT DUPLICATION WAS CAUGHT TWICE TODAY BY TWO DIFFERENT MEANS AND NEITHER WAS A GATE THIS SESSION
+RAN.** Section 8 records this session catching its own keep-both by counting spans; `main`'s
+`d120098d` records `RI-12` catching twelve copies independently. **The lesson is the same both
+times: on a generated block whose two sides hold the same sites, take one side.**
+
+| | `21afc5d8` | `dddb3860` | `a86971c6` | **`bfe690fb`** |
+| --- | ---: | ---: | ---: | ---: |
+| entry files | 212 | 214 | 216 | **218** |
+| `status: proposed` | 108 | 110 | 112 | **114** |
+| `status: accepted` | 104 | 104 | 104 | **104** |
+| money-path entries | 42 | 42 | 44 | **46** |
+| money-path files | 62 | 64 | 65 | **66** |
+| the residue, corrected classifier | 34 | 34 | 36 | **38** |
+
+**Both new entries are money path and both are tier 1.** `ADR-230` lands
+[`payouts.ts`](../../apps/api/src/routes/payouts.ts) and `ADR-232` lands
+[`wallet-withdrawals.ts`](../../apps/api/src/routes/wallet-withdrawals.ts) with migration `0070`. So
+**tier 1 becomes 13** and the table is **13 / 4 / 4 / 5 / 8 / 4**.
+
+**AND `ADR-232` ANSWERS THE FINDING SECTION 8.2 RECORDED FROM `ADR-228`.** That finding was *"no
+payout path in this tree carries dual control at any amount"*. `ADR-232` builds the approval edge and
+dual controls it above `500000` cents on an operator's hand alone. **The finding was recorded here
+rather than absorbed, and it was closed by the session that owned it**, which is the intended
+behaviour of writing a gap down outside your own fence rather than acting on it.
+
+**THE TREND IS THE POINT OF THIS TABLE.** The money-path queue has grown from 42 to 46 in one
+afternoon while nobody read any of it, and **it will keep growing at roughly the rate the build ships**.
+That is the argument for [ADR-227](../decisions/ADR-227.md)'s class B stated as a measurement rather
+than as a prediction: a queue drained only by reading loses ground to a queue filled by building.

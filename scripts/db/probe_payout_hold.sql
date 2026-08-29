@@ -203,15 +203,19 @@ END $$;
 -- 0011 made the halt REPRESENTABLE AND UNENFORCED. This is the enforcement.
 DO $$
 BEGIN
+  -- `approved_at` IS SUPPLIED BECAUSE `0070` MADE THIS ROW UNREPRESENTABLE
+  -- WITHOUT IT. The row's own status is `approved`, so the column the fixture
+  -- was missing is the one the status asserts. `approved_by` stays NULL, which
+  -- is the machine arm and takes no dual control (ADR-232 section 3).
   INSERT INTO wallet_withdrawals (
     id, identity_id, amount_cents, destination_ref, status, idempotency_key,
     frozen_at, freeze_flag_id, freeze_expires_at,
-    source_provenance_summary, earliest_credit_at
+    source_provenance_summary, earliest_credit_at, approved_at
   )
   VALUES ('dd000000-0000-0000-0000-000000000001',
     'aa000000-0000-0000-0000-000000000001', 50000, 'rise-dest-1',
     'approved', 'probe-w-1', now(), 'ff000000-0000-0000-0000-000000000001',
-    now() + interval '48 hours', '{"payout":50000}'::jsonb, now());
+    now() + interval '48 hours', '{"payout":50000}'::jsonb, now(), now());
   BEGIN
     UPDATE wallet_withdrawals SET status = 'settled', settled_at = now()
      WHERE id = 'dd000000-0000-0000-0000-000000000001';

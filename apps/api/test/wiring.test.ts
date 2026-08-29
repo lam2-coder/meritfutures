@@ -56,7 +56,7 @@ import { expect, test } from 'vitest';
 // -----------------------------------------------------------------------------
 // `useAffiliateDeps`, `useKycDeps` and `useCheckoutAdapters` already hold their
 // PRODUCTION value at module scope (`affiliate.ts:478`, `kyc.ts:284`,
-// `checkout.ts:1013`), so calling their setter from `start.ts` would install the
+// `checkout.ts:1051`), so calling their setter from `start.ts` would install the
 // object that is already installed and change nothing a request sees. It would
 // also make this file pass. THE REASON TEXT IS WHERE THAT IS RECORDED, so a
 // later reader raising the count that way meets the sentence saying it is not a
@@ -137,7 +137,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   an authority, it is a shape" (`routes/admin-reads.ts:961`).
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
-  // (`packages/db/src/scoped-db.ts:248`) and ADR-165 ruled it gains no member, so
+  // (`packages/db/src/scoped-db.ts:267`) and ADR-165 ruled it gains no member, so
   // the vocabulary was never the obstacle either. ADR-171 section 9 states the
   // condition under which the door becomes takeable: the slice that lands an
   // `AdminSessionSource` a deployment can install, because that is the first
@@ -152,7 +152,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`packages/db/migrations/0009_ledger.sql:164`) carries `as_of`, `open_liability_cents` and ' +
     'four exposure columns, plus `funded_accounts` ' +
     '(`packages/db/migrations/0049_reserve_coverage_snapshots.sql:135`) -- ' +
-    'and is scope class `firm` (`packages/db/src/scope.ts:756`), so the EXISTING `firm` door ' +
+    'and is scope class `firm` (`packages/db/src/scope.ts:826`), so the EXISTING `firm` door ' +
     'already reaches every column it has. A live adapter today would have to reach `sqlExecutor` ' +
     'to smuggle in SQL the accessor deliberately does not offer, which the port refuses by name.',
   setAdminSessionSource:
@@ -205,7 +205,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // ADR-172 clause 2 ruled that the handle is not the missing thing: the only
   // value satisfying `LedgerTx` is generic over EVERY TABLE IN THE ESTATE
-  // (`scoped-db.ts:2167`, `insert<K extends TableKey>`), so a door in `apps/api`
+  // (`scoped-db.ts:2389`, `insert<K extends TableKey>`), so a door in `apps/api`
   // returning one would be `systemDb` renamed. ADR-176 applied that to
   // `routes/payouts.ts`: `PayoutTx.ledger` is DELETED, the `LT-01` posting is
   // performed at a system authority, and the request path records the approval
@@ -272,9 +272,9 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'THAT RUNS EVERY METHOD ON ONE TRANSACTION: `PayoutTx.subject` returns `PayoutSubject` ' +
     '(`routes/payouts.ts:329`) whose `plan` (`:332`) is a `ResolvedPlan`, which M01 section 1.3 ' +
     'builds from `plan_versions.rules` and a `plan_version_sizes` row; both tables are scope ' +
-    'class `firm` -- `planVersions` (`packages/db/src/scope.ts:702`) and `planVersionSizes` ' +
-    '(`packages/db/src/scope.ts:707`) -- and `ScopedTableKey` is ' +
-    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1423`), so no `ScopedTx` read ' +
+    'class `firm` -- `planVersions` (`packages/db/src/scope.ts:772`) and `planVersionSizes` ' +
+    '(`packages/db/src/scope.ts:777`) -- and `ScopedTableKey` is ' +
+    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1514`), so no `ScopedTx` read ' +
     'reaches either. ADR-211 clause 2 RULED THE REMEDY AND NOTHING HAS APPLIED IT: two ' +
     'transactions, scoped first, the catalogue read a SECOND PORT beside `PayoutTx` rather ' +
     'than a member of it. That is a change to `routes/payouts.ts`. THE MUTABILITY HALF OF ' +
@@ -287,21 +287,70 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`ResolvedPlan` no scoped door reaches. Session 401 registered it, ADR-213 section 8 ' +
     'registered it again, and `routes/payouts.ts` is a handler file outside this fence. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
-    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1056`, and ' +
+    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1126`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
     'beside a `transact` that rejects would put a live-looking route in front of the arm that ' +
     'approves payouts. MONEY PATH.',
+  // ---------------------------------------------------------------------------
+  // THE REVENUE PATH, AND ITS ENTRY NAMED TWO OF FOUR OBSTRUCTIONS. ADR-230.
+  //
+  // THE FIRST IS DISCHARGED AND THE ENTRY SHRINKS BY IT, which is assertion 2 of
+  // this file's own three working: the day a door lands the list must shrink
+  // rather than keep a stale excuse beside a live line. `attributions` had no
+  // write authority in `packages/db` and now has the narrowest one there is.
+  //
+  // TWO OF THE THREE THAT REMAIN WERE NEVER IN THIS ENTRY AT ALL, and that is
+  // the finding rather than an omission being tidied. This list exists to make a
+  // reason a LIABILITY THAT EXPIRES, and an entry naming the second-cheapest
+  // blocker retires the question for every reader after it: a session dispatched
+  // to remove what this entry named would have removed it, found the route still
+  // answering 503, and had no written account of why. Both were derived on this
+  // tree at the sources cited below rather than inherited.
+  //
+  // THE FIRM READ IS THE ONE THAT BLOCKS EVERY REQUEST. `usePayoutBackend` above
+  // states the identical shape about a different port, and the difference is
+  // reach: there it is `PayoutTx.subject`, and here it is FIVE methods of which
+  // two are on the unconditional path of both handlers, so no checkout of any
+  // payment method gets past the plan lookup.
+  // ---------------------------------------------------------------------------
   useCheckoutBackend:
-    '`CheckoutTx.insertAttribution` (`routes/checkout.ts:886`) writes `attributions`, which is ' +
-    'scope class `pair` and which no authority in `packages/db` admits a request handler ' +
-    "writing; and the wallet arm's `ledger` (`routes/checkout.ts:877`) is the same `LedgerTx` " +
-    'ADR-165 declined to reach. The card arm alone would be a partial backend whose port ' +
-    'promises the whole transaction.',
+    'A `firm` READ AND A CROSS-IDENTITY READ ON A ONE-TRANSACTION PORT, AND NOT THE ' +
+    '`attributions` WRITE THIS ENTRY USED TO LEAD WITH. IT READ that `CheckoutTx.' +
+    'insertAttribution` writes a `pair` table "which no authority in `packages/db` admits a ' +
+    'request handler writing", AND THAT IS NOW FALSE: ADR-230 gives `PairRule` a required ' +
+    '`writer` field (`packages/db/src/scope.ts:1422` registers `attributions` `pair`), and ' +
+    '`ScopedTx.insertAsParty` (`packages/db/src/scoped-db.ts:2335`) inserts one row of a table ' +
+    'whose rule says `by: party`, over `PartyWritableTableKey` ' +
+    '(`packages/db/src/scoped-db.ts:2126`), stamping the identity the handle carries into ' +
+    '`buyer_identity_id` and refusing a caller that names it. WHAT REFUSES NOW, DERIVED ON THIS ' +
+    'TREE. FIRST, A `firm` READ INSIDE A PORT THAT RUNS EVERY METHOD ON ONE TRANSACTION ' +
+    '(`routes/checkout.ts:722`): `publishedPlanVersion` (`routes/checkout.ts:730`) reads ' +
+    '`plan_versions`, `planVersionSize` (`:733`) reads `plan_version_sizes`, `couponByCode` ' +
+    '(`:739`) reads `coupons`, `geoDecision` (`:765`) reads `geo_restrictions` and ' +
+    '`midCandidates` (`:768`) reads `mid_health`; all five tables are scope class `firm` ' +
+    '(`packages/db/src/scope.ts:772`, `:777`, `:917`, `:1358`, `:934`) and `ScopedTableKey` is ' +
+    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`packages/db/src/scope.ts:1514`), so no ' +
+    '`ScopedTx` read reaches one. THE FIRST TWO ARE UNCONDITIONAL, so this refuses every ' +
+    'checkout rather than one arm, which is how it differs from `usePayoutBackend`. SECOND, A ' +
+    'ROW THE BUYER MUST SEE THAT BELONGS TO THE AFFILIATE: `clickByToken` (`routes/checkout.ts:753`) ' +
+    'returns a `ClickRef` whose `affiliate` is an `AffiliateRef` carrying ' +
+    '`affiliates.identity_id`, and `couponByCode` returns the same shape ' +
+    '(`routes/checkout.ts:457`); `affiliates` is scope class `owned` on `identity_id` ' +
+    '(`packages/db/src/scope.ts:1093`) and `affiliate_clicks` is `derived` through it ' +
+    '(`packages/db/src/scope.ts:1109`), so a BUYER-scoped read of either returns the empty set ' +
+    'and `resolveAttribution` folds every referral as organic. That is a wrong answer that ' +
+    'RETURNS ROWS and it needs a ruling, not a door. THIRD, THE LEDGER ARM, AND THE GROUND ADR-165 STATED ' +
+    'STILL HOLDS, RE-DERIVED RATHER THAN CARRIED: the `ledger` on the wallet arm ' +
+    '(`routes/checkout.ts:906`) is a `LedgerTx`, which only `SystemTx` satisfies, `SystemReason` ' +
+    'is still exactly two members (`packages/db/src/scoped-db.ts:267`) and `apps/api/src/db.ts` ' +
+    'still declares no `system(reason, fn)` door. The card arm alone would be a partial backend ' +
+    'whose port promises the whole transaction, which is the shape `usePayoutBackend` refuses ' +
+    'above.',
   useCheckoutAdapters:
     'a configured PSP adapter per MID plus the `returnUrl` and `cancelUrl` configuration. ' +
     '`packages/psp` ships a port and TWO FAKES (`fakes/psp-a.ts`, `fakes/psp-b.ts`) and no ' +
     'vendor adapter, and `packages/enrichment` is in the same position. NOTE: this port already ' +
-    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1013`), so calling the ' +
+    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1051`), so calling the ' +
     'setter here would install what is already installed. That would raise the wired count and ' +
     'serve nothing, and it is not a wiring.',
 
@@ -350,7 +399,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
     'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
     'all, and `affiliateStatements` (`packages/db/src/schema.ts:2686`) declares it while ' +
-    '`affiliateStatements` (`packages/db/src/scope.ts:1046`) registers it `derived` through ' +
+    '`affiliateStatements` (`packages/db/src/scope.ts:1116`) registers it `derived` through ' +
     '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
     '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
     'and now `statements` -- and all four are an adapter somebody can write. REGISTERED RATHER ' +
@@ -364,7 +413,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
     'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
     '(`packages/db/src/schema.ts:2379`) declares `economic_calendar_current` and ' +
-    '`economicCalendarCurrent` (`packages/db/src/scope.ts:963`) classes it `firm`, so it is a ' +
+    '`economicCalendarCurrent` (`packages/db/src/scope.ts:1033`) classes it `firm`, so it is a ' +
     '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
     '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +
     'not in this deployable. The port says so at `routes/economic-calendar.ts:166`, "the answer ' +
@@ -398,12 +447,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'rules no door onto this database could ever serve. SECOND AND INDEPENDENT: ' +
     '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
-    'class `owned` on `identity_id` (`packages/db/src/scope.ts:790`). `db.firm` refuses that key ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:860`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1390-1392`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1473-1475`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
-    '(`packages/db/src/scope.ts:939`), so the audit half alone has a door and the subject half ' +
+    '(`packages/db/src/scope.ts:1009`), so the audit half alone has a door and the subject half ' +
     'does not, which is the same one-live-arm shape `useVerifySource` below refuses. THIRD, AND ' +
     'it is configuration rather than a door: `presentation()` ' +
     "(`routes/admin-certificates.ts:363`) is `GET /verify/:code`'s copy, and the " +
@@ -414,10 +463,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ONE ARM OF THREE, AND THE OTHER TWO ARE CONSTRUCTIBLE TODAY, WHICH IS WHY THIS ENTRY EXISTS ' +
     'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:596`) reads `certificates`, ' +
     'and `GET /verify/:code` is UNAUTHENTICATED, so `db.scoped` has no identity to open with; ' +
-    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:790`), and ' +
-    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1390-1392`), so ' +
+    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:860`), and ' +
+    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1473-1475`), so ' +
     '`db.firm` refuses that key AT COMPILE TIME. THE OTHER TWO ARMS HAVE WHAT THEY NEED: ' +
-    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1305`), so the ' +
+    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1375`), so the ' +
     '`record` arm is writable through `db.firm` now, and `presentation` is deployment ' +
     'configuration rather than a read. A BACKEND WITH ONE LIVE ARM AND ONE THAT REJECTS IS ' +
     "REFUSED HERE, on `usePayoutBackend`'s stated rule: it would put a live-looking public " +
@@ -443,31 +492,63 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
   // drives `requested --> approved` or `cooling --> approved`, and `:287-292`
   // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES` (the
-  // array is `wallet-withdrawals.ts:287-292`; :283-288 was the docblock above
-  // it), on
-  // which `gateNoInFlight` (`:1254`) refuses. So a wired endpoint writes a row
-  // nothing will ever advance and then refuses that identity's every later
-  // withdrawal, permanently, behind a screen saying a withdrawal is in flight.
+  // array is `wallet-withdrawals.ts:288-293` since ADR-232 added an import
+  // above it; it was :287-292, and :283-288 was the docblock above that), on
+  // which `gateNoInFlight` refuses. So a wired endpoint writes a row nothing
+  // will ever advance and then refuses that identity's every later withdrawal,
+  // permanently, behind a screen saying a withdrawal is in flight.
   //
   // A 503 AND A LOCKOUT BOTH REFUSE, AND ONLY ONE OF THEM IS REVERSIBLE. That
   // is why the 503 is kept, and it is the same fail-closed direction session
   // 303 was reaching for with the reason it had.
+  //
+  // AND THEN THE ENTRY NAMED THE WRONG EDGE, WHICH IS ADR-232's FINDING AND IS
+  // THE FOURTH TIME THIS FILE HAS RECORDED A REASON THAT DID NOT SURVIVE BEING
+  // CHECKED. It read the missing approval edge as the thing standing between a
+  // wired backend and the lockout, and IT IS NOT: `approved` IS ITSELF ONE OF
+  // THE FOUR OPEN STATUSES. A withdrawal that crosses `G-WITHDRAWAL-CLEARED`
+  // moves from `requested` to `approved`, `gateNoInFlight` finds it in exactly
+  // the same list, and the trader is refused their next withdrawal by the same
+  // 409. Building the approval edge -- which session 422 did build, guarded,
+  // with the founder's dual-control threshold on it -- does not shorten this
+  // entry by a word.
+  //
+  // WHAT ACTUALLY RELEASES AN IDENTITY IS `settled`, `failed` OR `cancelled`,
+  // the three arrows STATE_MACHINES section 3.2 draws into `[*]`, and NOTHING
+  // IN THIS TREE DRIVES ANY OF THEM EITHER. Derived over `apps/**` and
+  // `packages/**` outside the test and tooling directories at the moment
+  // ADR-232 was written: the only writers of a `wallet_withdrawals` row are the
+  // creation INSERT in `routes/wallet-withdrawals.ts` and one `updateAt` in
+  // `apps/worker/src/sweeps/expiry.ts`, and the second writes the freeze trio
+  // and `updated_at` without touching `status` at all.
+  //
+  // SO THE OBSTRUCTION IS ONE EDGE WIDER THAN IT WAS WRITTEN, and the honest
+  // 503 is kept for the reason it was always kept for rather than for the
+  // reason this entry used to give.
   // ---------------------------------------------------------------------------
   useWithdrawalBackend:
-    'A DRIVER FOR THE APPROVAL EDGE, AND NOT THE STORE THIS ENTRY USED TO NAME (ADR-172 clause ' +
-    '5). `databaseIdempotencyStore` (`src/idempotency-store.ts:144`) exists and serves the ' +
-    'identity arm this route presents (`routes/wallet-withdrawals.ts:1527`), so the idempotency ' +
-    'half is no longer what refuses. What refuses is that NOTHING IN THIS TREE performs ' +
-    '`requested --> approved` or `cooling --> approved` (`routes/wallet-withdrawals.ts:57-60`), ' +
-    'and both statuses are in `OPEN_WITHDRAWAL_STATUSES` (`:287-292`), so `gateNoInFlight` ' +
-    '(`:1254`) would refuse that identity every later withdrawal. Wiring it trades an honest 503 ' +
-    'for a permanent per-trader lockout, and only the 503 is reversible. TWO LINE NUMBERS IN ' +
-    'THIS ENTRY WERE FALSE BY EIGHTEEN LINES WHEN ADR-176 CHECKED THEM, in the reason ADR-172 ' +
-    'wrote one session earlier to replace a false one: line 1233 was the KYC term and line 1506 ' +
-    'was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, which is the ' +
-    'same drift in its quietest form. THOSE TWO NUMBERS ARE WRITTEN OUT OF CITATION GRAMMAR ON ' +
-    'PURPOSE: a `file:line` pointer is a claim about THIS tree, so a pointer quoted as HISTORY ' +
-    'must not wear the shape that says follow me (ADR-212).',
+    'A TERMINAL EDGE, AND NOT THE APPROVAL EDGE THIS ENTRY USED TO NAME (ADR-232), WHICH IN ' +
+    'TURN WAS NOT THE STORE IT NAMED BEFORE THAT (ADR-172 clause 5). ' +
+    '`databaseIdempotencyStore` (`src/idempotency-store.ts:144`) exists and serves the identity ' +
+    'arm this route presents, so the idempotency half has not been what refuses since ADR-172. ' +
+    'THE APPROVAL EDGE IS NOT WHAT REFUSES EITHER, and that sentence IS FALSE where this entry ' +
+    'used to state it: session 422 built `requested --> approved` and `cooling --> approved`, ' +
+    'guarded and dual controlled above 500000 integer cents, and the port did not become ' +
+    'wireable, because `approved` IS ITSELF ONE OF THE FOUR MEMBERS OF ' +
+    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:288-293`) and `gateNoInFlight` ' +
+    'refuses on the whole list. What refuses is that NOTHING IN THIS TREE reaches `settled`, ' +
+    '`failed` or `cancelled`, which are the three arrows STATE_MACHINES section 3.2 draws into ' +
+    'the terminal state and the only statuses that let an identity open a second withdrawal. ' +
+    'THE ENTRY SUPPLIES ITS OWN DECISION PROCEDURE AND RI-20 RUNS IT: ' +
+    '`grep -rn driveApprovals apps/api/src` returns 2 lines, which are the transition and one ' +
+    'reference to it in a docblock, and no third line is a caller. Wiring it trades an honest ' +
+    '503 for a permanent per-trader lockout, and only the 503 is reversible. TWO LINE NUMBERS ' +
+    'IN THIS ENTRY WERE FALSE BY EIGHTEEN LINES WHEN ADR-176 CHECKED THEM, in the reason ' +
+    'ADR-172 wrote one session earlier to replace a false one: line 1233 was the KYC term and ' +
+    'line 1506 was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, ' +
+    'which is the same drift in its quietest form. THOSE TWO NUMBERS ARE WRITTEN OUT OF ' +
+    'CITATION GRAMMAR ON PURPOSE: a `file:line` pointer is a claim about THIS tree, so a ' +
+    'pointer quoted as HISTORY must not wear the shape that says follow me (ADR-212).',
 };
 
 // -----------------------------------------------------------------------------

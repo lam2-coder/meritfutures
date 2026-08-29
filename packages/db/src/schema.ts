@@ -2929,6 +2929,30 @@ export const walletWithdrawals = pgTable('wallet_withdrawals', {
   // cash-out rail for a stolen card.
   sourceProvenanceSummary: jsonb('source_provenance_summary').notNull().default({}),
   earliestCreditAt: timestamp('earliest_credit_at', { withTimezone: true }),
+  // ADR-232, 0070. THE APPROVAL EDGE'S OWN COLUMNS. `0011` gave this table
+  // `requested_at` and `settled_at` and nothing for the transition between
+  // them, so a row that reached `approved` recorded WHEN only through the
+  // generic `updated_at` -- which the halt release moves without touching the
+  // rail status at all -- and WHO not at all.
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  // WHICH HAND MOVED THE ROW, and the column the dual-control constraints are
+  // written over. NULL is a MACHINE approval: `G-WITHDRAWAL-CLEARED` and
+  // `G-COOLING-ELAPSED` are both predicates naming no human, so an approval
+  // satisfying them has no operator to record and takes no dual control. A
+  // non-NULL value is a named operator in 0002's `actor` idiom, not a `users`
+  // row.
+  approvedBy: text('approved_by'),
+  // SD-M6-05's second person. The FOREIGN KEY proves a row exists and nothing
+  // about what it says; `assert_withdrawal_dual_control_is_real` (0070) is what
+  // makes it an approval OF THIS WITHDRAWAL, in status `approved`, whose
+  // requester is this row's own `approved_by`.
+  dualControlApprovalId: uuid('dual_control_approval_id').references(() => dualControlApprovals.id),
+  // The threshold IN FORCE when the row was approved, not the current one,
+  // which is why it is per row. `0038` shipped the same column with `> 0` as
+  // its only bound and `0068` bounded it eleven days later; here the ceiling
+  // (`<= 500000`) arrives in the same migration as the column, so a writer may
+  // lower it and may not raise it.
+  dualControlThresholdCents: bigint('dual_control_threshold_cents', { mode: 'bigint' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
