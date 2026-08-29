@@ -112,6 +112,29 @@ function cleanTree(): string {
   );
   write(root, 'apps/api/src/idempotency.ts', '// The protocol over the store port.\n');
   write(root, 'apps/api/src/routes/wallet-withdrawals.ts', '// The external leg.\n');
+  // RI-20 NAMES TWO MORE FILES THAN RI-14 DOES, and the pair is the shape
+  // session 410 landed: EACH ONE CARRIES THE CLAIM ABOUT THE OTHER, because a
+  // grep over the file a sentence is written in matches the sentence and the
+  // count would then include its own statement. So the fixture's `routes/auth.ts`
+  // counts the refusals in `auth-backend.ts` and the fixture's `auth-backend.ts`
+  // counts the port members in `routes/auth.ts`, and both claims are TRUE here.
+  write(
+    root,
+    'apps/api/src/auth-backend.ts',
+    '// The port size is a fact about the other file, so it is settleable here:\n' +
+      '// `grep -rn ": unwired" apps/api/src/routes/auth.ts` returns 2 lines.\n' +
+      "  requestOtp: blocked('requestOtp', NO_DELIVERY),\n" +
+      "  readMe: blocked('readMe', NO_MAX_ACCOUNTS),\n" +
+      "  elevate: blocked('elevate', NO_ELEVATION),\n",
+  );
+  write(
+    root,
+    'apps/api/src/routes/auth.ts',
+    '// The refusal count is a fact about the other file, so it is settleable\n' +
+      '// here: `grep -rn ": blocked" apps/api/src/auth-backend.ts` returns 3 lines.\n' +
+      "  sessionByToken: unwired('sessionByToken'),\n" +
+      "  requestOtp: unwired('requestOtp'),\n",
+  );
   // RI-15 NAMES THREE MORE FILES BY NAME AND THE FIXTURE CARRIES ALL OF THEM,
   // for the reason stated above RI-14's three: a fixture missing one makes the
   // rename guard fire on every case, which is the guard working and the fixture
@@ -2354,7 +2377,17 @@ describe('RI-20 runs the command a reason quotes', () => {
     // whose input is prose somebody has to write: an empty input is silence, not
     // a green tick.
     const root = cleanTree();
-    write(root, 'apps/api/test/wiring.test.ts', '// nothing quoted here.\n');
+    // EVERY FILE IN THE LIST GOES SILENT, not just the first one. This case read
+    // only `wiring.test.ts` until session 410 put two more files in RI-20's
+    // scope, at which point it stopped testing the empty-input guard and started
+    // passing on the claims the other two carry. Each file still EXISTS, so the
+    // rename guard is not what fires.
+    for (const rel of [
+      'apps/api/test/wiring.test.ts',
+      'apps/api/src/auth-backend.ts',
+      'apps/api/src/routes/auth.ts',
+    ])
+      write(root, rel, '// nothing quoted here.\n');
     expect(() => findings('RI-20', root)).toThrow(/found NO command claim/);
   });
 
@@ -2364,6 +2397,60 @@ describe('RI-20 runs the command a reason quotes', () => {
     // they are read and cleared rather than skipped.
     const root = cleanTree();
     expect(findings('RI-20', root)).toEqual([]);
+  });
+
+  test('THE DIRECTION THAT ACTUALLY HAPPENS: the TREE moves and no sentence is touched', () => {
+    // ADR-200 WIRED `verifyOtp` AND ELEVEN SENTENCES WENT ON SAYING TWELVE. The
+    // seeds above all edit the claim; this one edits the TREE and leaves every
+    // sentence exactly as its author wrote it, which is the event that produced
+    // the defect session 410 was dispatched for. The finding must land on the
+    // file holding the SENTENCE and name the file holding the COUNT.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/auth-backend.ts',
+      '// The port size is a fact about the other file, so it is settleable here:\n' +
+        '// `grep -rn ": unwired" apps/api/src/routes/auth.ts` returns 2 lines.\n' +
+        "  requestOtp: blocked('requestOtp', NO_DELIVERY),\n" +
+        "  readMe: blocked('readMe', NO_MAX_ACCOUNTS),\n" +
+        "  elevate: blocked('elevate', NO_ELEVATION),\n" +
+        "  verifyPhone: blocked('verifyPhone', NO_PREVIEW_COLUMN),\n",
+    );
+    const found = findings('RI-20', root).join('\n');
+    expect(found).toContain('apps/api/src/routes/auth.ts:2');
+    expect(found).toContain('returns 3 line(s) and it returns 4');
+  });
+
+  test('A CLAIM MUST NOT BE ABLE TO SATISFY ITSELF, which is why the two claims are crossed', () => {
+    // THE RULE STATED AS A CASE RATHER THAN AS A COMMENT. Writing the refusal
+    // count INTO `auth-backend.ts` puts the pattern on one more line of the file
+    // the command greps, so the sentence changes the number it is asserting: the
+    // three refusals below are three, the file returns FOUR, and the extra line
+    // is the claim itself. A true count is unwritable there, which is the whole
+    // reason the shipped tree crosses the two claims over.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/auth-backend.ts',
+      '// Written in the file it greps, which is the mistake:\n' +
+        '// `grep -rn ": blocked" apps/api/src/auth-backend.ts` returns 3 lines.\n' +
+        "  requestOtp: blocked('requestOtp', NO_DELIVERY),\n" +
+        "  readMe: blocked('readMe', NO_MAX_ACCOUNTS),\n" +
+        "  elevate: blocked('elevate', NO_ELEVATION),\n",
+    );
+    // The other file's claim is corrected to the same four, so the ONLY finding
+    // left is the self-matching one and the case cannot pass on the wrong site.
+    write(
+      root,
+      'apps/api/src/routes/auth.ts',
+      '// `grep -rn ": blocked" apps/api/src/auth-backend.ts` returns 4 lines.\n' +
+        "  sessionByToken: unwired('sessionByToken'),\n" +
+        "  requestOtp: unwired('requestOtp'),\n",
+    );
+    const found = findings('RI-20', root);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('apps/api/src/auth-backend.ts:2');
+    expect(found[0]).toContain('returns 3 line(s) and it returns 4');
   });
 
   test('THE LIMIT, ASSERTED RATHER THAN DESCRIBED: it reads the COUNT and not the content', () => {

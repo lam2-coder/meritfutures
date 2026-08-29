@@ -8776,17 +8776,129 @@ Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants re
 
 ---
 
+## 2026-08-29 - Session 410: the auth port's wiring count is stated once, in a form a runner runs, and the dispatch's count of the defect was wrong by nine
+
+**Objective.** The auth port's wiring count becomes derived, so it cannot go
+stale again. **`ADR-220` is NOT taken and the number returns to the pool
+unspent.**
+
+**THE TWO NUMBERS HOLD AND THE SIZE OF THE DEFECT DOES NOT.** Derived live over
+the real backend before a line changed: `AuthBackend` declares **16** methods,
+`databaseAuthBackend` implements **5** (`sessionByToken`, `logout`,
+`listSessions`, `revokeSession`, `verifyOtp`) and refuses **11**. So session
+408's reading is confirmed. **What is wrong is the reservation's own count of the
+restatements: it says three and the tree held TWELVE, of which ELEVEN were
+stale.** Four sat in `auth-backend.ts` alone, contradicting that file's own
+header four times over. **Two sat inside the very suite that asserts the
+eleven**, fifteen lines below a heading reading *"The twelve refusals"*. One is a
+SECTION HEADING in `routes/auth.ts` reading *"AN IMPLEMENTATION FOR FOUR OF ITS
+SIXTEEN METHODS"* -- **a numeral the reservation's own `twelve` needle could not
+see**, so a session that had grepped for the dispatch's word would have left a
+stale count at the top of the port file. **And four were outside the fence**, in
+`routes/accounts.ts` twice, `routes/account-reads.ts` and `test/db.test.ts`.
+
+**NOT ONE SITE IS REPAIRED BY WRITING `eleven`.** [ADR-034](decisions/ADR-034.md)'s
+remedy has exactly two branches, generate the value or delete it and point at the
+source, and [ADR-212](decisions/ADR-212.md) and [ADR-214](decisions/ADR-214.md)
+each refused the rewrite on the ground that a number written down goes stale and
+rewriting it only resets *when*. **Eleven sites take the second branch** and the
+sentences keep the point that was never the number. **One takes the first**: the
+port docblock in `routes/auth.ts` quotes the commands that settle it, and `RI-20`
+runs them on every `CI-01`. That is `ADR-214` clause 3 applied to a COUNT rather
+than to an existence claim, and the burden lands on the sentence making the claim.
+
+**THE TWO CLAIMS ARE CROSSED, AND THE RULE IS THE PART THAT IS NOT OBVIOUS: A
+CLAIM MUST NOT BE ABLE TO SATISFY ITSELF.** A grep over the file a sentence is
+written in matches the sentence, so a refusal count written into `auth-backend.ts`
+would put the pattern on one more line of the file the command reads and would
+**change the number it is asserting**. `routes/auth.ts` therefore states
+`auth-backend.ts`'s two halves and `auth-backend.ts` states `routes/auth.ts`'s
+port size, which `UNWIRED_AUTH_BACKEND: AuthBackend` holds at COMPILE time. A case
+asserts that failure rather than describing it.
+
+**DOES AN EXISTING CHECK ALREADY REACH THIS: NO, MEASURED AT ZERO.** `RI-20`'s
+grammar over the three auth files as they stood moves **0** sites, because a bare
+numeral quotes no command. **The closest check in the tree is
+`CI-06/derivable-counts`, and its own `covers` line already says it does not reach
+this**: it reads markdown only, records that the same recogniser over every `.ts`,
+`.tsx`, `.mjs` and `.sql` finds **17** further sites, that closing them needs a
+comment-span generator, and that an underivable population is unpoliced. The auth
+partition needs a query that reads TypeScript; that gate's vocabulary reads
+migrations. **So its remedy is much larger than `RI-20`'s.**
+
+**EVERY CANDIDATE WAS COSTED BY RUNNING IT**, on `ADR-212`'s precedent, over the
+**585** shipped `.ts`/`.tsx` files. A numeral-word beside a refusal noun moves
+**902** sites, and **34** in the three auth files alone of which **27 are honest**
+(*"One refusal is"*, *"TWO INDEPENDENT REFUSALS"*, *"One method per endpoint"*):
+**refused on precision**, because no rule over English separates a count of a
+partition from a singular noun phrase. **Widening `RI-14`'s own file list to these
+files moves 0 sites**, which is `ADR-212`'s and `ADR-214`'s finding a THIRD time,
+so that list is untouched and `RI-20` gets its own. **Widening `RI-20`'s grammar
+to the whole tree moves 18 sites of which 12 are this package's own seeded
+fixtures**, so it would be RED on landing: refused, and the four remaining false
+shapes are named in the log.
+
+**FOUR SEEDS WATCHED FIRING against the real tree**, each restored from a byte
+copy with the `sha256` identical both ways: eleven restated as twelve, five
+restated as four (`ADR-200`'s own staleness), sixteen restated as fifteen, and
+**the direction that actually happens** -- a twelfth refusal added to
+`auth-backend.ts` with **no sentence touched**, caught in the OTHER file, which is
+what crossing the claims buys. **AND ONE SEED EXPOSED A CONTROL COVERING LESS THAN
+ITS OWN WORDS**: `RI-20`'s asserting-nothing guard emptied only `wiring.test.ts`,
+so once the list held three files it would have passed on the other two files'
+claims while claiming to test an empty input. It now empties every file in the
+list.
+
+**REGISTERED RATHER THAN REACHED FOR.** Two TRUE live command claims sit in files
+`RI-20` still does not read, both settled by hand at **0**:
+`apps/portal/src/http/client.ts:176` and `apps/worker/src/detectors/canary.ts:30`.
+**Documents are NOT stale and are NOT repaired**: ADR-120, ADR-126, ADR-139,
+ADR-171 and this file all say "four of sixteen" under a dated or entry heading and
+each was true when written, which is `RI-20`'s own clause 3 boundary -- a document
+may honestly record what a command returned in the past and a live source comment
+may not.
+
+**THE FENCE WAS WIDENED ONTO FOUR SITES AND IT IS SAID RATHER THAN SLIPPED IN**,
+in a separate commit so a reviewer can take or drop it alone. The row drew its
+fence around a premise that was wrong by nine, and leaving those four would have
+ended a session whose whole objective is that this count cannot go stale with the
+tree still saying twelve in the same package. Every one was an ANALOGY carrying a
+number that was no part of its argument.
+
+Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants read
+off the runner's own last line, **247 files / 6,172 passed / 6 skipped** against
+an `origin/main` baseline at `b881cf0` of **247 / 6,170 / 6** reproduced before a
+line changed, which is this branch's own delta of **+0 files and +2 cases**;
+typecheck 0, lint 0, `format:check` clean; `falsify.mjs` read as OUTPUT with all
+33 gates clean-and-dirty plus **80** scope and **10** loader cases and the tree
+clean after it.
+
+**No migration, no `SD-nn`, no `GS-nnn`, no `CI-06` letter, no new `RI-nn`, no new
+enum type or label, no `SystemReason` or `SqlExecutorReason` member, no `pg`
+import, no cast past a key type, no ledger account named, no port member added or
+removed, no behaviour change of any kind, no gate weakened.** `NO_DELIVERY` and
+`NO_WEBAUTHN` are untouched and both are still founder-owed. `apps/portal/**` is
+byte for byte unchanged.
+
+**WHAT IS STILL OWED.** `RI-20` reads five files and the tree holds at least two
+more true command claims. The auth partition is now unstateable inside
+`auth-backend.ts` itself, which is correct and is also a thing a later author will
+try; the header says why. And **nobody can still sign in to this deployment by any
+route**, which is session 408's finding and is unchanged by this one.
+
+---
+
 ## 2026-08-29 - Session 409: the portal gets a write verb, and the CSRF control the corpus already requires is missing on the other side of the fence ([ADR-219](decisions/ADR-219.md), proposed)
 
 **`ApiClient` HAD EXACTLY ONE MEMBER AND `post` IS THE SECOND.** [`apps/portal/src/http/client.ts`](../apps/portal/src/http/client.ts) declared an interface whose only method was `get`, so this application could not express a `POST` at all and **19 trader writes** were unreachable behind it. Three screens declined the widening and each said why at the point it declined; this is the fourth encounter and it takes the ruling. **`POST` AND NO OTHER METHOD, MEASURED THROUGH A REAL `compose()`** rather than a grep: the `public` surface registers **46** of **73** declared routes and withholds **27**, and the 46 are **24 `GET` and 22 `POST`** with no `PATCH`, `PUT` or `DELETE`, so a method parameter would be a vocabulary this contract does not use.
 
-**THE RESERVATION SAID THE CORPUS IS SILENT ON `CSRF` AND IT IS NOT.** The grep row `219` quotes does return nothing, re-run, but it names two ARCHITECTURE documents. [`MERIT_BUILD_MASTER_PROMPT.md`](../MERIT_BUILD_MASTER_PROMPT.md) Appendix D section D2 rules **"CSRF on cookie mutations"** among the binding application controls. **That is a constitutional obligation with no implementation, which is a different finding from a silence and a different obligation.** Two further premises also failed: `C-02` at [`SECURITY.md:20`](architecture/SECURITY.md) says *"httpOnly Secure SameSite cookies"* and **names no mode** (the word `Lax` does not appear in that file; it is [`API_CONTRACT:19`](architecture/API_CONTRACT.md)'s and [`auth.ts:589`](../apps/api/src/routes/auth.ts)'s), and **`RI-20` would have checked nothing here**, because its `COMMAND_CLAIM_FILES` is three files all in `apps/api` and it reads neither `docs/` nor `apps/portal`.
+**THE RESERVATION SAID THE CORPUS IS SILENT ON `CSRF` AND IT IS NOT.** The grep row `219` quotes does return nothing, re-run, but it names two ARCHITECTURE documents. [`MERIT_BUILD_MASTER_PROMPT.md`](../MERIT_BUILD_MASTER_PROMPT.md) Appendix D section D2 rules **"CSRF on cookie mutations"** among the binding application controls. **That is a constitutional obligation with no implementation, which is a different finding from a silence and a different obligation.** Two further premises also failed: `C-02` at [`SECURITY.md:20`](architecture/SECURITY.md) says *"httpOnly Secure SameSite cookies"* and **names no mode** (the word `Lax` does not appear in that file; it is [`API_CONTRACT:19`](architecture/API_CONTRACT.md)'s and [`auth.ts:613`](../apps/api/src/routes/auth.ts)'s), and **`RI-20` would have checked nothing here**, because its `COMMAND_CLAIM_FILES` is three files all in `apps/api` and it reads neither `docs/` nor `apps/portal`.
 
 **THE CLIENT MINTS NO TOKEN, ON THREE MEASUREMENTS.** Nothing on the server reads one; the request this client makes is a server-to-server `fetch` rather than a browser request, and the portal exposes no browser-reachable write endpoint for a forged form to target ([ADR-095](decisions/ADR-095.md) ruling 3 and [ADR-138](decisions/ADR-138.md) section 3 with `RI-11` refuse a Server Action outright); and `SameSite=Lax` already closes the CROSS-SITE case, so a token for that case is a second copy of a control that exists.
 
 **WHAT `Lax` DOES NOT COVER IS NAMED AND IT IS LIVE.** `SameSite` is SITE-scoped. [`INFRA`](architecture/INFRA.md) section 2.1 puts `site` on **`meritfutures.com`** and both `portal` and `api` on **`app.meritfutures.com`**, which share one registrable domain, so a request issued by a page on the marketing origin to the API is **same-site**, `Lax` permits it, and the host-only session cookie is sent because the destination host matches. **AN INJECTION ON THE MARKETING SITE IS A FULLY AUTHENTICATED WRITE AGAINST A TRADER'S MONEY.** The corpus already separated the OPERATOR surfaces at exactly that boundary: `INFRA` hard rule 3 puts the admin console and `api-admin` on *"a separate apex domain"* and states that *"cookie scope, CORS, and the CSP never span the two origins"*. **The trader surfaces were not separated that way**, and the control is **REGISTERED AS OWED** to `apps/api` with two candidate shapes costed and neither chosen.
 
-**THE UNSAFE-METHOD COOKIE POLICY IS UNCHANGED OUTBOUND AND A DEAD END INBOUND.** Not one of `client.ts` section 2's three measurements turns on the method, so a write forwards exactly one named cookie and asks for no `credentials` mode. But **three registered `POST`s answer with a `Set-Cookie`** (`auth.ts:1033`, `:1088` and `:1098`) and this deployable can deliver none of them: `next@16.3.2` raises *"Cookies can only be modified in a Server Action or Route Handler"* and `ADR-138` section 3 refuses the first outright, while a portal-owned Route Handler on a path the contract does not specify is a door nobody has ruled on. **So `post` is NECESSARY AND NOT SUFFICIENT for sign-in**, which is a second and independent reason beside [session 408](sessions/2026-08-29-session-408.md)'s and is on this side of the fence, so it outlives delivery landing.
+**THE UNSAFE-METHOD COOKIE POLICY IS UNCHANGED OUTBOUND AND A DEAD END INBOUND.** Not one of `client.ts` section 2's three measurements turns on the method, so a write forwards exactly one named cookie and asks for no `credentials` mode. But **three registered `POST`s answer with a `Set-Cookie`** (`auth.ts:1057`, `:1112` and `:1122`) and this deployable can deliver none of them: `next@16.3.2` raises *"Cookies can only be modified in a Server Action or Route Handler"* and `ADR-138` section 3 refuses the first outright, while a portal-owned Route Handler on a path the contract does not specify is a door nobody has ruled on. **So `post` is NECESSARY AND NOT SUFFICIENT for sign-in**, which is a second and independent reason beside [session 408](sessions/2026-08-29-session-408.md)'s and is on this side of the fence, so it outlives delivery landing.
 
 **IDEMPOTENCY IS THE CALLER'S, REQUIRED, AND NEVER DEFAULTED.** A transport that minted a key would send a different key on the retry, which [`API_CONTRACT:23`](architecture/API_CONTRACT.md) makes a second payout rather than a replay of the first, and `INV-M5-06` states the identical rule one leg over. The field is a required `string | null` so an omitted key is a decision beside the path rather than a default, and **no list of the four routes that require one lives in the portal**: the portal is not the idempotency control for the reason `INV-M4-06` makes it not the authorization control. **A `204` IS A SUCCESS WITH A `null` BODY**, keyed on the status and not on an empty payload, and it matters immediately because **`POST /sessions/:id/revoke` answers `204`** and a successful revoke would otherwise render as an outage on the screen where a trader throws an attacker out.
 
@@ -8798,7 +8910,7 @@ Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants re
 
 **DECLINED INSIDE THE FENCE AND REGISTERED: a status on `ApiSuccess`.** Four segments already report wanting one and each refused because `client.ts` was outside their fence. This session holds that fence and still declines, because adding the field makes four sentences false in four files this fence does not hold: four new stale citations bought to save one, on the day this session repaired eleven of that exact shape. The slice is one type change plus five call sites, over `client.ts` and the four segments together.
 
-Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants read off the runner's own last line, typecheck 0, lint 0, `format:check` clean, `falsify.mjs` read as OUTPUT with all 33 gates clean-and-dirty plus **80** scope and **10** loader cases and the tree clean after it, `pnpm --filter @merit/portal build` green with **15** routes, the route table unchanged and `/sign-in` still static, against **247 files / 6,185 passed / 6 skipped** on an `origin/main` baseline at `b881cf0` of **247 / 6,170 / 6** reproduced before a line changed, **which is this branch's own delta of +0 files and +15 cases**.
+Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants read off the runner's own last line, typecheck 0, lint 0, `format:check` clean, `falsify.mjs` read as OUTPUT with all 33 gates clean-and-dirty plus **80** scope and **10** loader cases and the tree clean after it, `pnpm --filter @merit/portal build` green with **15** routes, the route table unchanged and `/sign-in` still static, against **247 files / 6,187 passed / 6 skipped** on the merged tree; the baseline reproduced before a line changed was `origin/main` at `b881cf0`, **247 / 6,170 / 6**, and after [session 410](sessions/2026-08-29-session-410.md) merged in, `origin/main` at `0f33a5b` re-derived in a worktree at that ref reads **247 / 6,172 / 6**, **so this branch's own delta is +0 files and +15 cases on both sides of the merge**.
 
 **No migration, no `SD-nn`, no `GS-nnn`, no `CI-06` letter, no `RI-nn`, no new enum type or label, no `SystemReason` or `SqlExecutorReason` member, no `pg` import, no cast past a key type, no ledger account named, no member added to `PortalErrorKind`, no second `fetch(`, no gate weakened and no fence widened to finish.** The approval line is **UNSIGNED**.
 

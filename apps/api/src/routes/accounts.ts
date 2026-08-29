@@ -103,9 +103,13 @@
 //
 // `readProgress` therefore raises `AccountsBackendUnwired` from the database
 // adapter, carrying both blockers, and the route answers `503
-// service_unavailable`. That is `databaseAuthBackend`'s shape exactly: it
-// implements four of sixteen methods and refuses the other twelve by name. A
-// fixture serving real traffic is worse than a 503, and a hardcoded `need` is
+// service_unavailable`. That is `databaseAuthBackend`'s shape exactly: part of
+// the port served and the rest refused BY NAME, each with its own blocker. (The
+// count stood here and read "four of sixteen ... the other twelve"; it had been
+// five and eleven since ADR-200 wired `verifyOtp`, and the shape rather than the
+// number is what this sentence is borrowing. `routes/auth.ts`'s port docblock
+// states the partition once and quotes the commands `RI-20` runs to settle it.)
+// A fixture serving real traffic is worse than a 503, and a hardcoded `need` is
 // the fixture the invariant exists to lock out.
 //
 // `GET /accounts` NEEDS NO PLAN PARAMETER AND NO CALENDAR, AND IS SERVED END TO
@@ -876,8 +880,11 @@ function pinnedVersions(accounts: readonly AccountRow[]): readonly string[] {
  * The backend, against the real accessor.
  *
  * TWO OF THREE METHODS ARE SERVED AND THE THIRD REFUSES BY NAME, which is
- * `databaseAuthBackend`'s shape: four of sixteen there, two of three here, and
- * in both cases the refusal carries the blocker rather than a shrug.
+ * `databaseAuthBackend`'s shape: a served part and a refused part there, two of
+ * three here, and in both cases the refusal carries the blocker rather than a
+ * shrug. THE AUTH COUNT IS NOT RESTATED HERE and it read "four of sixteen" until
+ * session 410, stale since ADR-200; `routes/auth.ts`'s port docblock states it
+ * once, in the form `RI-20` settles.
  */
 export function databaseAccountsBackend(db: ApiDb): AccountsBackend {
   const snapshotFrom = async (
