@@ -184,6 +184,29 @@ export {
   type TableKey,
 } from './scope.ts';
 
+// THE MINT FOR THE ONE COLUMN AN UNAUTHENTICATED CALLER MAY ADDRESS (ADR-235).
+//
+// `PUBLIC_LOOKUP_ADDRESS` above asserts that `certificates.code` cannot be
+// guessed. NOTHING IN THIS TREE PRODUCED SUCH A CODE until this export existed:
+// no `INSERT` reaches `certificates` from any deployable, so the 128 bits
+// `INV-M11-05` commits to were a property of a function nobody had written. The
+// mint is exported HERE rather than from the issuer, because `M11:111` puts the
+// issuer in the worker and ADR-231 put the verifier in the api, and `@merit/db`
+// is the only package both deployables already declare.
+//
+// IT IS EXPORTED AHEAD OF ITS CALLER, WHICH IS THE OPPOSITE OF THE RULE THE
+// DOOR ABOVE FOLLOWS, and the difference is what each thing costs when it sits
+// unused. An unexported accessor is an authority nobody can reach, which
+// ADR-197 finding 1 shows gets misreported as absent; an unexported mint is a
+// security parameter the next slice re-invents under deadline. `RI-22` executes
+// this function on every `CI-01` pass and measures what it actually returns.
+export {
+  CERTIFICATE_CODE_ALPHABET,
+  CERTIFICATE_CODE_ENTROPY_BITS,
+  CERTIFICATE_CODE_LENGTH,
+  mintCertificateCode,
+} from './certificate-code.ts';
+
 export * as schema from './schema.ts';
 
 // The pool's lifecycle, for a process that means to exit and for an integration

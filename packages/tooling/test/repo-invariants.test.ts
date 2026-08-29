@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, renameSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -60,6 +68,11 @@ afterEach(() => {
   for (const dir of seeded.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
+const appendTo = (root: string, rel: string, body: string): void => {
+  const at = join(root, rel);
+  writeFileSync(at, (existsSync(at) ? readFileSync(at, 'utf8') : '') + body);
+};
+
 const write = (root: string, rel: string, body: string): void => {
   mkdirSync(join(root, rel, '..'), { recursive: true });
   writeFileSync(join(root, rel), body);
@@ -83,6 +96,33 @@ const linesNaming = (n: number, at: Readonly<Record<number, string>>): string =>
   })
     .join('\n')
     .concat('\n');
+
+/**
+ * The mint RI-22 executes, as the fixture states it.
+ *
+ * IT IS A SECOND IMPLEMENTATION AND NOT A COPY OF THE SHIPPED ONE, on the rule
+ * the RI-04 comment below states: a fixture that keeps its own copy of the thing
+ * under test goes stale in step with it and cannot fail. What the shipped module
+ * and this one share is the CONTRACT RI-22 reads -- three exports and a draw --
+ * and each seeded case below breaks exactly one clause of it.
+ */
+const FIXTURE_MINT =
+  "import { randomInt } from 'node:crypto';\n" +
+  "export const CERTIFICATE_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';\n" +
+  'export const CERTIFICATE_CODE_LENGTH = 26;\n' +
+  'export const CERTIFICATE_CODE_ENTROPY_BITS = Math.floor(\n' +
+  '  CERTIFICATE_CODE_LENGTH * Math.log2(new Set(CERTIFICATE_CODE_ALPHABET).size),\n' +
+  ');\n' +
+  'export function mintCertificateCode() {\n' +
+  "  let code = '';\n" +
+  '  for (let i = 0; i < CERTIFICATE_CODE_LENGTH; i += 1)\n' +
+  '    code += CERTIFICATE_CODE_ALPHABET.charAt(randomInt(0, CERTIFICATE_CODE_ALPHABET.length));\n' +
+  '  return code;\n' +
+  '}\n';
+
+/** Put a mint at the path RI-22 names. */
+const writeMint = (root: string, body: string): void =>
+  write(root, 'packages/db/src/certificate-code.ts', body);
 
 /** A tree that satisfies every invariant, which each case then breaks in one way. */
 function cleanTree(): string {
@@ -442,6 +482,33 @@ function cleanTree(): string {
       '// lands, AND a primary source declares the stored `engine_gates` ENCODING,\n' +
       '// AND `eligible_next_7d` gains its `| null`.\n',
   );
+
+  // RI-22 READS THE CORPUS'S OWN COMMITMENT AND THROWS WHEN IT FINDS NONE, so
+  // the fixture carries all three documents it names with the figure they
+  // actually state. A fixture missing them makes the settles-nothing guard fire
+  // on every case in this file, which is the guard working and the fixture
+  // wrong: exactly the trap RI-14's three files and RI-20's two set before it.
+  write(
+    root,
+    'docs/plans/M11-certificates-social-proof.md',
+    '| INV-M11-05 | Certificate codes are unguessable | 128 bits of entropy, no sequence |\n' +
+      '1. **128 bits of entropy, no sequence, no structure** (INV-M11-05).\n',
+  );
+  // APPENDED RATHER THAN WRITTEN. `SUBJECTS` above already put RI-18's whole
+  // specification in this file, and `write` overwrites: replacing it left RI-18
+  // throwing "holds no ```ts block" on the clean tree, which is one check's
+  // fixture quietly deleting another's.
+  appendTo(
+    root,
+    'docs/architecture/API_CONTRACT.md',
+    "| `GET /verify/:code` | The catalog's budget is an enumeration budget on a 128-bit token |\n",
+  );
+  write(root, 'docs/edge-cases/EC-091.md', '- Correct behavior: **128 bits of entropy**.\n');
+  // AND THE MINT ITSELF, WHICH RI-22 EXECUTES. It is a real generator rather
+  // than a stub, because the check asserts over the DRAWS: a fixture that
+  // returned a constant would fail the clean direction, which is the check
+  // working.
+  writeMint(root, FIXTURE_MINT);
 
   // RI-21 ASKS `git` ABOUT THIS TREE, so the fixture is a real work tree rather
   // than a directory. `git init` is measured at roughly 7ms and this helper runs
@@ -2656,5 +2723,197 @@ describe('RI-21 asks git what the ignore rule says', () => {
       ENV_IGNORE_SUBJECTS.length = 0;
       ENV_IGNORE_SUBJECTS.push(...shipped);
     }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// RI-22, whose subject is what the mint ACTUALLY RETURNS
+// -----------------------------------------------------------------------------
+//
+// Every case below breaks one clause of the contract RI-22 reads and watches it
+// fire. THE MINT IS EXECUTED IN EACH ONE, which is what separates this check
+// from a static read: the prefix, the counter and the biased index cases are all
+// source that looks entirely reasonable and produces a token that is not what
+// five documents say it is.
+
+describe('RI-22 measures the certificate code by minting codes', () => {
+  /** The fixture mint with one clause replaced. */
+  const mintWith = (root: string, from: string, to: string): void => {
+    if (!FIXTURE_MINT.includes(from)) throw new Error(`the fixture mint does not contain: ${from}`);
+    writeMint(root, FIXTURE_MINT.replace(from, to));
+  };
+
+  test('a code too short for the corpus commitment', () => {
+    const root = cleanTree();
+    mintWith(root, 'CERTIFICATE_CODE_LENGTH = 26', 'CERTIFICATE_CODE_LENGTH = 24');
+    const found = findings('RI-22', root).join('\n');
+    expect(found).toContain('the mint yields 120 bit(s) and the corpus commits to 128');
+    expect(found).toContain('24 position(s) over 32 symbol(s) is not enough');
+  });
+
+  test('an alphabet that repeats a symbol', () => {
+    // THE LOSS IS INVISIBLE TO EVERY ARITHMETIC OVER THE STRING LENGTH: 32
+    // characters and 31 symbols, and `.length` reports 32 either way.
+    //
+    // THE FIXTURE MINT LOADS AND THE SHIPPED ONE REFUSES TO, and the case is
+    // written against the fixture's weaker behaviour deliberately: the shipped
+    // module's load-time guard is one line a later author can delete, and this
+    // asserts RI-22 still catches the repeat when it is gone. The load-failure
+    // path has its own case below.
+    const root = cleanTree();
+    mintWith(root, "'0123456789ABCDEFGHJKMNPQRSTVWXYZ'", "'0123456789ABCDEFGHJKMNPQRSTVWXY0'");
+    const found = findings('RI-22', root).join('\n');
+    expect(found).toContain('32 character(s) and 31 DISTINCT symbol(s)');
+    expect(found).toContain('every arithmetic taken over its length reports no loss');
+  });
+
+  test('a mint that refuses to load is a finding rather than an environment problem', () => {
+    // THE SHIPPED MODULE'S OWN SHAPE. It throws at import rather than reporting
+    // a number it cannot support, and RI-22 lifts the thrown message out of the
+    // child's stderr rather than the stack frames underneath it.
+    const root = cleanTree();
+    writeMint(root, FIXTURE_MINT + "throw new Error('CERTIFICATE_CODE_ALPHABET repeats');\n");
+    const found = findings('RI-22', root).join('\n');
+    expect(found).toContain('could not be executed');
+    expect(found).toContain('Error: CERTIFICATE_CODE_ALPHABET repeats');
+    expect(found).toContain('A mint that does not run mints nothing');
+  });
+
+  test('a mint drawn from Math.random rather than node:crypto', () => {
+    const root = cleanTree();
+    mintWith(
+      root,
+      "import { randomInt } from 'node:crypto';",
+      'const randomInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo));',
+    );
+    const found = findings('RI-22', root);
+    expect(found.join('\n')).toContain('does not import from `node:crypto`');
+    expect(found.join('\n')).toContain('names `Math.random`');
+  });
+
+  test('a mint that folds a clock into the token', () => {
+    const root = cleanTree();
+    mintWith(root, "  let code = '';", "  let code = '';\n  const at = Date.now();\n  void at;");
+    expect(findings('RI-22', root).join('\n')).toContain('names `Date.now`');
+  });
+
+  test('a fixed prefix, which is the structure M11 refuses', () => {
+    const root = cleanTree();
+    // THE LENGTH IS HELD CONSTANT AND ONE POSITION IS SPENT ON THE PREFIX,
+    // which is what a version marker actually looks like. Prepending a symbol
+    // without shortening the loop makes the code 27 characters and RI-22
+    // reports the LENGTH instead, which is the more fundamental finding and
+    // hides the one this case is about.
+    writeMint(
+      root,
+      FIXTURE_MINT.replace("  let code = '';", "  let code = 'M';").replace(
+        'for (let i = 0;',
+        'for (let i = 1;',
+      ),
+    );
+    const found = findings('RI-22', root).join('\n');
+    expect(found).toContain('position 0 of a minted code showed only 1 of 32 symbol(s)');
+    expect(found).toContain('no sequence, NO STRUCTURE');
+  });
+
+  test('a counter dressed as a token', () => {
+    const root = cleanTree();
+    writeMint(
+      root,
+      "export const CERTIFICATE_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';\n" +
+        'export const CERTIFICATE_CODE_LENGTH = 26;\n' +
+        'export const CERTIFICATE_CODE_ENTROPY_BITS = 130;\n' +
+        'let next = 0;\n' +
+        'export function mintCertificateCode() {\n' +
+        '  next += 1;\n' +
+        "  return String(next % 97).padStart(CERTIFICATE_CODE_LENGTH, '0');\n" +
+        '}\n',
+    );
+    const found = findings('RI-22', root).join('\n');
+    expect(found).toContain('produced 97 distinct code(s)');
+    expect(found).toContain('this is a mint with state');
+  });
+
+  test('a symbol outside the declared alphabet', () => {
+    // THE ALPHABET IS THE DENOMINATOR OF THE BIT COUNT, so a mint drawing from a
+    // different set is measured against the wrong number in both directions.
+    const root = cleanTree();
+    mintWith(root, '  return code;', "  return '-' + code.slice(1);");
+    expect(findings('RI-22', root).join('\n')).toContain(
+      'symbol(s) outside the declared alphabet: "-"',
+    );
+  });
+
+  test('a module whose exported bit count is not the one its own alphabet gives', () => {
+    const root = cleanTree();
+    mintWith(
+      root,
+      'export const CERTIFICATE_CODE_ENTROPY_BITS = Math.floor(\n' +
+        '  CERTIFICATE_CODE_LENGTH * Math.log2(new Set(CERTIFICATE_CODE_ALPHABET).size),\n' +
+        ');',
+      'export const CERTIFICATE_CODE_ENTROPY_BITS = 999;',
+    );
+    const found = findings('RI-22', root).join('\n');
+    expect(found).toContain('reports 999 bit(s)');
+    expect(found).toContain('is 130');
+  });
+
+  test('the corpus disagreeing with itself about the commitment', () => {
+    const root = cleanTree();
+    appendTo(root, 'docs/edge-cases/EC-091.md', 'Restated as **192 bits of entropy**.\n');
+    const found = findings('RI-22', root).join('\n');
+    expect(found).toContain('states MORE THAN ONE bit count');
+    expect(found).toContain('a mint cannot be measured against a threshold the corpus');
+  });
+
+  test('the mint deleted, which is the state ADR-235 was opened on', () => {
+    const root = cleanTree();
+    rmSync(join(root, 'packages/db/src/certificate-code.ts'));
+    expect(findings('RI-22', root).join('\n')).toContain(
+      'produced by no function in the repository',
+    );
+  });
+
+  test('a writer of certificates that mints its own code', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/issue.ts',
+      "await tx.insert('certificates', { code: 'MERIT-0001' });\n",
+    );
+    expect(findings('RI-22', root).join('\n')).toContain(
+      'writes a `certificates` row and never names `mintCertificateCode`',
+    );
+  });
+
+  test('a writer of certificates that reaches the mint is accepted', () => {
+    // THE ACCEPTANCE DIRECTION. A leg that only ever refuses is a leg that would
+    // pass over an issuer doing the right thing, and leg 3 has no site in the
+    // shipped tree yet, so this case is the only place it is exercised at all.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/issue.ts',
+      "import { mintCertificateCode } from '@merit/db';\n" +
+        "await tx.insert('certificates', { code: mintCertificateCode() });\n",
+    );
+    expect(findings('RI-22', root)).toEqual([]);
+  });
+
+  test('a corpus stating no bit count at all throws rather than passing', () => {
+    // THE SAME GUARD RI-20 AND RI-21 CARRY. A threshold read from nothing is a
+    // mint measured against nothing, and this check exists because five
+    // documents stated the figure while no runner read any of them.
+    const root = cleanTree();
+    for (const rel of ['docs/plans/M11-certificates-social-proof.md', 'docs/edge-cases/EC-091.md'])
+      writeFileSync(join(root, rel), 'No number here.\n');
+    writeFileSync(join(root, 'docs/architecture/API_CONTRACT.md'), '```ts\ntype X = {};\n```\n');
+    expect(() => findings('RI-22', root)).toThrow(/found NO stated bit count/);
+  });
+
+  test('a commitment document that moved is a finding rather than a smaller population', () => {
+    const root = cleanTree();
+    renameSync(join(root, 'docs/edge-cases/EC-091.md'), join(root, 'docs/edge-cases/EC-099.md'));
+    expect(findings('RI-22', root).join('\n')).toContain('point it at the new path');
   });
 });
