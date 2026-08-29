@@ -200,9 +200,23 @@ export type AdminSessionLookup =
  *
  * A PORT, AND NOTHING IN THIS TREE WIRES IT. C-08's hardware-key SSO and D3's IP
  * allowlist are edge controls on `ADMIN_ORIGIN` rather than code in this
- * process, and the mapping from a session to an actor and a role is the admin
- * identity provider's. This module states the shape it needs and refuses to
- * invent the rest.
+ * process.
+ *
+ * THIS DOCBLOCK ALSO SAID "the mapping from a session to an actor and a role is
+ * the admin identity provider's", AND ADR-237 SPLITS THAT SENTENCE IN TWO.
+ * Proving WHO someone is is the provider's and is a purchase Merit has not
+ * made. Recording WHICH operators exist and WHAT ROLE each holds was never the
+ * provider's and is now `operators` and `operator_sessions`
+ * (`0073_operator_directory.sql`), with `operators.role` closed over the same
+ * three values {@link ADMIN_ROLES} declares. A role asserted by a provider would
+ * put Merit's authorization model in a vendor console, where `admin_actions`
+ * cannot see it change.
+ *
+ * SO WHAT THIS PORT STILL WAITS ON IS ONE FUNCTION: an implementation of
+ * `OperatorAssertionVerifier` (`src/operator-identity.ts`), which turns a
+ * presented assertion into a verified one. The decision that follows it is
+ * built: `resolveOperatorSession` is this method's verdict without its query.
+ * This module states the shape it needs and refuses to invent the rest.
  */
 export interface AdminSessionSource {
   lookup(token: string): Promise<AdminSessionLookup>;

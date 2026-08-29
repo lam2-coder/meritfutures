@@ -189,6 +189,8 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   reserveCoverageSnapshots: 'reserve_coverage_snapshots',
   economicCalendarCurrent: 'economic_calendar_current',
   affiliateStatements: 'affiliate_statements',
+  operators: 'operators',
+  operatorSessions: 'operator_sessions',
 };
 
 /**
@@ -437,13 +439,21 @@ describe('the registry is total', () => {
   // one that needed the number, and its obstruction was its KIND rather than
   // its tenancy: it is `0039`'s view, the only `CREATE VIEW` in the migration
   // set, and every drift assertion in this file read a `CREATE TABLE` body.
-  test('112 declared relations, 112 scope rules, 0 reachable without one', () => {
+  // 113 AND 114 ARE ADR-237's SLICE AND NEITHER NEEDED A CLASS ARGUMENT.
+  // `0073` creates `operators` and `operator_sessions`, the operator directory
+  // `admin_actions.actor` had no referent in for seventeen migrations, and both
+  // are FIRM on ADR-199's predicate: neither row declares a column against
+  // `identities(id)` or `accounts(id)`. THE SESSION THAT WROTE THE DDL
+  // REGISTERED THEM, which is `payout_destinations`' and `reconciliation_runs`'
+  // shape rather than `live_account_state`'s, because the next slice on this
+  // path mints an operator session and needs both relations on its first line.
+  test('114 declared relations, 114 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(112);
-    expect(rules).toBe(112);
+    expect(declared).toBe(114);
+    expect(rules).toBe(114);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, AND IT IS
@@ -495,8 +505,13 @@ describe('the registry is total', () => {
     // available mistake and it is not an edge at all: it carries NO foreign key,
     // because EVENTS section 5.3 declares that `run_id` in three payloads and no
     // table in this schema stores it.
+    // 117 SINCE `0073`, AND THE TWO ARE THE 113th AND 114th REGISTRATIONS.
+    // `operators` and `operator_sessions` (ADR-237) are the operator directory,
+    // and this figure moved by two while the registry moved by two, which is
+    // the arithmetic this assertion exists to make checkable: a table created
+    // and left unregistered moves one number and not the other.
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
-    expect(createdTables).toBe(115);
+    expect(createdTables).toBe(117);
   });
 
   // SIX MEMBERS SINCE ADR-191, AND THE ASSERTION IS THE REASON NEITHER THE FIFTH
