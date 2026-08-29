@@ -40,6 +40,9 @@
 // because that is the half a route file can get wrong.
 // =============================================================================
 
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -60,6 +63,9 @@ import {
   type AuthSession,
 } from '../src/routes/auth.ts';
 import {
+  APPROVABLE_STATUSES,
+  CANCELLABLE_STATUSES,
+  CANCELLATION_HOLDS,
   CREATED_STATUSES,
   DESTINATION_COOLING_WINDOW_MS,
   IDENTITY_RESTRICTED,
@@ -68,6 +74,7 @@ import {
   MINIMUM_WITHDRAWAL_CENTS,
   OPEN_WITHDRAWAL_STATUSES,
   PAYOUTS_FROZEN,
+  TERMINAL_EDGE_FINDINGS,
   TERMINAL_WITHDRAWAL_STATUSES,
   UNWIRED_WITHDRAWAL_BACKEND,
   WALLET_PROVENANCES,
@@ -83,7 +90,9 @@ import {
   decideWithdrawal,
   currentKycState,
   decideApproval,
+  decideCancellation,
   driveApprovals,
+  driveCancellation,
   dualControlRequired,
   gateIdentityStatus,
   provenanceReview,
@@ -104,7 +113,10 @@ import {
   type WalletEntryRow,
   type WithdrawalBackend,
   type ApprovalHand,
+  type CancellationOutcome,
+  type WithdrawalApprovalCandidate,
   type WithdrawalApprovalValues,
+  type WithdrawalCancellationValues,
   type WithdrawalInsert,
   type WithdrawalTx,
 } from '../src/routes/wallet-withdrawals.ts';
@@ -205,6 +217,8 @@ interface Fixture {
   registered: DestinationInsert[];
   /** Every `approveWithdrawal` this fixture committed. ADR-232. */
   approved: { id: string; values: WithdrawalApprovalValues }[];
+  /** Every `cancelWithdrawal` this fixture committed. ADR-234. */
+  cancelled: { id: string; values: WithdrawalCancellationValues }[];
   keys: Map<string, IdempotencyRecord & { owner: string }>;
 }
 
@@ -225,6 +239,7 @@ function reset(): void {
     written: [],
     registered: [],
     approved: [],
+    cancelled: [],
     keys: new Map(),
   };
 }
@@ -285,6 +300,18 @@ const backend: WithdrawalBackend = {
         fixture.approved.push({ id, values });
         return Promise.resolve();
       },
+      cancelWithdrawal: (id, values) => {
+        fixture.calls.push(`cancelWithdrawal:${id}`);
+        const row = stagedWithdrawals.find((held) => held['id'] === id);
+        if (row === undefined) throw new Error(`no staged withdrawal ${id}`);
+        Object.assign(row, {
+          status: values.status,
+          cancelledAt: values.cancelledAt,
+          updatedAt: values.updatedAt,
+        });
+        fixture.cancelled.push({ id, values });
+        return Promise.resolve();
+      },
       entries: () => {
         fixture.calls.push('entries');
         return Promise.resolve(fixture.entries.map(toWalletEntryRow));
@@ -305,7 +332,25 @@ const backend: WithdrawalBackend = {
       insertWithdrawal: (row) => {
         fixture.calls.push('insertWithdrawal');
         stagedWritten.push(row);
-        return Promise.resolve({ id: `withdrawal-${String(stagedWritten.length)}` });
+        const id = `withdrawal-${String(stagedWritten.length)}`;
+        // THE INSERTED ROW JOINS THE ROWS THIS TRANSACTION CAN READ, AND IT DID
+        // NOT UNTIL ADR-234. A fake whose INSERT is invisible to its own SELECT
+        // makes every SEQUENCE unfalsifiable: "requested, then cancelled, then
+        // accepted again" could only ever be tested by PLANTING the middle
+        // state, which is what ADR-232's no-lockout test had to do and is
+        // exactly the thing the dispatch for this session called insufficient.
+        // The staging copy is what keeps it honest -- a refused request rolls
+        // this row back with everything else.
+        stagedWithdrawals.push({
+          id,
+          status: row.status,
+          amountCents: row.amountCents,
+          destinationRef: row.destinationRef,
+          sourceProvenanceSummary: row.sourceProvenanceSummary,
+          earliestCreditAt: row.earliestCreditAt,
+          frozenAt: null,
+        });
+        return Promise.resolve({ id });
       },
     };
     const value = await fn(tx);
@@ -1377,6 +1422,15 @@ function drive(hand: ApprovalHand | null = null, at: Date = NOW): Promise<unknow
   return backend.transact(SESSION, (tx) => driveApprovals({ tx, hand, at }));
 }
 
+/** One `wallet_withdrawals` row as {@link decideCancellation} reads it. ADR-234. */
+function candidateRow(over: Record<string, unknown> = {}): WithdrawalApprovalCandidate {
+  return toApprovalCandidate(openRow(over));
+}
+
+function cancel(id: string, at: Date = NOW): Promise<CancellationOutcome> {
+  return backend.transact(SESSION, (tx) => driveCancellation({ tx, id, at }));
+}
+
 describe('the approval edge does not release the identity, and that is asserted rather than argued', () => {
   it('partitions `wallet_withdrawal_status` into the open four and the terminal three', () => {
     // `0001:95-98` declares seven members. The two lists are complements, so a
@@ -1670,5 +1724,330 @@ describe('the transition over one transaction', () => {
       { id: 'withdrawal-1', decision: expect.objectContaining({ kind: 'approve' }) },
       { id: 'withdrawal-2', decision: { kind: 'hold', hold: 'destination_cooling' } },
     ]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The TERMINAL edge. ADR-234
+// -----------------------------------------------------------------------------
+
+/** The repository root, for the findings that are claims about this tree. */
+const REPO = join(import.meta.dirname, '..', '..', '..');
+
+/** Every `.ts` and `.json` path under a directory, recursively. */
+function sourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+      out.push(...sourceFiles(path));
+    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.json')) out.push(path);
+  }
+  return out;
+}
+
+describe('the terminal edge, and the two thirds of it that are not built', () => {
+  it('names one finding per terminal status and every source resolves to a real file', () => {
+    // A REASON POINTING AT A FILE THAT IS NOT THERE IS THE FIRST WAY THIS KIND
+    // OF ENTRY ROTS, and `wiring.test.ts` has recorded four reasons in this
+    // neighbourhood that did not survive being checked.
+    expect(TERMINAL_EDGE_FINDINGS.map((finding) => finding.id)).toStrictEqual(['A', 'B', 'C']);
+    for (const finding of TERMINAL_EDGE_FINDINGS) {
+      expect(finding.claim.length, `${finding.id} has too short a claim`).toBeGreaterThan(120);
+      expect(finding.ruled.length, `${finding.id} has no disposition`).toBeGreaterThan(80);
+      for (const source of finding.sources)
+        expect(existsSync(join(REPO, source)), `${finding.id} cites a missing ${source}`).toBe(
+          true,
+        );
+    }
+  });
+
+  it('RUNS finding A rather than trusting it: `@merit/rail` has no importer at all', () => {
+    // THE DECISION PROCEDURE, EXECUTED. `settled` is unreachable because
+    // `transferring` is, and `transferring` is reachable only by enqueueing on
+    // a rail. The day a consumer lands, this goes red and finding A is due a
+    // re-read -- which is the trap it exists to set, in `RI-20`'s idiom.
+    // THE NEEDLE IS ASSEMBLED FROM FRAGMENTS AND THAT IS NOT A FLOURISH. This
+    // test was written twice and failed twice on ITSELF: a claim about a tree,
+    // written into that tree, is a hit on itself. The first spelling searched
+    // for the bare package name and found the finding above and this file; the
+    // second searched for the import clause and found this file's own comment
+    // explaining the first. Assembling the string means the scan needs NO
+    // exclusion list at all and stays total over `apps/**` and `packages/**`
+    // outside the package itself -- which is the property that makes the day a
+    // real consumer lands the day this goes red.
+    const needle = ["from '@merit", "/rail'"].join('');
+    const scanned = [join(REPO, 'apps'), join(REPO, 'packages')].flatMap(sourceFiles);
+    const rail = join(REPO, 'packages', 'rail') + '/';
+    const importers = scanned.filter(
+      (path) => !path.startsWith(rail) && readFileSync(path, 'utf8').includes(needle),
+    );
+
+    expect(importers.map((path) => path.slice(REPO.length + 1))).toStrictEqual([]);
+  });
+
+  it('RUNS the other half of finding A: nothing writes `transferring`', () => {
+    // The scope is named because the claim is only as good as it: `apps/**` and
+    // `packages/**`, every `.ts` and `.json`, EXCLUDING test files, which is
+    // where a fixture may legitimately plant the value.
+    const scanned = [join(REPO, 'apps'), join(REPO, 'packages')]
+      .flatMap(sourceFiles)
+      .filter((path) => !path.includes('/test/') && !path.endsWith('.test.ts'));
+    const sites = scanned.filter((path) => readFileSync(path, 'utf8').includes("'transferring'"));
+
+    // THREE SITES AND ALL THREE ARE VOCABULARY. `wallet-withdrawals.ts` twice
+    // (`OPEN_WITHDRAWAL_STATUSES` and the docblock that quotes the index
+    // predicate) and `schema.ts` once (the enum). None is a write, and a
+    // fourth file appearing here is the enqueue this finding says does not
+    // exist.
+    expect(sites.map((path) => path.slice(REPO.length + 1)).sort()).toStrictEqual([
+      'apps/api/src/routes/wallet-withdrawals.ts',
+      'packages/db/src/schema.ts',
+    ]);
+  });
+
+  it('RUNS finding A last clause: the only `RailAdapter` implementation is a fake', () => {
+    const sandbox = readFileSync(
+      join(REPO, 'packages', 'rail', 'src', 'fakes', 'sandbox.ts'),
+      'utf8',
+    );
+    expect(sandbox).toContain('export class SandboxRail implements RailAdapter');
+
+    // TEST FILES ARE OUT OF SCOPE AND THE EXCLUSION IS PART OF THE CLAIM: a
+    // stub inside a suite is not an adapter a deployment can send through, and
+    // this file itself quotes the line above, which is the self-hit the
+    // importer case found first.
+    const implementations = sourceFiles(join(REPO, 'packages'))
+      .concat(sourceFiles(join(REPO, 'apps')))
+      .filter((path) => !path.endsWith('.test.ts'))
+      .filter((path) => /implements\s+RailAdapter/.test(readFileSync(path, 'utf8')));
+
+    expect(implementations.map((path) => path.slice(REPO.length + 1))).toStrictEqual([
+      'packages/rail/src/fakes/sandbox.ts',
+    ]);
+  });
+
+  it('RUNS finding C: `0057` rests its cancelled arm on the arrow set `0072` enforces', () => {
+    // The two files have to agree, and this is the assertion that makes the
+    // agreement checkable rather than a thing two headers both assert.
+    const wdc1 = readFileSync(
+      join(REPO, 'packages', 'db', 'migrations', '0057_terminal_withdrawal_obligation.sql'),
+      'utf8',
+    );
+    // The sentence is quoted from `COMMENT ON FUNCTION`, which is the half of
+    // that file a `pg_catalog` read can see, rather than from the header
+    // comment, which only a reader of the file can.
+    expect(wdc1).toContain('reachable only from requested and cooling, both before approval');
+
+    const wdc2 = readFileSync(
+      join(REPO, 'packages', 'db', 'migrations', '0072_terminal_withdrawal_transitions.sql'),
+      'utf8',
+    );
+    expect(wdc2).toContain(
+      "NEW.status = 'cancelled' AND OLD.status NOT IN ('requested', 'cooling')",
+    );
+    expect(wdc2).toContain('ADD COLUMN cancelled_at timestamptz NULL');
+  });
+});
+
+describe('`G-TRADER-CANCELS`, decided', () => {
+  it('takes the two arrow tails section 3.2 draws and no others', () => {
+    expect(CANCELLABLE_STATUSES).toStrictEqual(['requested', 'cooling']);
+    // AND THEY ARE BOTH OPEN AND BOTH PRE-APPROVAL, which is the whole reason
+    // this exit needs no posting. A member here that released the identity
+    // already, or that sat past approval, would be a different edge.
+    for (const status of CANCELLABLE_STATUSES) {
+      expect(withdrawalReleasesIdentity(status)).toBe(false);
+      expect(APPROVABLE_STATUSES as readonly string[]).toContain(status);
+    }
+  });
+
+  it('cancels from `requested` and from `cooling`, writing the clock `0072` requires', () => {
+    for (const status of CANCELLABLE_STATUSES) {
+      const decision = decideCancellation({ candidate: candidateRow({ status }), at: NOW });
+      expect(decision, status).toStrictEqual({
+        kind: 'cancel',
+        guard: 'G-TRADER-CANCELS',
+        values: { status: 'cancelled', cancelledAt: NOW, updatedAt: NOW },
+      });
+    }
+  });
+
+  it('holds every status that is not one of the two tails', () => {
+    // TOTAL OVER THE ENUM rather than over the cases somebody remembered, which
+    // is `decideApproval`'s discipline. The three terminal ones matter most:
+    // `0072` refuses leaving a terminal status, so a driver that re-cancelled a
+    // cancelled row would be refused at the statement rather than here.
+    for (const status of [...OPEN_WITHDRAWAL_STATUSES, ...TERMINAL_WITHDRAWAL_STATUSES]) {
+      if ((CANCELLABLE_STATUSES as readonly string[]).includes(status)) continue;
+      expect(
+        decideCancellation({ candidate: candidateRow({ status }), at: NOW }),
+        status,
+      ).toStrictEqual({ kind: 'hold', hold: 'not_cancellable' });
+    }
+  });
+
+  it('holds a HALTED row, which is a ruling and not a constraint', () => {
+    // ADR-234. EXECUTED against PostgreSQL 16.13 with every migration applied:
+    // the DATABASE permits an UPDATE carrying a halted `requested` row to
+    // `cancelled`, because the halt is orthogonal to the rail status and no
+    // constraint reads it on this arrow. The hold is this module's, on ADR-232
+    // section 5's direction: cancelling destroys the subject of the
+    // investigation and lets the trader open a fresh withdrawal the same
+    // second.
+    const decision = decideCancellation({
+      candidate: candidateRow({ status: 'requested', frozenAt: NOW }),
+      at: NOW,
+    });
+    expect(decision).toStrictEqual({ kind: 'hold', hold: 'halted' });
+  });
+
+  it('declares exactly the two holds it can return', () => {
+    expect(CANCELLATION_HOLDS).toStrictEqual(['not_cancellable', 'halted']);
+  });
+});
+
+describe('the cancellation over one transaction', () => {
+  it('takes the per-identity lock BEFORE it reads anything', async () => {
+    // The lock matters MORE here than on the approval edge: this transition is
+    // the one that makes `gateNoInFlight` start passing, so a cancellation
+    // racing a creation would release the identity while the creation was
+    // deciding against a set that still held the open row.
+    fixture.withdrawals = [openRow()];
+
+    await cancel('withdrawal-1');
+
+    expect(fixture.calls[0]).toBe('lockScope');
+    expect(fixture.calls).toContain('cancelWithdrawal:withdrawal-1');
+  });
+
+  it('writes the status and the clock and nothing else', async () => {
+    fixture.withdrawals = [openRow()];
+
+    const outcome = await cancel('withdrawal-1');
+
+    expect(outcome.decision).toStrictEqual({
+      kind: 'cancel',
+      guard: 'G-TRADER-CANCELS',
+      values: { status: 'cancelled', cancelledAt: NOW, updatedAt: NOW },
+    });
+    expect(fixture.cancelled).toStrictEqual([
+      { id: 'withdrawal-1', values: { status: 'cancelled', cancelledAt: NOW, updatedAt: NOW } },
+    ]);
+    expect(fixture.withdrawals[0]?.['status']).toBe('cancelled');
+  });
+
+  it('holds a row it cannot find, and does not distinguish absent from somebody else`s', async () => {
+    // The accessor scopes every read to the caller's identity before this file
+    // sees a row, so an id that resolves to nothing is EITHER a row of another
+    // trader's OR a row that does not exist. A driver that threw on one and
+    // held on the other would answer whether an arbitrary withdrawal id belongs
+    // to somebody else.
+    fixture.withdrawals = [openRow()];
+
+    expect(await cancel('withdrawal-nobody-has')).toStrictEqual({
+      id: 'withdrawal-nobody-has',
+      decision: { kind: 'hold', hold: 'not_cancellable' },
+    });
+    expect(fixture.cancelled).toStrictEqual([]);
+  });
+
+  it('writes nothing when it holds', async () => {
+    fixture.withdrawals = [openRow({ status: 'approved' })];
+
+    expect((await cancel('withdrawal-1')).decision).toStrictEqual({
+      kind: 'hold',
+      hold: 'not_cancellable',
+    });
+    expect(fixture.cancelled).toStrictEqual([]);
+    expect(fixture.withdrawals[0]?.['status']).toBe('approved');
+  });
+
+  it('cancels the row it was handed and leaves the identity`s others alone', async () => {
+    fixture.withdrawals = [openRow(), openRow({ id: 'withdrawal-2', status: 'cooling' })];
+
+    await cancel('withdrawal-2');
+
+    expect(fixture.withdrawals[0]?.['status']).toBe('requested');
+    expect(fixture.withdrawals[1]?.['status']).toBe('cancelled');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE DELIVERABLE. ADR-234
+// -----------------------------------------------------------------------------
+
+describe('THE NO-LOCKOUT PROPERTY, closed end to end and not planted', () => {
+  it('request, refuse the second, CANCEL, and the identity is accepted again', async () => {
+    // THE SEQUENCE THE ROW ASKED FOR, WITH THE MIDDLE OF IT DRIVEN. ADR-232
+    // could only assert this by PLANTING a terminal status on a fixture row,
+    // because nothing in the tree reached one. Every state below is reached by
+    // the thing that reaches it: the route creates, the route refuses, and
+    // `driveCancellation` releases.
+    settledDestination();
+
+    const first = await withdraw();
+    expect(first.statusCode, 'the first withdrawal').toBe(200);
+    const id = first.json().withdrawal_id as string;
+
+    // THE LOCKOUT, MEASURED. This is the 409 the blocked port's reason is about.
+    expect((await withdraw()).statusCode, 'the second, while the first is open').toBe(409);
+
+    const outcome = await cancel(id);
+    expect(outcome.decision).toStrictEqual({
+      kind: 'cancel',
+      guard: 'G-TRADER-CANCELS',
+      values: { status: 'cancelled', cancelledAt: NOW, updatedAt: NOW },
+    });
+    expect(withdrawalReleasesIdentity(String(fixture.withdrawals[0]?.['status']))).toBe(true);
+
+    // AND THE LOCKOUT IS OVER.
+    expect((await withdraw()).statusCode, 'the third, after the cancellation').toBe(200);
+    expect(fixture.written).toHaveLength(2);
+  });
+
+  it('and it is the CANCELLATION that opens it, not merely the passage of a request', async () => {
+    // THE FALSIFIER. Same sequence with the cancellation removed: if the third
+    // request were accepted here too, the test above would be proving nothing
+    // about this edge.
+    settledDestination();
+
+    expect((await withdraw()).statusCode).toBe(200);
+    expect((await withdraw()).statusCode).toBe(409);
+    expect((await withdraw()).statusCode).toBe(409);
+    expect(fixture.written).toHaveLength(1);
+  });
+
+  it('APPROVING the first does NOT open it, which is ADR-232 finding held in place', async () => {
+    // The half of the lockout this session does not close, asserted so that the
+    // day a door drives `driveApprovals` nobody reads the test above as
+    // covering it.
+    settledDestination();
+
+    const first = await withdraw();
+    expect(first.statusCode).toBe(200);
+
+    const approvals = await backend.transact(SESSION, (tx) =>
+      driveApprovals({ tx, hand: null, at: NOW }),
+    );
+    expect(approvals).toStrictEqual([
+      {
+        id: first.json().withdrawal_id,
+        decision: expect.objectContaining({ kind: 'approve', guard: 'G-WITHDRAWAL-CLEARED' }),
+      },
+    ]);
+    expect(fixture.withdrawals[0]?.['status']).toBe('approved');
+
+    expect((await withdraw()).statusCode, 'approved is still an OPEN status').toBe(409);
+
+    // AND THE CANCEL EDGE DOES NOT RESCUE IT EITHER, because `G-TRADER-CANCELS`
+    // is drawn before approval and `0072` refuses the arrow at the database.
+    // This is the row that stays locked out until the rail exists.
+    expect((await cancel(String(first.json().withdrawal_id))).decision).toStrictEqual({
+      kind: 'hold',
+      hold: 'not_cancellable',
+    });
+    expect((await withdraw()).statusCode).toBe(409);
   });
 });
