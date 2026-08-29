@@ -737,10 +737,16 @@ export function environmentVerifyPresentation(env: Environment): unknown {
  * OTP is six digits and a dump of unkeyed digests is a rainbow table; this one
  * is taken over a token `INV-M11-05` fixes at 128 bits, where a preimage search
  * is the same search as guessing the code. THAT ARGUMENT IS EXACTLY AS STRONG
- * AS THE CODE IS, WHICH IS ADR-231 SECTION 6's FINDING ARRIVING ONE LAYER DOWN:
- * 0025's own reason for hashing is that storing codes in the clear "would make
- * this table a list of valid tokens for anyone who reached it", and against a
- * walkable code space an unkeyed digest is that list with one step added.
+ * AS THE CODE IS, AND ADR-235 IS WHERE THE CODE STOPPED BEING A SENTENCE. When
+ * this file was written no function in the repository minted a certificate code
+ * at all, so the preimage argument rested on a specification; `@merit/db`'s
+ * `mintCertificateCode` now yields 130 bits from `node:crypto` and `RI-22`
+ * measures the draws on every CI-01 pass. 0025's own reason for hashing is that
+ * storing codes in the clear "would make this table a list of valid tokens for
+ * anyone who reached it", and against a walkable code space an unkeyed digest
+ * would be that list with one step added. THE SPACE IS NOT WALKABLE, SO THE KEY
+ * IS STILL NOT TAKEN, and ADR-235 section 6.3 says so rather than leaving the
+ * choice resting on the same unenforced sentence twice.
  */
 function digest(value: string): Uint8Array {
   return new Uint8Array(createHash('sha256').update(value, 'utf8').digest());

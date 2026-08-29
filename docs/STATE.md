@@ -29,7 +29,9 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->220<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->221<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->221<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9528,3 +9530,97 @@ running it, a delta of **+1 file and +20 cases**. **Four seeded defects watched
 firing**, each restored from a byte copy with `diff` confirming identity.
 **`falsify.mjs` was NOT run**: it is not in this row's verification list and it
 mutates the working tree.
+
+## 2026-08-29 - Session 425: the code is the only credential, and the corpus asserted its strength in five places while no function in the repository produced one ([ADR-235](decisions/ADR-235.md), proposed)
+
+**THE MEASUREMENT IS THAT THERE WAS NO GENERATOR, and that is a larger finding
+than the one row `235` anticipated.** Over `apps/`, `packages/`, `e2e/` and
+`scripts/`, which is every directory in this repository holding executable
+source: `INSERT INTO certificates` returns nothing, `insert('certificates'`
+returns nothing, and a seven-alternative grep for a certificate-code minter
+returns nothing. Of the eight files that draw from a CSPRNG at all, four draw for
+session secrets, OTP codes, a payout request id, a purchase id and a plan version
+id, and **four name the identifiers only to BAN them**.
+
+**So the real entropy of a certificate code was not 128 bits and not 64. It was
+undefined.** `INV-M11-05` ([M11:54](plans/M11-certificates-social-proof.md)),
+[M11:246](plans/M11-certificates-social-proof.md),
+[`API_CONTRACT:1472`](architecture/API_CONTRACT.md),
+[`:1473`](architecture/API_CONTRACT.md) and [`EC-091:3`](edge-cases/EC-091.md)
+described the output of a function nobody had written, and two shipped `.ts`
+files described it as a property the deployment HAS. **An absent generator reads
+as a satisfied specification**, because a short code is visible in a diff and a
+missing one has never been contradicted.
+
+**THE FIX IS [`certificate-code.ts`](../packages/db/src/certificate-code.ts) AND
+IT LANDS AHEAD OF ITS ISSUER ON PURPOSE.** Crockford Base32, thirty-two distinct
+symbols, twenty-six positions, `randomInt` per position, **130** bits, computed
+from the alphabet and typed in no constant, with a load-time refusal on a
+repeated symbol because an alphabet repeating one character is still thirty-two
+characters long and is thirty-one symbols of entropy. It is in `packages/db`
+because [M11:111](plans/M11-certificates-social-proof.md) puts the issuer in the
+WORKER and [ADR-231](decisions/ADR-231.md) put the verifier in the API, and
+`@merit/db` is the **only** package both manifests declare. The order is
+`ADR-231` section 6's own named safer order applied to the half that is not a
+migration, and [ADR-197](decisions/ADR-197.md) finding 1 is the standing argument
+against it: an unused ACCESSOR is an authority nobody can reach, an unused
+SECURITY PARAMETER is one the next slice re-derives under deadline.
+
+**`RI-22` EXECUTES THE MINT RATHER THAN READING IT**, which is `RI-20`'s move one
+class over and is what the subject forces: a constant position, a biased index
+and a counter are all source that reads perfectly well. It draws **2,000** codes
+in a child `node --experimental-strip-types` and asserts over the DRAWS.
+**The threshold is read out of the five corpus sites, which must agree with each
+other, and `128` appears in no constant in the check**, so a corpus that raised
+the commitment would fail on the next run rather than on the next reader.
+**Seeded red eight ways on the real tree**, each restored from a byte copy with
+`diff` confirming identity, transcripts in the entry's section 4. **Two fired
+before they were seeded**: the fixture's clean-direction case went red the moment
+`RI-22` joined `CHECKS`, and the repair's first attempt OVERWROTE the
+`API_CONTRACT` specification `RI-18` reads, so one check's fixture silently
+deleted another's.
+
+**THE ROW'S OWN CITATION IS THE FINDING AND IT IS REFUTED.**
+[`API_CONTRACT:1473`](architecture/API_CONTRACT.md) does not decline a rate limit
+for this endpoint. It SPECIFIES one, *"per IP and per ASN"*, holds its values as
+data on the SMS row's precedent, and declines only the INHERITANCE of the
+catalog's `600/minute/IP`. **And `INV-M11-05` itself reads *"the verification
+endpoint IS RATE LIMITED and non-enumerable"***, so a limit is owed by the
+invariant regardless of any measurement of the entropy. **Ruled both ways and
+they are not the same way**: the catalog declination STANDS and now stands on a
+number that is real and asserted, and a per-IP, per-ASN limit is **OWED AND
+ABSENT**, no limiter existing anywhere in `apps` or `packages`. **`API_CONTRACT`
+is not touched**, because the row was right and the dispatch's reading of it was
+wrong.
+
+**OF THE THREE ENUMERATION CONTROLS THE CORPUS NAMES, TWO ARE NOW REAL.** Session
+421 made the anomaly signal real; this session made the entropy real. **The rate
+limit is the one that is still absent**, and the column still carries no `CHECK`:
+a bound is a migration, this row reserves no number, and
+`public-lookup.test.ts`'s pinned red light still passes unchanged.
+
+**No `SD-nn`, no `GS-nnn`, no `CI-06` letter, no `VG` row, no migration, no edge
+case, no new enum member, no new canonical error code, no dependency, no float on
+a money path, no gate weakened and no fence widened to finish.** `scope.ts`,
+`scoped-db.ts`, every migration, `API_CONTRACT.md`, `M11`, `EC-091`,
+`SECURITY.md` and `MERIT_BUILD_MASTER_PROMPT.md` were **read and not written**.
+**Two fence readings are stated rather than assumed**: `packages/db/**` under the
+row's own *"wherever the code is generated"*, and `packages/tooling/test/**`
+because `repo-invariants.mjs`'s clean-direction case runs every member of
+`CHECKS` against its fixture and went red on the first run.
+
+Counts derived at reporting time: **33 of 33** gates, **21 of 21** invariants
+read off the runner's own last line, typecheck 0, lint 0, `format:check` clean,
+**257 files / 6,410 passed / 6 skipped** against an `origin/main` baseline at
+`b8351af` of **256 / 6,385 / 6** reproduced before a line changed, a delta of
+**+1 file and +25 cases**. **`falsify.mjs` was NOT run**: it is not in this row's
+verification list and it mutates the working tree.
+
+**WHAT IS STILL OWED.** **A `CHECK` on `certificates.code`**, which is a small
+migration-only session and is the one control here that becomes irreversible once
+a weak code is committed. **The rate limit**, per IP and per ASN, held as data.
+**The issuer**, which `M11` section 3.2 specifies and which now has a mint
+waiting for it. **The `certificate.verify_anomaly` detector**. **The
+constant-time floor measurement**, which is the deployment's. **The founder
+decision in [ADR-235](decisions/ADR-235.md)'s approval block**, whose first item
+is whether a mint may land ahead of its issuer at all.
