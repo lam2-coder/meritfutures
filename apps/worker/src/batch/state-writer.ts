@@ -201,10 +201,22 @@ export type RuleStateWriteTable = (typeof RULE_STATE_WRITE_TABLES)[number];
 /**
  * Every `rule_states` column this writer sets, by Drizzle property name.
  *
- * TWENTY-THREE, AND THE THREE ABSENCES ARE THE DATABASE'S. `ports.ts` states the
+ * TWENTY-SIX, AND THE THREE ABSENCES ARE THE DATABASE'S. `ports.ts` states the
  * rule this list obeys: "`id`, `computed_at` and `created_at` are absent because
  * they are the database's: `id` is `GENERATED ALWAYS AS IDENTITY` and both
  * timestamps default to `now()`. THE BATCH THEREFORE READS NO CLOCK."
+ *
+ * **IT WAS TWENTY-THREE AND THE CASE BELOW IS WHY IT IS NOT ANY MORE.** `0065`
+ * added `lifetime_settled_cents`, `breached` and `breach_kind`; this list did
+ * not, and case `1.2` went RED on the merge of the two branches while each was
+ * green alone. **THE FIX THAT WAS AVAILABLE AND IS REFUSED IN WRITING** is
+ * widening `1.2`'s expected list from three names to six. That would have made
+ * the suite green and left the writer setting none of the three, so every row
+ * would carry the columns' DEFAULTS -- `0`, `false`, `null` -- and
+ * `readEligibility`, which `apps/api/src/start.ts` wires in production, would
+ * answer a trader that they have settled nothing and breached nothing whatever
+ * the truth was. `ADR-190`'s distinction: a wrong answer is worse than the
+ * honest rejection it replaces.
  *
  * **IT IS DATA SO A SUITE CAN COMPARE IT WITH THE SCHEMA RATHER THAN WITH THIS
  * FILE.** `test/rule-state-writer.test.ts` parses the `ruleStates` block of
@@ -241,6 +253,16 @@ export const RULE_STATE_WRITE_COLUMNS = [
   'stateHash',
   'engineVersion',
   'calendarRevisionId',
+  // `0065`'s three, in the order that migration adds them, which is the order
+  // `packages/db/src/schema.ts` lists them and NOT the order `RuleState`
+  // declares them. `RuleState` puts `lifetimeSettledCents` between
+  // `cadenceAnchorDay` and `engineGates` and the breach pair between
+  // `engineEligible` and `engineVersion`; the TABLE appends all three, because
+  // `ALTER TABLE ADD COLUMN` appends. This list follows the table, as its
+  // comparator does: case `1.2` reads `schema.ts`.
+  'lifetimeSettledCents',
+  'breached',
+  'breachKind',
 ] as const;
 
 /** One of {@link RULE_STATE_WRITE_COLUMNS}. */
@@ -574,9 +596,9 @@ export function refuseUnstorableJson(
  * key was named, which address was written, which values were set".
  *
  * **THE FIELD NAMES ARE `RuleStateRow`'s AND THE COLUMN NAMES ARE THE SAME
- * TWENTY-THREE WORDS**, which is a fact about this schema rather than a rule,
+ * TWENTY-SIX WORDS**, which is a fact about this schema rather than a rule,
  * and it is asserted in the suite against `packages/db/src/schema.ts` rather
- * than trusted. TWO of the twenty-three are not identity, and both are here:
+ * than trusted. TWO of the twenty-six are not identity, and both are here:
  *
  *   `engineGates`        header section 2. Encoded, then guarded.
  *   `calendarRevisionId` `RuleStateRow` types it `number | null` and
@@ -633,6 +655,36 @@ export function ruleStateValues(
     stateHash: row.stateHash,
     engineVersion: row.engineVersion,
     calendarRevisionId: row.calendarRevisionId === null ? null : BigInt(row.calendarRevisionId),
+    // -------------------------------------------------------------------------
+    // `0065`'s three, AND THE BREACH PAIR IS TRANSCRIBED RATHER THAN DERIVED
+    // -------------------------------------------------------------------------
+    // `breached` is `breach_kind IS NOT NULL` and this mapping COULD compute it.
+    // It does not, and that is the whole reason `0065` stores a derivable
+    // column: `rule_states_breach_flag_matches_kind` is `breached =
+    // (breach_kind IS NOT NULL)`, and a mapping that derives one side from the
+    // other satisfies that CHECK by construction, which turns the constraint
+    // into a tautology and stops it detecting anything. Carrying BOTH from the
+    // engine leaves the database comparing two independently transcribed facts,
+    // which is what `0065`'s header calls "the detector for the realistic
+    // adapter defect".
+    //
+    // THE ENGINE'S INVARIANT IS WHAT MAKES THE CHECK SATISFIABLE, and it holds
+    // at every site that writes the pair onto a `RuleState`:
+    // `day/advance.ts`'s opening state is `(false, null)`, its breach branch is
+    // guarded on `breach.breached && breach.kind !== null` and writes
+    // `(true, breach.kind)`, and `day/progression.ts`'s expiry writes
+    // `(false, null)` on an account that closed WITHOUT breaching. Every other
+    // state carries the pair through a spread. So `breached === (breachKind !==
+    // null)` is the engine's, this mapping does not restate it, and the
+    // database refuses the row if either ever stops being true.
+    //
+    // `lifetimeSettledCents` IS ALREADY A `bigint` AND IS NOT CONVERTED.
+    // `Cents` is `bigint` (`packages/rules-engine/src/types.ts`), the column is
+    // `bigint NOT NULL DEFAULT 0`, and `calendarRevisionId` above is the one
+    // field on this row whose port type and column type differ.
+    lifetimeSettledCents: row.lifetimeSettledCents,
+    breached: row.breached,
+    breachKind: row.breachKind,
   };
 }
 
