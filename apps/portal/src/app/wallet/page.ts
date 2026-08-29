@@ -40,17 +40,25 @@
 // wrong in different ways, and a wallet has the same asymmetry in a sharper
 // form. Rendering a balance the server did not send is the worst statement this
 // application can make; rendering nothing leaves a trader unable to tell an
-// empty wallet from a broken page. So `./sections.ts` has exactly two arms, the
-// unavailable one carries no figure at all and says the balance is unaffected,
-// and an empty statement renders as "no activity yet" rather than as a fault --
-// which is API_CONTRACT section 6.2's own ruling that "an identity with no
-// `wallet_entries` row is `0` and not a `404`".
+// empty wallet from a broken page. So NO ARM OF `./sections.ts` CARRIES A
+// FIGURE IT DID NOT RECEIVE, every one of them says the balance is unaffected
+// because on a read path that is true, and an empty statement renders as "no
+// activity yet" rather than as a fault -- which is API_CONTRACT section 6.2's
+// own ruling that "an identity with no `wallet_entries` row is `0` and not a
+// `404`".
+//
+// THERE ARE THREE ARMS AND THERE WERE TWO. ADR-217 added `error`, and the same
+// contract sentence is why the split lands where it does: a 404 cannot be an
+// empty wallet, so it can only be a route this deployment does not serve, and
+// it stays with `unavailable`. Everything that reached a server which then
+// refused or failed is `error`, which is what lets a signed-out trader read
+// "you are signed out" instead of "this is a problem on our side".
 
 import type { ReactElement } from 'react';
 import { createElement } from 'react';
 
 import { walletFraming } from '../../view/wallet.ts';
-import { Wallet, WalletUnavailable } from './sections.ts';
+import { Wallet, WalletError, WalletUnavailable } from './sections.ts';
 import { load } from './source.ts';
 
 /**
@@ -94,7 +102,17 @@ export const dynamic = 'force-dynamic';
 export default async function WalletPage(): Promise<ReactElement> {
   const loaded = await load();
 
-  return loaded.kind === 'ready'
-    ? createElement(Wallet, { view: loaded.view, framing: walletFraming(loaded.copy) })
-    : createElement(WalletUnavailable, { missing: loaded.missing });
+  // A SWITCH RATHER THAN A TERNARY, AND THE ARM COUNT IS THE REASON. This read
+  // `loaded.kind === 'ready' ? Wallet : WalletUnavailable` while the union had
+  // two arms, and a third arm added to a ternary is a screen that renders the
+  // wrong state with the compiler silent. Switching on the discriminant makes
+  // ADR-217's next arm, if there is ever one, a compile error here.
+  switch (loaded.kind) {
+    case 'ready':
+      return createElement(Wallet, { view: loaded.view, framing: walletFraming(loaded.copy) });
+    case 'unavailable':
+      return createElement(WalletUnavailable, { missing: loaded.missing });
+    case 'error':
+      return createElement(WalletError, { error: loaded.error });
+  }
 }

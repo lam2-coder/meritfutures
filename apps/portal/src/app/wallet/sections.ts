@@ -68,6 +68,7 @@ import { createElement } from 'react';
 import type { ReactElement } from 'react';
 
 import type { CopyBlock } from '../../copy/copy-block.ts';
+import type { PortalErrorKind } from '../../shell/app-shell.ts';
 import type {
   WalletBalanceView,
   WalletEntryView,
@@ -394,5 +395,69 @@ export function WalletUnavailable({
       { className: 'merit-wallet__missing' },
       ...missing.map((endpoint) => el('li', { key: endpoint }, endpoint)),
     ),
+  );
+}
+
+// -----------------------------------------------------------------------------
+// The error arm, which is ADR-217's and is the sentence the old screen could not
+// say
+// -----------------------------------------------------------------------------
+
+/**
+ * One sentence per member of `PortalErrorKind`.
+ *
+ * `Record<PortalErrorKind, string>` IS THE MECHANISM, and it is
+ * `app/referrals/states.ts`'s `REFERRALS_ERROR_COPY` and `app/kyc/copy.ts`'s
+ * `KYC_CONTENT_COPY`: a member added to the union in ../../shell/app-shell.ts
+ * and not added here is `error TS2741`, so this screen cannot silently acquire
+ * a failure it has no sentence for.
+ *
+ * THREE MEMBERS SHARE ONE SENTENCE AND THAT IS DELIBERATE RATHER THAN LAZY.
+ * `unexpected` is a `403` on a read surface, which ../../shell/app-shell.ts
+ * calls "FM-M4-10 firing" and "a rendering bug until proven otherwise", and
+ * INV-M4-07 spends its whole row keeping a "forbidden" vocabulary off this
+ * screen: giving it its own sentence would tell a trader they lack permission
+ * to see their own money, on the reading of an alertable defect. `not_found`
+ * cannot reach this arm at all, because ./source.ts routes a 404 to the
+ * unavailable arm on API_CONTRACT section 6.2's ruling that an empty wallet is
+ * `0` and not a `404`; it is written out because the record is what keeps the
+ * vocabulary from drifting, not because the sentence is reachable today.
+ *
+ * THE TWO THAT DIFFER ARE THE TWO A TRADER CAN ACT ON, and every sentence ends
+ * the same way because it is true in every one of these cases: these are READ
+ * failures, and no read moves money.
+ */
+export const WALLET_ERROR_COPY: Readonly<Record<PortalErrorKind, string>> = {
+  not_found:
+    'Your wallet cannot be shown right now. This is a problem on our side and your balance is unaffected.',
+  unauthenticated:
+    'You are signed out. Sign in again to see your wallet. Your balance is unaffected.',
+  rate_limited: 'Too many requests. Wait a moment and reload the page. Your balance is unaffected.',
+  server_error:
+    'Your wallet cannot be shown right now. This is a problem on our side and your balance is unaffected.',
+  unexpected:
+    'Your wallet cannot be shown right now. This is a problem on our side and your balance is unaffected.',
+};
+
+/**
+ * A read that reached a server which then refused or failed.
+ *
+ * IT SHOWS NO FIGURE, which is the same rule `WalletUnavailable` follows and
+ * ./page.ts's reason for it: rendering a balance the server did not send is the
+ * worst statement this application can make.
+ *
+ * AND IT NAMES NO ENDPOINT. `WalletUnavailable` lists the paths it did not get
+ * because a path this deployment does not serve is a fact about the build and a
+ * reader of that screen is the person who can fix it. A 401 is a fact about the
+ * trader's own session; a list of API paths under it tells them nothing they can
+ * use and reads as a stack trace on a money screen. The `status` is carried in
+ * the type for whoever logs it and is not rendered.
+ */
+export function WalletError({ error }: { readonly error: PortalErrorKind }): ReactElement {
+  return el(
+    'main',
+    { className: 'merit-wallet merit-wallet--error' },
+    el('h1', null, 'Merit Wallet'),
+    el('p', null, WALLET_ERROR_COPY[error]),
   );
 }
