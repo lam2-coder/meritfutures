@@ -36,11 +36,27 @@
 // as an `internal_error` with the real status in the log, which is a defect
 // somebody can find. No route accepts a request body yet, so nothing in this
 // tree can produce either one.
+//
+// -----------------------------------------------------------------------------
+// THE ONE CHECK THIS FILE RUNS, AND WHY IT IS HERE RATHER THAN IN A HANDLER
+// -----------------------------------------------------------------------------
+// `csrf.ts` decides the constitution's D2 control and this file wires it. It is
+// the transport's for the reason the 404 above is the transport's: it reads
+// three HEADERS, it reads no identity and no resource, and it must answer
+// before a body is parsed and before any route is reached. A handler-by-handler
+// copy would be a control whose coverage is a count nobody maintains.
+//
+// IT IS AN `onRequest` HOOK ON THE ROOT INSTANCE, so it covers every registered
+// route on both surfaces AND the not-found path, with no list of what it covers
+// anywhere. The refusal is this file's problem document rather than a thrown
+// error, because a throw would route through the error handler above and arrive
+// as the same `403 forbidden` by a longer path.
 // =============================================================================
 
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
+import { csrfVerdict } from './csrf.ts';
 import { compose } from './registry.ts';
 import type { CompositionReport, RouteModule } from './registry.ts';
 import type { ApiSurface } from './surface.ts';
@@ -137,6 +153,32 @@ export interface BuiltServer {
  */
 export function buildServer(options: ServerOptions): BuiltServer {
   const app = Fastify({ logger: options.logger ?? false });
+
+  // D2's `CSRF on cookie mutations`. FIRST, because everything after it costs
+  // more than it does and none of it should run for a forged write.
+  //
+  // THE REFUSAL IS `403 forbidden` AND CARRIES NO `required_factor`. Section
+  // 2's canonical code table is closed and ADR-111 clause 4 is the precedent
+  // for what to do about that: the code stays `forbidden`. The factor
+  // vocabulary is six tokens and none of them names an origin, so declaring one
+  // would tell a client to offer a factor that cannot help it. THE CLAUSE GOES
+  // TO THE LOG AND NEVER TO THE CALLER: the only client that ever sees this
+  // answer is the forged one, and telling it which half of the check it failed
+  // is telling it what to send next.
+  app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
+    const verdict = csrfVerdict({
+      method: request.method,
+      origin: request.headers.origin,
+      host: request.headers.host,
+    });
+    if (verdict.allowed) return;
+    request.log.warn(
+      { csrf: verdict.reason, method: request.method, origin: request.headers.origin },
+      'cross-origin write refused',
+    );
+    await sendProblem(reply, problem('forbidden', 403, request.id));
+    return reply;
+  });
 
   // ADR-083's 404, in the contract's shape. Reached only because nothing was
   // registered at this path: this is not a check and there is nothing here to

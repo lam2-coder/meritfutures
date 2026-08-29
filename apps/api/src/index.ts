@@ -52,8 +52,23 @@
 // for `/internal/*` by having nothing there. `registry.ts` is the half that
 // decides whether the slices behind this one can run at once, and its header is
 // where that argument lives.
+//
+// `csrf.ts` IS THE ONE SECURITY CONTROL THIS DEPLOYABLE OWNS OUTSIDE A HANDLER
+// (ADR-221). The constitution's Appendix D section D2 rules "CSRF on cookie
+// mutations" and nothing in this tree implemented it until that entry; it is an
+// `Origin` check rather than a token, it is wired as a hook in `server.ts` so
+// its coverage is the instance's rather than a list, and its own header carries
+// why `SameSite=Lax` was never the control the corpus took it for.
 // =============================================================================
 
+export { CSRF_SAFE_METHODS, csrfVerdict } from './csrf.ts';
+export type {
+  CsrfAdmission,
+  CsrfRefusal,
+  CsrfRequest,
+  CsrfSafeMethod,
+  CsrfVerdict,
+} from './csrf.ts';
 export {
   compose,
   defineRoutes,
