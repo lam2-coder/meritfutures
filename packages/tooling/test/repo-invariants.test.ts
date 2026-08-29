@@ -125,6 +125,47 @@ function cleanTree(): string {
       '//\n'.repeat(399),
   );
   write(root, 'apps/worker/src/sweeps/ports.ts', '//\n'.repeat(250));
+  // AND THE TWO ADR-212 ADDED, WHICH ARE VACANT-LINE FINDINGS RATHER THAN NAME
+  // ONES. Both sit in `apps/worker/**`, both cite a line that is BLANK, and
+  // neither binds a name -- which is the shape the vacant rule exists for and
+  // the reason the register carries a nullable `name` at all. The fixture puts
+  // the blank line exactly where the real tree has it, so a case reads the
+  // register's own pointers back rather than some other ones.
+  //
+  // `scope.ts` DOUBLES AS RI-16'S TWO REGISTERED DOC FINDINGS, and the line
+  // choices are not free: `derived` sits at 521 and `firm` at 487, so the
+  // SECOND number of each comma list in `ALLOCATION.md` below resolves and the
+  // FIRST one does not. That is the real tree's shape -- four wrong pointers of
+  // which two go green on a coincidence -- reproduced rather than described.
+  write(
+    root,
+    'packages/db/src/scope.ts',
+    Array.from({ length: 960 }, (_, i) => {
+      if (i + 1 === 909) return '';
+      const name = { 487: 'firm', 521: 'derived' }[i + 1];
+      return name === undefined ? '//' : `// class: '${name}',`;
+    })
+      .join('\n')
+      .concat('\n'),
+  );
+  write(
+    root,
+    'packages/db/migrations/0008_risk.sql',
+    Array.from({ length: 140 }, (_, i) => (i + 1 === 107 ? '' : '-- risk'))
+      .join('\n')
+      .concat('\n'),
+  );
+  write(
+    root,
+    'apps/worker/src/detectors/identity.ts',
+    '// The identity is always there because "flags attach to HUMANS, not to\n' +
+      '// accounts" (`0008_risk.sql:107`).\n',
+  );
+  write(
+    root,
+    'apps/worker/src/provisioning/payload.ts',
+    '// The payload is flat, and `scope.ts:909` repeats it at length.\n',
+  );
   write(
     root,
     'docs/plans/FOLD-01-phone-identity.md',
@@ -167,8 +208,10 @@ function cleanTree(): string {
     'docs/decisions/ALLOCATION.md',
     '# Number allocation\n\n## Reservations\n\n' +
       '| 164 | `PayoutTx.ledger` (`routes/payouts.ts:395`) is required, and the worker at ' +
-      "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts |\n" +
-      '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395` |\n',
+      "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts; both are scope " +
+      'class `derived` (`scope.ts:512,521`) |\n' +
+      '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395`, and ' +
+      'both plan tables are scope class `firm` (`scope.ts:482,487`) |\n',
   );
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
@@ -1303,12 +1346,18 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     expect(findings('RI-15', root)).toEqual([]);
   });
 
-  test('RI-15 admits a pointer one line off and catches one three lines off', () => {
-    // THE WINDOW, IN BOTH DIRECTIONS, AT ITS TWO BOUNDARIES. The widest TRUE
-    // citation measured in this corpus is one line off, and the narrowest FALSE
-    // one on record is three: `admin-writes.ts:266` for a declaration at `:269`.
-    // A case that only asserted the catch could not tell this window from one of
-    // zero, and a window of zero is a check nobody could keep green.
+  test('RI-15 admits a pointer ON the declaration, refuses one two lines off it, and catches one three lines off', () => {
+    // THE WINDOW AT ITS TWO BOUNDARIES, AND THE ANCHOR BETWEEN THEM. The widest
+    // TRUE citation measured in this corpus is one line off and the narrowest
+    // FALSE one on record is three (`admin-writes.ts:266` for a declaration at
+    // `:269`), so a case that only asserted the catch could not tell this window
+    // from one of zero.
+    //
+    // THE MIDDLE TRANSITION IS ADR-212 AND IT USED TO BE SILENT. `:267` is a
+    // filler line two above the declaration: the window admits it, and the
+    // anchor asks the question the window cannot -- is the cited line part of
+    // anything this sentence names -- and gets no for an answer. The next case
+    // shows the same distance passing when the answer is yes.
     const root = cleanTree();
     write(root, 'apps/api/src/routes/admin-writes.ts', fileWithNameAt(300, 269, 'principal'));
     const reason = (line: number): string =>
@@ -1316,13 +1365,141 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
       `  useAdminWriteBackend: '\`principal(request)\` (\`routes/admin-writes.ts:${line}\`).',\n` +
       '};\n';
 
-    write(root, REASON, reason(267));
+    write(root, REASON, reason(269));
     expect(findings('RI-15', root)).toEqual([]);
+
+    write(root, REASON, reason(267));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/admin-writes.ts:267` for `principal`, and `principal` is within 2 line(s) ' +
+        'of it WITHOUT THE CITED LINE BEING PART OF ANYTHING THIS SENTENCE NAMES',
+    );
 
     write(root, REASON, reason(266));
     expect(findings('RI-15', root).join('\n')).toContain(
       'cites `routes/admin-writes.ts:266` for `principal` and `principal` is at ' +
         'apps/api/src/routes/admin-writes.ts:269, 3 lines away',
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // ADR-212: what a citation PROVES
+  // ---------------------------------------------------------------------------
+  // THE SEEDS ARE THE REGISTRY SHAPE SESSION 399 MEASURED THE DEFECT IN, reduced
+  // to two entries. `packages/db/src/scope.ts` carries 112 of them, `owned` sits
+  // on 72 lines and `firm` on 107, and that is the entire mechanism: the reader
+  // binds the NEAREST backticked token, the nearest token is the CLASS, and a
+  // window around any entry's class line is satisfied by every other entry's.
+  //
+  // A CASE THAT ONLY PLANTED THE VIOLATION COULD NOT TELL THE ANCHOR FROM A
+  // CHECK THAT REFUSES EVERY REGISTRY CITATION, so each one below runs in both
+  // directions on ONE fixture: the right entry is silent and the wrong entry
+  // fires, with the coincidental token on the cited line in BOTH.
+
+  /** A file this case owns, so no case here overwrites a register input. */
+  const REGISTRY = 'packages/db/src/registry.ts';
+
+  /** Two registry entries of the same class, which is what makes the token cheap. */
+  const registry = [
+    'export const SCOPE_RULES = {',
+    '  certificates: {',
+    "    class: 'owned',",
+    "    column: 'identity_id',",
+    '  },',
+    '',
+    '  payoutRequests: {',
+    "    class: 'owned',",
+    "    column: 'identity_id',",
+    '  },',
+    '};',
+  ]
+    .join('\n')
+    .concat('\n');
+
+  test('RI-15 separates the right registry entry from the wrong one, with the same token on both lines', () => {
+    const root = cleanTree();
+    write(root, REGISTRY, registry);
+    const reason = (line: number): string =>
+      'const BLOCKED = {\n' +
+      `  usePayoutBackend: '\`payoutRequests\` is \`owned\` (\`registry.ts:${line}\`).',\n` +
+      '};\n';
+
+    // `:8` IS `payoutRequests`' OWN CLASS LINE. Anchored by the enclosing
+    // declaration, which the sentence names.
+    write(root, REASON, reason(8));
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // `:3` IS `certificates`' CLASS LINE, and it holds the word `owned` too.
+    // THE OLD CHECK WAS SILENT HERE: the name is on the cited line, distance
+    // zero, and it points at a rule about a different table.
+    write(root, REASON, reason(3));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `registry.ts:3` for `owned`, and `owned` is within 2 line(s) of it WITHOUT THE ' +
+        'CITED LINE BEING PART OF ANYTHING THIS SENTENCE NAMES. The line neither declares ' +
+        '`owned` nor sits inside `certificates`',
+    );
+  });
+
+  test('RI-15 catches a pointer that lands on a blank line or a bare closing bracket, with no name at all', () => {
+    // THE HALF THAT NEEDS NO NAME, and three of the five wrong `scope.ts`
+    // pointers on `origin/main` were this shape: `:1307` and `:909` are both
+    // `},`, the close of some other entry. A pointer that lands on nothing reads
+    // as verified exactly as loudly as one that lands on the claim.
+    const root = cleanTree();
+    write(root, REGISTRY, registry);
+    const reason = (line: number): string =>
+      'const BLOCKED = {\n' +
+      `  usePayoutBackend: 'the registry states it at \`registry.ts:${line}\`.',\n` +
+      '};\n';
+
+    // A LINE THAT CARRIES A CLAIM, cited by a sentence that binds no name: the
+    // stated miss, and it stays silent.
+    write(root, REASON, reason(3));
+    expect(findings('RI-15', root)).toEqual([]);
+
+    write(root, REASON, reason(5));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `registry.ts:5` and that line is BLANK OR A BARE CLOSING BRACKET',
+    );
+
+    write(root, REASON, reason(6));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `registry.ts:6` and that line is BLANK OR A BARE CLOSING BRACKET',
+    );
+  });
+
+  test('RI-15 reads a comma list as one citation per number, where it read the whole token as none', () => {
+    // `packages/db/src/scope.ts:644,649` AND `:675,684` ARE REAL POINTERS ON
+    // `origin/main` AND BOTH WERE UNREAD. The tail expression was anchored at
+    // the end of the token, so `:644,649` matched nothing and the token fell
+    // through as prose -- including its FIRST number, which on its own would
+    // have resolved. Two of the five citations session 399 measured wrong were
+    // green for that reason and not because a window admitted them.
+    const root = cleanTree();
+    write(root, REGISTRY, registry);
+    const reason = (pointer: string): string =>
+      'const BLOCKED = {\n' +
+      `  usePayoutBackend: '\`certificates\` and \`payoutRequests\` are both \`owned\` ` +
+      `(\`registry.ts:${pointer}\`).',\n` +
+      '};\n';
+
+    // BOTH NUMBERS ANSWERED AND BOTH ANCHORED: `:3` is `certificates`' class
+    // line and `:8` is `payoutRequests`', and the sentence names both. This is
+    // the shape a comma list is honestly written in and it stays silent.
+    write(root, REASON, reason('3,8'));
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // THE SECOND NUMBER IS PAST THE END OF THE FILE, which the old reader could
+    // not say because it never read the token at all.
+    write(root, REASON, reason('3,900'));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `registry.ts:900` and packages/db/src/registry.ts has 12 lines',
+    );
+
+    // AND THE FIRST NUMBER IS ANSWERED SEPARATELY, so a list cannot hide one
+    // bad pointer behind one good one.
+    write(root, REASON, reason('900,3'));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `registry.ts:900` and packages/db/src/registry.ts has 12 lines',
     );
   });
 

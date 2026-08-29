@@ -18,7 +18,8 @@
 // -----------------------------------------------------------------------------
 // `identity_links_canonical_order` CHECKs `identity_a < identity_b`, so an edge
 // is stored ONCE and which column a person lands in is decided by uuid ordering
-// (`0002_identity.sql`, and `scope.ts:403` states it at length). A filter is a
+// (`0002_identity.sql`, and `identityLinks` states it at length at
+// `scope.ts:1333`). A filter is a
 // conjunction of equalities, so "every edge touching X" is `identity_a = X` ORed
 // with `identity_b = X`, and this module spells that as TWO reads unioned in
 // memory rather than reaching for a predicate the accessor does not offer.
