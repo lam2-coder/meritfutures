@@ -5,6 +5,7 @@ import {
   ECONOMIC_CALENDAR_PATH,
   ECONOMIC_CALENDAR_REQUIRED_FACTORS,
   EconomicCalendarError,
+  EconomicCalendarUnconfigured,
   renderEconomicCalendar,
   setEconomicCalendarSource,
 } from '../src/routes/economic-calendar.ts';
@@ -351,12 +352,56 @@ test('a request with no session is unauthenticated, and the source is never read
   await app.close();
 });
 
-test('an unwired source is a 500 and never a 404', async () => {
+test('an unwired source is a 503, and never a 404 and never a 500', async () => {
   useAuthBackend(backend);
   const { app } = serve();
 
   // 404 would say the calendar does not exist, which is a statement about the
   // world. An unwired source is a statement about this deployment.
+  //
+  // AND IT USED TO BE A 500, WHICH SAID THE WRONG THING TO THE OTHER READER.
+  // ADR-240 separated `EconomicCalendarUnwired` from `EconomicCalendarError`
+  // because the two are different facts: a 500 sends an operator looking for a
+  // bug and a 503 sends them to the deployment, and only the second is true of
+  // a port nobody installed. Every other case of `EconomicCalendarError` is
+  // still a 500 and the cases above assert it.
+  const response = await app.inject({ method: 'GET', url, headers: authed });
+  expect(response.statusCode).toBe(503);
+  expect(response.json<{ code: string }>().code).toBe('service_unavailable');
+
+  await app.close();
+});
+
+test('a source that refuses as unconfigured is the same 503 and says nothing more', async () => {
+  useAuthBackend(backend);
+  // THE PORT IS WIRED AND THE DEPLOYMENT IS NOT CONFIGURED, which is the state
+  // ADR-240 created and which no case could reach before it. The caller is told
+  // exactly what an unwired port tells them; which half is unfinished is the
+  // operator's and reaches the log.
+  setEconomicCalendarSource({
+    readPanel: () =>
+      Promise.reject(
+        new EconomicCalendarUnconfigured('no horizon is configured, so `stale` has no threshold'),
+      ),
+  });
+  const { app } = serve();
+
+  const response = await app.inject({ method: 'GET', url, headers: authed });
+  expect(response.statusCode).toBe(503);
+  expect(response.json<{ code: string }>().code).toBe('service_unavailable');
+  expect(JSON.stringify(response.json())).not.toContain('horizon');
+
+  await app.close();
+});
+
+test('a row the source cannot render is still a 500, so the two refusals stay apart', async () => {
+  useAuthBackend(backend);
+  // The separation ADR-240 drew has to hold in BOTH directions or it is a
+  // rename. A tier of four is a defect in whatever wrote the row, and a 503
+  // would tell an operator to go and look at a vault.
+  setEconomicCalendarSource(sourceOf(panelOf([{ ...EVENING, tier: 4 }])));
+  const { app } = serve();
+
   const response = await app.inject({ method: 'GET', url, headers: authed });
   expect(response.statusCode).toBe(500);
   expect(response.json<{ code: string }>().code).toBe('internal_error');
