@@ -37,7 +37,7 @@
 // =============================================================================
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,6 +53,7 @@ import adminWallet, {
   AdminWalletMoneyError,
   AdminWalletUnwired,
   CORRECTION_PROVENANCE,
+  DUAL_CONTROL_THRESHOLD_CENTS,
   INSUFFICIENT_FUNDS_STATUS,
   WALLET_CORRECT_PATH,
   WALLET_RECONCILIATION_PATH,
@@ -392,6 +393,177 @@ const SOURCE = readFileSync(join(HERE, '..', 'src', 'routes', 'admin-wallet.ts')
  * CODE does has to be made against.
  */
 const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+// -----------------------------------------------------------------------------
+// 2a. THE DUAL-CONTROL THRESHOLD, ADR-228
+// -----------------------------------------------------------------------------
+// Item 3 of the header used to say the threshold had "no wire field and no
+// configured source in this tree". The founder answered on 2026-08-29 and the
+// second half is discharged. THREE THINGS ARE ASSERTED HERE AND EACH HAS A REAL
+// FAILURE MODE:
+//
+//   1. THE NUMBER, AND THAT IT IS AN INTEGER-CENTS `bigint`. A threshold that
+//      became a `number` would be a float on the money path.
+//
+//   2. THE CEILING AGREES WITH THE CONSTANT. Two copies of one number in two
+//      languages is ADR-092 section 5's hazard, and the only defence is a
+//      comparison. If a later session moves the constant and not the migration,
+//      the constant becomes a value the database refuses; if it moves the
+//      migration and not the constant, the ceiling stops being the answer.
+//      Either way this fails.
+//
+//   3. THE THRESHOLD IS NEVER A WIRE FIELD. This is the whole of ruling 2: a
+//      caller who names the threshold names the right-hand side of
+//      `amount_cents < dual_control_threshold_cents`, and can therefore satisfy
+//      it at any amount with no approval row.
+//
+// AND THE PAYOUT-PATH FINDING IS ASSERTED RATHER THAN WRITTEN DOWN, because it
+// is the claim most likely to quietly stop being true and the one a reader is
+// most likely to assume the opposite of.
+
+const MIGRATION_0068 = readFileSync(
+  join(REPO, 'packages/db/migrations/0068_dual_control_threshold_ceiling.sql'),
+  'utf8',
+);
+
+/**
+ * `0068` with its comments stripped, which is what a claim about the DDL has to
+ * be made against. `CODE`'s shape, one language over.
+ */
+const DDL_0068 = MIGRATION_0068.replace(/^--.*$/gm, '');
+
+describe('the dual-control threshold the founder answered', () => {
+  const ADJUSTMENTS = readFileSync(
+    join(REPO, 'packages/db/migrations/0038_account_adjustments.sql'),
+    'utf8',
+  );
+
+  it('is 500000 integer cents, as a bigint, so no float touches it', () => {
+    expect(DUAL_CONTROL_THRESHOLD_CENTS).toBe(500_000n);
+    expect(typeof DUAL_CONTROL_THRESHOLD_CENTS).toBe('bigint');
+  });
+
+  it('records the question it answers, verbatim, beside the number', () => {
+    // A threshold whose reasoning is lost is a threshold the next session moves.
+    expect(SOURCE).toContain('above what payout amount should a second human have to approve it');
+    expect(SOURCE).toContain(
+      'without adding friction to normal trader withdrawals, which typically',
+    );
+    expect(SOURCE).toContain('run $500-$3,000');
+    // AND IT RECORDS THAT THE REASONING SHOWN IS NOT THE REASONING THIS COLUMN
+    // CARRIES. Deleting that sentence is how the mismatch gets forgotten.
+    expect(SOURCE).toContain('IS NOT THE REASONING THIS NUMBER');
+  });
+
+  it('is bounded above in DDL by 0068, and 0038 is not edited to do it', () => {
+    expect(MIGRATION_0068).toContain('ALTER TABLE account_adjustments');
+    expect(MIGRATION_0068).toContain(
+      'ADD CONSTRAINT account_adjustments_dual_control_threshold_ceiling CHECK (',
+    );
+    // `0038` STILL SAYS EXACTLY WHAT IT SAID. A merged migration is never
+    // edited, only superseded (constitution E2).
+    expect(ADJUSTMENTS).toContain('dual_control_threshold_cents bigint NOT NULL');
+    expect(ADJUSTMENTS).toContain('CHECK (dual_control_threshold_cents > 0)');
+    expect(ADJUSTMENTS).not.toContain('threshold_ceiling');
+  });
+
+  it('bounds the column at exactly the constant, which is the anti-drift assertion', () => {
+    const ceiling = /dual_control_threshold_cents <= (\d+)/.exec(DDL_0068)?.[1];
+    expect(ceiling).toBeTypeOf('string');
+    expect(BigInt(ceiling ?? '-1')).toBe(DUAL_CONTROL_THRESHOLD_CENTS);
+  });
+
+  it('is a CEILING and deliberately not an EQUALITY', () => {
+    // An equality CHECK constrains historical rows too, so it would make every
+    // row written at the old threshold unrepresentable the first time the
+    // threshold moved -- destroying the property `0038:279` created the column
+    // for in order to defend it.
+    //
+    // THE CLAIM IS ABOUT THE DDL AND SO IS THE ASSERTION. Read against the whole
+    // file this matched the ATTACK the header describes (`dual_control_threshold
+    // _cents = 9223372036854775807`), which is prose arguing FOR the ceiling, so
+    // a whole-file match would have failed the file for explaining itself.
+    expect(DDL_0068).toContain('dual_control_threshold_cents <= 500000');
+    expect(DDL_0068).not.toMatch(/dual_control_threshold_cents\s*=/);
+    expect(MIGRATION_0068).toContain('A CEILING, AND DELIBERATELY NOT AN EQUALITY');
+  });
+
+  it('is never a wire field, on either the contract row or the port draft', () => {
+    // The contract's body carries `second_approver` and no threshold.
+    expect(CORRECTION_BLOCK).not.toContain('dual_control_threshold');
+    expect(CORRECTION_BLOCK).not.toContain('threshold');
+    // AND THE DRAFT THE PORT RECEIVES CARRIES NONE EITHER. A caller-supplied
+    // threshold is a caller-supplied right-hand side for
+    // `amount_cents < dual_control_threshold_cents`.
+    const open = SOURCE.indexOf('export interface WalletCorrectionDraft {');
+    expect(open).toBeGreaterThan(-1);
+    const draft = SOURCE.slice(open, SOURCE.indexOf('\n}', open));
+    expect(draft.toLowerCase()).not.toContain('threshold');
+  });
+
+  it('has no writer at all, so the constraint it bounds has never run on a row', () => {
+    // `ADMIN_WALLET_TABLES` excludes the adjustment table by construction, and
+    // nothing else in either deployable inserts one. The ceiling is live from
+    // the moment a writer exists and not before, and this suite says so rather
+    // than letting a green run read as coverage.
+    for (const key of ADMIN_WALLET_TABLES) expect(key).not.toBe('accountAdjustments');
+    expect(CODE).not.toContain('accountAdjustments');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 2b. THE FINDING: THE THRESHOLD IS UNDISCHARGED ON THE PATH THE QUESTION NAMED
+// -----------------------------------------------------------------------------
+// The founder was asked about a PAYOUT amount. `dual_control_threshold_cents`
+// is the only amount-denominated dual-control threshold in the estate and it
+// exists on ONE table, which is the ADMIN adjustment table. Every assertion in
+// this block is a claim ADR-228 section 5 makes, pinned so that the day one of
+// them stops being true this suite says so.
+
+describe('what the payout and withdrawal paths carry, which is the finding', () => {
+  const ROUTES = ['payouts.ts', 'admin-payouts.ts', 'wallet-withdrawals.ts', 'wallet.ts'] as const;
+
+  it('is no dual control at all, on any of the four money-out routes', () => {
+    for (const file of ROUTES) {
+      const body = readFileSync(join(REPO, 'apps/api/src/routes', file), 'utf8');
+      expect({ file, matches: (body.match(/dual_control|dualControl/g) ?? []).length }).toEqual({
+        file,
+        matches: 0,
+      });
+    }
+  });
+
+  it('and `dual_channel` on the withdrawal route is an AUTH FACTOR, not a second human', () => {
+    // The one near-miss a reader is likely to mistake for the control. It is a
+    // step-up factor for the SAME person, and it appears on `required:`.
+    const withdrawals = readFileSync(
+      join(REPO, 'apps/api/src/routes/wallet-withdrawals.ts'),
+      'utf8',
+    );
+    expect(withdrawals).toContain("required: 'passkey or dual_channel'");
+    expect(withdrawals).not.toContain('dual_control');
+  });
+
+  it('and neither payout table declares a dual-control column of any kind', () => {
+    for (const file of ['0010_payouts.sql', '0011_wallet.sql']) {
+      const sql = readFileSync(join(REPO, 'packages/db/migrations', file), 'utf8');
+      expect({ file, dual: sql.includes('dual_control') }).toEqual({ file, dual: false });
+    }
+  });
+
+  it('so the only amount threshold in the estate is on the admin adjustment table', () => {
+    const dir = join(REPO, 'packages/db/migrations');
+    const carriers = readdirSync(dir)
+      .filter((f) => f.endsWith('.sql'))
+      .filter((f) => readFileSync(join(dir, f), 'utf8').includes('dual_control_threshold_cents'));
+    // `0038` declares it and `0068` bounds it. A third file here means a second
+    // threshold exists and this suite's claim needs re-deriving.
+    expect(carriers).toEqual([
+      '0038_account_adjustments.sql',
+      '0068_dual_control_threshold_ceiling.sql',
+    ]);
+  });
+});
 
 describe('the refusal reconciliation stops at', () => {
   it('is ADR-157 clause 6 and section 7 item 1, read out of the entry', () => {

@@ -175,7 +175,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'unfinished deployment as a caller who is not an operator, on the endpoint that releases ' +
     'held payouts. MONEY PATH.',
   useAdminWalletBackend:
-    '`principal(request)` (`routes/admin-wallet.ts:601`), blocked on `setAdminSessionSource` ' +
+    '`principal(request)` (`routes/admin-wallet.ts:679`), blocked on `setAdminSessionSource` ' +
     'above, AND TWO METHODS THAT WIRING DOES NOT REACH. `writeCorrection` is refused on four ' +
     'constraints: `0038` is the built door for a wallet correction and ADR-158 never read it, so ' +
     'no column holds which entry a correction corrects (ADR-173). `reconcile` is refused on ' +
