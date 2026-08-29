@@ -1,14 +1,21 @@
 // =============================================================================
 // apps/api/test/rule-state-producibility.test.ts
 // =============================================================================
-// WHY A `RuleState` CANNOT BE PRODUCED IN THIS DEPLOYMENT, AS FOUR PREDICATES
-// RATHER THAN AS FOUR SENTENCES IN A REFUSAL MESSAGE.
+// WHY THE PAYOUT PORT CANNOT BE WIRED IN THIS DEPLOYMENT, AS PREDICATES RATHER
+// THAN AS SENTENCES IN A REFUSAL MESSAGE.
 //
 // `usePayoutBackend`'s entry in `wiring.test.ts` is down to one clause and the
 // clause is "a `RuleState` THIS DEPLOYMENT CANNOT PRODUCE". Session 429 asked
 // what stands under it and found FOUR links, of which the first had never been
 // named on this port or on `GET /accounts/:id/eligibility`: NOTHING RUNS THE
 // JOB. The other three are the ones the two reasons already carry.
+//
+// **ADR-241 CLOSED THE FIRST AND MOVED THE SECOND, AND ADR-245 ADDED A FIFTH
+// THAT IS NOT UNDER THE `RuleState` AT ALL.** `PayoutSubject` carries `state`,
+// `plan` AND `gates`; links 1 to 4 are the first field and ADR-233 discharged
+// the second, so the third had gone eleven entries without a clause. It is
+// section 5 below, and it did not move when the worker landed because nothing
+// the worker landed touches it.
 //
 // THE FILE EXISTS BECAUSE OF THE DEFECT SESSION 426 NAMED: a comment cannot
 // fail. Every clause below was true when somebody wrote it, and the one that
@@ -271,6 +278,13 @@ describe("link 4: the payout port's reason carries the chain, and carries no ret
     expect(reason).toContain('NON-ZERO exit status');
     expect(reason).toContain('BatchPorts');
     expect(reason).toContain('encodeEngineGates');
+
+    // AND IT NAMES THE THIRD FIELD NOW, which is section 5's subject seen from
+    // the entry. Asserted here rather than only there because the finding that
+    // matters is not that `gates` has no producer; it is that the REASON did not
+    // say so, and a clause deleted from the entry has to fail somewhere.
+    expect(reason).toContain('ExternalGates');
+    expect(reason).toContain('provisioning_pending');
   });
 
   test('and it no longer says the stored encoding is undeclared, because ADR-206 declared it', () => {
@@ -286,5 +300,98 @@ describe("link 4: the payout port's reason carries the chain, and carries no ret
     // repository's own grep results, where it reads as live.
     const retired = 'INVENTING A ' + 'CORPUS FACT';
     expect(payoutReason()).not.toContain(retired);
+  });
+});
+
+describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port had ever named it', () => {
+  // `PayoutSubject` is `accountId`, `state`, `plan` and `gates`
+  // (`apps/api/src/routes/payouts.ts`). Every clause this entry has ever carried
+  // was about `state` or about `plan`: ADR-233 discharged the `ResolvedPlan`
+  // half with `catalogRows`, and links 1 to 4 above are the `RuleState` half.
+  // **`gates` HAS BEEN THE THIRD FIELD THE WHOLE TIME AND NOTHING NAMED IT**,
+  // which is `wiring.test.ts`'s own finding about this very entry, for the third
+  // time: a reason that names the second-cheapest blocker retires the question
+  // for every reader after it.
+  //
+  // AND IT IS NOT DOWNSTREAM OF THE WORKER. Links 1 and 2 moved when ADR-241
+  // landed; this one did not move, because nothing ADR-241 built touches it. A
+  // session that lands the codec and the adapter and reads this entry would
+  // arrive at `subject()` with a `RuleState` in hand and still have no third
+  // argument for it.
+
+  test('no `ExternalGates` value is resolved from a row anywhere under a `src/`', () => {
+    // THE NEEDLE IS THE OBJECT KEY AND NOT THE TYPE NAME, because a file that
+    // NAMES `ExternalGates` is usually declaring a parameter, which is the
+    // opposite of producing one: seven files name it in code and five of those
+    // are the engine declaring, re-exporting or consuming the type. A literal
+    // must carry every member, so `hasPayoutInFlight:` finds the construction
+    // and the annotation does not.
+    const producers = deployableSources()
+      .filter((path) => codeOf(path).includes('hasPayoutInFlight:'))
+      .map(rel)
+      .sort();
+
+    // NEITHER OF THESE TWO READS A DATABASE AND THAT IS WHY THE COUNT IS NOT THE
+    // ANSWER. `types.ts` DECLARES the field, which is the interface itself.
+    // `trial.ts` RAISES one member on a value its own caller handed it
+    // (`...context`), inside a Monte Carlo loop in a package whose manifest
+    // declares the engine and the simulator and no database at all. So the
+    // estate has no function that turns `accounts`, `identities` and
+    // `payout_requests` into this record, on either deployable's door.
+    expect(producers).toEqual([
+      'packages/harness/src/trial.ts',
+      'packages/rules-engine/src/types.ts',
+    ]);
+
+    // NON-VACUITY, on link 2's own precedent: the identical predicate is shown
+    // finding the values that DO exist, all of them fixtures and none of them
+    // reachable from a deployment.
+    for (const path of [
+      'apps/api/test/payouts.test.ts',
+      'apps/worker/test/fixtures.ts',
+      'packages/harness/test/canonical.ts',
+      'packages/rules-engine/test/rules-f-context.test.ts',
+      'scripts/demo/fold.ts',
+    ])
+      expect(
+        readFileSync(join(REPO_ROOT, path), 'utf8'),
+        `the sweep's needle no longer matches ${path}`,
+      ).toContain('hasPayoutInFlight:');
+  });
+
+  test('and `accountStatus` cannot be a total map of `accounts.status`, by one member', () => {
+    // **THE DATABASE DECLARES SEVEN AND THE ENGINE TAKES SIX.** Both sides are
+    // derived here rather than typed out, so the day either one moves this case
+    // names the difference instead of going quietly stale.
+    //
+    // THE ENGINE IS FAITHFUL AND THE GAP IS THE CORPUS'S. `M01` section 2.1
+    // carries the same six, so `types.ts` transcribed its source correctly and
+    // the missing member was never dropped here.
+    const ddl = readFileSync(
+      join(REPO_ROOT, 'packages/db/migrations/0001_extensions_and_enums.sql'),
+      'utf8',
+    );
+    const declared = ddl.slice(ddl.indexOf('CREATE TYPE account_status AS ENUM ('));
+    const stored = [...declared.slice(0, declared.indexOf(');')).matchAll(/'(\w+)'/g)].map(
+      (match) => match[1] ?? '',
+    );
+
+    const types = codeOf(join(REPO_ROOT, 'packages/rules-engine/src/types.ts'));
+    const union = types.slice(types.indexOf('export type AccountStatus ='));
+    const accepted = [...union.slice(0, union.indexOf(';')).matchAll(/'(\w+)'/g)].map(
+      (match) => match[1] ?? '',
+    );
+
+    expect(stored).toHaveLength(7);
+    expect(accepted).toHaveLength(6);
+    expect(stored.filter((member) => !accepted.includes(member))).toEqual(['provisioning_pending']);
+    expect(accepted.filter((member) => !stored.includes(member))).toEqual([]);
+
+    // SO THE RESOLVER OWES A REFUSAL RATHER THAN A GUESS, and the precedent is
+    // one file over: `IdentityStatus` in `routes/payouts.ts` is read against
+    // `= 'active'` "precisely so that a fourth arriving later fails CLOSED on
+    // this door rather than open". A resolver that widened the engine's union to
+    // admit the seventh would be a route deciding what a provisioning account is
+    // worth to the rules.
   });
 });

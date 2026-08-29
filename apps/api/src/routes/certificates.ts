@@ -1226,10 +1226,26 @@ export const CERTIFICATE_LIST_ENDPOINTS: readonly EndpointSpec[] = [
           .type(PROBLEM_MEDIA_TYPE)
           .send({ ...problem('validation_failed', 400, request.id), errors: query.errors });
 
+      // BOTH ARMS OF THE PORT ARE INSIDE THE GUARD AND THE RENDER USED TO BE
+      // OUTSIDE IT (ADR-246). `CertificateBackendUnwired` is raised by
+      // `readCertificates` AND by `links`, and its own message says `GET
+      // /certificates` answers 503; the render sat after the `catch`, so a
+      // refusal from the signer left this handler as an unhandled error and
+      // `server.ts` answered 500. ADR-240 section 4 ruled that shape on
+      // `economic-calendar.ts` in the same words: an unwired port is a
+      // deployment nobody finished, not a defect, and a 500 sends an operator
+      // hunting for a bug when what is missing is a line in `start.ts`.
+      //
+      // THIS DOES NOT MAKE A HALF-WIRING SAFE AND IS NOT WHY IT IS HERE.
+      // `projectCertificate` never calls `links` for a deferred row, so a
+      // backend with a live read and a refusing signer answers 200 to one
+      // trader and refuses the next on the state of their own rows.
+      // `certificate-ports.test.ts` executes that, and it is the reason this
+      // port stays out of `start.ts` rather than the status code.
       const wired = backend;
-      let rows: readonly CertificateRow[];
       try {
-        rows = await wired.readCertificates(session);
+        const rows = await wired.readCertificates(session);
+        return renderCertificates(rows, query.value, (code) => wired.links(code));
       } catch (err) {
         if (!(err instanceof CertificateBackendUnwired)) throw err;
         request.log.error({ err }, 'certificate backend is not wired');
@@ -1241,7 +1257,6 @@ export const CERTIFICATE_LIST_ENDPOINTS: readonly EndpointSpec[] = [
             title: 'Service unavailable',
           });
       }
-      return renderCertificates(rows, query.value, (code) => wired.links(code));
     }),
   },
 ];

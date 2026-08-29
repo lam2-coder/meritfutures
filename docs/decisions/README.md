@@ -258,6 +258,8 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-242](ADR-242.md) | an ops plane is four different questions, and one of them is a database read whose blocker is a door somebody already ruled (2026-08-29, status: proposed) |
 | [ADR-243](ADR-243.md) | four money-path approvals are earned rather than granted, and the classifier that sized the queue is over-inclusive at the tier that matters most  (2026-08-29, status: proposed) |
 | [ADR-244](ADR-244.md) | tier 1 is classified entire, its class C residue is ONE entry of twenty-one, and the classifier that sized it is not measuring the same object rather than measuring it wrongly  (2026-08-29, status: proposed) |
+| [ADR-245](ADR-245.md) | the worker landing closed two of the payout port's four links and moved neither of the other two, so the port still refuses, and `PayoutSubject`'s third field has never had a clause  (2026-08-29, status: proposed) |
+| [ADR-246](ADR-246.md) | three certificate ports are two questions, the card is one deliverable and not three, and a port whose own message promised a 503 was answering 500 (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -331,6 +331,22 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // `rule_states`. The alternative, an API that folds its own, puts the engine on
   // two paths and only one of them is audited, which is the divergence ADR-026
   // C-07's `state_hash` exists to make detectable.
+  //
+  // AND SESSION 435 WAS DISPATCHED TO ASK WHETHER THE WORKER LANDING DISCHARGED
+  // THIS ENTRY, FOUND THAT IT DID NOT, AND FOUND A CLAUSE UNDER THE ONES IT WAS
+  // SENT TO RE-DERIVE. Every clause above re-derives true on this tree and the
+  // entry is not rewritten for the worker: link 1 is measured CLOSED (the
+  // deployable now exits NON-ZERO where ADR-239 measured no output and exit 0),
+  // link 2 is a real adapter serving four of ten, and links 3 and 4 are exactly
+  // where ADR-239 left them. ADR-245 records the measurement.
+  //
+  // THE SIXTH CLAUSE IS THE FINDING AND IT IS THIS ENTRY'S OWN DEFECT FOR THE
+  // THIRD TIME. `PayoutSubject` has THREE fields and eleven revisions of this
+  // reason have named two. `gates` is not downstream of the worker, not
+  // downstream of the codec and not downstream of a row, so every session that
+  // clears links 1 to 4 still arrives at `subject()` unable to call it. A reason
+  // that names the second-cheapest blocker retires the question for every reader
+  // after it, and this list exists to make that expire.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -373,7 +389,28 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
     "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
-    'detectable, computed on the one path no replay audit reads. THE FIRM-READ CLAUSE IS ' +
+    'detectable, computed on the one path no replay audit reads. SIXTH, AND IT IS NOT UNDER THE ' +
+    '`RuleState` AT ALL: `PayoutSubject` (`routes/payouts.ts:329`) CARRIES THREE FIELDS AND THIS ' +
+    'ENTRY HAS ONLY EVER NAMED TWO. `state` is clauses one to four and `plan` was discharged by ' +
+    'ADR-233; `gates` is an `ExternalGates` (`routes/payouts.ts:333`) and NO VALUE OF IT IS ' +
+    'RESOLVED FROM A ROW ANYWHERE UNDER A `src/`. Swept comment-stripped over every `.ts` under ' +
+    'every `apps/*/src` and `packages/*/src`, the object key `hasPayoutInFlight:` appears in ' +
+    'TWO files: `packages/rules-engine/src/types.ts`, which DECLARES the field, and ' +
+    '`packages/harness/src/trial.ts`, which raises one member on a value its caller handed it ' +
+    'inside a Monte Carlo loop whose package declares no database. Every constructed value is a ' +
+    'fixture or `scripts/demo/fold.ts`. THE FIVE FACTS ALL HAVE COLUMNS AND THE RESOLVER IS ' +
+    'WHAT IS MISSING: `identities.payouts_frozen` (`0002_identity.sql:50`), ' +
+    '`accounts.payouts_frozen` (`0007_accounts.sql:83`), `accounts.recon_blocked` ' +
+    '(`0007_accounts.sql:87`), the ' +
+    '`kyc_status` enum (`0001_extensions_and_enums.sql:29`) and R-38s in-flight leg off ' +
+    '`payout_requests`. AND THE ACCOUNT-STATUS LEG CANNOT BE A TOTAL MAP: `account_status` ' +
+    'declares SEVEN members (`0001_extensions_and_enums.sql:47`) and `AccountStatus` ' +
+    '(`packages/rules-engine/src/types.ts:891`) takes SIX, the difference being ' +
+    '`provisioning_pending`, and `M01:203` carries the same six, so the engine transcribed its ' +
+    'source correctly and the resolver owes a REFUSAL rather than a widened union. THIS CLAUSE ' +
+    'DID NOT MOVE WHEN THE WORKER LANDED because nothing ADR-241 built touches it, which is why ' +
+    'a session that lands the codec and the adapter would arrive at `subject()` with a ' +
+    '`RuleState` in hand and no third argument for it. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +
@@ -591,31 +628,35 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'EVERY ABSENCE ABOVE IS EXECUTED in `test/internal-ops-constructibility.test.ts` rather than ' +
     'stated here, so the day any of them lifts a case goes red and this entry expires.',
   useCertificateBackend:
-    'ITS SIGNER, AND NOT ITS READ, AND ADR-240 SPLITS THE SIGNER CLAUSE IN TWO BECAUSE ONLY ONE ' +
-    'HALF WAS EVER A CONFIGURATION. `databaseCertificateBackend` still exists ' +
-    '(`routes/certificates.ts:654`) and its second parameter still has no supplier. ' +
+    'ONE FIELD OF ONE RESPONSE, AND ADR-246 READ THE THREE CERTIFICATE PORTS AS A SET AND FOUND ' +
+    'THAT THIS ONE AND `useCertificateImageSource` WAIT ON THE SAME ABSENT THING. ' +
+    '`databaseCertificateBackend` still exists (`routes/certificates.ts:692`) and its read arm is ' +
+    'constructible today through `db.scoped`; its second parameter still has no supplier. ' +
     "THE `verify_url` CLAUSE IS DISCHARGED AND IS REWRITTEN RATHER THAN DELETED, on RI-14's " +
     'rule that a false sentence removed leaves nothing for the next reader to check. It read ' +
     'that the path is "named by M11 and DEFINED BY NO SECTION of the contract" (ADR-168 ' +
     'foreclosure 1), and API_CONTRACT section 6.3 has carried a `GET /verify/:code` row since ' +
-    'ADR-170 (`docs/architecture/API_CONTRACT.md:786`), `routes/verify.ts` implements it, and ' +
-    '`start.ts` wires `databaseVerifySource(LIVE_DB)` today. What that half now waits on is an ' +
-    'ORIGIN, which is a deployment fact ADR-012 keeps out of this repository and which one ' +
-    'named environment variable would close. ' +
-    "THE `image_url` CLAUSE STANDS AND IS NOT A SECRET, WHICH IS ADR-240'S RULING. " +
-    'API_CONTRACT section 6 types it "signed, time-limited" and its section 6.3 image row states ' +
-    '"Request: the path token only, no query, no body" ' +
-    '(`docs/architecture/API_CONTRACT.md:776`), so a signature and an expiry have nowhere to ' +
-    'ride on the URL of `GET /certificates/:code/image.png` and `imageHandler` verifies none: ' +
-    '`test/certificate-links.test.ts` asserts that the endpoint answers identically with and ' +
-    'without signature-shaped query parameters. THREE THINGS ARE MISSING AND ONLY ONE IS ' +
-    'CONFIGURATION, and `routes/account-reads.ts` reached the same finding independently on its ' +
-    'own `/certificate` row: "the card renderer, the CDN origin and the URL signer are all M11 ' +
-    'and none exists", and `certificates` (`0020_public_surface.sql`) carries `signature` and ' +
-    '`signing_key_id` and NO image location column, "so there is not even a stored value to ' +
-    'sign". A VARIABLE NAMED HERE WOULD CLOSE THE ORIGIN AND NEITHER OF THE OTHER TWO, so this ' +
-    'port is NOT the shape ADR-226 and ADR-229 wired and it is not wired on their precedent.',
+    'ADR-170, `routes/verify.ts` implements it, and `start.ts` wires `databaseVerifySource(LIVE_DB)` ' +
+    'today. What that half waits on is an ORIGIN, which is a deployment fact ADR-012 keeps out of ' +
+    'this repository and which one named environment variable would close. ' +
+    'WHAT STILL REFUSES IS `image_url`, AND IT IS THE CARD RATHER THAN THE SIGNER. ADR-240 ruled ' +
+    'the URL signing key out of this deployable and named where it belongs (the object store or ' +
+    'the edge, INFRA section 2), and ADR-246 read that ruling forward: a signer signs an address, ' +
+    'an address addresses an object, and the object is a card THIS REPOSITORY HAS NO RENDERER ' +
+    'FOR. `certificates` (`0020_public_surface.sql`) carries seventeen columns and none ' +
+    'of them is an image location, so there is not even a stored value to sign, and no migration ' +
+    'in the set alters the table. `test/certificate-ports.test.ts` executes the column set and ' +
+    'the sweep, so the day either moves this entry goes red. ' +
+    'AND THE HALF-WIRING IS REFUSED ON A SECOND GROUND THAT IS NOT A MISSING PIECE AT ALL: ' +
+    '`projectCertificate` never calls `links` for a deferred row (ADR-168 foreclosure 4), so a ' +
+    'backend with a live read and a refusing signer answers 200 to a trader whose certificates ' +
+    'are all deferred and refuses the trader beside them whose certificate issued. THAT IS A ' +
+    "RESPONSE DECIDED BY THE STATE OF THE CALLER'S OWN ROWS, it is executed in " +
+    '`test/certificate-ports.test.ts`, and it is why raising the wired count here is refused ' +
+    'however the refusal is dressed. ADR-246 repaired the status code of that refusal (503 rather ' +
+    'than 500, on ADR-240 section 4) and deliberately did NOT wire the port.',
   useCertificateImageSource:
+    'THE SAME ABSENCE AS `useCertificateBackend` SEEN FROM THE OTHER SIDE, WHICH IS ADR-246. ' +
     'THE REASON HERE WAS THE DOOR AND ADR-231 BUILT IT, so the entry is REPLACED rather than ' +
     'deleted and the obstruction that remains is a different one. It read: "a door neither of ' +
     'the two serves. The row is read UNAUTHENTICATED, so `scoped` has no identity to open with, ' +
@@ -626,7 +667,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'constructible: `record` writes `certificate_verifications`, scope class `firm`, exactly as ' +
     '`databaseVerifySource` does. WHAT BLOCKS THIS ROW IS THAT ITS ANSWER IS NOT A ROW, IT IS ' +
     'BYTES. `CertificateLookup.card` carries `image/png` bytes ' +
-    '(`routes/certificates.ts:918-938`) and this file\'s own header says the renderer "is not ' +
+    "(`routes/certificates.ts:958`, reached at `:976`) and this file's own header says the " +
+    'renderer "is not ' +
     'in this repository" (`routes/certificates.ts:44`). An adapter written here would have to ' +
     'invent a card, and a public endpoint serving an invented card is a worse failure than a ' +
     "503: it puts Merit's name on an artefact Merit did not render. " +
@@ -641,8 +683,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'number stated here" (API_CONTRACT section 6.3), so a deployment supplies it, and the BYTES ' +
     'beside it are a renderer no deployment can set. ADR-240 declines to name the first while ' +
     'the second has no producer, because a variable whose only consumer refuses is a name ' +
-    'nothing reads.',
+    'nothing reads. ' +
+    'ADR-246 ADDS THE SET READING AND NOTHING ELSE: the bytes this port owes and the `image_url` ' +
+    '`useCertificateBackend` owes are ONE deliverable, so the two entries expire together or ' +
+    'not at all, and a session dispatched at either is dispatched at the card.',
   useCertificateRevokeBackend:
+    'READ BY ADR-246 AS THE THIRD OF THE THREE CERTIFICATE PORTS AND LEFT EXACTLY WHERE IT ' +
+    'STOOD: it is the one of the three that is NOT about the card, so the card landing does ' +
+    'nothing for it and this entry does not expire with the other two. ' +
     'TWO OBSTRUCTIONS, AND THE SECOND IS A CIRCULARITY RATHER THAN A MISSING DOOR. ' +
     '`principal(request)` (`routes/admin-certificates.ts:353`) resolves only through ' +
     '`AdminSessionSource`, so it is blocked on `setAdminSessionSource` above, WHICH IS NOW ONE ' +
