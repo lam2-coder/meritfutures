@@ -161,6 +161,13 @@
 //       PER-ACCOUNT half is not, on two INDEPENDENT legs, either of which alone
 //       blocks the group.
 //
+//       **THE CALENDAR INPUT IS BUILT AS OF SESSION 392 AND IT LIFTS NOTHING**,
+//       which is stated before the legs so no reader infers otherwise.
+//       `projectPayout` takes FIVE inputs and {@link readCalendarSlice} is the
+//       one this fence can produce. `state: RuleState` carries `engineGates:
+//       EngineGateResults`, which is the bag leg 1 is about, so the input that
+//       blocks the fold is not the calendar and never was.
+//
 //       LEG 1, THE ENGINE'S OWN FORECAST IS UNWRITTEN AND UNSPECIFIED. Six gate
 //       groups decide eligibility (`tradedDays`, `winDays`, `buffer`,
 //       `consistency`, `cadenceGap`, `minimumAmount`) and exactly ONE of them
@@ -182,34 +189,71 @@
 //       which is why ADR-199 clause 4 could rule those two figures readable off
 //       an event nothing has emitted yet.
 //
-//       LEG 2, RECOMPUTING THE GATE NEEDS A COLUMN THAT DOES NOT EXIST. ADR-199
-//       section 6's own input table offers the other route: `plan_versions.rules`
-//       for `cadence_gap_trading_days` and the ladder caps, `accounts` for the
-//       pinned version, `rule_states` for the anchors. Every one of those is a
-//       real column and a registered `TableKey`. **`CalendarDay.sequence` IS
-//       NOT.** R-37 counts the gap by `sequence` subtraction and R-02 fixes that
-//       "gap counting is `calendar.sequence` subtraction, NEVER date arithmetic";
-//       `trading_calendar` declares no such column in `0004` or in any of the 59
-//       migrations, and `packages/db/src/seed/calendars/` assigns none. The
-//       engine gets its slice from a PORT (`BatchPorts.read.calendarSlice`) that
-//       the caller supplies, never from a table. So the substitute available here
-//       is date arithmetic, which is the one thing AS-06 says publishes "a rule
-//       its own traders cannot evaluate".
+//       LEG 2, **REFUTED BY `ADR-204` SECTION 8 AND NOW BUILT.** This paragraph
+//       read: "R-37 counts the gap by `sequence` subtraction and R-02 fixes that
+//       gap counting is `calendar.sequence` subtraction, NEVER date arithmetic;
+//       `trading_calendar` declares no such column ... So the substitute
+//       available here is date arithmetic, which is the one thing AS-06 says
+//       publishes a rule its own traders cannot evaluate."
 //
-//       **AND RECOMPUTING IT WOULD BE THE WRONG SHAPE EVEN IF THE COLUMN
-//       EXISTED.** `admin-source/account.ts` states this directory's rule for the
-//       same column: "Nothing in this module derives an eligibility, recomputes a
-//       gate or summarises one". A second evaluator of a money gate living in an
-//       admin read adapter is FM-M6-07's shape on the pager one field over.
+//       **THE PREMISE HOLDS AND THE CONCLUSION DOES NOT FOLLOW.** The column is
+//       still absent and nothing here adds one. `CalendarDay.sequence` is a
+//       property of the SLICE rather than of the table, every reader of it is
+//       slice local, and a slice over ONE COVERED INTERVAL cannot have a hole,
+//       because `0032` makes a day inside coverage the table does not hold
+//       POSITIVELY not a session. So position over the ordered, holiday-filtered
+//       rows of one covered interval IS the dense index. That entry returned the
+//       work to this fence in terms -- "a `CalendarSlice` loader in the
+//       `apps/api` fence, not DDL" -- and {@link readCalendarSlice} below is it,
+//       executed against a live database across a holiday and a coverage edge.
+//       **LEG 2 IS SPENT AND IT WAS NEVER A MIGRATION.**
+//
+//       **AND NOTHING BELOW RECOMPUTES A GATE, WHICH THE ROUTE THIS PARAGRAPH
+//       USED TO FEAR WOULD HAVE.** `admin-source/account.ts` states this
+//       directory's rule: "Nothing in this module derives an eligibility,
+//       recomputes a gate or summarises one". The loader produces a CALENDAR and
+//       `packages/rules-engine`'s own `projectPayout` is the evaluator, so the
+//       second evaluator of a money gate that would be FM-M6-07's shape one field
+//       over does not exist and is not proposed.
 //
 //       **THE GROUP GOES WHOLE OR NOT AT ALL**, on B2's stated reason. Producing
 //       only the accounts eligible TODAY would understate `total_cents`, and that
 //       figure is the one the payout wallet is funded against (EC-074, P-M6-02,
 //       ADR-011's top-up trigger). EC-074's own words for understating it:
 //       "Funding the wallet against the overstatement starves operations".
-//       CLEARING CONDITION: a `rule_states` writer lands and a primary source
-//       declares the stored `engine_gates` shape, or a ruling defines the
-//       forecast over columns that exist.
+//
+//       **THE CLEARING CONDITION WAS STATED TWICE, IN TWO PLACES, WITH TWO OF
+//       ITS THREE TERMS EACH, AND THE TWO STATEMENTS HAD DRIFTED APART.** This
+//       header said "a `rule_states` writer lands AND a primary source declares
+//       the stored `engine_gates` shape, or a ruling defines the forecast over
+//       columns that exist"; `test/admin-source-liability.test.ts` said "a
+//       `writeRuleState` implementation lands, AND `eligible_next_7d` gains its
+//       `| null`". Neither named the other's second term. **THAT IS `FM-16`'s
+//       shape arriving on the clearing condition itself** -- a second statement
+//       of one predicate, free to drift, with no control comparing them -- and it
+//       is repaired by writing the condition ONCE, here, with all three terms.
+//       The ruling arm is struck: `ADR-204` IS that ruling, it landed, and it
+//       moved nothing, which is what session 388 recorded and 389 confirmed.
+//
+//       **CLEARING CONDITION, ALL THREE TERMS, AND THE GROUP NEEDS EVERY ONE:**
+//         1. A `writeRuleState` IMPLEMENTATION. `nightly.ts` calls the port and
+//            the only things satisfying it are test doubles and
+//            `scripts/demo/world.ts`, which refuses. `rule_states` therefore
+//            holds no rows, which session 392 measured on a live database over
+//            all 60 migrations: **ZERO**. `apps/worker/**` and `packages/**`.
+//         2. A PRIMARY SOURCE DECLARING THE STORED `engine_gates` ENCODING.
+//            `EngineGateResults` types every cents member `bigint`, which JSON
+//            cannot carry, and `0015`'s column comment names EIGHT gates where
+//            the engine produces six. Without it a reader here would FIX the
+//            encoding from the read side, which is the trade `ADR-199` section 7
+//            refuses. An ADR.
+//         3. `eligible_next_7d: EligibleNext7d | null`, so the response can
+//            decline where the horizon has no answer (`ADR-204` ruling 9,
+//            `ADR-203`). **`RI-18` MAKES THIS ONE ATOMIC ACROSS THREE FILES** --
+//            `API_CONTRACT.md`, `routes/admin-reads.ts` and
+//            `apps/admin/src/api/types.ts` -- and session 392 seeded it and
+//            watched it fire: the partial move drops FIVE field paths from one
+//            copy and reports six findings. An ADR plus two fences.
 //
 // **`withdrawals_in_flight_cents` IS ABSENT AND IS NOT A FIFTH BLOCKER**, because
 // it is not on the response. ADR-195 section 6 row 1 owes the column, no migration
@@ -256,6 +300,9 @@
 // would drop the row an operator is looking at during the incident where the
 // producer stopped running.
 // =============================================================================
+
+import { buildCalendarSlice, CalendarSliceError } from '@merit/rules-engine';
+import type { CalendarDay, CalendarSlice, TradingDay } from '@merit/rules-engine';
 
 import { AdminReadError } from '../routes/admin-reads.ts';
 import type { LiabilityResponse } from '../routes/admin-reads.ts';
@@ -1801,6 +1848,203 @@ export async function readTradingLookback(
       anchor_day: anchorDay,
       covered_from_day: covering.from,
       days,
+    },
+    cost,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// THE CALENDAR SLICE, WHICH IS WHAT `B5` LEG 2 ACTUALLY NAMES AND IS NOT DDL
+// -----------------------------------------------------------------------------
+// Session 380 recorded `B5` leg 2 as a missing `trading_calendar.sequence`
+// column: `R-37` counts the cadence gap by `sequence` subtraction (`R-02`: "gap
+// counting is `calendar.sequence` subtraction, NEVER date arithmetic"), the
+// table declares no such column, and the header above still concludes from that
+// that "the substitute available here is date arithmetic".
+//
+// **`ADR-204` SECTION 8 REFUTED THE CONCLUSION AND RETURNED THE WORK TO THIS
+// FENCE**, in terms: "What leg 2 names is a `CalendarSlice` loader in the
+// `apps/api` fence, not DDL." Session 389's own next-slice line says the same
+// thing from the other side: "what is owed is one `CalendarSlice` loader over
+// the covered interval". **THIS SECTION IS THAT LOADER, AND BUILDING IT IS WHAT
+// TURNS THAT ENTRY'S ARGUMENT INTO A FACT A SUITE READS.**
+//
+// THE ARGUMENT, IN THREE STEPS, EACH AT ITS OWN SOURCE:
+//
+//   1. `sequence` IS A PROPERTY OF THE SLICE AND NOT OF THE TABLE.
+//      `CalendarDay.sequence` is documented as a "Dense index into the
+//      calendar", and `CalendarSlice` is a VALUE the caller constructs
+//      (`ADR-049`: "an interface carrying `get()` ... is a CAPABILITY ... A
+//      value has no behavior to smuggle").
+//   2. EVERY READER OF IT IS SLICE LOCAL. `tradingDaysBetween` returns
+//      `to.day.sequence - from.day.sequence` for two days looked up in ONE
+//      slice, and `tradingDayAtSequence` scans that same slice. `RuleState`
+//      stores no sequence and `cadenceGap.nextEligibleTradingDay` is a DATE, so
+//      no sequence is ever compared across two slices. **THE BASE IS FREE AND
+//      ONLY DENSITY INSIDE ONE SLICE IS LOAD BEARING.**
+//   3. A SLICE OVER ONE COVERED INTERVAL CANNOT HAVE A HOLE. `0032`'s coverage
+//      rule makes a day inside coverage that the table does not hold POSITIVELY
+//      not a session, so it is correctly absent from a dense index; a day
+//      OUTSIDE coverage is UNKNOWN, and coverage is what bounds this walk.
+//      `packages/golden-loader/src/calendar.ts` states the exact limit of
+//      position-as-index -- "on a calendar with a hole in it, position and
+//      calendar index diverge" -- and one covered interval is precisely the
+//      shape that has none.
+//
+// **SO POSITION OVER THE ORDERED, HOLIDAY-FILTERED ROWS OF ONE COVERED INTERVAL
+// IS THE DENSE CALENDAR INDEX, BY CONSTRUCTION RATHER THAN BY LUCK**, and no
+// day below is computed: every `CalendarDay` is a `trading_calendar` row this
+// function read, and `sequence` is its position among them.
+//
+// -----------------------------------------------------------------------------
+// THE INTERVAL IS THE WHOLE OF THE ONE COVERING THE ANCHOR, AND NOT THE HORIZON
+// -----------------------------------------------------------------------------
+// {@link readTradingHorizon} returns the seven days AFTER the anchor and
+// {@link readTradingLookback} the days ENDING at it. **NEITHER IS A SLICE
+// `projectPayout` can be handed**, and the reason is that function's own
+// precondition: the calendar "Must cover the cadence anchor AND every horizon
+// day". The cadence anchor is `rule_states.cadence_anchor_day`, the basis for
+// `R-37`'s count, and it sits in the PAST, before the horizon and possibly
+// before a seven-day lookback. A slice built to the horizon alone would refuse
+// every account whose anchor predates it, which reads as an empty projection
+// rather than as a window chosen too narrowly.
+//
+// So this walk takes the ENTIRE interval covering the anchor, in both
+// directions, which is the largest slice `0032` entitles the estate to answer
+// for and the only one whose density step 3 above establishes. **AN ANCHOR
+// OUTSIDE IT IS STILL A REFUSAL AND IT IS THE CALLER'S**: `lookupCalendarDay`
+// answers `outside_coverage` and the engine refuses the projection, which is
+// `ADR-042` F-4's answer arriving where it can be acted on rather than being
+// pre-empted here.
+//
+// -----------------------------------------------------------------------------
+// WHAT THIS DOES NOT UNBLOCK, SAID HERE SO NO READER INFERS IT
+// -----------------------------------------------------------------------------
+// **THIS IS ONE OF `projectPayout`'s FIVE INPUTS AND IT IS THE ONLY ONE THIS
+// FENCE CAN PRODUCE.** `PayoutProjectionInput` takes `state: RuleState`, `plan:
+// ResolvedPlan`, `gates: ExternalGates`, `calendar: CalendarSlice` and the
+// horizon days. The horizon is {@link readTradingHorizon} and the calendar is
+// below. **`state` IS `B5` LEG 1 AND IT IS UNMOVED**: `RuleState.engineGates` is
+// an `EngineGateResults`, that value lives in `rule_states.engine_gates`, a
+// `jsonb NOT NULL` bag no adapter writes and no primary source declares an
+// encoding for. A reader here that decoded it would be FIXING that encoding from
+// the read side, at the moment of maximum ignorance about the writer, which is
+// the trade `ADR-199` section 7 refuses and `ADR-204` section 8 cites to return
+// a migration number unspent. **NOTHING BELOW READS `rule_states`.**
+// -----------------------------------------------------------------------------
+
+/**
+ * The engine's brand, applied at the ONE boundary where a day has been validated.
+ *
+ * `TradingDay` is `string & { __brand: 'TradingDay' }` and the engine "NEVER
+ * DERIVES ONE": it arrives on a value the caller assembled. So every adapter in
+ * this estate that hands the engine a calendar applies the brand itself, and
+ * `packages/golden-loader/src/calendar.ts` does it on rows of this exact table
+ * (`session.trading_day as TradingDay`). This is that boundary for the live one.
+ *
+ * **IT IS ONE FUNCTION SO THE ASSERTION HAS ONE SITE AND THAT SITE HAS A
+ * PRECONDITION.** The argument is always a value {@link horizonRow} already put
+ * through `day()`, which refuses anything that is not a `YYYY-MM-DD` string, so
+ * the brand records a check that happened rather than standing in for one. A
+ * second `as TradingDay` anywhere below would be a second place to get that
+ * wrong.
+ */
+const brandTradingDay = (validated: string): TradingDay => validated as TradingDay;
+
+/**
+ * What the slice walk can answer, and the two answers are genuinely different.
+ *
+ * {@link TradingHorizon}'s shape with one arm fewer, and the missing arm is the
+ * finding rather than a simplification: a slice CANNOT be `exhausted`. A horizon
+ * asks for seven days and can be short of them; a slice asks for the covered
+ * interval and takes whatever that interval holds, so the only thing that can go
+ * wrong is having no interval to take. A one-day interval is a correct slice
+ * over a nearly empty estate, and reporting it short would be reporting the
+ * calendar's size as a defect.
+ */
+export type LiabilityCalendarSlice =
+  | {
+      readonly kind: 'resolved';
+      readonly anchor_day: string;
+      readonly covered_from_day: string;
+      readonly covered_through_day: string;
+      readonly slice: CalendarSlice;
+    }
+  | { readonly kind: 'uncovered'; readonly anchor_day: string | null; readonly detail: string };
+
+/** {@link readCalendarSlice}'s answer, with {@link readTradingHorizon}'s cost object. */
+export interface LiabilityCalendarSliceResult {
+  readonly slice: LiabilityCalendarSlice;
+  readonly cost: TradingHorizonCost;
+}
+
+/**
+ * The engine's `CalendarSlice` over the covered interval holding the last closed
+ * day, or the reason there is no such interval.
+ *
+ * THE ANCHOR RULE IS {@link anchorCalendar}'s AND IS SHARED BY IDENTITY, which
+ * is that function's own stated reason: three walks off one anchor cannot drift,
+ * and a second transcription of "which day is the snapshot's" would be two
+ * answers to one question inside one module.
+ *
+ * `sequence` IS THE POSITION AND THE CONSTRUCTOR IS THE ENGINE'S. Nothing here
+ * validates ordering, monotonicity or containment; `buildCalendarSlice` does all
+ * three and throws `CalendarSliceError` on any of them, and letting it do so is
+ * what keeps this loader from being a second opinion about what a slice is. A
+ * refusal from it is a defect in THIS assembly rather than in the data, and it
+ * is re-thrown in this module's vocabulary saying so.
+ */
+export async function readCalendarSlice(
+  tx: TradingCalendarTx,
+  asOf: string,
+): Promise<LiabilityCalendarSliceResult> {
+  const anchor = await anchorCalendar(tx, asOf);
+  if (anchor.kind === 'uncovered')
+    return {
+      slice: { kind: 'uncovered', anchor_day: anchor.anchor_day, detail: anchor.detail },
+      cost: anchor.cost,
+    };
+
+  const { parsed, anchorDay, covering, cost } = anchor;
+
+  // ONE COVERED INTERVAL, HOLIDAYS REMOVED, ASCENDING, AND `sequence` IS THE
+  // POSITION. Every bound is a lexicographic comparison between two
+  // `YYYY-MM-DD` strings, which is chronological order with no arithmetic, and
+  // the `map` runs after the `sort` so the index is dense in the order the
+  // engine reads.
+  const days: CalendarDay[] = parsed
+    .filter((row) => !row.isHoliday && row.day >= covering.from && row.day <= covering.to)
+    .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+    .map((row, position) => ({
+      tradingDay: brandTradingDay(row.entry.trading_day),
+      isHalfDay: row.entry.is_half_day,
+      halted: row.entry.halted,
+      sequence: position,
+    }));
+
+  let slice: CalendarSlice;
+  try {
+    slice = buildCalendarSlice({
+      days,
+      coverage: { from: brandTradingDay(covering.from), to: brandTradingDay(covering.to) },
+    });
+  } catch (error) {
+    if (!(error instanceof CalendarSliceError)) throw error;
+    throw new AdminReadError(
+      `the trading calendar rows covering ${anchorDay} do not assemble into a slice: ` +
+        `${error.message}. ADR-049 makes a malformed slice a CALLER defect rather than a day ` +
+        'the engine refuses, and this loader is that caller, so the rows inside ' +
+        `${covering.from}..${covering.to} carry a day the covered interval cannot hold in order`,
+    );
+  }
+
+  return {
+    slice: {
+      kind: 'resolved',
+      anchor_day: anchorDay,
+      covered_from_day: covering.from,
+      covered_through_day: covering.to,
+      slice,
     },
     cost,
   };
