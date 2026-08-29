@@ -49,9 +49,10 @@ test('every read surface is reachable from the package entry point', () => {
     'isRevocable',
 
     // SC-M4-01, the last row of section 3.1 with no route until this session.
-    // It reads nothing: every endpoint behind it is a POST and this application
-    // has no verb but GET, so the view model is a pure function of a MEASUREMENT
-    // of what a deployment can serve.
+    // It reads nothing: every endpoint behind it is a POST and this screen calls
+    // none of them, so the view model is a pure function of a MEASUREMENT of
+    // what a deployment can serve. The transport gained a `post` in ADR-219,
+    // which wires no page.
     'toSignInView',
     'SIGN_IN_FACTORS',
   ]) {

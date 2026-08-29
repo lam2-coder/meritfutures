@@ -65,7 +65,9 @@
 // appearing to satisfy it." SC-M4-01 exists as a SCREEN and submits nothing:
 // every control on it carries `submits_to: null` typed as the literal, exactly
 // as the payout centre's and the session list's do, and the write half of the
-// clause is untouched. This application still has no verb but GET.
+// clause is untouched. THE TRANSPORT HAS A `post` FROM ADR-219 AND NO SEGMENT
+// CALLS IT: that entry ships the verb and wires no page, so "submits nothing"
+// is a property of the six segments rather than of the client.
 //
 // THERE IS TRANSPORT NOW, AND IT IS ONE FILE. `src/http/client.ts`, ADR-162.
 // THE SENTENCE THAT FOLLOWED IT IS CORRECTED RATHER THAN LEFT STANDING: it read
@@ -288,8 +290,11 @@ export type {
 // `test/surface.test.ts`'s third test asserts and which this pair of screens is
 // the closest any read surface has come to. Both of them RENDER a control for a
 // C-27 sensitive action and neither of them has a route to submit it to: every
-// such control carries a `submits_to`/`revokes_at` typed as the literal `null`,
-// because ../http/client.ts's `ApiClient` declares `get` and nothing else.
+// such control carries a `submits_to`/`revokes_at` typed as the literal `null`.
+// UNTIL ADR-219 THE REASON WAS THAT ../http/client.ts's `ApiClient` DECLARED
+// `get` AND NOTHING ELSE. It declares `post` now, and the `null`s did not move:
+// that entry ships the transport and wires no page, so the reason is the
+// segments' rather than the transport's and wiring one is a type change.
 // -----------------------------------------------------------------------------
 
 export { toWalletView, walletFraming } from './view/wallet.ts';
@@ -313,8 +318,9 @@ export type { ActiveSessionView, SecurityGap, SecurityView } from './view/sessio
 // that reads nothing at all.
 //
 // IT IS PRE-IDENTITY, so there is no identity-scoped read to perform and
-// API_CONTRACT gives this surface no GET: every endpoint behind it is a POST and
-// `./http/client.ts`'s `ApiClient` declares `get` and nothing else. What is
+// API_CONTRACT gives this surface no GET: every endpoint behind it is a POST,
+// and while `./http/client.ts` has carried a `post` since ADR-219, that entry
+// wires no page and this screen still calls nothing. What is
 // exported is the view model and the measurement it is built from, so a
 // consumer can read what this deployment can serve without importing a route
 // segment. NOTHING HERE PERFORMS OR PREPARES A WRITE: every control carries a

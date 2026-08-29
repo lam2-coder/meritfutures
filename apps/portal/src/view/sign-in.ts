@@ -247,14 +247,18 @@ export type SignInFactorView = {
    * today, and they would stop being false on different days, in different
    * repositories' worth of work.
    *
-   * ../../http/client.ts declares an `ApiClient` with `get` and nothing else,
-   * `test/surface.test.ts` fails on a second file in this application growing a
-   * `fetch(`, and ADR-083 section 3 with ADR-095 ruling 3 forbid a route handler
-   * or a Server Action here. Giving this application its first write verb is a
-   * transport ruling with a CSRF posture, an unsafe-method cookie policy and an
-   * idempotency question attached, and `app/security/source.ts` declined exactly
-   * that widening for `POST /sessions/:id/revoke` one screen over. This screen
-   * declines it on a heavier path: `POST /auth/verify` sets the session cookie.
+   * ../../http/client.ts declared an `ApiClient` with `get` and nothing else
+   * until ADR-219, which took the transport ruling and DELIBERATELY WIRED NO
+   * PAGE, so `post` exists and nothing on this screen calls it.
+   * `test/surface.test.ts` still fails on a second file in this application
+   * growing a `fetch(`, and ADR-083 section 3 with ADR-095 ruling 3 still forbid
+   * a route handler or a Server Action here.
+   *
+   * AND ON THIS SCREEN THE VERB IS NOT ENOUGH BY ITSELF, which is ADR-219
+   * section 6.2: `POST /auth/verify` answers with a `Set-Cookie`, and a session
+   * cookie can be written only in a Server Action or a Route Handler, the first
+   * of which ADR-138 section 3 refuses outright. So this field stays `null` for
+   * a reason that outlives the transport.
    */
   readonly submits_to: null;
 };

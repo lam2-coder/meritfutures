@@ -14,8 +14,8 @@
 // The reason it reads nothing is not a shortcut. SC-M4-01 is PRE-IDENTITY: a
 // person arriving at it has no session, so there is no identity-scoped read to
 // perform and API_CONTRACT gives this surface no GET at all. Every endpoint
-// behind the screen is a POST, and ../../http/client.ts's `ApiClient` declares
-// `get` and nothing else. THE PAGE IS THEREFORE STATIC AND CORRECTLY SO, on
+// behind the screen is a POST, and this file calls none of them. THE PAGE IS
+// THEREFORE STATIC AND CORRECTLY SO, on
 // `app/page.tsx`'s argument: it reads no trader data, and forcing it dynamic
 // would assert a requirement it does not have. `test/route-rendering.test.ts`
 // DERIVES that exemption rather than listing it, so nothing here has to be
@@ -97,16 +97,17 @@
 // a wrong answer is worse than an honest refusal. On the surface a trader meets
 // FIRST, the honest refusal is the whole product of this file.
 //
-// AND A SECOND REFUSAL WOULD STOP IT ANYWAY, INDEPENDENTLY OF ALL OF THE ABOVE.
-// All four routes are POST and ../../http/client.ts declares an `ApiClient` with
-// `get` and NOTHING ELSE, so this application cannot express any of the four
-// even for the one that answers. Giving the portal its first write verb is a
-// transport ruling with a CSRF posture, an unsafe-method cookie policy and an
-// idempotency question attached; `app/security/source.ts` declined exactly that
-// widening one screen over for `POST /sessions/:id/revoke`, and this screen's
-// write is heavier still because `POST /auth/verify` sets the session cookie.
-// `src/http/client.ts` is outside this segment either way. The two refusals are
-// independent and would lift on different days, which is why
+// A SECOND REFUSAL STOOD HERE INDEPENDENTLY AND ADR-219 HAS LIFTED HALF OF IT.
+// All four routes are POST and ../../http/client.ts declared an `ApiClient` with
+// `get` and NOTHING ELSE, so this application could not express any of the four
+// even for the one that answers. `post` exists from ADR-219, WHICH CHANGES
+// NOTHING ON THIS SCREEN: that entry ships the transport and wires no page, so
+// nothing here calls it, and the refusal above stands on its own. It is also
+// still not sufficient for sign-in, and ADR-219 section 6.2 is why: three
+// registered POSTs answer with a `Set-Cookie` and this deployable can deliver
+// none of them, because `next@16.3.2` permits a cookie write only in a Server
+// Action or a Route Handler and ADR-138 section 3 refuses the first outright.
+// The two refusals are independent and lift on different days, which is why
 // `view/sign-in.ts`'s `submits_to` is a separate field from `served` and not a
 // second spelling of it.
 //
