@@ -133,8 +133,15 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   same session source, so all three reduce to the port above BEFORE any door
   //   is reached. Each carries at least one further blocker of its own.
   //
-  //   `setAdminReadSource` says in its own header that what it is missing "is not
-  //   an authority, it is a shape" (`routes/admin-reads.ts:961`).
+  //   `setAdminReadSource` SAID IN ITS OWN HEADER that what it is missing "is
+  //   not an authority, it is a shape". THAT SENTENCE IS RETIRED (ADR-236) and
+  //   this entry quoted it three citations deep: the header said it, this list
+  //   quoted the header, ADR-171 section 4 read this list, and an ALLOCATION row
+  //   read ADR-171. Six of the port's seven reads have producers today and none
+  //   reaches `sqlExecutor`, so the missing thing IS the authority, which is the
+  //   inverse of what the four of them said. `test/admin-read-constructibility.test.ts`
+  //   derives that partition from source on every run, so the correction cannot
+  //   go stale the way the claim it replaces did.
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
   // (`packages/db/src/scoped-db.ts:267`) and ADR-165 ruled it gains no member, so
@@ -144,17 +151,25 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // moment the door has a caller that reaches a row.
   // ---------------------------------------------------------------------------
   setAdminReadSource:
-    'A READ SHAPE, and the door second. `routes/admin-reads.ts:961` states it: "WHAT IS MISSING ' +
-    'IS NOT AN AUTHORITY, IT IS A SHAPE", and `:967` "There is no join and no aggregate to ' +
-    'reach for." ' +
-    'None of the six methods is a projection of one table: `LiabilityResponse` needs a seven-day ' +
-    'forecast, a payout velocity, a reserve and a per-plan loss ratio, and `liability_snapshots` ' +
-    '(`packages/db/migrations/0009_ledger.sql:164`) carries `as_of`, `open_liability_cents` and ' +
-    'four exposure columns, plus `funded_accounts` ' +
-    '(`packages/db/migrations/0049_reserve_coverage_snapshots.sql:135`) -- ' +
-    'and is scope class `firm` (`packages/db/src/scope.ts:826`), so the EXISTING `firm` door ' +
-    'already reaches every column it has. A live adapter today would have to reach `sqlExecutor` ' +
-    'to smuggle in SQL the accessor deliberately does not offer, which the port refuses by name.',
+    'THE OPERATOR DOOR, AND THE READ SHAPE IS NO LONGER SECOND BECAUSE IT IS NO LONGER A ' +
+    'BLOCKER (ADR-236). This entry read "A READ SHAPE, and the door second", quoting a sentence ' +
+    'in the port that was true when written and is now measured false for SIX OF SEVEN methods: ' +
+    '`AdminReadSource` declares seven reads, `IMPLEMENTED_ADMIN_READS` names five, ' +
+    '`adminReadSourceParts` supplies `exportEvidence` as a sixth, and not one producer reaches ' +
+    '`sqlExecutor` or takes a handle off the accessor. ' +
+    'WHAT IT WAITS ON IS AN `AdminSourceBackend`, whose one method takes a `SystemTx`, and ' +
+    '`systemDb` is the only name in the accessor that yields one. `src/db.ts` declares no ' +
+    '`operator(fn)` and imports no `systemDb`, ADR-171 clause 1 refuses to add it, and ADR-171 ' +
+    'section 9 makes it takeable only by "the slice that lands an `AdminSessionSource` a ' +
+    'deployment can install". SO THIS PORT REDUCES TO `setAdminSessionSource` TOO, one step ' +
+    'further along than the four `principal(request)` backends do, and the SSO purchase blocks ' +
+    'SIX entries in this list rather than the four ADR-171 counted. ' +
+    'THE ONE THING HERE THAT IS NOT BEHIND THAT PURCHASE IS `readLiability`, which is UNBUILT ' +
+    'rather than blocked: its book reader, its seven-day horizon and its payout-velocity ' +
+    'evaluator all exist and nothing folds them into one body, and the figure holding that fold ' +
+    'is `eligible_next_7d`, whose last term is a `writeRuleState` implementation under ' +
+    '`apps/worker/**` or `packages/**`. `test/admin-read-constructibility.test.ts` holds every ' +
+    'count in this entry and derives each from source.',
   setAdminSessionSource:
     'THE ADMIN IDENTITY PROVIDER, AND NO DOOR ONTO THIS DATABASE COULD EVER SERVE IT. The port ' +
     'says so at `routes/admin-reads.ts:186-197`: C-08 hardware-key SSO and the D3 IP allowlist ' +
@@ -163,7 +178,13 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`admin_actions.actor` is `text NOT NULL` with no foreign key ' +
     '(`0017_events_and_audit.sql:77`) and no table in the registry holds an operator, a role or ' +
     'an operator session. ADR-171 rules this port never waited on the operator door, and that ' +
-    'THREE OTHER PORTS WAIT ON THIS ONE through `principal(request)`.',
+    'FOUR OTHER PORTS WAIT ON THIS ONE through `principal(request)` and A FIFTH WAITS ON IT ' +
+    'THROUGH A DOOR, WHICH IS SIX ENTRIES IN THIS LIST BEHIND ONE PURCHASE. The four are ' +
+    '`useAdminWriteBackend`, `useAdminPayoutBackend`, `useAdminWalletBackend` and ' +
+    '`useCertificateRevokeBackend`; ADR-171 said THREE, which was right before ' +
+    '`useCertificateRevokeBackend` existed. The fifth is `setAdminReadSource`, through ' +
+    'ADR-171 section 9 (ADR-236). `test/admin-read-constructibility.test.ts` derives ' +
+    'both counts from this file.',
   useAdminPayoutBackend:
     '`principal(request)` (`routes/admin-payouts.ts:390`), which resolves only through ' +
     '`AdminSessionSource` and is therefore blocked on `setAdminSessionSource` above. THIS IS THE ' +
