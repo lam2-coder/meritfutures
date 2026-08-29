@@ -25,8 +25,8 @@
 
 import type { ApiDb } from '../src/db.ts';
 
-/** Which door one call was made through. ADR-200 added the last two. */
-export type DbDoor = 'scoped' | 'firm' | 'resolution' | 'establishment';
+/** Which door one call was made through. ADR-200 added two and ADR-231 the last. */
+export type DbDoor = 'scoped' | 'firm' | 'resolution' | 'establishment' | 'publicLookup';
 
 /** One accessor call, as this file records it. */
 export interface DbCall {
@@ -63,6 +63,8 @@ export interface Replies {
   readonly insertUnder?: unknown[];
   /** What the RESOLUTION door answers. `undefined` is "nobody holds this address". */
   readonly resolvesTo?: unknown;
+  /** What the PUBLIC LOOKUP door answers. `undefined` is "no row carries this code". */
+  readonly publiclyLooksUpTo?: unknown;
   /** What `establish` answers, and what it throws instead. */
   readonly establishes?: unknown;
   readonly establishThrows?: unknown;
@@ -94,7 +96,7 @@ export interface Recorder {
  * wallet or catalogue adapter quietly acquire a capability its own suite is
  * asserting it does not use. A rejection names the file and the door.
  */
-export const NO_PRE_IDENTITY_DOORS: Pick<ApiDb, 'resolution' | 'establishment'> = {
+export const NO_PRE_IDENTITY_DOORS: Pick<ApiDb, 'resolution' | 'establishment' | 'publicLookup'> = {
   resolution: () =>
     Promise.reject(
       new Error('this fixture opens no resolution door: its subject resolves no address'),
@@ -102,6 +104,17 @@ export const NO_PRE_IDENTITY_DOORS: Pick<ApiDb, 'resolution' | 'establishment'> 
   establishment: () =>
     Promise.reject(
       new Error('this fixture opens no establishment door: its subject creates no identity'),
+    ),
+  // ADR-231's door is a THIRD member and it is NEVER-identity rather than
+  // pre-identity, so the constant's name is now one word wider than its
+  // contents. IT IS NOT RENAMED, and that is a deliberately small decision:
+  // five suites spread this object and none of them names the door, so a rename
+  // would put this slice's diff into four files it has no other business in
+  // while changing nothing any fixture asserts. What the set MEANS is "every
+  // door that opens without a session", and all three members are that.
+  publicLookup: () =>
+    Promise.reject(
+      new Error('this fixture opens no public lookup door: its subject reads no published token'),
     ),
 };
 
@@ -181,6 +194,24 @@ export function recordingDb(replies: Replies = {}): Recorder {
     },
     establishment: <T>(fn: (tx: never) => Promise<T>): Promise<T> =>
       fn(handle('establishment') as never),
+    // THE PUBLIC LOOKUP HANDLE ANSWERS `rowAt` AND NOTHING ELSE, which is the
+    // whole of `PublicLookupDb` (ADR-231). It is a SEPARATE literal from the
+    // resolution one rather than a shared handle with two brands, because the
+    // property a suite asserts here is WHICH DOOR was opened: the two doors
+    // reach different tables by different columns and a recorder that answered
+    // both from one object could not tell a caller that opened the wrong one.
+    // That the predicate reaches one row is `packages/db`'s and is not
+    // simulated here.
+    publicLookup: <T>(fn: (px: never) => Promise<T>): Promise<T> => {
+      const px = {
+        __brand: 'PublicLookupDb',
+        rowAt: (key: string, at: unknown) => {
+          calls.push({ door: 'publicLookup', verb: 'rowAt', key, address: at });
+          return Promise.resolve(replies.publiclyLooksUpTo);
+        },
+      };
+      return fn(px as never);
+    },
   };
 
   return { db, calls };

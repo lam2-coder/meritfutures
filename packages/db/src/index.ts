@@ -137,6 +137,36 @@ export {
   type ResolvableTableKey,
 } from './scoped-db.ts';
 
+// THE DOOR THAT EXERCISES A SCOPE NOBODY HOLDS (ADR-231).
+//
+// `publicLookupDb` IS THE FIFTH AND IT IS THE FIRST THAT READS AN `owned` ROW
+// FOR A CALLER WHO WILL NEVER BE ANYBODY. The four above it divide into "the
+// caller is somebody" and "the caller is about to be somebody"; `GET
+// /verify/:code` is neither, and a certificate a stranger cannot read is not a
+// certificate. Its vocabulary is `(table, column)` on `RESOLUTION_ADDRESS`'s
+// own shape, and the column half is the control: a member of
+// `PUBLIC_LOOKUP_ADDRESS` is an assertion that the named column is unguessable,
+// because the address is the entire predicate and there is no tenancy conjunct
+// to fall back on.
+//
+// IT IS EXPORTED WITH ITS CALLER RATHER THAN AHEAD OF ONE, which is ADR-197
+// finding 1 read as a rule instead of as a mistake: `resolutionDb` landed
+// unexported and a refusal string in `auth-backend.ts` cited a missing
+// pre-identity read that had existed for months. `apps/api/src/db.ts` takes this
+// value in the same slice that adds it.
+//
+// THERE IS NO `transaction` OVERLOAD FOR IT and that absence is the ruling. A
+// door open to a caller who has proved nothing reaches no write at any
+// authority, because `transaction` is the only thing in that file that makes a
+// statement a unit of work.
+export {
+  publicLookupDb,
+  PUBLIC_LOOKUP_ADDRESS,
+  type PublicLookupAddress,
+  type PublicLookupDb,
+  type PubliclyLookedUpTableKey,
+} from './scoped-db.ts';
+
 export { atLeast, atMost, isFilterTerm, isNull, type FilterTerm } from './scoped-db.ts';
 
 export {

@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->216<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->217<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9235,3 +9235,149 @@ Counts derived at reporting time: **33 of 33** gates after `gates.mjs generate`,
 Counts derived at reporting time: **33 of 33** gates, **20 of 20** invariants read off the runner's own last line, typecheck 0, lint 0, `format:check` clean, against an `origin/main` baseline at `15eae35` of **253 files / 6,292 passed / 6 skipped** reproduced before a line changed, now **253 / 6,312 / 6**. **`falsify.mjs` was NOT run**: it is not in this row's verification list and it mutates the working tree.
 
 **WHAT IS STILL OWED.** The `E2` read on `0070` and on the transition. **The founder's ruling on section 3**, which is whether a trader's own withdrawal above `$5,000` should wait for two people including their own. **The terminal edge**, which is the rail, `LT-06` and `LT-07`, and the ledger authority `apps/api` may not open: **this is the largest unbuilt thing on the money path and no row holds it.** **`POST /admin/identities/:identityId/wallet/withdrawals`**, the admin-originated arm [ADR-069](decisions/ADR-069.md) section 5 rules dual controlled at every amount, which does not exist. **`payload_hash`**, unread by the trigger and owed to that route. Dual control on `payouts.ts`, `admin-payouts.ts` and `wallet.ts`, which nobody holds.
+---
+
+## 2026-08-29 - Session 421: the verify page serves, and the enumeration control it rests on is asserted by the corpus and enforced by nothing ([ADR-231](decisions/ADR-231.md), proposed)
+
+**`GET /verify/:code` serves a real certificate row.** The ruling is
+[ADR-231](decisions/ADR-231.md), `proposed` and **UNSIGNED**, and **no migration
+number was taken**. `useVerifySource` leaves `wiring.test.ts`'s `BLOCKED` list
+and the wired count goes **6 to 7**.
+
+**THE SCOPE SYSTEM GAINS A FIFTH DOOR AND THE REGISTRY IS UNTOUCHED.**
+`db.publicLookup` reads one row of one table at one declared column, with the
+vocabulary `PUBLIC_LOOKUP_ADDRESS = { certificates: ['code'] }`
+([`scoped-db.ts:1697`](../packages/db/src/scoped-db.ts)): read only,
+non-transactional, brand disjoint from the other four, **no `transaction`
+overload**, taken on `resolutionDb`'s own shape one door along. `certificates`
+is still `owned` and still owned by the trader whose row it is; the class
+answers WHO OWNS A ROW and the new vocabulary answers WHAT AN UNAUTHENTICATED
+CALLER MAY ADDRESS ONE BY. **[`scope.ts`](../packages/db/src/scope.ts) was read
+and not written**, so this door and session 420's `pair` write were ruled
+separately and neither is in the other's diff.
+
+**THE CANDIDATE THE DISPATCH CALLED CHEAPEST WAS REFUSED AND THE REASON IS
+ARITHMETIC BEFORE IT IS TASTE.** Resolving the identity FROM the code needs a
+pre-identity read of `certificates` addressed by `code`, which is exactly the
+read that had no door, so it is this machinery **plus** a round trip. What the
+round trip buys is `db.scoped(identityId)`, an authority over every `owned` and
+`derived` table that identity has at seven verbs, held by an unauthenticated
+handler, in exchange for one column of one row it already had. It also gives
+`null` two meanings where `INV-M11-03` needs exactly one.
+
+**A TRANSCRIPTION GAP WAS FOUND BY BUILDING ON IT.** `certificates_code_uq` is a
+standalone `CREATE UNIQUE INDEX` in [`0020`](../packages/db/migrations/0020_public_surface.sql),
+a spelling drizzle's `getTableConfig` cannot see, so `schema.ts` never declared
+it and `refuseUnaddressed` refused `{ code }` as an address that can match more
+than one row. The database has bounded it since `0020`; only the transcription
+was behind. **Any table whose only key is a standalone unique index is
+unaddressable through every accessor**, and `keyed-accessor.test.ts` measures
+that set while asserting only that it is non-empty.
+
+**THE FINDING IS WORTH MORE THAN THE ROUTE AND IT IS NOT CLOSED.**
+`INV-M11-05` fixes `certificates.code` at **128 bits of entropy, no sequence**,
+and [`API_CONTRACT:1473`](architecture/API_CONTRACT.md) says the catalogue's
+rate budget *"is an enumeration budget on a 128-bit token and is deliberately
+not inherited here"*. **Nothing in this tree enforces any of it.** The column is
+`text NOT NULL` under one unique index with **no length bound and no alphabet
+bound**; the table's three `CHECK` constraints are payout kind, revocation
+completeness and deferral and none names `code`; **nothing in `apps`,
+`packages`, `e2e` or `scripts` inserts a `certificates` row at all**, so there is
+no minter either; and the per-IP, per-ASN rate limit the contract rows **does
+not exist** in this tree, `apps/api` declaring one runtime dependency,
+`fastify`. **Of the three enumeration controls the corpus names, this session
+made the third one real and the first two are absent.**
+
+**The route is safe to serve today only because there is nothing to enumerate.**
+What must not happen is that the issuer lands without the mint. **The issuance
+slice owes the 128-bit mint in the same slice**, and the column owes a `CHECK`
+that outlives every issuer.
+
+**THE FIX IS NOT IN THIS PULL REQUEST AND THE FENCE IS WHY.** A `CHECK` is a
+migration; row `231` names `packages/db/src/**` and `packages/db/test/**` and
+not `packages/db/migrations/**`, and unlike rows `230` and `232` it reserves no
+number. The dispatch asked for the fix here and **the fence won**, because
+widening a fence to finish and weakening a gate to pass it are the same move.
+**The gap is pinned as a red light instead**:
+[`public-lookup.test.ts`](../packages/db/test/public-lookup.test.ts) reads `0020`
+and asserts the absence, so the day a bound lands the case fails and sends its
+author to the ruling.
+
+**`code_hash` IS AN UNKEYED SHA-256 AND THE CHOICE IS THIS ENTRY'S**, `0025`
+naming no algorithm. Its justification is exactly as strong as the 128 bits
+above, which is said rather than assumed: `0025`'s own reason for hashing is
+that clear codes would make that table *"a list of valid tokens for anyone who
+reached it"*, and against a walkable code space an unkeyed digest is that list
+with one step added. **A keyed digest is named as the remedy and not taken**,
+because keying it today would add a required secret to defend a property that is
+either fine or broken at the mint.
+
+**SEVEN SEEDED DEFECTS WATCHED FIRING**, each restored from a byte copy with
+`diff` confirming identity, and **one fired before it was seeded**: the first
+draft of the vocabulary guard indexed the table list without checking the table,
+so a caller reaching past the type met a `TypeError` about `includes` rather
+than a refusal anybody could read. The suite found it on its first run.
+
+**`RI-15` AND `RI-16` TURNED RED ON SIX POINTERS** this session's own insertions
+moved: three into `scoped-db.ts` from [ALLOCATION](decisions/ALLOCATION.md), one
+from `payouts.ts`, and two into `schema.ts` from `wiring.test.ts`. All
+repointed, **no claim changed, only the numbers**, and **one had to be repointed
+twice** because a guard added after the first repair moved the file again. That
+is session 418's landmine arriving with a sharper edge: derive pointers last,
+and re-derive them after the LAST edit.
+
+**No `SD-nn`, no `GS-nnn`, no `CI-06` letter, no `VG` row, no new `RI-nn`, no
+migration, no edge case, no new enum member, no new canonical error code, no
+dependency, no float on a money path, no gate weakened and no fence widened to
+finish.** `scope.ts`, every migration, `API_CONTRACT.md`, `SECURITY.md`, `M11`
+and `MERIT_BUILD_MASTER_PROMPT.md` were **read and not written**. `apps/site`
+was not opened: no page in it renders this row.
+
+Counts derived at reporting time: **33 of 33** gates, **20 of 20** invariants
+read off the runner's own last line, typecheck 0, lint 0, `format:check` clean,
+**254 files / 6,319 passed / 6 skipped** against an `origin/main` baseline at
+`15eae35` of **253 / 6,292 / 6** reproduced by checking it out, a delta of **+1
+file and +27 cases**.
+
+**WHAT IS STILL OWED.** The founder decision in
+[ADR-231](decisions/ADR-231.md)'s approval block: what must be true before the
+first certificate is issued. **A `CHECK` on `certificates.code`**, which nobody
+holds. **The rate limit**, per IP and per ASN, which nothing in this tree can
+express. **The floor measurement**, which is the deployment's. **`OQ-M11-02`**,
+the `account_enforced` wording, still open. **A renderer**, which is what
+`GET /certificates/:code/image.png` now waits on rather than a door.
+
+**MERGED WITH `origin/main` AT `bfe690f` AFTER THE COUNTS ABOVE WERE TAKEN**,
+which brought [ADR-230](decisions/ADR-230.md), session 420's `pair` write door,
+and [ADR-232](decisions/ADR-232.md), session 422's approval edge. The counts
+above are facts about the `15eae35` baseline they name and are not rewritten.
+
+**SEVEN FILES CONFLICTED AND EACH WAS RESOLVED ON ITS MERITS.**
+[`verify.ts`](../apps/api/src/routes/verify.ts) and two of
+[`wiring.test.ts`](../apps/api/test/wiring.test.ts)'s four hunks took THIS
+branch, because main's side still says `lookup` reaches neither door and still
+carries the `useVerifySource` entry, and both stopped being true when the door
+landed. [`payouts.ts`](../apps/api/src/routes/payouts.ts) and the other two
+hunks were line-number drift on both sides. The four registers were unioned by
+key, so rows `419`, `420`, `421` and `422` all stand, and this file took main's
+collapse of the duplicated `gen:adr_count` paragraph to ONE copy, which is the
+`RI-12` repair `d120098` made after it reached twelve.
+
+**TWELVE CITATIONS WERE REPOINTED AND NO CLAIM CHANGED.** The two branches each
+inserted **212** lines into [`scoped-db.ts`](../packages/db/src/scoped-db.ts),
+so pointers from BOTH sides were stale: main's accounted for 420's insertion and
+not for this one's, and this branch's for neither of 420's nor 422's. **That is
+the merge-time form of this session's own landmine**, and the rule it produces is
+sharper than "derive pointers last": on a merge, re-derive both sides.
+
+**BOTH DOORS WERE VERIFIED BY READING RATHER THAN BY TYPECHECKING**, because a
+clean `tsc` cannot see an export that is simply gone. `insertAsParty` is at
+[`scoped-db.ts:2547`](../packages/db/src/scoped-db.ts), `publicLookupDb` at
+[`:1807`](../packages/db/src/scoped-db.ts) with `PUBLIC_LOOKUP_ADDRESS` at
+[`:1697`](../packages/db/src/scoped-db.ts), and `scopePredicate`'s `case 'pair'`
+still throws on every read.
+
+**Re-derived on the merge**: **33 of 33** gates, **20 of 20** invariants,
+typecheck 0, lint 0, `format:check` clean, **256 files / 6,385 passed / 6
+skipped** against a `bfe690f` baseline of **255 / 6,358 / 6** reproduced by
+checking it out, the same delta of **+1 file and +27 cases**.

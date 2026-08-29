@@ -956,8 +956,15 @@ export const certificates = pgTable('certificates', {
   signature: bytea('signature').notNull(),
   // SD-M11-01. INV-M11-06.
   signingKeyId: text('signing_key_id').notNull(),
-  // SD-M11-01.
-  code: text('code').notNull(),
+  // SD-M11-01. THE UNIQUE IS `certificates_code_uq`, AND IT IS TRANSCRIBED HERE
+  // RATHER THAN LEFT TO THE MIGRATION BECAUSE `uniqueKeys()` READS THIS FILE.
+  // `0020_public_surface.sql` declares the key as a separate `CREATE UNIQUE
+  // INDEX` rather than inline, which is a spelling `getTableConfig` cannot see,
+  // so this column sat in the set `keyed-accessor.test.ts` measures as "the
+  // transcription is behind the DDL somewhere" and `{ code }` was refused as an
+  // address that "can match more than one row". The database has bounded it to
+  // one row since 0020; only the transcription did not say so. ADR-231.
+  code: text('code').notNull().unique('certificates_code_uq'),
   // SD-M11-01. INV-M11-05.
   claimsSchemaVersion: integer('claims_schema_version').notNull().default(1),
   issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),

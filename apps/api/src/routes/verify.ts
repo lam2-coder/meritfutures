@@ -6,9 +6,15 @@
 // ADR-170 admitted this row into the contract and deliberately built nothing:
 // its foreclosure 9 says "no route is registered, no handler is written ... The
 // rows are the specification a later slice transcribes, and the `E2` read is
-// owed on the handlers". This file is that transcription. It takes NO ADR
-// number and NO migration number, because every decision below is already ruled
-// and the ones that are not are reported rather than taken.
+// owed on the handlers". This file is that transcription.
+//
+// THE TRANSCRIPTION TOOK NO ADR NUMBER AND THE WIRING TOOK ONE. It said "NO ADR
+// number and NO migration number, because every decision below is already ruled",
+// and that held for everything the handler does; it did not hold for what the
+// handler needed from `packages/db`, which was a scope-system authority that did
+// not exist. ADR-231 is that ruling and it is the only decision this file cites
+// that was taken for it. STILL NO MIGRATION NUMBER: the door reads, and 0020 and
+// 0025 already declare both tables it touches.
 //
 // THE NAME `VerifyResponse` IS ALSO `auth.ts`'s, FOR `POST /auth/verify`, AND
 // THE TWO ARE UNRELATED. The contract names this shape `VerifyResponse` in
@@ -135,34 +141,46 @@
 // reuses its `CertificateObservation` type rather than declaring a second one.
 //
 // -----------------------------------------------------------------------------
-// THE ROW CANNOT BE REACHED FROM THIS DEPLOYABLE, AND ONE ARM OF THE PORT CAN
+// THE ARM THAT COULD NOT REACH A DOOR NOW HAS ONE, AND THE DOOR IS ADR-231's
 // -----------------------------------------------------------------------------
-// `apps/api/src/db.ts` opens exactly two doors, `scoped(identityId, fn)` and
-// `firm(fn)`.
+// THIS SECTION USED TO SAY THE ROW COULD NOT BE SERVED, AND IT IS REPLACED
+// RATHER THAN DELETED BECAUSE IT WAS TRUE WHEN IT WAS WRITTEN. It read that
+// `apps/api/src/db.ts` opens exactly two doors and that `lookup` reaches
+// neither: this row is unauthenticated, so `scoped` has no identity to open
+// with, and `certificates` is scope class `owned` on `identity_id`, so
+// `FirmTableKey` excludes it and `firm` refuses the key at compile time. Every
+// clause of that is still a true sentence about those two doors.
 //
-//   `lookup` REACHES NEITHER. This row is unauthenticated, so `scoped` has no
-//   identity to open with, and `certificates` is scope class `owned` on
-//   `identity_id` (`packages/db/src/scope.ts:860`), so `FirmTableKey` excludes
-//   it and `firm` refuses the key at compile time.
+// WHAT CHANGED IS THAT THE SCOPE SYSTEM GAINED A THIRD ANSWER. `db.publicLookup`
+// reads ONE ROW of ONE TABLE at ONE COLUMN for a caller who will never be
+// anybody, and `PUBLIC_LOOKUP_ADDRESS` is `{ certificates: ['code'] }`. The
+// registry is untouched: `certificates` is still `owned` and still owned by the
+// trader whose row it is, because the class answers WHO OWNS A ROW and the new
+// vocabulary answers WHAT AN UNAUTHENTICATED CALLER MAY ADDRESS ONE BY.
 //
-//   `record` REACHES ONE. `certificate_verifications` is scope class `firm`
-//   (`packages/db/src/scope.ts:1375`), so `db.firm` can write it today.
+// SO ALL THREE ARMS ARE LIVE AND `databaseVerifySource` BELOW IS THE BACKEND.
+// `record` always could be: `certificate_verifications` is scope class `firm`
+// (`packages/db/src/scope.ts:1375`), so `db.firm` has been able to write it all
+// along, and `presentation` is deployment configuration rather than a read.
 //
-// A BACKEND WITH ONE LIVE ARM AND ONE THAT REJECTS IS WORSE THAN NO BACKEND, and
-// this file writes none for that reason: it would put a live-looking route in
-// front of the arm that refuses, and the arm that refuses is the one that
-// answers the caller. `usePayoutBackend`'s entry in `test/wiring.test.ts` states
-// the same refusal about a different pair of arms. The split is recorded in this
-// port's `BLOCKED` entry so the day `lookup` has a door the entry shrinks rather
-// than being rewritten.
+// THE REFUSAL THAT STOOD HERE IS KEPT AS A RULE RATHER THAN RETIRED AS A
+// CONDITION: a backend with one live arm and one that rejects is worse than no
+// backend, because it puts a live-looking route in front of the arm that answers
+// the caller, and this route answers `INV-M11-03`'s "no certificate with this
+// code", which is a claim about Merit's book rather than about a deployment.
+// That is why the wiring waited for the door instead of shipping half of it.
 // =============================================================================
+
+import { createHash } from 'node:crypto';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import type { ApiDb } from '../db.ts';
 import { defineRoutes } from '../registry.ts';
 import type { RouteHandler } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX } from '../server.ts';
 import type { Problem } from '../server.ts';
+import type { Environment } from '../surface.ts';
 import { CERTIFICATE_KINDS, REVOCATION_CLASSES, narrowClaims } from './certificates.ts';
 import type {
   CertificateClaims,
@@ -642,6 +660,142 @@ export function resetVerifySource(): void {
 /** The installed source. */
 export function currentVerifySource(): VerifySource {
   return source;
+}
+
+// -----------------------------------------------------------------------------
+// The adapter (ADR-231)
+// -----------------------------------------------------------------------------
+
+/**
+ * The variables a deployment sets to supply the copy and the floor.
+ *
+ * SEVEN VARIABLES AND NOT ONE JSON BLOB, so a deployment that forgot the
+ * `account_enforced` sentence is told which sentence it forgot. The refusal is
+ * `readPresentation`'s and this map only decides where the strings come from.
+ *
+ * FIVE OF THE SEVEN ARE COPY NO APPROVED DOCUMENT FIXES. M11 section 7
+ * describes what each sentence says and `OQ-M11-02` records that the
+ * `account_enforced` wording is a legal and brand question still owed, so a
+ * default written here would be this file answering it in a string literal.
+ * `INV-M11-03`'s unknown wording is the one sentence this file DOES fix, and it
+ * is `UNKNOWN_STATEMENT` above rather than a variable, so no deployment can
+ * override it into "this is fake".
+ */
+export const VERIFY_PRESENTATION_VARS = {
+  valid: 'MERIT_VERIFY_STATEMENT_VALID',
+  fact_untrue: 'MERIT_VERIFY_STATEMENT_FACT_UNTRUE',
+  account_enforced: 'MERIT_VERIFY_STATEMENT_ACCOUNT_ENFORCED',
+  issued_in_error: 'MERIT_VERIFY_STATEMENT_ISSUED_IN_ERROR',
+  trader_request: 'MERIT_VERIFY_STATEMENT_TRADER_REQUEST',
+} as const satisfies Readonly<Record<(typeof STATEMENT_KEYS)[number], string>>;
+
+/** `INV-M11-04`'s simulated-environment disclosure, rendered on every card. */
+export const VERIFY_DISCLOSURE_VAR = 'MERIT_VERIFY_DISCLOSURE';
+
+/** `INV-M11-05`'s constant-time floor, in whole milliseconds. */
+export const VERIFY_FLOOR_MS_VAR = 'MERIT_VERIFY_FLOOR_MS';
+
+/**
+ * The configured copy and floor, from the environment.
+ *
+ * NOTHING IS DEFAULTED AND AN UNSET VARIABLE IS A REFUSAL. `readPresentation`
+ * runs over whatever this returns and throws `VerifyPresentationError` on the
+ * first blank, which the handler answers 503 for EVERY code identically because
+ * it is read before the lookup. That is the shape ADR-226 ruled for an absent
+ * Turnstile secret: an unconfigured control refuses rather than passing.
+ *
+ * `floor_ms` ARRIVES AS A STRING AND IS PARSED HERE RATHER THAN COERCED.
+ * `Number('')` is `0` and `Number(undefined)` is `NaN`, and both would reach
+ * `readPresentation` as "not a positive whole number", so the parse is written
+ * to make an absent variable and a nonsense one arrive as the same refusal.
+ * NO UPPER BOUND IS INVENTED: no approved document gives one, and ADR-170
+ * section 4.2 rules the value is a MEASURED p99 the deployment owes.
+ */
+export function environmentVerifyPresentation(env: Environment): unknown {
+  const statements: Record<string, unknown> = {};
+  for (const [key, variable] of Object.entries(VERIFY_PRESENTATION_VARS))
+    statements[key] = env[variable];
+  const floor = env[VERIFY_FLOOR_MS_VAR];
+  return {
+    statements,
+    disclosure: env[VERIFY_DISCLOSURE_VAR],
+    floor_ms: floor === undefined || floor.trim() === '' ? undefined : Number(floor),
+  };
+}
+
+/**
+ * `certificate_verifications.code_hash` and `ip_hash`, both `bytea NOT NULL`
+ * and `bytea NULL`.
+ *
+ * SHA-256, UNKEYED, AND THE CHOICE IS THIS FILE'S BECAUSE NO APPROVED DOCUMENT
+ * MAKES IT. `0025_reserved_sequence.sql` requires digests and names no
+ * algorithm; `idempotency.ts:180` takes the same one over a different input,
+ * and a second algorithm in one deployable would be a vocabulary nothing shares.
+ *
+ * IT IS UNKEYED WHERE `auth-backend.ts`'s OTP DIGEST IS HMAC, and the
+ * difference is the input rather than the taste. That digest keys because an
+ * OTP is six digits and a dump of unkeyed digests is a rainbow table; this one
+ * is taken over a token `INV-M11-05` fixes at 128 bits, where a preimage search
+ * is the same search as guessing the code. THAT ARGUMENT IS EXACTLY AS STRONG
+ * AS THE CODE IS, WHICH IS ADR-231 SECTION 6's FINDING ARRIVING ONE LAYER DOWN:
+ * 0025's own reason for hashing is that storing codes in the clear "would make
+ * this table a list of valid tokens for anyone who reached it", and against a
+ * walkable code space an unkeyed digest is that list with one step added.
+ */
+function digest(value: string): Uint8Array {
+  return new Uint8Array(createHash('sha256').update(value, 'utf8').digest());
+}
+
+/**
+ * The source, reading through the accessor.
+ *
+ * `db.publicLookup` FOR THE READ AND `db.firm` FOR THE WRITE, AND THE SPLIT IS
+ * THE TWO TABLES' SCOPE CLASSES RATHER THAN A PREFERENCE. `certificates` is
+ * `class: 'owned'` on `identity_id`, so no door this deployable held could read
+ * it for an unauthenticated caller until ADR-231 built the fifth;
+ * `certificate_verifications` is `class: 'firm'` and has been writable through
+ * `db.firm` all along, which is why the port's `BLOCKED` entry named one arm of
+ * three rather than two.
+ *
+ * THE READ CARRIES NO IDENTITY AND THE WRITE CARRIES NO CODE. Those are the two
+ * halves of this endpoint's whole disclosure posture: `toVerifyRow` rebuilds the
+ * published fields and drops `identity_id`, `id`, `payout_request_id` and
+ * `revoked_reason` structurally, and {@link digest} means the log holds a
+ * pseudonym rather than a token. `0025`'s own comment asks for the second and
+ * `ADR-170` foreclosure 5 asks for the first.
+ *
+ * THE WRITE IS ONE STATEMENT IN ITS OWN TRANSACTION AND IS NOT COMPOSED WITH
+ * THE READ. It could not be: the public door has no `transaction` overload by
+ * ADR-231's own ruling. The handler is what orders them, and it orders the write
+ * BEFORE the response and INSIDE the floor, so a rejected write fails the lookup
+ * rather than serving it unmetered.
+ */
+export function databaseVerifySource(db: ApiDb, env: Environment = process.env): VerifySource {
+  return {
+    lookup: async (code) => {
+      const row = await db.publicLookup((px) => px.rowAt('certificates', { code }));
+      // `undefined` IS THE ACCESSOR'S "NO ROW" AND `null` IS THE PORT'S, and
+      // the translation happens here rather than in the handler because the
+      // handler's `null` is `INV-M11-03`'s claim about Merit's book.
+      return row === undefined || row === null ? null : toVerifyRow(row);
+    },
+    record: (observation) =>
+      db.firm(async (tx) => {
+        await tx.insert('certificateVerifications', {
+          codeHash: digest(observation.code),
+          result: observation.result,
+          // `ip_hash bytea NULL`, and a caller whose address this deployable
+          // could not observe writes NULL rather than a digest of the empty
+          // string, which would be one shared bucket every such row collided in.
+          ipHash: observation.ip === null ? null : digest(observation.ip),
+          // `user_agent_class` IS NOT SENT AT ALL. The column's own comment is
+          // "a class, never the string" and no approved document enumerates the
+          // classes, so a taxonomy invented here would be a vocabulary nothing
+          // else shares. The column is nullable; the gap is reported.
+        });
+      }),
+    presentation: () => readPresentation(environmentVerifyPresentation(env)),
+  };
 }
 
 // -----------------------------------------------------------------------------

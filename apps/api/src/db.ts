@@ -33,7 +33,7 @@
 // moved, with every gate in the repository green over it. ADR-171.
 //
 // -----------------------------------------------------------------------------
-// FOUR DOORS, AND THE ONE THAT IS STILL ABSENT IS THE ONE ADR-171 REFUSED
+// FIVE DOORS, AND THE ONE THAT IS STILL ABSENT IS THE ONE ADR-171 REFUSED
 // -----------------------------------------------------------------------------
 // `scoped(identityId, fn)`  every read and write a request handler makes on
 //                           behalf of the caller it resolved.
@@ -49,6 +49,19 @@
 //                           exported it.
 // `establishment(fn)`       the identity and its first login, in ONE unit of
 //                           work. ADR-196 clause 2, ADR-197 ruling 3.
+// `publicLookup(fn)`        the NEVER-IDENTITY READ. One table, one address:
+//                           `certificates` by `code`. ADR-231. It is the first
+//                           door here that reads a row an identity OWNS for a
+//                           caller who will never be anybody, and the code is
+//                           what authorises it.
+//
+// THE FIFTH IS NOT A WIDENING OF THE FIRST AND THE DIFFERENCE IS WORTH THE
+// SENTENCE. `scoped` grants every `owned` and `derived` table that identity
+// has, at seven verbs; `publicLookup` grants ONE ROW of ONE TABLE at ONE
+// COLUMN, read only, and cannot be composed into a transaction at all. ADR-231
+// section 4 refused the design that would have handed the first to
+// `GET /verify/:code` by resolving the identity from the code, which is exactly
+// the trade this line does not make.
 //
 // THE LAST TWO ARE ADR-200 AND THEY DO NOT OVERTURN ADR-171 CLAUSE 1, WHICH IS
 // ABOUT A DIFFERENT DOOR AND A DIFFERENT ARGUMENT. That clause refuses
@@ -106,8 +119,22 @@
 // tried to prove it here would be agreeing with its own fake.
 // =============================================================================
 
-import { establishmentDb, firmDb, resolutionDb, scopedDb, transaction } from '@merit/db';
-import type { EstablishmentTx, FirmTx, IdentityId, ResolutionDb, ScopedTx } from '@merit/db';
+import {
+  establishmentDb,
+  firmDb,
+  publicLookupDb,
+  resolutionDb,
+  scopedDb,
+  transaction,
+} from '@merit/db';
+import type {
+  EstablishmentTx,
+  FirmTx,
+  IdentityId,
+  PublicLookupDb,
+  ResolutionDb,
+  ScopedTx,
+} from '@merit/db';
 
 /** Raised when a door is asked for something it must not guess about. */
 export class DbDoorError extends Error {
@@ -135,7 +162,7 @@ export function isIdentityId(value: string): boolean {
 }
 
 /**
- * The four doors this deployable opens onto the trader database.
+ * The five doors this deployable opens onto the trader database.
  *
  * Each takes the whole unit of work rather than handing back a handle, so a
  * transaction cannot outlive the function that opened it and no caller has a
@@ -179,6 +206,21 @@ export interface ApiDb {
    * statement that writes the first is the statement that writes the second.
    */
   establishment<T>(fn: (tx: EstablishmentTx) => Promise<T>): Promise<T>;
+
+  /**
+   * The never-identity read: `certificates` by `code`, one row or none.
+   *
+   * IT TAKES THE UNIT OF WORK AND NOT A HANDLE, on `resolution`'s precedent and
+   * for the same property: the handle stays inside the call, so no adapter can
+   * hold one and reach past its own function. `packages/db` gives it no
+   * `transaction` overload either, so a caller who has proved nothing reaches
+   * no write at any authority.
+   *
+   * THE CODE IS THE CREDENTIAL AND THAT IS THE WHOLE AUTHORISATION. There is no
+   * session, no reason and no tenancy conjunct; `PUBLIC_LOOKUP_ADDRESS` is the
+   * only thing bounding what this handle can name. ADR-231.
+   */
+  publicLookup<T>(fn: (px: PublicLookupDb) => Promise<T>): Promise<T>;
 }
 
 /**
@@ -212,5 +254,12 @@ export const LIVE_DB: ApiDb = {
   },
   establishment<T>(fn: (tx: EstablishmentTx) => Promise<T>): Promise<T> {
     return transaction(establishmentDb(), fn);
+  },
+  // NO `transaction` HERE EITHER, AND FOR A HARDER REASON THAN `resolution`'s.
+  // The accessor offers no overload for this handle, and the absence is ADR-231's
+  // ruling rather than an omission: this is the one door in this file that opens
+  // for a caller who has proved nothing at all.
+  publicLookup<T>(fn: (px: PublicLookupDb) => Promise<T>): Promise<T> {
+    return fn(publicLookupDb());
   },
 };

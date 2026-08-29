@@ -1609,6 +1609,218 @@ export function resolutionDb(): ResolutionDb {
 }
 
 // =============================================================================
+// THE PUBLIC LOOKUP: AN `owned` ROW READ BY NOBODY, BECAUSE THE ADDRESS IS THE
+// CREDENTIAL (ADR-231)
+// =============================================================================
+// EVERY DOOR ABOVE ANSWERS "WHAT MAY THIS CALLER DO", INCLUDING THE ONE THAT
+// TAKES NO IDENTITY. `firmDb()` reads rows nobody owns; `resolutionDb()` reads
+// one row of one table to find out WHO the caller is. `GET /verify/:code` is
+// neither. It reads a row an identity DOES own, on behalf of a caller who will
+// never be anybody, and it is correct that it does: a certificate is a claim
+// Merit published, and the person the trader shows it to is a stranger by
+// construction.
+//
+// THE SCOPE SYSTEM HAD NO VOCABULARY FOR THAT AND THIS IS THE ONE IT GETS.
+// `certificates` is `class: 'owned'` on `identity_id`, so `ScopedTableKey`
+// includes it and `FirmTableKey` does not: `db.scoped` needs an identity this
+// route cannot have and `db.firm` refuses the key at compile time. That is not
+// a gap in the registry. The registry answers WHO OWNS A ROW and it answers it
+// correctly here; what was missing is a separate answer to WHAT AN
+// UNAUTHENTICATED CALLER MAY ADDRESS A ROW BY.
+//
+// -----------------------------------------------------------------------------
+// THE VOCABULARY IS `(TABLE, COLUMN)` AND THE COLUMN HALF IS THE WHOLE CONTROL
+// -----------------------------------------------------------------------------
+// This is `RESOLUTION_ADDRESS`'s own two-part shape and it is taken for the
+// same reason, one table along. A table-only opt-in would admit EVERY unique
+// key the table declares, and `certificates` declares two: `id` and `code`.
+// Admitting `id` would defeat the reason the two columns are distinct at all --
+// `0020_public_surface.sql` keeps `code` separate "so the public token can be
+// ROTATED AFTER AN INCIDENT" -- because a holder who kept the immutable key can
+// still correlate the certificate after the token they were told to forget has
+// changed. Naming `id` here is `TS2353` at the call site and a throw behind it.
+//
+// A MEMBER OF THIS LIST IS AN ASSERTION THAT THE NAMED COLUMN IS UNGUESSABLE,
+// and that is the sentence a later member has to be able to say. The address is
+// the entire predicate: there is no tenancy conjunct, no reason, and no session,
+// so whoever can WRITE the value can READ the row. `certificates.code` is here
+// because `INV-M11-05` fixes it at "128 bits of entropy, no sequence" and
+// M11 section 9's `AS-M11-04` is the scenario written about exactly this door.
+//
+// THAT ASSERTION IS NOT MECHANICALLY TRUE IN THIS TREE TODAY AND ADR-231
+// SECTION 6 SAYS SO RATHER THAN LEAVING IT TO BE FOUND. `certificates.code` is
+// `text NOT NULL` under a unique index and carries NO length bound and NO
+// alphabet bound in DDL, and nothing in this repository issues a certificate,
+// so no minter exists to hold `INV-M11-05` either. The invariant is a corpus
+// commitment with no enforcement anywhere. It is recorded here because this door
+// is the surface that would pay for it.
+//
+// -----------------------------------------------------------------------------
+// WHAT THIS DOOR DELIBERATELY IS NOT
+// -----------------------------------------------------------------------------
+// IT IS NOT A `SystemDb` WITH A NICER NAME. `SystemTx` is generic over
+// `TableKey` at seven verbs; this reads ONE ROW of ONE TABLE at ONE COLUMN and
+// has no insert, no update, no delete, no lock and no `sqlExecutor`.
+//
+// IT IS NOT COMPOSABLE. There is no `transaction(publicLookupDb(), ...)`
+// overload, on `resolutionDb`'s precedent and for a stronger reason: every write
+// in this file is reached through `transaction`, so a handle with no overload
+// cannot participate in a unit of work at any authority. A door open to a caller
+// who has proved nothing must not be able to write.
+//
+// IT IS NOT A ROUTE INTO `db.scoped`. Resolving `identity_id` from the code and
+// then opening the scoped door was the cheaper-looking design and ADR-231
+// section 4 refuses it: it needs THIS read to happen first in any case, so it is
+// this machinery plus a second round trip, and what the second trip buys is an
+// authority over every `owned` and `derived` table that identity has -- payouts,
+// accounts, wallet entries, KYC -- handed to an unauthenticated handler in
+// exchange for one column of one row it already held.
+
+/**
+ * The tables an unauthenticated caller may read ONE ROW of BY PRESENTING ITS
+ * TOKEN.
+ *
+ * A CLOSED LIST OF ONE, AND JOINING IT IS A DIFF ON THIS FILE with an argument
+ * attached. The argument a member owes is not "this row is public"; it is "the
+ * column below cannot be guessed", because the address is the only thing
+ * standing between a stranger and the row.
+ */
+export type PubliclyLookedUpTableKey = 'certificates';
+
+/**
+ * The columns each publicly readable table may be addressed BY.
+ *
+ * `code` AND NEVER `id`. See this section's header: the two columns exist
+ * separately so the public one can be rotated, and admitting the immutable one
+ * would spend that property for nothing.
+ */
+export const PUBLIC_LOOKUP_ADDRESS = { certificates: ['code'] } as const;
+
+/** The address shape one publicly readable table accepts, from the list above. */
+export type PublicLookupAddress<K extends PubliclyLookedUpTableKey> = Readonly<
+  Record<(typeof PUBLIC_LOOKUP_ADDRESS)[K][number], unknown>
+>;
+
+/**
+ * Refuse a public address that is not EXACTLY the declared one.
+ *
+ * BOTH DIRECTIONS, and they are `refuseUnresolvableAddress`'s two failures with
+ * a harder consequence. A column the list does not carry is a caller reaching
+ * past the vocabulary; a declared column the caller omitted is a WIDER predicate
+ * than this door was opened for, and on a one-column list it is the empty
+ * address, which at an authority carrying no tenancy is the whole table.
+ */
+function refusePublicAddress(
+  key: PubliclyLookedUpTableKey,
+  at: Readonly<Record<string, unknown>>,
+): void {
+  // THE TABLE IS REFUSED BEFORE THE COLUMN, AND BY NAME. The type already
+  // excludes every unregistered key, and a type is gone by the time this runs:
+  // a caller that reached here through an `any` or a cast would otherwise index
+  // `undefined` and get a `TypeError` about `includes`, which is a refusal
+  // nobody can read as one. The suite reaches past the type on purpose, and
+  // this is the sentence it meets.
+  const declared: readonly string[] | undefined = PUBLIC_LOOKUP_ADDRESS[key];
+  if (declared === undefined)
+    throw new Error(
+      `${String(key)} is not publicly readable: no column of that table is declared a public ` +
+        `lookup address. \`PUBLIC_LOOKUP_ADDRESS\` names ` +
+        `[${Object.keys(PUBLIC_LOOKUP_ADDRESS).join(', ')}], and joining it is a diff on this ` +
+        'file asserting that the column named cannot be guessed.',
+    );
+  const permitted: readonly string[] = declared;
+  for (const named of Object.keys(at)) {
+    if (permitted.includes(named)) continue;
+    throw new Error(
+      `"${named}" is not a public lookup address on ${key}. This door is open to a caller who ` +
+        `has proved nothing, so it reaches [${permitted.join(', ')}] and nothing else: the ` +
+        'address is the credential and a column that is not one must not be an address.',
+    );
+  }
+  for (const required of permitted) {
+    if (Object.prototype.hasOwnProperty.call(at, required)) continue;
+    throw new Error(
+      `a public lookup of ${key} must name "${required}". The declared address is ` +
+        `[${permitted.join(', ')}] and a subset of it is a wider predicate than this door grants.`,
+    );
+  }
+}
+
+/**
+ * The reader an unauthenticated caller's request handler uses.
+ *
+ * READ ONLY, NON-TRANSACTIONAL, ONE ROW, ONE TABLE, ONE ADDRESS. Its brand is
+ * disjoint from the other four, so it is not assignable to a `ScopedDb`, a
+ * `SystemDb`, a `FirmDb` or a `ResolutionDb`, and none of them is assignable to
+ * it.
+ *
+ * WHAT IT COSTS, STATED RATHER THAN LEFT TO BE FOUND. The row comes back whole,
+ * so every column of `certificates` reaches the handler including
+ * `revoked_reason`, which `0020` marks INTERNAL free text, and `identity_id`.
+ * A door cannot project, because a projection is a statement about what one
+ * caller renders and this is an authority. `routes/verify.ts` is where the
+ * withholding lives and `toVerifyRow` is the structural form of it: the response
+ * is rebuilt field by field rather than spread, so a column added to this table
+ * tomorrow cannot ride out onto the public page.
+ */
+export interface PublicLookupDb {
+  readonly __brand: 'PublicLookupDb';
+  /** ONE row, or `undefined`. The address is the declared one and no other. */
+  rowAt<K extends PubliclyLookedUpTableKey>(key: K, at: PublicLookupAddress<K>): Promise<unknown>;
+}
+
+/**
+ * THE ONLY PRODUCER OF A PUBLIC LOOKUP PREDICATE, and the seam the suite
+ * asserts through.
+ *
+ * IT IS A SEPARATE FUNCTION FOR `resolutionPredicate`'s REASON. The handle
+ * itself reads `client()`, which throws when `DATABASE_URL` is unset, so a
+ * refusal asserted only through `publicLookupDb().rowAt` would be a refusal no
+ * suite in this workspace could reach: `ci.yml`'s `integration` job has no
+ * services block.
+ *
+ * THERE IS NO TENANCY CONJUNCT AND THERE IS NO CORRECT ONE, which is what makes
+ * the vocabulary the whole control rather than half of it.
+ */
+export function publicLookupPredicate<K extends PubliclyLookedUpTableKey>(
+  key: K,
+  at: PublicLookupAddress<K>,
+): SQL {
+  const address = at as Readonly<Record<string, unknown>>;
+  refusePublicAddress(key, address);
+  // THE FOLD TO `schema.ts`. The vocabulary says which column is permitted;
+  // this says the database agrees that column names ONE row. A later member
+  // added over a non-unique column would be a many-row read at an authority
+  // carrying no tenancy, which is the widest failure this file has.
+  refuseUnaddressed(key, address);
+  return addressPredicate(key, address);
+}
+
+/**
+ * The public reader. No identity, because there will never be one.
+ *
+ * IT TAKES NO REASON, on `firmDb()`'s and `resolutionDb()`'s shared precedent:
+ * the question a reason answers is "why are you reading rows that are not
+ * yours", and here the vocabulary answers it in advance. There is one table and
+ * one address and no second thing this handle could be doing.
+ */
+export function publicLookupDb(): PublicLookupDb {
+  return {
+    __brand: 'PublicLookupDb',
+    async rowAt<K extends PubliclyLookedUpTableKey>(
+      key: K,
+      at: PublicLookupAddress<K>,
+    ): Promise<unknown> {
+      const found = (await client()
+        .select()
+        .from(TABLES[key] as PgTable)
+        .where(publicLookupPredicate(key, at))) as unknown[];
+      return oneOrNone(key, found);
+    },
+  };
+}
+
+// =============================================================================
 // ESTABLISHING AN IDENTITY (ADR-197)
 // =============================================================================
 // THE THIRD CONSTRUCTION, WHICH THE SECTION ABOVE NAMED AND DECLINED TO BUILD.

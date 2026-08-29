@@ -169,18 +169,34 @@ function namedBindings(clause: string): string[] {
 // 1. The door count, which is the diff ADR-171 refuses
 // -----------------------------------------------------------------------------
 
-test('there are exactly four doors, and the one ADR-171 refused is still not one of them', () => {
+test('there are exactly five doors, and the one ADR-171 refused is still not one of them', () => {
   // `LIVE_DB` IS TYPED `ApiDb`, SO THE INTERFACE IS CHECKED THROUGH ITS ONE
   // IMPLEMENTATION. A method added to the interface and not to this value does
   // not compile, and a method added to both lands here. That is why the case
   // reads a runtime object rather than parsing a type: the type has a witness.
-  // FOUR SINCE ADR-200, AND THE ORDER IS THE DECLARATION'S. `resolution` is
-  // ADR-126's pre-identity read and `establishment` is ADR-197's one-verb write,
-  // both narrowed AT THE DOOR by a type in `packages/db` rather than by a
-  // convention here: `ResolutionDb` reads one row of one table at one address
-  // and has no `transaction` overload at all, and `EstablishmentTx` carries
-  // `establish` and no other verb, no key vocabulary and no `sqlExecutor`.
-  expect(Object.keys(LIVE_DB)).toEqual(['scoped', 'firm', 'resolution', 'establishment']);
+  // FOUR SINCE ADR-200 AND FIVE SINCE ADR-231, AND THE ORDER IS THE
+  // DECLARATION'S. `resolution` is ADR-126's pre-identity read and
+  // `establishment` is ADR-197's one-verb write, both narrowed AT THE DOOR by a
+  // type in `packages/db` rather than by a convention here: `ResolutionDb` reads
+  // one row of one table at one address and has no `transaction` overload at
+  // all, and `EstablishmentTx` carries `establish` and no other verb, no key
+  // vocabulary and no `sqlExecutor`.
+  //
+  // `publicLookup` IS THE FIFTH AND IT IS NARROWED THE SAME WAY. `PublicLookupDb`
+  // reads one row of one table at one column, has no `transaction` overload, and
+  // its vocabulary is `PUBLIC_LOOKUP_ADDRESS`, which is `{ certificates:
+  // ['code'] }` and grows only by a diff on `packages/db` with an argument
+  // attached. It is the first door here that reads a row an identity OWNS for a
+  // caller who will never be anybody, and ADR-231 section 4 records what it was
+  // built INSTEAD OF: resolving the identity from the code and opening `scoped`
+  // with it, which would have reached that identity's whole book.
+  expect(Object.keys(LIVE_DB)).toEqual([
+    'scoped',
+    'firm',
+    'resolution',
+    'establishment',
+    'publicLookup',
+  ]);
 
   // NOT `operator`, written as its own expectation rather than left implied by
   // the line above, because a reader of a failing suite should see the word
@@ -206,6 +222,12 @@ test('there are exactly four doors, and the one ADR-171 refused is still not one
   // have and `system` was refused for having.
   expect(LIVE_DB.resolution.length).toBe(1);
   expect(LIVE_DB.establishment.length).toBe(1);
+  // AND THE FIFTH. A `publicLookup(code, fn)` would be a door whose first
+  // argument is a value the CALLER supplies, which on the one door that opens
+  // for an unauthenticated request is the shape worth pinning hardest: the
+  // address belongs inside the unit of work where `publicLookupPredicate`
+  // refuses it, and never in the door's own signature.
+  expect(LIVE_DB.publicLookup.length).toBe(1);
 });
 
 // -----------------------------------------------------------------------------
@@ -213,7 +235,7 @@ test('there are exactly four doors, and the one ADR-171 refused is still not one
 //    would become reachable
 // -----------------------------------------------------------------------------
 
-test('src/db.ts imports five values from the accessor and systemDb is not one of them', () => {
+test('src/db.ts imports six values from the accessor and systemDb is not one of them', () => {
   const accessor = accessorPackageName();
   const values = importsIn(join(APP, 'src', 'db.ts'))
     .filter((entry) => entry.specifier === accessor && !entry.typeOnly)
@@ -226,12 +248,20 @@ test('src/db.ts imports five values from the accessor and systemDb is not one of
   // obstacle and this list is: with case 3 below making this the only file that
   // may import the accessor at all, the two together are the mechanical form of
   // "this deployable cannot open a door at the operator reason".
-  // FIVE SINCE ADR-200. The two added are CONSTRUCTORS FOR THE TWO DOORS ABOVE
-  // and neither widens what this file can reach: `resolutionDb()` yields a
-  // reader over `users` by `email`, and `establishmentDb()` yields a handle
-  // whose transaction has one verb. `systemDb` is still absent and that is the
-  // name this case exists for.
-  expect(values).toEqual(['establishmentDb', 'firmDb', 'resolutionDb', 'scopedDb', 'transaction']);
+  // FIVE SINCE ADR-200 AND SIX SINCE ADR-231. Every name added has been a
+  // CONSTRUCTOR FOR ONE NARROW DOOR and none of them widens what this file can
+  // reach: `resolutionDb()` yields a reader over `users` by `email`,
+  // `establishmentDb()` yields a handle whose transaction has one verb, and
+  // `publicLookupDb()` yields a reader over `certificates` by `code`.
+  // `systemDb` is still absent and that is the name this case exists for.
+  expect(values).toEqual([
+    'establishmentDb',
+    'firmDb',
+    'publicLookupDb',
+    'resolutionDb',
+    'scopedDb',
+    'transaction',
+  ]);
 });
 
 // -----------------------------------------------------------------------------
@@ -241,21 +271,24 @@ test('src/db.ts imports five values from the accessor and systemDb is not one of
 /**
  * Every export of `packages/db` that YIELDS A HANDLE.
  *
- * The FIVE constructors plus the function that turns one into a transaction with
+ * The SIX constructors plus the function that turns one into a transaction with
  * the write methods attached. Nothing else in that package can reach a
  * connection: `atMost` and its sibling terms mint frozen values,
  * `normalizedEmail` is a pure function over a string, `IdentityAlreadyEstablished`
  * is an error class, and the rest of the surface is types.
  *
- * `resolutionDb` AND `establishmentDb` ARE ON THIS LIST RATHER THAN EXEMPT FROM
- * IT. They are narrow, and narrow is not the same as harmless: each opens a real
- * connection at an authority holding no identity, so the property this case
- * asserts -- that `src/db.ts` is the only file that can obtain one -- is the
- * property that matters most about them.
+ * `resolutionDb`, `establishmentDb` AND `publicLookupDb` ARE ON THIS LIST RATHER
+ * THAN EXEMPT FROM IT. They are narrow, and narrow is not the same as harmless:
+ * each opens a real connection at an authority holding no identity, so the
+ * property this case asserts -- that `src/db.ts` is the only file that can
+ * obtain one -- is the property that matters most about them. `publicLookupDb`
+ * is the one where it matters most of all, because it is the only one whose
+ * caller is an unauthenticated request (ADR-231).
  */
 const HANDLE_NAMES = [
   'establishmentDb',
   'firmDb',
+  'publicLookupDb',
   'resolutionDb',
   'scopedDb',
   'systemDb',
@@ -310,7 +343,14 @@ test('only src/db.ts takes a handle off the accessor, and the other importer tak
       'isNull',
       'normalizedEmail',
     ],
-    'src/db.ts': ['establishmentDb', 'firmDb', 'resolutionDb', 'scopedDb', 'transaction'],
+    'src/db.ts': [
+      'establishmentDb',
+      'firmDb',
+      'publicLookupDb',
+      'resolutionDb',
+      'scopedDb',
+      'transaction',
+    ],
     'src/routes/account-reads.ts': ['atMost'],
   });
 });
