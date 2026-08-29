@@ -432,31 +432,54 @@ export const planVersions = pgTable('plan_versions', {
 // `payout_cap_schedule_cents` IS AN ARRAY FROM DAY ONE holding a single flat
 // step in v1, ADR-025 having rejected progressive cap release. The shape is the
 // DDL's; no plan parameter is stated in application code and none is here.
-export const planVersionSizes = pgTable('plan_version_sizes', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  planVersionId: uuid('plan_version_id')
-    .notNull()
-    .references(() => planVersions.id),
-  sizeCents: bigint('size_cents', { mode: 'bigint' }).notNull(),
-  priceCents: bigint('price_cents', { mode: 'bigint' }).notNull(),
-  resetPriceCents: bigint('reset_price_cents', { mode: 'bigint' }).notNull(),
-  drawdownCents: bigint('drawdown_cents', { mode: 'bigint' }).notNull(),
-  // NULL ON DIRECT: there is no evaluation, so there is no profit target. A
-  // zero here would be a target of zero, which is a different and reachable
-  // thing.
-  profitTargetCents: bigint('profit_target_cents', { mode: 'bigint' }),
-  bufferCents: bigint('buffer_cents', { mode: 'bigint' }).notNull(),
-  winDayFloorCents: bigint('win_day_floor_cents', { mode: 'bigint' }).notNull(),
-  payoutCapScheduleCents: jsonb('payout_cap_schedule_cents').notNull(),
-  dailyLossLimitCents: bigint('daily_loss_limit_cents', { mode: 'bigint' }),
-  // SD-10. The enabling flag is MATERIALIZED here from the parent's `rules`
-  // jsonb because a CHECK constraint cannot read another table, and the
-  // completeness of the trio is a constraint rather than a trigger.
-  floorLockEnabled: boolean('floor_lock_enabled').notNull(),
-  floorLockAtProfitCents: bigint('floor_lock_at_profit_cents', { mode: 'bigint' }),
-  floorLockFloorAtCents: bigint('floor_lock_floor_at_cents', { mode: 'bigint' }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const planVersionSizes = pgTable(
+  'plan_version_sizes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    planVersionId: uuid('plan_version_id')
+      .notNull()
+      .references(() => planVersions.id),
+    sizeCents: bigint('size_cents', { mode: 'bigint' }).notNull(),
+    priceCents: bigint('price_cents', { mode: 'bigint' }).notNull(),
+    resetPriceCents: bigint('reset_price_cents', { mode: 'bigint' }).notNull(),
+    drawdownCents: bigint('drawdown_cents', { mode: 'bigint' }).notNull(),
+    // NULL ON DIRECT: there is no evaluation, so there is no profit target. A
+    // zero here would be a target of zero, which is a different and reachable
+    // thing.
+    profitTargetCents: bigint('profit_target_cents', { mode: 'bigint' }),
+    bufferCents: bigint('buffer_cents', { mode: 'bigint' }).notNull(),
+    winDayFloorCents: bigint('win_day_floor_cents', { mode: 'bigint' }).notNull(),
+    payoutCapScheduleCents: jsonb('payout_cap_schedule_cents').notNull(),
+    dailyLossLimitCents: bigint('daily_loss_limit_cents', { mode: 'bigint' }),
+    // SD-10. The enabling flag is MATERIALIZED here from the parent's `rules`
+    // jsonb because a CHECK constraint cannot read another table, and the
+    // completeness of the trio is a constraint rather than a trigger.
+    floorLockEnabled: boolean('floor_lock_enabled').notNull(),
+    floorLockAtProfitCents: bigint('floor_lock_at_profit_cents', { mode: 'bigint' }),
+    floorLockFloorAtCents: bigint('floor_lock_floor_at_cents', { mode: 'bigint' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // THE SIZE GRID'S KEY IS `(plan_version_id, size_cents)` AND IT IS TRANSCRIBED
+  // HERE FOR `coupons.code`'s REASON, ONE SPELLING FURTHER OUT.
+  // `0004_catalog.sql:220` declares it as a standalone `CREATE UNIQUE INDEX
+  // plan_version_sizes_version_size_uq`, which is the spelling `getTableConfig`
+  // cannot see at all, so this table sat in the set `keyed-accessor.test.ts`
+  // measures as "the transcription is behind the DDL somewhere" and
+  // `{ planVersionId, sizeCents }` was refused as an address that can match more
+  // than one row.
+  //
+  // IT IS WRITTEN AS A CONSTRAINT WHERE THE DDL WRITES AN INDEX, AND THE
+  // DIFFERENCE IS STATED RATHER THAN GLOSSED. `uniqueKeys()` reads
+  // `config.uniqueConstraints` and does not read `config.indexes`, and this file
+  // generates no DDL -- the migrations are hand written and merged (constitution
+  // E2) -- so what is transcribed is the PROPERTY the accessor needs, which is
+  // that this column set bounds the row count to one. A unique index does that
+  // exactly as a unique constraint does. `certificates.code` took the same move
+  // on one column (ADR-231); this is the two-column spelling of it. ADR-233.
+  (table) => [
+    unique('plan_version_sizes_version_size_uq').on(table.planVersionId, table.sizeCents),
+  ],
+);
 
 // -----------------------------------------------------------------------------
 // purchases -- 0006_commerce.sql. OWNED: `identity_id` is on the row, NOT NULL.
@@ -1344,7 +1367,16 @@ export const correlationGroups = pgTable('correlation_groups', {
 // and would be a wrong transcription on the one axis nothing checks.
 export const coupons = pgTable('coupons', {
   id: uuid('id').primaryKey().defaultRandom(),
-  code: citext('code').notNull(),
+  // THE UNIQUE IS TRANSCRIBED HERE BECAUSE `uniqueKeys()` READS THIS FILE AND
+  // NOT THE DDL. `0006_commerce.sql:38` declares `code citext NOT NULL UNIQUE`
+  // inline and unnamed, so Postgres names the constraint `coupons_code_key`;
+  // `getTableConfig` sees a Drizzle column's `isUnique` flag and nothing about a
+  // migration, so before this line `{ code }` was refused by `refuseUnaddressed`
+  // as an address that "can match more than one row". The database has bounded
+  // it to one row since `0006`; only the transcription did not say so. This is
+  // `certificates.code`'s repair one table over (ADR-231), and the address
+  // `CheckoutTx.couponByCode` needs. ADR-233.
+  code: citext('code').notNull().unique('coupons_code_key'),
   discountKind: text('discount_kind').notNull(),
   discountBp: integer('discount_bp'),
   discountCents: bigint('discount_cents', { mode: 'bigint' }),
