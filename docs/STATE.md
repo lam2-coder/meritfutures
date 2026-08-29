@@ -8773,3 +8773,115 @@ Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants re
 **No migration, no `SD-nn`, no `GS-nnn`, no `CI-06` letter, no `RI-nn`, no new enum type or label, no `SystemReason` or `SqlExecutorReason` member, no `pg` import, no cast past a key type, no ledger account named, no write path of any kind, no member added to `PortalErrorKind`, no second `fetch(`, no gate weakened and no fence widened.** `apps/api/**` is byte for byte unchanged and the approval line is **NOT SIGNED**.
 
 **WHAT IS STILL OWED.** The `error` arm on `payouts` and `security`. The consolidation of four failure types and three helper spellings onto `ApiFailure`. Row `218`'s re-derivation from `client.get` rather than `fetch(`. And the wallet's `copy_blocks` source, which is unchanged by this session and is still a schema and contract question rather than a portal one.
+
+---
+
+## 2026-08-29 - Session 410: the auth port's wiring count is stated once, in a form a runner runs, and the dispatch's count of the defect was wrong by nine
+
+**Objective.** The auth port's wiring count becomes derived, so it cannot go
+stale again. **`ADR-220` is NOT taken and the number returns to the pool
+unspent.**
+
+**THE TWO NUMBERS HOLD AND THE SIZE OF THE DEFECT DOES NOT.** Derived live over
+the real backend before a line changed: `AuthBackend` declares **16** methods,
+`databaseAuthBackend` implements **5** (`sessionByToken`, `logout`,
+`listSessions`, `revokeSession`, `verifyOtp`) and refuses **11**. So session
+408's reading is confirmed. **What is wrong is the reservation's own count of the
+restatements: it says three and the tree held TWELVE, of which ELEVEN were
+stale.** Four sat in `auth-backend.ts` alone, contradicting that file's own
+header four times over. **Two sat inside the very suite that asserts the
+eleven**, fifteen lines below a heading reading *"The twelve refusals"*. One is a
+SECTION HEADING in `routes/auth.ts` reading *"AN IMPLEMENTATION FOR FOUR OF ITS
+SIXTEEN METHODS"* -- **a numeral the reservation's own `twelve` needle could not
+see**, so a session that had grepped for the dispatch's word would have left a
+stale count at the top of the port file. **And four were outside the fence**, in
+`routes/accounts.ts` twice, `routes/account-reads.ts` and `test/db.test.ts`.
+
+**NOT ONE SITE IS REPAIRED BY WRITING `eleven`.** [ADR-034](decisions/ADR-034.md)'s
+remedy has exactly two branches, generate the value or delete it and point at the
+source, and [ADR-212](decisions/ADR-212.md) and [ADR-214](decisions/ADR-214.md)
+each refused the rewrite on the ground that a number written down goes stale and
+rewriting it only resets *when*. **Eleven sites take the second branch** and the
+sentences keep the point that was never the number. **One takes the first**: the
+port docblock in `routes/auth.ts` quotes the commands that settle it, and `RI-20`
+runs them on every `CI-01`. That is `ADR-214` clause 3 applied to a COUNT rather
+than to an existence claim, and the burden lands on the sentence making the claim.
+
+**THE TWO CLAIMS ARE CROSSED, AND THE RULE IS THE PART THAT IS NOT OBVIOUS: A
+CLAIM MUST NOT BE ABLE TO SATISFY ITSELF.** A grep over the file a sentence is
+written in matches the sentence, so a refusal count written into `auth-backend.ts`
+would put the pattern on one more line of the file the command reads and would
+**change the number it is asserting**. `routes/auth.ts` therefore states
+`auth-backend.ts`'s two halves and `auth-backend.ts` states `routes/auth.ts`'s
+port size, which `UNWIRED_AUTH_BACKEND: AuthBackend` holds at COMPILE time. A case
+asserts that failure rather than describing it.
+
+**DOES AN EXISTING CHECK ALREADY REACH THIS: NO, MEASURED AT ZERO.** `RI-20`'s
+grammar over the three auth files as they stood moves **0** sites, because a bare
+numeral quotes no command. **The closest check in the tree is
+`CI-06/derivable-counts`, and its own `covers` line already says it does not reach
+this**: it reads markdown only, records that the same recogniser over every `.ts`,
+`.tsx`, `.mjs` and `.sql` finds **17** further sites, that closing them needs a
+comment-span generator, and that an underivable population is unpoliced. The auth
+partition needs a query that reads TypeScript; that gate's vocabulary reads
+migrations. **So its remedy is much larger than `RI-20`'s.**
+
+**EVERY CANDIDATE WAS COSTED BY RUNNING IT**, on `ADR-212`'s precedent, over the
+**585** shipped `.ts`/`.tsx` files. A numeral-word beside a refusal noun moves
+**902** sites, and **34** in the three auth files alone of which **27 are honest**
+(*"One refusal is"*, *"TWO INDEPENDENT REFUSALS"*, *"One method per endpoint"*):
+**refused on precision**, because no rule over English separates a count of a
+partition from a singular noun phrase. **Widening `RI-14`'s own file list to these
+files moves 0 sites**, which is `ADR-212`'s and `ADR-214`'s finding a THIRD time,
+so that list is untouched and `RI-20` gets its own. **Widening `RI-20`'s grammar
+to the whole tree moves 18 sites of which 12 are this package's own seeded
+fixtures**, so it would be RED on landing: refused, and the four remaining false
+shapes are named in the log.
+
+**FOUR SEEDS WATCHED FIRING against the real tree**, each restored from a byte
+copy with the `sha256` identical both ways: eleven restated as twelve, five
+restated as four (`ADR-200`'s own staleness), sixteen restated as fifteen, and
+**the direction that actually happens** -- a twelfth refusal added to
+`auth-backend.ts` with **no sentence touched**, caught in the OTHER file, which is
+what crossing the claims buys. **AND ONE SEED EXPOSED A CONTROL COVERING LESS THAN
+ITS OWN WORDS**: `RI-20`'s asserting-nothing guard emptied only `wiring.test.ts`,
+so once the list held three files it would have passed on the other two files'
+claims while claiming to test an empty input. It now empties every file in the
+list.
+
+**REGISTERED RATHER THAN REACHED FOR.** Two TRUE live command claims sit in files
+`RI-20` still does not read, both settled by hand at **0**:
+`apps/portal/src/http/client.ts:176` and `apps/worker/src/detectors/canary.ts:30`.
+**Documents are NOT stale and are NOT repaired**: ADR-120, ADR-126, ADR-139,
+ADR-171 and this file all say "four of sixteen" under a dated or entry heading and
+each was true when written, which is `RI-20`'s own clause 3 boundary -- a document
+may honestly record what a command returned in the past and a live source comment
+may not.
+
+**THE FENCE WAS WIDENED ONTO FOUR SITES AND IT IS SAID RATHER THAN SLIPPED IN**,
+in a separate commit so a reviewer can take or drop it alone. The row drew its
+fence around a premise that was wrong by nine, and leaving those four would have
+ended a session whose whole objective is that this count cannot go stale with the
+tree still saying twelve in the same package. Every one was an ANALOGY carrying a
+number that was no part of its argument.
+
+Counts derived at reporting time: **33 of 33** gates, **19 of 19** invariants read
+off the runner's own last line, **247 files / 6,172 passed / 6 skipped** against
+an `origin/main` baseline at `b881cf0` of **247 / 6,170 / 6** reproduced before a
+line changed, which is this branch's own delta of **+0 files and +2 cases**;
+typecheck 0, lint 0, `format:check` clean; `falsify.mjs` read as OUTPUT with all
+33 gates clean-and-dirty plus **80** scope and **10** loader cases and the tree
+clean after it.
+
+**No migration, no `SD-nn`, no `GS-nnn`, no `CI-06` letter, no new `RI-nn`, no new
+enum type or label, no `SystemReason` or `SqlExecutorReason` member, no `pg`
+import, no cast past a key type, no ledger account named, no port member added or
+removed, no behaviour change of any kind, no gate weakened.** `NO_DELIVERY` and
+`NO_WEBAUTHN` are untouched and both are still founder-owed. `apps/portal/**` is
+byte for byte unchanged.
+
+**WHAT IS STILL OWED.** `RI-20` reads five files and the tree holds at least two
+more true command claims. The auth partition is now unstateable inside
+`auth-backend.ts` itself, which is correct and is also a thing a later author will
+try; the header says why. And **nobody can still sign in to this deployment by any
+route**, which is session 408's finding and is unchanged by this one.
