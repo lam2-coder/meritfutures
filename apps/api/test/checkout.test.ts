@@ -1824,7 +1824,7 @@ describe('the contract-conformant body is untouched, which is what makes this a 
 //
 // ONE RESIDUAL, STATED. The KYC member is exercised at `pending` and the row
 // says `expired`. Both refuse through the same `kycState !== 'verified'` at
-// `checkout.ts:1514`, and `KycState` carries `expired` at `checkout.ts:471`, so
+// `checkout.ts:1522`, and `KycState` carries `expired` at `checkout.ts:479`, so
 // no case names the row's own word.
 describe('INV-M20-06: the enumerated gate set, one case per member', () => {
   beforeEach(() => {

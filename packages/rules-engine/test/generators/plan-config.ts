@@ -26,6 +26,13 @@
 // carries it, and the note there says "the zod schema and the CV publish
 // validations key off this name". This file follows the ADR, and the drift in
 // CV-14's own text is recorded in the session log rather than silently absorbed.
+//
+// THE SIXTH ZOD CITATION IN THIS TREE, AND THE ONE A FIVE-FILE LIST MISSES.
+// ADR-225 matched `zod` case-insensitively over `apps/**` and `packages/**` and
+// found SIX sites, not the five the D2 controls audit named. The quotation
+// above is exact against DATA_MODEL section 11; only the CV half exists, in
+// `src/plan/validate.ts`, and this file declares the shape that validator
+// reads. `zod` is a dependency of no `package.json` in this workspace.
 // =============================================================================
 
 /** `plan_versions.rules.*.drawdown.type`. CV-01's vocabulary plus the value it rejects. */

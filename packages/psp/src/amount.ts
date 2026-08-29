@@ -23,6 +23,15 @@
 // where it came from, and there is exactly one function in this workspace that
 // can produce that type, and it takes a purchase ROW.
 //
+// ADR-225 TOOK THIS PARAGRAPH AS THE MODEL AND CHANGED NOTHING IN IT. `zod` is
+// a dependency of no `package.json` in this workspace and no file under
+// `apps/**` or `packages/**` imports it, so the schema the quoted sentence
+// names does not exist anywhere; this file had already declined to rely on it
+// and rebuilt the guarantee out of a type with one producer. That is the shape
+// ADR-225 rules for a comment that quotes a control the tree does not have, and
+// it is the only one of the six citation sites that needed no clause added
+// beyond this pointer.
+//
 // -----------------------------------------------------------------------------
 // THE SECOND FINDING, WHICH IS ARITHMETIC AND NOT PHILOSOPHY
 // -----------------------------------------------------------------------------
