@@ -29,13 +29,21 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->233<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->235<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -10003,3 +10011,51 @@ not in this row's verification list and it mutates the working tree.
 **THE SHALLOW-CLONE TRAP [ADR-243](decisions/ADR-243.md) RECORDED WAS LIVE AGAIN**, 220 commits against 3,551, and `git fetch --unshallow origin` was run before any number was taken. **Second consecutive session to inherit it.**
 
 **THE POPULATION, re-derived at `52b5202`**: **229** entry files, **103** accepted, **126** proposed, **53** money-path entries over **69** files, tier 1 at **21**. The trend holds for a third day: 42, 44, 46, 47, 52, **53**.
+
+## 2026-08-29 - Session 438: `ExternalGates` is external to the replayed state and not to this estate, and the in-flight leg has no predicate because M01 states R-38's grain both ways ([ADR-248](decisions/ADR-248.md), proposed)
+
+**MONEY PATH, `E2` READ OWED. The entry ships `proposed` and UNSIGNED, and merging is not signing.**
+
+**Row `248` asked what `PayoutSubject`'s `gates` field actually needs and then whether it is constructible in this deployable today. It is NOT, so the port stays blocked and no arm was installed.**
+
+**THE NAME WAS ESTABLISHED BY READING BEFORE ANYTHING WAS BUILT ON IT, WHICH IS WHAT THE ROW REQUIRED.** `INV-23` at [`packages/rules-engine/src/types.ts:874`](../packages/rules-engine/src/types.ts) is that context gates "NEVER ENTER THE REPLAYED STATE OR ITS HASH", and `:898` is "Context, never replayed (INV-23). Every field is resolved by the CALLER." **So `external` means external to the replayed state, and the caller is this estate.** The row's second `setAdminSessionSource` reading was available and it is wrong.
+
+**WHAT A GATE DECIDES IS WHETHER A TRADER IS PAID.** `evaluatePayout` at [`payout/evaluate.ts:63`](../packages/rules-engine/src/payout/evaluate.ts) computes R-40's four gates and R-38 straight off the supplied record, R-41 conjoins them with the engine six, **so every one of the five members is a veto and an invented one is a veto that never fires.**
+
+**THE FIVE FACTS SPLIT THREE AND TWO.** `payoutsFrozen`, `reconBlocked` and `kycState` resolve off tables this port already reaches, and one of the three is already written and already fails closed on another money door: `currentKycState` at [`routes/wallet-withdrawals.ts:471`](../apps/api/src/routes/wallet-withdrawals.ts) returns `kyc_required` when the supersession head cannot be named uniquely. **`accountStatus` is not a total map, which [ADR-245](decisions/ADR-245.md) registered and this session inherited without re-opening.**
+
+**AND THE FIFTH IS THE FINDING: `hasPayoutInFlight` IS NOT A MISSING FUNCTION, IT IS A CONTRADICTED PREDICATE.** [`M01:207`](plans/M01-rules-engine.md), the block that DECLARES the field, reads "exists for this account". [`M01:531`](plans/M01-rules-engine.md), R-38's own rule row, reads "no wallet-to-rail withdrawal for this identity". [`EC-040`](edge-cases/EC-040.md), `M01:861`'s AS-01 residual and the live SD-09 index at [`0031_payout_hold_and_identity_restriction.sql:105`](../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) all take the ACCOUNT reading, and `AS-09` is ruled at the gate at `M01:969` as "visibility, not a rule". **The two readings differ by every identity holding more than one account.** One refuses nine of a copy trader's ten accounts under a ceiling the corpus deliberately declined to impose; the other answers "no payout in flight" for an identity that has one.
+
+**THE GRAIN IS RULED UNRESOLVED RATHER THAN RESOLVED, AND THAT IS THE JUDGEMENT MOST WORTH DISAGREEING WITH.** The account reading has four sources and the identity reading has two, one of which is a transcription of the other. **That is an argument and not a ruling**, because `M01` is frozen, both sentences are in it, and `M01:531` cites `ADR-019` on its face where `ADR-019` really did move this leg to the wallet.
+
+**NO PERMISSIVE DEFAULT WAS SYNTHESISED AND NO PARTIAL RESOLVER WAS WRITTEN.** A record literal carries every member, so a partial resolver is not a smaller resolver: it is a resolver with two invented fields in it.
+
+**`ADR-245` SECTION 6's SIZING IS CORRECTED IN ONE DIRECTION.** It sized this resolver as an independent fourth slice. `AccountDay.external` is required at [`apps/worker/src/batch/ports.ts:87`](../apps/worker/src/batch/ports.ts), `nightly.ts:196` feeds it to the engine, and the projection lands in `rule_states.context_gates`, which is `NOT NULL` at [`0015_rule_states.sql:130`](../packages/db/migrations/0015_rule_states.sql). **So no `rule_states` row can be written without one: the resolver is UPSTREAM of link 4 rather than independent of it, and the grain ruling is on the worker's critical path too.**
+
+**THE ONE REPAIR TAKEN, AND IT IS LINE FOR LINE.** `types.ts`'s `ExternalGates` block claimed "M01 section 2.1 verbatim" and then wrote the identity reading twice. **The claim is false whichever reading is right**, because section 2.1 says account, and it is the file every caller opens to learn what to supply. It is repaired to name both readings and rule neither, in exactly the lines it replaces, `git diff --numstat` five and five, **so `types.ts:891`, `:954`, `:961`, `:1004` and `:1006` do not move.**
+
+**FINDING REGISTERED RATHER THAN REPAIRED, AND IT WAS ALREADY FALSE ON `origin/main`.** [`WAVE-06:265`](plans/WAVE-06-admin-console-transport.md) cites `wiring.test.ts:457` for a wiring triple that is at neither that line nor those numbers. [`ADR-184`](decisions/ADR-184.md) row 7 and a session log carry the same pointer. Outside this row's fence, in a frozen plan.
+
+## 2026-08-29 - Session 439: the certificate card is rendered on fetch, stored nowhere, addressed by the code and signed by nothing ([ADR-249](decisions/ADR-249.md), proposed)
+
+**THE RULING IS [ADR-249](decisions/ADR-249.md), `proposed` and UNSIGNED, and NO MIGRATION NUMBER IS RESERVED OR TAKEN.** Row `249` was **CONDITIONAL** on ruling and the condition fired: all four of the questions it named are answered. **[ADR-246](decisions/ADR-246.md)'s MEASUREMENT WAS RE-DERIVED BEFORE ANYTHING WAS BUILT ON IT AND IT HOLDS**: `certificates` carries **seventeen** columns, none of them an image location, and a case-insensitive `ALTER TABLE ... certificates` sweep over all **67** migrations matches **zero** files.
+
+**WHAT RENDERS IT: whatever answers this deployable's own image row, behind `CertificateImageSource.lookup`, and NOT the worker's issuer.** That **NARROWS** [ADR-246](decisions/ADR-246.md) section 2 clause 5 on the clause's own ground: the issuer holds the Vault relationship because the CLAIM signature is written once into a column, and **a thing that runs once per certificate cannot re-render on fetch.**
+
+**WHEN: ON FETCH, and it is stated rather than chosen.** `INV-M11-08` says a rendered image *"is re-generated on fetch from the live row"* and is *"never a static artifact Merit keeps serving after the row changed"*, and `imageHandler` already enforces it by refusing a non-deferred lookup that carries no card. **At-issue, on-first-request and on-a-schedule are each rejected with their cost written down**, and **option (d)'s own cost is named rather than waved past**: a render on an unauthenticated public path is compute an attacker can drive, which [API_CONTRACT](architecture/API_CONTRACT.md) section 6.3 already accepted in writing when it put this surface OUTSIDE `INV-M11-05`'s constant-time clause.
+
+**INTO WHAT STORE: NONE. A CACHE, AND A CACHE IS NOT A STORE.** It may be emptied at any moment with no loss, because the row plus the renderer reproduce it exactly. `FM-M11-05`'s `(code, row_version)` key is what makes a state change **MISS** the cache with nobody invalidating anything, which is `INV-M9-04`'s *"usually right"* objection avoided without a second write path. **The rejected option's real benefit is stated**: a durable store keeps serving during a render outage, and the thing it keeps serving is exactly what `INV-M11-08` exists to stop.
+
+**HOW A URL REACHES THE ROW: IT DOES NOT, AND THAT IS THE WHOLE SCHEMA ANSWER.** `image_url` is `origin` plus the path this repository already serves, derived from `code` at projection time; `projectCertificate` hands `links` the code and **no other field of the row can reach the address**. **`0020`'s separation of `code` from `id` points this way rather than at a column**: a stored address would have to be rewritten in the same transaction as a rotated code, which is the incident that separation exists to survive.
+
+**THE SIGNATURE QUESTION IS RULED EXPLICITLY RATHER THAN INHERITED AND THE ANSWER IS NO SIGNATURE AT ALL.** `PUBLIC_LOOKUP_ADDRESS` is already this estate's assertion that `code` alone is the entire predicate on an unauthenticated read of this row, and `GET /verify/:code` discloses **more** than the card on that assertion today; the signature has nowhere to ride; **the only thing it would buy is an EXPIRY and the code beside it never expires**, so an expiring `image_url` inconveniences the holder and stops nobody. **[ADR-240](decisions/ADR-240.md) IS LEFT STANDING RATHER THAN OVERTURNED**: it answered *where does the key go*, conditional on there being one, and this answers *is there a key*.
+
+**THE LINE THAT IS WRONG IS NAMED AND DELIBERATELY NOT REPAIRED**: [API_CONTRACT](architecture/API_CONTRACT.md) section 6's `image_url: string; // signed, time-limited` and its echo in section 6.3. That document is `approved` and was not in this fence. **[M11](plans/M11-certificates-social-proof.md) is not touched either**, although the row permitted it, because every answer is derived FROM M11.
+
+**A FINDING THE SUITE CARRIES**: `FM-M11-05`'s cache key names `row_version` and **`certificates` has no `row_version`, no `version` and no `updated_at`**. The ruling is that the version is a **digest over the value handed to the template**, which cannot drift from what was drawn, rather than a stored counter costing a migration, a trigger and a second source of truth.
+
+**BOTH `BLOCKED` ENTRIES ARE NARROWED TO NAME ONLY WHAT STILL REFUSES**, which is **the renderer, alone**, for `useCertificateImageSource`, and the renderer plus an origin for `useCertificateBackend`. **NO PORT IS WIRED**, the wired count is unchanged, and `useCertificateRevokeBackend` is behind the SSO purchase and was not touched.
+
+**BUILT**: [`apps/api/test/certificate-card-home.test.ts`](../apps/api/test/certificate-card-home.test.ts), **five cases, all five watched RED** on four seeded defects with `git status --porcelain` clean after each restore. **The `certificates.ts` edit is LINE-NEUTRAL and that is deliberate**: eighteen lines for eighteen, every anchor unmoved, because **28 citations by line at 14 distinct targets** point into that file on the base tree and most sit in documents this fence does not include.
+
+**WHERE THIS IS MOST LIKELY WRONG**, named rather than left to be found: **the derived render version is asserted sufficient and nothing executes that it is.** The digest cannot drift only while the template draws nothing the digest did not see, and **no template exists yet to check that against**. A renderer that reaches for the clock, for a plan-version lookup or for a fetched asset has a rendering input the row does not carry, and the cache would then serve a stale card nobody can tell is stale.
