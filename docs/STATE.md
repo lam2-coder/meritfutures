@@ -29,11 +29,15 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->223<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->226<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->223<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->223<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+
+
+
+
+
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9648,6 +9652,141 @@ is whether a mint may land ahead of its issuer at all.
 **Measured, not carried**: 66 migrations applied forward-only under `ON_ERROR_STOP=1` on PostgreSQL 16.13, **115** base tables unchanged, **17** cases watched refusing and permitting. **33 of 33** gates, **20 of 20** invariants, **256 files / 6,403 passed / 6 skipped**, typecheck 0, lint 0, `format:check` clean.
 
 **LANDMINE, AND IT IS THE SAME ONE TWICE.** A test that greps the tree for a pattern **contains that pattern**, so it matches itself. The importer scan failed on its own finding text, then on its own comment explaining the first failure. The needle is now assembled from fragments so the scan needs no exclusion list and stays total. **The same class as ADR-212's rule for `file:line` pointers, arriving in a runner instead of in prose.**
+
+## 2026-08-29 - Session 429: the payout port is not blocked by a door, it is blocked by a deployable that runs no job ([ADR-239](decisions/ADR-239.md), proposed)
+
+**THE ROW'S OWN FIRST INSTRUCTION WAS RIGHT AND THERE IS A LINK UNDER IT.**
+`runNightlyBatch` is exported and called by nothing, and **the deployable that
+would call it does not run.** [`apps/worker/package.json`](../apps/worker/package.json)
+starts `src/index.ts`; that module declares `export function main` at
+[`:1268`](../apps/worker/src/index.ts) and calls it nowhere;
+[`apps/api/src/start.ts:149`](../apps/api/src/start.ts) is `await main();`. The
+two entrypoints differ by one statement. **MEASURED RATHER THAN READ:
+`pnpm --filter @merit/worker start` prints nothing and exits 0**, which is what a
+healthy service looks like to a supervisor, **so the absence pages nobody**.
+
+**THAT IS LARGER THAN THE WIRING THE ROW WAS WILLING TO SETTLE FOR.** The
+provisioning saga, the expiry sweep, the detector runner, the breaker evaluator
+and the two digest producers are all downstream of the same uncalled function.
+Every one of them is described in
+[CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md) as *"built against ports and not
+yet wired or scheduled"*, which reads as one missing adapter per job. **There is
+no process.**
+
+**FOUR LINKS STAND BETWEEN THIS TREE AND ONE `rule_states` ROW, ALL ABSENT, AND
+ONLY TWO HAD EVER BEEN NAMED ON THIS PORT.** A scheduler. A `BatchPorts` value,
+which **no file under any `src/` constructs**: seven read methods at
+[`ports.ts:265`](../apps/worker/src/batch/ports.ts), three write at
+[`:336`](../apps/worker/src/batch/ports.ts), and the four satisfiers that exist
+are three test doubles and [`scripts/demo/world.ts`](../scripts/demo/world.ts),
+which refuses. An `engine_gates` codec. And rows.
+
+**THE QUESTION IS RULED AND THE FIRST ANSWER IS THE RIGHT ONE: the API READS a
+`RuleState` the WORKER WROTE**, and the two deployables meet at `rule_states`.
+`INV-M5-02` ([M05:81](plans/M05-payout-system.md)) is a claim about the number of
+EVALUATORS and states its own control in five words, *"a second evaluator would
+be a second rule"*; a request-path fold is **invisible** to
+[ADR-026](decisions/ADR-026.md) `C-07`'s `state_hash`, which is the one detector
+this corpus built for two disagreeing producers, because a state computed in a
+request is never stored and never hashed; and `R-06`
+([M01:470](plans/M01-rules-engine.md)) leaves the request path no legal mark to
+fold from at all.
+
+**ONE BLOCKER GOT CHEAPER AND THAT IS THE ENTRY'S SECOND FINDING.**
+`usePayoutBackend` said a decoding for `engine_gates` **would be inventing a
+corpus fact**. [ADR-206](decisions/ADR-206.md) ruled that fact on 2026-08-29,
+six groups and twenty-five leaves with every cents leaf a base-10 string, and
+[`rule_states.md`](architecture/data-model/rule_states.md) reproduces it in full.
+**So the clause moved from a ruling nobody had made to a module nobody has
+typed.** Two live sentences still said otherwise:
+[`state-writer.ts`](../apps/worker/src/batch/state-writer.ts)'s docblock is
+**REPAIRED** and the port's reason is **REWRITTEN**, both in fence.
+**`ELIGIBILITY_BLOCKER` carries the same retired sentence and is REPORTED rather
+than edited**, `routes/account-reads.ts` being outside this fence, so
+`INV-M5-02`'s one blocker across two endpoints now reads two ways until somebody
+holds that file.
+
+**THE PORT IS NARROWED AND NOT WIRED**, and a PARTIAL backend is refused rather
+than overlooked: `listPayouts` and `idempotency` are constructible today, and
+installing them beside a `transact` whose `subject` rejects would put a
+live-looking route in front of the arm that approves payouts.
+
+**THE NEXT SLICE IS SIZED AS THREE, STRICTLY ORDERED.** The **codec** in
+`packages/rules-engine`, cheapest and with no open question, reachable from both
+manifests, and it also clears `B5` term 2's implementation that `readLiability`
+waits on. The **`BatchPorts` adapter**, ten methods plus `FM-10`'s per-account
+advisory lock, whose event sink `TRANSACTION_EVENT_WRITER` lives in `apps/api`
+and which `apps/worker` cannot import. The **scheduler**, which is where the
+migration is: pg-boss's schema is in no migration in this tree.
+
+**A THIRD FINDING, REPORTED AND NOT REPAIRED.**
+[CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md)'s nightly-batch row does not say
+the job is unscheduled while four rows below it say exactly that about their own
+jobs, and it is the `S2` row the `S1` replay self-audit and the statistics run
+both sit downstream of.
+
+**EVERY CLAUSE IS A PREDICATE AND NOT ONLY A SENTENCE.**
+[`rule-state-producibility.test.ts`](../apps/api/test/rule-state-producibility.test.ts)
+runs the four links on every `CI-01` pass, each with a non-vacuity half: the
+entrypoint case asserts the API's `main()` call with the identical predicate that
+finds no call in the worker, and the `BatchPorts` census is shown finding the
+four values that exist outside `src/`. **Eight seeds, eight red**, each restored
+from a byte copy with SHA-256 checked both ways.
+
+Counts derived at reporting time: **33 of 33** gates, **21 of 21** invariants
+read off the runner's own last line, **260 files / 6,461 passed / 6 skipped**
+against an `origin/main` baseline at `294a64f` of **259 / 6,454 / 6** reproduced
+before a line changed, a delta of **+1 file and +7 cases**, typecheck 0, lint 0,
+`format:check` clean. **`RI-15` went red on this branch's own citation drift**
+and is repaired at source. **No migration taken and none needed**; `0073` is
+session 427's and stays free of this branch. **`falsify.mjs` was NOT run**: it is
+not in this row's verification list and it mutates the working tree.
+
+## Session 428: the checkout port kept all three blockers, and the cap had the wrong home rather than no source
+
+**[ADR-238](decisions/ADR-238.md), `status: proposed`, UNSIGNED. MONEY PATH, `E2` READ OWED. NO MIGRATION NUMBER TAKEN OR RESERVED.**
+
+**ALL THREE BLOCKERS ARE RULED AND NONE IS DISCHARGED, WHICH IS A DIFFERENT OUTCOME FROM THE TWO ENTRIES BEFORE IT AND IS THE ENTRY'S MAIN CLAIM.** [ADR-230](decisions/ADR-230.md) and [ADR-233](decisions/ADR-233.md) each BUILT a door and took this port's lead clause off it, and the route answered 503 after each. **This entry built nothing.** What was needed was three rulings, one of which is that the corpus stores a parameter in the wrong home.
+
+**THE CAP DID NOT HAVE NO SOURCE. IT HAD THE WRONG HOME, AND READING THE VALUE THE CORPUS STATES WOULD HAVE SHIPPED A CAP AN ADVERSARY SELECTS.** The enforcement is identity-level: constitution B1 lists *"total accounts (cap enforcement)"* among the identity-level aggregations, `INV-M3-08` says per resolved identity, `GS-094` pins the eleventh purchase, and `AccountCapRow.liveAccounts` is declared *"Live accounts this IDENTITY holds"*. The parameter is per plan version, in the `plan_versions.rules` jsonb, with no `CV-nn` and no database constraint. **So one number per published version is compared against one count that spans every plan**, and the three available readings are each refused for a reason that is not the others': the PURCHASED version makes the effective cap the MAXIMUM over published versions, so a buyer picks their own cap by picking a plan, which is `B4 #21`'s ceiling computed from a number the adversary chooses; the PINNED version on the reset path reads a row that may have been retired years earlier, because pinning is what makes `B4 #12` provable; and requiring every published version to AGREE is a firm parameter in a plan's blob that no `CHECK` can express, since a `CHECK` cannot read another row.
+
+**THE HOME IS A `firm` PARAMETER ROW ON `price_floors`' SHAPE, AND IT IS RULED RATHER THAN BUILT.** Effective dated, superseded by a new row rather than updated, carrying its approver, with `identities.max_accounts_override` folded over it exactly as that column's name already says. `price_floors` is an exact precedent, its own registry rule saying the number is the firm's and that the table carries no identity column *"because a floor that differed per trader would not be a floor"*. **The fence is the reason it is not built**: a new `firm` table is a migration plus `packages/db/src/schema.ts` plus `scope.ts`, both session 427's this wave, so STOP AND REPORT was taken and **no migration number was reserved for a file this session cannot write**. An environment variable is refused by name: a cap is quoted back to the buyer in the refusal body, an operator must be able to change it and be recorded doing so, and the corpus already rules that no plan parameter lives in application code.
+
+**THE CROSS-IDENTITY READ IS REFUSED A SECOND TIME AND NOT ON ADR-233's GROUND**, which is unavailable because those rows belong to nobody and these belong to somebody. **What is genuinely different was found and does not carry**: a buyer holds a token the affiliate gave them, which is ADR-230's own premise for not validating `insertAsParty`'s counterparty. It loses to three objections that do not depend on each other: a token is picked up by following a link and is not an authorisation; every door in `packages/db` returns whole rows, so a grant is the widest answer to a question needing one column and one bit; and `OwnedRule` has no field for a per-table exception. **WHAT THE PORT MUST DO INSTEAD IS A STAMP AND NOT A READ**: `packages/db` resolves the affiliate inside the transaction, stamps `attributions.affiliate_identity_id` as `insertAsParty` already stamps the buyer, and hands the handler a BOOLEAN for the literal self-deal void. **That closes the contradiction ADR-233 section 5 registered and could not repair**, which is that `insertAsParty` on `attributions` has had no possible caller since it was built. Not taken here: `AffiliateRef` carries `identityId` and `packages/affiliate` was outside the fence.
+
+**THE LEDGER ARM IS NOT THIS SESSION'S, AND SAYING SO IS THE RESULT RATHER THAN A SHORTFALL.** [ADR-165](decisions/ADR-165.md)'s ground holds, re-derived: `SystemReason` is two members, `ApiDb` declares six doors and none yields a `SystemTx`, `ledger_transactions` and `ledger_entries` are both `derived` so `FirmTx` cannot serve them, and ADR-233's catalogue door reads `firm` rows and has no write verb at all. **The half ADR-165 never had to make is the one that matters now**: [ADR-176](decisions/ADR-176.md) cleared the identical obstruction for `LT-01` by DELETING `PayoutTx.ledger` and posting later at a system authority, and **that remedy does not transfer**, because [M20](plans/M20-wallet.md) says *"LT-08 posted in the same transaction as the purchase"* and `DEP-M20-02`'s consequence column says the wallet becomes a transfer instrument.
+
+**FINDING 4, WHICH NOBODY WENT LOOKING FOR AND WHICH IS THE THIRD INSTANCE OF ITS CLASS IN THREE DAYS.** `routes/checkout.ts` states in TWO places that `apps/api` declares no `@merit/db`, once in a section heading's paragraph and once inside `CheckoutTx.insertAttribution`'s docblock, and **that has been false since [ADR-120](decisions/ADR-120.md)**. Both repaired in fence. The conclusion they were drawn for survives intact: the port is the fence, and after ADR-120 the manifest is not one.
+
+**THE `BLOCKED` ENTRY IS REWRITTEN FOR ACCURACY RATHER THAN NARROWED, AND EVERY CLAUSE IS NOW ASSERTED.** All three survive their rulings, so the entry names three things exactly as it did. What changed is that `apps/api/test/checkout-backend-blockers.test.ts` reads the file each clause is about and pins it: the port method that takes no plan, the call order on both handlers, the one migration line, the two registry classes, the catalogue list, the reason vocabulary, the door set and the corpus line that pins `LT-08`. **A clause going stale now turns a case red instead of waiting four restatements for a reader**, which is this port's own history twice over.
+
+**Measured at reporting time, on this branch, each command run separately**: **33 of 33** gates after `generate`, **21 of 21** invariants off the runner's own last line, **260 files / 6,465 passed / 6 skipped** against a `294a64f` baseline of **259 / 6,454 / 6** measured on this branch before a line changed, typecheck 0, lint 0, `format:check` clean. **Five seeded defects watched firing**, each file restored from a byte copy with `diff` confirming identity. **`RI-15` turned red on one pointer this session's insertions moved** and it was repointed with its neighbour; no claim changed. **`start.ts` untouched and the wiring triple unmoved at `{declared: 24, wired: 7, blocked: 17}`.** **`falsify.mjs` was NOT run**: it is not in this row's verification list and it mutates the working tree.
+
+**LANDMINE, REGISTERED RATHER THAN RULED.** `gateIdentity` refuses a RESET when `liveAccounts >= maxAccounts`, and a reset creates no account, so an identity at its cap cannot reset an account it already holds. It is a behaviour question about a live handler and it was not this entry's subject.
+
+## A horizon a deployment sets is configuration and a signing key this deployable would hold is not (2026-08-29, session 430)
+
+**[ADR-240](decisions/ADR-240.md), `status: proposed`, UNSIGNED. NOT the money path. No migration number reserved and none taken.**
+
+**THE ROW SENT ONE SESSION AT THREE PORTS ON ONE PREMISE AND THE PREMISE HELD FOR ONE OF THEM.** Row `240` read that all three waited on deployment configuration, on the rule [ADR-226](decisions/ADR-226.md) and [ADR-229](decisions/ADR-229.md) established: a port may be wired when its only remaining gap is something the deployment supplies, because an adapter that refuses `unconfigured` is a live control rather than a stub. **One gap was a threshold. One was a signing arrangement no variable names. One was a renderer.**
+
+**`setEconomicCalendarSource` IS WIRED AND `GET /economic-calendar` SERVES REAL ROWS.** The horizon has a name, `MERIT_ECONOMIC_CALENDAR_HORIZON_TRADING_DAYS`, valued nowhere in this repository ([ADR-012](decisions/ADR-012.md)) and rowed in [INFRA](architecture/INFRA.md) section 8 beside the alarm that reads the same column. **Absent, the endpoint answers 503 for every request identically** rather than publishing a freshness verdict nobody decided, because both defaults are wrong in a way a deployment cannot see: a `false` is `DEP-M4-09`'s confident failure and a `true` is an alarm nobody can switch off by configuring the thing they forgot. **The unit is in the NAME** because [ADR-146](decisions/ADR-146.md) exists over two date vocabularies that met with nothing saying which was which.
+
+**AND [ADR-146](decisions/ADR-146.md) CLAUSE 4 SURVIVES ON ITS OWN STATED GROUND RATHER THAN BEING REPEALED.** That clause forbids a route reaching for a clock and comparing a UTC calendar date with an exchange CT trading day. `databaseEconomicCalendar` **never resolves "today"**: it counts the `trading_calendar` rows whose session has not yet opened at the instant of the read and whose `trading_day` is still covered, and compares that COUNT with the horizon. An instant is only ever compared with an instant and a day only with a day. **The obvious implementation has no answer at 03:00 on a Saturday** and a dashboard is asked the question at 03:00 on a Saturday; a count of sessions ahead is defined at every instant, needs no holiday branch because `0032` made a holiday's `session_open_at` NULL, and degrades toward `stale` when the trading calendar itself is exhausted.
+
+**AN UNWIRED PORT IS NOW A 503 ON THIS ROUTE AND IT WAS A 500.** `EconomicCalendarUnwired` and `EconomicCalendarUnconfigured` are two classes and one status code, kept apart for the operator and collapsed for the caller. **A row the source cannot render is still a 500 and the suite asserts both directions**, because a separation asserted one way is a rename.
+
+**THE TRAP IS RULED AND A SIGNING KEY IS NOT A TURNSTILE SECRET.** A Turnstile secret is sent to the party that does the work; a URL signing key is held and USED by this process, which is the internet-facing surface with the largest reachable code path in the estate. **And the signature could not address this repository's own image row even if a key existed**: [API_CONTRACT](architecture/API_CONTRACT.md) section 6.3 states of `GET /certificates/:code/image.png` that the request is *"the path token only, no query, no body"*, and `imageHandler` reads `request.params` and never `request.query`, asserted structurally and behaviourally. **The signer belongs with whatever verifies it**, the object store or the edge, both already rowed in [INFRA](architecture/INFRA.md) section 2. The CLAIM signer is a different key, it is the worker's, it talks to a Vault ([M11](plans/M11-certificates-social-proof.md) section 3.2), and `apps/api` already reads its output out of a column without ever holding it.
+
+**TWO CITATIONS DID NOT SURVIVE AND BOTH ARE ON THE CERTIFICATE HALF.** `verify_url` is no longer *"DEFINED BY NO SECTION of the contract"*: section 6.3 has carried a `GET /verify/:code` row since [ADR-170](decisions/ADR-170.md), `routes/verify.ts` implements it and `start.ts` wires it today, so that half now waits on an ORIGIN alone. And `certificates.ts`' header said `db.ts` opens *"exactly two doors"* where it opens five, which made its conclusion that the image row can use neither correct from a premise that had moved: `databaseVerifySource` already performs **both** of `CertificateImageSource`'s database arms. **Both sentences are repaired in place rather than deleted** and neither repair moves either port.
+
+**THE TWO BLOCKED ENTRIES STOP RESTING ON UNEXECUTED CLAIMS.** Over every `src` directory of every workspace member, `CertificateCard` is named in ONE file and `image/png` in ONE file, and [`certificate-links.test.ts`](../apps/api/test/certificate-links.test.ts) runs both counts after first asserting that the sweep reaches source at all. **The day a renderer lands, the case goes red and the entry expires**, which is `RI-22` leg 3's shape at test scale and is session 426's landmine answered: a comment cannot fail.
+
+**NO NAME IS TAKEN FOR THE CARD ORIGIN.** `useCheckoutAdapters`' stated rule: a variable whose only consumer refuses is a name nothing reads, and installing a supplier that always throws would raise the wired count and serve nothing.
+
+**Measured, not carried**: **33 of 33** gates, **21 of 21** invariants read off the runner's own last line, **261 files / 6,482 passed / 6 skipped** against an `origin/main` baseline at `294a64f` of **259 / 6,454 / 6** reproduced before any behaviour changed, typecheck 0, lint 0, `format:check` clean. The wired count moves from **seven to eight** and the blocked list from **seventeen to sixteen**. **Five seeded defects were watched failing on the real tree** and each was restored before the next: a `<=` for a `<`, a defaulted horizon, a trading day built from the instant, a renderer added under `apps/worker/src`, and a handler reading `request.query`.
+
+**WHAT IS STILL OWED.** **The horizon's VALUE**, which is the deployment's and which no approved document states. **A card renderer, a card origin and a URL signer**, all three [M11](plans/M11-certificates-social-proof.md)'s, and `certificates` holds no image location column for any of them to address. **The tension between section 6's `image_url` and section 6.3's image row**, reported rather than repaired because [API_CONTRACT](architecture/API_CONTRACT.md) is `approved` and outside this fence. **A check that the panel and the alarm read the same value**, which nothing in this tree can make because the alarm is not in this tree. **A section 12 row for `GET /economic-calendar`**, owed since [ADR-146](decisions/ADR-146.md).
 
 ---
 

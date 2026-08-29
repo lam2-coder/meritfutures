@@ -251,6 +251,9 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-235](ADR-235.md) | The code is the only credential, and the corpus asserted its strength in five places while no function in the repository produced one  (2026-08-29, status: proposed) |
 | [ADR-236](ADR-236.md) | The admin read port is behind the SSO purchase after all, its shape reason is retired as measured false for six of seven, and the one read that is genuinely unbuilt waits on a rule-state writer  (2026-08-29, status: proposed) |
 | [ADR-237](ADR-237.md) | Authentication and the operator directory are two different things, so the directory is built, `admin_actions.actor` gains a referent, and what is left of the SSO blocker is one named function and three named variables  (2026-08-29, status: proposed) |
+| [ADR-238](ADR-238.md) | The account cap is the firm's number and no plan version can hold it, the cross-identity read is refused a second time with the remedy named, and the checkout ledger arm is foreclosed by the corpus rather than by the accessor  (2026-08-29, status: proposed) |
+| [ADR-239](ADR-239.md) | The API reads a rule state the worker wrote, and the reason this deployment can produce none is that nothing runs the worker at all  (2026-08-29, status: proposed) |
+| [ADR-240](ADR-240.md) | a horizon a deployment sets is configuration and a signing key this deployable would hold is not, so one of three ports is wired and the other two have their absences measured (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

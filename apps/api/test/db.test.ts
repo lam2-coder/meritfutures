@@ -352,5 +352,12 @@ test('only src/db.ts takes a handle off the accessor, and the other importer tak
       'transaction',
     ],
     'src/routes/account-reads.ts': ['atMost'],
+    // `src/routes/economic-calendar.ts` IS THE FOURTH IMPORTER AND IT TAKES NO
+    // HANDLE EITHER (ADR-240). Both names are ADR-157 filter terms and both
+    // mint a frozen value: `atLeast` bounds the session read by the clock and
+    // the occurrence read by the same instant, and `atMost` bounds the session
+    // read by the coverage day. Neither opens anything, which is why the
+    // `elsewhere` assertion above is still empty on this diff.
+    'src/routes/economic-calendar.ts': ['atLeast', 'atMost'],
   });
 });

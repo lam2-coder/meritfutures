@@ -324,9 +324,26 @@ export interface RuleStateWriterIo {
    *
    * **NO IMPLEMENTATION OF THIS METHOD SHIPS IN THIS FILE OR IN THIS
    * DEPLOYABLE**, and {@link UNWIRED_RULE_STATE_WRITER_IO} refuses it by name.
-   * A primary source declaring the stored encoding is `B5` term 2 and is an
-   * amendment to the corpus rather than a line of code; this session held no
-   * number for it and took none.
+   *
+   * **THIS PARAGRAPH READ "A PRIMARY SOURCE DECLARING THE STORED ENCODING IS
+   * `B5` TERM 2 AND IS AN AMENDMENT TO THE CORPUS RATHER THAN A LINE OF CODE",
+   * AND THAT WENT FALSE ON THE DAY IT WAS WRITTEN.** `ADR-206` ruled the
+   * encoding on 2026-08-29 and `docs/architecture/data-model/rule_states.md`
+   * reproduces it beside the `state_hash` input list: the engine's own
+   * `EngineGateResults` value, group for group and leaf for leaf, six groups and
+   * twenty-five leaves in the engine's field names, with every cents leaf a
+   * base-10 string and `null` written as JSON `null`. The leaf set is exactly
+   * `ENGINE_GATE_LEAVES`, so the column and column 19 of the hash read one list
+   * rather than two copies of one list.
+   *
+   * **WHAT IS OWED IS THEREFORE A CODEC AND NO LONGER A RULING**, which is a
+   * smaller and differently shaped debt: term 2's DECLARATION is discharged and
+   * term 2's IMPLEMENTATION is not. Session 429 repaired this sentence rather
+   * than the port that quotes it (`apps/api/test/wiring.test.ts`, narrowed in
+   * the same commit), and `ADR-239` records why the decoder's home is
+   * `packages/rules-engine` rather than here: `readLiability` cannot import
+   * `apps/worker`, so an encoder here and a decoder there is `FM-16`'s two
+   * statements of one predicate with nothing comparing them.
    *
    * Its return is `unknown` and not a JSON type, because a JSON type here would
    * be this file choosing the outer shape (an object? an array of leaves?) while

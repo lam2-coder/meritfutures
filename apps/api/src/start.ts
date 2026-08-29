@@ -62,6 +62,7 @@ import { databaseAccountReads, useAccountReadsBackend } from './routes/account-r
 import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.ts';
 import { useAuthBackend } from './routes/auth.ts';
 import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
+import { databaseEconomicCalendar, setEconomicCalendarSource } from './routes/economic-calendar.ts';
 import { databaseMethodDefinitions, setMethodDefinitionSource } from './routes/public-methods.ts';
 import { databaseVerifySource, useVerifySource } from './routes/verify.ts';
 import { databaseWalletBackend, useWalletBackend } from './routes/wallet.ts';
@@ -105,6 +106,28 @@ useWalletBackend(databaseWalletBackend(LIVE_DB));
 // compile with that key. Nothing is withheld here because there is no field an
 // identity filter would have had to remove.
 setMethodDefinitionSource(databaseMethodDefinitions(LIVE_DB));
+
+// `GET /economic-calendar`, over the FIRM door, three reads in one transaction.
+// ADR-240.
+//
+// THE PORT WAITED ON A CONFIGURED THRESHOLD AND NOT ON A DOOR, which is the
+// distinction this line is worth reading for. ADR-209 registered
+// `economic_calendar_current` and the read arm has been constructible since; the
+// half that refused was `freshness.stale`, decided against a horizon that lives
+// with the alarm. It has a NAME now,
+// `MERIT_ECONOMIC_CALENDAR_HORIZON_TRADING_DAYS`, valued nowhere in this
+// repository (ADR-012), and a deployment that has not set it answers 503 for
+// every request identically rather than publishing a freshness verdict nobody
+// decided. That is ADR-226's rule about an absent secret, applied to a threshold.
+//
+// AND THE STALENESS COMPARISON READS NO CALENDAR DATE. `databaseEconomicCalendar`
+// counts the `trading_calendar` sessions that have not yet opened and whose
+// trading day is still covered, and compares that count with the horizon; an
+// instant is only ever compared with an instant and a day only with a day. That
+// is what keeps ADR-146 clause 4 intact rather than repealed: the failure it
+// forbids is a UTC calendar date derived from a clock meeting an exchange CT
+// trading day, and no value in that adapter crosses between the two.
+setEconomicCalendarSource(databaseEconomicCalendar(LIVE_DB));
 
 // `GET /verify/:code`, over the FIFTH DOOR and the FIRM one. ADR-231.
 //

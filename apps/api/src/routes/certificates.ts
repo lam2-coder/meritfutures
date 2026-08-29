@@ -193,29 +193,38 @@
 // NEITHER ROW CAN REACH THE DATABASE FROM THIS DEPLOYABLE TODAY, AND ONE OF THE
 // TWO CANNOT REACH IT AT ALL
 // -----------------------------------------------------------------------------
-// `apps/api/src/db.ts` opens exactly two doors, `scoped(identityId, fn)` and
-// `firm(fn)`, and its header states that the absence of a third "is the point".
+// THIS PARAGRAPH SAID `apps/api/src/db.ts` OPENS EXACTLY TWO DOORS AND IT OPENS
+// FIVE (ADR-200 added two, ADR-231 the fifth), so it is repaired rather than
+// left beside a file that refutes it. The header's own sentence about the door
+// it does NOT open is the one that survives, and it is about `system(reason, fn)`.
 //
 //   GET /certificates IS SERVABLE THROUGH THE SCOPED DOOR. `certificates` is
 //   `class: 'owned'` on `identity_id` in `packages/db/src/scope.ts`, so
 //   `tx.rows('certificates')` is the caller's own rows with `scopePredicate`
 //   already ANDed in, and `databaseCertificateBackend` below is that adapter.
+//   WHAT KEEPS THAT ROW AT 503 IS THE LINK SIGNER AND NOT THE READ, and
+//   {@link CertificateLinks} carries the ruling (ADR-240).
 //
-//   GET /certificates/:code/image.png CANNOT USE EITHER DOOR. It is
-//   unauthenticated, so there is no identity for `scoped`; and `certificates`
-//   is `owned`, so it is excluded from `FirmTableKey` and `firm` REFUSES IT AT
-//   COMPILE TIME. The door that would serve it is `systemDb(reason)`, whose
-//   `SystemReason` is `'nightly-batch' | 'operator-console'` and which
-//   `apps/api` deliberately does not open. Widening that vocabulary is ADR-096
-//   clause 3's refusal and ADR-109 clause 1's, and it is outside this fence.
+//   GET /certificates/:code/image.png HAS A DOOR NOW AND STILL HAS NO ANSWER.
+//   This paragraph read that it "CANNOT USE EITHER DOOR", because it is
+//   unauthenticated and `certificates` is `owned`; ADR-231 built a fifth door,
+//   `publicLookup(fn)`, which reads `certificates` by `code` for a caller who
+//   will never be anybody, and `databaseVerifySource` in `routes/verify.ts`
+//   already reads that row and writes `certificate_verifications` through
+//   `db.firm`, which is both of this port's database arms. WHAT REFUSES NOW IS
+//   THAT THE ANSWER IS BYTES: `CertificateCard.bytes` is a rendered PNG, this
+//   file's own header says the renderer "is not in this repository", and
+//   `test/certificate-links.test.ts` measures that rather than restating it --
+//   `CertificateCard` is named in ONE file in this repository and it is this
+//   one.
 //
 // So the image row is served through a PORT and the port is UNWIRED, which is
-// `routes/public-methods.ts`' and `routes/economic-calendar.ts`' shape and
-// their stated reason: an unset source is a deployment that has not been
-// finished, and it is answered loudly rather than guessed at. The row is
-// registered, its shape is the contract's, its refusals are real, and its data
-// path is a slice of its own. That is reported in the pull-request body rather
-// than solved by reaching past the fence.
+// `routes/public-methods.ts`' shape and its stated reason: an unset source is a
+// deployment that has not been finished, and it is answered loudly rather than
+// guessed at. `routes/economic-calendar.ts` STOOD BESIDE IT HERE AND NO LONGER
+// DOES: ADR-240 wired it, because its remaining gap was a configured threshold
+// and a threshold is a thing a deployment supplies. This one's is a renderer,
+// and no deployment supplies a renderer by setting a variable.
 // =============================================================================
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -329,13 +338,42 @@ export interface CertificateListResponse {
 /**
  * The two public URLs for one code.
  *
- * NEITHER IS BUILT IN THIS FILE AND THAT IS DELIBERATE TWICE OVER. `image_url`
- * is "signed, time-limited" (API_CONTRACT section 6, carried into 6.3), and
- * this deployable holds no signing key; `verify_url` addresses `GET
- * /verify/:code`, which ADR-168 foreclosure 1 records as named by M11 and
- * DEFINED BY NO SECTION OF THE CONTRACT, deliberately not repaired there. A
- * string composed here would invent both the origin ADR-012 keeps out of this
- * repository and a path no approved document defines.
+ * NEITHER IS BUILT IN THIS FILE, AND ADR-240 SPLITS THE REASON BECAUSE THE TWO
+ * HALVES STOPPED BEING THE SAME KIND OF ABSENCE.
+ *
+ * `verify_url` WAITS ON AN ORIGIN AND NOTHING ELSE NOW. This comment read that
+ * the path it addresses is "DEFINED BY NO SECTION OF THE CONTRACT" (ADR-168
+ * foreclosure 1), and that is no longer true: API_CONTRACT section 6.3 carries
+ * a `GET /verify/:code` row, `routes/verify.ts` implements it at `VERIFY_PATH`,
+ * and `start.ts` installs `databaseVerifySource` against the public-lookup door
+ * (ADR-231). What is left is the ORIGIN, which is a deployment fact ADR-012
+ * keeps out of this repository and `apps/admin/src/origin.ts` states the rule
+ * for. One named environment variable closes it.
+ *
+ * `image_url` IS "signed, time-limited" AND IS NOT WAITING ON A SECRET, WHICH
+ * IS THE RULING WORTH READING SLOWLY. Three things are missing and only one of
+ * them is configuration; `routes/account-reads.ts`' `CERTIFICATE_BLOCKER`
+ * reached the same finding independently on the `/certificate` row: "the card
+ * renderer, the CDN origin and the URL signer are all M11 and none exists", and
+ * `certificates` (`0020_public_surface.sql`) carries `signature` and
+ * `signing_key_id` and NO image location column, "so there is not even a stored
+ * value to sign".
+ *
+ * AND THE SIGNATURE COULD NOT ADDRESS THIS FILE'S OWN IMAGE ROW EVEN IF A KEY
+ * EXISTED. API_CONTRACT section 6.3 states of `GET /certificates/:code/image.png`:
+ * "Request: the path token only, no query, no body". A signature and an expiry
+ * have no slot in that URL and `imageHandler` below reads nothing but `:code`,
+ * so an `image_url` pointing here is unsigned however it is dressed. Whatever
+ * serves those bytes is what verifies the signature, and that is an object
+ * store or the edge -- both already in INFRA section 2 -- rather than this
+ * process. THE KEY BELONGS WITH THE VERIFIER AND NEVER WITH THIS DEPLOYABLE:
+ * `apps/api` is the internet-facing surface with the largest reachable code
+ * path in the estate, and a URL-signing key held here would be one an
+ * application compromise mints cards with, under a rotation calendar M11
+ * section 3.3 wrote for a different key entirely. That other key is the CLAIM
+ * signer, it is the WORKER's (M11 section 3.2's issuer talks to a Vault), and
+ * this deployable already reads its output out of a column without ever holding
+ * it. See ADR-240.
  */
 export interface CertificateLinks {
   readonly verify_url: string;
