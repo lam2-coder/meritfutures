@@ -215,16 +215,30 @@ export type {
 // silent stubs would be a batch whose audit channel is a no-op, so no such
 // composition exists and this leg exports the one method it can serve.
 //
-// **TERM 2 WAS UNCLEARED WHILE THIS LEG WAS WRITTEN AND `ADR-206` CLEARED IT
-// WHILE THE BRANCH WAS OPEN.** This paragraph read: "No primary source declares
-// what `rule_states.engine_gates` holds ... So `RuleStateWriterIo` takes the
-// encoding as a parameter and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by
-// name." **THE PREMISE WAS TRUE AND IS SPENT.** `ADR-206` rules the bag to be
-// the engine's own value, six groups and twenty-five leaves in the engine's
-// names with every cents leaf a base-10 string, so `encodeEngineGates` below is
-// that ruling as code and the `Io` is down to one member. The leaf set is bound
-// to `ENGINE_GATE_LEAVES` by a case rather than re-typed, on ruling 1's own
-// words.
+// **TERM 2 WAS UNCLEARED WHEN THIS LEG WAS WRITTEN, `ADR-206` CLEARED IT WHILE
+// THE BRANCH WAS OPEN, AND THE SEAM IS NOW GONE RATHER THAN REFUSING.** This
+// paragraph read "no primary source declares what `rule_states.engine_gates`
+// holds ... So `RuleStateWriterIo` takes the encoding as a parameter and
+// `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name". **THE PREMISE WAS TRUE AND
+// IS SPENT.** `ADR-206` (session 394) declares the bag at
+// `docs/architecture/data-model/rule_states.md`: the engine's own
+// `EngineGateResults`, six groups and twenty-five leaves at `ENGINE_GATE_LEAVES`'
+// dotted paths, cents as base-10 strings. `encodeEngineGates` below is that
+// ruling as code, so the `Io` is down to one member and the leaf set is bound to
+// `ENGINE_GATE_LEAVES` by a case rather than re-typed.
+//
+// **AN INTERMEDIATE STATE OF THIS PARAGRAPH SAID THE SEAM SHOULD STAY**, on the
+// ground that "no adapter in this tree encodes to that shape". That was true
+// when written and is what this commit ends: a port that refuses is the correct
+// state until an encoder exists, and an encoder now exists. `ADR-206` is
+// `proposed` and UNSIGNED, which is what an ADR ships as and is not a reason to
+// leave a declared encoding unimplemented.
+//
+// **AND THE NUMBER IN THIS PARAGRAPH WAS WRONG IN BOTH COPIES.** It read
+// "`EngineGateResults` types four leaves `bigint`". **SEVEN** of the twenty-five
+// are `Cents`, derived by counting what `ENGINE_GATE_LEAVES` renders through
+// `money()`. The four came from `packages/rules-engine/src/hash.ts`, which said
+// four for the same reason and is repaired on this branch.
 export {
   RULE_STATE_WRITE_COLUMNS,
   RULE_STATE_WRITE_TABLES,

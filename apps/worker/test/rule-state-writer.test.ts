@@ -296,8 +296,10 @@ describe('2. the mapping carries the fold’s values through unchanged', () => {
 
 describe('3. the guard refuses what JSON.stringify throws on, drops or changes', () => {
   test('3.1 a bigint is refused and the PATH is named', () => {
-    // THE SHAPE THAT MADE THE SEAM NECESSARY. `EngineGateResults` types four of
-    // its twenty-five leaves as `Cents`.
+    // THE SHAPE THAT MADE THIS GUARD NECESSARY. `EngineGateResults` types SEVEN
+    // of its twenty-five leaves as `Cents`, and case 3b.2 names all seven. This
+    // comment said FOUR, inherited from `hash.ts`, which said four until
+    // 2026-08-29; both are repaired on this branch.
     let raised: unknown;
     try {
       refuseUnstorableJson('engine_gates', { buffer: { needCents: 100_000n } });

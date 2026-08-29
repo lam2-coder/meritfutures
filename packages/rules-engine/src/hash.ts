@@ -388,9 +388,20 @@ function nullable<T>(value: T | null, render: (v: T) => string): string {
 // -----------------------------------------------------------------------------
 // Column 19 is `jsonb`, and the obvious rendering is the wrong one twice over.
 //
-//   1. `JSON.stringify` THROWS ON A BIGINT, and four of the twenty-five leaf
+//   1. `JSON.stringify` THROWS ON A BIGINT, and SEVEN of the twenty-five leaf
 //      fields below are `Cents`. So the obvious rendering does not merely drift,
 //      it does not run.
+//
+//      THIS SENTENCE SAID **FOUR** UNTIL 2026-08-29 AND THE TREE SAID SEVEN,
+//      which is worth a line because the number is the argument. Derived by
+//      counting the leaves this array renders through `money()`:
+//      `winDays.floorCents`, `buffer.haveCents`, `buffer.needCents`,
+//      `consistency.profitNeededToDiluteCents`, `minimumAmount.withdrawableCents`,
+//      `minimumAmount.capCents` and `minimumAmount.minPayoutCents`. A wrong count
+//      here understates the reason rather than contradicting it, which is exactly
+//      why nothing caught it: the paragraph stayed persuasive while its evidence
+//      rotted. Session 396 reported the drift and session 395 had already
+//      inherited it into `apps/worker/src/index.ts`.
 //   2. M01 section 1.4 BANS "iteration over an object's keys where the result
 //      affects output", because "key order is insertion order and CAN DRIFT
 //      WITH A REFACTOR", and names "explicit ordered arrays, and canonical

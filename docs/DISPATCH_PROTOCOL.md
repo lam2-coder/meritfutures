@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../CLAUDE.md, decisions/ALLOCATION.md]
-last_updated: 2026-08-28
+last_updated: 2026-08-29
 ---
 
 # Dispatch protocol
@@ -46,7 +46,7 @@ Run each command **separately**. **`pnpm install` first**, always: a stale `node
 | Command | Expected |
 |---|---|
 | `node scripts/corpus/gates.mjs generate` then `check` | **33 of 33** |
-| `node packages/tooling/checks/repo-invariants.mjs` | **16 of 16** unless your slice adds one |
+| `node packages/tooling/checks/repo-invariants.mjs` | **whatever the runner's own last line reports.** It was 18 when this row was last repaired, a slice that adds an invariant moves it, and `RI-17` is not in the runner because it needs `@merit/api`. **Derive it; never carry it forward.** This row read `16 of 16` while the tree reported 18, and five sessions in a row reported the drift without repairing it because the file sits outside every fence |
 | `pnpm vitest run` | green, against the baseline your dispatch names, **reproduced before a line changes** |
 | `pnpm run typecheck` | exit 0 |
 | `pnpm run lint`, `pnpm run format:check` | 0, clean. The format glob reads `.ts`, `.tsx`, `.mjs` and `scripts/` |

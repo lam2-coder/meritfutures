@@ -449,9 +449,11 @@ export function refuseUnstorableJson(
 
     switch (typeof current) {
       case 'bigint':
-        // THE ONE THAT MADE THIS SEAM NECESSARY. `hash.ts`: "`JSON.stringify`
-        // THROWS ON A BIGINT, and four of the twenty-five leaf fields below are
-        // `Cents`."
+        // THE ONE THAT MADE THIS GUARD NECESSARY. `hash.ts`: "`JSON.stringify`
+        // THROWS ON A BIGINT, and SEVEN of the twenty-five leaf fields below
+        // are `Cents`." **THAT SENTENCE SAID FOUR UNTIL 2026-08-29** and this
+        // comment inherited the wrong number from it; both are repaired on this
+        // branch, and `ADR-206` ruling 3 names the same seven.
         throw new RuleStateEncodingRefusal(
           column,
           path,
