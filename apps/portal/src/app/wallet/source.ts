@@ -47,9 +47,36 @@
 // not substitute sentences of its own for them. `load` passes `copy: null` and
 // the screen renders the absence. Reported rather than repaired: giving the
 // wallet a copy source is a schema and contract question, not a portal one.
+//
+// -----------------------------------------------------------------------------
+// AND THE SCREEN CAN NOW SAY "THIS FAILED", WHICH IT COULD NOT BEFORE
+// -----------------------------------------------------------------------------
+// `WalletLoad` HAD TWO ARMS AND A 401 RENDERED THROUGH THE UNAVAILABLE ONE,
+// which reads "Your wallet cannot be shown right now. This is a problem on our
+// side and your balance is unaffected." BOTH HALVES OF THAT SENTENCE ARE FALSE
+// TO A TRADER WHOSE SESSION EXPIRED: it is not a problem on our side,
+// and telling someone who is signed out that we are broken is the screen
+// authoring a fault that did not happen.
+//
+// ADR-162 FORECLOSURE 1 RECORDED THIS GAP ON `app/payouts/source.ts` AND SAID
+// THE REPAIR "IS NOT ONE FILE": an error arm needs ./sections.ts to render it
+// and ./page.ts to branch on it, and that session's fence held neither. This
+// session's fence holds all three, which is the only thing that changed.
+// ADR-217 is the ruling and it was taken because the segments DISAGREE rather
+// than because one was missing a spelling.
+//
+// THE BOUNDARY IS 404 AND IT IS THE CONTRACT'S OWN, NOT A PREFERENCE.
+// API_CONTRACT section 6.2 rules that "an identity with no `wallet_entries` row
+// is `0` and not a `404`", so on THIS screen a 404 can never be a data
+// condition: it can only mean the route is not served. That is what
+// `unavailable` has always meant here, so 404 keeps it and keeps naming WHICH
+// endpoint. Everything that reached a server which then refused or failed --
+// 401, 429, 5xx, a transport that never connected, a 2xx whose body is not
+// JSON -- is `error`, carrying the `PortalErrorKind` ../../shell/app-shell.ts
+// already derived.
 
 import type { WalletEntry, WalletProvenance, WalletResponse } from '../../api/types.ts';
-import type { ApiClient } from '../../http/client.ts';
+import type { ApiClient, ApiFailure, ApiResult } from '../../http/client.ts';
 import { ApiConfigError, serverApiClient } from '../../http/client.ts';
 import { toWalletView } from '../../view/wallet.ts';
 import type { WalletCopy, WalletView } from '../../view/wallet.ts';
@@ -62,16 +89,37 @@ export const WALLET_PATH = '/wallet';
 export const WALLET_ENTRIES_PATH = '/wallet/entries';
 
 /**
+ * The `error` arm's payload. `ApiFailure` WITHOUT THE DISCRIMINANT, AND DERIVED
+ * RATHER THAN DECLARED.
+ *
+ * `app/accounts/source.ts`, `app/(purchases)/source.ts` and
+ * `app/calendar/load.ts` each declare this shape by hand, under three names,
+ * carrying the same doc sentence three times. `Omit` states it once and the
+ * compiler keeps it true: a field added to `ApiFailure` arrives here, and a
+ * hand-written copy would not notice. ADR-217 rules the other three onto this
+ * spelling; they are outside this fence and are reported rather than changed.
+ */
+export type WalletFailure = Omit<ApiFailure, 'ok'>;
+
+/**
  * What the page got.
  *
- * `unavailable` IS NOT AN ERROR STATE, which is `app/payouts/source.ts`'s
- * argument and applies here unchanged: nothing is in flight, nothing is absent
- * from a populated response, and nothing failed. It is what this screen shows
- * when a read did not answer, and it names WHICH one rather than assuming both.
+ * `unavailable` IS STILL NOT AN ERROR STATE and the arm did not change meaning:
+ * nothing is in flight, nothing is absent from a populated response, and
+ * nothing failed. What changed is that FAILURES NO LONGER ARRIVE HERE. The arm
+ * now carries only the two cases that genuinely mean "this deployment cannot
+ * reach the endpoint" -- no `MERIT_API_ORIGIN`, or a 404 -- and it still names
+ * WHICH one rather than assuming both.
+ *
+ * `error` IS THE THIRD STATE AND IT IS RULED RATHER THAN INVENTED (ADR-217).
+ * It is every read that reached a server which then refused or failed, and it
+ * carries the kind so ./sections.ts can say the true sentence rather than the
+ * one sentence that used to cover all of them.
  */
 export type WalletLoad =
   | { readonly kind: 'ready'; readonly view: WalletView; readonly copy: WalletCopy | null }
-  | { readonly kind: 'unavailable'; readonly missing: readonly string[] };
+  | { readonly kind: 'unavailable'; readonly missing: readonly string[] }
+  | ({ readonly kind: 'error' } & WalletFailure);
 
 /**
  * Build the screen from two responses.
@@ -237,6 +285,38 @@ export function isEntriesResponse(
  * still the balance; reporting both misses at once is what lets the screen name
  * which one is missing.
  */
+/**
+ * One read, sorted into the three things it can be.
+ *
+ * `not_found` IS THE ONLY STATUS THAT BECOMES `absent`, and the contract is
+ * what makes that safe rather than a preference. API_CONTRACT section 6.2:
+ * "an identity with no `wallet_entries` row is `0` and not a `404`". A 404 on
+ * either of these paths therefore cannot be a trader with an empty wallet; it
+ * can only be a route this deployment does not serve, which is what
+ * `unavailable` has always meant on this screen.
+ *
+ * A MALFORMED 2xx IS A FAILURE AND NOT AN ABSENCE. The guard rejecting a body
+ * means a server answered and answered wrongly, which is `server_error` for
+ * `../../http/client.ts`'s own reason -- the trader can do nothing about it and
+ * no other member of the vocabulary is true. `status` is carried because there
+ * WAS one, which is what keeps it distinguishable from a transport that never
+ * reached a status line.
+ */
+function sorted<T>(
+  result: ApiResult,
+  guard: (value: unknown) => value is T,
+):
+  | { readonly kind: 'value'; readonly value: T }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'failed'; readonly failure: WalletFailure } {
+  if (!result.ok) {
+    if (result.error === 'not_found') return { kind: 'absent' };
+    return { kind: 'failed', failure: { error: result.error, status: result.status } };
+  }
+  if (guard(result.body)) return { kind: 'value', value: result.body };
+  return { kind: 'failed', failure: { error: 'server_error', status: null } };
+}
+
 export async function loadFrom(input: {
   readonly client: ApiClient;
   readonly copy: WalletCopy | null;
@@ -246,21 +326,31 @@ export async function loadFrom(input: {
     input.client.get(WALLET_ENTRIES_PATH),
   ]);
 
-  const wallet =
-    walletResponse.ok && isWalletResponse(walletResponse.body) ? walletResponse.body : null;
-  const entries =
-    entriesResponse.ok && isEntriesResponse(entriesResponse.body) ? entriesResponse.body : null;
+  const wallet = sorted(walletResponse, isWalletResponse);
+  const entries = sorted(entriesResponse, isEntriesResponse);
+
+  // A FAILURE ON EITHER READ DECIDES THE SCREEN, AND IT OUTRANKS AN ABSENCE ON
+  // THE OTHER. The two arms say different things to a trader and only one of
+  // them can be shown, so the rule is the one that cannot state a falsehood: a
+  // 401 on the statement beside a 404 on the balance is a trader who is signed
+  // out, and rendering "this is a problem on our side" over it would be the
+  // exact sentence this arm exists to stop.
+  //
+  // THE BALANCE READ WINS A TIE BECAUSE IT IS THE SCREEN'S SUBJECT. `GET
+  // /wallet` is what SC-M4-10 is; the statement is what it is composed with.
+  if (wallet.kind === 'failed') return { kind: 'error', ...wallet.failure };
+  if (entries.kind === 'failed') return { kind: 'error', ...entries.failure };
 
   const missing: string[] = [];
-  if (wallet === null) missing.push(REQUIRED_ENDPOINTS[0]);
-  if (entries === null) missing.push(REQUIRED_ENDPOINTS[1]);
+  if (wallet.kind === 'absent') missing.push(REQUIRED_ENDPOINTS[0]);
+  if (entries.kind === 'absent') missing.push(REQUIRED_ENDPOINTS[1]);
 
-  if (wallet === null || entries === null) return { kind: 'unavailable', missing };
+  if (wallet.kind !== 'value' || entries.kind !== 'value') return { kind: 'unavailable', missing };
 
   return readyFrom({
-    wallet,
-    entries: entries.data,
-    next_cursor: entries.next_cursor,
+    wallet: wallet.value,
+    entries: entries.value.data,
+    next_cursor: entries.value.next_cursor,
     copy: input.copy,
   });
 }

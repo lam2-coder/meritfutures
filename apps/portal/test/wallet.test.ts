@@ -3,7 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 
 import type { WalletEntry, WalletResponse } from '../src/api/types.ts';
-import { Wallet, WalletUnavailable } from '../src/app/wallet/sections.ts';
+import {
+  WALLET_ERROR_COPY,
+  Wallet,
+  WalletError,
+  WalletUnavailable,
+} from '../src/app/wallet/sections.ts';
 import { REQUIRED_ENDPOINTS, readyFrom } from '../src/app/wallet/source.ts';
 import { copyBlock } from '../src/copy/copy-block.ts';
 import type { PinnedPlanCopy } from '../src/copy/copy-block.ts';
@@ -346,5 +351,60 @@ describe('the unavailable arm', () => {
 
     expect(loaded.kind).toBe('ready');
     expect(REQUIRED_ENDPOINTS).toEqual(['GET /wallet', 'GET /wallet/entries']);
+  });
+});
+
+describe('the error arm, which is ADR-217’s', () => {
+  test('a signed-out trader is told they are signed out and not that we are broken', () => {
+    // THE DEFECT THE ARM WAS ADDED FOR, ASSERTED AT THE RENDERED BYTES. Before
+    // ADR-217 a 401 rendered `WalletUnavailable`, whose sentence begins "This is
+    // a problem on our side" -- false to someone whose session expired, and the
+    // sentence a trader would read before deciding whether to call support.
+    const html = renderToStaticMarkup(createElement(WalletError, { error: 'unauthenticated' }));
+
+    expect(html).toContain('You are signed out');
+    expect(html).not.toContain('problem on our side');
+    expect(html).toContain('balance is unaffected');
+  });
+
+  test('rate limiting says to wait rather than that the wallet is broken', () => {
+    const html = renderToStaticMarkup(createElement(WalletError, { error: 'rate_limited' }));
+
+    expect(html).toContain('Wait a moment');
+    expect(html).not.toContain('problem on our side');
+  });
+
+  test('no arm of this screen renders a figure it did not receive', () => {
+    // THE RULE `WalletUnavailable` IS ALREADY HELD TO, EXTENDED TO THE NEW ARM
+    // RATHER THAN ASSUMED OF IT. A wallet screen that rendered `0.00` because a
+    // request failed would tell a trader their money is gone.
+    for (const kind of Object.keys(WALLET_ERROR_COPY) as (keyof typeof WALLET_ERROR_COPY)[]) {
+      const html = renderToStaticMarkup(createElement(WalletError, { error: kind }));
+
+      expect(html).not.toContain('0.00');
+      expect(html).toContain('balance is unaffected');
+    }
+  });
+
+  test('no sentence in this arm words a refusal of permission', () => {
+    // INV-M4-07 keeps a "forbidden" vocabulary off this screen, and
+    // ../src/shell/app-shell.ts refuses `PortalErrorKind` a `forbidden` member
+    // for the same reason. `unexpected` is the member a 403 maps to, so it is
+    // the one that would carry such a sentence if anything did.
+    for (const sentence of Object.values(WALLET_ERROR_COPY)) {
+      expect(sentence.toLowerCase()).not.toContain('permission');
+      expect(sentence.toLowerCase()).not.toContain('forbidden');
+      expect(sentence.toLowerCase()).not.toContain('not allowed');
+    }
+  });
+
+  test('the arm names no endpoint, which the unavailable arm deliberately does', () => {
+    // THE TWO ARMS ADDRESS DIFFERENT READERS. A path this deployment does not
+    // serve is a fact about the build; a 401 is a fact about the trader's own
+    // session, and a list of API paths under it reads as a stack trace on a
+    // money screen.
+    const html = renderToStaticMarkup(createElement(WalletError, { error: 'server_error' }));
+
+    expect(html).not.toContain('GET /wallet');
   });
 });

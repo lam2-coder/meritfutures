@@ -84,6 +84,32 @@ function serving(bodies: {
   };
 }
 
+/**
+ * `serving`, but an unserved path 404s rather than 503s.
+ *
+ * TWO HELPERS BECAUSE THE TWO STATUSES NOW MEAN DIFFERENT THINGS. Before
+ * ADR-217 every unserved path could be one status because every failure landed
+ * in one arm; the ruling splits them, so the suite has to be able to say which
+ * of the two it is exercising.
+ */
+function absent(bodies: { readonly wallet?: unknown; readonly entries?: unknown }): {
+  readonly transport: Transport;
+} {
+  return {
+    transport: (url) => {
+      const body = url.endsWith(WALLET_ENTRIES_PATH) ? bodies.entries : bodies.wallet;
+      if (body === undefined)
+        return Promise.resolve(new Response('{"type":"about:blank"}', { status: 404 }));
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    },
+  };
+}
+
 const ok = { wallet: WALLET, entries: { data: ENTRIES, next_cursor: null } };
 
 test('the ready branch is reached through two real requests', async () => {
@@ -123,11 +149,16 @@ test('the trader’s session cookie is forwarded and nothing else is', async () 
   expect(headers[0]!['cookie']).toBe(`${SESSION_COOKIE}=tok_abc`);
 });
 
-test('a failure of one read is reported as a failure of that one', async () => {
+test('a 404 on one read is reported as that one endpoint being absent', async () => {
   // THE SCREEN NAMES WHICH ENDPOINT IT DID NOT GET, which is
   // `app/payouts/source.ts`'s "rather than assuming both". Here the balance
-  // answers and the statement does not.
-  const { transport } = serving({ wallet: WALLET });
+  // answers and the statement 404s.
+  //
+  // 404 AND NOT 503, WHICH IS ADR-217's WHOLE BOUNDARY. This case asserted a
+  // 503 before that ruling, and API_CONTRACT section 6.2 is why it cannot: "an
+  // identity with no `wallet_entries` row is `0` and not a `404`", so a 404
+  // here can only be a route this deployment does not serve.
+  const { transport } = absent({ wallet: WALLET });
   const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
 
   const loaded = await loadFrom({ client, copy: null });
@@ -137,8 +168,8 @@ test('a failure of one read is reported as a failure of that one', async () => {
   expect(loaded.missing).toEqual(['GET /wallet/entries']);
 });
 
-test('both missing is reported as both', async () => {
-  const { transport } = serving({});
+test('both endpoints absent is reported as both', async () => {
+  const { transport } = absent({});
   const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
 
   const loaded = await loadFrom({ client, copy: null });
@@ -146,6 +177,102 @@ test('both missing is reported as both', async () => {
   expect(loaded.kind).toBe('unavailable');
   if (loaded.kind !== 'unavailable') throw new Error('unreachable');
   expect(loaded.missing).toEqual([...REQUIRED_ENDPOINTS]);
+});
+
+// -----------------------------------------------------------------------------
+// The error arm, which is ADR-217's and is the state this screen could not reach
+// -----------------------------------------------------------------------------
+
+test('a 503 is an error and is no longer an absent endpoint', async () => {
+  // THE CASE THE RULING TURNED OVER. This screen rendered a 503 through
+  // `WalletUnavailable`, which lists API paths under a sentence about a build.
+  const { transport } = serving({ wallet: WALLET });
+  const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
+
+  const loaded = await loadFrom({ client, copy: null });
+
+  expect(loaded.kind).toBe('error');
+  if (loaded.kind !== 'error') throw new Error('unreachable');
+  expect(loaded.error).toBe('server_error');
+  expect(loaded.status).toBe(503);
+});
+
+test('a 401 reaches the screen as unauthenticated and not as our fault', async () => {
+  // THE DEFECT ADR-217 WAS TAKEN FOR, and it is the sharpest of the set: a
+  // trader whose session expired was told "This is a problem on our side and
+  // your balance is unaffected", of which only the second half was true.
+  const { transport } = serving({ wallet: WALLET, entries: {}, status: 401 });
+  const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
+
+  const loaded = await loadFrom({ client, copy: null });
+
+  expect(loaded.kind).toBe('error');
+  if (loaded.kind !== 'error') throw new Error('unreachable');
+  expect(loaded.error).toBe('unauthenticated');
+  expect(loaded.status).toBe(401);
+});
+
+test('a 429 reaches the screen as rate_limited', async () => {
+  const { transport } = serving({ wallet: WALLET, entries: {}, status: 429 });
+  const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
+
+  const loaded = await loadFrom({ client, copy: null });
+
+  expect(loaded.kind).toBe('error');
+  if (loaded.kind !== 'error') throw new Error('unreachable');
+  expect(loaded.error).toBe('rate_limited');
+});
+
+test('a transport that never reaches a status line is an error carrying no status', async () => {
+  // `../src/http/client.ts`'s `TRANSPORT_FAILURE`, end to end. `status: null` is
+  // what keeps "nothing answered" distinguishable from "the API said 503", and
+  // this screen must not invent the number.
+  const transport: Transport = () => Promise.reject(new Error('ECONNREFUSED'));
+  const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
+
+  const loaded = await loadFrom({ client, copy: null });
+
+  expect(loaded.kind).toBe('error');
+  if (loaded.kind !== 'error') throw new Error('unreachable');
+  expect(loaded.error).toBe('server_error');
+  expect(loaded.status).toBeNull();
+});
+
+test('a failure on either read outranks an absence on the other', async () => {
+  // THE PRECEDENCE RULE, AND IT IS NOT A TIE-BREAK FOR NEATNESS. The balance
+  // route is absent and the statement says the session is bad; only one arm can
+  // render, and the one that cannot state a falsehood is `error`. Rendering
+  // "this is a problem on our side" over an expired session is the exact
+  // sentence the arm exists to stop.
+  const transport: Transport = (url) =>
+    Promise.resolve(
+      new Response('{"type":"about:blank"}', {
+        status: url.endsWith(WALLET_ENTRIES_PATH) ? 401 : 404,
+      }),
+    );
+  const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
+
+  const loaded = await loadFrom({ client, copy: null });
+
+  expect(loaded.kind).toBe('error');
+  if (loaded.kind !== 'error') throw new Error('unreachable');
+  expect(loaded.error).toBe('unauthenticated');
+});
+
+test('the balance read wins a tie because it is the screen’s subject', async () => {
+  const transport: Transport = (url) =>
+    Promise.resolve(
+      new Response('{"type":"about:blank"}', {
+        status: url.endsWith(WALLET_ENTRIES_PATH) ? 503 : 429,
+      }),
+    );
+  const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
+
+  const loaded = await loadFrom({ client, copy: null });
+
+  expect(loaded.kind).toBe('error');
+  if (loaded.kind !== 'error') throw new Error('unreachable');
+  expect(loaded.error).toBe('rate_limited');
 });
 
 // -----------------------------------------------------------------------------
@@ -254,12 +381,20 @@ test('the entries guard refuses a numeric entry_id', () => {
   );
 });
 
-test('a 200 whose body is not the contract’s shape is unavailable, never rendered', () => {
+test('a 200 whose body is not the contract’s shape is an error, never rendered', () => {
   // A guard that passed here would put an arbitrary object onto a money screen.
+  //
+  // AN ERROR AND NOT AN ABSENCE, WHICH IS ADR-217's SECOND HALF. A server
+  // answered and answered wrongly, which is not the same fact as a route this
+  // deployment does not serve, and `status: null` says the malformed body was
+  // rejected here rather than that nothing replied.
   const { transport } = serving({ wallet: { balance_cents: 1 }, entries: { data: [] } });
   const client = createApiClient({ origin: ORIGIN, sessionToken: null, transport });
 
   return loadFrom({ client, copy: null }).then((loaded) => {
-    expect(loaded.kind).toBe('unavailable');
+    expect(loaded.kind).toBe('error');
+    if (loaded.kind !== 'error') throw new Error('unreachable');
+    expect(loaded.error).toBe('server_error');
+    expect(loaded.status).toBeNull();
   });
 });
