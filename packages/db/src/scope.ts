@@ -34,6 +34,7 @@ import {
   affiliateClicks,
   affiliateCreatives,
   affiliates,
+  affiliateStatements,
   alarmSuppressions,
   analyticsSnapshots,
   attributions,
@@ -53,6 +54,7 @@ import {
   discordLinks,
   dualControlApprovals,
   economicCalendar,
+  economicCalendarCurrent,
   economicCalendarLoads,
   events,
   evidencePacks,
@@ -142,10 +144,20 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * ONE HUNDRED AND NINE OF 114, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
- * owner the TABLE: a table is registered ONCE by the first session that needs
- * it, the registration is never re-argued, and a session computes its own slice
- * from `TABLE_KEYS` on the tree it opened rather than from a roster.
+ * ONE HUNDRED AND TWELVE KEYS: 111 OF THE 115 TABLES, PLUS ONE VIEW, AND THE
+ * SET IS NOT A PHASE'S. ADR-092 makes the owner the RELATION: it is registered
+ * ONCE by the first session that needs it, the registration is never re-argued,
+ * and a session computes its own slice from `TABLE_KEYS` on the tree it opened
+ * rather than from a roster.
+ *
+ * `TableKey` NO LONGER MEANS "TABLE" AND ADR-209 IS WHERE THAT WAS DECIDED. One
+ * key names `economic_calendar_current`, which `0039` creates with the migration
+ * set's only `CREATE VIEW`. The name of the type is left alone deliberately: it
+ * is `keyof TABLES` by construction and appears at hundreds of call sites, and a
+ * rename would be a very large diff carrying no ruling. What the ADR fixes
+ * instead is the CHECK, in `test/scoped-db.test.ts`, where a view is compared
+ * against its own `CREATE VIEW` and against the relation it projects rather than
+ * against a `CREATE TABLE` it does not have.
  *
  * THE VOCABULARY HAS SIX MEMBERS AND THE SIXTH IS ADR-191's. This file used to
  * say the question `HOW DOES A ROW REACH AN IDENTITY?` has "exactly these four
@@ -431,6 +443,23 @@ export const TABLES = {
   // `readLiability`, whose `eligible_next_7d` fold names this table as its
   // fourth input.
   tradingCalendar,
+  // ADR-209 clause 1. THE FIRST REGISTERED RELATION THAT IS NOT A TABLE. It is
+  // `0039`'s only `CREATE VIEW` and the only one in the migration set, and the
+  // route that reads it (`apps/api/src/routes/economic-calendar.ts`) declares
+  // its source against THIS relation and never the base table, in its own
+  // words. `firm`, and the class is the projection's rather than a second
+  // judgement: the view selects ten columns of `economic_calendar` unchanged,
+  // `economic_calendar` is itself `firm`, and no column of either is declared
+  // against `identities(id)`. Registering it clears the FIRST of the two
+  // blockers `apps/api/test/wiring.test.ts` records on
+  // `setEconomicCalendarSource`, and not the second.
+  economicCalendarCurrent,
+  // SD-M8-01. `derived` via `affiliates` on `affiliate_id`, which is
+  // `affiliate_creatives`' and `affiliate_clicks`' rule a third time on a third
+  // table that declares the identical edge. No ruling was needed and none was
+  // taken. It clears the FIRST of `useAffiliateDeps`' obstructions and leaves
+  // the other three standing.
+  affiliateStatements,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -931,6 +960,11 @@ export const SCOPE_RULES = {
     why: "ONE ROW PER INGESTED PUBLICATION OF A THIRD PARTY'S RELEASE SCHEDULE. There is no identity column and there is no correct one: a load is the same load for every reader. `actor text NOT NULL` is 0002's actor idiom -- a loader or an operator, not a `users` row -- so it is not a path to anybody. The coverage window is what makes staleness answerable (FM-M7-08): a D-04 run over a day outside every load's coverage must refuse rather than report no releases, and that refusal is firm-wide.",
   },
 
+  economicCalendarCurrent: {
+    class: 'firm',
+    why: "THE CURRENT REVISION OF EVERY OCCURRENCE, AND IT IS A VIEW RATHER THAN A TABLE (0039_economic_calendar.sql, ADR-209). `SELECT DISTINCT ON (event_key, occurrence_key) ... ORDER BY event_key, occurrence_key, revision DESC` over `economic_calendar`, which that migration calls the only definition of current anywhere. THE CLASS IS THE PROJECTION'S AND NOT A SECOND JUDGEMENT: the view selects ten of `economic_calendar`'s columns unchanged, renames nothing and computes nothing, so every column it offers is a column of a `firm` table and a rule of any other class would have to name a column that is not there. `load_id` IS THE AVAILABLE MISTAKE AND A VIEW CANNOT EVEN CARRY IT: a view declares no foreign key, so `derived` has no edge in the DDL for the suite's own assertion to find, and the target `economic_calendar_loads` is `firm` besides, so the chain would terminate nowhere -- which is `trading_calendar_revisions`' refusal arriving on a relation that has no constraints at all. IT IS REGISTERED BECAUSE THE READER READS IT: `apps/api/src/routes/economic-calendar.ts` declares `EconomicCalendarSource` against this view and NEVER the base table, and an adapter forced onto `economic_calendar` would re-derive the maximum revision in TypeScript, which is the second-source-of-truth failure FM-M7-08 guards and the exact thing the view exists to make impossible. IT HAS NO KEY, AND THE ABSENCE IS THE DDL. `id` is `bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY` on the base table and a plain projected column here, so `uniqueKeys` finds nothing, every addressed write is refused before it reaches the database, and the database would have refused it too because a `DISTINCT ON` view is not auto-updatable. REGISTERING IT MAKES IT READABLE AND NOTHING ELSE, which is `events`' and `reserve_coverage_snapshots`' sentence on the first relation whose obstruction was its KIND rather than its tenancy.",
+  },
+
   evidencePacks: {
     class: 'derived',
     via: 'accounts',
@@ -1009,6 +1043,15 @@ export const SCOPE_RULES = {
     traversal: 'hop',
     why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0005_affiliate_program.sql), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. A CLICK BELONGS TO THE AFFILIATE AND NOT TO THE PERSON WHO CLICKED, and the DDL is what decides that: the table has no identity column, no `user_id` and no `purchase_id`, because a click happens before anybody has signed in. The three columns that look like a clicker are the trap and none of them is a tenancy -- `ip` reaches whoever shares a network, `user_agent` reaches whoever shares a browser build, and `click_fingerprint` is `sessions.device_fingerprint_id`'s named trap arriving on a different table.",
   },
+  affiliateStatements: {
+    class: 'derived',
+    via: 'affiliates',
+    localColumn: 'affiliate_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0012_disputes_and_affiliate_settlement.sql), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THIS IS THE THIRD TABLE ON EXACTLY THE SHAPE `affiliate_creatives` AND `affiliate_clicks` WERE REGISTERED ON, and it is registered without a ruling for that reason: the DDL declares one edge, the edge terminates one hop out at an `owned` table, and no column of this row is declared against `identities(id)` for ADR-101 clause 1 to refuse. WHAT A STATEMENT IS ABOUT IS THE AFFILIATE AND NEVER THE BUYERS WHOSE PURCHASES BUILT IT: the row carries `total_cents` and no line items, and the line items are `affiliate_commissions`, which is UNREGISTERED and stays so -- a scoped read of this table therefore returns a person their own periods and totals and hands them nobody else's uuid, which is the property that makes `derived` admissible here and refuses it one table over. `total_cents bigint NOT NULL` IS SIGNED and a clawback-heavy month is negative, so a wrong rule here shows one affiliate what another is owed; `affiliates.balance_cents` one hop out is signed for the same reason and is already `owned`. `paid_transfer_ref text NULL` IS THE AVAILABLE MISTAKE AND IT IS NOT A COLUMN A RULE COULD NAME: it carries no foreign key at all, so there is nothing to traverse, and it names a row in a payment provider's database rather than one in this one, which is `payout_destinations`' `destination_ref` argument arriving on the affiliate rail. A SCOPED READ RETURNS EVERY PERIOD INCLUDING THE VOID ONES, and that is deliberate: `status` admits `void` and `affiliate_statements_issued_has_date` keeps a non-draft statement's `issued_at` present, so what Merit told an affiliate and later voided stays quotable, which is `tos_acceptances`' history argument on a money document.",
+  },
+
   payoutRequests: {
     class: 'owned',
     column: 'identity_id',

@@ -1,39 +1,49 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// ONE HUNDRED AND NINE TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
-// UP. The other 5 are not reachable through ANY accessor: `SCOPE_RULES` is total
-// over the keys of this file, so a table that is not here is a COMPILE ERROR at
-// the call site rather than an unscoped read at runtime.
+// ONE HUNDRED AND ELEVEN TABLES OF 115, PLUS ONE VIEW, AND THAT IS REPORTED
+// RATHER THAN ROUNDED UP. The other 4 tables are not reachable through ANY
+// accessor: `SCOPE_RULES` is total over the keys of this file, so a relation
+// that is not here is a COMPILE ERROR at the call site rather than an unscoped
+// read at runtime.
 //
-// THE DENOMINATOR WAS STALE BEFORE THIS EDIT AND IS CORRECTED HERE RATHER THAN
+// THE ONE VIEW IS `economic_calendar_current` AND ADR-209 IS WHY IT IS COUNTED
+// SEPARATELY. It is the only `CREATE VIEW` in the migration set, so "of 115" is
+// a count of `CREATE TABLE` and the view is outside that denominator in both
+// directions: it is not one of the 115 and it is one of the 112 keys.
+//
+// THE DENOMINATOR HAS BEEN STALE TWICE AND IS RECOMPUTED HERE RATHER THAN
 // INCREMENTED. It read "111" while `0049`, `0050` and `0051` had taken the tree
-// to 114, so two earlier sessions moved the migration set and left this
-// sentence behind; both figures are now recomputed rather than adjusted --
-// `TABLE_KEYS.length` for the first and a count of `CREATE TABLE` across
-// `packages/db/migrations` for the second. `test/scoped-db.test.ts` asserts
-// both, which is why the staleness could survive here and not there.
+// to 114, and it then read "109 of 114" while `tradingCalendar` and `0065` had
+// taken it to 110 of 115 -- so four sessions in a row moved one of these figures
+// and left this sentence behind. Every number in this header is recomputed:
+// `TABLE_KEYS.length`, a count of `CREATE TABLE` across `packages/db/migrations`,
+// and the class tallies over `SCOPE_RULES`. `test/scoped-db.test.ts` asserts the
+// first, which is why the staleness could survive here and not there, and the
+// rest are asserted nowhere, which is why they went stale in company.
 //
-// NOT ALL 109 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
-// RATHER THAN ONE. 43 are `firm` and 3 are `pair` (ADR-106), so 63 of
-// the 109 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// NOT ALL 112 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
+// RATHER THAN ONE. 45 are `firm` and 3 are `pair` (ADR-106), so 64 of
+// the 112 are served by `scopedDb`. A `pair` table belongs to TWO identities and
 // is scoped to neither: it is excluded from `ScopedTableKey` because returning
 // the row to either party hands them the other party's identity uuid, and from
 // `FirmTableKey` because `firmDb()` takes no reason on the ground that no
 // identity is at risk. `systemDb(reason)` is its only door.
 //
-// THE SIXTY-THIRD IS THE FIRST OF A SIXTH CLASS AND IS SERVED RATHER THAN
-// REFUSED (ADR-191). `events` is `either`: one nullable identity column of its
+// ONE OF THE 64 IS THE ONLY MEMBER OF A SIXTH CLASS AND IS SERVED RATHER THAN
+// REFUSED (ADR-191). The sentence used to name it by ORDINAL, which made it a
+// figure that moves every time anything else is registered, and it had already
+// moved once. `events` is `either`: one nullable identity column of its
 // own beside one nullable account column, so a row reaches an identity the
 // `owned` way, or the `derived` way, or neither, and the predicate is the
 // DISJUNCTION of the two legs. It is in `ScopedTableKey` where `pair` is not,
 // because no row that predicate returns discloses a second party through a
-// tenancy column. It is the only table of that shape in the 114: seven others
+// tenancy column. It is the only table of that shape in the 115: seven others
 // carry both an identities edge and an accounts edge and every one of the seven
 // declares its identity column NOT NULL, which makes them `owned` with no
 // disjunction to write.
 //
-// THE ONE HUNDRED AND NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE ONE HUNDRED AND TWELVE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -119,6 +129,7 @@ import {
   smallint,
   text,
   timestamp,
+  unique,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -2315,6 +2326,49 @@ export const economicCalendar = pgTable('economic_calendar', {
 });
 
 // -----------------------------------------------------------------------------
+// economic_calendar_current -- 0039_economic_calendar.sql. FIRM. A VIEW.
+// -----------------------------------------------------------------------------
+// THE FIRST RELATION IN THIS FILE THAT IS NOT A TABLE, AND ADR-209 IS WHY IT IS
+// HERE AT ALL. `0039` declares exactly one `CREATE VIEW` and it is the only one
+// in the sixty migrations: `SELECT DISTINCT ON (event_key, occurrence_key) ...
+// ORDER BY event_key, occurrence_key, revision DESC` over `economic_calendar`,
+// which the migration calls "the only definition of that anywhere".
+//
+// IT IS TRANSCRIBED BECAUSE THE READER READS IT AND NEVER THE BASE TABLE.
+// `apps/api/src/routes/economic-calendar.ts` declares `EconomicCalendarSource`
+// against this view in its own words, and an adapter that read
+// `economic_calendar` instead would have to re-derive the maximum revision --
+// which is the second-source-of-truth failure `FM-M7-08` guards and the exact
+// thing `0039` created the view to make impossible. Refusing to register it does
+// not keep the derivation out of the tree; it moves it into an adapter where
+// nothing compares it to the view.
+//
+// A VIEW HAS NO KEY, NO FOREIGN KEY AND NO CONSTRAINT, AND THE OMISSIONS BELOW
+// ARE THE DDL RATHER THAN AN OVERSIGHT. `id` is `bigint GENERATED ALWAYS AS
+// IDENTITY PRIMARY KEY` on the base table and is a plain projected column here,
+// so `uniqueKeys` finds nothing and every addressed write is refused before it
+// reaches the database -- which is the safe direction, and it is also what the
+// database would have said, because a `DISTINCT ON` view is not auto-updatable.
+//
+// THE TYPES AND NULLABILITY ARE THE BASE TABLE'S, BECAUSE THE ROWS ARE. The
+// projection renames nothing and computes nothing, so each column below is
+// `economic_calendar`'s column unchanged, and `packages/db/test/scoped-db.test.ts`
+// asserts that against `economic_calendar`'s folded DDL rather than against a
+// `CREATE TABLE` this relation does not have.
+export const economicCalendarCurrent = pgTable('economic_calendar_current', {
+  id: bigint('id', { mode: 'bigint' }).notNull(),
+  loadId: bigint('load_id', { mode: 'bigint' }).notNull(),
+  eventKey: text('event_key').notNull(),
+  occurrenceKey: text('occurrence_key').notNull(),
+  tier: smallint('tier').notNull(),
+  scheduledReleaseAt: timestamp('scheduled_release_at', { withTimezone: true }).notNull(),
+  releaseTradingDay: date('release_trading_day').notNull(),
+  revision: integer('revision').notNull(),
+  revisionReason: text('revision_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// -----------------------------------------------------------------------------
 // report_schedules -- 0040_report_schedules.sql. FIRM.
 // -----------------------------------------------------------------------------
 // WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. The
@@ -2577,6 +2631,56 @@ export const affiliateClicks = pgTable('affiliate_clicks', {
   suspiciousReason: text('suspicious_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// affiliate_statements -- 0012_disputes_and_affiliate_settlement.sql. DERIVED:
+// `affiliate_id` -> affiliates, one hop.
+// -----------------------------------------------------------------------------
+// SD-M8-01. WHAT MERIT OWES ONE AFFILIATE FOR ONE PERIOD, monthly and immutable
+// once issued. `0012` creates it BEFORE `affiliate_commissions` because that
+// table's `paid_in_statement_id` references it.
+//
+// THE CLASS IS `affiliate_creatives`' AND `affiliate_clicks`' AND IT NEEDED NO
+// RULING: `affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE
+// RESTRICT` is the only path to an identity, it is single-valued so the hop
+// cannot multiply rows, and `affiliates` carries the identity. Two siblings on
+// this exact shape were registered `derived` by earlier sessions and this is the
+// third, which is why `ADR-209` rules on the OTHER relation in its slice and not
+// on this one.
+//
+// `total_cents` IS SIGNED AND THAT IS WHAT MAKES THE TENANCY MATTER. A
+// clawback-heavy month is negative, so a wrong rule here shows one affiliate the
+// money another is owed, or owes. `affiliates.balance_cents` one hop out is
+// signed for the same reason and is already `owned`.
+//
+// `paid_transfer_ref` IS `text NULL` WITH NO FOREIGN KEY and is the only column
+// that reads like a second path. It names a row in a payment provider's
+// database rather than one in this one, which is `payout_destinations`'
+// `destination_ref` arriving on the affiliate rail.
+//
+// `affiliate_statements_period_uq` IS TRANSCRIBED RATHER THAN LEFT OUT, and
+// `treasury_balances` is why: a key the DDL declares and `schema.ts` does not is
+// an address ADR-112 refuses, so the period a caller actually names would be
+// unaddressable while the database was bounding it all along.
+export const affiliateStatements = pgTable(
+  'affiliate_statements',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    affiliateId: uuid('affiliate_id')
+      .notNull()
+      .references(() => affiliates.id),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+    // Signed: a clawback-heavy month is negative.
+    totalCents: bigint('total_cents', { mode: 'bigint' }).notNull(),
+    status: text('status').notNull().default('draft'),
+    paidTransferRef: text('paid_transfer_ref'),
+    issuedAt: timestamp('issued_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique('affiliate_statements_period_uq').on(table.affiliateId, table.periodStart)],
+);
 
 // -----------------------------------------------------------------------------
 // payout_requests -- 0010_payouts.sql, PLUS FIVE COLUMNS FROM 0031. ADR-094's
