@@ -356,11 +356,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // THE SIXTH CLAUSE IS THE FINDING AND IT IS THIS ENTRY'S OWN DEFECT FOR THE
   // THIRD TIME. `PayoutSubject` has THREE fields and eleven revisions of this
-  // reason have named two. `gates` is not downstream of the worker, not
-  // downstream of the codec and not downstream of a row, so every session that
-  // clears links 1 to 4 still arrives at `subject()` unable to call it. A reason
-  // that names the second-cheapest blocker retires the question for every reader
-  // after it, and this list exists to make that expire.
+  // reason named two. ADR-248 RULED THE THIRD AND THE ANSWER IS THAT `gates` IS
+  // NOT CONSTRUCTIBLE IN THIS DEPLOYABLE: three of its five facts resolve off
+  // registered tables, `accountStatus` is not a total map, and the in-flight
+  // leg has NO PREDICATE TO READ because M01 states R-38's grain both ways. SO
+  // THE ENTRY NARROWS TO NAME ALL THREE FIELDS AND WHAT EACH ONE WAITS ON.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -412,19 +412,39 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'TWO files: `packages/rules-engine/src/types.ts`, which DECLARES the field, and ' +
     '`packages/harness/src/trial.ts`, which raises one member on a value its caller handed it ' +
     'inside a Monte Carlo loop whose package declares no database. Every constructed value is a ' +
-    'fixture or `scripts/demo/fold.ts`. THE FIVE FACTS ALL HAVE COLUMNS AND THE RESOLVER IS ' +
-    'WHAT IS MISSING: `identities.payouts_frozen` (`0002_identity.sql:50`), ' +
-    '`accounts.payouts_frozen` (`0007_accounts.sql:83`), `accounts.recon_blocked` ' +
-    '(`0007_accounts.sql:87`), the ' +
-    '`kyc_status` enum (`0001_extensions_and_enums.sql:29`) and R-38s in-flight leg off ' +
-    '`payout_requests`. AND THE ACCOUNT-STATUS LEG CANNOT BE A TOTAL MAP: `account_status` ' +
+    'fixture or `scripts/demo/fold.ts`. THE FIVE FACTS SPLIT THREE AND TWO, AND THE ENTRY ' +
+    'NARROWS BY ADR-248 RATHER THAN REPEATING THAT A RESOLVER IS MISSING. THREE RESOLVE: ' +
+    '`payoutsFrozen` is `identities.payouts_frozen` (`0002_identity.sql:50`) OR ' +
+    '`accounts.payouts_frozen` (`0007_accounts.sql:83`), which `admin-source/search.ts` ' +
+    'already works out and states; `reconBlocked` is `accounts.recon_blocked` ' +
+    '(`0007_accounts.sql:87`) and has no identity half; and `kycState` is the head of the ' +
+    'supersession chain over `kyc_verifications.state` (`0003_kyc.sql:51`), which ' +
+    '`currentKycState` (`apps/api/src/routes/wallet-withdrawals.ts:471`) ALREADY RESOLVES AND ' +
+    'FAILS CLOSED ON, on another money door. TWO DO NOT. THE ACCOUNT-STATUS LEG CANNOT BE A ' +
+    'TOTAL MAP: `account_status` ' +
     'declares SEVEN members (`0001_extensions_and_enums.sql:47`) and `AccountStatus` ' +
     '(`packages/rules-engine/src/types.ts:891`) takes SIX, the difference being ' +
     '`provisioning_pending`, and `M01:203` carries the same six, so the engine transcribed its ' +
-    'source correctly and the resolver owes a REFUSAL rather than a widened union. THIS CLAUSE ' +
-    'DID NOT MOVE WHEN THE WORKER LANDED because nothing ADR-241 built touches it, which is why ' +
-    'a session that lands the codec and the adapter would arrive at `subject()` with a ' +
-    '`RuleState` in hand and no third argument for it. THE FIRM-READ CLAUSE IS ' +
+    'source correctly and the resolver owes a REFUSAL rather than a widened union. AND THE ' +
+    'IN-FLIGHT LEG IS NOT A MISSING FUNCTION, IT IS A CONTRADICTED PREDICATE, WHICH IS WHERE ' +
+    'ADR-245 SIZED THIS SLICE TOO CHEAPLY: `M01:207` declares the field as an outstanding leg ' +
+    '"for this account" and `M01:531` states R-38 as one "for this identity". `EC-040`, ' +
+    '`M01:861`s AS-01 residual and the live SD-09 index (`payout_requests (account_id)`, ' +
+    '`0031_payout_hold_and_identity_restriction.sql:105`) all take the ACCOUNT reading, and ' +
+    'AS-09 is RULED at the gate as visibility rather than a rule, so the identity reading ' +
+    'would refuse nine of a copy traders ten accounts under a ceiling the corpus declined to ' +
+    'impose. THE TWO READINGS DIFFER BY EVERY IDENTITY HOLDING MORE THAN ONE ACCOUNT, AND ONE ' +
+    'OF THEM IS PERMISSIVE ON THE DOOR WHERE MONEY LEAVES. A resolver picking either would be ' +
+    'a route ruling a contradiction inside a FROZEN plan, so `gates` IS NOT CONSTRUCTIBLE IN ' +
+    'THIS DEPLOYABLE TODAY and ADR-248 refused to build it. THIS CLAUSE ' +
+    'DID NOT MOVE WHEN THE WORKER LANDED because nothing ADR-241 built touches it, and it is ' +
+    'NOT DOWNSTREAM OF THE CODEC EITHER: `rule_states.context_gates` is `NOT NULL` ' +
+    '(`0015_rule_states.sql:130`) and `AccountDay.external` is required ' +
+    '(`apps/worker/src/batch/ports.ts:87`), so this resolver is UPSTREAM of the row rather ' +
+    'than the independent fourth slice ADR-245 section 6 sized. SO THE THREE FIELDS WAIT ON ' +
+    'THREE DIFFERENT THINGS AND THE TWELFTH REVISION OF THIS REASON SAYS SO: `state` waits on ' +
+    'a codec, an adapter and a row, which is clauses one to four; `plan` waits on NOTHING and ' +
+    'ADR-233 discharged it; `gates` waits on a RULING and not on code. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +
@@ -653,14 +673,24 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ADR-170, `routes/verify.ts` implements it, and `start.ts` wires `databaseVerifySource(LIVE_DB)` ' +
     'today. What that half waits on is an ORIGIN, which is a deployment fact ADR-012 keeps out of ' +
     'this repository and which one named environment variable would close. ' +
-    'WHAT STILL REFUSES IS `image_url`, AND IT IS THE CARD RATHER THAN THE SIGNER. ADR-240 ruled ' +
-    'the URL signing key out of this deployable and named where it belongs (the object store or ' +
-    'the edge, INFRA section 2), and ADR-246 read that ruling forward: a signer signs an address, ' +
-    'an address addresses an object, and the object is a card THIS REPOSITORY HAS NO RENDERER ' +
-    'FOR. `certificates` (`0020_public_surface.sql`) carries seventeen columns and none ' +
-    'of them is an image location, so there is not even a stored value to sign, and no migration ' +
-    'in the set alters the table. `test/certificate-ports.test.ts` executes the column set and ' +
-    'the sweep, so the day either moves this entry goes red. ' +
+    'WHAT STILL REFUSES IS `image_url`, AND ADR-249 NARROWED IT TO ONE THING. It is no longer ' +
+    'the signer, the column and the renderer: it is the RENDERER, alone. ADR-249 ruled that this ' +
+    'card carries NO SIGNATURE AT ALL, so the key ADR-240 placed outside this deployable is a key ' +
+    'nothing in the design asks for, and that `image_url` is `origin` plus the path this file ' +
+    'already serves, DERIVED FROM `code` at projection time. `projectCertificate` hands `links` ' +
+    'the code and no other field of the row can reach the address, which is executed in ' +
+    '`test/certificate-card-home.test.ts` rather than argued here, so `certificates` needs no ' +
+    'image-location column and ADR-249 RESERVED NO MIGRATION NUMBER AND TOOK NONE. The table ' +
+    'still carries seventeen columns and none is an image location and no migration in the set ' +
+    'alters it (`0020_public_surface.sql`), and that is now a RULING that it needs none rather ' +
+    'than a measurement of an absence. `test/certificate-ports.test.ts` executes the column set ' +
+    'and the sweep, so the day either moves this entry goes red. ' +
+    'SO THIS PORT WAITS ON THE ENDPOINT ITS OWN FIELD WOULD ADDRESS, and on an origin. Publishing ' +
+    'a link to a trader is publishing a promise that bytes are there, and until ' +
+    '`useCertificateImageSource` has a renderer the address would resolve to a 503. ADR-240 ' +
+    'clause 10 still declines to name the origin variable, for a ground ADR-249 CHANGED rather ' +
+    'than repeated: it is no longer that the sibling field can never be built, it is that the ' +
+    'row it addresses does not answer yet. ' +
     'AND THE HALF-WIRING IS REFUSED ON A SECOND GROUND THAT IS NOT A MISSING PIECE AT ALL: ' +
     '`projectCertificate` never calls `links` for a deferred row (ADR-168 foreclosure 4), so a ' +
     'backend with a live read and a refusing signer answers 200 to a trader whose certificates ' +
@@ -698,9 +728,20 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'beside it are a renderer no deployment can set. ADR-240 declines to name the first while ' +
     'the second has no producer, because a variable whose only consumer refuses is a name ' +
     'nothing reads. ' +
-    'ADR-246 ADDS THE SET READING AND NOTHING ELSE: the bytes this port owes and the `image_url` ' +
+    'ADR-246 ADDED THE SET READING: the bytes this port owes and the `image_url` ' +
     '`useCertificateBackend` owes are ONE deliverable, so the two entries expire together or ' +
-    'not at all, and a session dispatched at either is dispatched at the card.',
+    'not at all, and a session dispatched at either is dispatched at the card. ' +
+    'AND ADR-249 RULED WHERE THAT CARD COMES FROM, WHICH LEAVES THIS ENTRY WAITING ON A ' +
+    'RENDERER AND ON NOTHING ELSE. It is rendered ON FETCH, from the live row, by whatever ' +
+    "answers this deployable's own image row, and it is stored NOWHERE DURABLE: `INV-M11-08` " +
+    'says a rendered image "is re-generated on fetch from the live row" and is "never a static ' +
+    'artifact Merit keeps serving after the row changed", and `imageHandler` already enforces it ' +
+    'by refusing a non-deferred lookup that carries no card. Every value the card draws is ' +
+    'already a column of `certificates`, so the renderer this port waits on needs NO MIGRATION, ' +
+    "and `FM-M11-05`'s cache key `(code, row_version)` names a column that does not exist and " +
+    'that ADR-249 rules DERIVED rather than stored. Both halves are executed in ' +
+    '`test/certificate-card-home.test.ts`. THE RENDERER IS STILL ABSENT AND THAT IS THE WHOLE ' +
+    'OF WHAT REFUSES HERE.',
   useCertificateRevokeBackend:
     'READ BY ADR-246 AS THE THIRD OF THE THREE CERTIFICATE PORTS AND LEFT EXACTLY WHERE IT ' +
     'STOOD: it is the one of the three that is NOT about the card, so the card landing does ' +
