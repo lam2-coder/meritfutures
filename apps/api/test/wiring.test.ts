@@ -137,7 +137,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   an authority, it is a shape" (`routes/admin-reads.ts:961`).
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
-  // (`packages/db/src/scoped-db.ts:248`) and ADR-165 ruled it gains no member, so
+  // (`packages/db/src/scoped-db.ts:267`) and ADR-165 ruled it gains no member, so
   // the vocabulary was never the obstacle either. ADR-171 section 9 states the
   // condition under which the door becomes takeable: the slice that lands an
   // `AdminSessionSource` a deployment can install, because that is the first
@@ -152,7 +152,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`packages/db/migrations/0009_ledger.sql:164`) carries `as_of`, `open_liability_cents` and ' +
     'four exposure columns, plus `funded_accounts` ' +
     '(`packages/db/migrations/0049_reserve_coverage_snapshots.sql:135`) -- ' +
-    'and is scope class `firm` (`packages/db/src/scope.ts:756`), so the EXISTING `firm` door ' +
+    'and is scope class `firm` (`packages/db/src/scope.ts:826`), so the EXISTING `firm` door ' +
     'already reaches every column it has. A live adapter today would have to reach `sqlExecutor` ' +
     'to smuggle in SQL the accessor deliberately does not offer, which the port refuses by name.',
   setAdminSessionSource:
@@ -205,7 +205,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // ADR-172 clause 2 ruled that the handle is not the missing thing: the only
   // value satisfying `LedgerTx` is generic over EVERY TABLE IN THE ESTATE
-  // (`scoped-db.ts:2167`, `insert<K extends TableKey>`), so a door in `apps/api`
+  // (`scoped-db.ts:2389`, `insert<K extends TableKey>`), so a door in `apps/api`
   // returning one would be `systemDb` renamed. ADR-176 applied that to
   // `routes/payouts.ts`: `PayoutTx.ledger` is DELETED, the `LT-01` posting is
   // performed at a system authority, and the request path records the approval
@@ -272,9 +272,9 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'THAT RUNS EVERY METHOD ON ONE TRANSACTION: `PayoutTx.subject` returns `PayoutSubject` ' +
     '(`routes/payouts.ts:329`) whose `plan` (`:332`) is a `ResolvedPlan`, which M01 section 1.3 ' +
     'builds from `plan_versions.rules` and a `plan_version_sizes` row; both tables are scope ' +
-    'class `firm` -- `planVersions` (`packages/db/src/scope.ts:702`) and `planVersionSizes` ' +
-    '(`packages/db/src/scope.ts:707`) -- and `ScopedTableKey` is ' +
-    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1423`), so no `ScopedTx` read ' +
+    'class `firm` -- `planVersions` (`packages/db/src/scope.ts:772`) and `planVersionSizes` ' +
+    '(`packages/db/src/scope.ts:777`) -- and `ScopedTableKey` is ' +
+    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1514`), so no `ScopedTx` read ' +
     'reaches either. ADR-211 clause 2 RULED THE REMEDY AND NOTHING HAS APPLIED IT: two ' +
     'transactions, scoped first, the catalogue read a SECOND PORT beside `PayoutTx` rather ' +
     'than a member of it. That is a change to `routes/payouts.ts`. THE MUTABILITY HALF OF ' +
@@ -287,7 +287,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`ResolvedPlan` no scoped door reaches. Session 401 registered it, ADR-213 section 8 ' +
     'registered it again, and `routes/payouts.ts` is a handler file outside this fence. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
-    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1056`, and ' +
+    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1126`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
     'beside a `transact` that rejects would put a live-looking route in front of the arm that ' +
     'approves payouts. MONEY PATH.',
@@ -350,7 +350,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'which is `pair`; and no table records an ISSUED link. THE THIRD IS SPENT AND THE ENTRY IS ' +
     'REWRITTEN RATHER THAN SHRUNK: it read that `affiliate_statements` is not in `schema.ts` at ' +
     'all, and `affiliateStatements` (`packages/db/src/schema.ts:2686`) declares it while ' +
-    '`affiliateStatements` (`packages/db/src/scope.ts:1046`) registers it `derived` through ' +
+    '`affiliateStatements` (`packages/db/src/scope.ts:1116`) registers it `derived` through ' +
     '`affiliates` on `affiliate_id`. So FOUR of the six methods have a door rather than three -- ' +
     '`affiliate`, `requiredDisclosure` and `submitCreative` on `affiliates`, which is `owned`, ' +
     'and now `statements` -- and all four are an adapter somebody can write. REGISTERED RATHER ' +
@@ -364,7 +364,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'neither `packages/db/src/schema.ts` nor `scope.ts`, so no door could name it, AND THAT IS ' +
     'FALSE: ADR-209 registered it. `economicCalendarCurrent` ' +
     '(`packages/db/src/schema.ts:2379`) declares `economic_calendar_current` and ' +
-    '`economicCalendarCurrent` (`packages/db/src/scope.ts:963`) classes it `firm`, so it is a ' +
+    '`economicCalendarCurrent` (`packages/db/src/scope.ts:1033`) classes it `firm`, so it is a ' +
     '`TableKey` and `db.firm` reaches it. WHAT REFUSES IS THE SECOND GROUND, UNTOUCHED: ' +
     '`freshness.stale` is decided against a CONFIGURED HORIZON that lives with the alarm and ' +
     'not in this deployable. The port says so at `routes/economic-calendar.ts:166`, "the answer ' +
@@ -398,12 +398,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'rules no door onto this database could ever serve. SECOND AND INDEPENDENT: ' +
     '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
-    'class `owned` on `identity_id` (`packages/db/src/scope.ts:790`). `db.firm` refuses that key ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:860`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1390-1392`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1473-1475`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
-    '(`packages/db/src/scope.ts:939`), so the audit half alone has a door and the subject half ' +
+    '(`packages/db/src/scope.ts:1009`), so the audit half alone has a door and the subject half ' +
     'does not, which is the same one-live-arm shape `useVerifySource` below refuses. THIRD, AND ' +
     'it is configuration rather than a door: `presentation()` ' +
     "(`routes/admin-certificates.ts:363`) is `GET /verify/:code`'s copy, and the " +
@@ -414,10 +414,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ONE ARM OF THREE, AND THE OTHER TWO ARE CONSTRUCTIBLE TODAY, WHICH IS WHY THIS ENTRY EXISTS ' +
     'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:596`) reads `certificates`, ' +
     'and `GET /verify/:code` is UNAUTHENTICATED, so `db.scoped` has no identity to open with; ' +
-    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:790`), and ' +
-    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1390-1392`), so ' +
+    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:860`), and ' +
+    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1473-1475`), so ' +
     '`db.firm` refuses that key AT COMPILE TIME. THE OTHER TWO ARMS HAVE WHAT THEY NEED: ' +
-    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1305`), so the ' +
+    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1375`), so the ' +
     '`record` arm is writable through `db.firm` now, and `presentation` is deployment ' +
     'configuration rather than a read. A BACKEND WITH ONE LIVE ARM AND ONE THAT REJECTS IS ' +
     "REFUSED HERE, on `usePayoutBackend`'s stated rule: it would put a live-looking public " +
