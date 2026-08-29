@@ -227,6 +227,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-206](ADR-206.md) | `engine_gates` stores the engine's own value in the engine's own names, with cents as base-10 strings, because the storage constrains nothing and the three shapes already in this tree disagree  (2026-08-29, status: proposed) |
 | [ADR-208](ADR-208.md) | `GET /admin/eligible-forecast` declines with a body and never with a 404, because on its own heading a 404 already means a route nobody has built  (2026-08-29, status: proposed) |
 | [ADR-209](ADR-209.md) | a `TableKey` may name a VIEW, its scope class is the class of the relation it PROJECTS, and it is never addressable -- so `economic_calendar_current` is registered and `affiliate_statements` needed no ruling at all  (2026-08-29, status: proposed) |
+| [ADR-212](ADR-212.md) | a citation proves the cited line is PART OF WHAT THE SENTENCE NAMES, so `RI-15` gains an anchor, a vacancy rule and the comma list -- and the window it was built on turns out to move nothing at all  (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
