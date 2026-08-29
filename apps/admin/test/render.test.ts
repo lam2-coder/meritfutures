@@ -14,6 +14,8 @@ import {
   servedLiabilityHomeStrings,
 } from '../src/app/liability-home.tsx';
 import { TRUST_KEYS, type TrustSignal } from '../src/data-trust.ts';
+import { ADMIN_BARREL_LEGS } from '../src/index.ts';
+import { readLiabilityHome } from '../src/liability-read.ts';
 import {
   type LiabilityHomeInput,
   type LiabilityHomePage,
@@ -574,5 +576,50 @@ describe('M6-A-61: the liability home serves the answers that were measured', ()
     // and are what the exception is for.
     const money = served.match(/\d[\d,]*\.\d\d/g) ?? [];
     expect(money).toEqual([]);
+  });
+});
+
+// =============================================================================
+// M6-A-86. THE SCREEN IS READY AND THE SOURCE IS NOT, AND BOTH HALVES ARE READ
+// RATHER THAN ASSERTED
+// =============================================================================
+// The root route renders its honest unavailable state and its `P5-l` entry says
+// why. **A BLOCKER IS A CLAIM ABOUT ANOTHER PACKAGE AND CLAIMS GO STALE
+// SILENTLY** (session 364 landmine 5), and this one recites five method names
+// out of `apps/api`. So the sentence is bound to the array it recites: the day
+// `readLiability` is composed, this case fails and the blocker comes out.
+
+describe('M6-A-86: the served blocker recites the register rather than a memory of it', () => {
+  const markup = renderToStaticMarkup(LiabilityHomeRoute());
+  const served = text(markup);
+
+  const implemented = (): readonly string[] => {
+    const source = readFileSync(
+      join(import.meta.dirname, '..', '..', 'api', 'src', 'admin-source', 'index.ts'),
+      'utf8',
+    );
+    const declared = /export const IMPLEMENTED_ADMIN_READS = \[([\s\S]*?)\] as const/.exec(source);
+    expect(declared, 'admin-source/index.ts declares IMPLEMENTED_ADMIN_READS').not.toBeNull();
+    return [...(declared?.[1] ?? '').matchAll(/'([A-Za-z]+)'/g)].map((match) => match[1] ?? '');
+  };
+
+  test('every method the blocker names is really in the register', () => {
+    const names = implemented();
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names)
+      expect(served, `${name} is composed and the blocker omits it`).toContain(name);
+  });
+
+  test('`readLiability` is NOT in the register, which is the whole of the blocker', () => {
+    expect(implemented()).not.toContain('readLiability');
+    expect(served).toContain('readLiability is not among the five');
+  });
+
+  test('the blocker says the missing half is the SOURCE and not a console file', () => {
+    // A READER WHO CONCLUDED THE SCREEN WAS UNBUILT WOULD REBUILD IT. The
+    // reader module exists, is a barrel leg, and this route`s own prose says so.
+    expect(served).toContain('THE CONSOLE HALF IS NOT WHAT IS MISSING');
+    expect(ADMIN_BARREL_LEGS).toContain('./liability-read.ts');
+    expect(typeof readLiabilityHome).toBe('function');
   });
 });
