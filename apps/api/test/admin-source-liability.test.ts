@@ -15,16 +15,19 @@
 // **AND `readLiability` IS STILL NOT COMPOSABLE, WHICH IS NOT WHAT THE CLEARING
 // LOOKED LIKE FROM OUTSIDE.** *No column of that name exists* and *the figure has
 // no producible source* are two claims ADR-199 correctly separates; *the figure is
-// derivable* and *this tree can read it today* are a THIRD pair, and they come
-// apart on two of the same three figures. `src/admin-source/liability.ts` now
-// produces 27 of `LiabilityResponse`'s 39 leaf paths from live rows, and the
-// arithmetic is checked in `admin-source-liability-book.test.ts` rather than
-// asserted here. **THE PRODUCED COUNT DID NOT MOVE WHEN `ADR-203` LANDED AND THE
-// DECLARED COUNT DID**: two groups became nullable containers, so `RI-18`'s
-// reader stopped walking into seven object members and started reporting two
-// leaves plus `gaps`' four. The other 12 are FIVE blockers holding 8 and an empty
-// `gaps` array standing over 4, none of them a column, and the last section of
-// this file holds each blocker with its own clearing condition.
+// derivable* and *this tree can read it today* are a THIRD pair, and they came
+// apart on two of the same three figures.
+//
+// **FOUR OF THE FIVE BLOCKERS ARE SPENT AND ONE STANDS**, which is session 390's
+// diff and is the largest move this file has recorded. `B4` gained a reader over
+// `0064`'s run record; `B3` and `B2` gained a RENDERING of the absence `ADR-203`
+// had only made sayable. **NO COUNT IS WRITTEN HERE**: this header carried
+// "produces 27 of `LiabilityResponse`'s 39 leaf paths" and the first half went
+// stale in the same diff that lifted the blockers, twice.
+// `admin-source-liability-book.test.ts` derives declared, blocked and produced
+// from API_CONTRACT through `RI-18`'s own reader, and that is the only place any
+// of the three belongs. What is still blocked is `eligible_next_7d` and nothing
+// else, and the last section of this file holds each blocker with its condition.
 //
 // **B1 LIFTED AND THE COUNT DID NOT MOVE, WHICH IS SESSION 380's FINDING AND IS
 // WHY B5 IS AT THE BOTTOM OF THIS FILE.** `trading_calendar` is a `TableKey` now
@@ -37,10 +40,13 @@
 // Session 374 was dispatched to read a red and found 12 of 12 green because
 // session 372 had spent the clearing condition in its own diff. Session 380 was
 // dispatched to read a red and found 56 of 56 green, because session 377 spent
-// B1's two conditions in ITS own diff and said so. THE MECHANISM IS WORKING AND
-// THE DISPATCH IS READING IT BACKWARDS: a clearing condition is spent by the
-// session that lifts the blocker, so the NEXT session inherits a green suite and
-// an accurate map. That is the design, not a failure of it.
+// B1's two conditions in ITS own diff and said so. Session 390 was dispatched
+// with the point written into the prompt in terms -- "running the suite first
+// tells you the map is still accurate, not that a blocker lifted" -- ran it
+// green, and then turned two cases red in its own diff. THE MECHANISM IS WORKING:
+// a clearing condition is spent by the session that lifts the blocker, so the
+// NEXT session inherits a green suite and an accurate map. That is the design,
+// not a failure of it.
 //
 // This file is not the suite of that module -- `test/admin-source-liability-book.test.ts`
 // is, and it is where the subtraction is checked against API_CONTRACT. This one
@@ -377,21 +383,27 @@ describe('the keys this method would take are already reachable', () => {
 });
 
 // =============================================================================
-// THE FOUR BLOCKERS THAT STAND AFTER ADR-199, EACH WITH ITS CLEARING CONDITION
+// THE BLOCKERS, EACH WITH ITS CLEARING CONDITION, AND FOUR OF THE FIVE ARE SPENT
 // =============================================================================
 // SESSION 374's MEASUREMENT, IN THE FORM SESSION 363 CHOSE FOR ITS OWN. ADR-199
 // ruled three figures DERIVABLE and it is right about all three; what it did not
 // rule is that they are READABLE, and for two of the three it says so in its own
-// words. These are what stands between `src/admin-source/liability.ts`, which
-// produces 27 of the response's 39 leaf paths from live rows, and
+// words. These are what stands between `src/admin-source/liability.ts` and
 // `AdminReadSource.readLiability`, which needs all of them.
 //
+// **NO NUMERAL IS WRITTEN IN THIS BLOCK.** It used to read "produces 27 of the
+// response's 39 leaf paths" and the first half went stale in session 390's own
+// diff. `test/admin-source-liability-book.test.ts` derives declared, blocked and
+// produced from API_CONTRACT through `RI-18`'s reader, and that is the only
+// place any of the three belongs.
+//
 // NOT ONE OF THEM IS A COLUMN, so no migration number clears any of them and
-// `0062` stays returned. **BOTH RULINGS OWED HAVE NOW LANDED** -- `ADR-201` the
-// window, `ADR-202` and `ADR-203` the absence and its wire shape -- and a ruling
-// makes a figure SAYABLE and never PRODUCED, so B2 and B3 stay below with their
-// conditions restated rather than deleted. The other two are absences of a fact
-// nothing in this estate records.
+// `0062` stays returned. **ALL THREE RULINGS OWED HAVE LANDED** -- `ADR-201` the
+// window, `ADR-202` and `ADR-203` the absence and its wire shape, `ADR-204` the
+// per-account projection -- and a ruling makes a figure SAYABLE and never
+// PRODUCED, which is why each of B2, B3 and B4 then took a SESSION as well.
+// **B1, B2, B3 AND B4 ARE SPENT. B5 IS THE ONE STILL STANDING**, and `ADR-204`
+// section 8 is why: leg 1 holds and leg 2 is refuted.
 // =============================================================================
 
 describe('blocker B1: eligible_next_7d, and the TableKey that arrived', () => {
@@ -547,14 +559,34 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(migration).not.toContain('cadenceGap');
   });
 
-  it('LEG 2: R-37 counts by `sequence` subtraction and NO MIGRATION DECLARES ONE', () => {
-    // THE OTHER ROUTE ADR-199 SECTION 6 OFFERS, AND IT ENDS AT A MISSING COLUMN.
-    // Recomputing the gate needs `CalendarDay.sequence`, which M01 R-02 fixes as
-    // the mechanism ("gap counting is `calendar.sequence` subtraction, never date
-    // arithmetic"). The engine receives its slice from a PORT the caller
-    // supplies; `trading_calendar` stores no such column and the seed assigns
-    // none, so the only substitute available to an adapter is the date
-    // arithmetic AS-06 forbids.
+  it('LEG 2: `sequence` is still not a column, and ADR-204 REFUTED the conclusion', () => {
+    // **CITATION REPAIR, HANDED TO THIS FENCE BY THE ENTRY THAT REFUTED IT.**
+    // `ADR-204` section 10 finding 1 says of this case, in terms: "Every
+    // assertion in it is still true ... What is now wrong is its prose", and
+    // "Reported: `apps/api/**` is not this fence's". This is that fence, so the
+    // prose is repaired here and every assertion below is UNCHANGED.
+    //
+    // WHAT THE CASE USED TO CONCLUDE: "The engine receives its slice from a PORT
+    // the caller supplies; `trading_calendar` stores no such column and the seed
+    // assigns none, so the only substitute available to an adapter is the date
+    // arithmetic AS-06 forbids."
+    //
+    // **THE PREMISE HOLDS AND THE CONCLUSION DOES NOT FOLLOW**, on `ADR-204`
+    // section 8's three steps. `CalendarDay.sequence` is a property of the
+    // SLICE and not of the table: `CalendarSlice` is a value the caller
+    // constructs (`ADR-049`), every reader of the field is slice-local
+    // (`tradingDaysBetween` subtracts two lookups in ONE slice), and two callers
+    // in this tree already synthesize it and both state when that is safe. A
+    // slice built over ONE COVERED INTERVAL cannot have a hole, because `0032`
+    // makes a day inside coverage that the table does not hold POSITIVELY not a
+    // session. So position over the ordered, holiday-filtered rows of one
+    // covered interval IS the dense index, by construction.
+    //
+    // **THEREFORE LEG 2 IS NOT A BLOCKER AND NO MIGRATION IS OWED.** What it
+    // names is a `CalendarSlice` loader over the covered interval, which is
+    // ordinary code in `apps/api`. The assertions stay because the COLUMN's
+    // absence is still the fact any later reader has to start from, and because
+    // `ADR-204` takes no number to add one.
     expect(readFileSync(join(ROOT, 'packages/rules-engine/src/types.ts'), 'utf8')).toContain(
       'readonly sequence: number;',
     );
@@ -604,16 +636,75 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     );
   });
 
-  it('CLEARING CONDITION: a rule_states writer lands, or a ruling defines the forecast', () => {
-    // THIS CASE GOES RED THE DAY EITHER LEG CLEARS, AND IT NAMES WHICH. Session
-    // 363's design and session 374's four: a clearing condition fires ONCE and
-    // the session that lifts the blocker spends it in its own diff.
+  // **THE RULING HALF OF THIS CONDITION FIRED AND THE PRODUCER HALF DID NOT**,
+  // which is why the condition is restated rather than inverted. It read: "a
+  // rule_states writer lands, OR a ruling defines the forecast". `ADR-204` is
+  // that ruling and it defines the projection completely -- population `E` union
+  // `C`, at most one `by_day` row per account, `min(withdrawable_cents,
+  // cap_for_next_ordinal)`, five named assumptions a producer may not choose --
+  // and it ruled the word FORECAST out while keeping the field. **A DEFINITION
+  // IS NOT A PRODUCER**, which is `B2`'s lesson arriving on the fifth blocker:
+  // `ADR-201` defined `avg_30d_cents` in August and the figure took two more
+  // sessions to reach a body.
+  //
+  // **AND THE ENGINE PRODUCER LANDED WHILE THIS BRANCH WAS OPEN, WHICH IS THE
+  // THIRD ARM AND MOVED IT NO FURTHER.** Session 389 built `projectPayout` in
+  // `packages/rules-engine`: `ADR-204`'s projection, executed, with the five
+  // assumptions carried as data rather than as arithmetic. **A PRODUCER WITH NO
+  // INPUT IS THE SAME BLOCKER WITH A LONGER CHAIN**, because that function takes
+  // a `RuleState` and a `RuleState` comes from `rule_states`, which is leg 1.
+  // That session reported the repair of this case's title to this fence in
+  // terms, and the title above is that repair: the ruling arm and the engine arm
+  // are both spent and neither was ever the blocker.
+  //
+  // **TWO THINGS ARE OWED AND NEITHER IS THIS FENCE'S TO TAKE ALONE.**
+  //   1. A `rule_states` writer. `ADR-204` section 8 refines session 380's
+  //      finding: the CALL SITE is real (`nightly.ts` calls `writeRuleState`)
+  //      and the IMPLEMENTATION is missing, so what is owed is one adapter and
+  //      not a call path. `packages/**` and `apps/worker/**` hold it.
+  //   2. `eligible_next_7d: EligibleNext7d | null`. `ADR-203` ruling 8 rules
+  //      that this field takes the absence shape and that BOTH causes it needs
+  //      are already in the vocabulary, and it deliberately did NOT move the
+  //      declaration: the seed produced exactly two `TS2345`s and no `RI-18`
+  //      finding, one of them in `EligibleForecastResponse`, a SECOND response
+  //      whose empty-horizon body is an open ruling. So the transcribing slice
+  //      owes one `| null`, one gap entry, and one ruling on a sibling body.
+  //
+  // CLEARING CONDITION, RESTATED: a `writeRuleState` implementation lands, AND
+  // `eligible_next_7d` gains its `| null`. Either one alone leaves this group
+  // unproducible, and the group goes whole or not at all (EC-074).
+  it('CLEARING CONDITION: a rule_states WRITER lands, and the field gains its `| null`', () => {
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
     );
-    expect(tradingCalendarColumnNames()).not.toContain('sequence');
+    // NON-VACUITY ON THE ARM THAT DID LAND, so this case cannot be read as
+    // saying the projection is unbuilt. It is built and it has no input.
+    expect(
+      readFileSync(join(ROOT, 'packages/rules-engine/src/payout/project.ts'), 'utf8'),
+    ).toContain('export function projectPayout');
+    // THE DECLARATION HALF, READ AT THE CONTRACT. `ADR-203` ruling 8 names this
+    // exact edit and does not make it, so a reader of that entry alone would
+    // conclude the shape had landed.
+    const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
+    const declared = contract.split('\n').filter((line) => /^ {2}eligible_next_7d:/.test(line));
+    expect(declared).toHaveLength(1);
+    expect(declared[0]).toContain('by_day: Array<{');
+    expect(declared[0]).not.toContain('| null');
+    expect(readFileSync(join(ROOT, 'docs/decisions/ADR-203.md'), 'utf8')).toContain(
+      '`eligible_next_7d` TAKES THIS SHAPE',
+    );
     // AND THE METHOD IS STILL NOT COMPOSED, which is what the two above decide.
     expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');
+  });
+
+  // **AND `eligible_next_7d` IS THE ONLY GROUP LEFT**, which is the one count
+  // worth holding here and is READ OFF THE MODULE rather than written down. The
+  // book's `Omit` list was four entries when session 374 measured it.
+  it('is the WHOLE of what LiabilityBook still subtracts, which was four groups', () => {
+    const book = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
+    expect(book).toContain(
+      "export type LiabilityBook = Omit<LiabilityResponse, 'eligible_next_7d'>;",
+    );
   });
 });
 
@@ -703,14 +794,18 @@ describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose wire
     // longer reads as a quiet week, which was ADR-201 finding 3's gap with a
     // pager attached.
     //
-    // WHAT IS LEFT IS THE COMPOSITION AND IT IS NOT THIS ENTRY'S. `readLiability`
-    // stays out of `IMPLEMENTED_ADMIN_READS` on B4 and B5, so nothing calls this
-    // evaluator on a served path yet. **A SHAPE THAT CAN CARRY AN ANSWER IS NOT
-    // AN ANSWER**, and a case that stopped asserting the leaves are producible
-    // would lose the half ADR-201 and session 383 actually bought.
+    // **AND THE THIRD INVERSION IS THE ONE ON THIS COMMENT RATHER THAN ON AN
+    // ASSERTION.** It read: "`readLiability` stays out of
+    // `IMPLEMENTED_ADMIN_READS` on B4 and B5, so nothing calls this evaluator on
+    // a served path yet." **B4 IS SPENT AND SOMETHING CALLS IT**: session 390
+    // wired `evaluatePayoutVelocity` into `readLiabilityBook` as a port, so the
+    // group is on the book, produced or declined with a paired gap, executed
+    // against a live PostgreSQL. **A SHAPE THAT CAN CARRY AN ANSWER IS NOT AN
+    // ANSWER** and this is the sentence's other half: an answer that reaches the
+    // BOOK is still not an answer on a SERVED PATH.
     //
-    // CLEARING CONDITION, RESTATED: `IMPLEMENTED_ADMIN_READS` contains
-    // `readLiability`.
+    // CLEARING CONDITION, UNCHANGED AND NOW HELD BY ONE BLOCKER RATHER THAN TWO:
+    // `IMPLEMENTED_ADMIN_READS` contains `readLiability`, which waits on B5.
     const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
     expect(contract).toContain(
       'payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean } | null',
@@ -730,7 +825,7 @@ describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose wire
   });
 });
 
-describe('blocker B3: per_plan[].cusum, ruled ABSENT and given a wire shape for absence by ADR-203', () => {
+describe('blocker B3: per_plan[].cusum, ruled ABSENT, wired by ADR-203 and RENDERED by session 390', () => {
   it('has ADR-167 clause 5 rendering it absent until DEP-M6-05, in those words', () => {
     const adr = readFileSync(join(ROOT, 'docs/decisions/ADR-167.md'), 'utf8');
     expect(adr).toContain('renders `per_plan[].cusum` as ABSENT until `DEP-M6-05` lands');
@@ -776,6 +871,29 @@ describe('blocker B3: per_plan[].cusum, ruled ABSENT and given a wire shape for 
     );
   });
 
+  // **THE THIRD HALF, AND IT IS THE ONE THIS SESSION SPENT.** `ADR-202` ruled
+  // the form and `ADR-203` put it on the wire; neither RENDERED it, and a
+  // nullable field nobody fills is a shape rather than an answer. The book now
+  // carries `cusum: null` on every plan with one `gaps` entry naming the path,
+  // and the entry is CONDITIONAL on there being a plan, because
+  // `assertLiabilityGapsPaired` refuses a gap over a figure that is not absent
+  // and `plan_breaker_state` has never held a row.
+  //
+  // CLEARING CONDITION: `DEP-M6-05` lands and the three members become numbers.
+  it('is RENDERED by the book, as a null the body explains rather than a member it drops', () => {
+    const book = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
+    expect(book).toContain('cusum: null');
+    expect(book).toContain("field: 'per_plan[].cusum'");
+    expect(book).toContain("awaiting: 'DEP-M6-05'");
+    // AND THE ENTRY IS CONDITIONED ON THE ARRAY THE VALIDATOR READS, which is
+    // what a constant `CUSUM_GAPS` could not be. `admin-breaker.ts` carries the
+    // constant form and has no pairing validator; this response has one.
+    expect(book).toContain('if (perPlan.some((plan) => plan.cusum === null))');
+    expect(readFileSync(join(ROOT, 'apps/api/src/routes/admin-breaker.ts'), 'utf8')).toContain(
+      'export const CUSUM_GAPS',
+    );
+  });
+
   it('has the CALIBRATION in Wave 4 and not in any migration, which is not a column', () => {
     expect(readFileSync(join(ROOT, 'docs/plans/M06-admin-ops-console.md'), 'utf8')).toContain(
       'DEP-M6-05',
@@ -784,7 +902,7 @@ describe('blocker B3: per_plan[].cusum, ruled ABSENT and given a wire shape for 
   });
 });
 
-describe('blocker B4: integrations.recon.last_run_at, a run nothing records', () => {
+describe('blocker B4: integrations.recon.last_run_at, LIFTED -- a run IS recorded and IS read', () => {
   it('has per-account recon events and no run event, which is the fold ADR-199 refuses', () => {
     // ADR-199 section 5 refuses `max(rule_states.computed_at)` for the batch
     // because OVERVIEW section 5.2 makes the run resumable at the account
@@ -834,21 +952,47 @@ describe('blocker B4: integrations.recon.last_run_at, a run nothing records', ()
     );
   });
 
-  // WHAT B4 STILL HOLDS, AND IT IS NOT THE SCHEMA. Two things stand between this
-  // record and a produced `last_run_at`, and neither is a migration: a producer
-  // that writes the row (`apps/worker`, which reaches neither this package's
-  // producer nor this adapter today), and the reader here. The event named in
-  // the case above is a THIRD thing and is owed to a frozen document rather than
-  // to this field: the data-model README section 1 says a mutable table emits an
-  // event on every meaningful transition, and EVENTS section 5.3 has no
-  // `recon.completed` to emit.
+  // **B4 IS LIFTED AND THIS CASE IS INVERTED IN THE DIFF THAT LIFTED IT.** It
+  // read "is still blocked on a reader, which is what the record does not
+  // supply", and it asserted the adapter named no `reconciliationRuns` and
+  // carried `'last_run_at'` only as a string inside a type subtraction. Session
+  // 374 named two things standing between the record and the field, neither of
+  // them a migration: a PRODUCER that writes the row, and the READER here.
+  // Session 387 wrote the producer (`apps/worker/src/recon/sweep.ts`); this
+  // session wrote the reader. A clearing condition fires ONCE and the session
+  // that lifts the blocker spends it.
   //
-  // THIS CASE IS THE NEXT CLEARING CONDITION and it goes red the day the adapter
-  // produces the field, which is the day this whole describe block should be
-  // re-derived rather than edited.
-  it('is still blocked on a reader, which is what the record does not supply', () => {
+  // WHAT THE CASE HOLDS NOW IS THE PROPERTY WORTH HOLDING AFTER THE LIFT, and it
+  // is not "a reader exists". It is that the reader takes the newest COMPLETED
+  // run, which is `reconciliation_runs_completed_is_whole`'s own stated reader
+  // and the only reading under which `0064` clears what `max(reconciliations.
+  // created_at)` could not. A later edit that drops the predicate would put the
+  // `started_at` of a sweep that died at account 2,341 of 5,000 on the panel
+  // P-M6-09 gates the page with, and it fails here.
+  it('has a reader now, and the reader takes the newest COMPLETED run', () => {
     const book = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
-    expect(book).toContain("'last_run_at'");
-    expect(book).not.toContain('reconciliationRuns');
+    expect(book).toContain('reconciliationRuns');
+    expect(book).toContain("rowsWhere('reconciliationRuns', { status: 'completed' })");
+    expect(book).toContain("latestInstant(completedRuns, 'startedAt'");
+    // AND THE COLUMN IS THE ONE `0064` NAMES FOR THIS FIELD, which is the half a
+    // reader of the predicate alone would not check. `finished_at` is a
+    // different instant and the index the migration attaches to the panel's read
+    // is on `started_at`.
+    expect(readFileSync(join(MIGRATIONS, '0064_reconciliation_runs.sql'), 'utf8')).toContain(
+      "-- The panel's read, which is `integrations.recon.last_run_at`: the newest run,",
+    );
+    expect(book).not.toContain("latestInstant(completedRuns, 'finishedAt'");
+  });
+
+  // THE EVENT IS A THIRD THING AND IT IS STILL OWED, which is stated as its own
+  // case so the lift above does not read as closing it. `data-model/README`
+  // section 1 says a mutable table emits an event on every meaningful
+  // transition; EVENTS section 5.3 has no `recon.completed` to emit. That is an
+  // amendment to a frozen document and therefore an ADR, and it blocks no field
+  // on this response.
+  it('CLEARING CONDITION: `recon.completed` reaches EVENTS section 5.3', () => {
+    expect(readFileSync(join(ROOT, 'docs/architecture/EVENTS.md'), 'utf8')).not.toContain(
+      'recon.completed',
+    );
   });
 });

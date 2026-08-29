@@ -8169,6 +8169,92 @@ Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, t
 
 ---
 
+## Session 390 (2026-08-28): four of the five liability blockers are spent, and the one that stands was never a rendering
+
+**`B4`, `B3` AND `B2` LANDED; `B1` WAS ALREADY SPENT; `B5` STANDS.** The pattern across the four is
+the finding rather than the arithmetic: **a ruling makes a figure sayable and a session makes it
+said.** [ADR-201](decisions/ADR-201.md) defined `avg_30d_cents` and the figure took two more sessions
+to reach a body; [ADR-202](decisions/ADR-202.md) and [ADR-203](decisions/ADR-203.md) ruled the shape of
+an absence and neither rendered one. `LiabilityBook`'s `Omit` list went from four entries to one, and
+the one is `eligible_next_7d`.
+
+**`readLiability` IS STILL NOT COMPOSED AND `IMPLEMENTED_ADMIN_READS` IS STILL FIVE**, on session
+374's judgement upheld a fourth time: composing against a source it cannot fully serve turns an honest
+500 into a wrong answer.
+
+**`B4`'s READ IS TRANSCRIBED FROM TWO PRIMARY SOURCES.** [`0064`](../packages/db/migrations/0064_reconciliation_runs.sql)'s
+index comment names the COLUMN for this very field, *"The panel's read, which is
+`integrations.recon.last_run_at`: the newest run, one index scan"*; and
+`reconciliation_runs_completed_is_whole`'s comment names the PREDICATE, *"a reader taking the latest
+completed run gets a sweep that actually covered the book"*. **Without that predicate the clock dates
+a sweep that died at the account boundary**, which is `ADR-199` section 5's refusal reproduced inside
+the table built to answer it, and `FM-M6-01` on the panel `P-M6-09` gates every other number with.
+Session 387 wrote the producer; this is the reader, which was the last of the three pieces.
+
+**`latestInstant` IS A MAX OVER ONE COLUMN AND DELIBERATELY NOT `latestBy`.** That fold refuses a tie
+and argues it from `liability_snapshots_as_of_uq`; `0064` rules a unique index OUT because `RB-02`
+section A sends a quarantined day to redelivery. Two completed runs at one instant is a state this
+schema admits, and it was executed rather than reasoned about.
+
+**`readGaps` BUILDS THE ARRAY AND DOES NOT CARRY A CONSTANT, AND THAT IS A CONTROL.** `CUSUM_GAPS` in
+`routes/admin-breaker.ts` is a constant because that endpoint has no pairing validator. This response
+has `assertLiabilityGapsPaired`, which refuses a gap naming a figure that is PRESENT, and
+`plan_breaker_state` has never held a row, so a constant entry would fire `ADR-203` ruling 2's second
+direction on the first read.
+
+**FOUND AND IN NO DISPATCH: A VALUE IMPORT OF `payout-velocity.ts` FROM `liability.ts` CLOSES AN ESM
+CYCLE.** That module spreads this one's calendar roster at module INITIALISATION, so whichever module
+is entered second reads a temporal dead zone and the suite dies at import with
+`TRADING_CALENDAR_TABLES is not iterable`. Measured on the first wired run. The evaluator arrives as a
+PORT and every import of it is type-only. **Extracting the calendar section into its own module is the
+better end state, moves roughly six hundred lines of a money-path file, and is REGISTERED rather than
+taken**; it is in this fence, so a later session can take it without a ruling.
+
+**CITATION REPAIR, HANDED TO THIS FENCE BY THE ENTRY THAT REFUTED IT.** [ADR-204](decisions/ADR-204.md)
+section 10 finding 1 says of `B5`'s LEG 2 case *"Every assertion in it is still true ... What is now
+wrong is its prose"* and *"Reported: `apps/api/**` is not this fence's"*. Every assertion is unchanged.
+
+**`B5`'s CONDITION IS RESTATED BECAUSE ITS RULING HALF FIRED AND ITS PRODUCER HALF DID NOT.** `ADR-204`
+defines the projection completely, and **a definition is not a producer**. **AND THE ENGINE PRODUCER
+LANDED WHILE THIS BRANCH WAS OPEN AND MOVED IT NO FURTHER**: session 389 built `projectPayout`, which
+takes a `RuleState`, and a `RuleState` comes from `rule_states`, which nothing writes. **A producer
+with no input is the same blocker with a longer chain**, and that session reported the repair of this
+case's title to this fence in terms. Two things are owed and neither is this fence's: a
+`writeRuleState` IMPLEMENTATION, and the `\| null` `ADR-203` ruling 8 rules onto `eligible_next_7d` and
+deliberately did not transcribe, because one of the two type errors that edit produces is in
+`EligibleForecastResponse`, a second response whose empty-horizon body is an open ruling.
+
+**EXECUTED AGAINST POSTGRESQL 16 WITH ALL 60 MIGRATIONS AND 115 TABLES, THROUGH THE REAL ACCESSOR.**
+Over a seeded estate of 64 sessions, 64 settled transfers and four runs: `last_run_at` reads
+`2026-08-28T05:04:00.000Z`, the newest COMPLETED run, and **not** the `failed` run at 05:12 nor the
+`running` one at 05:40; `payout_velocity` reads `10000 bp, alarm false` on the steady state; `cusum` is
+`null` with one paired gap, and the served validator passes. Six more arms probed live: only-unfinished
+runs and no runs both REFUSE; coverage deleted gives `estate_uncovered`; coverage shortened gives
+`insufficient_history` naming *"31 trading days were asked for ending at 2026-08-27 and the calendar
+holds 14"*; and two completed runs at one instant answer once. **`rcr_bp` is a GENERATED column**, which
+the seed learned from the database rather than from the schema file.
+
+**SEVEN SEEDS, SEVEN REDS**, each applied to the committed shape and restored from a byte copy, with
+`git status --porcelain` empty after every one.
+
+Counts derived at reporting time: **33 of 33** gates, **17 of 17** invariants, typecheck 0, lint 0,
+`format:check` clean, `falsify.mjs` read as OUTPUT with the tree clean after it, **60** migrations and
+**115** live tables, `LIABILITY_READ_TABLES` at **12**, `IMPLEMENTED_ADMIN_READS` at **5**, **5**
+blocked leaves against **39** declared so **34** produced, and **242 files / 6,002 passed / 6
+skipped** against an `origin/main` baseline at `bca754c` of **242 / 5,986 / 6** measured in this tree
+after the merge. The delta is **+16 cases and no new file**.
+
+**No ADR number, no migration number, no `SD-nn`**, no `SystemReason` or `SqlExecutorReason` member, no
+`pg` import, no cast past a key type, no ledger account named, no gate weakened, no merged migration
+touched, and `API_CONTRACT.md`, `routes/admin-reads.ts`, `apps/admin/**` and `packages/**` byte for
+byte unchanged.
+
+**WHAT IS STILL OWED.** The `rule_states` adapter; `eligible_next_7d`'s `| null` plus a ruling on what
+`GET /admin/eligible-forecast` serves when there is no horizon; the calendar-section extraction; and
+`recon.completed`, which still has no row in `EVENTS` section 5.3.
+
+---
+
 ## `detector.run_completed` carries two defects of two different kinds, both are ruled, and the row writes (2026-08-28, session 391)
 
 **SESSION 382 REFUSED TO TRANSCRIBE [`EVENTS:358`](architecture/EVENTS.md) AND WAS RIGHT TO. WHAT IT COULD NOT DO INSIDE ITS FENCE WAS ESTABLISH WHICH KIND OF DEFECT IT HAD HIT, AND THE ANSWER IS TWO, OF TWO KINDS, STACKED.** [ADR-205](decisions/ADR-205.md) rules both, `status: proposed`, approval line UNSIGNED. **The first is ABSENT**: `events.subject_id` is `uuid NOT NULL` at `0017:47` and the payload declared no `_id` field at all, while the subject it omitted is a real `uuid PRIMARY KEY` at `0008:61` whose reference spelling `detector_run_id` this schema already carries twice. **The second is not a defect in that row at all**: the catalogue had no way for ANY row to say its fact belongs to the firm, so `assertTenanted` could not tell an untenanted firm fact from an untenanted trader fact and correctly refused both. **The payload is not ambiguous anywhere and the third candidate defect is refuted**, checked field by field, `duration_ms` included.

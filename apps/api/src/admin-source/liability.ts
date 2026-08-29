@@ -3,19 +3,25 @@
 // =============================================================================
 // `GET /admin/liability`'s ROWS, AND IT IS NOT `AdminReadSource.readLiability`.
 //
-// THE DISTINCTION IS THE WHOLE POINT OF THIS FILE AND IT IS STATED FIRST.
-// `LiabilityResponse` projects 40 leaf paths under 10 containers. This module
-// produces 27 of the 40 from live rows through ADR-112's keyed accessor. The
-// other 13 are FIVE SEPARATE BLOCKERS, none of which is a missing column and
-// none of which this fence can clear. **B1 IS LIFTED AND THE COUNT DID NOT MOVE**,
-// which is the finding session 380 landed: it was one of TWO blockers on the same
-// five leaves and only the second had ever been looked for. **B2 IS LIFTED TOO,
-// BY ADR-201, AND THE COUNT DID NOT MOVE THERE EITHER**, for the same reason and
-// not for a new one: a ruling clears a blocker and leaves the fold unwritten.
-// **THE BLOCKED-LEAF COUNT IS WHAT IS PRODUCED AND NEVER WHAT IS PERMITTED**, and
-// the suite derives it from API_CONTRACT rather than from this comment. So the method is NOT composed, the array
-// `IMPLEMENTED_ADMIN_READS` does not name it, and `composeAdminReadSource` still
-// fills the gap with `AdminSourceNotComposed('readLiability')`.
+// THE DISTINCTION IS THE WHOLE POINT OF THIS FILE AND IT IS STATED FIRST. This
+// module produces most of `LiabilityResponse` from live rows through ADR-112's
+// keyed accessor and NOT ALL OF IT, and **NO NUMERAL IS WRITTEN HERE**:
+// `test/admin-source-liability-book.test.ts` derives the declared, blocked and
+// produced counts from API_CONTRACT through `RI-18`'s own reader, every count in
+// this header went stale at least once, and a numeral in a comment beside a
+// derivation is the derivation's reader believing the comment.
+//
+// **THE BLOCKED-LEAF COUNT IS WHAT IS PRODUCED AND NEVER WHAT IS PERMITTED.**
+// B1 lifted and the count did not move (session 380: it was one of TWO blockers
+// on the same five leaves). B2 lifted by ADR-201 and the count did not move
+// either. ADR-203 moved the DECLARED count and left production alone, which was
+// that ruling's own point. **B4 IS THE FIRST BLOCKER IN FOUR SESSIONS WHOSE LIFT
+// MOVED PRODUCTION**, because `0064` plus session 387's producer plus
+// {@link readRecon} is a leaf with a source where yesterday it had none.
+//
+// So the method is NOT composed, the array `IMPLEMENTED_ADMIN_READS` does not
+// name it, and `composeAdminReadSource` still fills the gap with
+// `AdminSourceNotComposed('readLiability')`.
 //
 // -----------------------------------------------------------------------------
 // WHY A MODULE THAT COMPOSES NOTHING EXISTS AT ALL, WHICH SESSION 363 ARGUED
@@ -28,11 +34,11 @@
 // have been the seven top-level fields alone.
 //
 // ADR-199 moved the count. `reserve` is a keyed read now, and `integrations.batch`
-// turned out to be an EVENT rather than an owed column. What is left is 27 of 40,
-// and the balance of that argument moves with the number: a reader that produces
-// 27 leaves and MEASURES the 13 it cannot is worth more than a paragraph saying
-// the same thing, because the 27 are RUN and the 13 are pinned with clearing
-// conditions rather than asserted.
+// turned out to be an EVENT rather than an owed column. Most of the response is
+// what is left, and the balance of that argument moves with the number: a reader
+// that produces the leaves it can and MEASURES the ones it cannot is worth more
+// than a paragraph saying the same thing, because the produced ones are RUN and
+// the blocked ones are pinned with clearing conditions rather than asserted.
 //
 // **AND THE TYPE STATES THE GAP RATHER THAN THIS COMMENT.** {@link LiabilityBook}
 // is `LiabilityResponse` minus exactly the blocked paths, written as a mechanical
@@ -80,9 +86,20 @@
 //       meaning what four documents say it means; ruling 6 answers the empty
 //       denominator with `ratio_bp` 0 and `alarm` false. The entry is
 //       `status: proposed` with an UNSIGNED approval line, which is what an ADR
-//       ships as. **THE FOUR LEAVES ARE STILL BLOCKED AND THAT IS NOT A
-//       CONTRADICTION**: the ruling landed and the fold is unwritten, which is
-//       B1's shape exactly. A lifted blocker is a session's work, not a field.
+//       ships as.
+//       **AND THE GROUP IS PRODUCED NOW, WHICH TOOK THREE THINGS AND NOT ONE.**
+//       ADR-201 supplied the definition, session 383 built
+//       `evaluatePayoutVelocity` beside this file, and ADR-203 gave the wire a
+//       way to DECLINE. The third was load bearing rather than tidy: the
+//       evaluator answers three ways -- `evaluated`, `exhausted`, `uncovered` --
+//       and a wire carrying one object had to render an uncovered calendar as
+//       `0 / false`, which reads exactly like a quiet week on a control that
+//       PAGES. {@link readGaps} maps the two absences onto ADR-203 section 6's
+//       two causes and keeps them apart, because one says WAIT and the other
+//       says LOAD A CALENDAR TODAY.
+//       **THE BOOK PAYS FOR THE CALENDAR NOW.** `readTradingLookback` walks the
+//       same two tables backwards, so `LIABILITY_READ_TABLES` gained
+//       `payoutTransfers` and the book reads every member of it.
 //
 //   B3. `per_plan[].cusum` (3 leaves). ADR-167 clause 1 folds `S_t` at read time
 //       from a landed series, and clause 5 rules that the field is rendered
@@ -92,29 +109,49 @@
 //       already renders that absence in terms -- "absent: blocked on ...
 //       (ADR-167 clause 5, FM-M6-07)" -- so the absence is the answer this tree
 //       already gives on the one surface that has a shape for it.
-//       **AND THE WIRE HAS NO SHAPE FOR IT.** All three declarations of
-//       `LiabilityResponse` type `cusum` as a REQUIRED object of two numbers and
-//       a boolean, so the only two ways to answer are to manufacture a statistic
+//       **THE WIRE HAD NO SHAPE FOR IT AND NOW IT DOES, WHICH IS THE SECOND OF
+//       THE TWO CLEARING CONDITIONS AND NOT THE FIRST.** All three declarations
+//       of `LiabilityResponse` typed `cusum` as a REQUIRED object of two numbers
+//       and a boolean, so the only two answers were to manufacture a statistic
 //       clause 5 refuses or to change a shape `RI-18` binds in three copies.
 //       ADR-167 clause 5's own last sentence -- "the wire shape is `P7-b`'s to
-//       carry, not this entry's to invent" -- is a shape nobody has carried.
-//       CLEARING CONDITION: `DEP-M6-05` lands, or a ruling gives the absence a
-//       wire shape.
+//       carry, not this entry's to invent" -- named a shape nobody had carried.
+//       ADR-202 ruled the form and ADR-203 transcribed it, atomically across the
+//       three copies. So `cusum` is `{...} | null` and {@link readGaps} writes
+//       the reason once on the body.
+//       **THE CALIBRATION HAS NOT LANDED AND THE FIGURE IS EXACTLY AS ABSENT AS
+//       IT WAS.** `DEP-M6-05` is still M06 Wave 4. What the lift bought is that
+//       the response can SAY the figure is missing, name the deliverable that
+//       would supply it, and be refused by `assertLiabilityGapsPaired` if it
+//       ever says so about a figure it is actually carrying. A shape that can
+//       carry an answer is not an answer, and this is the other half of that
+//       sentence: a shape that can carry an ABSENCE is the whole of what an
+//       absence needs.
+//       CLEARING CONDITION, RESTATED: `DEP-M6-05` lands and the three members
+//       become numbers.
 //
-//   B4. `integrations.recon.last_run_at` (1 leaf). NOTHING IN THIS SCHEMA RECORDS
-//       A RECONCILIATION RUN. `reconciliations` (0014) is one row per account per
-//       trading day, and EVENTS section 5 carries `recon.mismatch_detected` and
-//       `recon.resolved`, both per account, and no `recon.completed`. The
-//       available fold is `max(reconciliations.created_at)`, and IT IS THE FOLD
-//       ADR-199 SECTION 5 REFUSES ONE FIELD TO THE RIGHT: it refuses
-//       `max(rule_states.computed_at)` for the batch because OVERVIEW section 5.2
-//       makes the run resumable at the account boundary, "so a fold over
-//       per-account clocks reports a SUCCESS for a run that crashed". The
-//       reconciliation sweep is per account too. Taking the fold here would
-//       overturn that reasoning by writing code, one field from where the entry
-//       wrote it down. `mismatches_open` is a COUNT of a state rather than a
-//       clock and is produced.
-//       CLEARING CONDITION: a `recon.completed` event or a run record.
+//   B4. `integrations.recon.last_run_at` (1 leaf). **LIFTED, AND THE LEAF IS
+//       PRODUCED.** The paragraph this replaces read "NOTHING IN THIS SCHEMA
+//       RECORDS A RECONCILIATION RUN", and it was true of a 59-migration schema:
+//       `reconciliations` (0014) is one row per account per trading day, so the
+//       only fold across it is `max(created_at)`, and that is the fold ADR-199
+//       section 5 refuses one field to the left, because OVERVIEW section 5.2
+//       makes the nightly run resumable at the account boundary and "a fold over
+//       per-account clocks reports a SUCCESS for a run that crashed".
+//       **THE CLEARING CONDITION WAS "a `recon.completed` event OR A RUN
+//       RECORD", AND THE SECOND HALF ARRIVED IN TWO PIECES**: `0064` created
+//       `reconciliation_runs`, and session 387 wrote its first producer in
+//       `apps/worker/src/recon/sweep.ts`. This module is the third piece and the
+//       last one: {@link readRecon} dates the field off the newest COMPLETED
+//       run's `started_at`, which is the column `0064`'s own index comment names
+//       for this field and the predicate `reconciliation_runs_completed_is_whole`
+//       names for its reader.
+//       **THE `recon.completed` EVENT IS STILL OWED AND IS NOT THIS FIELD'S.**
+//       EVENTS section 5.3 carries `recon.mismatch_detected` and `recon.resolved`
+//       and no completion event, and data-model/README section 1 says a mutable
+//       table emits one on every meaningful transition. That is an amendment to a
+//       frozen document and therefore an ADR; it is REPORTED here and it blocks
+//       nothing on this response.
 //
 //   B5. `eligible_next_7d` AGAIN (the same 5 leaves), AND IT IS THE HALF NOBODY
 //       HAD LOOKED AT. The group is a FORECAST: "which accounts clear their
@@ -223,6 +260,12 @@
 import { AdminReadError } from '../routes/admin-reads.ts';
 import type { LiabilityResponse } from '../routes/admin-reads.ts';
 import type { AdminRowFilter } from './flags.ts';
+import type {
+  PayoutVelocityCost,
+  PayoutVelocityResult,
+  PayoutVelocityTx,
+  PayoutVelocityVerdict,
+} from './payout-velocity.ts';
 
 // -----------------------------------------------------------------------------
 // The port onto the database
@@ -246,17 +289,24 @@ import type { AdminRowFilter } from './flags.ts';
  * `trading_calendar_loads`, so a day outside it is UNKNOWN rather than a
  * holiday.
  *
- * THEY ARE READ BY {@link readTradingHorizon} AND NOT BY {@link readLiabilityBook},
- * which is stated here because the array would otherwise imply the second. The
- * book carries no `eligible_next_7d` (blocker B5), so paying two whole-table
- * reads inside it would buy a group it cannot return.
+ * **THAT PARAGRAPH USED TO SAY THE BOOK DOES NOT READ THEM AND IT IS REPAIRED
+ * RATHER THAN DELETED.** It read: "THEY ARE READ BY {@link readTradingHorizon}
+ * AND NOT BY {@link readLiabilityBook} ... the book carries no
+ * `eligible_next_7d` (blocker B5), so paying two whole-table reads inside it
+ * would buy a group it cannot return." **The premise held and the conclusion
+ * stopped following the moment `payout_velocity` entered the book**:
+ * `evaluatePayoutVelocity` walks the SAME two tables BACKWARDS through
+ * `readTradingLookback`, so the book pays for them and buys a different group
+ * with them. `eligible_next_7d` is still not returned and still not why.
  */
 export const LIABILITY_READ_TABLES = [
   'events',
   'liabilitySnapshots',
   'midHealth',
+  'payoutTransfers',
   'planBreakerState',
   'plans',
+  'reconciliationRuns',
   'reconciliations',
   'reserveCoverageSnapshots',
   'tradingCalendar',
@@ -284,13 +334,20 @@ export interface LiabilityTx {
 // The shape this module can fill
 // -----------------------------------------------------------------------------
 
-/** `LiabilityResponse.per_plan`'s element, LESS the CUSUM. Blocker B3. */
-export type LiabilityPlanRow = Omit<LiabilityResponse['per_plan'][number], 'cusum'>;
+/**
+ * `LiabilityResponse.per_plan`'s element, WHOLE, AND THE CUSUM IS A `null`.
+ *
+ * IT WAS AN `Omit<..., 'cusum'>` UNTIL `ADR-203` LANDED and it is an index now,
+ * which is the whole of what B3's lift bought. `ADR-167` clause 5 renders the
+ * field ABSENT until `DEP-M6-05` and said the wire shape was *"`P7-b`'s to
+ * carry, not this entry's to invent"*; `ADR-202` ruled the form and `ADR-203`
+ * transcribed it into all three declarations. So the absence has a spelling now
+ * and this type stops subtracting the member.
+ */
+export type LiabilityPlanRow = LiabilityResponse['per_plan'][number];
 
-/** `LiabilityResponse.integrations`, LESS the reconciliation clock. Blocker B4. */
-export type LiabilityIntegrations = Omit<LiabilityResponse['integrations'], 'recon'> & {
-  readonly recon: Omit<LiabilityResponse['integrations']['recon'], 'last_run_at'>;
-};
+/** One entry of `LiabilityResponse.gaps`. `ADR-203` ruling 2. */
+export type LiabilityBookGap = LiabilityResponse['gaps'][number];
 
 /**
  * `LiabilityResponse` MINUS the thirteen leaves nothing in this estate produces.
@@ -302,13 +359,7 @@ export type LiabilityIntegrations = Omit<LiabilityResponse['integrations'], 'rec
  * type by the rule, and a blocker that lifts is removed from this type by
  * deleting one `Omit`.
  */
-export type LiabilityBook = Omit<
-  LiabilityResponse,
-  'eligible_next_7d' | 'payout_velocity' | 'per_plan' | 'integrations'
-> & {
-  readonly per_plan: readonly LiabilityPlanRow[];
-  readonly integrations: LiabilityIntegrations;
-};
+export type LiabilityBook = Omit<LiabilityResponse, 'eligible_next_7d'>;
 
 /**
  * What the read cost, in rows handed to this module.
@@ -324,8 +375,51 @@ export interface LiabilityReadCost {
   readonly plansScanned: number;
   readonly midHealthRowsScanned: number;
   readonly openMismatchesScanned: number;
+  readonly completedReconRunsScanned: number;
   readonly batchCompletedScanned: number;
+
+  /**
+   * What the velocity arm cost, CARRIED WHOLE AND NOT FLATTENED.
+   *
+   * `PayoutVelocityCost`'s nine counters include the identity a suite asserts
+   * ruling 4 dropped nothing with -- before plus after plus attributed is every
+   * settled transfer read -- and folding them into this object one prefix at a
+   * time would break that identity into nine unrelated numbers.
+   */
+  readonly velocity: PayoutVelocityCost;
 }
+
+/**
+ * The velocity arm, SUPPLIED RATHER THAN IMPORTED, and the reason is a module
+ * cycle rather than a taste for injection.
+ *
+ * **`payout-velocity.ts` IMPORTS THIS MODULE AND CANNOT STOP**: its window is
+ * thirty TRADING days, so it reads the calendar through {@link readTradingLookback}
+ * and spreads {@link TRADING_CALENDAR_TABLES} into its own roster AT MODULE
+ * INITIALISATION. A value import in the other direction closes that loop, and
+ * under ESM the loser is whichever module is entered second: `PAYOUT_VELOCITY_TABLES`
+ * evaluates against a `TRADING_CALENDAR_TABLES` still in its temporal dead zone
+ * and the whole suite dies at import with `TRADING_CALENDAR_TABLES is not
+ * iterable`. **That is measured rather than feared: it is what this session got
+ * on the first run of the wired book.**
+ *
+ * **A TYPE IMPORT IS ERASED AND A PORT IS THE REST OF THE ANSWER.** Everything
+ * this module needs from that one is a type, so the loop does not exist at run
+ * time, and the one value it needs arrives as an argument. `AdminReadSource` is
+ * the same shape one layer up.
+ *
+ * **THE ALTERNATIVE IS NAMED AND NOT TAKEN.** Extracting the calendar section of
+ * this file into its own module would break the cycle at its real joint and both
+ * consumers would import that. It is the better end state and it moves roughly
+ * six hundred lines of a money-path file, including five row readers this module
+ * shares with it, on a branch whose subject is the leaves rather than the
+ * layout. **REGISTERED, NOT REPAIRED**, and it is `apps/api/src/admin-source/**`
+ * so a later session in this fence can take it without a ruling.
+ */
+export type PayoutVelocityReader = (
+  tx: PayoutVelocityTx,
+  asOf: string,
+) => Promise<PayoutVelocityResult>;
 
 /** {@link readLiabilityBook}'s answer, or `null` when no snapshot has been written. */
 export interface LiabilityBookResult {
@@ -477,6 +571,41 @@ function latestBy(rows: readonly unknown[], column: string, at: string): unknown
   return best;
 }
 
+/**
+ * The greatest value of one `timestamptz` column, as the INSTANT and never as
+ * the row that carries it, or `null` when there are no rows.
+ *
+ * {@link latestBy} REFUSES A TIE AND THIS ONE MUST NOT, and the difference is a
+ * property of the tables rather than a relaxation. `latestBy`'s refusal is
+ * argued from `liability_snapshots_as_of_uq` and `reserve_coverage_snapshots_as_of_uq`:
+ * on those tables one instant IS one row, so two rows at one instant is the
+ * database disagreeing with its own unique index. `reconciliation_runs` carries
+ * no unique index at all and the absence is RULED rather than forgotten --
+ * `0064`'s second E2 note refuses one because `RB-02` section A sends a
+ * quarantined day to REDELIVERY and a redelivered day is reconciled again -- so
+ * two runs sharing an instant is a state this schema admits and refusing it
+ * here would be this module inventing a constraint the database declines.
+ *
+ * AND THE TIE COSTS NOTHING BECAUSE NO ROW IS SELECTED. The answer is a max over
+ * one column, so two rows sharing the greatest `started_at` yield one answer
+ * rather than an arbitrary one. That is exactly what `latestBy` cannot do: it
+ * returns a ROW, and every other field of that row would then be picked by
+ * accessor order.
+ */
+function latestInstant(rows: readonly unknown[], column: string, at: string): string | null {
+  let best: string | null = null;
+  let bestAt = Number.NEGATIVE_INFINITY;
+  for (const row of rows) {
+    const when = instant(row, column, at);
+    const ms = Date.parse(when);
+    if (ms > bestAt) {
+      best = when;
+      bestAt = ms;
+    }
+  }
+  return best;
+}
+
 // -----------------------------------------------------------------------------
 // The groups
 // -----------------------------------------------------------------------------
@@ -484,7 +613,7 @@ function latestBy(rows: readonly unknown[], column: string, at: string): unknown
 /** ADR-188 clause 1: the top-level fields are one `liability_snapshots` row, column for column. */
 function readSnapshot(
   row: unknown,
-): Omit<LiabilityBook, 'reserve' | 'per_plan' | 'integrations' | 'gaps'> {
+): Omit<LiabilityBook, 'reserve' | 'per_plan' | 'integrations' | 'gaps' | 'payout_velocity'> {
   const at = 'the liability snapshot';
   return {
     as_of: instant(row, 'asOf', at),
@@ -607,7 +736,26 @@ function day(row: unknown, name: string, at: string): string {
 }
 
 /**
- * `per_plan`, LESS the CUSUM, which is blocker B3.
+ * `per_plan`, WITH THE CUSUM RENDERED ABSENT, WHICH IS BLOCKER B3 LIFTED.
+ *
+ * **THE FIGURE IS EXACTLY AS UNAVAILABLE AS IT WAS AND THE RESPONSE CAN SAY SO,
+ * WHICH IS THE DIFFERENCE `ADR-203` MADE AND IS NOT A SMALLER ONE.** `ADR-167`
+ * clause 1 folds `S_t` at read time from a landed series and clause 5 rules the
+ * field ABSENT until `DEP-M6-05` supplies `mu_0` and `sigma`, which `M06` puts
+ * in Wave 4. That did not move. What moved is that clause 5's own last sentence,
+ * *"the wire shape is `P7-b`'s to carry, not this entry's to invent"*, has been
+ * carried: `ADR-202` ruled the form and `ADR-203` put `{...} | null` into all
+ * three declarations with a `gaps` entry carrying the reason.
+ *
+ * **THE `null` IS AT THE OBJECT AND NEVER AT A MEMBER**, which is `ADR-202`
+ * ruling 3's second refusal: `{ statistic: null, threshold: 4, alarm: false }`
+ * is a half-calibrated chart, a shape nothing in the corpus describes. All three
+ * members stay non-nullable and the object is the thing that is absent.
+ *
+ * **AND THE GAP IS ONE ENTRY AND NOT ONE PER PLAN.** The absence is a property
+ * of the CALIBRATION rather than of a plan, so {@link readGaps} writes the path
+ * with the index elided, which is what `assertLiabilityGapsPaired` reads and
+ * what `CUSUM_GAPS` in `routes/admin-breaker.ts` already spells.
  *
  * ONE ROW PER PLAN, THE LATEST `evaluated_on`, AND NO NARROWING ON `metric`.
  * `0016` declares `metric text NOT NULL` with NO CHECK and no document states a
@@ -661,6 +809,10 @@ function readPerPlan(
       loss_ratio_bp: whole(held.row, 'ratioBp', at),
       threshold_bp: whole(held.row, 'thresholdBp', at),
       sales_paused: text(held.row, 'state', at) === 'paused',
+      // ADR-167 clause 5, and it is a VALUE this response asserts rather than a
+      // key it withholds. An omitted key would make "absent, blocked on
+      // DEP-M6-05" and "this deployment did not fill the field" the same body.
+      cusum: null,
     });
   }
   // ORDERED BY CODE, because the accessor returns rows in no promised order and
@@ -697,6 +849,73 @@ function readMidHealth(rows: readonly unknown[]): LiabilityBook['integrations'][
     healthy: text(held.row, 'state', `the MID health window for \`${psp}\``) === 'healthy',
   }));
   return health.sort((a, b) => (a.psp < b.psp ? -1 : a.psp > b.psp ? 1 : 0));
+}
+
+/**
+ * `integrations.recon`, WHICH IS NOW A CLOCK AS WELL AS A COUNT. Blocker `B4`,
+ * lifted, and the half that lifted it is not in this file.
+ *
+ * **THE BLOCKER WAS NEVER A COLUMN AND IT WAS NEVER A SHAPE.** Session 374 read
+ * it as `NOTHING IN THIS SCHEMA RECORDS A RECONCILIATION RUN`, and it was right:
+ * `reconciliations` is one row per account per trading day, so the only fold
+ * across it is `max(created_at)`, which is the fold `ADR-199` section 5 refuses
+ * one field to the left because `OVERVIEW` section 5.2 leaves the nightly run
+ * *"resumable at the account boundary"* and a fold over per-account clocks
+ * *"reports a SUCCESS for a run that crashed"*. `0064_reconciliation_runs.sql`
+ * is the row that fold was missing and session 387 wrote its first producer
+ * (`apps/worker/src/recon/sweep.ts`). What was left after those two is the
+ * READER, which is this function.
+ *
+ * -----------------------------------------------------------------------------
+ * TWO PRIMARY SOURCES FIX THIS READ AND NEITHER OF THEM IS A JUDGEMENT MADE HERE
+ * -----------------------------------------------------------------------------
+ * **THE COLUMN IS `started_at`.** `0064`'s index comment names this very field:
+ * *"The panel's read, which is `integrations.recon.last_run_at`: the newest run,
+ * one index scan"*, over `reconciliation_runs_latest_idx (started_at DESC)`, and
+ * `data-model/reconciliation_runs.md` says it a second time. `finished_at` is
+ * NOT taken and the field name is the reason -- `last_run_at` is when the run
+ * WAS, and the run is what `started_at` dates.
+ *
+ * **THE PREDICATE IS `status = 'completed'`, AND IT IS THE CONTROL RATHER THAN A
+ * FILTER.** `reconciliation_runs_completed_is_whole` states its own reader in
+ * terms: *"a reader taking the latest completed run gets a sweep that actually
+ * covered the book"*. Without the predicate this clock reads the `started_at` of
+ * a sweep that died at account 2,341 of 5,000 -- `OVERVIEW` section 5.2 makes
+ * that ORDINARY rather than exotic -- and reports it as a reconciliation that
+ * happened. That is `ADR-199` section 5's refusal reproduced inside the table
+ * built to answer it, and it is `FM-M6-01` on the panel `P-M6-09` gates every
+ * other number with: *"The page must refuse to look healthy while data trust is
+ * red"*. A `running` row hours old and a `failed` row are both visible through
+ * `reconciliation_runs_unhealthy_idx`; neither is a run this field may date.
+ *
+ * **AND THE TWO NUMBERS BESIDE EACH OTHER ARE DELIBERATELY NOT THE SAME NUMBER.**
+ * `mismatches_open` is a count of the CURRENT state of `reconciliations` and
+ * moves when a human resolves one; `reconciliation_runs.mismatches_found` is
+ * what one run saw and nothing may change it afterwards (`0064`'s fifth E2
+ * note). This response carries the first, so the run row is read for its clock
+ * and for nothing else.
+ *
+ * **NO COMPLETED RUN IS A REFUSAL AND NOT A FIELD TO FILL**, which is
+ * {@link readBatch}'s answer two lines down and for the same reason. All three
+ * declarations of `LiabilityResponse` type `last_run_at` a required `string`,
+ * `ADR-203` puts an absence at a NULLABLE FIGURE and this member is not one, and
+ * `ADR-202` ruling 3's second refusal forbids the alternative of a half-null
+ * object. An estate that has never completed a reconciliation is `P-M6-09` red
+ * rather than a panel with a blank on it.
+ */
+function readRecon(
+  completedRuns: readonly unknown[],
+  openMismatches: readonly unknown[],
+): LiabilityBook['integrations']['recon'] {
+  const lastRunAt = latestInstant(completedRuns, 'startedAt', 'a completed reconciliation run');
+  if (lastRunAt === null)
+    throw new AdminReadError(
+      'no reconciliation run has ever completed, so `integrations.recon.last_run_at` has no ' +
+        'source. 0064 records the sweep and reconciliation_runs_completed_is_whole is what makes ' +
+        'a completed row trustworthy; an estate holding none has not reconciled, which P-M6-09 ' +
+        'renders above every figure on this page rather than beside one',
+    );
+  return { last_run_at: lastRunAt, mismatches_open: openMismatches.length };
 }
 
 /**
@@ -749,6 +968,83 @@ function readBatch(rows: readonly unknown[]): LiabilityBook['integrations']['bat
   return { last_success_at: instant(row, 'occurredAt', at), last_duration_ms: durationMs };
 }
 
+/**
+ * `gaps`, WHICH IS `ADR-203` RULING 2 AND IS BUILT FROM THE BOOK RATHER THAN
+ * WRITTEN AS A CONSTANT.
+ *
+ * **`CUSUM_GAPS` IN `routes/admin-breaker.ts` IS A CONSTANT AND THIS IS NOT, AND
+ * THE DIFFERENCE IS A CONTROL RATHER THAN A STYLE.** That endpoint has no
+ * pairing validator; this response has {@link assertLiabilityGapsPaired}, which
+ * refuses BOTH a `null` nothing names AND a name over a figure that is present.
+ * A constant array cannot satisfy the second direction, and the case where it
+ * fails is not exotic:
+ *
+ * **A BOOK WITH NO PLANS HAS NO ABSENT CUSUM, AND THE VALIDATOR IS WHERE THAT IS
+ * DECIDED.** `plan_breaker_state` has never held a row (`ADR-167` finding 9), so
+ * `per_plan` is `[]` today and the validator's `absent` set is built with
+ * `.some(...)`: over an empty array nothing is null, so a gap naming
+ * `per_plan[].cusum` would be a gap over a figure this response is not
+ * withholding. That is the failure `ADR-203` ruling 2's second direction exists
+ * for, arriving on the very first read. So the entry is conditioned on the array
+ * the validator reads and not on the calibration's state.
+ *
+ * **THE PATH ELIDES THE INDEX AND THAT IS THE RULING RATHER THAN A SHORTHAND.**
+ * One entry per absent FIGURE, and the CUSUM is absent on every plan for one
+ * reason, so a per-plan entry would put the identical sentence on the body once
+ * per plan and give an operator a list to read instead of a fact.
+ */
+function readGaps(
+  perPlan: readonly LiabilityPlanRow[],
+  velocity: PayoutVelocityVerdict,
+): readonly LiabilityBookGap[] {
+  const gaps: LiabilityBookGap[] = [];
+
+  // **THE TWO ABSENCES ARE TWO CAUSES AND KEEPING THEM APART IS THE RULING
+  // RATHER THAN A REFINEMENT.** `evaluatePayoutVelocity` answers three ways and
+  // the wire carries one object, so `exhausted` and `uncovered` both arrive here
+  // as a `null`. `ADR-042` F-4 is the corpus's rule that an uncovered day is
+  // UNKNOWN rather than a not-holiday, and `ADR-203` section 6 maps the pair:
+  // `insufficient_history` is the estate being correct and young, and the reader
+  // WAITS; `estate_uncovered` is the estate holding no opinion at all, and the
+  // reader LOADS A CALENDAR TODAY. A bare null makes those one act.
+  //
+  // `detail` CARRIES THE VERDICT'S OWN SENTENCE and is not restated here. The
+  // evaluator knows how many trading days short it was and which anchor day
+  // nothing covers, which is exactly the quantity `ADR-203` ruling 4 keeps
+  // `detail` free text for.
+  if (velocity.kind === 'exhausted')
+    gaps.push({
+      field: 'payout_velocity',
+      cause: 'insufficient_history',
+      awaiting: null,
+      detail: velocity.detail,
+    });
+
+  if (velocity.kind === 'uncovered')
+    gaps.push({
+      field: 'payout_velocity',
+      cause: 'estate_uncovered',
+      awaiting: null,
+      detail: velocity.detail,
+    });
+
+  if (perPlan.some((plan) => plan.cusum === null))
+    gaps.push({
+      field: 'per_plan[].cusum',
+      // A NAMED DELIVERABLE IS OUTSTANDING, which is the one cause `awaiting`
+      // may be non-null for (ADR-203 ruling 4). Nothing in the estate is wrong.
+      cause: 'awaiting_dependency',
+      awaiting: 'DEP-M6-05',
+      detail:
+        'ADR-167 clause 5 renders the CUSUM absent until DEP-M6-05 supplies mu_0 and sigma, ' +
+        'which M06 puts in Wave 4. FM-M6-07: an uncalibrated CUSUM is either constant alarms ' +
+        'or none, which is the same as no chart. The statistic is recomputed at read time and ' +
+        'stored nowhere (ADR-167 clause 1), so no column is owed and nothing is lost by waiting.',
+    });
+
+  return gaps;
+}
+
 // -----------------------------------------------------------------------------
 // The read
 // -----------------------------------------------------------------------------
@@ -775,7 +1071,10 @@ function readBatch(rows: readonly unknown[]): LiabilityBook['integrations']['bat
  * forces one `as_of` on two sources that do not move together"), so the reserve
  * row is the latest reserve row and never the one nearest the book's instant.
  */
-export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookResult | null> {
+export async function readLiabilityBook(
+  tx: LiabilityTx,
+  evaluateVelocity: PayoutVelocityReader,
+): Promise<LiabilityBookResult | null> {
   const snapshots = await tx.rows('liabilitySnapshots');
   if (snapshots.length === 0) return null;
   const snapshot = latestBy(snapshots, 'asOf', 'liability snapshot');
@@ -803,11 +1102,15 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
         'state this schema admits',
     );
 
-  const [breakerRows, planRows, midHealthRows, openMismatches, batchRows] = [
+  const [breakerRows, planRows, midHealthRows, openMismatches, completedRuns, batchRows] = [
     await tx.rows('planBreakerState'),
     await tx.rows('plans'),
     await tx.rows('midHealth'),
     await tx.rowsWhere('reconciliations', { status: 'mismatch' }),
+    // THE PREDICATE IS THE CONTROL AND IT IS APPLIED AT THE ACCESSOR. A typed
+    // equality on a closed column, which is what ADR-157 admits on the read
+    // path, and it is the same shape as the two reads either side of it.
+    await tx.rowsWhere('reconciliationRuns', { status: 'completed' }),
     await tx.rowsWhere('events', { eventName: 'batch.completed' }),
   ];
 
@@ -820,28 +1123,43 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
         'rather than a field to fill',
     );
 
+  const perPlan = readPerPlan(breakerRows, planRows);
+
+  // THE VELOCITY IS ANCHORED ON THE BOOK'S OWN `as_of` AND NOT ON THE CLOCK.
+  // `INV-M6-04` makes every number on this page name its as-of moment, and a
+  // ratio computed to `now` beside a book computed to the snapshot would be two
+  // moments under one heading. `ADR-201`'s window is trailing trading days from
+  // the anchor, so the anchor is the instant the rest of this body is dated at.
+  const snapshotAsOf = instant(snapshot, 'asOf', 'the liability snapshot');
+  const velocity = await evaluateVelocity(tx, snapshotAsOf);
+
   return {
     book: {
       ...readSnapshot(snapshot),
+      // `null` WHEN THE ESTATE CANNOT SUPPLY THE WINDOW, AND `gaps` SAYS WHICH
+      // WAY. `ADR-201` ruling 6 answers an empty DENOMINATOR with a ratio of
+      // zero and no alarm, which is a real reading over a real window; it cannot
+      // answer an ABSENT window, and `ADR-203` is the shape that can.
+      payout_velocity: velocity.verdict.kind === 'evaluated' ? velocity.verdict.panel : null,
       reserve: readReserve(reserve, anchors[0]),
-      per_plan: readPerPlan(breakerRows, planRows),
+      per_plan: perPlan,
       integrations: {
         mid_health: readMidHealth(midHealthRows),
-        // A COUNT OF A STATE AND NEVER A CLOCK. Blocker B4 is the clock beside
-        // it: `status = 'mismatch'` is what `0014` declares open, and `resolved`
-        // and `match` are the other two.
-        recon: { mismatches_open: openMismatches.length },
+        // A COUNT OF A STATE AND A CLOCK, WHICH IS `B4` LIFTED. `status =
+        // 'mismatch'` is what `0014` declares open and `resolved` and `match`
+        // are the other two; the clock is the newest COMPLETED run of `0064`.
+        recon: readRecon(completedRuns, openMismatches),
         batch,
       },
 
-      // EMPTY, AND THAT IS TRUE OF THIS TYPE RATHER THAN OF THE RESPONSE.
-      // `ADR-203` gives `LiabilityResponse` a way to say a figure is absent and
-      // why; this BOOK says it by OMITTING the group instead, which is what
-      // `LiabilityBook`'s `Omit` list is, so the book carries no null and
-      // therefore no gap. The two spellings are the reason `readLiability` is
-      // still not composed: the day a blocker lifts, the session that lifts it
-      // deletes an `Omit` and writes the gap here rather than dropping a field.
-      gaps: [],
+      // THE BOOK SPEAKS `ADR-203`'s SPELLING NOW AND NO LONGER ITS OWN. It used
+      // to say a figure was absent by OMITTING the group, which is what
+      // `LiabilityBook`'s `Omit` list was, and this array was `[]` because a
+      // book that omits carries no null and therefore no gap. Those were two
+      // spellings of one fact and only one of them can be served. The `Omit`
+      // list is one entry long now and every absence below it is a `null` with
+      // a reason, which is what `assertLiabilityGapsPaired` reads.
+      gaps: readGaps(perPlan, velocity.verdict),
     },
     cost: {
       liabilitySnapshotsScanned: snapshots.length,
@@ -851,7 +1169,9 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
       plansScanned: planRows.length,
       midHealthRowsScanned: midHealthRows.length,
       openMismatchesScanned: openMismatches.length,
+      completedReconRunsScanned: completedRuns.length,
       batchCompletedScanned: batchRows.length,
+      velocity: velocity.cost,
     },
   };
 }
