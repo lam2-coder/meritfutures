@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -100,7 +100,15 @@ function cleanTree(): string {
       '  useRailBackend:\n' +
       "    'a vendor adapter this workspace does not ship, named in no package.json.',\n" +
       '};\n' +
-      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:538`).\n',
+      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:538`).\n' +
+      // RI-20 READS THESE FILES BY NAME AND THROWS WHEN IT FINDS NO COMMAND
+      // CLAIM IN ANY OF THEM, so the fixture carries one in each direction and
+      // both are TRUE against this tree. A fixture without them makes the
+      // asserting-nothing guard fire on every case in this file, which is the
+      // guard working and the fixture wrong -- the same trap RI-14's three files
+      // and RI-15's six set while they were being written.
+      '// `grep -rn zzznosuchtoken packages/db/migrations` returns nothing.\n' +
+      '// `grep -rln risk packages/db/migrations` returns 1 line.\n',
   );
   write(root, 'apps/api/src/idempotency.ts', '// The protocol over the store port.\n');
   write(root, 'apps/api/src/routes/wallet-withdrawals.ts', '// The external leg.\n');
@@ -2265,5 +2273,136 @@ describe('RI-19 is about a real pair on the real tree, which is separate from it
     expect(b5?.module[0]?.count).toBe(3);
     expect(b5?.case[0]?.count).toBe(3);
     expect(b5?.case[0]?.terms.length).toBe(0);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// RI-20, whose subject is a sentence that quotes its own decision procedure
+// -----------------------------------------------------------------------------
+// THE DEFECT THIS CHECK WAS WRITTEN FOR IS ON THE REAL TREE AND WAS CAUGHT BY IT
+// BEFORE A LINE OF THE MAP WAS REPAIRED: `wiring.test.ts`'s `usePayoutBackend`
+// entry claimed a recursive grep for lifetime_settled over the migrations
+// directory returned nothing, and it returned seven lines. That run is the only
+// evidence that matters and it is reproduced here as a seed, because a check
+// that has only ever been seen pass is indistinguishable from one that cannot
+// fail.
+describe('RI-20 runs the command a reason quotes', () => {
+  /** The fixture's `wiring.test.ts` with `body` appended as a comment. */
+  const claiming = (root: string, body: string): void => {
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      '// `grep -rn zzznosuchtoken packages/db/migrations` returns nothing.\n' +
+        '// `grep -rln risk packages/db/migrations` returns 1 line.\n' +
+        body,
+    );
+  };
+
+  test('it catches a claim that a command returns nothing when the command returns lines', () => {
+    // THE REAL DEFECT, IN THE SHAPE IT ACTUALLY HAD. `risk` is on 139 lines of
+    // the fixture's one migration, and the sentence says the grep finds none.
+    const root = cleanTree();
+    claiming(root, '// `grep -rn risk packages/db/migrations` returns nothing at all.\n');
+    expect(findings('RI-20', root).join('\n')).toContain('returns nothing and it returns 139');
+  });
+
+  test('it catches a stated COUNT that is not the count', () => {
+    const root = cleanTree();
+    claiming(root, '// `grep -rln risk packages/db/migrations` returns 4 lines.\n');
+    expect(findings('RI-20', root).join('\n')).toContain('returns 4 line(s) and it returns 1');
+  });
+
+  test('a command that is not `grep` is a FINDING and never a skip', () => {
+    // A CHECK A LATER AUTHOR EVADES BY WRITING A DIFFERENT COMMAND NAME IS NOT A
+    // CHECK, so the unexecutable direction reports rather than passing quietly.
+    const root = cleanTree();
+    claiming(root, '// `rg -n risk packages/db/migrations` returns nothing.\n');
+    expect(findings('RI-20', root).join('\n')).toContain('only `grep` is executable here');
+  });
+
+  test('a command carrying a shell metacharacter is unsettleable rather than executed', () => {
+    // NOTHING RUNS THROUGH A SHELL. This is the case that would be arbitrary
+    // code execution out of a comment if the check took the easy route, and the
+    // seed is the easy route's exact payload.
+    const root = cleanTree();
+    claiming(root, '// `grep -rn risk packages/db; touch pwned` returns nothing.\n');
+    const found = findings('RI-20', root).join('\n');
+    expect(found).toContain('cannot settle it');
+    expect(existsSync(join(root, 'pwned'))).toBe(false);
+  });
+
+  test('a command whose path has moved is a finding rather than a silent zero', () => {
+    // grep exits 2 for a missing path and 1 for no match, and reading the two
+    // the same way would make every renamed directory look like a claim that
+    // came true.
+    const root = cleanTree();
+    claiming(root, '// `grep -rn risk packages/db/no-such-dir` returns nothing.\n');
+    expect(findings('RI-20', root).join('\n')).toContain('rather than returning a result');
+  });
+
+  test('it names a file that has been renamed out from under it', () => {
+    const root = cleanTree();
+    rmSync(join(root, 'apps/api/src/idempotency.ts'));
+    expect(findings('RI-20', root).join('\n')).toContain('point it at the new path');
+  });
+
+  test('a run that settles NO claim throws rather than passing', () => {
+    // "A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED", applied to a check
+    // whose input is prose somebody has to write: an empty input is silence, not
+    // a green tick.
+    const root = cleanTree();
+    write(root, 'apps/api/test/wiring.test.ts', '// nothing quoted here.\n');
+    expect(() => findings('RI-20', root)).toThrow(/found NO command claim/);
+  });
+
+  test('THE ACCEPTANCE DIRECTION: a true claim in both shapes passes', () => {
+    // A PROBE THAT ONLY EVER ATTEMPTS FORBIDDEN THINGS PASSES AGAINST A GUARD
+    // THAT REJECTS EVERYTHING. The fixture's two claims are true and this asserts
+    // they are read and cleared rather than skipped.
+    const root = cleanTree();
+    expect(findings('RI-20', root)).toEqual([]);
+  });
+
+  test('THE LIMIT, ASSERTED RATHER THAN DESCRIBED: it reads the COUNT and not the content', () => {
+    // `zzznosuchtoken` and a token matching nothing else both return nothing, so
+    // a sentence naming the wrong pattern passes. This is the hole, and it is
+    // stated in the suite because `covers` claiming it would be a claim nobody
+    // checked.
+    const root = cleanTree();
+    claiming(root, '// `grep -rn alsonotpresent packages/db/migrations` returns nothing.\n');
+    expect(findings('RI-20', root)).toEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// RI-15's two `ALTER TABLE` declaration shapes, which ADR-214 added
+// -----------------------------------------------------------------------------
+describe('RI-15 can anchor a citation on a column a migration ADDS', () => {
+  test('`ADD COLUMN` and `ADD CONSTRAINT` are declarations', () => {
+    // WITHOUT THESE TWO SHAPES EVERY COLUMN ADDED AFTER A TABLE'S `CREATE` WAS
+    // UNCITABLE, which is RI-14's blindness arriving in RI-15's reader: a
+    // merged migration is never edited, only superseded, so `ALTER TABLE ... ADD
+    // COLUMN` is how half the schema exists. The fixture below is `0065`'s shape.
+    const root = cleanTree();
+    write(
+      root,
+      'packages/db/migrations/0065_rule_state_lifetime_and_breach.sql',
+      'ALTER TABLE rule_states\n' +
+        '  ADD COLUMN lifetime_settled_cents bigint NOT NULL DEFAULT 0;\n' +
+        'ALTER TABLE rule_states\n' +
+        '  ADD CONSTRAINT rule_states_breach_flag_matches_kind CHECK (true);\n',
+    );
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      '// The gate reads `principal(request)` (`routes/admin-wallet.ts:538`).\n' +
+        '// `grep -rn zzznosuchtoken packages/db/migrations` returns nothing.\n' +
+        '// `grep -rln risk packages/db/migrations` returns 1 line.\n' +
+        '// `lifetime_settled_cents`\n' +
+        '// (`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:2`) and\n' +
+        '// `rule_states_breach_flag_matches_kind`\n' +
+        '// (`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql:4`).\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
   });
 });

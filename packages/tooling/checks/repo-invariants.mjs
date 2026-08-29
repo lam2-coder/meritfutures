@@ -37,6 +37,7 @@
 // the corpus runner's directory and these do not check the corpus.
 // =============================================================================
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join, dirname, resolve, relative, extname, basename } from 'node:path';
@@ -2776,14 +2777,27 @@ function subjectsBefore(seen, upto) {
  * be right about more lines and would be a second compiler in a check that must
  * finish in a second over 19 MB. These five are what the cited files are written
  * in: a TypeScript binding, an object-literal or interface member, a `CREATE`,
- * a named constraint, and a SQL column. Anything else declares nothing HERE,
- * which makes the anchor fail closed -- it reports rather than guesses.
+ * a named constraint, a SQL column, and the two `ALTER TABLE` forms. Anything
+ * else declares nothing HERE, which makes the anchor fail closed -- it reports
+ * rather than guesses.
+ *
+ * THE TWO `ALTER` SHAPES WERE MISSING AND THAT IS RI-14'S BLINDNESS ARRIVING IN
+ * THIS READER. A merged migration is never edited, only superseded (E2), so
+ * every column added to a table after its `CREATE` arrives as `ALTER TABLE ...
+ * ADD COLUMN` and every constraint as `ADD CONSTRAINT`. Without these two, the
+ * whole of that half of the schema was UNCITABLE: a reason pointing at
+ * `0065:101` for `lifetime_settled_cents` was told the line declares nothing,
+ * so the only way to cite the column that this session's entire subject turns on
+ * was to cite it wrongly. ADR-214 section 5. MEASURED before it was written: the
+ * two shapes move 0 existing sites and make 1,088 schema objects citable.
  */
 const DECLARATION_SHAPES = [
   /^\s*(?:export\s+)?(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:function|const|let|var|class|interface|type|enum|namespace)\s+([A-Za-z_$][A-Za-z0-9_$]*)/,
   /^\s*(?:readonly\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*[?!]?\s*[:(]/,
   /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:UNIQUE\s+)?(?:MATERIALIZED\s+)?(?:TABLE|VIEW|INDEX|TYPE|FUNCTION|TRIGGER)\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([A-Za-z_][A-Za-z0-9_]*)"?/i,
   /^\s*CONSTRAINT\s+"?([A-Za-z_][A-Za-z0-9_]*)"?/i,
+  /^\s*(?:ALTER\s+TABLE\s+\S+\s+)?ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([A-Za-z_][A-Za-z0-9_]*)"?/i,
+  /^\s*(?:ALTER\s+TABLE\s+\S+\s+)?ADD\s+CONSTRAINT\s+"?([A-Za-z_][A-Za-z0-9_]*)"?/i,
   /^\s*"?([A-Za-z_][A-Za-z0-9_]*)"?\s+(?:uuid|text|citext|integer|bigint|numeric|boolean|jsonb|json|bytea|timestamptz|timestamp|date|smallint|interval)\b/i,
 ];
 
@@ -4194,6 +4208,234 @@ const ri19 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-20  A reason that quotes a command and states its result is RUN
+// -----------------------------------------------------------------------------
+//
+// WHAT HAPPENED, AND IT IS THE SAME FILE RI-14 WAS WRITTEN FOR, ONE CLASS OVER.
+// `wiring.test.ts`'s `usePayoutBackend` entry read "`grep -rn lifetime_settled
+// packages/db/migrations` returns nothing at all". `0065` landed the three
+// columns and session 400 landed the writer, and the entry's OWN CITED GREP now
+// returns SEVEN lines. Every gate stayed green, because RI-14 reads EXPORTS and
+// a migration COLUMN is not an export. That is not a bug in RI-14; it is a
+// boundary nobody had drawn.
+//
+// THE RULING THIS CHECK IMPLEMENTS IS ADR-214'S, AND IT WAS DERIVED BY RUNNING
+// THE ALTERNATIVES RATHER THAN BY ARGUING THEM. Four candidates were measured
+// over this tree before one was written:
+//
+//   C1  RI-14's existing claim shapes, with the name set widened from exports to
+//       the 1,088 schema objects the 62 migrations declare.
+//       MEASURED: 0 sites in RI-14's three files, 0 across 280 shipped `.ts`.
+//       THE PARAMETER EVERYBODY WOULD HAVE CHANGED FIRST MOVES NOTHING, which is
+//       ADR-212's finding arriving on a different check. The false sentence does
+//       not wear any of RI-14's four shapes.
+//   C3  New absence phrasings over declared schema names -- `is absent`,
+//       `no column`, `declares no`.
+//       MEASURED: 0 sites in RI-14's three files, 26 across shipped `.ts`, of
+//       which ONE is a real defect and 25 are honest sentences. `events` is
+//       absent from a REGISTRY, `name` from a RESPONSE, `route` is a file stem.
+//       The word "absent" does not mean "not in the schema", and no discriminator
+//       over prose recovers that.
+//   C4  Any backticked snake_case token in a sentence carrying a negation.
+//       MEASURED: 13 sites in RI-14's three files ALONE, every one honest.
+//   C2  A quoted command with a stated result is EXECUTED.
+//       MEASURED: 1 site in RI-14's three files, and it is exactly the false
+//       sentence. 0 honest sentences moved.
+//
+// SO THE RULE IS NOT "RECOGNISE THE COLUMN NAME", WHICH IS UNDECIDABLE OVER
+// PROSE AND WAS MEASURED TO BE. THE RULE IS THAT A REASON WANTING TO CLAIM A
+// SCHEMA FACT SUPPLIES ITS OWN DECISION PROCEDURE, AND THE RUNNER RUNS IT. The
+// burden lands on the sentence making the claim rather than on every sentence
+// that is not making one, which is why this check turns no honest prose red.
+//
+// WHAT IT DOES NOT CATCH, stated rather than left to be discovered.
+//   (1) It reads only `grep`. A reason quoting any other command is a FINDING
+//       and not a skip, because a check evadable by writing `rg` instead is not
+//       a check. Widening the vocabulary is a ruling, not an edit.
+//   (2) It executes NOTHING through a shell. The command is tokenised here and
+//       run with `execFileSync`, and any shell metacharacter, glob character,
+//       absolute path or `..` segment makes the claim UNSETTLEABLE, which is a
+//       finding. A reason that needs a regex pattern must state its claim in a
+//       form a runner can settle, or not state it.
+//   (3) It reads the same three files RI-14 reads, for RI-14's measured reason
+//       and one of its own: `docs/` carries 26 more command claims, and several
+//       are TIME-STAMPED history -- ADR-211's row 19 says "at this commit" and
+//       names `0064` as the last migration. A document may honestly record what
+//       a command returned in the past; a live source comment may not. Reaching
+//       docs needs an "as at commit X" exemption this check does not have, and
+//       that is RI-16's territory.
+//   (4) It reads the COUNT of matching lines and never their content, so a
+//       command returning the right number of the wrong lines passes.
+const COMMAND_CLAIM_FILES = SOURCED_CLAIM_FILES;
+
+/**
+ * A quoted command and the result the sentence claims for it, on a two-line
+ * window so a wrapped string literal does not blind the reader.
+ */
+const COMMAND_CLAIM =
+  /`([a-z][a-z0-9-]* [^`\n]{2,180})`([^.`\n]{0,60}?)\b(?:returns|matches|finds|reports) (nothing(?: at all)?|no lines|(\d+) lines?)\b/gi;
+
+/** Characters that would mean something to a shell, a glob, or a regex engine. */
+const UNSAFE_IN_COMMAND = /[;|&$><()`\\!*?[\]{}~\n]/;
+
+/**
+ * The command as an argv a runner can execute without a shell, or `null` when
+ * no such argv exists.
+ * @param {string} command
+ * @returns {readonly string[] | null}
+ */
+function commandArgv(command) {
+  if (UNSAFE_IN_COMMAND.test(command)) return null;
+  const parts = command.match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
+  const argv = parts.map((p) => (/^["']/.test(p) ? p.slice(1, -1) : p));
+  if (argv.length < 2) return null;
+  for (const arg of argv.slice(1)) {
+    if (arg.startsWith('-')) continue;
+    if (arg.startsWith('/') || arg.split('/').includes('..')) return null;
+  }
+  return argv;
+}
+
+/** @type {Invariant} */
+const ri20 = {
+  id: 'RI-20',
+  title:
+    'A reason that quotes a command and states its result is run, and the result is what it says',
+  covers:
+    'the reason text in ' +
+    COMMAND_CLAIM_FILES.join(', ') +
+    '. A claim is in scope when a BACKTICKED COMMAND is followed, within sixty ' +
+    'characters and across at most a two-line window, by `returns`, `matches`, ' +
+    '`finds` or `reports` and then either `nothing`, `no lines`, or a DIGIT ' +
+    'followed by `line`/`lines`. The command is tokenised and executed with no ' +
+    'shell, and the claim FAILS when the number of non-empty output lines is not ' +
+    'the number the sentence states. THIS IS THE HALF RI-14 STRUCTURALLY CANNOT ' +
+    'READ: RI-14 settles a non-existence claim about a named EXPORT, and a ' +
+    'migration COLUMN is not an export, so `lifetime_settled_cents` was outside ' +
+    'every gate in the tree while the entry asserting its absence was read by ' +
+    'every later session. WHY THE RULE IS A DECISION PROCEDURE RATHER THAN A ' +
+    'NAME MATCHER, and it was measured rather than assumed (ADR-214): widening ' +
+    "RI-14's name set to the 1,088 schema objects the migrations declare moves 0 " +
+    'sites in these three files and 0 across 280 shipped `.ts`; absence ' +
+    'phrasings over declared schema names move 26 sites of which 25 are honest ' +
+    'sentences, because `absent` means absent from a REGISTRY or a RESPONSE far ' +
+    'more often than from the schema; a backticked snake_case token near a ' +
+    'negation moves 13 sites in these three files alone, all honest. Executing ' +
+    'the quoted command moves exactly 1, and it is the defect. WHAT IT DOES NOT ' +
+    'CATCH. (1) Only `grep` is executable; any other command is a FINDING rather ' +
+    'than a skip, because a check evadable by writing `rg` is not a check. (2) ' +
+    'Nothing runs through a shell: a shell metacharacter, a glob character, an ' +
+    'absolute path or a `..` segment makes the claim UNSETTLEABLE, which is a ' +
+    'finding. A reason needing a regex states its claim in a settleable form or ' +
+    'does not state it. (3) It reads these three files and not `docs/`, which ' +
+    'carries 26 more command claims of which several are TIME-STAMPED history: ' +
+    'ADR-211 row 19 says "at this commit" and names `0064` as the last ' +
+    'migration. A document may honestly record what a command returned in the ' +
+    'past and a live source comment may not, and the exemption that needs is ' +
+    "RI-16's. (4) It reads the COUNT of matching lines and never their content.",
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    let sites = 0;
+    for (const rel of COMMAND_CLAIM_FILES) {
+      const abs = join(root, rel);
+      if (!existsSync(abs)) {
+        findings.push(
+          `${rel} does not exist. This check names the files whose REASONS it reads, ` +
+            `so a rename silently empties it; point it at the new path`,
+        );
+        continue;
+      }
+      const lines = readFileSync(abs, 'utf8').split('\n');
+      for (let i = 0; i < lines.length; i += 1) {
+        // THE STRING FURNITURE IS REMOVED RATHER THAN MATCHED AROUND. These
+        // reasons are JS string literals concatenated with `' +`, so a claim
+        // wraps mid-sentence; joining the pair back into the prose the author
+        // wrote is what makes the window read one sentence instead of two
+        // halves of one.
+        const head = (lines[i] ?? '').replace(/['"]\s*\+\s*$/, '');
+        const tail = (lines[i + 1] ?? '').replace(/^\s*['"]/, '');
+        const window = head + tail;
+        COMMAND_CLAIM.lastIndex = 0;
+        for (const m of window.matchAll(COMMAND_CLAIM)) {
+          // ATTRIBUTE EACH MATCH TO EXACTLY ONE WINDOW. A claim sitting wholly
+          // inside line i is visible from window i-1 as well, and counting it
+          // twice would make the site total a number about this loop rather
+          // than about the file.
+          if ((m.index ?? 0) >= head.length) continue;
+          sites += 1;
+          const command = m[1] ?? '';
+          const stated = m[4] === undefined ? 0 : Number(m[4]);
+          const where = `${rel}:${i + 1}`;
+          const argv = commandArgv(command);
+          if (argv === null) {
+            findings.push(
+              `${where}: the reason states a result for \`${command}\` and the runner cannot ` +
+                `settle it. A command is executed with NO SHELL, so a shell metacharacter, a ` +
+                `glob character, an absolute path or a \`..\` segment leaves the claim ` +
+                `unsettleable. State it in a form a runner can settle, or do not state it`,
+            );
+            continue;
+          }
+          if (argv[0] !== 'grep') {
+            findings.push(
+              `${where}: the reason states a result for \`${argv[0]}\`, and only \`grep\` is ` +
+                `executable here. This is a FINDING rather than a skip on purpose: a check a ` +
+                `later author evades by writing a different command name is not a check. ` +
+                `Widening the vocabulary is a ruling`,
+            );
+            continue;
+          }
+          /** @type {string} */
+          let out;
+          try {
+            out = execFileSync(argv[0], argv.slice(1), {
+              cwd: root,
+              encoding: 'utf8',
+              timeout: 30_000,
+              maxBuffer: 16 * 1024 * 1024,
+            });
+          } catch (err) {
+            // grep exits 1 for "no match", which IS a result. Anything else --
+            // a path that no longer exists, most often -- is a claim about a
+            // tree this one is not.
+            const status = /** @type {{ status?: number; stdout?: string }} */ (err).status;
+            if (status === 1) out = '';
+            else {
+              findings.push(
+                `${where}: \`${command}\` exited ${String(status)} rather than returning a ` +
+                  `result, so the sentence states an outcome for a command this tree cannot ` +
+                  `run. A path it names has usually moved`,
+              );
+              continue;
+            }
+          }
+          const actual = out.split('\n').filter((l) => l !== '').length;
+          if (actual === stated) continue;
+          findings.push(
+            `${where}: the reason says \`${command}\` ${m[4] === undefined ? 'returns nothing' : `returns ${String(stated)} line(s)`} ` +
+              `and it returns ${String(actual)}. THE SENTENCE QUOTES ITS OWN DECISION ` +
+              `PROCEDURE AND NOBODY RAN IT: this is how \`usePayoutBackend\` told every later ` +
+              `session that no migration could store a \`RuleState\` for a full night after ` +
+              `\`0065\` landed all three columns. Open the file: either the claim is wrong and ` +
+              `the reason is rewritten with the surviving one, or it was true when written and ` +
+              `the block says so`,
+          );
+        }
+      }
+    }
+    if (sites === 0 && findings.length === 0)
+      throw new Error(
+        'RI-20 read ' +
+          `${COMMAND_CLAIM_FILES.length} file(s) and found NO command claim in any of them. ` +
+          'This check exists because a reason quoted a command and nobody ran it, so a run ' +
+          'that settles nothing is not a pass',
+      );
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -4213,6 +4455,7 @@ export const CHECKS = [
   ri16,
   ri18,
   ri19,
+  ri20,
 ];
 
 function main() {
