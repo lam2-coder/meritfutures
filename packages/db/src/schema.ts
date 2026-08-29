@@ -842,8 +842,19 @@ export const ruleStates = pgTable('rule_states', {
   calendarRevisionId: bigint('calendar_revision_id', { mode: 'bigint' }),
   // 0065_rule_state_lifetime_and_breach.sql, ADR-207. THE THREE FIELDS
   // `RuleState` REQUIRES AND `0015` NEVER DECLARED. Until 0065 the engine's own
-  // type was not persistable in this schema, which is why `readEligibility`
-  // rejects in production today.
+  // type was not persistable in this schema.
+  //
+  // `readEligibility` STILL REJECTS AND THIS IS NO LONGER WHY. Session 405
+  // measured it and left the repair to this fence: the storage gap 0065 closed
+  // is spent, and the refusal survives on grounds this file is not the record
+  // of. `rule_states` holds ZERO rows and no deployable schedules the batch
+  // that would write one; `RuleStateWriterIo.encodeEngineGates` has no
+  // implementation and `UNWIRED_RULE_STATE_WRITER_IO` refuses it by name
+  // (`apps/worker/src/batch/state-writer.ts`); and the same absence binds the
+  // READ side, because `RuleState.engineGates` is `EngineGateResults` while
+  // `engine_gates` above is `jsonb`, so an adapter handed a row would have to
+  // INVENT a decoding. That encoding is `B5` term 2 and is a corpus amendment
+  // rather than a line of code.
   //
   // `breached` IS DERIVABLE FROM `breachKind` AND IS STORED ANYWAY. The pair is
   // bound by `rule_states_breach_flag_matches_kind`, so a mapping that carries
