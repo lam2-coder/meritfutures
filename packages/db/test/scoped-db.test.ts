@@ -191,6 +191,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   affiliateStatements: 'affiliate_statements',
   operators: 'operators',
   operatorSessions: 'operator_sessions',
+  firmParameters: 'firm_parameters',
 };
 
 /**
@@ -447,13 +448,26 @@ describe('the registry is total', () => {
   // REGISTERED THEM, which is `payout_destinations`' and `reconciliation_runs`'
   // shape rather than `live_account_state`'s, because the next slice on this
   // path mints an operator session and needs both relations on its first line.
-  test('114 declared relations, 114 scope rules, 0 reachable without one', () => {
+  // 115 IS ADR-252's AND IT IS THE FIRST ONE WHOSE TABLE THE ROW ALSO CREATED.
+  // `0074` creates `firm_parameters`, the home ADR-238 ruling 1 ruled the base
+  // account cap into and deliberately did not build, because that entry's fence
+  // reached neither this file's subject nor `schema.ts`. FIRM on ADR-199's
+  // predicate: no column of the row is declared against `identities(id)` or
+  // `accounts(id)`. Its one foreign key is `approved_by` against
+  // `operators(actor)`, which is itself FIRM, so the available `derived` rule
+  // terminates at a table with no identity on it -- `offers.experiment_id`'s
+  // trap and `reserve_coverage_snapshots`' `treasury_balances` chain in a third
+  // dress -- and an APPROVER IS NOT AN OWNER in any case. REGISTERING IT MAKES
+  // IT READABLE THROUGH `firmDb()` AND NOTHING ELSE: the key is deliberately
+  // NOT added to `CATALOG_TABLE_KEYS`, so a scoped transaction still refuses it
+  // and `accountCap()` is no nearer implementable than it was.
+  test('115 declared relations, 115 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(114);
-    expect(rules).toBe(114);
+    expect(declared).toBe(115);
+    expect(rules).toBe(115);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, AND IT IS
@@ -510,8 +524,15 @@ describe('the registry is total', () => {
     // and this figure moved by two while the registry moved by two, which is
     // the arithmetic this assertion exists to make checkable: a table created
     // and left unregistered moves one number and not the other.
+    //
+    // 118 SINCE `0074`, AND `firm_parameters` IS THE 115th REGISTRATION.
+    // Both numbers moved by one in the same commit, which is
+    // `payout_destinations`' shape: ADR-238 ruling 1 had already ruled the
+    // table's contents and could not create it, so the session that wrote the
+    // DDL is also the one that registered it and there is no window in which
+    // this table exists unregistered.
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
-    expect(createdTables).toBe(117);
+    expect(createdTables).toBe(118);
   });
 
   // SIX MEMBERS SINCE ADR-191, AND THE ASSERTION IS THE REASON NEITHER THE FIFTH
