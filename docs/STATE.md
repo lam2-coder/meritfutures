@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->219<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->220<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9438,3 +9438,93 @@ checking it out, the same delta of **+1 file and +27 cases**.
 **TWO STALE CITATIONS REPORTED AND NOT REPAIRED, both outside this fence.** [`admin-feed.ts:18`](../apps/api/src/routes/admin-feed.ts) cites `admin-reads.ts:1361` for a sentence at **`:2004`**, already wrong by **643** lines before this branch existed, and this branch moves the target further. The composition header states the wiring triple as `{ 23, 6, 17 }` against a runner reporting `{ 24, 7, 17 }`.
 
 **Verified, derived rather than carried**: **33 of 33** gates (one failure on the way, `CI-06/table-row-width`, an unescaped pipe in an ADR table cell), **20 of 20** invariants (one failure on the way, `RI-16`), **257 files / 6,391 passed / 6 skipped** against a pre-edit baseline of **256 / 6,385 / 6**, the delta being exactly the six new cases, typecheck 0, lint 0, `format:check` clean. **The [ADR-012](decisions/ADR-012.md) grep over the whole diff came back EMPTY.**
+
+## 2026-08-29 - Session 423: a `firm`-class read on the scoped transaction, and the two ports it was built for are each blocked by something neither had ever named ([ADR-233](decisions/ADR-233.md), proposed)
+
+**THE RULING LANDED AND NEITHER PORT IS WIRED.** `ScopedTx` gains a `firm`-class
+READ over `CATALOG_TABLE_KEYS`
+([`scoped-db.ts:2558`](../packages/db/src/scoped-db.ts)), a closed list of five
+keys at three verbs and **no write verb**, guarded at run time by
+`refuseUncatalogued` ([`:2591`](../packages/db/src/scoped-db.ts)) as well as by
+type. Row `233` asked for exactly this and the two ports it was asked to unblock
+are still 503, for reasons underneath the one it named.
+
+**THE DISCLOSURE ARGUMENT IS ABSENT RATHER THAN OUTWEIGHED, AND IT IS SAID IN
+THOSE TERMS.** [ADR-106](decisions/ADR-106.md) keeps a `pair` key out of a scoped
+read because returning the row discloses the counterparty;
+[ADR-008](decisions/ADR-008.md) filters an `owned` read because the row is
+somebody's. **A `firm` row is nobody's**, so there is no party to disclose and no
+tenancy to read around, and there is nothing to weigh. What the narrowness is
+bought for instead is two things that are not tenancy: **not every `firm` table
+is catalogue** (`otp_challenges` holds `code_hash`, and the class is **45 keys of
+a registry of 112**, derived at reporting time), and **a read is not a write**
+(`FirmTx` carries `insert`, `updateAt` and `deleteAt`, and a buyer's transaction
+that could `UPDATE geo_restrictions` is a checkout that switches off its own geo
+block).
+
+**AN EXPLICIT LIST, NOT [ADR-230](decisions/ADR-230.md)'s REGISTRY DERIVATION,
+ON ADR-230's OWN REASONING.** `PairRule.writer` is a per-table ruling a
+derivation can read; `FirmRule` carries `class` and `why` and nothing else, so
+deriving would yield `FirmTableKey` **entire**, which is the class rather than a
+slice of it. That is `ParentedTableKey`'s situation and this takes
+`ParentedTableKey`'s answer.
+
+**THE CROSS-IDENTITY READ IS RULED SEPARATELY AND REFUSED.** `affiliates` is
+`owned` ([`scope.ts:1094`](../packages/db/src/scope.ts)) and `affiliate_clicks`
+is `derived` through it ([`:1108`](../packages/db/src/scope.ts)), so the row
+belongs to somebody and the objection that is ABSENT for `firm` is fully
+PRESENT. **And the refusal registers a contradiction in ADR-230**: that entry
+declined to validate `insertAsParty`'s counterparty on the ground that *"the
+identity it names is one the caller already held"*, and **no door in this tree
+resolves a coupon code or a click token to an identity**, so the write door has
+no possible caller until this is ruled.
+
+**THE STOP CONDITION IS NOT MET AND THE REASON IS THE FINDING.** Each port
+carries a blocker no reason on it had ever stated, and neither is a door.
+`usePayoutBackend`: `PayoutTx.subject`
+([`payouts.ts:428`](../apps/api/src/routes/payouts.ts)) returns a `RuleState`
+whose `engineGates` ([`types.ts:1006`](../packages/rules-engine/src/types.ts))
+has **no decoding** for `rule_states.engine_gates`, `encodeEngineGates`
+([`state-writer.ts:337`](../apps/worker/src/batch/state-writer.ts)) has no
+implementation under any `src/`, and the table holds no rows. All three have been
+stated by `ELIGIBILITY_BLOCKER`
+([`account-reads.ts:851`](../apps/api/src/routes/account-reads.ts)) since session
+401, about the other endpoint `INV-M5-02` binds to the same evaluator.
+`useCheckoutBackend`: `accountCap()`
+([`checkout.ts:736`](../apps/api/src/routes/checkout.ts)) is the **first** call
+of both handlers and its `maxAccounts` has no source. `grep -rn max_accounts
+packages/db/migrations` returns one line and it is the per-entity **exception**,
+which `databaseAuthBackend` already refuses `readMe` for
+([`auth-backend.ts:1518`](../apps/api/src/auth-backend.ts)).
+
+**NOTHING WAS WIRED BECAUSE BOTH AVAILABLE WIRINGS ARE SHAPES THIS TREE ALREADY
+REFUSES.** A payout backend with `listPayouts` live and `subject` rejecting is
+the live-looking route in front of the approving arm that `usePayoutBackend`'s
+own entry forbids; a checkout backend whose first unconditional call rejects
+raises the wired count and serves no request, which `useCheckoutAdapters`'s entry
+already calls *"not a wiring"*. **Both `BLOCKED` entries are rewritten and
+neither is deleted.**
+
+**TWO TRANSCRIPTION REPAIRS, FOUND BY BUILDING ON THEM.** `coupons.code` (inline
+`UNIQUE` in `0006`) and `plan_version_sizes_version_size_uq` (a standalone
+`CREATE UNIQUE INDEX` in `0004`) were both absent from
+[`schema.ts`](../packages/db/src/schema.ts), which is the one file
+`uniqueKeys()` reads, so two of the five catalogue tables were unaddressable
+through **every** accessor. This is [ADR-231](decisions/ADR-231.md)'s
+`certificates_code_uq` repair on two more tables, and session 421's landmine
+about that transcription gap is now three instances rather than one.
+
+**A STALE COUNT IS REGISTERED RATHER THAN REPAIRED.** `firmDb()`'s docblock says
+the `firm` classification decides authorization for *"thirty-five"* tables and
+the class is **45**. It is a bare numeral in prose, which `RI-20`'s own header
+records as the one claim shape it measured and could not settle, and the
+correction is a sentence about a different door.
+
+**Counts derived at reporting time**: **33 of 33** gates, **20 of 20**
+invariants off the runner's own last line, typecheck 0, lint 0, `format:check`
+clean, **257 files / 6,405 passed / 6 skipped** against a `b8351af` baseline of
+**256 / 6,385 / 6** reproduced by checking `origin/main` out into a worktree and
+running it, a delta of **+1 file and +20 cases**. **Four seeded defects watched
+firing**, each restored from a byte copy with `diff` confirming identity.
+**`falsify.mjs` was NOT run**: it is not in this row's verification list and it
+mutates the working tree.
