@@ -32,10 +32,10 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->60<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
-<!--gen:migration_files-->60<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
-<!--gen:migration_files-->60<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
-<!--gen:migration_files-->60<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->61<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->61<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->61<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->61<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -234,7 +234,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 
 **`SD-M6-07`'s load-bearing half is the delivery log and not the schedule**, and the reason is [M05](../../docs/plans/M05-payout-system.md):91 `INV-M5-18` rather than anything new. That invariant is asserted *"on the QUERY, never on the job"*, evaluated independently of whether the sweep reported success, on the stated ground that **a job that reports success is not evidence that the work happened**. A second sweep with the same shape gets the same control rather than a new one: the delivery-failure alarm reads `report_deliveries` and never the job's own report, and `GS-288` pins the case where the job reports success and nothing arrived. **`due_at` is what makes that askable**, because without a stored window "nothing arrived" and "not due yet" return the same empty set, which is [`economic_calendar_loads`](../../docs/architecture/data-model/economic_calendar_loads.md)'s coverage bound one table over and one row up.
 
-**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
+**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
 
 | Aimed at | What actually refused it |
 |---|---|
@@ -477,11 +477,11 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->60<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->60<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->60<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->60<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->60<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->61<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->61<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->61<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->61<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->61<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->115<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -731,11 +731,11 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->60<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->60<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->60<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->60<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->60<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->61<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->61<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->61<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->61<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->115<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->25<!--/gen--> triggers**, across <!--gen:migration_files-->61<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -845,10 +845,10 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -923,10 +923,10 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
-**All <!--gen:migration_files-->60<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->61<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
 
 | | Before `0034` | After `0034` |
 |---|---|---|
@@ -1831,3 +1831,117 @@ Session 365 wrote a candidate constraint against this schema and refused it on a
 **It proposes no constraint that reads another table.** `mismatches_found` is bounded and not verified against `reconciliations`; doing that needs a cross-table trigger, which is the class `0060` refused on evidence.
 
 **It gives `batch_run_id` no foreign key**, because no batch run is a row anywhere in this schema. `EVENTS section 5.3` declares the `run_id` in three payloads and no table stores it, which is a second and smaller absence of the same shape as `B4`, found while re-deriving the first and reported rather than taken.
+
+---
+
+## 30. `0065` lands, and the storage was the easy half of the question (2026-08-29)
+
+**Session 398, [ADR-207](../../docs/decisions/ADR-207.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `207` and `0065`.** `RuleState` requires `lifetimeSettledCents`, `breached` and `breachKind` and `0015_rule_states.sql` declares none of the three. **The port that refuses because of it is wired in production**: [`start.ts:76`](../../apps/api/src/start.ts) installs `databaseAccountReads` and `readEligibility` rejects on `ELIGIBILITY_BLOCKER`, so a trader asking whether they are eligible today gets a rejection because a column does not exist. `0015` is merged and is superseded **by addition** rather than edited (constitution E2).
+
+### The absence, re-derived from the catalogue and larger than the reservation said
+
+`0001`..`0064` applied forward-only under `ON_ERROR_STOP=1` against **PostgreSQL 16.13**, 60 of 60, then read at `pg_attribute`, `pg_constraint`, `pg_indexes` and `pg_trigger`:
+
+| Query | Result |
+|---|---|
+| Columns matching `%breach%` across all **115** tables | **zero**. Not absent from this table; absent from the estate |
+| Columns matching `%lifetime%` across all **115** tables | **zero** |
+| `rule_states` columns | **26**, not the 25 `0015` declares. `0035` added `calendar_revision_id` |
+| `rule_states` `CHECK` constraints (`contype = 'c'`) | **12**. Fifteen constraints in all, with two foreign keys and one primary key |
+| `rule_states` indexes / triggers / rows | **5 / 0 / 0** |
+| `0015` constraints still in the catalogue under their original names | **two are not**, both superseded by [`0037`](migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) and [`0046`](migrations/0046_supersede_rule_states_consistency_period_started.sql). This file does not restate either retired name: section 24 already records one of them and `CI-06/retired-constraints` bounds the citations per file |
+| `rule_states.phase` | bare `text`, **no vocabulary constraint at all**, while `account_phase` exists at `0001:45` and only `accounts.phase` uses it |
+
+**The last row is a finding in no dispatch and is reported rather than taken** ([ADR-207](../../docs/decisions/ADR-207.md) section 9): the engine's own record admits any string as a phase, on the table replay compares against.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-207` | `rule_states` | `lifetime_settled_cents bigint NOT NULL DEFAULT 0` with `>= 0`; `breached boolean NOT NULL DEFAULT false`; `breach_kind text NULL` closed over `BreachKind`'s three members; three named `CHECK` constraints; the `state_hash` column comment superseded | 0065 | **landed** |
+
+**No `SD-nn` is claimed**, on `0051`'s and `0064`'s reasoning: this is not a schema delta proposed by an approved module document. **An ADR number was allocated and is taken**, unlike `0064`, and it carries the two rulings a `CHECK` cannot state: `text` over an `ENUM`, and a derivable column stored anyway.
+
+### The defaults are forced, and this was measured rather than assumed
+
+Five committed probe scripts insert into `rule_states` with explicit column lists naming none of the three: `probe_audited_writes.sql`, `probe_calendar_revision_required.sql`, `probe_consistency_period_after_anchor.sql`, `probe_rule_states_calendar_revision.sql` and `probe_rule_states_high_water_bound.sql`, all wired in `corpus.yml`. **A `NOT NULL` without a default turns sixteen CI probes red.** The values chosen are also the engine's own opening state at [`advance.ts:124`](../../packages/rules-engine/src/day/advance.ts), so the constraint and the correctness argument agree rather than one being bent to the other.
+
+### The install, from empty, every figure queried rather than counted
+
+`0001`..`0065` applied forward-only under `ON_ERROR_STOP=1` against **PostgreSQL 16.13**, **61 of 61**. The re-apply **fails**, as it must: `ERROR: column "lifetime_settled_cents" of relation "rule_states" already exists`.
+
+```
+                                    0064      0065     delta
+pg_tables (public)                   115       115        0
+pg_indexes (public)                  401       401        0
+pg_constraint (public, all)          793       797       +4
+pg_constraint (public, contype c)    491       495       +4
+pg_trigger (public, not internal)     25        25        0
+pg_proc (public)                     111       111        0
+enum labels (pg_enum)                 65        65        0     no new type
+
+rule_states columns                   26        29       +3
+rule_states CHECK constraints         12        16       +4
+```
+
+**The four are the three named constraints plus the inline `lifetime_settled_cents >= 0`.** No index, no trigger, no function and no enum type: `breach_kind` is `text` with a `CHECK`, on [ADR-207](../../docs/decisions/ADR-207.md) section 4.
+
+### `0048` item 4's claim, executed rather than read
+
+`rewrite_rule_state` ([`0048:488`](migrations/0048_audited_writes_on_append_only_tables.sql)) takes the whole `rule_states` composite type and derives its assignment list from `pg_attribute` at [`:563`](migrations/0048_audited_writes_on_append_only_tables.sql), on the stated argument that "a column a later migration adds to `rule_states` is rewritten with nobody remembering to add it here". **This is the first migration to test that claim.** The derivation, run against the installed `0065` schema, returns 25 names ending:
+
+```
+..., computed_at, calendar_revision_id, lifetime_settled_cents, breached, breach_kind
+```
+
+All three are present and `B.4` step 4's audited rewrite covers them with no edit to `0048`.
+
+### The grants, checked rather than assumed
+
+Column adds inherit table-level grants and the catalogue confirms it. `merit_app` holds `INSERT` and `SELECT` on all three and **no `UPDATE`**, so `0026`'s append-only revoke is not widened by a column; `merit_migrator` holds `SELECT` and `UPDATE`, which is `0048`'s table-scoped exception for the audited rewrite. `assert_append_only_grants.mjs` still reports the document and the database naming the same **26** append-only tables.
+
+### Eleven database cases, five acceptances and six rejections, all watched firing
+
+Against `0001`..`0065`, in one transaction, rolled back. **The acceptances are here because a probe that only ever attempts forbidden things passes against a guard that rejects everything.**
+
+```
+ACCEPTANCE 1  an insert naming none of the three lands at (0, false, NULL), the engine opening state
+ACCEPTANCE 2  all three BreachKind members are writable with breached true
+ACCEPTANCE 3  payouts_settled_count 1 with 250000 cents lifetime lands
+ACCEPTANCE 4  count 1 with lifetime 0 LANDS, which the refused biconditional would have rejected
+ACCEPTANCE 5  an EXPIRED account is phase closed and breached false, so phase does not decide the flag
+REJECTION 1   breached true with a null kind          -> rule_states_breach_flag_matches_kind
+REJECTION 2   a kind with breached false              -> rule_states_breach_flag_matches_kind
+REJECTION 3   'soft_daily_loss_limit'                 -> rule_states_breach_kind_is_a_breach_kind
+REJECTION 4   cents settled with nothing settled      -> rule_states_no_settlements_no_lifetime_total
+REJECTION 5   a negative lifetime total               -> rule_states_lifetime_settled_cents_check
+REJECTION 6   merit_app UPDATE on a new column        -> insufficient_privilege, append-only holds
+```
+
+**REJECTION 3 is the vocabulary doing work rather than decorating.** `soft_daily_loss_limit` is the plausible fourth member and `R-23` is explicit that a soft limit is a FACT and never a breach ([`breach.ts:72`](../../packages/rules-engine/src/day/breach.ts)). **ACCEPTANCE 4 is the refused biconditional**: `(payouts_settled_count = 0) = (lifetime_settled_cents = 0)` mirrors `rule_states_settlements_imply_anchors` exactly and is unsound, because [`0010:54`](migrations/0010_payouts.sql) admits `approved_cents = 0`.
+
+**The counterfactual was run.** The same script against `0001`..`0064` fails at ACCEPTANCE 1 with `ERROR: record "r" has no field "lifetime_settled_cents"`.
+
+### The A/B against every existing probe, both legs
+
+| Leg | Result |
+|---|---|
+| All 16 `scripts/db/probe_*.sql` against `0001`..`0064` | **16 of 16 pass** |
+| All 16 against `0001`..`0065` | **16 of 16 pass** |
+| `assert_no_floats.sql`, `assert_append_only_grants.mjs`, `assert_date_unit_shape.mjs` at `0065` | all pass |
+
+**The cleanness is structural rather than lucky.** Every constraint is row-local, no merged migration is edited, no constraint is dropped or re-added, no trigger or function is created, and the only pre-existing artefact this file rewrites is one column comment whose load-bearing substring is preserved verbatim.
+
+### What `0065` does not do
+
+**It does not put the three columns in the state hash and it does not rule them out either.** `ADR-026` C-07 fixes nineteen inputs; `0035` added a column and ruled it **excluded** on `ADR-047`'s own reason; **there is no reason of that kind here.** All three are replayable facts the fold produced, which is what inputs 3 and 15 are, so on the merits they belong in the hash. The executable list is `HASHED_COLUMNS` in `packages/rules-engine/src/hash.ts`, outside this fence, and a declared input set no code computes is worse than a stated open question. **The `state_hash` comment therefore records them as UNRULED, in those words.** [ADR-207](../../docs/decisions/ADR-207.md) section 5 is the decision and it is free while the table is empty.
+
+**It does not clear `usePayoutBackend`.** That port's **second** blocker is independent and stands, verified at its sources rather than quoted: `planVersions` ([`scope.ts:672`](src/scope.ts)) and `planVersionSizes` ([`:677`](src/scope.ts)) are class `firm` and `ScopedTableKey` excludes them ([`:1380`](src/scope.ts)), so no `ScopedTx` reaches the `ResolvedPlan` while `PayoutTx` runs every method on one transaction. **`ELIGIBILITY_BLOCKER` is not edited either**, because `readEligibility` still has no adapter: what `0065` removes is the reason the adapter could not be written, not the adapter.
+
+**It writes no row and installs no writer.** `B5` term 1 is still owed and is another fence's.
+
+**It adds no constraint that reads another table.** `INV-17`'s `ladder * max cap` bound reads `plan_version_sizes` and is named in the column comment rather than enforced, which is the class `0060` refused on evidence.
+
+**It does not close `phase`.** Section 9 of the entry says why and says it is the obvious next slice on this table.
+
+**It commits no probe.** The eleven cases above were executed and their transcript is here; `scripts/db/`, `.github/workflows/corpus.yml` and `docs/testing/STRATEGY.md` are all outside this fence, and a probe committed without the workflow row runs nowhere. **It is evidence and not yet a control**, and the remedy is named in the entry's fence section.

@@ -1567,6 +1567,17 @@ function ruleStateRow(id: bigint, tradingDay: string, overrides: RawRow = {}): R
     computedAt: instantOf(`${tradingDay}T22:05:00.000Z`),
     createdAt: instantOf(`${tradingDay}T22:05:00.000Z`),
     calendarRevisionId: null,
+    // `0065_rule_state_lifetime_and_breach.sql`, ADR-207. NOT DEFAULTED AWAY
+    // HERE. The row builder mirrors a stored row, and a fixture that omitted
+    // these would leave `projectRow`'s integer refusal unexercised on the two
+    // columns it was added for. `payoutsSettledCount` above is 1, so the
+    // lifetime total is non-zero: `rule_states_no_settlements_no_lifetime_total`
+    // is what makes those two facts agree at the store.
+    lifetimeSettledCents: 250000n,
+    // NOT BREACHED, and the pair moves together
+    // (`rule_states_breach_flag_matches_kind`).
+    breached: false,
+    breachKind: null,
     ...overrides,
   };
 }
