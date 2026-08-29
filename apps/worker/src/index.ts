@@ -171,6 +171,27 @@ export type {
   StoredContextGates,
 } from './batch/ports.ts';
 
+// -----------------------------------------------------------------------------
+// `ADR-239` SLICE B: A `BatchPorts` VALUE, OVER POSTGRES (session 431)
+// -----------------------------------------------------------------------------
+// **THE FIRST `BatchPorts` VALUE CONSTRUCTED UNDER ANY `src/` IN THIS
+// WORKSPACE.** `apps/api/test/rule-state-producibility.test.ts` case 2 runs that
+// measurement as a test and it read zero until this leg. Four of its ten methods
+// are served, six refuse by name with the slice that clears each, and `ADR-241`
+// section 4 is the accounting. It is a leg rather than an internal module
+// because it is the composition this deployable's own suite substitutes a
+// recorder into, and a composition nobody can import is a composition nobody can
+// test.
+export {
+  BatchPortUnwired,
+  BatchRowError,
+  calendarCarriesDay,
+  postgresBatchPorts,
+  readLastClosedTradingDay,
+  toCalendarSlice,
+} from './batch/adapter.ts';
+export type { BatchTx } from './batch/adapter.ts';
+
 // SD-08. Exported because the replay self-audit is the other caller: it will
 // re-derive a state and hash it with THIS function, and a second implementation
 // of the canonical serialization would make the audit compare two serializers
@@ -1180,6 +1201,7 @@ export type {
  * same change, which costs one line and is the whole price of the check above.
  */
 export const WORKER_BARREL_LEGS = [
+  './batch/adapter.ts',
   './batch/nightly.ts',
   './batch/ports.ts',
   './batch/replay.ts',
@@ -1198,6 +1220,7 @@ export const WORKER_BARREL_LEGS = [
   './digests/produce.ts',
   './digests/rows.ts',
   './integrations/loops.ts',
+  './job.ts',
   './live/ingest.ts',
   './live/ports.ts',
   './provisioning/index.ts',
@@ -1242,6 +1265,11 @@ export const WORKER_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = 
     'THE ONE DOOR. ADR-165 and `test/db.test.ts`: this is the only file under apps/worker/src ' +
     'that may import @merit/db. Re-exporting it would leave every consumer of this package one ' +
     'import short of the accessor.',
+  './start.ts':
+    'THE PROCESS ENTRY POINT. `apps/api/src/start.ts` states the ruling this transcribes: this ' +
+    'package`s `exports` target is `index.ts`, so importing it must have no effect, and a barrel ' +
+    'that re-exported the entry point would run the nightly batch on import. It is not a module ' +
+    'anything imports; `package.json`s `start` names it and nothing else does. ADR-241.',
   './batch/statistics.ts':
     "M12's statistics run (ADR-122) has never been re-exported here and `test/statistics.test.ts` " +
     'imports it by path. FOUND BY WRITING THIS LIST rather than by a merge, and RECORDED rather ' +
@@ -1252,26 +1280,38 @@ export const WORKER_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = 
 export const SERVICE = 'worker' as const;
 
 /**
- * Still not a scheduled application, and the missing piece has moved again.
+ * THIS DEPLOYABLE IS SCHEDULED NOW, AND WHAT USED TO STAND HERE WAS THE DEFECT.
  *
- * The batch exists, the queue's INTERFACE exists (ADR-086), the provisioning
- * saga exists, and now the hourly expiry sweep does. What is absent is the job
- * store: pg-boss's schema is not in `packages/db/migrations`, so there is
- * nothing to enqueue into, and nothing here installs a scheduler.
+ * The paragraph this replaces read "Still not a scheduled application, and the
+ * missing piece has moved again", and under it sat `export function main(): void`
+ * whose body was a `console.log` describing everything the module does not do.
+ * **NOTHING CALLED IT.** `ADR-239` measured `pnpm --filter @merit/worker start`
+ * printing nothing and exiting 0, and the allocation row re-derived both halves:
+ * `package.json`'s `start` named this file, and `grep -c "^main();"` over this
+ * file returned 0. A process that exits 0 having done nothing is what a healthy
+ * service looks like to a supervisor.
  *
- * **THAT ABSENCE IS ITSELF ALARMED AND THAT IS WHY IT IS SAFE TO STATE PLAINLY.**
- * `CRON_INVENTORY` gives the expiry sweep an **S1 dead-man switch on the job's
- * absence**, and `INV-M5-18`'s nightly assertion runs **on the query** rather
- * than on the job, so a deployment with no scheduler is a deployment two
- * unsuppressible alarms are already about to page on.
+ * **`main` NOW LIVES IN {@link WORKER_BARREL_LEGS}' `./job.ts` AND IS RE-EXPORTED
+ * HERE**, `src/start.ts` calls it, and a failed batch leaves a NON-ZERO exit
+ * status. `ADR-241` is the ruling, the schedule is EXTERNAL and registered in
+ * `CRON_INVENTORY`, and `test/entrypoint.test.ts` watches a real process exit
+ * rather than reasoning about one.
+ *
+ * WHAT IS STILL ABSENT IS NAMED RATHER THAN IMPLIED. The job store is still not
+ * installed: pg-boss's schema is not in `packages/db/migrations`, so there is
+ * nothing to enqueue into, and the five other jobs this deployable has built
+ * (detector runs, the expiry sweep, the two digest producers, the breaker
+ * evaluation and the statistics run) are still unscheduled, each with its own
+ * row in `CRON_INVENTORY` saying so.
  */
-export function main(): void {
-  console.log(
-    `merit ${SERVICE}: nightly batch built, provisioning saga built, expiry sweep built, ` +
-      'detector runner built, seven identity and payment detectors built and every one of them ' +
-      'declining on an unseeded threshold, breaker evaluator built and declining on an unstated ' +
-      'minimum sample, two digest producers built and the delivery dead-man switch built and ' +
-      'reading the delivery table rather than any run report, job interface built, no job store ' +
-      'and no scheduler yet',
-  );
-}
+export {
+  BATCH_CONCURRENCY,
+  ENGINE_VERSION_VAR,
+  TRADING_DAY_VAR,
+  WorkerJobRefusal,
+  liveWorkerIo,
+  main,
+  resolveEngineVersion,
+  resolveTradingDay,
+} from './job.ts';
+export type { WorkerJobIo } from './job.ts';

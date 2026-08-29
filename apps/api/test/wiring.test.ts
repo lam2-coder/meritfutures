@@ -333,21 +333,28 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // C-07's `state_hash` exists to make detectable.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
-    'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE IS NOW THE ONE NO ENTRY ' +
-    'ON THIS PORT OR ON `/eligibility` HAD EVER NAMED: NOTHING SCHEDULES THE JOB THAT WOULD ' +
-    'PRODUCE ONE, AND THAT IS A MISSING DEPLOYABLE RATHER THAN A MISSING DOOR. ' +
-    "`apps/worker/package.json` starts this workspace's only batch deployable at " +
-    '`node --experimental-strip-types src/index.ts`, and that module DECLARES ' +
-    '`export function main` (`apps/worker/src/index.ts:1268`) and calls it nowhere, while ' +
-    '`apps/api/src/start.ts:149` is `await main();`. The two entrypoints differ by one ' +
-    'statement. MEASURED RATHER THAN READ: `pnpm --filter @merit/worker start` loads the ' +
-    'barrel, prints nothing and exits 0, which is what a HEALTHY service looks like to a ' +
-    'supervisor, so the absence pages nobody. SECOND, EVEN GIVEN A SCHEDULER THERE IS NOTHING ' +
-    'TO SCHEDULE AGAINST: `runNightlyBatch` (`apps/worker/src/batch/nightly.ts:276`) takes a ' +
-    '`BatchPorts`, its read half declares SEVEN methods and its write half THREE ' +
-    '(`apps/worker/src/batch/ports.ts:265,336`), and NO VALUE OF THAT TYPE IS CONSTRUCTED ' +
-    'UNDER ANY `src/`: the four that exist are three test doubles and `scripts/demo/world.ts`, ' +
-    'whose `writeRuleState` refuses. THIRD, THE WRITER WOULD REFUSE ON A CODEC THAT IS RULED ' +
+    'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
+    'LINK UNDER IT CLOSED: THE JOB NOW RUNS AND THE ROW IT WOULD WRITE IS STILL OUT OF REACH. ' +
+    'THIS ENTRY LED WITH AN UNSCHEDULED JOB AND WITH A PROCESS THAT LOADED A BARREL, PRINTED ' +
+    'NOTHING AND LEFT A ZERO STATUS, AND ADR-241 MADE BOTH CLAUSES FALSE. THE RETIRED WORDING ' +
+    'IS PARAPHRASED RATHER THAN QUOTED, because a reason that reproduces its own retired ' +
+    'sentence reads as live to every grep and to the predicate that checks it is gone. ' +
+    '`apps/worker/package.json` starts the batch deployable at ' +
+    '`node --experimental-strip-types src/start.ts`, that file ends in a top-level ' +
+    '`await main()`, and a batch that throws leaves a NON-ZERO exit status, which a supervisor ' +
+    'can read: `apps/worker/test/entrypoint.test.ts` SPAWNS the process and asserts the status ' +
+    'rather than reasoning about it. The schedule is ruled EXTERNAL and registered in ' +
+    '`docs/ops/runbooks/CRON_INVENTORY.md`, because a timer inside a process nothing restarts ' +
+    'is not a schedule and a long-lived process has no exit code to fail with. SECOND, THERE ' +
+    'IS A `BatchPorts` VALUE NOW AND IT SERVES FOUR OF TEN METHODS: `runNightlyBatch` ' +
+    '(`apps/worker/src/batch/nightly.ts:276`) takes a `BatchPorts`, its read half declares ' +
+    'SEVEN methods and its write half THREE (`apps/worker/src/batch/ports.ts:265,336`), and ' +
+    '`postgresBatchPorts` (`apps/worker/src/batch/adapter.ts`) serves the calendar watermark, ' +
+    'the calendar slice, the accounts with a live mark and the accounts with stored state over ' +
+    "this deployable's one door. IT REFUSES `loadAccountDay` BY NAME, so the fold never " +
+    'starts: an `AccountDay` carries a resolved plan, a prior state, a mark, settlements, an ' +
+    'opened-on anchor and R-40s five context facts, and no adapter resolves them. THIRD, THE ' +
+    'WRITER WOULD REFUSE ON A CODEC THAT IS RULED ' +
     'AND UNWRITTEN, AND THIS CLAUSE NARROWED SINCE ADR-233: ' +
     '`RuleStateWriterIo.encodeEngineGates` (`apps/worker/src/batch/state-writer.ts:354`) has no ' +
     'implementation under any `src/` and `UNWIRED_RULE_STATE_WRITER_IO` throws by name, but ' +
