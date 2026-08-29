@@ -393,46 +393,70 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // what this entry named would have removed it twice over and found the route
   // still answering 503, which is the failure mode the paragraph above describes
   // and this is its second instance on one port.
+  //
+  // ADR-238 RULED ALL THREE AND DISCHARGED NONE, WHICH IS A DIFFERENT OUTCOME
+  // FROM THE TWO BEFORE IT AND IS WORTH THE DISTINCTION. ADR-230 and ADR-233
+  // each BUILT a door and this entry lost a clause to each. ADR-238 built
+  // nothing: it ruled where the cap comes from, refused the cross-identity read
+  // a second time on ground ADR-233 could not supply, and established that the
+  // ledger arm is foreclosed by the CORPUS rather than by the accessor. So the
+  // entry below is REWRITTEN FOR ACCURACY RATHER THAN NARROWED, and it says so.
+  //
+  // THE REASONS ARE NOW ASSERTED AS WELL AS WRITTEN, which is what this entry
+  // has needed since the first time it went stale. `test/checkout-backend-
+  // blockers.test.ts` reads the file each clause is about and pins it: the port
+  // method that takes no plan, the call order on both handlers, the one
+  // migration line, the two registry classes, the catalogue list, the reason
+  // vocabulary, the door set and the corpus line that pins `LT-08`. A clause
+  // here going stale now turns a case red rather than waiting for a reader.
   // ---------------------------------------------------------------------------
   useCheckoutBackend:
-    'A CAP WITH NO SOURCE, A CROSS-IDENTITY READ AND THE LEDGER ARM, AND NOT THE `firm` READ ' +
-    'THIS ENTRY LED WITH UNTIL ADR-233. THE FIRM-READ CLAUSE IS DISCHARGED AND IS DELETED ' +
-    'RATHER THAN KEPT BESIDE A DOOR THAT LANDED: it read that `publishedPlanVersion`, ' +
-    '`planVersionSize`, `couponByCode`, `geoDecision` and `midCandidates` read five `firm` ' +
-    'tables no `ScopedTx` read reaches, and `ScopedTx` now carries `catalogRows`, ' +
-    '`catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:2558`), whose five members are exactly those five tables. ' +
-    'THE `attributions` WRITE CLAUSE BEFORE IT WAS DISCHARGED THE SAME WAY BY ADR-230, so this ' +
-    'entry has now lost its lead blocker twice and answered 503 after each. WHAT REFUSES NOW, ' +
-    'DERIVED ON THIS TREE. FIRST, AND IT IS NEW TO THIS ENTRY AND IS THE FIRST LINE OF BOTH ' +
-    'HANDLERS: `accountCap()` (`routes/checkout.ts:736`) is called before anything else on the ' +
-    'purchase path and on the reset path alike, and its `maxAccounts` (`routes/checkout.ts:491`) ' +
-    'is "the identity cap, `max_accounts_override` folded over the plan default" -- and THE ' +
-    'PLAN DEFAULT IS IN NO COLUMN OF ANY MIGRATION. RI-20 RUNS THE COMMAND THAT SETTLES IT: ' +
+    'A CAP WITH NO SOURCE, A CROSS-IDENTITY READ AND THE LEDGER ARM. ALL THREE ARE NOW RULED AND ' +
+    'NONE IS DISCHARGED (ADR-238), WHICH IS WHY THIS ENTRY IS REWRITTEN FOR ACCURACY RATHER THAN ' +
+    'NARROWED. THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
+    '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
+    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2558`), whose five members are exactly ' +
+    'the five tables this port reads, and the `attributions` write clause before it was ' +
+    'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
+    '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS THE ' +
+    'FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:777`) runs before the plan ' +
+    'on the purchase path and before `resetTarget` on the reset path, and its `maxAccounts` ' +
+    '(`routes/checkout.ts:532`) has no column. RI-20 RUNS THE COMMAND THAT SETTLES IT: ' +
     '`grep -rn max_accounts packages/db/migrations` returns 1 line, which is ' +
-    '`identities.max_accounts_override`, the per-entity EXCEPTION. `databaseAuthBackend` ' +
-    'REFUSES `readMe` (`src/auth-backend.ts:1518`) for the identical finding about the same ' +
-    'number on `GET /me`. The value the corpus states is ' +
-    '`limits.max_accounts_per_entity` inside the `plan_versions.rules` jsonb, which this door ' +
-    'now reaches -- and `accountCap()` TAKES NO PLAN, is called before the plan version is ' +
-    'resolved, and asks a PER-IDENTITY question of a PER-PLAN-VERSION parameter that nothing ' +
-    'validates and no two published versions are required to agree on. Choosing one is a ' +
-    'ruling about who gets refused a purchase, and it is not this one. SECOND, A ROW THE BUYER ' +
-    'MUST SEE THAT BELONGS TO THE AFFILIATE, AND ADR-233 SECTION 5 REFUSED IT RATHER THAN ' +
-    'LEAVING IT OPEN: `clickByToken` (`routes/checkout.ts:753`) returns a `ClickRef` whose ' +
-    '`affiliate` carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
-    '(`routes/checkout.ts:457`); `affiliates` is scope class `owned` on `identity_id` ' +
-    '(`packages/db/src/scope.ts:1094`) and `affiliate_clicks` is `derived` through it ' +
-    '(`packages/db/src/scope.ts:1108`), so the row belongs to somebody else and the disclosure ' +
-    'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of ' +
-    'either returns the empty set and `resolveAttribution` folds every referral as organic, ' +
-    'which is a wrong answer that RETURNS ROWS. THIRD, THE LEDGER ARM, AND THE GROUND ADR-165 ' +
-    'STATED STILL HOLDS, RE-DERIVED RATHER THAN CARRIED: the `ledger` on the wallet arm ' +
-    '(`routes/checkout.ts:906`) is a `LedgerTx`, which only `SystemTx` satisfies, `SystemReason` ' +
-    'is still exactly two members (`packages/db/src/scoped-db.ts:267`) and `apps/api/src/db.ts` ' +
-    'still declares no `system(reason, fn)` door. The card arm alone would be a partial backend ' +
-    'whose port promises the whole transaction, which is the shape `usePayoutBackend` refuses ' +
-    'above.',
+    '`identities.max_accounts_override`, the per-entity EXCEPTION. `databaseAuthBackend` REFUSES ' +
+    '`readMe` (`src/auth-backend.ts:1518`) for the identical finding about the same number on ' +
+    "`GET /me`. ADR-238 RULING 1 RULES THE BASE CAP THE FIRM'S NUMBER AND REFUSES THE PLAN BLOB " +
+    'IN ALL THREE OF ITS AVAILABLE FORMS: `limits.max_accounts_per_entity` is PER PLAN VERSION ' +
+    "and `liveAccounts` beside it is this identity's total across every plan, so reading the " +
+    'purchased version makes the effective cap the MAXIMUM over published versions, reading the ' +
+    'pinned version reads a row that may have been retired years earlier, and requiring every ' +
+    "published version to agree is a firm parameter wearing a plan's costume that no CHECK can " +
+    'express. THE RULING NAMES A HOME AND DOES NOT BUILD IT, because a firm parameter row is a ' +
+    "registration in `packages/db/src/schema.ts` and `scope.ts`, which that entry's fence does " +
+    'not reach. SECOND, A ROW THE BUYER MUST SEE THAT BELONGS TO THE AFFILIATE, REFUSED A SECOND ' +
+    'TIME: `clickByToken` (`routes/checkout.ts:806`) returns a `ClickRef` whose `affiliate` ' +
+    'carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
+    '(`routes/checkout.ts:478`); `affiliates` is scope class `owned` on `identity_id` ' +
+    '(`packages/db/src/scope.ts:1093`) and `affiliate_clicks` is `derived` through it ' +
+    '(`packages/db/src/scope.ts:1109`), so the row belongs to somebody else and the disclosure ' +
+    'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of either ' +
+    'returns the empty set and `resolveAttribution` folds every referral as organic, which is a ' +
+    'wrong answer that RETURNS ROWS. ADR-238 RULING 2 NAMES WHAT THE PORT MUST DO INSTEAD AND IT ' +
+    'IS NOT A READ: a door that resolves the affiliate INSIDE `packages/db` and hands this ' +
+    "handler a BIT rather than a uuid, which is ADR-230's `insertAsParty` stamp applied to the " +
+    'counterparty. IT IS UNAVAILABLE WHILE `AffiliateRef` CARRIES `identityId` and ' +
+    "`packages/affiliate` was outside that entry's fence. THIRD, THE LEDGER ARM, AND ADR-165's " +
+    'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:969`) is a ' +
+    '`LedgerTx`, which only `SystemTx` satisfies because `ledger_transactions` and ' +
+    '`ledger_entries` are both `derived` rather than `firm`, `SystemReason` is still exactly two ' +
+    'members (`packages/db/src/scoped-db.ts:267`) and `ApiDb` still declares no door that yields ' +
+    'a `SystemTx`. ADR-238 RULING 3 ADDS THE HALF ADR-165 DID NOT REACH: ADR-176 cleared the ' +
+    'same obstruction for `LT-01` by DELETING `PayoutTx.ledger` and posting later at a system ' +
+    'authority, and that remedy does NOT transfer, because M20 pins `LT-08` to the purchase ' +
+    'transaction by name and `DEP-M20-02` states the consequence of moving it. The card arm ' +
+    'alone would be a partial backend whose port promises the whole transaction, which is the ' +
+    'shape `usePayoutBackend` refuses above. EVERY CLAUSE HERE IS ASSERTED BY ' +
+    '`test/checkout-backend-blockers.test.ts` RATHER THAN ONLY WRITTEN. MONEY PATH.',
   useCheckoutAdapters:
     'a configured PSP adapter per MID plus the `returnUrl` and `cancelUrl` configuration. ' +
     '`packages/psp` ships a port and TWO FAKES (`fakes/psp-a.ts`, `fakes/psp-b.ts`) and no ' +
