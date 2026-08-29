@@ -19,6 +19,15 @@
 // MOVED PRODUCTION**, because `0064` plus session 387's producer plus
 // {@link readRecon} is a leaf with a source where yesterday it had none.
 //
+// **AND `ADR-208` IS THE SHARPEST CASE OF THAT RULE THIS FILE HAS SEEN: IT MOVED
+// THE BLOCKED COUNT ITSELF WITHOUT MOVING PRODUCTION.** `eligible_next_7d` gained
+// its `| null`, `RI-18`'s reader does not walk into a union arm, and the
+// contract now declares the group as ONE leaf where it declared five. So the
+// blocked-leaf census falls by four and NOT ONE FIGURE GAINED A SOURCE. A
+// falling blocked count is therefore ambiguous on its own, and the produced
+// count is what disambiguates it: `test/admin-source-liability-book.test.ts`
+// asserts declared, blocked AND produced for exactly this reason.
+//
 // So the method is NOT composed, the array `IMPLEMENTED_ADMIN_READS` does not
 // name it, and `composeAdminReadSource` still fills the gap with
 // `AdminSourceNotComposed('readLiability')`.
@@ -243,6 +252,14 @@
 //       The ruling arm is struck: `ADR-204` IS that ruling, it landed, and it
 //       moved nothing, which is what session 388 recorded and 389 confirmed.
 //
+//       **AND THE REPAIR IS NOW A CONTROL RATHER THAN A CONVENTION.** `RI-19`
+//       (session 396) derives the term set from the enumeration below and asks
+//       the case whether it names each one, in both directions, so a fourth
+//       session cannot read a two-term condition off this blocker again. It
+//       binds the form rather than the words: the count word below and the
+//       numbered items are compared, and the case's restatement is measured
+//       against these terms and never against a stored list.
+//
 //       **CLEARING CONDITION, ALL THREE TERMS, AND THE GROUP NEEDS EVERY ONE:**
 //         1. A `writeRuleState` IMPLEMENTATION. `nightly.ts` calls the port and
 //            the only things satisfying it are test doubles and
@@ -250,22 +267,30 @@
 //            holds no rows, which session 392 measured on a live database over
 //            all 60 migrations: **ZERO**. `apps/worker/**` and `packages/**`.
 //         2. A PRIMARY SOURCE DECLARING THE STORED `engine_gates` ENCODING.
-//            **CLEARED by `ADR-206` (session 394), and it is the ONLY term of
-//            the three that has moved.** The trade this term existed to refuse
+//            **CLEARED by `ADR-206` (session 394), and it was the FIRST of the
+//            three to move.** The trade this term existed to refuse
 //            -- a reader here FIXING the encoding from the read side, which is
 //            what `ADR-199` section 7 refuses -- is refused by a ruling instead:
 //            the bag is the engine's own value, six groups and twenty-five
 //            leaves, cents as base-10 strings, declared at
 //            `docs/architecture/data-model/rule_states.md`. **THE GROUP IS
-//            STILL BLOCKED**, because terms 1 and 3 stand and EC-074 makes it
-//            whole or nothing.
+//            STILL BLOCKED**, because term 1 stands and EC-074 makes it whole
+//            or nothing.
 //         3. `eligible_next_7d: EligibleNext7d | null`, so the response can
 //            decline where the horizon has no answer (`ADR-204` ruling 9,
-//            `ADR-203`). **`RI-18` MAKES THIS ONE ATOMIC ACROSS THREE FILES** --
-//            `API_CONTRACT.md`, `routes/admin-reads.ts` and
-//            `apps/admin/src/api/types.ts` -- and session 392 seeded it and
-//            watched it fire: the partial move drops FIVE field paths from one
-//            copy and reports six findings. An ADR plus two fences.
+//            `ADR-203` ruling 8). **CLEARED by `ADR-208` (session 397), and it
+//            is the SECOND of the three to move.** `RI-18` made it atomic
+//            across three files -- `API_CONTRACT.md`, `routes/admin-reads.ts`
+//            and `apps/admin/src/api/types.ts` -- and session 392 seeded the
+//            partial move and watched it fire: FIVE field paths leave one copy
+//            and the check reports six findings. The three moved in one commit.
+//            **WHAT `ADR-203` RULING 8 LEFT BEHIND WAS A RULING RATHER THAN A
+//            TRANSCRIPTION, WHICH IS THE FINDING THIS TERM COST**: the same
+//            `| null` is a compile error inside `EligibleForecastResponse`, a
+//            SECOND response body that carries this one figure and that no
+//            entry had fixed, and `ADR-208` rules it a body with a `null` and a
+//            forwarded gap rather than `adminNotFound`. **TERM 1 NOW HOLDS THE
+//            GROUP ALONE**, and EC-074 still makes it whole or nothing.
 //
 // **`withdrawals_in_flight_cents` IS ABSENT AND IS NOT A FIFTH BLOCKER**, because
 // it is not on the response. ADR-195 section 6 row 1 owes the column, no migration

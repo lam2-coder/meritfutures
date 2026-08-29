@@ -38,13 +38,20 @@
 // the wire deliberately does not carry."
 //
 // AND THE MEASUREMENT THAT MATTERS MORE THAN THE MAPPING: NO `gaps` ENTRY CAN
-// REACH A FIGURE THIS PAGE RENDERS TODAY. The two nullable sites on the response
-// are `payout_velocity` and `per_plan[].cusum`, and `LiabilityHomeInput` has no
-// member for either: they are `P-M6-04` and `P-M6-06`, both of which `page.ts`
-// holds in `PENDING`. See {@link WIRE_FIELDS_THIS_PAGE_DOES_NOT_READ}. The two
-// layers agree on what an absence means and there is not yet one place where
-// both of them speak about the same figure, which is a measurement rather than
-// a disagreement and is reported as one.
+// REACH A FIGURE THIS PAGE RENDERS TODAY. **THE NULLABLE SITES ARE THREE AND
+// WERE TWO**, `ADR-208` adding `eligible_next_7d` to `payout_velocity` and
+// `per_plan[].cusum`, AND THE MEASUREMENT SURVIVES FOR A THIRD REASON RATHER
+// THAN FOR THE FIRST TWO. `LiabilityHomeInput` has no member for the first two:
+// they are `P-M6-04` and `P-M6-06`, both of which `page.ts` holds in `PENDING`,
+// and both are in {@link WIRE_FIELDS_THIS_PAGE_DOES_NOT_READ}. It HAS a member
+// for the third, `eligibleNextSevenDays`, and {@link liabilityHomeInputFrom}
+// leaves it unsupplied anyway because the response carries the figure and not
+// its as-of. **SO THE THIRD SITE IS THE FIRST ONE THAT IS NOT UNREACHABLE BY
+// CONSTRUCTION**, and the day `P-M6-03` gets its as-of this console renders a
+// panel a `gaps` entry can speak about. The two layers agree on what an absence
+// means and there is still not one place where both of them speak about the
+// same figure, which is a measurement rather than a disagreement and is
+// reported as one.
 //
 // -----------------------------------------------------------------------------
 // WHAT THIS FILE REFUSES TO SUPPLY, WHICH IS THE HALF A READER SHOULD CHECK
@@ -167,9 +174,13 @@ export interface UnreadWireField {
  * twelve top-level fields become five page inputs, and the list is here so that
  * the count is checkable rather than a reader's arithmetic.
  *
- * **BOTH NULLABLE SITES ON THE RESPONSE ARE IN THIS LIST**, which is the
- * measurement the header states: `ADR-203`'s `gaps` mechanism is total and
- * correct and has no figure on this page to speak about yet.
+ * **TWO OF THE RESPONSE'S THREE NULLABLE SITES ARE IN THIS LIST AND THE THIRD
+ * IS NOT**, which is the measurement the header states and the half `ADR-208`
+ * moved. `payout_velocity` and `per_plan[].cusum` are here; `eligible_next_7d`
+ * is dropped by {@link liabilityHomeInputFrom} for want of an as-of rather than
+ * by this roster, and only `eligible_next_7d.account_count` appears below.
+ * `ADR-203`'s `gaps` mechanism is total and correct and has no figure on this
+ * page to speak about yet.
  */
 export const WIRE_FIELDS_THIS_PAGE_DOES_NOT_READ: readonly UnreadWireField[] = [
   {
@@ -482,11 +493,31 @@ function readGap(
 export function narrowLiabilityResponse(body: unknown): LiabilityResponse {
   const root = record(body, 'body');
 
-  const eligible = record(root['eligible_next_7d'], 'eligible_next_7d');
   const reserve = record(root['reserve'], 'reserve');
   const integrations = record(root['integrations'], 'integrations');
   const recon = record(integrations['recon'], 'integrations.recon');
   const batch = record(integrations['batch'], 'integrations.batch');
+
+  const rawEligible = root['eligible_next_7d'];
+  const eligibleNext7d =
+    rawEligible === null
+      ? null
+      : ((): NonNullable<LiabilityResponse['eligible_next_7d']> => {
+          const eligible = record(rawEligible, 'eligible_next_7d');
+          return {
+            total_cents: integer(eligible['total_cents'], 'eligible_next_7d.total_cents'),
+            account_count: integer(eligible['account_count'], 'eligible_next_7d.account_count'),
+            by_day: list(eligible['by_day'], 'eligible_next_7d.by_day').map((entry, index) => {
+              const path = `eligible_next_7d.by_day[${index}]`;
+              const day = record(entry, path);
+              return {
+                trading_day: text(day['trading_day'], `${path}.trading_day`),
+                cents: integer(day['cents'], `${path}.cents`),
+                accounts: integer(day['accounts'], `${path}.accounts`),
+              };
+            }),
+          };
+        })();
 
   const rawVelocity = root['payout_velocity'];
   const velocity =
@@ -549,6 +580,7 @@ export function narrowLiabilityResponse(body: unknown): LiabilityResponse {
   const absentPaths = new Set<string>();
   if (velocity === null) absentPaths.add('payout_velocity');
   if (perPlan.some((plan) => plan.cusum === null)) absentPaths.add('per_plan[].cusum');
+  if (eligibleNext7d === null) absentPaths.add('eligible_next_7d');
   assertGapsPaired(gaps, absentPaths);
 
   const rcrBp = cents(reserve['rcr_bp'], 'reserve.rcr_bp');
@@ -583,19 +615,7 @@ export function narrowLiabilityResponse(body: unknown): LiabilityResponse {
       'absorbed_corrections_cents',
     ),
     funded_accounts: integer(root['funded_accounts'], 'funded_accounts'),
-    eligible_next_7d: {
-      total_cents: integer(eligible['total_cents'], 'eligible_next_7d.total_cents'),
-      account_count: integer(eligible['account_count'], 'eligible_next_7d.account_count'),
-      by_day: list(eligible['by_day'], 'eligible_next_7d.by_day').map((entry, index) => {
-        const path = `eligible_next_7d.by_day[${index}]`;
-        const day = record(entry, path);
-        return {
-          trading_day: text(day['trading_day'], `${path}.trading_day`),
-          cents: integer(day['cents'], `${path}.cents`),
-          accounts: integer(day['accounts'], `${path}.accounts`),
-        };
-      }),
-    },
+    eligible_next_7d: eligibleNext7d,
     payout_velocity: velocity,
     reserve: {
       as_of: text(reserve['as_of'], 'reserve.as_of'),

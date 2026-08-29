@@ -254,7 +254,7 @@ document of what the surface did before that second entry moved it).
 served by `admin-reads.ts`'s shared `adminHandler`, which is the family every screen in this wave reads,
 answer **500 `internal_error`**, because `AdminReadSource` is a port nothing wires
 ([`AdminReadSource:920`](../../apps/api/src/routes/admin-reads.ts),
-[`setAdminReadSource:964`](../../apps/api/src/routes/admin-reads.ts)). The routes served by the four write
+[`setAdminReadSource:1018`](../../apps/api/src/routes/admin-reads.ts)). The routes served by the four write
 backends answer **503 `service_unavailable`**, which ADR-192 clause 1 KEPT on the ground that those four
 classes carry one fact each: *no backend is installed*. What ADR-192 clause 2 changed is the ORDER, moving
 that 503 behind the 401 so an anonymous caller is no longer told which of this deployment's ports are
