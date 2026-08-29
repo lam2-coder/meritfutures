@@ -226,18 +226,32 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ADR-157 clause 6, which needs a join and an aggregate. Installing a backend would not ' +
     'resolve either finding and must not paper over them. MONEY PATH.',
   useAdminWriteBackend:
-    'THREE SUPPLIERS AND NONE OF THEM IS A DOOR. `principal(request)` ' +
-    '(`routes/admin-writes.ts:276`), blocked on `setAdminSessionSource` above. `tradingDay()`, ' +
-    'which is the smallest and the least tractable: nothing in this workspace maps an instant to ' +
-    'an exchange trading day, and ADR-145 names the gap rather than papering over it with a UTC ' +
-    'date. And a projection of `ValidationResult` onto `PlanValidation`, whose `errors` is ' +
-    '`{ code, message }` where `CvViolation` is `{ id, path, detail, sizeCents }` and whose `ok` ' +
-    'is false when `materialization` is non-empty as well. THE CLAIM THAT `apps/api` DOES NOT ' +
-    'DECLARE `@merit/rules-engine` STOOD HERE AND WAS FALSE: it has been declared since session ' +
-    '252 landed `routes/payouts.ts` (`apps/api/package.json`), and `validatePlan` is exported ' +
-    '(`packages/rules-engine/src/index.ts:163`). ADR-171 finding 10. The same stale sentence ' +
-    "survives in that port's own docstring at `routes/admin-writes.ts:284-288`, which is a " +
-    "handler file and outside that entry's fence.",
+    'TWO SUPPLIERS AND NEITHER OF THEM IS A DOOR. THIS ENTRY NAMED THREE AND THE THIRD IS ' +
+    'DISCHARGED (ADR-251). `principal(request)` (`routes/admin-writes.ts:276`), blocked on ' +
+    '`setAdminSessionSource` above. And a projection of `ValidationResult` onto ' +
+    '`PlanValidation` (`routes/admin-writes.ts:342`), whose `errors` is `{ code, message }` ' +
+    'where `CvViolation` is `{ id, path, detail, sizeCents }` and whose `ok` is false when ' +
+    '`materialization` is non-empty as well. Nothing in this tree performs that projection. ' +
+    'THE THIRD CLAUSE READ "nothing in this workspace maps an instant to an exchange trading ' +
+    'day" AND IT IS NOW FALSE RATHER THAN NARROWED: `@merit/rules-engine` exports ' +
+    '`buildSessionCalendar` (`packages/rules-engine/src/calendar.ts:443`) and `tradingDayAt` ' +
+    '(`packages/rules-engine/src/calendar.ts:591`), which answer by CONTAINMENT over ' +
+    "`trading_calendar`'s stored session bounds and `trading_calendar_loads`' coverage, " +
+    'comparing an instant only with an instant. Both tables are `firm` and `apps/api` holds ' +
+    '`db.firm`, so the supplier and the read are both in this deployable. ' +
+    'WHAT REPLACES IT IS SMALLER AND IS NOT A MISSING FUNCTION. `tradingDay(): string` ' +
+    '(`routes/admin-writes.ts:338`) has ONE arm and the resolver answers THREE, because ' +
+    'ADR-042 F-4 requires `outside_coverage` to be distinguishable from `not_a_session`; and no ' +
+    'ruling says which day an operator close takes when the instant is in no session, while ' +
+    '`accounts_terminal_has_close_date` requires `closed_on` on every `closed_admin` row. A ' +
+    'DECISION IS OWED AND A FUNCTION IS NOT. ' +
+    'THE CLAIM THAT `apps/api` DOES NOT DECLARE `@merit/rules-engine` ALSO STOOD HERE AND WAS ' +
+    'FALSE: it has been declared since session 252 landed `routes/payouts.ts` ' +
+    '(`apps/api/package.json`), and `validatePlan` is exported ' +
+    '(`packages/rules-engine/src/index.ts:185`). ADR-171 finding 10. That stale sentence ' +
+    "survived in this port's own docstring, which was outside that entry's fence and is inside " +
+    "ADR-251's; it is repaired at the source. `test/admin-write-trading-day.test.ts` derives " +
+    'every clause here from source on every run.',
 
   // ---------------------------------------------------------------------------
   // THE LEDGER DOOR, AND THE TWO PORTS THAT REACHED FOR IT ARE NOW ONE.

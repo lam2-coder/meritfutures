@@ -263,6 +263,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-247](ADR-247.md) | tiers 2 and 3 classified entire, the class C residue is TWO of fifteen, and one of the two is established by running the falsifier rather than by arguing it  (2026-08-29, status: proposed) |
 | [ADR-248](ADR-248.md) | `ExternalGates` is external to the REPLAYED STATE and not to this estate, three of its five facts resolve off registered tables, and the in-flight leg has no predicate to read because M01 states R-38's grain both ways  (2026-08-29, status: proposed) |
 | [ADR-249](ADR-249.md) | the certificate card is rendered on fetch, stored nowhere, addressed by the code and signed by nothing, so the two remaining certificate ports wait on a renderer and no migration is owed (2026-08-29, status: proposed) |
+| [ADR-251](ADR-251.md) | an instant is not a trading day, the gap was narrower than the sentence, and the port that named it asked a three-armed question with one arm (2026-08-29, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
