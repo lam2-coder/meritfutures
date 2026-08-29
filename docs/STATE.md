@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->227<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->228<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -9819,6 +9819,32 @@ not in this row's verification list and it mutates the working tree.
 **`0073` HAS NEVER BEEN APPLIED TO A LIVE POSTGRESQL BY THIS SESSION**, which is where the entry is most likely wrong. The install job runs in CI and this branch has not merged.
 
 ---
+
+## 2026-08-29 - Session 431: the worker runs its job, and a job that fails leaves a non-zero status ([ADR-241](decisions/ADR-241.md), proposed)
+
+**[ADR-241](decisions/ADR-241.md), `status: proposed`, UNSIGNED. MONEY PATH BY CONSEQUENCE, `E2` READ OWED.** Migration `0074` was reserved conditionally by row `241`, **the condition did not fire, no DDL was needed, and the number returns to the pool** with its own row in [ALLOCATION](decisions/ALLOCATION.md)'s migration table saying why.
+
+**THE LARGEST DEFECT FOUND IN THIS WAVE IS CLOSED AND IT WAS REPRODUCED FIRST-HAND BEFORE A LINE CHANGED.** In a worktree at `6e8891c`: `grep -c` for a top-level call to `main` over the worker barrel returned **0**, and `pnpm --filter @merit/worker start` printed nothing and **exited 0**. The same command on this branch exits **1**. A process that exits 0 having done nothing is what a healthy service looks like to a supervisor, and every dead-man switch in [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md) watches for a completion signal to be absent from a deployment that was reporting success.
+
+**ALL THREE THINGS ROW `241` NAMED LANDED, AND THE ROW NAMED THEM SO THAT NONE COULD BE QUIETLY SKIPPED.** [`apps/worker/src/start.ts`](../apps/worker/src/start.ts) is one top-level `await main().finally(closeWorkerDb)` with **nothing between the fold and the process catching**. `postgresBatchPorts` in [`batch/adapter.ts`](../apps/worker/src/batch/adapter.ts) is the **first `BatchPorts` value constructed under any `src/` in this workspace**, a measurement `apps/api/test/rule-state-producibility.test.ts` had been running and getting zero. And the schedule is **ruled EXTERNAL** and registered.
+
+**THE TRAP WAS THAT A JOB WHICH CANNOT FAIL LOUDLY IS THE SAME DEFECT IN A NEW COSTUME, AND THE ANSWER IS A PREDICATE RATHER THAN A PROMISE.** `test/entrypoint.test.ts` **SPAWNS FOUR REAL PROCESSES AND READS `status`**: the real entry point with no `DATABASE_URL` exits non-zero, a job that cannot resolve its day exits non-zero, **a port that refuses mid-batch exits non-zero**, and a completed run over an empty book exits 0 and prints its report. A test that imported `main` and asserted on a rejected promise would have proved that a function throws, which was never in doubt.
+
+**AND THE SUITE ALREADY CARRIED THE DEFECT AS A GREEN TEST.** `apps/worker/test/service.test.ts` read `expect(() => main()).not.toThrow()` under the name *"the deployable starts"*, and it passed every day of the period in which the deployable started and did nothing. **A seeded `catch` that logs and falls through turns the real entry point's status back to 0 and takes two cases red with it**, which is the same defect offered back to the new suite and refused.
+
+**THE SCHEDULE IS EXTERNAL BECAUSE A LONG-LIVED PROCESS HAS NO EXIT CODE TO FAIL WITH.** The only status such a process leaves is the status of its last moment, which says nothing about the folds before it, so an in-process timer would make every future run unreadable in exactly the way this session exists to end. The register's own grammar agrees: every switch on that page is phrased as the ABSENCE of a completion signal by an expected-by time, which presumes discrete runs. **Which scheduler and which cron expression are deployment facts and are not written down here** ([ADR-012](decisions/ADR-012.md)), exactly as a `DATABASE_URL` is not.
+
+**FOUR OF TEN PORTS ARE SERVED AND SIX REFUSE BY NAME**, each `BatchPortUnwired` carrying the slice that clears it, which is `databaseAccountReads`' own shape and not a shortcut: `runNightlyBatch` counts a `written` outcome per account that did not throw, so a port returning a plausible value reports rows written on a night the book gained none. **THE `engine_gates` CODEC WAS NOT WRITTEN AND THE FENCE WAS NOT WIDENED TO WRITE IT**: [ADR-239](decisions/ADR-239.md) slice A homes it in `packages/rules-engine` because `readLiability` needs the same decoder and cannot import `apps/worker`, and that package is not in this row's fence.
+
+**THE FIRST RUN AGAINST AN EMPTY DATABASE IS STATED AS A TABLE OF FIVE CASES AND IS NEITHER DESTRUCTIVE NOR SILENT.** With no calendar the job refuses **above the watermark read** and writes nothing. With a calendar and no marks it **completes**, prints `written: 0` beside `accountsConsidered: 0` and exits 0. The watermark is `null` and `null` is the **correct** fact on a calendar that has never been corrected rather than an unknown. And `rule_states` is insert-only under `0015` and `0026`, so **the worst a first run can do is write correct rows or write none**.
+
+**THE DAY IS READ FROM `trading_calendar` AND IS NEVER DERIVED FROM A CLOCK** ([ADR-146](decisions/ADR-146.md) clause 4): an instant is compared only with an instant and the trading day is read off the row that comparison selected. **CONCURRENCY IS 1 AND IT IS A RULING RATHER THAN A KNOB**, because the adapter owes `FM-10`'s per-account advisory lock and does not hold it, so the value is a constant no deployment can raise past a control that does not exist.
+
+**CITATION REPAIR IN FOUR `apps/api` SITES** that asserted the defect as a live fact, with one landmine recorded: the first repair **quoted** the retired sentence and the predicate asserting that sentence was gone matched the quotation. **A reason that reproduces its own retired wording reads as live to every grep and to the check that says it is dead.**
+
+**Measured, not carried**: **33 of 33** gates, **21 of 21** invariants read off the runner's own last line, **266 files / 6,543 passed / 6 skipped** against an `origin/main` baseline measured at `6e8891c` of **265 / 6,534 / 6**, a delta of **+1 file and +9 cases**. Typecheck 0, lint 0, `format:check` clean. **Three seeds went red and the tree was restored after each.**
+
+**WHERE THIS IS MOST LIKELY WRONG**: the external-schedule ruling assumes the platform can run a process to completion and read its exit code. That is true of every cron-shaped scheduler and it was **not verified against the deployment**, because the deployment is not in this repository. If it turns out to be false, the shape that satisfies the ruling is a thin supervisor invoking this process. **The thing that must not happen is the timer.**
 
 ## 2026-08-29 - Session 433: four money-path approvals earned rather than granted, and the classifier that sized the queue is over-inclusive ([ADR-243](decisions/ADR-243.md), proposed)
 

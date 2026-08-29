@@ -98,7 +98,7 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
-import { systemDb, transaction } from '@merit/db';
+import { closeClient, systemDb, transaction } from '@merit/db';
 import type { SystemDb, SystemReason, SystemTx } from '@merit/db';
 
 /**
@@ -152,3 +152,28 @@ export const LIVE_DB: WorkerDb = {
     return transaction(workerHandle(), fn);
   },
 };
+
+/**
+ * Release the pool, so a job that finished can let the process EXIT.
+ *
+ * **IT IS ON THE FILE AND NOT ON `WorkerDb` BECAUSE IT IS PROCESS LIFECYCLE AND
+ * NOT A UNIT OF WORK.** The door above takes a whole unit of work precisely so
+ * that no caller holds a handle it could forget to close; a `close` on that
+ * interface would hand every adapter the one capability the shape exists to
+ * withhold, and a suite substituting a recorder would have to implement it.
+ *
+ * **WHY THE DEPLOYABLE NEEDS IT AT ALL, which `apps/api` does not.** That
+ * service means to keep listening; this one is a ONE-SHOT JOB (`ADR-241`), and
+ * `pg` holds the event loop open. A batch that completed and then hung is a job
+ * a supervisor reads as still running and a dead-man switch reads as never
+ * finished, which is the exit-0-and-do-nothing defect in its other direction.
+ * `closeClient`'s own docstring names this caller: "for a process that means to
+ * exit".
+ *
+ * IDEMPOTENT, because `closeClient` returns without acting when no pool was ever
+ * opened. A run that refused before it read a row closes nothing and says so by
+ * doing nothing.
+ */
+export function closeWorkerDb(): Promise<void> {
+  return closeClient();
+}

@@ -948,11 +948,24 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // suites, so this file is inside it and the line is assigned rather than
     // reached for; the count below is the whole of the rest of the change.
     './batch/state-writer.ts',
+    // ADR-239 slice B, session 431. The `BatchPorts` value, over Postgres. That
+    // row's fence is `apps/worker/**` and its suites, so this file is inside it
+    // and the line is assigned rather than reached for.
+    './batch/adapter.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  // 25 SINCE SESSION 395, WHICH ADDED `./batch/state-writer.ts`. It was 24 from
-  // session 387, which added `./recon/ports.ts` and `./recon/sweep.ts`. The
-  // number is here rather than derived so that a leg DISAPPEARING is a failure
-  // and not a smaller list nobody counted.
-  expect(new Set(legs).size).toBe(25);
+  // 26 SINCE SESSION 431, WHICH ADDED `./batch/adapter.ts`. It was 25 from
+  // session 395, which added `./batch/state-writer.ts`, and 24 from session 387,
+  // which added `./recon/ports.ts` and `./recon/sweep.ts`. The number is here
+  // rather than derived so that a leg DISAPPEARING is a failure and not a
+  // smaller list nobody counted.
+  //
+  // **IT COUNTS 26 OF THE BARREL'S 27 LEGS AND THE MISSING ONE IS A PROPERTY OF
+  // THE REGEX ABOVE, STATED SO THE NEXT READER DOES NOT CALL IT A DROPPED LEG.**
+  // The pattern requires a DIRECTORY segment, and session 431 also added
+  // `./job.ts`, which sits at the top of `src/` because it is the deployable's
+  // one job rather than one module of a subsystem. `test/digests.test.ts` case
+  // 9.1 counts that leg, over `WORKER_BARREL_LEGS` itself and with no path shape
+  // in its regex, so the leg is guarded; it is guarded there and not here.
+  expect(new Set(legs).size).toBe(26);
 });

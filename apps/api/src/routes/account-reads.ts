@@ -855,10 +855,16 @@ const ELIGIBILITY_BLOCKER =
   '`lifetime_settled_cents`, `breached` and `breach_kind`, and ' +
   '`apps/worker/src/batch/state-writer.ts` maps all three, so `lifetimeSettledCents`, ' +
   '`breached` and `breachKind` ARE persistable now. Three things refuse instead, each measured ' +
-  'rather than inherited. (1) `rule_states` HOLDS NO ROWS AND NOTHING IN A DEPLOYMENT WRITES ' +
-  'ONE: the single insert site in this tree is `writeRuleStateVia`, its only caller is ' +
-  '`runNightlyBatch`, no adapter implements `BatchPorts` over Postgres, and ' +
-  '`apps/worker/src/index.ts` exports the batch without scheduling it. (2) EVEN GIVEN AN ' +
+  'rather than inherited. (1) `rule_states` HOLDS NO ROWS AND THE RUN THAT WOULD WRITE ONE ' +
+  'STOPS SHORT: the single insert site in this tree is `writeRuleStateVia` and its only caller ' +
+  'is `runNightlyBatch`. THE TWO HALVES THIS CLAUSE USED TO NAME ARE SPENT AND ADR-241 SPENT ' +
+  'THEM: the deployable is scheduled, `apps/worker/src/start.ts` calls `main` and exits ' +
+  'non-zero when the batch throws, and `postgresBatchPorts` in ' +
+  '`apps/worker/src/batch/adapter.ts` is a `BatchPorts` value over Postgres. What refuses now ' +
+  'is NARROWER AND IS NOT WEAKER: that adapter serves four of ten methods and rejects ' +
+  '`loadAccountDay` by name, so a fold never starts, because an `AccountDay` carries a ' +
+  'resolved plan, a prior state, a mark, settlements, an opened-on anchor and R-40s five ' +
+  'context facts and this deployment resolves none of them. (2) EVEN GIVEN AN ' +
   'ADAPTER THE WRITER WOULD REFUSE: `RuleStateWriterIo.encodeEngineGates` has no ' +
   'implementation under any `src/`, and `UNWIRED_RULE_STATE_WRITER_IO` throws ' +
   '`RuleStateWriterUnwired` by name, because the stored encoding of `engine_gates` is `B5` ' +
