@@ -312,6 +312,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-297](ADR-297.md) | a column that cannot be null, and the null is not the defect. `payout_requests.approved_at` holds the REQUEST instant on every row, it is the only one of four state timestamps not bound to its state, and the repair is a SUPERSESSION whose number is RESERVED AND NOT WRITTEN  (2026-08-30, status: proposed) |
 | [ADR-298](ADR-298.md) | five citations in the plan every payout row reads. Four line numbers, one backwards range, six sites, and the sixth pointer in the same sentence resolves to nothing and is LEFT  (2026-08-30, status: proposed) |
 | [ADR-299](ADR-299.md) | the home is the DOOR, because its `unknown` was never ruled and it has NO CALLER; the decoder splits at the line that actually exists rather than at the one ADR-286 drew; and the cap schedule is dispatched FIRST  (2026-08-30, status: proposed) |
+| [ADR-302](ADR-302.md) | three readers of one payout ceiling, one of them wrong on the money in both directions, collapsed onto a single codec in the diff that wrote it  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
