@@ -386,21 +386,35 @@ export interface PayoutSubject {
    * THE PINNED PLAN VERSION AT THE ACCOUNT'S OWN SIZE, RESOLVED.
    *
    * **THIS FIELD HAD NO DOCBLOCK FOR SEVENTEEN REVISIONS OF `usePayoutBackend`'s
-   * REASON AND THE REASON SAID IT WAITED ON NOTHING. IT DOES NOT (`ADR-281`).**
-   * `ADR-233` catalogued `planVersions` and `planVersionSizes`, so a `ScopedTx`
-   * can READ both rows on this transaction. It cannot DECODE one:
-   * `plan_versions.rules` is `jsonb`, `resolvePlan` takes a decoded
-   * `PlanRulesJson`, and no decoding of that blob exists in this deployable or
-   * in the engine.
+   * REASON AND THE REASON SAID IT WAITED ON NOTHING. IT DID NOT (`ADR-281`), AND
+   * WHAT IT WAITED ON IS NOW HALF LANDED (`ADR-283`).** `ADR-233` catalogued
+   * `planVersions` and `planVersionSizes`, so a `ScopedTx` can READ both rows on
+   * this transaction, and it gave the READ and not the DECODE.
    *
-   * **A BACKEND IMPLEMENTING `subject()` MAY NOT WRITE ONE HERE.** The two that
-   * exist are `toPublishedRules` (`apps/worker/src/batch/adapter.ts`) and
-   * `decodeRules` (`apps/site/src/catalog/adapter.ts`), neither importable from
-   * here, and a third statement of the blob that fixes every cents value a
-   * payout is decided against would be `FM-16` on the money path. `ADR-269`
-   * refused exactly that for `readLiability` one port over, on the same value.
-   * `ADR-239` slice A rules the shared home is `packages/rules-engine`, beside
-   * `gates-codec.ts`.
+   * **THE BLOB HALF IS DISCHARGED AND THE DECODER IS THE ENGINE'S.**
+   * `decodePlanRules` (`packages/rules-engine/src/plan/rules-codec.ts`) turns
+   * `plan_versions.rules` into the `PlanRulesJson` `resolvePlan` declares, this
+   * deployable has declared `@merit/rules-engine` since session 252, and
+   * `ADR-239` slice A is the home it landed in, beside `gates-codec.ts`.
+   *
+   * **A BACKEND IMPLEMENTING `subject()` MAY STILL NOT WRITE ONE HERE.** A
+   * fourth statement of the blob that fixes every cents value a payout is
+   * decided against is `FM-16` on the money path, and `ADR-269` refused exactly
+   * that for `readLiability` one port over, on the same value. The two copies
+   * `ADR-283` exists to retire are `toPublishedRules`
+   * (`apps/worker/src/batch/adapter.ts`) and `decodeRules`
+   * (`apps/site/src/catalog/adapter.ts`), and neither is importable from here.
+   *
+   * **AND `resolvePlan` TAKES TWO ARGUMENTS.** The second is a
+   * `PlanVersionSizeRow`, `ScopedTx.catalogRowAt` returns `Promise<unknown>`,
+   * and `plan_version_sizes.payout_cap_schedule_cents` is itself `jsonb` holding
+   * cents. So what this field waits on is the SIZE ROW's decoding, which
+   * `ADR-283` section 5 measured and did not take: the two readers that exist
+   * read two DIFFERENT sources under two different key spellings, so it is not
+   * one predicate stated twice and merging them is a ruling rather than a
+   * transcription. **NO CAST STANDS IN FOR IT.** A `PlanVersionSizeRow` asserted
+   * onto an untyped row is a payout basis nobody checked, and it is worse than a
+   * refusal because it looks like a decode.
    */
   readonly plan: ResolvedPlan;
   /**

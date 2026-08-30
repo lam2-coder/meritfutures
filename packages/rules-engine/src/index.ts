@@ -184,6 +184,27 @@ export type { RuleId } from './rules.ts';
 export { resolvePlan } from './plan/resolve.ts';
 export { validatePlan } from './plan/validate.ts';
 
+// `plan/rules-codec.ts` IS ADR-283, AND IT IS ADR-078's TEST APPLIED A SIXTH
+// TIME ON ADR-250's OWN GROUND. Section 1.3's rationale is the only thing that
+// decides an export here: "every additional export is a way for a caller to
+// reimplement a rule slightly differently". WITHHOLDING DEFEATS IT, and the
+// proof is not hypothetical: `toPublishedRules` (`apps/worker`) and
+// `decodeRules` (`apps/site`) ALREADY exist, read the same stored document under
+// the same key spelling, return this package's own `PlanRulesJson`, and are
+// compared by nothing. That is `FM-16` over the blob that fixes every cents
+// value a payout is decided against, and a withheld decoder is not a decoder
+// nobody writes: it is the two that are already written plus the third
+// `apps/api` would need.
+//
+// `PlanRulesCodecError` rides with it on `EngineGatesCodecError`'s reasoning
+// unchanged: a refusal a caller must be able to catch is a refusal a caller must
+// be able to name. THE ENCODE DIRECTION IS NOT EXPORTED AND DOES NOT EXIST,
+// which is where this differs from `gates-codec.ts`: nothing in this repository
+// WRITES `plan_versions.rules` from a `PlanRulesJson`, the publish path is
+// `validatePlan` over a document somebody authored, and an encoder nobody calls
+// would be a second statement of the shape with no caller to keep it honest.
+export { decodePlanRules, PlanRulesCodecError } from './plan/rules-codec.ts';
+
 // `hash.ts` IS ADR-081, AND IT IS ADR-078's TEST APPLIED A SECOND TIME. Section
 // 1.3's layout lists `hash.ts` exactly as it lists `payout/clamp.ts` and
 // `replay.ts`, so the site count decides nothing here either; what decides it is

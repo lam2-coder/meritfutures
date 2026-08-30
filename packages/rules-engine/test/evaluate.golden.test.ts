@@ -144,6 +144,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'PAYOUT_IN_FLIGHT_STATUSES',
     'PROJECTION_ASSUMPTIONS',
     'PROJECTION_CAVEAT',
+    'PlanRulesCodecError',
     'ReplayAssertionError',
     'StateHashError',
     'advanceDay',
@@ -152,6 +153,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'buildSessionCalendar',
     'canonicalStateSerialization',
     'decodeEngineGates',
+    'decodePlanRules',
     'encodeEngineGates',
     'evaluatePayout',
     'initialState',
@@ -219,7 +221,25 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // status set is written out in five places, and a constant is only a control if
 // a caller can name it. `ExternalGatesRefusal` is the sixth error class, on
 // `EngineGatesCodecError`'s reason unchanged.
-test('of the thirty-one names, exactly eighteen are non-class functions after ADR-260', () => {
+// ADR-283 IS THE SIXTH AND IT IS THE FIRST WHOSE ARGUMENT IS A COUNT THAT
+// ALREADY STOOD AT TWO: thirty-one names to THIRTY-THREE, eighteen functions to
+// NINETEEN, and the error classes from six to SEVEN. `decodePlanRules` is not a
+// codec somebody might one day need in two places; `toPublishedRules`
+// (`apps/worker`) and `decodeRules` (`apps/site`) read the same stored document
+// under the same key spelling TODAY, return this package's own `PlanRulesJson`,
+// and are compared by nothing, which is the `FM-16` section 1.3's rationale
+// exists to price. Withholding it would not prevent a decoder, it would add the
+// third one `apps/api` needs. `PlanRulesCodecError` is the seventh error class,
+// on `EngineGatesCodecError`'s reason unchanged.
+//
+// **AND THE ENCODE HALF IS DELIBERATELY ABSENT, WHICH IS WHERE THIS DIFFERS FROM
+// ADR-250.** `gates-codec.ts` exports BOTH directions because the worker writes
+// `rule_states.engine_gates` through `RuleStateWriterIo`. NOTHING in this
+// repository writes `plan_versions.rules` from a `PlanRulesJson`: the publish
+// path validates a document somebody authored. An encoder here would be a second
+// statement of the shape with no caller to keep it honest, which is the thing
+// this gate exists to refuse rather than an omission it should catch.
+test('of the thirty-three names, exactly nineteen are non-class functions after ADR-283', () => {
   const functions = Object.keys(engine)
     .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
     .sort();
@@ -232,6 +252,7 @@ test('of the thirty-one names, exactly eighteen are non-class functions after AD
     'EngineGatesCodecError',
     'EngineInvariantError',
     'ExternalGatesRefusal',
+    'PlanRulesCodecError',
     'ReplayAssertionError',
     'StateHashError',
   ];
@@ -242,6 +263,7 @@ test('of the thirty-one names, exactly eighteen are non-class functions after AD
     'buildSessionCalendar',
     'canonicalStateSerialization',
     'decodeEngineGates',
+    'decodePlanRules',
     'encodeEngineGates',
     'evaluatePayout',
     'initialState',
