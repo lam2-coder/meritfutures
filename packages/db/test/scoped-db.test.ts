@@ -829,7 +829,11 @@ describe('the accessors', () => {
  *            ADR-216, on ADR-103's own mechanism and for its own reason. It
  *            changes no NAME either, so this fold only RECORDS it and
  *            `foldTableDefs` is where the type actually moves.
- * `refused`  statements outside the fold's three-member vocabulary. Any of these
+ * `renamed`  the `from -> to` pairs an `ALTER TABLE ... RENAME COLUMN` moved.
+ *            ADR-278, and it is the FIRST MEMBER OF THIS VOCABULARY THAT
+ *            CHANGES A NAME, which is why it moves the column set here AND the
+ *            definition in `foldTableDefs` rather than only recording itself.
+ * `refused`  statements outside the fold's four-member vocabulary. Any of these
  *            turns the suite red, exactly as the other shapes do today.
  */
 interface ColumnFold {
@@ -837,6 +841,7 @@ interface ColumnFold {
   readonly added: readonly string[];
   readonly relaxed: readonly string[];
   readonly retyped: readonly string[];
+  readonly renamed: readonly string[];
   readonly refused: readonly string[];
 }
 
@@ -919,6 +924,67 @@ function retypedColumns(statement: string): ReadonlyMap<string, string> | null {
     moved.set(named[1], type);
   }
   return moved.size > 0 ? moved : null;
+}
+
+/**
+ * The `<from>` to `<to>` pairs of an `ALTER TABLE ... RENAME COLUMN`, or `null`
+ * for a statement outside the shape. ADR-278.
+ *
+ * `RENAME` WAS REFUSED WHOLE UNTIL `0075` AND THE REFUSAL IS WHAT BROUGHT THIS
+ * FUNCTION ABOUT, exactly as `ALTER COLUMN`'s default-fail brought ADR-103's
+ * reader and then ADR-216's. Until that migration this estate held no `RENAME
+ * COLUMN` and no `DROP COLUMN` at all, so the fold's three shapes covered every
+ * statement written; ADR-278 renames a column `0045` declares, and constitution
+ * E2 makes that `CREATE TABLE` body permanent, so a fold that skipped the rename
+ * would compare the transcription against a name the database does not have.
+ *
+ * THE OPTIONAL `COLUMN` KEYWORD IS NOT OPTIONAL HERE. PostgreSQL accepts
+ * `ALTER TABLE t RENAME a TO b`, and so does this, but `RENAME TO` (the TABLE
+ * rename) and `RENAME CONSTRAINT` return `null` and are refused whole: this fold
+ * is a per-table column set and neither shape is one.
+ */
+function renamedColumns(statement: string): ReadonlyMap<string, string> | null {
+  const body = statement
+    .replace(/^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?/i, '')
+    .replace(/;\s*$/, '');
+  const moved = new Map<string, string>();
+  for (const clause of topLevelParts(body)) {
+    const named =
+      /^RENAME\s+(?:COLUMN\s+)?"?([a-z_][a-z0-9_]*)"?\s+TO\s+"?([a-z_][a-z0-9_]*)"?$/i.exec(
+        clause.replace(/\s+/g, ' ').trim(),
+      );
+    if (named?.[1] === undefined || named[2] === undefined) return null;
+    moved.set(named[1], named[2]);
+  }
+  return moved.size > 0 ? moved : null;
+}
+
+/**
+ * One folded definition under a new column name. ADR-278.
+ *
+ * A RENAME THAT APPLIES NOTHING IS REFUSED RATHER THAN ABSORBED, on `withType`
+ * and `withoutNotNull`'s own argument: a fold whose rename quietly did not
+ * happen leaves the comparison asserting the PRE-rename name, which is the
+ * stale-`CREATE` failure this whole fold exists to end.
+ */
+function withName(def: string, name: string, where: string): string {
+  const flat = def.trim().replace(/\s+/g, ' ');
+  const words = flat.split(' ');
+  const was = words[0] ?? '';
+  if (was === '') {
+    throw new Error(
+      `RENAME COLUMN ${where} TO ${name}, against a definition with no name in it. ` +
+        `Its DDL is: ${def}`,
+    );
+  }
+  if (was === name) {
+    throw new Error(
+      `RENAME COLUMN ${where} TO ${name}, and the definition it applies to already carries ` +
+        `that name. A fold that applies nothing agrees with a transcription it never checked. ` +
+        `Its DDL is: ${def}`,
+    );
+  }
+  return [name, ...words.slice(1)].join(' ');
 }
 
 /**
@@ -1146,6 +1212,7 @@ function foldTable(table: string): ColumnFold {
   const added: string[] = [];
   const relaxed: string[] = [];
   const retyped: string[] = [];
+  const renamed: string[] = [];
   const refused: string[] = [];
 
   for (const file of files.slice(createdIn)) {
@@ -1190,8 +1257,42 @@ function foldTable(table: string): ColumnFold {
         continue;
       }
 
-      // THE DEFAULT IS FAIL. `DROP COLUMN` and `RENAME` are refused, including a
-      // statement that mixes one in.
+      // ADR-278'S MEMBER, AND IT IS THE ONLY ONE THAT MOVES A NAME. The other
+      // three leave the column set alone and change what a column IS; this one
+      // leaves every column alone and changes what one is CALLED. Refused whole
+      // on the same default as the rest: a `RENAME TO` (the table), a `RENAME
+      // CONSTRAINT`, or anything mixing a second clause in reads as `null` here
+      // and falls through to the refusal below.
+      if (/\bRENAME\b/i.test(statement) && !/\bDROP\s+COLUMN\b/i.test(statement)) {
+        const moved = renamedColumns(statement);
+        if (moved !== null) {
+          for (const [from, to] of moved) {
+            // A MIS-PARSE IS LOUD RATHER THAN ABSORBED, on ADD COLUMN's and
+            // ALTER COLUMN's own rule. Renaming a column the fold has never seen
+            // means the clause reader and the column set disagree; renaming onto
+            // a name already in the set would silently shrink it by one.
+            if (!columns.has(from)) {
+              throw new Error(
+                `${file}: RENAME COLUMN ${table}.${from} TO ${to}, and ${from} is not in ` +
+                  `the folded column set of ${table}`,
+              );
+            }
+            if (columns.has(to)) {
+              throw new Error(
+                `${file}: RENAME COLUMN ${table}.${from} TO ${to}, and ${to} is already in ` +
+                  `the folded column set of ${table}`,
+              );
+            }
+            columns.delete(from);
+            columns.add(to);
+            renamed.push(`${from} -> ${to}`);
+          }
+          continue;
+        }
+      }
+
+      // THE DEFAULT IS FAIL. `DROP COLUMN` and every `RENAME` shape outside
+      // ADR-278's member are refused, including a statement that mixes one in.
       if (/\bDROP\s+COLUMN\b|\bRENAME\b/i.test(statement)) {
         refused.push(`${file}: ${statement.slice(0, 90).replace(/\s+/g, ' ')}`);
         continue;
@@ -1222,7 +1323,7 @@ function foldTable(table: string): ColumnFold {
     }
   }
 
-  return { columns: [...columns].sort(), added, relaxed, retyped, refused };
+  return { columns: [...columns].sort(), added, relaxed, retyped, renamed, refused };
 }
 
 describe('the TypeScript schema has not drifted from the DDL', () => {
@@ -1268,6 +1369,18 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
       gained.length,
       `no registered table replays an ADD COLUMN: ${gained.join(', ')}`,
     ).toBeGreaterThan(0);
+  });
+
+  // THE SAME ARGUMENT FOR ADR-278's MEMBER, AND IT NEEDS IT MORE THAN THE OTHER
+  // THREE DO. `renamedColumns` returning `null` for every statement in the set
+  // would send each one to the refusal below it, which is loud; a rename branch
+  // that never fired for any other reason would leave the assertions above
+  // comparing a transcription against a column set that still carries the OLD
+  // name, and the transcription would have to be wrong in the same direction for
+  // that to go green. This is what says the fold's newest member did something.
+  test('the fold is not vacuous: a registered table has a column renamed after its CREATE', () => {
+    const moved = DDL_NAMES.flatMap(([, sqlName]) => foldTable(sqlName).renamed);
+    expect(moved).toEqual(['calibration_observed_at -> calibration_observed_on']);
   });
 
   // WIDENED BY ADR-209 FROM "one CREATE TABLE" TO "one CREATE, OF ONE KIND",
@@ -1406,12 +1519,32 @@ function foldTableDefs(table: string): Map<string, string> {
         }
         continue;
       }
+      // ADR-278. THIS IS WHERE THE NAME ACTUALLY MOVES, and unlike the two
+      // shapes above it moves in BOTH readers: `foldTable` holds the column set
+      // and this holds the definitions, so a rename applied to one and not the
+      // other would make them disagree about the same table.
+      if (/\bRENAME\b/i.test(statement) && !/\bDROP\s+COLUMN\b/i.test(statement)) {
+        const moved = renamedColumns(statement);
+        if (moved !== null) {
+          for (const [from, to] of moved) {
+            const def = defs.get(from);
+            if (def === undefined) {
+              throw new Error(
+                `${file}: RENAME COLUMN ${table}.${from} TO ${to}, and ${from} has no ` +
+                  `folded definition on ${table}`,
+              );
+            }
+            defs.delete(from);
+            defs.set(to, withName(def, to, `${table}.${from}`));
+          }
+          continue;
+        }
+      }
       if (!/\bADD\s+COLUMN\b/i.test(statement)) continue;
       // REFUSED SHAPES ARE SKIPPED HERE AND REFUSED THERE. `foldTable` records
-      // every `DROP COLUMN`, `RENAME` and unreadable `ALTER COLUMN` into
-      // `refused`, and the assertion above holds that list empty over every
+      // every `DROP COLUMN`, unreadable `RENAME` and unreadable `ALTER COLUMN`
+      // into `refused`, and the assertion above holds that list empty over every
       // registered table, so skipping them here absorbs nothing already red.
-      if (/\bDROP\s+COLUMN\b|\bRENAME\b/i.test(statement)) continue;
 
       const body = statement
         .replace(/^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?/i, '')
@@ -2798,6 +2931,39 @@ describe('the transcription states the DDL type and nullability, not only the co
       ].sort(),
     );
     expect(statements, 'the ALTER COLUMN statement count this fold was ruled against').toBe(4);
+  });
+
+  // THE SAME CENSUS FOR ADR-278's MEMBER, AND FOR ADR-216's OWN REASON. The
+  // vocabulary is closed and this is what keeps it measured rather than
+  // believed: `0075` is the first `RENAME` this estate has ever carried, and the
+  // day a second one lands -- or the first `DROP COLUMN`, which has no fold at
+  // all and never will without a ruling -- this is RED and the next session
+  // reads ADR-278 before widening a regex. It covers UNREGISTERED tables too.
+  test('the migration set carries exactly the RENAME statements this fold was ruled against', () => {
+    const carriers = new Set<string>();
+    let renames = 0;
+    for (const file of migrationFiles()) {
+      const sqlText = readFileSync(join(MIGRATIONS, file), 'utf8').replace(/--[^\n]*/g, '');
+      for (const statement of sqlText.match(
+        /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?[\s\S]*?;/gi,
+      ) ?? []) {
+        expect(
+          /\bDROP\s+COLUMN\b/i.test(statement),
+          `a DROP COLUMN, which no fold in this file reads: ${statement.replace(/\s+/g, ' ')}`,
+        ).toBe(false);
+        if (!/\bRENAME\b/i.test(statement)) continue;
+        renames++;
+        const named = /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?([a-z_]+)"?/i.exec(statement)?.[1];
+        expect(named, `a RENAME statement names no table: ${statement}`).toBeDefined();
+        expect(
+          renamedColumns(statement),
+          `a RENAME shape ADR-278 does not fold: ${statement.replace(/\s+/g, ' ')}`,
+        ).not.toBeNull();
+        if (named !== undefined) carriers.add(named);
+      }
+    }
+    expect([...carriers].sort()).toEqual(['simulation_runs']);
+    expect(renames, 'the RENAME statement count this fold was ruled against').toBe(1);
   });
 
   // THE TWO MEMBERS ARE READ BY TWO FUNCTIONS AND EXACTLY ONE MUST CLAIM EACH

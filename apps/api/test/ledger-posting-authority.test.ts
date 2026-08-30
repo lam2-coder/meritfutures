@@ -146,11 +146,24 @@ test('both legs already store the key a later door posts under, so nothing is ad
   expect(PAYOUTS).toMatch(/interface PayoutRequestInsert[\s\S]*?readonly idempotencyKey: string;/);
 });
 
-test('no migration is taken by this entry and 0074 is still the highest', () => {
-  const migrations = readdirSync(join(ROOT, 'packages', 'db', 'migrations'))
+// THE CLAIM IS ABOUT ADR-270 AND IT USED TO BE WRITTEN AS A CLAIM ABOUT THE
+// ESTATE. It read "0074 is still the highest" and pinned the global maximum to
+// prove a local absence, so it was destined to fail on the next migration
+// whoever wrote it and for whatever reason: ADR-278's `0075` is the one that
+// arrived, and it renames a column on `simulation_runs` with nothing to do with
+// a ledger posting. Rewritten to assert what the sentence means. `0074` is
+// still named, as the highest number ON THE DAY ADR-270 LANDED, which is a fact
+// about that entry rather than a fact about every later one.
+test('no migration is taken by this entry: none names ADR-270', () => {
+  const dir = join(ROOT, 'packages', 'db', 'migrations');
+  const migrations = readdirSync(dir)
     .filter((name) => name.endsWith('.sql'))
     .sort();
-  expect(migrations.at(-1)).toBe('0074_firm_parameters.sql');
+  expect(migrations).toContain('0074_firm_parameters.sql');
+  const claiming = migrations.filter((name) =>
+    readFileSync(join(dir, name), 'utf8').includes('ADR-270'),
+  );
+  expect(claiming).toEqual([]);
 });
 
 // -----------------------------------------------------------------------------

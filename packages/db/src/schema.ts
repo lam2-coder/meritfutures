@@ -3299,8 +3299,12 @@ export const supportContextViews = pgTable('support_context_views', {
 // `>= 0` CHECK because `provenanceFor` throws only below zero, so a zero-sample
 // run is legal in the harness and has to be storable.
 //
-// `calibration_observed_at` IS A `date` AND THE DAY THE FIGURES WERE OBSERVED,
-// never the day of the run. The three digests are `bytea`, on the same
+// `calibration_observed_on` IS A `date` AND THE DAY THE FIGURES WERE OBSERVED,
+// never the day of the run. `0075` renamed it from `calibration_observed_at`
+// (ADR-278): a `date` wearing `_at` asserts an RFC 3339 instant (ADR-146 clause
+// 2) and this value is a day, which is ADR-272 clause 3's one measured defect.
+// NOT `_day`, which API_CONTRACT section 1 reserves for an exchange trading
+// day. The three digests are `bytea`, on the same
 // convention `rule_states.state_hash` and `dual_control_approvals.payload_hash`
 // already hold, each with a `length = 32` CHECK the database keeps.
 export const simulationRuns = pgTable('simulation_runs', {
@@ -3310,7 +3314,7 @@ export const simulationRuns = pgTable('simulation_runs', {
   sizesDigest: bytea('sizes_digest').notNull(),
   calibrationId: text('calibration_id').notNull(),
   calibrationDigest: bytea('calibration_digest').notNull(),
-  calibrationObservedAt: date('calibration_observed_at').notNull(),
+  calibrationObservedOn: date('calibration_observed_on').notNull(),
   harnessVersion: text('harness_version').notNull(),
   engineVersion: text('engine_version').notNull(),
   seed: text('seed').notNull(),

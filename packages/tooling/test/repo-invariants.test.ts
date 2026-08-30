@@ -3203,10 +3203,17 @@ describe('RI-25 keeps one date type parser aimed at the day OID', () => {
 // -----------------------------------------------------------------------------
 // RI-26, whose subject is a name that is FALSE rather than a name that is silent
 // -----------------------------------------------------------------------------
-// ADR-272. The check has two legs and each is asserted in BOTH directions, so
-// the fixture has to carry the ruled exceptions rather than a clean estate: an
-// exception set that is never observed to be violated is the same shape as a
-// reader that stopped reading, and the check is supposed to say so.
+// ADR-272, and ADR-278 for the rename fold. The check has two legs and each is
+// asserted in BOTH directions, so the fixture has to carry the ruled exception
+// rather than a clean estate: an exception set that is never observed to be
+// violated is the same shape as a reader that stopped reading, and the check is
+// supposed to say so.
+//
+// THE FIXTURE ALSO CARRIES A REPAIR, WHICH IS NEW WITH ADR-278. `0045` declares
+// `calibration_observed_at date` and `0075` renames it; E2 makes the first
+// permanent, so the estate's DECLARATIONS and its INSTALLED schema disagree here
+// and every case below is written against the second. Deleting `0075` from the
+// fixture is the seed that proves the fold is load bearing, and it is a test.
 //
 // EVERY CASE HERE WRITES A MIGRATIONS DIRECTORY, because a tree without one is
 // silent by design and would pass every case for the wrong reason.
@@ -3232,10 +3239,16 @@ describe('RI-26 keeps a temporal column name honest about its own type', () => {
     '  effective_from  timestamptz NOT NULL,\n' +
     '  created_at      timestamptz NOT NULL\n' +
     ');\n';
+  /** ADR-278's repair. `0045` above is untouched, because E2 forbids editing it. */
+  const RENAME =
+    '-- ADR-278. `calibration_observed_at` was a `date` wearing an instant suffix.\n' +
+    'ALTER TABLE simulation_runs\n' +
+    '  RENAME COLUMN calibration_observed_at TO calibration_observed_on;\n';
   const ESTATE: Record<string, string> = {
     '0004_catalog.sql': CATALOG,
     '0045_simulation_runs.sql': SIMULATION_RUNS,
     '0074_firm_parameters.sql': FIRM_PARAMETERS,
+    '0075_calibration_observed_on.sql': RENAME,
   };
 
   /** The estate as it stands, with named files replaced or added. */
@@ -3247,7 +3260,7 @@ describe('RI-26 keeps a temporal column name honest about its own type', () => {
     return root;
   };
 
-  test('the estate as it stands holds, both exceptions observed', () => {
+  test('the estate as it stands holds: the ruled collision observed, the `_at` repaired', () => {
     expect(findings('RI-26', estate())).toEqual([]);
   });
 
@@ -3270,18 +3283,56 @@ describe('RI-26 keeps a temporal column name honest about its own type', () => {
     expect(findings('RI-26', root).join('\n')).toContain('reviewed_at is declared `date`');
   });
 
-  // LEG 1, REVERSE. The repair landing is what makes the entry stale, and the
-  // check has to say so or the exception outlives its ground.
-  test('repairing the ruled `_at` exception turns the entry stale, which is a finding', () => {
+  // LEG 1 HAS NO EXCEPTION TO GO STALE ANY MORE, SO THE FOLD CARRIES THAT
+  // DIRECTION INSTEAD (ADR-278). These two are the seeds that would have caught
+  // the reader shipping unfolded: the first proves the repair is what makes the
+  // tree green, the second proves the fold feeds leg 1 rather than bypassing it.
+  test('WITHOUT the renaming migration the estate is a finding again', () => {
+    const root = cleanTree();
+    for (const [file, body] of Object.entries(ESTATE)) {
+      if (file === '0075_calibration_observed_on.sql') continue;
+      write(root, `packages/db/migrations/${file}`, body);
+    }
+    expect(findings('RI-26', root).join('\n')).toContain(
+      'calibration_observed_at is declared `date` in 0045_simulation_runs.sql',
+    );
+  });
+
+  test('a rename INTO a false name is a finding, so the fold feeds leg 1', () => {
     const root = estate({
-      '0045_simulation_runs.sql': SIMULATION_RUNS.replace(
-        'calibration_observed_at date',
-        'calibration_observed_on date',
-      ),
+      '0076_new.sql':
+        'ALTER TABLE geo_restrictions RENAME COLUMN effective_from TO effective_at;\n',
+    });
+    expect(findings('RI-26', root).join('\n')).toContain('effective_at is declared `date`');
+  });
+
+  test('the fold reads the form with the COLUMN keyword omitted, which is legal DDL', () => {
+    const root = estate({
+      '0075_calibration_observed_on.sql':
+        'ALTER TABLE simulation_runs RENAME calibration_observed_at TO calibration_observed_on;\n',
+    });
+    expect(findings('RI-26', root)).toEqual([]);
+  });
+
+  test("a rename named only in a COMMENT folds nothing, on RI-25's seed", () => {
+    const root = estate({
+      '0075_calibration_observed_on.sql':
+        '-- ALTER TABLE simulation_runs RENAME COLUMN calibration_observed_at TO x;\n',
     });
     expect(findings('RI-26', root).join('\n')).toContain(
-      'carries calibration_observed_at as a ruled `_at` exception',
+      'calibration_observed_at is declared `date`',
     );
+  });
+
+  // A DROP HAS NO FOLD AND MUST NOT BE IGNORED. This reader would otherwise go
+  // on asserting about a column the database does not have, which is the
+  // suppression list the exception sets were shaped to avoid, reached through
+  // the reader instead of through an entry.
+  test('a `DROP COLUMN` anywhere in the set is a THROW, never a silent pass', () => {
+    const root = estate({
+      '0076_new.sql': 'ALTER TABLE simulation_runs DROP COLUMN started_at;\n',
+    });
+    expect(() => findings('RI-26', root)).toThrow(/DROP COLUMN.*and has no fold/s);
   });
 
   // LEG 2, FORWARD.
@@ -3362,6 +3413,21 @@ describe('RI-26 keeps a temporal column name honest about its own type', () => {
   // THE READER'S OWN FAILURE, AND IT THROWS RATHER THAN PASSING. A tree
   // carrying the witness migrations and parsing to nothing is not a repaired
   // estate; it is a check that has stopped reading.
+  // LEG 1'S SENTINEL, WHICH REPLACES THE STALE-ENTRY HALF ADR-278 RETIRED. With
+  // no exception left, nothing else asserts that the suffix filter still
+  // matches: a reader that stopped seeing `_at` would report a clean estate over
+  // all 321 of them. This tree parses temporal columns and has no `_at` among
+  // them, which the real estate cannot be.
+  test('temporal columns but not one `*_at` among them is a THROW', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'packages/db/migrations/0001_only.sql',
+      'CREATE TABLE things (\n  trading_day date NOT NULL,\n  opened_on date NOT NULL\n);\n',
+    );
+    expect(() => findings('RI-26', root)).toThrow(/found no `\*_at` temporal column among the 2/);
+  });
+
   test('witness migrations present and nothing parsed is a THROW, never a pass', () => {
     const root = estate(
       Object.fromEntries(
