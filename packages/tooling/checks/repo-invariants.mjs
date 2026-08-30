@@ -6239,6 +6239,301 @@ const ri26 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-27  Every statement of the last-closed-trading-day fold is registered, and
+//        each one's coverage disposition is the one the register claims
+// -----------------------------------------------------------------------------
+// ADR-273's PROPERTY, AND IT IS A PROPERTY OF THE TREE RATHER THAN OF A FILE.
+//
+// `R-06` permits an eligibility verdict against exactly one day, the LAST CLOSED
+// one, and `ADR-042` F-4 rules that the last closed day MERIT KNOWS ABOUT is a
+// different answer from the last closed day: a day outside `trading_calendar_loads`
+// is UNKNOWN and unknown is not a holiday. `0032`'s own header calls confusing
+// the two "the single most silent failure available to this table", because the
+// wrong answer is a confident `YYYY-MM-DD` that every gate downstream reads
+// without complaint.
+//
+// THE FOLD IS STATED THREE TIMES IN THIS TREE AND THE THREE PUT THE COVERAGE
+// READ IN THREE DIFFERENT PLACES. ADR-273 ruled that this is safe wherever a
+// TYPE makes forgetting a compile error and unsafe wherever only a convention
+// does, and registered the one site where nothing holds it at all. What the
+// ruling cannot do is survive a FOURTH statement landing in a package nobody
+// was looking at, which is exactly the shape ADR-268 measured when it found the
+// first two disagreeing.
+//
+// SO THE CENSUS IS THE CHECK. Every source file whose CODE names a session-close
+// instant is either on the register with a stated disposition or is a finding.
+// The needle is the close instant rather than the phrase "last closed day",
+// because a fold is written with the column and named whatever its author likes:
+// `readLastClosedTradingDay`, `lastClosedDay` and `lastClosedTradingDayStatement`
+// are three names for one predicate already.
+//
+// COMMENTS ARE STRIPPED, ON `RI-25`'s SEED. That check's first version read the
+// raw file and reported PASS with the call commented out, because the file's own
+// header explained the repair at length. Every file on this register discusses
+// this subject in prose; matching a mention would make the register agree with
+// itself.
+//
+// LEG 2 IS WHAT KEEPS THE REGISTER FROM BECOMING A LIST OF NAMES. A file
+// registered as consulting coverage must NAME THE COVERAGE TABLE in code, and
+// the one registered as consulting none must not. Both directions are findings:
+// coverage disappearing from a site that had it is the regression, and coverage
+// APPEARING at the site that lacks it is good news that makes this register and
+// ADR-273's finding 1 stale, which a reader needs told rather than hidden.
+//
+// WHAT IT CANNOT SEE: whether a fold that reads both tables reads them
+// CORRECTLY, and whether a file-local fold has acquired a second caller inside
+// its own module. Both are `apps/api/test/last-closed-day-coverage-split.test.ts`'s
+// half, which drives the real readers over a calendar loaded past its coverage
+// and parses `liability.ts` for the one-caller property. This check is only that
+// the census is closed and that each entry is still what it says it is.
+
+/**
+ * A READ of `trading_calendar_loads`, MATCHED AS AN ACT RATHER THAN A MENTION.
+ *
+ * THE SEED THAT PROVED THE FIRST VERSION WRONG IS RECORDED IN ADR-273 SECTION 7.
+ * Leg 2 originally asked whether the file NAMED the table at all, and
+ * `liability.ts` was seeded by pointing `anchorCalendar` at `trading_calendar`
+ * instead: the check reported PASS, because that module's three `uncovered`
+ * refusals each quote the table name inside their own detail string. Comments
+ * are stripped and STRING LITERALS ARE NOT, so on this subject the files richest
+ * in explanatory text are the ones a mention-matcher cannot see through. This is
+ * `RI-25`'s seed one class over.
+ *
+ * Two forms, and they are the two idioms this estate has: `ADR-112`'s keyed
+ * accessor (`tx.rows('tradingCalendarLoads')`) and the drizzle table handle
+ * (`TABLES.tradingCalendarLoads`). A THIRD idiom would report as absent, which
+ * is the fail-closed direction: the finding names the file and a reader adds the
+ * form.
+ */
+const READS_THE_LOADS_TABLE =
+  /(?:\.\s*(?:rows|rowsWhere|rowAt)\s*\(\s*['"]tradingCalendarLoads['"]|\bTABLES\s*\.\s*tradingCalendarLoads\b)/;
+
+/** Identifiers that mean "this file handles a session close instant". */
+const CLOSE_INSTANT = /\b(?:sessionCloseAt|session_close_at|closeAtMs|closeMs)\b/;
+
+/**
+ * Every source file that may name one, and what it does with it.
+ *
+ * `coverage` IS THE ASSERTION AND NOT A LABEL. `consulted` means the file's own
+ * code names `trading_calendar_loads`; `absent` means it must not; `n/a` is a
+ * file that declares, registers or WRITES the column and folds nothing, so
+ * coverage is not its question.
+ */
+const CLOSE_INSTANT_REGISTER = [
+  {
+    rel: 'apps/api/src/admin-source/liability.ts',
+    coverage: 'consulted',
+    what:
+      'FOLDS. `lastClosedDay`, module-private, whose one caller `anchorCalendar` reads ' +
+      '`trading_calendar_loads` and returns a discriminated union: the anchored day is ' +
+      'unreachable without narrowing past an `uncovered` arm (ADR-273 ruling 2)',
+  },
+  {
+    rel: 'apps/worker/src/batch/adapter.ts',
+    coverage: 'absent',
+    what:
+      'FOLDS, AND CONSULTS NO COVERAGE AT ALL. `readLastClosedTradingDay`, exported, ' +
+      'returning `TradingDay | null` where `null` means "no session has closed" and never ' +
+      '"outside coverage". THE REGISTERED GAP: ADR-268 finding 2 reported it, ADR-273 ' +
+      'finding 1 re-derived it, and `apps/worker` was outside both fences',
+  },
+  {
+    rel: 'packages/db/src/scoped-db.ts',
+    coverage: 'consulted',
+    what:
+      'FOLDS. `lastClosedTradingDayStatement`, the fourth named door (ADR-268), which reads ' +
+      'BOTH tables itself and refuses an exhausted or gapped calendar. Nothing to forget',
+  },
+  {
+    rel: 'packages/rules-engine/src/calendar.ts',
+    coverage: 'required-input',
+    what:
+      'FOLDS A DIFFERENT QUESTION, `tradingDayAt`, and is the strongest of the four shapes: ' +
+      '`SessionCalendarSource` REQUIRES both `sessions` and `coverage`, so a calendar cannot ' +
+      'be BUILT without coverage, and the answer type carries `outside_coverage`. IT NAMES ' +
+      'NO TABLE AND MUST NOT: the engine is pure and reads no schema, so its coverage read ' +
+      'is a field of its own input type rather than a query',
+  },
+  {
+    rel: 'packages/db/src/schema.ts',
+    coverage: 'n/a',
+    what: 'DECLARES the column. Folds nothing',
+  },
+  {
+    rel: 'packages/db/src/scope.ts',
+    coverage: 'n/a',
+    what: "REGISTERS the table and names the column inside `tradingCalendar`'s `why`. Folds nothing",
+  },
+  {
+    rel: 'packages/db/src/seed/calendars/generate.mjs',
+    coverage: 'n/a',
+    what: 'WRITES the column. The loader PRODUCES coverage rather than consulting it',
+  },
+];
+
+const ri27 = {
+  id: 'RI-27',
+  title: 'Every last-closed-day fold is registered, with the coverage disposition it claims',
+  covers:
+    'A CONFIDENT DAY FOR A DATE THE ESTATE KNOWS NOTHING ABOUT IS A WRONG PAYOUT ' +
+    'BASIS (ADR-042 F-4, ADR-273). Two legs. ONE: THE CENSUS IS CLOSED. Every ' +
+    '`*.ts`, `*.mjs` and `*.js` under an `apps/*/src`, `packages/*/src` or ' +
+    '`scripts/` directory is read with COMMENTS STRIPPED, and a file whose code ' +
+    'names a session-close instant (`sessionCloseAt`, `session_close_at`, ' +
+    '`closeAtMs`, `closeMs`) must be one of the ' +
+    `${String(CLOSE_INSTANT_REGISTER.length)} registered sites. An unregistered ` +
+    'one is a candidate FOURTH statement of `R-06`’s selection and needs an ADR; ' +
+    'a registered one that no longer names it means the register is stale. ' +
+    'TWO: EACH DISPOSITION STILL HOLDS. A site registered as consulting coverage ' +
+    "must READ it — `.rows('tradingCalendarLoads')` or " +
+    '`TABLES.tradingCalendarLoads`, an ACT and never a mention, because every ' +
+    'refusal on this subject quotes the table name in its own detail string; ' +
+    'the PURE one must instead ' +
+    'declare a `readonly coverage` input and an `outside_coverage` answer, ' +
+    'because an engine that reads no schema owes the read as a field rather ' +
+    'than as a query; and the one registered as consulting none must name ' +
+    'neither — in BOTH directions, because coverage vanishing is the regression ' +
+    'and coverage arriving makes this register and ADR-273 finding 1 stale. ' +
+    'THE NEEDLE IS THE COLUMN AND NOT THE PHRASE, because one predicate already ' +
+    'carries three names in this tree. ' +
+    'IT READS `src/` AND `scripts/` AND NOT TESTS, on RI-25’s reading: a suite ' +
+    'names the identifier while asserting about it. ' +
+    'WHAT IT CANNOT SEE: whether a two-table fold reads them CORRECTLY, and ' +
+    'whether a file-local fold has gained a second caller inside its own module. ' +
+    'Both are `apps/api/test/last-closed-day-coverage-split.test.ts`’s half. ' +
+    'SILENT on a tree where NO source file handles a session close at all, ' +
+    'which is the synthetic fixture: silence is keyed on the subject rather ' +
+    'than on a registered path, because the fixture writes stubs at two of ' +
+    'those paths. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const present = CLOSE_INSTANT_REGISTER.filter((entry) => existsSync(join(root, entry.rel)));
+
+    const sources = walk(root).filter((f) => {
+      if (!/\.(ts|tsx|mjs|js)$/.test(f)) return false;
+      if (/(^|\/)(test|tests|__tests__)\//.test(f)) return false;
+      if (/\.test\.[a-z]+$/.test(f)) return false;
+      return (
+        /^apps\/[^/]+\/src\//.test(f) || /^packages\/[^/]+\/src\//.test(f) || /^scripts\//.test(f)
+      );
+    });
+
+    // A SENTINEL, on RI-24's and RI-25's precedent. Zero source files on a tree
+    // that DOES carry a registered file means the walk or the path filter has
+    // moved, at which point leg 1 passes by having read nothing and a fourth
+    // statement of the fold anywhere in the tree reports as absent.
+    if (sources.length === 0 && present.length > 0) {
+      throw new Error(
+        'RI-27 found no source file under any `apps/*/src`, `packages/*/src` or `scripts/` ' +
+          'on a tree that DOES carry a registered fold. Zero means the walk or the path ' +
+          'filter has moved, at which point leg 1 is asserting about an empty list',
+      );
+    }
+
+    /** Every source file whose CODE handles a session close instant, read once. */
+    const naming = new Set(
+      sources.filter((f) => CLOSE_INSTANT.test(stripComments(readFileSync(join(root, f), 'utf8')))),
+    );
+
+    // SILENT ON A TREE THAT HOLDS NO CALENDAR AT ALL, on RI-23, RI-24 and
+    // RI-25's precedent, and the condition is the SUBJECT rather than a file
+    // name. The synthetic scaffold fixture writes a `scope.ts` and a
+    // `scoped-db.ts` of its own, so keying silence on a registered PATH would
+    // have made this check report a stale register against a stub; keying it on
+    // whether any file in the tree handles a session close is the question this
+    // check is actually about, and a tree with no fold has no census to close.
+    if (naming.size === 0) return findings;
+
+    const registered = new Map(CLOSE_INSTANT_REGISTER.map((entry) => [entry.rel, entry]));
+
+    // LEG 1. The census, in both directions.
+    for (const file of sources) {
+      const names = naming.has(file);
+      const entry = registered.get(file);
+
+      if (names && entry === undefined) {
+        findings.push(
+          `${file} names a session-close instant in CODE and is not on RI-27's register. ` +
+            'A file that handles `session_close_at` is a candidate statement of `R-06`’s ' +
+            'selection, and this tree already holds three of them putting the coverage read ' +
+            'in three different places (ADR-273). Either it folds a last-closed day, in ' +
+            'which case an ADR rules where its coverage check lives before it acquires a ' +
+            'caller, or it does not, in which case add it to the register with `coverage: ' +
+            "'n/a'` and say what it does",
+        );
+      }
+
+      if (!names && entry !== undefined) {
+        findings.push(
+          `${file} is on RI-27's register as "${entry.what}" and its code no longer names a ` +
+            'session-close instant. The register is stale: either the fold moved, in which ' +
+            'case the new home needs its row here, or the file stopped being about this ' +
+            'subject, in which case remove the row and say so in ADR-273’s successor',
+        );
+      }
+    }
+
+    // LEG 2. Each disposition, asked of the file rather than of the register.
+    for (const entry of present) {
+      if (entry.coverage === 'n/a') continue;
+      const code = stripComments(readFileSync(join(root, entry.rel), 'utf8'));
+      const consults = READS_THE_LOADS_TABLE.test(code);
+
+      // A PURE MODULE CANNOT NAME A TABLE AND IS NOT EXCUSED FROM COVERAGE.
+      // `packages/rules-engine` reads no schema by construction, so the read it
+      // owes is a REQUIRED FIELD of its own input type and an answer that can
+      // say `outside_coverage`. Asserting the table name of it would be asking
+      // the engine to import a database.
+      if (entry.coverage === 'required-input') {
+        const declares = code.indexOf('interface SessionCalendarSource {');
+        const block = declares === -1 ? '' : code.slice(declares, code.indexOf('}', declares));
+        if (
+          !/\breadonly coverage\s*:\s*readonly CoverageInterval\[\]/.test(block) ||
+          !code.includes('outside_coverage')
+        ) {
+          findings.push(
+            `${entry.rel} is registered as taking coverage AS A REQUIRED INPUT ` +
+              `("${entry.what}") and its code no longer declares a \`readonly coverage\` ` +
+              'field or no longer carries the `outside_coverage` answer. A calendar that can ' +
+              'be built without coverage places an instant inside a span nobody loaded, and ' +
+              'ADR-042 F-4 rules that day UNKNOWN rather than a session',
+          );
+        }
+        continue;
+      }
+
+      if (entry.coverage === 'consulted' && !consults) {
+        findings.push(
+          `${entry.rel} is registered as CONSULTING coverage ("${entry.what}") and its code ` +
+            "does not READ the loads table: no `.rows('tradingCalendarLoads')` and no " +
+            '`TABLES.tradingCalendarLoads`. A MENTION IS NOT A READ and this check will not ' +
+            "accept one, because every refusal on this subject quotes the table's name in " +
+            'its own detail string. A last-closed-day fold without the coverage read answers ' +
+            'a CONFIDENT day for a date outside `trading_calendar_loads`, which ADR-042 F-4 ' +
+            'rules UNKNOWN and 0032 calls the single most silent failure available to this ' +
+            'table',
+        );
+      }
+
+      if (entry.coverage === 'absent' && consults) {
+        findings.push(
+          `${entry.rel} is registered as consulting NO coverage ("${entry.what}") and its ` +
+            'code now names the loads table. THIS IS THE GAP CLOSING AND IT IS GOOD NEWS, ' +
+            'and it makes this register and ADR-273 finding 1 wrong. Change this row to ' +
+            "`coverage: 'consulted'` in the same commit and record the repair, so the next " +
+            'reader is not told a gap exists that somebody already closed',
+        );
+      }
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -6265,6 +6560,7 @@ export const CHECKS = [
   ri24,
   ri25,
   ri26,
+  ri27,
 ];
 
 function main() {
