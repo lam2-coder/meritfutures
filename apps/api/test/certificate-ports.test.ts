@@ -12,12 +12,16 @@ import {
   type AuthSession,
 } from '../src/routes/auth.ts';
 import {
+  CERTIFICATE_ORIGIN_VAR,
   CertificateBackendUnwired,
+  databaseCertificateBackend,
   resetCertificateBackend,
   useCertificateBackend,
   type CertificateLinks,
   type CertificateRow,
 } from '../src/routes/certificates.ts';
+import type { Environment } from '../src/surface.ts';
+import { recordingDb } from './db-recorder.ts';
 
 // CI-02, the `unit` project.
 //
@@ -60,12 +64,30 @@ import {
 // expectation rather than a sentence.
 //
 // -----------------------------------------------------------------------------
-// 3. THE SET SPLITS TWO AND ONE, AND THE SPLIT IS READ OFF THE LIST
+// 2b. THE PORT IS WIRED NOW AND THAT CASE IS KEPT, BECAUSE IT MEASURES THE PORT
+// AND NOT THE ADAPTER (ADR-266)
 // -----------------------------------------------------------------------------
-// Two of the three wait on the card; the third waits on the operator door. The
-// last case reads `wiring.test.ts`'s own entries rather than restating the
-// split here, on `admin-read-constructibility.test.ts`' rule that a count
-// written into a string is not read by anything.
+// `CertificateBackend` is TWO methods and the second is SYNCHRONOUS and called
+// PER RENDERED ROW, so a caller composing the two arms by hand can still build
+// the shape above, and the case that measures it stays. WHAT CHANGED IS THAT THE
+// FACTORY CANNOT BUILD ONE: `databaseCertificateBackend` resolves the origin out
+// of the environment in BOTH arms, and it resolves it in the READ arm before the
+// accessor is opened, so a deployment that has not set it refuses every caller
+// alike and the scoped door is never touched.
+//
+// THE ASSERTION THAT MAKES THAT STATE-INDEPENDENT RATHER THAN UNIFORM-TODAY IS
+// THE RECORDER'S CALL LIST, not the pair of status codes. A check that ran after
+// the read would satisfy "both answers are 503" and still be an oracle the
+// moment a branch was added below it, which is `certificate-image-source.ts`'
+// own stated reason for asserting on an EMPTY call list one port over.
+//
+// -----------------------------------------------------------------------------
+// 3. THE SET HAS FINISHED SPLITTING, AND IT IS READ OFF THE LIST
+// -----------------------------------------------------------------------------
+// Both card ports are wired; the third waits on the operator door and the card
+// landing did nothing for it. The last case reads `wiring.test.ts`'s own entries
+// rather than restating the split here, on `admin-read-constructibility.test.ts`'
+// rule that a count written into a string is not read by anything.
 // =============================================================================
 
 const HERE = import.meta.dirname;
@@ -192,6 +214,108 @@ test('a half-wired backend answers by the state of the rows it was asked about',
 });
 
 // -----------------------------------------------------------------------------
+// 2b. The guard: the origin is read BEFORE the rows, so no caller's rows decide
+// -----------------------------------------------------------------------------
+
+/** One `certificates` row as the ACCESSOR hands it over: camelCase, `Date` instants. */
+function accessorRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: ISSUED.id,
+    identityId: IDENTITY,
+    accountId: '55555555-5555-4555-8555-555555555555',
+    payoutRequestId: null,
+    signature: Uint8Array.of(1, 2, 3),
+    signingKeyId: 'key-2026-08',
+    claimsSchemaVersion: 1,
+    kind: 'pass',
+    claims: { plan_code: 'MERIT-50K', size_cents: 5_000_000, trading_day: '2026-08-24' },
+    code: ISSUED.code,
+    issuedAt: new Date(ISSUED.issuedAt),
+    revokedAt: null,
+    revokedReason: null,
+    revocationClass: null,
+    deferredUntil: null,
+    deferredReason: null,
+    createdAt: new Date(ISSUED.issuedAt),
+    ...over,
+  };
+}
+
+/** The deferred twin of the row above. It differs in the two deferral columns and nothing else. */
+const DEFERRED_ROW = accessorRow({
+  id: DEFERRED.id,
+  code: DEFERRED.code,
+  deferredUntil: new Date('2026-09-01T00:00:00.000Z'),
+  deferredReason: DEFERRED.deferredReason,
+});
+
+/**
+ * The port as `start.ts` installs it: the FACTORY over a recorded door and an
+ * environment, rather than two arms a caller composed.
+ */
+function wireFromFactory(rows: readonly Record<string, unknown>[], env: Environment): void {
+  useAuthBackend({
+    ...UNWIRED_AUTH_BACKEND,
+    sessionByToken: (token) => Promise.resolve(token === TOKEN ? SESSION : null),
+  });
+  const { db } = recordingDb({ rows: [...rows] });
+  useCertificateBackend(databaseCertificateBackend(db, env));
+}
+
+test('the adapter over an unset origin answers the same to both callers', async () => {
+  // THIS IS THE CASE ABOVE WITH THE HALF-WIRING REPLACED BY THE REAL FACTORY,
+  // and it is the whole of what ADR-266 had to establish. The two calls differ
+  // in nothing but the state of one row. Above, the deployment answers one and
+  // refuses the other; here it must refuse both, because the origin is read
+  // before the door is opened and a refusal that happened before the read
+  // cannot have been decided by what the read returned.
+  wireFromFactory([DEFERRED_ROW], {});
+  const deferredOnly = await list();
+  resetCertificateBackend();
+
+  wireFromFactory([accessorRow()], {});
+  const carriesIssued = await list();
+
+  expect(deferredOnly).toStrictEqual({ status: 503, code: 'service_unavailable' });
+  expect(carriesIssued).toStrictEqual(deferredOnly);
+});
+
+/** A configured deployment. No real hostname reaches this repository (ADR-012). */
+const ORIGIN_SET = { [CERTIFICATE_ORIGIN_VAR]: 'https://cards.example.invalid' };
+
+test('the same two callers are both served once the origin is set', async () => {
+  // THE OTHER DIRECTION, because a guard that refused everything would pass the
+  // case above and serve nobody. `links` is called for the issued row and not
+  // for the deferred one, and neither call refuses.
+  wireFromFactory([DEFERRED_ROW], ORIGIN_SET);
+  const deferredOnly = await list();
+  resetCertificateBackend();
+
+  wireFromFactory([accessorRow()], ORIGIN_SET);
+  const carriesIssued = await list();
+
+  expect(deferredOnly.status).toBe(200);
+  expect(carriesIssued).toStrictEqual(deferredOnly);
+});
+
+test('the read door is never opened when the origin is unusable', async () => {
+  // THE ASSERTION THAT MAKES THE PROPERTY STATE-INDEPENDENT RATHER THAN MERELY
+  // UNIFORM TODAY, and it is `certificate-image-source.ts`' recorder assertion
+  // at this port: a check that ran AFTER the read would satisfy "both answers
+  // are 503" and still be an oracle the moment a branch was added below it.
+  // The recorder's call list is the observation, and it is EMPTY.
+  useAuthBackend({
+    ...UNWIRED_AUTH_BACKEND,
+    sessionByToken: (token) => Promise.resolve(token === TOKEN ? SESSION : null),
+  });
+  const { db, calls } = recordingDb({ rows: [accessorRow()] });
+  useCertificateBackend(databaseCertificateBackend(db, {}));
+
+  expect(await list()).toStrictEqual({ status: 503, code: 'service_unavailable' });
+  expect(calls).toStrictEqual([]);
+});
+
+// -----------------------------------------------------------------------------
 // 3. The one artefact the two remaining ports wait on has no column either
 // -----------------------------------------------------------------------------
 
@@ -251,10 +375,10 @@ test('`certificates` carries no image location column, and no migration adds one
 });
 
 // -----------------------------------------------------------------------------
-// 4. The set splits two and one, read off the list rather than restated
+// 4. The set has finished splitting: two wired, one on the door
 // -----------------------------------------------------------------------------
 
-test('one of the three certificate ports is wired, one waits on the origin and the guard, one on the door', () => {
+test('two of the three certificate ports are wired and the third waits on the door', () => {
   const source = readFileSync(WIRING, 'utf8');
   const start = source.indexOf('const BLOCKED');
   const listing = source.slice(start, source.indexOf('\n};', start));
@@ -269,45 +393,36 @@ test('one of the three certificate ports is wired, one waits on the origin and t
     ]),
   );
 
-  // THE SET SPLIT TWO-AND-ONE AND IT NOW SPLITS ONE-ONE-ONE, which is ADR-256
-  // ruling 13 arriving: the two card ports "no longer expire together, they
-  // expire in ORDER", and ADR-261 wired the first of the two. This case is
-  // rewritten rather than deleted, on the rule that a case measuring a shape
-  // the tree has left behind is a case that stops measuring anything.
+  // THE SET SPLIT TWO-AND-ONE, THEN ONE-ONE-ONE, AND NOW TWO-AND-ONE THE OTHER
+  // WAY UP. That is ADR-256 ruling 13 finishing: the two card ports "no longer
+  // expire together, they expire in ORDER", ADR-261 wired the first and ADR-266
+  // the second. This case is rewritten each time rather than deleted, on the
+  // rule that a case measuring a shape the tree has left behind is a case that
+  // stops measuring anything.
   const startSource = readFileSync(join(HERE, '..', 'src', 'start.ts'), 'utf8');
-  expect(startSource).toContain('useCertificateImageSource(databaseCertificateImageSource(');
-  expect(entries.has('useCertificateImageSource')).toBe(false);
+  for (const line of [
+    'useCertificateImageSource(databaseCertificateImageSource(',
+    'useCertificateBackend(databaseCertificateBackend(',
+  ])
+    expect(startSource, `\`${line}\` is not installed in start.ts`).toContain(line);
 
-  const list = 'useCertificateBackend';
-  const door = 'useCertificateRevokeBackend';
-  for (const port of [list, door])
-    expect(entries.has(port), `\`${port}\` is not in the BLOCKED list`).toBe(true);
+  for (const port of ['useCertificateImageSource', 'useCertificateBackend'])
+    expect(entries.has(port), `\`${port}\` is still BLOCKED`).toBe(false);
 
-  // THE LIST PORT NAMES THE TWO THINGS IT WAITS ON AND THE REVOKE PORT NAMES
-  // NEITHER. Neither half is a count: both are named ports, so a fourth
-  // certificate port joining the list fails here rather than passing quietly.
+  // THE THIRD IS NOT ABOUT THE CARD AND THE CARD LANDING DOES NOTHING FOR IT.
+  // Its entry names the resolver and must not start naming an origin: the day it
+  // does, somebody has read the two wirings above as a precedent for a port whose
+  // obstruction is an admin identity nobody in this tree can install.
   //
   // CASE-INSENSITIVE, AND THAT IS NOT A DETAIL. These entries shout their
   // findings in capitals and quote their own sources in lower case, so the same
-  // word appears both ways inside one reason; a case-sensitive draft of this
-  // case failed on `useCertificateBackend` while the word was in the entry
-  // twice. `RI-14`'s first draft made the identical mistake and its header
-  // records it.
-  const ORIGIN = /an origin/i;
-  const GUARD = /guard/i;
-  const RESOLVER = /principal\(request\)/i;
-
-  expect(entries.get(list), `\`${list}\` stopped naming the origin`).toMatch(ORIGIN);
-  // THE GUARD IS THE HALF THAT MATTERS, because the origin alone is a thing a
-  // deployment sets and ADR-226 and ADR-229 permit wiring on that. What keeps
-  // this port shut is that `links`' refusal is decided by the state of the
-  // caller's own rows until something reads the origin BEFORE the rows, and
-  // ADR-261 section 5 rules that check is code rather than configuration. An
-  // entry that stopped naming it would be an entry a reader could close with
-  // one variable.
-  expect(entries.get(list), `\`${list}\` stopped naming the guard`).toMatch(GUARD);
-  expect(entries.get(list), `\`${list}\` started naming the resolver`).not.toMatch(RESOLVER);
-
-  expect(entries.get(door), `\`${door}\` stopped naming the resolver`).toMatch(RESOLVER);
-  expect(entries.get(door), `\`${door}\` started naming the origin`).not.toMatch(ORIGIN);
+  // word appears both ways inside one reason; a case-sensitive draft of the case
+  // this one replaces failed on a word that was in the entry twice. `RI-14`'s
+  // first draft made the identical mistake and its header records it.
+  const door = 'useCertificateRevokeBackend';
+  expect(entries.has(door), `\`${door}\` is not in the BLOCKED list`).toBe(true);
+  expect(entries.get(door), `\`${door}\` stopped naming the resolver`).toMatch(
+    /principal\(request\)/i,
+  );
+  expect(entries.get(door), `\`${door}\` started naming the origin`).not.toMatch(/an origin/i);
 });

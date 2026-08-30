@@ -202,8 +202,10 @@
 //   `class: 'owned'` on `identity_id` in `packages/db/src/scope.ts`, so
 //   `tx.rows('certificates')` is the caller's own rows with `scopePredicate`
 //   already ANDed in, and `databaseCertificateBackend` below is that adapter.
-//   WHAT KEEPS THAT ROW AT 503 IS AN ORIGIN AND A GUARD, NOT THE READ, and
-//   {@link CertificateLinks} carries both (ADR-249, ADR-261).
+//   THIS PARAGRAPH READ THAT THE ROW WAITED ON "AN ORIGIN AND A GUARD, NOT THE
+//   READ", and ADR-266 wrote both: the origin is `CERTIFICATE_ORIGIN_VAR`, named
+//   and valued nowhere, and the guard is that the read arm resolves it BEFORE
+//   the accessor is opened. NOTHING IN THIS FILE REFUSES THIS ROW ANY MORE.
 //
 //   GET /certificates/:code/image.png HAS A DOOR, A PRODUCER, AND SINCE
 //   ADR-261 THE COMPOSITION OF THE TWO. This paragraph read that the row
@@ -222,9 +224,13 @@
 // threshold and a threshold is a thing a deployment supplies; this one's gap was
 // a RENDERER, which ADR-256 supplied, and then a COMPOSITION, which ADR-261
 // supplied. A process that never ran `start.ts` still answers 503 here and says
-// so. THE LIST ROW BESIDE IT IS STILL UNWIRED and {@link CertificateLinks}
-// carries what it waits on: an origin, and a guard that makes its refusal
-// state-independent (ADR-261 section 5).
+// so. THE LIST ROW BESIDE IT IS SERVED THROUGH A PORT `start.ts` NOW INSTALLS
+// TOO (ADR-266). This paragraph read that it "IS STILL UNWIRED"; what it waited
+// on was an origin and a guard that makes its refusal state-independent
+// (ADR-261 section 5), and {@link certificateOrigin} is both. A deployment that
+// has not set the origin answers 503 to EVERY caller of this row alike, which is
+// the same sentence the image row above carries and the reason either can be
+// wired at all.
 // =============================================================================
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -232,6 +238,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ApiDb } from '../db.ts';
 import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
+import { BASE_PATH, type Environment } from '../surface.ts';
 import {
   requiredFactorTable,
   toRoutes,
@@ -338,24 +345,32 @@ export interface CertificateListResponse {
 /**
  * The two public URLs for one code.
  *
- * NEITHER IS BUILT IN THIS FILE, AND ADR-240 SPLITS THE REASON BECAUSE THE TWO
- * HALVES STOPPED BEING THE SAME KIND OF ABSENCE.
+ * BOTH ARE BUILT IN THIS FILE NOW, BY {@link certificateLinks}, AND THE
+ * PARAGRAPH THAT SAID NEITHER WAS IS REWRITTEN RATHER THAN DELETED (`RI-14`).
+ * It read "NEITHER IS BUILT IN THIS FILE, AND ADR-240 SPLITS THE REASON BECAUSE
+ * THE TWO HALVES STOPPED BEING THE SAME KIND OF ABSENCE", and the split has
+ * closed: ADR-249 section 3 ruled the signer out of existence, ADR-256 and
+ * ADR-261 landed and wired the row `image_url` addresses, and what was left of
+ * both halves was one origin and one guard (ADR-261 section 5). ADR-266 is
+ * both.
  *
- * `verify_url` WAITS ON AN ORIGIN AND NOTHING ELSE NOW. This comment read that
- * the path it addresses is "DEFINED BY NO SECTION OF THE CONTRACT" (ADR-168
- * foreclosure 1), and that is no longer true: API_CONTRACT section 6.3 carries
- * a `GET /verify/:code` row, `routes/verify.ts` implements it at `VERIFY_PATH`,
- * and `start.ts` installs `databaseVerifySource` against the public-lookup door
- * (ADR-231). What is left is the ORIGIN, which is a deployment fact ADR-012
- * keeps out of this repository and `apps/admin/src/origin.ts` states the rule
- * for. One named environment variable closes it.
+ * `verify_url` WAITED ON AN ORIGIN AND NOTHING ELSE. This comment read that the
+ * path it addresses is "DEFINED BY NO SECTION OF THE CONTRACT" (ADR-168
+ * foreclosure 1), and that stopped being true at ADR-170: API_CONTRACT section
+ * 6.3 carries a `GET /verify/:code` row, `routes/verify.ts` implements it at
+ * `VERIFY_PATH`, and `start.ts` installs `databaseVerifySource` against the
+ * public-lookup door (ADR-231). The origin is {@link CERTIFICATE_ORIGIN_VAR},
+ * named here and valued nowhere, which is `apps/admin/src/origin.ts`' rule for
+ * `ADMIN_ORIGIN` applied to this deployable's own public surface.
  *
  * `image_url` IS "signed, time-limited" AND IS NOT WAITING ON A SECRET, WHICH
  * IS THE RULING WORTH READING SLOWLY. `routes/account-reads.ts`'
  * `CERTIFICATE_BLOCKER` counted THREE absent things on the `/certificate` row,
- * "the card renderer, the CDN origin and the URL signer", and TWO have moved:
- * ADR-249 ruled there is no signer to place, ADR-256 landed the renderer and
- * ADR-261 wired the row this field addresses, SO WHAT IS LEFT IS THE ORIGIN.
+ * "the card renderer, the CDN origin and the URL signer", and ALL THREE have
+ * moved: ADR-249 ruled there is no signer to place, ADR-256 landed the renderer,
+ * ADR-261 wired the row this field addresses, and ADR-266 names the origin.
+ * THAT ROW IS NOT THIS ONE and is not released by this paragraph:
+ * `GET /accounts/:accountId/certificate` has its own blocker in its own file.
  * `certificates` (`0020_public_surface.sql`) carries `signature` and
  * `signing_key_id` and NO image location column, "not even a value to sign".
  *
@@ -676,6 +691,165 @@ export function currentCertificateBackend(): CertificateBackend {
   return backend;
 }
 
+// -----------------------------------------------------------------------------
+// The origin, and the guard that makes the port's refusal state-independent
+// (ADR-266)
+// -----------------------------------------------------------------------------
+
+/**
+ * The origin both link fields are built on. NAMED HERE AND VALUED NOWHERE (ADR-012).
+ *
+ * THE NAME ADR-240 CLAUSE 10 AND ADR-249 SECTION 5 EACH DECLINED TO TAKE, AND
+ * THE CONDITION THEY DECLINED UNDER HAS LIFTED. Clause 10 held that "a variable
+ * whose only consumer refuses is a name nothing reads" and put the name with
+ * "the slice that has a card to point it at"; ADR-256 landed the renderer and
+ * ADR-261 wired `useCertificateImageSource`, so the row `image_url` addresses
+ * ANSWERS and the sentence that kept this shut, "publishing a link to a trader
+ * is publishing a promise that bytes are there", has expired.
+ *
+ * ONE VARIABLE FOR BOTH FIELDS, which is ADR-249's own wording ("an origin
+ * variable for BOTH link fields") and is a fact about this deployable rather
+ * than a convenience: `GET /verify/:code` and `GET /certificates/:code/image.png`
+ * are two rows of API_CONTRACT section 6.3 and this process serves both, under
+ * one {@link BASE_PATH}, on one origin.
+ *
+ * IT IS NOT `PORTAL_ORIGIN` AND THE REUSE WAS CONSIDERED AND REFUSED.
+ * INFRA section 2.1 puts the `api` service and the `portal` service on the same
+ * host, so the two values will very often be equal; but INFRA section 7 scopes
+ * environment variables PER SERVICE, `apps/admin/src/origin.ts` declares
+ * `PORTAL_ORIGIN` for the admin console's separation check and nothing declares
+ * it for this one, and a name borrowed across a service boundary is this file
+ * asserting a deployment fact no approved document carries. The `MERIT_` prefix
+ * is this deployable's own convention for the variables it defines
+ * (`MERIT_API_SURFACE`, the seven `MERIT_VERIFY_*`, `MERIT_CERTIFICATE_CARD_MAX_AGE_SECONDS`,
+ * `MERIT_ECONOMIC_CALENDAR_HORIZON_TRADING_DAYS`), and this one follows it.
+ */
+export const CERTIFICATE_ORIGIN_VAR = 'MERIT_PUBLIC_ORIGIN';
+
+/**
+ * Raised when the port is installed and its origin is not usable. 503, never 500.
+ *
+ * IT SITS BESIDE {@link CertificateBackendUnwired} AND NOT BESIDE
+ * {@link CertificateRowError}, which is `routes/verify.ts`' two-classes-one-answer
+ * shape and ADR-240 section 4's standing ruling: a deployment nobody finished is
+ * not a defect, and a 500 sends an operator hunting for a bug when what is
+ * missing is a variable.
+ *
+ * AND IT IS RAISED BEFORE THE READ, OR IT IS THE ORACLE ADR-246 CLAUSE 8
+ * REFUSED. `projectCertificate` never calls `links` for a deferred row (ADR-168
+ * foreclosure 4), so a refusal raised where the link is MINTED is a refusal only
+ * a caller whose certificate ISSUED can reach: the trader whose certificates are
+ * all deferred is served 200 and the trader beside them is refused, and the
+ * difference between those two answers is a fact about the caller's own rows.
+ * {@link databaseCertificateBackend} reads the origin in the READ arm, before
+ * the door is opened, so one misconfigured deployment answers 503 to every
+ * caller alike and holds no information about any of them.
+ */
+export class CertificateBackendUnconfigured extends Error {
+  constructor(reason: string) {
+    super(
+      `\`GET /certificates\` is installed and ${CERTIFICATE_ORIGIN_VAR} is not usable, so it ` +
+        'answers 503 for EVERY caller alike rather than for the callers whose certificates ' +
+        `issued: ${reason}`,
+    );
+    this.name = 'CertificateBackendUnconfigured';
+  }
+}
+
+/**
+ * `routes/verify.ts`' `VERIFY_PATH`, written a second time and BOUND BY A TEST.
+ *
+ * IT IS NOT IMPORTED AND THE REASON IS A CYCLE. `routes/verify.ts` imports
+ * `CERTIFICATE_KINDS`, `REVOCATION_CLASSES` and `narrowClaims` from this file at
+ * RUN TIME, so an import back for this constant would be a real module cycle
+ * rather than an erased type edge. TWO SPELLINGS OF ONE PATH IS A DRIFT, so the
+ * two are asserted equal in `test/certificates.test.ts` rather than left to
+ * agree by inspection: the day one moves, a case goes red naming both.
+ */
+const VERIFY_LINK_PATH = '/verify/:code';
+
+/**
+ * The configured origin, refused TOTALLY and read BEFORE any row.
+ *
+ * `apps/admin/src/origin.ts`' `parseOrigin` IS THE SHAPE AND ITS THREE REFUSALS
+ * ARE TAKEN FOR THIS SURFACE'S OWN REASONS rather than inherited:
+ *
+ *   1. ABSENT OR BLANK IS A REFUSAL AND NEVER A DEFAULT. A deployment that has
+ *      not named its own origin has not authorised this route to publish links
+ *      into a trader's share sheet. ADR-226's rule for an absent secret, applied
+ *      to an address.
+ *   2. NOT `https:` IS A REFUSAL. These two fields are pasted by the trader and
+ *      opened by a third party who uses them to check a claim about Merit, and
+ *      `INV-M11-02` makes the row the authority; a cleartext link is one anybody
+ *      on the path can point at their own page. THE COST IS NAMED: a local or
+ *      preview deployment on a cleartext loopback origin is refused here and
+ *      answers 503 on this row. The alternative considered was a scheme
+ *      exception keyed on the hostname, and a rule that admits cleartext for one
+ *      host is a rule that gets widened for the next one.
+ *   3. A PATH, A QUERY OR A FRAGMENT IS A REFUSAL. An origin is a scheme and a
+ *      host, and anything after it would land AHEAD of {@link BASE_PATH} in the
+ *      links below, minting an address this deployable does not serve.
+ *
+ * IT RETURNS `URL.origin` AND NEVER THE RAW STRING, so a trailing slash cannot
+ * reach the concatenation below and produce a double one.
+ */
+export function certificateOrigin(env: Environment): string {
+  const raw = env[CERTIFICATE_ORIGIN_VAR];
+  if (raw === undefined || raw.trim() === '')
+    throw new CertificateBackendUnconfigured(
+      `${CERTIFICATE_ORIGIN_VAR} is not set. It is read at deploy time and deliberately absent ` +
+        'from this repository (ADR-012), so an unset one is a deployment that has not been ' +
+        'configured rather than a default this file may supply',
+    );
+
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    throw new CertificateBackendUnconfigured(`${CERTIFICATE_ORIGIN_VAR} is not a URL`);
+  }
+  if (url.protocol !== 'https:')
+    throw new CertificateBackendUnconfigured(
+      `${CERTIFICATE_ORIGIN_VAR} is not https. Both link fields are pasted into a share sheet ` +
+        'and opened by a third party checking a claim about Merit, and `INV-M11-02` makes the ' +
+        'row the authority; a cleartext link is one anybody on the path can redirect',
+    );
+  if (url.pathname !== '/' || url.search !== '' || url.hash !== '')
+    throw new CertificateBackendUnconfigured(
+      `${CERTIFICATE_ORIGIN_VAR} carries a path, a query or a fragment. An origin is a scheme ` +
+        'and a host, and anything else here lands ahead of the base path and mints an address ' +
+        'this deployable does not serve',
+    );
+  return url.origin;
+}
+
+/**
+ * The two public URLs for one code, on an origin {@link certificateOrigin} has
+ * already accepted.
+ *
+ * IT TAKES THE ORIGIN AND NEVER THE ENVIRONMENT, so there is no path on which
+ * this function is the thing that refuses. That is what makes the guard above a
+ * guard: the refusal happens once, in the arm every caller reaches, and the
+ * minting cannot reintroduce it for the subset of callers who own an issued row.
+ *
+ * `code` IS PERCENT-ENCODED AND THE COLUMN IS WHY. `certificates.code` is `text
+ * NOT NULL` with no length and no alphabet CHECK (ADR-235 section 6.1 leaves
+ * that bound owed), so the mint being the only writer in this tree is a property
+ * of `RI-22` rather than of the database. A code carrying a `/` or a `?` would
+ * otherwise mint a URL addressing a different row, or none.
+ *
+ * BOTH PATHS ARE DERIVED FROM THE ROUTE CONSTANTS THIS FILE ALREADY EXPORTS
+ * rather than written out, so a path that moves moves both the route and the
+ * link it advertises.
+ */
+export function certificateLinks(origin: string, code: string): CertificateLinks {
+  const token = encodeURIComponent(code);
+  return {
+    verify_url: `${origin}${BASE_PATH}${VERIFY_LINK_PATH.replace(':code', token)}`,
+    image_url: `${origin}${BASE_PATH}${CERTIFICATE_IMAGE_PATH.replace(':code', token)}`,
+  };
+}
+
 /**
  * The backend, reading through the accessor.
  *
@@ -686,19 +860,40 @@ export function currentCertificateBackend(): CertificateBackend {
  * become one by accident. `db.firm('certificates')` would not compile:
  * `FirmTableKey` excludes every owned table.
  *
- * THE SIGNER IS A PARAMETER because signing is not this deployable's. See
- * {@link CertificateLinks}.
+ * THE SECOND PARAMETER WAS THE SIGNER AND IT IS NOW THE ENVIRONMENT, AND THE
+ * SENTENCE IT CARRIED IS REWRITTEN RATHER THAN DELETED (`RI-14`'s rule). It read
+ * "THE SIGNER IS A PARAMETER because signing is not this deployable's", which
+ * was true of a card ADR-240 placed with an object store; ADR-249 section 3
+ * ruled there is no URL signer to place AT ALL, so what the parameter supplied
+ * stopped being a capability and became an ADDRESS. An address is configuration,
+ * and configuration is read from the environment here exactly as
+ * `src/certificate-image-source.ts` reads the copy and the lifetime.
+ *
+ * THE TWO ARMS CANNOT BE INSTALLED SEPARATELY, WHICH IS THE POINT OF THE CHANGE.
+ * The half-wiring ADR-246 clause 8 refused was a live read beside a refusing
+ * `links`; this factory has no shape that produces one, because both arms resolve
+ * the same origin out of the same environment.
+ *
+ * THE ORIGIN IS READ IN THE READ ARM, BEFORE THE DOOR IS OPENED, and it is read
+ * AGAIN in the mint. Both readings are the same pure function of the same
+ * environment, so the second cannot refuse what the first accepted; it runs
+ * because a check that runs twice is cheaper than the oracle, which is
+ * `readCertificateImageConfig`'s own stated discipline at the port one row over.
  */
 export function databaseCertificateBackend(
   db: ApiDb,
-  links: (code: string) => CertificateLinks,
+  env: Environment = process.env,
 ): CertificateBackend {
   return {
-    readCertificates: (session) =>
-      db.scoped(session.identityId, async (tx) =>
+    readCertificates: (session) => {
+      // BEFORE THE DOOR IS OPENED. A configuration refusal raised after the read
+      // is a refusal the caller's own rows decided.
+      certificateOrigin(env);
+      return db.scoped(session.identityId, async (tx) =>
         (await tx.rows('certificates')).map(toCertificateRow),
-      ),
-    links,
+      );
+    },
+    links: (code) => certificateLinks(certificateOrigin(env), code),
   };
 }
 
@@ -1267,19 +1462,35 @@ export const CERTIFICATE_LIST_ENDPOINTS: readonly EndpointSpec[] = [
       // deployment nobody finished, not a defect, and a 500 sends an operator
       // hunting for a bug when what is missing is a line in `start.ts`.
       //
-      // THIS DOES NOT MAKE A HALF-WIRING SAFE AND IS NOT WHY IT IS HERE.
+      // TWO CLASSES, ONE ANSWER, WHICH IS `routes/verify.ts`' SHAPE AND
+      // `unwiredOrThrow`'s below: a port nobody installed and a port nobody
+      // configured are the same deployment fact seen twice.
+      // `CertificateRowError` is deliberately NOT here; those are defects and a
+      // defect is a 500.
+      //
+      // AND THE STATUS CODE WAS NEVER WHAT KEPT THIS PORT OUT OF `start.ts`.
       // `projectCertificate` never calls `links` for a deferred row, so a
       // backend with a live read and a refusing signer answers 200 to one
       // trader and refuses the next on the state of their own rows.
-      // `certificate-ports.test.ts` executes that, and it is the reason this
-      // port stays out of `start.ts` rather than the status code.
+      // `certificate-ports.test.ts` executes that and still does. What changed
+      // is that `databaseCertificateBackend` can no longer BE that backend:
+      // it reads the origin in the read arm, before the door is opened, so a
+      // misconfigured deployment refuses every caller alike (ADR-266).
+      //
+      // ONE CAPTURE, TWO ARMS. `wired` is read once, so a `useCertificateBackend`
+      // call landing between the read and the render cannot split the two arms
+      // across two backends.
       const wired = backend;
       try {
         const rows = await wired.readCertificates(session);
         return renderCertificates(rows, query.value, (code) => wired.links(code));
       } catch (err) {
-        if (!(err instanceof CertificateBackendUnwired)) throw err;
-        request.log.error({ err }, 'certificate backend is not wired');
+        if (
+          !(err instanceof CertificateBackendUnwired) &&
+          !(err instanceof CertificateBackendUnconfigured)
+        )
+          throw err;
+        request.log.error({ err }, 'certificate backend is not wired or not configured');
         return reply
           .code(503)
           .type(PROBLEM_MEDIA_TYPE)

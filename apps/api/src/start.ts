@@ -63,7 +63,11 @@ import { databaseAccountReads, useAccountReadsBackend } from './routes/account-r
 import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.ts';
 import { useAuthBackend } from './routes/auth.ts';
 import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
-import { useCertificateImageSource } from './routes/certificates.ts';
+import {
+  databaseCertificateBackend,
+  useCertificateBackend,
+  useCertificateImageSource,
+} from './routes/certificates.ts';
 import { databaseEconomicCalendar, setEconomicCalendarSource } from './routes/economic-calendar.ts';
 import { databaseMethodDefinitions, setMethodDefinitionSource } from './routes/public-methods.ts';
 import { databaseVerifySource, useVerifySource } from './routes/verify.ts';
@@ -206,5 +210,42 @@ useVerifySource(databaseVerifySource(LIVE_DB));
 // IT. `useCertificateBackend` waits on an origin AND on a guard that makes
 // `links`' refusal state-independent, and the second is code (ADR-261 section 5).
 useCertificateImageSource(databaseCertificateImageSource(LIVE_DB));
+
+// `GET /certificates`, over the SCOPED door. ADR-266.
+//
+// IT IS THE SECOND OF TWO AND THE ORDER IS A RULING RATHER THAN A LAYOUT.
+// ADR-246 read the two card ports as ONE deliverable that would "expire together
+// or not at all"; ADR-256 ruling 13 narrowed that to expire in ORDER, with this
+// row DOWNSTREAM of the image row above. The sentence that kept this line out of
+// this file for four entries was "publishing a link to a trader is publishing a
+// promise that bytes are there", and the line above is what discharges it. Wired
+// the other way round, this row would have published the promise first.
+//
+// THE READ WAS NEVER BLOCKED AND THE GUARD WAS. `certificates` is `class:
+// 'owned'` on `identity_id`, so `db.scoped` has served this arm since the route
+// landed. What refused was ADR-246 clause 8: `projectCertificate` never calls
+// `links` for a deferred row (ADR-168 foreclosure 4), so a live read beside a
+// refusing signer answers 200 to a trader whose certificates are all deferred
+// and 503 to the trader beside them whose certificate issued, and THAT IS A
+// RESPONSE DECIDED BY THE STATE OF THE CALLER'S OWN ROWS. ADR-261 section 5
+// ruled the remedy is code rather than configuration and left it unwritten.
+//
+// SO THE ORIGIN IS READ IN THE READ ARM, BEFORE THE ACCESSOR IS OPENED, which
+// is the line above's own timing control at a port with two arms instead of one.
+// A deployment that has not set `MERIT_PUBLIC_ORIGIN` answers 503 to every
+// caller of this row identically and the scoped door is never opened, asserted
+// on the recorder's call list being EMPTY rather than on the status codes.
+// ADR-012 keeps the value out of this repository, and ADR-249 section 3 is why
+// there is no key beside it: the card carries no signature at all.
+//
+// AND THE COST THIS LINE ADDS TO THE ONE ABOVE, NAMED WHERE IT IS PAID. The
+// image row is a PNG encode on an unauthenticated path with no rate limit and no
+// cache; this row is what puts its address in front of every trader who opens
+// their certificates page, so the traffic ADR-261's founder block accepted in
+// principle is the traffic this line invites. `INV-M11-05`'s limit per IP and
+// per ASN still EXISTS NOWHERE IN THIS TREE and `FM-M11-05`'s cache is still
+// owed. ADR-266 ships UNSIGNED and this is the sentence a founder is asked to
+// read beside the one above it.
+useCertificateBackend(databaseCertificateBackend(LIVE_DB));
 
 await main();

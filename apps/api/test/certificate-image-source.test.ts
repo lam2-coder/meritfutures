@@ -539,13 +539,24 @@ test('the composition did not make the renderer depend on this deployable', () =
   expect(composition).toContain('./routes/certificates.ts');
 });
 
-test('`start.ts` installs the composition and does NOT install the list backend', () => {
-  // THE PORT THIS ROW WIRES AND THE PORT IT DOES NOT, read off the wiring slice
-  // itself rather than asserted in prose. `useCertificateBackend` waits on an
-  // origin AND on a guard that makes `links`' refusal state-independent, and
-  // ADR-261 section 5 rules the second is code rather than something a
-  // deployment sets.
+test('a deployment that publishes `image_url` also installs the row it addresses', () => {
+  // THIS CASE READ "`start.ts` INSTALLS THE COMPOSITION AND DOES NOT INSTALL THE
+  // LIST BACKEND", and it is rewritten rather than deleted (`RI-14`). It was
+  // ADR-261's, it was true, and ADR-266 falsified it by writing the guard that
+  // entry's section 5 named: the list port waited on an origin AND on a check
+  // that reads it before the caller's rows, and only the second was code.
+  //
+  // WHAT SURVIVES IS THE PAIR, AND IT IS THE STRONGER CLAIM. `image_url` is
+  // `origin` plus the path THIS deployable serves (ADR-249 section 2.4), so a
+  // process that installs the list backend without the image source publishes a
+  // link, to every trader with an issued certificate, addressing a row of its own
+  // that answers 503. "Publishing a link to a trader is publishing a promise that
+  // bytes are there" is the sentence that kept the list port shut for four
+  // entries, and this is that sentence as an assertion rather than as prose.
   const start = readFileSync(join(SRC, 'start.ts'), 'utf8');
-  expect(start).toContain('useCertificateImageSource(databaseCertificateImageSource(LIVE_DB));');
-  expect(start).not.toContain('useCertificateBackend(');
+  const bytes = 'useCertificateImageSource(databaseCertificateImageSource(LIVE_DB));';
+  const promise = 'useCertificateBackend(databaseCertificateBackend(LIVE_DB));';
+  if (start.includes(promise))
+    expect(start, 'the list backend is installed and the image source is not').toContain(bytes);
+  expect(start).toContain(bytes);
 });
