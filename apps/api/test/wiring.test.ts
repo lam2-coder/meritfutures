@@ -759,11 +759,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'than a measurement of an absence. `test/certificate-ports.test.ts` executes the column set ' +
     'and the sweep, so the day either moves this entry goes red. ' +
     'SO THIS PORT WAITS ON THE ENDPOINT ITS OWN FIELD WOULD ADDRESS, and on an origin. Publishing ' +
-    'a link to a trader is publishing a promise that bytes are there, and until ' +
-    '`useCertificateImageSource` has a renderer the address would resolve to a 503. ADR-240 ' +
-    'clause 10 still declines to name the origin variable, for a ground ADR-249 CHANGED rather ' +
-    'than repeated: it is no longer that the sibling field can never be built, it is that the ' +
-    'row it addresses does not answer yet. ' +
+    'a link to a trader is publishing a promise that bytes are there, and the row that would ' +
+    'answer is still unwired. ADR-256 LANDED THE RENDERER AND THIS CLAUSE SURVIVES ONE STEP ' +
+    'NARROWER RATHER THAN EXPIRING: it read "until `useCertificateImageSource` has a renderer the ' +
+    'address would resolve to a 503", `renderCertificateCard` (`src/certificate-card.ts`) draws ' +
+    'one now, and what still answers 503 is the PORT, because nothing composes the read, the ' +
+    'append and the render into a `CertificateImageSource`. ADR-240 clause 10 still declines to ' +
+    'name the origin variable, on a ground ADR-249 changed and ADR-256 did not: it is not that ' +
+    'the sibling field can never be built, it is that the row it addresses does not answer yet. ' +
     'AND THE HALF-WIRING IS REFUSED ON A SECOND GROUND THAT IS NOT A MISSING PIECE AT ALL: ' +
     '`projectCertificate` never calls `links` for a deferred row (ADR-168 foreclosure 4), so a ' +
     'backend with a live read and a refusing signer answers 200 to a trader whose certificates ' +
@@ -784,17 +787,20 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'constructible: `record` writes `certificate_verifications`, scope class `firm`, exactly as ' +
     '`databaseVerifySource` does. WHAT BLOCKS THIS ROW IS THAT ITS ANSWER IS NOT A ROW, IT IS ' +
     'BYTES. `CertificateLookup.card` carries `image/png` bytes ' +
-    "(`routes/certificates.ts:958`, reached at `:976`) and this file's own header says the " +
-    'renderer "is not ' +
-    'in this repository" (`routes/certificates.ts:44`). An adapter written here would have to ' +
-    'invent a card, and a public endpoint serving an invented card is a worse failure than a ' +
-    "503: it puts Merit's name on an artefact Merit did not render. " +
+    "(`routes/certificates.ts:958`, reached at `:976`) and this file's own header said the " +
+    'renderer "is not in this repository". THAT SENTENCE IS FALSE SINCE ADR-256 AND IS REPOINTED ' +
+    'RATHER THAN LEFT CITING A LINE THAT NOW SAYS THE OPPOSITE: `routes/certificates.ts:44` reads ' +
+    '"it is in the renderer `src/certificate-card.ts`, which ADR-256 landed". An adapter written ' +
+    'before that landed would have had to INVENT a card, and a public endpoint serving an ' +
+    "invented card is a worse failure than a 503: it puts Merit's name on an artefact Merit did " +
+    'not render. ' +
     "ADR-240 MEASURED THE MISSING RENDERER RATHER THAN RESTATING IT, on ADR-235's rule that an " +
-    'absent producer reads as a satisfied specification: over every directory in this ' +
-    'repository holding shipped source, `CertificateCard` is named in ONE file and that file is ' +
-    "the port's own declaration, and the string `image/png` appears in ONE file too. " +
-    '`test/certificate-links.test.ts` executes both counts, so the day a renderer lands this ' +
-    'entry goes red rather than waiting to be noticed. ' +
+    'absent producer reads as a satisfied specification: over every directory in this repository ' +
+    'holding shipped source, `CertificateCard` was named in ONE file and that file was the ' +
+    "port's own declaration, and the string `image/png` appeared in ONE file too. " +
+    'THOSE TWO CASES WENT RED ON ADR-256 AND THE MEASUREMENT NOW READS TWO, which is the control ' +
+    'working rather than a count drifting: `test/certificate-links.test.ts` executes them and ' +
+    'the second file is `src/certificate-card.ts`, the renderer. ' +
     'AND ONE HALF OF THE CARD IS CONFIGURATION WHILE THE OTHER IS NOT, which is why naming a ' +
     'variable does not close this port either: `cache_max_age_seconds` is "config rather than a ' +
     'number stated here" (API_CONTRACT section 6.3), so a deployment supplies it, and the BYTES ' +
@@ -804,7 +810,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ADR-246 ADDED THE SET READING: the bytes this port owes and the `image_url` ' +
     '`useCertificateBackend` owes are ONE deliverable, so the two entries expire together or ' +
     'not at all, and a session dispatched at either is dispatched at the card. ' +
-    'AND ADR-249 RULED WHERE THAT CARD COMES FROM, WHICH LEAVES THIS ENTRY WAITING ON A ' +
+    'AND ADR-249 RULED WHERE THAT CARD COMES FROM, WHICH LEFT THIS ENTRY WAITING ON A ' +
     'RENDERER AND ON NOTHING ELSE. It is rendered ON FETCH, from the live row, by whatever ' +
     "answers this deployable's own image row, and it is stored NOWHERE DURABLE: `INV-M11-08` " +
     'says a rendered image "is re-generated on fetch from the live row" and is "never a static ' +
@@ -813,8 +819,23 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'already a column of `certificates`, so the renderer this port waits on needs NO MIGRATION, ' +
     "and `FM-M11-05`'s cache key `(code, row_version)` names a column that does not exist and " +
     'that ADR-249 rules DERIVED rather than stored. Both halves are executed in ' +
-    '`test/certificate-card-home.test.ts`. THE RENDERER IS STILL ABSENT AND THAT IS THE WHOLE ' +
-    'OF WHAT REFUSES HERE.',
+    '`test/certificate-card-home.test.ts`. ' +
+    'THE RENDERER IS NO LONGER ABSENT AND THIS ENTRY IS NARROWED TO WHAT IS. ADR-256 landed ' +
+    '`renderCertificateCard` (`src/certificate-card.ts`), a pure function from the row and the ' +
+    "deployment's copy to `image/png` bytes plus `FM-M11-05`'s derived version, and " +
+    '`test/certificate-card.test.ts` runs a revoked card through this very route end to end at ' +
+    '200. WHAT REFUSES NOW IS AN ADAPTER AND ONE UNNAMED NUMBER, WHICH IS NOT THE SHAPE ADR-226 ' +
+    'AND ADR-229 WIRED EITHER. Nothing in this tree composes `db.publicLookup` for the row, ' +
+    '`db.firm` for the `certificate_verifications` append and the render into one ' +
+    '`CertificateImageSource`; `databaseVerifySource` performs both database arms for a ' +
+    'DIFFERENT projection and is not that composition. And `cache_max_age_seconds` is "config ' +
+    'rather than a number stated here" (API_CONTRACT section 6.3) and has no variable name yet, ' +
+    "while the card's COPY needs none because `routes/verify.ts` already names all six " +
+    '(`VERIFY_PRESENTATION_VARS`, `VERIFY_DISCLOSURE_VAR`) and the renderer takes them as an ' +
+    'argument rather than reading an environment of its own. AN ADAPTER IS CODE AND NOT ' +
+    'SOMETHING A DEPLOYMENT SUPPLIES, so this port is one SLICE from wireable rather than one ' +
+    'VARIABLE from wired, and ADR-256 says that in its own words rather than wiring it on the ' +
+    'way past.',
   useCertificateRevokeBackend:
     'READ BY ADR-246 AS THE THIRD OF THE THREE CERTIFICATE PORTS AND LEFT EXACTLY WHERE IT ' +
     'STOOD: it is the one of the three that is NOT about the card, so the card landing does ' +

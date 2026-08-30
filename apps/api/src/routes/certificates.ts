@@ -40,8 +40,8 @@
 //
 // ONE OF THEM CANNOT SURVIVE, AND IT IS THE ONE THAT MATTERS MOST HERE. The
 // response-shape allowlist is a projection function over named fields, and
-// nothing chooses fields inside a PNG. So on this row the disclosure boundary
-// is NOT in this file: it is in the renderer, which is not in this repository.
+// nothing chooses fields inside a PNG. So the disclosure boundary is NOT here:
+// it is in the renderer `src/certificate-card.ts`, which ADR-256 landed.
 // What this file can hold, and does, is the boundary either side of the bytes:
 // which rows render at all, what the headers carry, and that the body is
 // exactly the bytes it was handed and not one byte more. `certificates.test.ts`
@@ -211,20 +211,20 @@
 //   `publicLookup(fn)`, which reads `certificates` by `code` for a caller who
 //   will never be anybody, and `databaseVerifySource` in `routes/verify.ts`
 //   already reads that row and writes `certificate_verifications` through
-//   `db.firm`, which is both of this port's database arms. WHAT REFUSES NOW IS
-//   THAT THE ANSWER IS BYTES: `CertificateCard.bytes` is a rendered PNG, this
-//   file's own header says the renderer "is not in this repository", and
-//   `test/certificate-links.test.ts` measures that rather than restating it --
-//   `CertificateCard` is named in ONE file in this repository and it is this
-//   one.
+//   `db.firm`, which is both of this port's database arms. WHAT REFUSED WAS
+//   THAT THE ANSWER IS BYTES, AND ADR-256 LANDED THE PRODUCER:
+//   `renderCertificateCard` draws one from the row and the deployment's copy,
+//   and `test/certificate-links.test.ts` counts TWO files naming
+//   `CertificateCard` where it counted ONE. WHAT REFUSES NOW IS AN ADAPTER
+//   COMPOSING THE TWO DATABASE ARMS WITH THE RENDER, AND ONE UNNAMED NUMBER.
 //
 // So the image row is served through a PORT and the port is UNWIRED, which is
 // `routes/public-methods.ts`' shape and its stated reason: an unset source is a
 // deployment that has not been finished, and it is answered loudly rather than
 // guessed at. `routes/economic-calendar.ts` STOOD BESIDE IT HERE AND NO LONGER
 // DOES: ADR-240 wired it, because its remaining gap was a configured threshold
-// and a threshold is a thing a deployment supplies. This one's is a renderer,
-// and no deployment supplies a renderer by setting a variable.
+// and a threshold is a thing a deployment supplies. THIS ONE'S WAS A RENDERER,
+// which ADR-256 supplied; what is left is the adapter named above.
 // =============================================================================
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -351,13 +351,13 @@ export interface CertificateListResponse {
  * for. One named environment variable closes it.
  *
  * `image_url` IS "signed, time-limited" AND IS NOT WAITING ON A SECRET, WHICH
- * IS THE RULING WORTH READING SLOWLY. Three things are missing and only one of
- * them is configuration; `routes/account-reads.ts`' `CERTIFICATE_BLOCKER`
- * reached the same finding independently on the `/certificate` row: "the card
- * renderer, the CDN origin and the URL signer are all M11 and none exists", and
- * `certificates` (`0020_public_surface.sql`) carries `signature` and
- * `signing_key_id` and NO image location column, "so there is not even a stored
- * value to sign".
+ * IS THE RULING WORTH READING SLOWLY. `routes/account-reads.ts`'
+ * `CERTIFICATE_BLOCKER` counted THREE absent things independently on the
+ * `/certificate` row, "the card renderer, the CDN origin and the URL signer",
+ * and TWO have since moved: ADR-249 ruled there is no URL signer to place and
+ * ADR-256 landed the renderer, so what is left is the ORIGIN. `certificates`
+ * (`0020_public_surface.sql`) carries `signature` and `signing_key_id` and NO
+ * image location column, "so there is not even a stored value to sign".
  *
  * AND THE SIGNATURE COULD NOT ADDRESS THIS FILE'S OWN IMAGE ROW EVEN IF A KEY
  * EXISTED. API_CONTRACT section 6.3 states of `GET /certificates/:code/image.png`:
