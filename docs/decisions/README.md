@@ -298,6 +298,8 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-282](ADR-282.md) | a generated line is never written twice, and the fence had to reach the generator before the check could say so  (2026-08-30, status: proposed) |
 | [ADR-283](ADR-283.md) | the decode ADR-233 did not give the payout transaction, and the validation that lives at PUBLISH cannot be re-run at READ because it takes the value the read is trying to build  (2026-08-30, status: proposed) |
 | [ADR-284](ADR-284.md) | the cap's missing row is a missing WRITER, the writer is an operator act on a config number, and so the control lands before the row does  (2026-08-30, status: proposed) |
+| [ADR-285](ADR-285.md) | a 500 on the door where money leaves the firm, and the honest arm is a refusal rather than a state  (2026-08-30, status: proposed) |
+| [ADR-286](ADR-286.md) | the two spellings are the dependency graph rather than a preference, so no caller renames and what the size row waits on is a HOME; and the one FM-16 in this area is the cap schedule, which has three statements and has already diverged on the money  (2026-08-30, status: proposed) |
 | [ADR-287](ADR-287.md) | the whole purchase, enumerated. `PayoutTx` declares four methods, one is buildable today, two wait on rulings nobody has made, and one of those waits on counsel  (2026-08-30, status: proposed) |
 <!--/gen-->
 
