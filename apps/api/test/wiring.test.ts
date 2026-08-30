@@ -200,12 +200,37 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'deployment can install". SO THIS PORT REDUCES TO `setAdminSessionSource` TOO, one step ' +
     'further along than the four `principal(request)` backends do, and the SSO purchase blocks ' +
     'SIX entries in this list rather than the four ADR-171 counted. ' +
-    'THE ONE THING HERE THAT IS NOT BEHIND THAT PURCHASE IS `readLiability`, which is UNBUILT ' +
-    'rather than blocked: its book reader, its seven-day horizon and its payout-velocity ' +
-    'evaluator all exist and nothing folds them into one body, and the figure holding that fold ' +
-    'is `eligible_next_7d`, whose last term is a `writeRuleState` implementation under ' +
-    '`apps/worker/**` or `packages/**`. `test/admin-read-constructibility.test.ts` holds every ' +
-    'count in this entry and derives each from source.',
+    'THE ONE THING HERE THAT IS NOT BEHIND THAT PURCHASE IS `readLiability`, WHICH IS STILL ' +
+    'UNBUILT AND IS NOW BLOCKED ONE LAYER LOWER (ADR-269). This entry read that the figure ' +
+    'holding the fold "is `eligible_next_7d`, whose last term is a `writeRuleState` ' +
+    'implementation under `apps/worker/**` or `packages/**`". THAT CLAUSE IS FALSE AND IT IS ' +
+    'FALSE BY MEASUREMENT: `writeRuleStateVia` is that implementation ' +
+    '(`apps/worker/src/batch/state-writer.ts`), `postgresBatchPorts` composes it on ADR-250`s ' +
+    'codec, `runNightlyBatch` calls it, and ADR-264 section 2 ran the batch against PostgreSQL ' +
+    'and watched `rule_states` go from zero rows to one. All THREE terms of `liability.ts`s ' +
+    '`B5` are spent -- ADR-206 cleared term 2 and ADR-208 term 3 -- AND THE FIGURE IS STILL ' +
+    'NOT ON THE WIRE, which is a blocker that was stated one layer too high rather than a term ' +
+    'left over. ' +
+    'THE FOLD IS BUILT NOW. `src/admin-source/eligible-next-7d.ts` is the body those four ' +
+    'readers never had: it reads the funded population, takes each account`s folded state ' +
+    'through `ruleStateOn` (ADR-264), resolves the five R-41 vetoes through ' +
+    '`resolveExternalGates`, and calls the engine`s `projectPayout` over the horizon and slice ' +
+    '`liability.ts` already produced. ONE OF `PayoutProjectionInput`s FIVE INPUTS REFUSES AND ' +
+    'IT IS `plan`: `plan_versions.rules` decodes into `PlanRulesJson` in exactly one place in ' +
+    'this repository, `toPublishedRules` in `apps/worker/src/batch/adapter.ts`, `apps/api` ' +
+    'cannot import it, and a second decoder of the blob that fixes every cents value a payout ' +
+    'is decided against is FM-16 on the money path. ADR-239 slice A rules the shared home is ' +
+    '`packages/rules-engine`; until that move lands the term is `EligibleFoldIo.resolvePinnedPlan`, ' +
+    'injected, whose unwired default throws `EligibleFoldUnwired` by name. ' +
+    'SO `readLiability` IS STILL NOT COMPOSED, AND COMPOSING IT WOULD BE A LIVE-LOOKING FIGURE ' +
+    'IN FRONT OF AN ARM THAT CANNOT ANSWER (`usePayoutBackend`s rule). ' +
+    'AND THE FIGURE IS A FORECAST RATHER THAN A MEASUREMENT, WHICH THE WIRE TYPE CANNOT SAY: ' +
+    '`EligibleNext7d` declares `total_cents`, `account_count` and `by_day[]` and NOT ONE ' +
+    'MEASURED TERM, so there is no field a basis could ride on. The fold carries the basis on ' +
+    'its own value instead (`ELIGIBLE_FIGURE_TERMS`), an empty `rule_states` is a REFUSAL ' +
+    'rather than a zero liability, and `test/admin-source-eligible-next-7d.test.ts` derives ' +
+    'both from the figure. `test/admin-read-constructibility.test.ts` holds every count in ' +
+    'this entry and derives each from source.',
   setAdminSessionSource:
     'THE ADMIN IDENTITY PROVIDER, AND IT IS NOW THE ONLY THING LEFT (ADR-237). This entry read ' +
     '"NO DOOR ONTO THIS DATABASE COULD EVER SERVE IT" over two reasons, and ONE OF THE TWO IS ' +
@@ -889,8 +914,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'list, so the queue half alone cannot render either. ' +
     '`readReconStatus` IS A DATABASE READ AND THE ENTRY WAS RIGHT ABOUT IT FOR THE WRONG REASON. ' +
     '`apps/worker/src/recon/sweep.ts` writes the rows, every field maps to a column of ' +
-    '`0014_marks.sql`, and the exact filter is ALREADY WRITTEN in this deployable at ' +
-    '`admin-source/liability.ts:1193`. What refuses it is THE DOOR: `reconciliations` is scope ' +
+    '`0014_marks.sql`, and the exact filter is ALREADY WRITTEN in this deployable, inside ' +
+    "`readLiabilityBook` as its `rowsWhere('reconciliations', { status: 'mismatch' })` read " +
+    '(`admin-source/liability.ts`). THE POINTER IS A NAME RATHER THAN A NUMBER, on ADR-212, ' +
+    'because this citation has now been broken twice by lines inserted above it. ' +
+    'What refuses it is THE DOOR: `reconciliations` is scope ' +
     'class `derived` (`packages/db/src/scope.ts:1406`), so `firm` refuses the key AT COMPILE ' +
     'TIME and `scoped` has no identity on this surface, and ADR-171 clause 1 refuses the ' +
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +

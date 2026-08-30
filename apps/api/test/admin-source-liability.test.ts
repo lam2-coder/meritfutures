@@ -717,18 +717,29 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   //      move produces two MORE type errors, in `apps/admin`, which no entry
   //      had measured because no entry had made the move `RI-18` forces.
   //
-  // CLEARING CONDITION, ALL THREE TERMS: a `writeRuleState` IMPLEMENTATION
-  // lands, AND a primary source declares the stored `engine_gates` ENCODING, AND
-  // `eligible_next_7d` gains its `| null`. Any one alone leaves this group
-  // unproducible, and the group goes whole or not at all (EC-074).
+  // **ALL THREE OF THOSE TERMS ARE NOW SPENT AND THE FIGURE IS STILL NOT
+  // PRODUCED (ADR-269).** Term 1 was the last of them: session 395 wrote the
+  // implementation and ADR-264 section 2 ran the nightly batch against
+  // PostgreSQL and watched the table go from zero rows to one. The assertions
+  // below are kept and are POSITIVE on all three, because a spent term deleted
+  // leaves nothing for the next reader to check (RI-14), and the last two
+  // assert the condition that replaces them.
   //
-  // **TERMS 2 AND 3 ARE CLEARED, BY `ADR-206` AND `ADR-208`, AND TERM 1 HOLDS
-  // THE GROUP ALONE.** Both assertions below are now POSITIVE ones on their
-  // terms rather than the absences they used to be, so this case still carries
-  // all three and a reader cannot mistake a one-term condition for the whole of
-  // it. `readLiability` stays uncomposed for a seventh session, and the reason
-  // is now a single missing adapter rather than three open questions.
-  it('CLEARING CONDITION: a rule_states WRITER, a declared engine_gates ENCODING, and the `| null`', () => {
+  // **A CONDITION WHOSE EVERY TERM IS SPENT WHILE ITS FIGURE STAYS ABSENT WAS
+  // STATED ONE LAYER TOO HIGH**, which is this blocker's own finding rather
+  // than a surprise: all three were about getting a ROW, and none named what
+  // stands between a row and a rendered number. The module states the
+  // replacement once and this case restates it.
+  //
+  // CLEARING CONDITION, ALL TWO TERMS: a `PlanRulesJson` decoder this fence can
+  // reach, which today is `toPublishedRules` in
+  // `apps/worker/src/batch/adapter.ts` and becomes reachable only once
+  // `ADR-239` slice A moves it beside `gates-codec.ts` in
+  // `packages/rules-engine`, AND a wire that can say the figure is a forecast,
+  // which `EligibleNext7d` cannot because `total_cents`, `account_count` and
+  // `by_day` are the whole of its declaration. Either one alone leaves this
+  // group unproducible, and the group goes whole or not at all (EC-074).
+  it('CLEARING CONDITION: a PlanRulesJson decoder this fence can reach, and a wire that says forecast', () => {
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
     );
@@ -789,6 +800,32 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(readFileSync(join(ROOT, 'docs/decisions/ADR-208.md'), 'utf8')).toContain(
       'GET /admin/eligible-forecast',
     );
+    // TERM 1 OF THE CONDITION THAT REPLACES THEM. The single decoder is in the
+    // worker; this deployable declares none, and the port that stands in for it
+    // refuses by name. BOTH HALVES ARE ASSERTED, because a case that only read
+    // the worker would pass on a tree where `apps/api` had quietly grown a
+    // second decoder, which is the FM-16 the port exists to refuse.
+    expect(readFileSync(join(ROOT, 'apps/worker/src/batch/adapter.ts'), 'utf8')).toContain(
+      'function toPublishedRules(',
+    );
+    const foldModule = readFileSync(
+      join(ROOT, 'apps/api/src/admin-source/eligible-next-7d.ts'),
+      'utf8',
+    );
+    expect(foldModule).toContain('resolvePinnedPlan(planVersionId: string, sizeCents: Cents)');
+    expect(foldModule).not.toContain('schema_version');
+
+    // TERM 2. `EligibleNext7d` declares three members and not one of them is a
+    // measurement, so ADR-204 ruling 7's "both halves wherever it is shown"
+    // has no field to ride on. READ AT THE CONTRACT AND NOT AT THE TYPE, so a
+    // widening lands here first.
+    const apiContract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
+    const figure = apiContract.split('\n').filter((line) => /^ {2}eligible_next_7d:/.test(line))[0];
+    expect(figure).toContain('total_cents');
+    expect(figure).toContain('account_count');
+    for (const measured of ['assumptions', 'caveat', 'population', 'basis'])
+      expect(figure).not.toContain(measured);
+
     // AND THE METHOD IS STILL NOT COMPOSED, which is what the two above decide.
     expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');
   });

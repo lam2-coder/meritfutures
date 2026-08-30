@@ -200,7 +200,19 @@ test('ApiDb declares no operator door, so no deployment can construct the backen
 // 4. `readLiability`'s own blocker, which is NOT the purchase
 // -----------------------------------------------------------------------------
 
-test('readLiability has its parts and not its assembly, and the term that holds it is writeRuleState', () => {
+// **THIS CASE PROMISED A RED IT COULD NOT DELIVER AND `ADR-269` IS WHERE THAT
+// WAS FOUND.** It read "the day a real implementation lands, this case goes red
+// and says which figure it unblocks", and asserted `expect(liability).toContain
+// ('writeRuleState')` -- a string in a COMMENT of the module it was reading.
+// `writeRuleStateVia` landed in session 395 and this case stayed green, because
+// what it measured was the blocker's own prose and never the tree. A case that
+// pins a sentence about a term instead of the term is the shape RI-15 and RI-16
+// exist for, one level up: the citation is to a claim rather than to a line.
+//
+// So both halves are read at their own sources now: the RETIRED term over the
+// scope the blocker named, POSITIVELY, and the LIVE term over the two files that
+// hold it.
+test('readLiability has its parts and now its fold, and the term that holds it is the plan decoder', () => {
   // THE THREE PARTS EXIST. This is the half of ADR-236 that says the remaining
   // read shape is UNBUILT rather than blocked by anything a founder must buy.
   const liability = read('src', 'admin-source', 'liability.ts');
@@ -209,22 +221,39 @@ test('readLiability has its parts and not its assembly, and the term that holds 
   expect(liability).toContain('export async function readTradingHorizon(');
   expect(velocity).toContain('export async function evaluatePayoutVelocity(');
 
-  // AND THE ASSEMBLY DOES NOT. `LiabilityBook` is `LiabilityResponse` minus
-  // `eligible_next_7d`, written as a subtraction so the widening is a type error
-  // on the day the blocker lifts. Nothing folds the book and the horizon into one
-  // body, which is why `readLiability` is the one name missing from case 1.
+  // **AND THE BODY THAT FOLDS THEM EXISTS NOW**, which is the sentence this
+  // case carried for eight sessions and can no longer carry: "nothing folds
+  // them into one body".
+  const fold = read('src', 'admin-source', 'eligible-next-7d.ts');
+  expect(fold).toContain('export async function readEligibleNext7d(');
+
+  // THE ASSEMBLY IS STILL NOT COMPOSED ALL THE SAME. `LiabilityBook` is
+  // `LiabilityResponse` minus `eligible_next_7d`, written as a subtraction so
+  // the widening is a type error on the day the blocker lifts, and
+  // `readLiability` is still the one name missing from case 1.
   expect(liability).toContain("Omit<LiabilityResponse, 'eligible_next_7d'>");
   expect(producedReads()).not.toContain('readLiability');
 
-  // THE TERM THAT HOLDS IT. `rule_states` has no writer in this tree, so the
-  // per-account half of the forecast has no source, and EC-074 makes the group
-  // whole or nothing. `writeRuleState` is a port whose only implementations are
-  // test doubles and a demo that refuses.
-  //
-  // ASSERTED OVER `apps/worker` AND `packages`, WHICH IS THE SCOPE THE BLOCKER
-  // ITSELF NAMES. The day a real implementation lands, this case goes red and
-  // says which figure it unblocks.
-  expect(liability).toContain('writeRuleState');
+  // THE RETIRED TERM, READ AT SOURCE AND IN THE SCOPE THE BLOCKER NAMED
+  // (`apps/worker/**` and `packages/**`). It is spent: the implementation
+  // exists, the adapter composes it on the engine's codec, and ADR-264 section
+  // 2 measured it writing a row.
+  const root = join(APP, '..', '..');
+  const writer = readFileSync(join(root, 'apps/worker/src/batch/state-writer.ts'), 'utf8');
+  expect(writer).toContain('export function writeRuleStateVia');
+  expect(readFileSync(join(root, 'apps/worker/src/batch/adapter.ts'), 'utf8')).toContain(
+    'writeRuleState: writeRuleStateVia(',
+  );
+
+  // THE LIVE TERM. `plan_versions.rules` decodes in exactly one place in this
+  // repository and it is not this deployable, so the fold's `plan` input is an
+  // injected port that refuses by name rather than a second decoder of the blob
+  // that fixes every cents value a payout is decided against.
+  expect(fold).toContain('export class EligibleFoldUnwired');
+  expect(fold).not.toContain('schema_version');
+  expect(readFileSync(join(root, 'apps/worker/src/batch/adapter.ts'), 'utf8')).toContain(
+    'function toPublishedRules(',
+  );
 });
 
 // -----------------------------------------------------------------------------

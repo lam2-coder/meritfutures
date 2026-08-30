@@ -146,7 +146,15 @@ describe('link 1: CLOSED. The worker deployable runs its job and fails loudly wh
       .filter((path) => codeOf(path).includes('runNightlyBatch'))
       .map(rel)
       .sort();
+    //
+    // **THERE ARE FIVE NAMERS NOW AND THE FIFTH IS THE SECOND STRING LITERAL**,
+    // which is worth keeping in the list rather than filtering out: this sweep
+    // counts files that NAME the batch and the two `apps/api` entries are both
+    // reasons rather than callers. `admin-source/eligible-next-7d.ts` names it
+    // in the `awaiting` field of its `no_folded_state` refusal, because what an
+    // operator reading that refusal has to do is get this batch run.
     expect(namers).toEqual([
+      'apps/api/src/admin-source/eligible-next-7d.ts',
       'apps/api/src/routes/account-reads.ts',
       'apps/worker/src/batch/nightly.ts',
       'apps/worker/src/index.ts',

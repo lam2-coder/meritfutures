@@ -897,7 +897,17 @@ describe('the eligibility blocker states causes that are LIVE, and each is deriv
     const namers = deployableSources()
       .filter((path) => codeOf(path).includes('runNightlyBatch'))
       .map((path) => path.slice(REPO_ROOT.length + 1))
-      .filter((path) => path !== 'apps/api/src/routes/account-reads.ts')
+      // TWO MODULES ARE EXCLUDED AND BOTH FOR THE ONE REASON. Each names
+      // `runNightlyBatch` inside a STRING LITERAL -- this file in
+      // `ELIGIBILITY_BLOCKER`, and `admin-source/eligible-next-7d.ts` in the
+      // `awaiting` field of its `no_folded_state` refusal (ADR-269) -- so
+      // comment stripping does not reach either and the sweep counts a reason
+      // as a caller. Neither imports the batch.
+      .filter(
+        (path) =>
+          path !== 'apps/api/src/routes/account-reads.ts' &&
+          path !== 'apps/api/src/admin-source/eligible-next-7d.ts',
+      )
       .sort();
     expect(namers).toEqual([
       'apps/worker/src/batch/nightly.ts',
