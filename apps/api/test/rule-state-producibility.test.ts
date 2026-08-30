@@ -1166,19 +1166,43 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     );
   });
 
-  test('and NOTHING in this tree implements `PayoutTx`, which no clause may skip past', () => {
-    // **THE CLAUSE THAT OUTLIVES EVERY OTHER ONE.** `wiring.test.ts` clause FIVE
-    // has said it since `ADR-239` and it is the reason a discharged `plan` does
-    // not wire this port: there is no value to install. It is asserted here so a
-    // reader who watches `plan` and `state` close cannot conclude the port is one
-    // step from live.
+  test('ONE file implements `PayoutTx` now, and it is still not installed', () => {
+    // **THE CLAUSE THAT OUTLIVED EVERY OTHER ONE HAS CLOSED, AND THE CHECK IS
+    // INVERTED RATHER THAN DELETED**, on this file's own idiom one link up: an
+    // arm nothing asserts is an arm the next refactor removes.
+    //
+    // THE RETIRED ASSERTION IS DESCRIBED RATHER THAN LEFT IN PLACE. This case
+    // required the list to be EMPTY, on `wiring.test.ts` clause FIVE, which had
+    // said since `ADR-239` that there was no value to install. `ADR-291` built
+    // one: `postgresPayoutBackend` implements `transact` and `identityStatus()`
+    // and its other five members reject with `PayoutBackendUnwired`.
+    //
+    // **THE COUNT IS EXACT AND THAT IS THE POINT OF KEEPING IT A CENSUS.** A
+    // SECOND implementation appearing under a deployable's `src/` is either a
+    // fixture that escaped a test directory or a second payout adapter, and the
+    // day either arrives this goes red rather than stale.
     const backends = deployableSources()
       .filter((path) => /:\s*PayoutTx\b/.test(codeOf(path)) && !rel(path).endsWith('payouts.ts'))
       .map(rel)
       .sort();
-    expect(backends).toEqual([]);
+    expect(backends).toEqual(['apps/api/src/payout-backend.ts']);
 
+    // **AND THE HALF THAT MATTERS MOST IS UNCHANGED.** Building the backend is
+    // `ADR-287` slice 3 and INSTALLING it is slice 9, which is a separate
+    // money-path session behind a founder `E2` read. A module that exists and is
+    // not reached moves no count, and this is the line that says so: the wired
+    // set is what `start.ts` CALLS.
     expect(codeOf(join(REPO_ROOT, 'apps/api/src/start.ts'))).not.toContain('usePayoutBackend(');
+
+    // **AND IT IS A PARTIAL BACKEND THAT REFUSES AS A WHOLE.** `listPayouts` and
+    // `idempotency` are both constructible today, and installing them beside a
+    // `transact` whose `subject` rejects is what `usePayoutBackend`'s entry
+    // refuses in its own closing sentence. Asserted at the module rather than
+    // only in its own suite, because this is the file the entry cites.
+    const backend = codeOf(join(REPO_ROOT, 'apps/api/src/payout-backend.ts'));
+    for (const member of ['subject', 'holdFlag', 'insertPayoutRequest', 'listPayouts'])
+      expect(backend).toContain(`new PayoutBackendUnwired('${member}')`);
+    expect(backend).not.toContain('databaseIdempotencyStore');
   });
 
   test('and the entry names what the SIZE ROW waits on as a HOME rather than as a rename', () => {
