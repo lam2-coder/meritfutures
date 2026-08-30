@@ -283,6 +283,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-267](ADR-267.md) | the remedy does not transfer, because LT-01 credits the wallet and LT-06 debits it, and the corpus separates the two legs by exactly that fact  (2026-08-30, status: proposed) |
 | [ADR-268](ADR-268.md) | the day is a named door, because a catalogue read would hand the payout route R-06 itself and a second transaction would compute a verdict from a calendar the recording transaction never read  (2026-08-30, status: proposed) |
 | [ADR-270](ADR-270.md) | what posts a ledger entry is decided by who the transaction's opener serves, a posting may move to a clock exactly where its pinned check resolves no caller, and both refusals stand  (2026-08-30, status: proposed) |
+| [ADR-271](ADR-271.md) | a calendar day has no timezone, so the `date` type parser hands back the wire text and the crossing two libraries were performing has nowhere left to happen  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
