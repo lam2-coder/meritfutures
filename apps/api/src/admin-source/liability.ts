@@ -183,10 +183,17 @@
 //       carries a forward-looking date: `cadenceGap.nextEligibleTradingDay`,
 //       which AS-06 requires be published as a resolved date. Every other gate
 //       clears only when the trader TRADES, so no stored row says when. That one
-//       date lives in `rule_states.engine_gates`, a `jsonb NOT NULL` bag, and
-//       **NOTHING IN THIS TREE WRITES IT**: `writeRuleState` is a port
-//       (`apps/worker/src/batch/ports.ts`) whose only implementations are test
-//       doubles and `scripts/demo/world.ts`, which REFUSES. **ITS ENCODING IS
+//       date lives in `rule_states.engine_gates`, a `jsonb NOT NULL` bag.
+//       **THIS PARAGRAPH SAID NOTHING IN THIS TREE WROTE IT AND THAT IS NOW
+//       FALSE** (`ADR-269`). The retired sentence is paraphrased rather than
+//       quoted, on `RI-14`'s rule that a sentence reproduced verbatim reads as
+//       live to every grep: it said `writeRuleState` was a port whose only
+//       satisfiers were test doubles and a demo that refuses.
+//       `writeRuleStateVia` (`apps/worker/src/batch/state-writer.ts`) is the
+//       implementation, `postgresBatchPorts` composes it on `ADR-250`'s codec,
+//       `runNightlyBatch` calls it, and `ADR-264` section 2 ran the batch
+//       against PostgreSQL and watched `rule_states` go from zero rows to one.
+//       **ITS ENCODING IS
 //       NOW DECLARED AND THAT HALF OF THIS PARAGRAPH IS SPENT.** It read "fixed
 //       by no document either", and ADR-206 fixes it: the bag is the engine's
 //       own `EngineGateResults`, six groups and twenty-five leaves at
@@ -260,37 +267,49 @@
 //       numbered items are compared, and the case's restatement is measured
 //       against these terms and never against a stored list.
 //
-//       **CLEARING CONDITION, ALL THREE TERMS, AND THE GROUP NEEDS EVERY ONE:**
-//         1. A `writeRuleState` IMPLEMENTATION. `nightly.ts` calls the port and
-//            the only things satisfying it are test doubles and
-//            `scripts/demo/world.ts`, which refuses. `rule_states` therefore
-//            holds no rows, which session 392 measured on a live database over
-//            all 60 migrations: **ZERO**. `apps/worker/**` and `packages/**`.
-//         2. A PRIMARY SOURCE DECLARING THE STORED `engine_gates` ENCODING.
-//            **CLEARED by `ADR-206` (session 394), and it was the FIRST of the
-//            three to move.** The trade this term existed to refuse
-//            -- a reader here FIXING the encoding from the read side, which is
-//            what `ADR-199` section 7 refuses -- is refused by a ruling instead:
-//            the bag is the engine's own value, six groups and twenty-five
-//            leaves, cents as base-10 strings, declared at
-//            `docs/architecture/data-model/rule_states.md`. **THE GROUP IS
-//            STILL BLOCKED**, because term 1 stands and EC-074 makes it whole
-//            or nothing.
-//         3. `eligible_next_7d: EligibleNext7d | null`, so the response can
-//            decline where the horizon has no answer (`ADR-204` ruling 9,
-//            `ADR-203` ruling 8). **CLEARED by `ADR-208` (session 397), and it
-//            is the SECOND of the three to move.** `RI-18` made it atomic
-//            across three files -- `API_CONTRACT.md`, `routes/admin-reads.ts`
-//            and `apps/admin/src/api/types.ts` -- and session 392 seeded the
-//            partial move and watched it fire: FIVE field paths leave one copy
-//            and the check reports six findings. The three moved in one commit.
-//            **WHAT `ADR-203` RULING 8 LEFT BEHIND WAS A RULING RATHER THAN A
-//            TRANSCRIPTION, WHICH IS THE FINDING THIS TERM COST**: the same
-//            `| null` is a compile error inside `EligibleForecastResponse`, a
-//            SECOND response body that carries this one figure and that no
-//            entry had fixed, and `ADR-208` rules it a body with a `null` and a
-//            forwarded gap rather than `adminNotFound`. **TERM 1 NOW HOLDS THE
-//            GROUP ALONE**, and EC-074 still makes it whole or nothing.
+//       **ALL THREE TERMS OF THAT CONDITION ARE NOW SPENT AND THE FIGURE IS
+//       STILL NOT PRODUCED, WHICH IS `ADR-269`'s FINDING.** They were: a
+//       `writeRuleState` implementation (`writeRuleStateVia`, session 395,
+//       composed by `postgresBatchPorts` and MEASURED writing a row by
+//       `ADR-264` section 2); a primary source declaring the stored
+//       `engine_gates` encoding (`ADR-206`, session 394); and
+//       `eligible_next_7d: EligibleNext7d | null` on all three copies
+//       (`ADR-208`, session 397). **A CONDITION WHOSE EVERY TERM IS SPENT WHILE
+//       ITS FIGURE STAYS ABSENT WAS STATED ONE LAYER TOO HIGH**: all three were
+//       about getting a ROW, and none named what stands between a row and a
+//       rendered number.
+//
+//       **AND THE FOLD ITSELF IS BUILT.** `admin-source/eligible-next-7d.ts`
+//       reads the funded population, takes each account's state through
+//       `ruleStateOn` (`ADR-264`), resolves the five `R-41` vetoes through
+//       `resolveExternalGates`, and calls the engine's `projectPayout` over
+//       {@link readTradingHorizon}'s horizon and {@link readCalendarSlice}'s
+//       slice. It refuses an empty `rule_states` rather than summing it to a
+//       zero liability, and it carries the basis of every term it reports.
+//
+//       **CLEARING CONDITION, ALL TWO TERMS, AND THE GROUP NEEDS BOTH:**
+//         1. A `PlanRulesJson` DECODER THIS FENCE CAN REACH. `resolvePlan` is
+//            exported by the engine and its first argument is not:
+//            `plan_versions.rules` decodes in exactly one place in this
+//            repository, `toPublishedRules` in
+//            `apps/worker/src/batch/adapter.ts`, and this deployable cannot
+//            import that one. A second decoder written on the read side is
+//            `FM-16` on the blob that fixes every cents value and every gate
+//            threshold a payout is decided against, which is a worse trade than
+//            the figure is worth. `ADR-239` slice A rules the shared home is
+//            `packages/rules-engine`, beside `gates-codec.ts`, and that move is
+//            a money-path refactor of a merged adapter rather than a liability
+//            read. Until it lands the term is
+//            `EligibleFoldIo.resolvePinnedPlan`, injected and refusing by name.
+//         2. A WIRE THAT CAN SAY THE FIGURE IS A FORECAST. `ADR-204` ruling 7
+//            requires both halves of the figure to be stated wherever it is
+//            shown. `EligibleNext7d` declares `total_cents`, `account_count`
+//            and `by_day` and NOT ONE MEASURED TERM, so there is no field the
+//            assumptions, the caveat or the covered population can ride on, and
+//            a liability number that reads as measured when it is projected is
+//            worse than no number on the surface an operator funds a payout
+//            wallet from. The shape is bound in three copies, so it moves
+//            atomically and by a ruling rather than by this module.
 //
 // **`withdrawals_in_flight_cents` IS ABSENT AND IS NOT A FIFTH BLOCKER**, because
 // it is not on the response. ADR-195 section 6 row 1 owes the column, no migration

@@ -2393,7 +2393,7 @@ describe('RI-19 binds the two statements of one clearing condition', () => {
 });
 
 describe('RI-19 is about a real pair on the real tree, which is separate from its verdict', () => {
-  test('it binds `B5`s condition across `liability.ts` and its case, with three terms', () => {
+  test('it binds `B5`s condition across `liability.ts` and its case, with two terms', () => {
     // "IT RETURNED AN EMPTY ARRAY" IS NOT EVIDENCE THAT IT LOOKED. RI-04 passed
     // green for three sessions while checking nothing, so this case asserts the
     // SUBJECT: the pair RI-19 found, which side is canonical, and how many terms
@@ -2406,9 +2406,15 @@ describe('RI-19 is about a real pair on the real tree, which is separate from it
     expect(b5?.case.map((c) => c.file)).toEqual(['apps/api/test/admin-source-liability.test.ts']);
     // THE MODULE ENUMERATES AND THE CASE RESTATES, which is session 392's repair
     // in its own words: the condition is written ONCE, in the module.
-    expect(b5?.module[0]?.terms.length).toBe(3);
-    expect(b5?.module[0]?.count).toBe(3);
-    expect(b5?.case[0]?.count).toBe(3);
+    // **THE COUNT MOVED FROM THREE TO TWO AND THAT IS THE SUBJECT MOVING, NOT
+    // THIS CASE WEAKENING.** All three of `B5`s original terms were spent by
+    // ADR-206, ADR-208 and ADR-264 while the figure stayed absent, so ADR-269
+    // restated the condition over the two terms that actually hold it. The
+    // numbers are read out of the tree at run time and this case is what
+    // notices the day they move again.
+    expect(b5?.module[0]?.terms.length).toBe(2);
+    expect(b5?.module[0]?.count).toBe(2);
+    expect(b5?.case[0]?.count).toBe(2);
     expect(b5?.case[0]?.terms.length).toBe(0);
   });
 });
