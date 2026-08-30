@@ -56,6 +56,10 @@ const SCOPED_DB = read('packages', 'db', 'src', 'scoped-db.ts');
 const LEDGER_TX = read('packages', 'ledger', 'src', 'tx.ts');
 const ATTRIBUTION = read('packages', 'affiliate', 'src', 'attribution.ts');
 const M20 = read('docs', 'plans', 'M20-wallet.md');
+const API_CONTRACT = read('docs', 'architecture', 'API_CONTRACT.md');
+const SECURITY = read('docs', 'architecture', 'SECURITY.md');
+const FIRM_PARAMETERS_DDL = read('packages', 'db', 'migrations', '0074_firm_parameters.sql');
+const WRITE_CONTROL = read('packages', 'db', 'migrations', '0076_firm_parameter_write_control.sql');
 
 // -----------------------------------------------------------------------------
 // BLOCKER 1. A CAP WITH NO SOURCE. ADR-238 ruling 1
@@ -168,6 +172,47 @@ test('ADR-252 and ADR-265: the table ships empty, so a refusal is what the reade
   expect(declaringLinesMatching('INSERT INTO firm_parameters')).toHaveLength(0);
   expect(CHECKOUT).toContain('AN ABSENT ROW IS NO CAP');
   expect(SCOPED_DB).toContain('AN ABSENT ROW IS NO CAP AND NOT AN UNLIMITED ONE');
+});
+
+test('ADR-284: the write control is a NEW migration and 0074 is not edited', () => {
+  // MIGRATIONS ARE SACRED AND ARE SUPERSEDED BY ADDITION (constitution E2).
+  // The control the write owes could not go into the file that created the
+  // table, so this case is the one that turns red the day somebody puts it
+  // there instead. It reads the OTHER file for the absence, because a control
+  // added to `0074` would leave `0076` looking perfectly correct.
+  expect(WRITE_CONTROL).toContain('ALTER TABLE firm_parameters');
+  expect(FIRM_PARAMETERS_DDL).not.toContain('dual_control_approval_id');
+  expect(FIRM_PARAMETERS_DDL).not.toContain('FP-DC');
+});
+
+test('ADR-284: a cap row is unwritable without an approval, two owners and an audit row', () => {
+  // THE CLAUSE THIS ENTRY LEADS WITH IS NARROWED BY THESE THREE OBJECTS AND BY
+  // NOTHING ELSE, so each is named rather than the file being asserted whole.
+  // A session that deletes one of them and leaves the prose is what this case
+  // exists to catch.
+  expect(WRITE_CONTROL).toContain('CREATE CONSTRAINT TRIGGER firm_parameters_dual_control_is_real');
+  expect(WRITE_CONTROL).toContain('CREATE CONSTRAINT TRIGGER firm_parameters_change_is_audited');
+  expect(WRITE_CONTROL).toContain('CREATE TRIGGER firm_parameters_are_superseded_never_rewritten');
+
+  // BOTH HANDS, AND THE ROLE LEG IS THE ONE A READER WOULD ASSUME RATHER THAN
+  // CHECK. API_CONTRACT section 8 bounds `ops` to "read plus account actions,
+  // no config or role changes", so a cap is an `owner` act on BOTH sides: the
+  // operator of record and the second person who checks them.
+  expect(API_CONTRACT).toContain('no config or role changes');
+  const ownerLegs = WRITE_CONTROL.split('\n').filter((line) => line.includes("role <> 'owner'"));
+  expect(ownerLegs).toHaveLength(2);
+});
+
+test('ADR-284: the delay window is NOT installed, and the file says so rather than implying it', () => {
+  // CONSTITUTION D4 AND ADR-010 REQUIRE "DUAL CONTROL PLUS A DELAY WINDOW" AND
+  // NEITHER STATES A DURATION. `0074` refused to invent the cap for the same
+  // reason, so the second half of C-10 is owed and declared rather than
+  // silently satisfied by the approval's own expiry. THE CASE TURNS RED IN
+  // BOTH DIRECTIONS: if somebody installs a window without a ruled number, and
+  // if somebody deletes the sentence that says it is missing.
+  expect(WRITE_CONTROL).toContain('THE DELAY WINDOW IS NOT INSTALLED');
+  expect(SECURITY).toContain('Dual control plus delay window');
+  expect(declaringLinesMatching('delay_window')).toHaveLength(0);
 });
 
 // -----------------------------------------------------------------------------
