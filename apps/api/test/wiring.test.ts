@@ -878,7 +878,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
     '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
-    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:825`) runs before the ' +
+    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:838`) runs before the ' +
     'plan on the purchase path and before `resetTarget` on the reset path. ADR-238 ruling 1 ruled ' +
     "the base cap the FIRM'S number and refused `limits.max_accounts_per_entity` in all three of " +
     'its available forms, because that leaf is PER PLAN VERSION while `liveAccounts` beside it ' +
@@ -887,8 +887,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'that may have been retired years earlier, and requiring every published version to agree is ' +
     "a firm parameter wearing a plan's costume that no CHECK can express. ADR-252 BUILT THAT " +
     'HOME AND WIRED NOTHING TO IT: `grep -rln firm_parameters packages/db/migrations` returns ' +
-    '1 line, which is `0074_firm_parameters.sql`, and it creates `base_account_cap` on ' +
-    "`price_floors`' shape with its approver a foreign key into `operators`. THE EXCEPTION IS " +
+    '2 files, and the FIRST is `0074_firm_parameters.sql`, which creates `base_account_cap` on ' +
+    "`price_floors`' shape with its approver a foreign key into `operators`. THE COUNT READ 1 " +
+    'UNTIL ADR-284 PUT THE WRITE CONTROL BESIDE THE ROW, and the second file is that control ' +
+    'rather than a caller: the clause at the foot of this entry is where it is read. THE ' +
+    'EXCEPTION IS ' +
     'UNTOUCHED AND 0002 IS NOT EDITED: `grep -rn max_accounts_override ' +
     'packages/db/migrations/0002_identity.sql` returns 1 line. AND ADR-265 BUILT THE DOOR, SO ' +
     'THE CLAUSE THAT SAID "NO DOOR" IS SPENT: `grep -rn effectiveAccountCap ' +
@@ -912,6 +915,27 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'and AN ABSENT ROW IS NO CAP RATHER THAN AN UNLIMITED ONE, so the door THROWS there, before ' +
     'it reads the identity, and its return type is `number` so no caller has an absent value to ' +
     'fold into `Infinity`. THAT IS THE REFUSAL ADR-252 SAID THIS SLICE OWED. ' +
+    'AND THE EMPTY TABLE IS NARROWED FOR THE THIRD TIME RATHER THAN DISCHARGED (ADR-284), ' +
+    'BECAUSE A ROW NEEDS A WRITER AND A WRITER FOR A CONFIG NUMBER IS AN OPERATOR ACT. ' +
+    'THE HALF THAT NEEDED NO IDENTITY PROVIDER IS BUILT AND IT IS A CONTROL RATHER THAN A ' +
+    'CALLER: `grep -rn firm_parameters packages/db/migrations` now returns TWO files, and ' +
+    '`0076_firm_parameter_write_control.sql` makes an unapproved cap UNWRITABLE. A row cites ' +
+    'an approved `dual_control_approvals` row whose `payload_hash` is that row of the cap ' +
+    "written out canonically, its requester is the cap row's own `approved_by` so that " +
+    "`0016`'s second-person CHECK is the second-person rule rather than a second copy of it, " +
+    'BOTH HANDS ARE ACTIVE `owner` OPERATORS because API_CONTRACT section 8 bounds `ops` to ' +
+    '"no config or role changes", the act appears in `admin_actions` under the operator who ' +
+    'signed it, and the row is superseded rather than rewritten. THREE THINGS THAT FILE FOUND ' +
+    'BY EXECUTING RATHER THAN READING: `firm_parameters` declared NO `uuid` COLUMN AT ALL ' +
+    'while `admin_actions.subject_id` is `uuid NOT NULL`, so the audit row section 8 requires ' +
+    'COULD NOT NAME A CAP ROW; `dual_control_approvals` had NO FOREIGN KEY on either of its ' +
+    'two names, so the second person could be a string naming nobody; and `0074` promised ' +
+    'supersession and nothing enforced it. THE DELAY WINDOW IS NOT INSTALLED ' +
+    'AND THE REASON IS STATED: D4 and ADR-010 require one and state NO DURATION, and a number ' +
+    'invented here is what `0074` refused to do with the cap itself. WHAT IS LEFT IS THE ' +
+    'OPERATOR ROUTE AND IT IS BEHIND THE SSO PURCHASE: every admin mutation resolves its ' +
+    'principal through `setAdminSessionSource`, `operators` still has no writer, the table is ' +
+    'STILL EMPTY and the door STILL THROWS. This port is not wired and nothing here wires it. ' +
     '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1539`) ABOUT THE SAME ' +
     'NUMBER AND IS ONE FINDING WITH THIS ONE AGAIN: ADR-252 found the two had STOPPED being one ' +
     'finding, because this port needed a catalogue admission and that one did not; ADR-265 built ' +

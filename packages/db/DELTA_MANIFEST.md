@@ -20,7 +20,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->69<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->70<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -219,7 +219,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 
 **`SD-M6-07`'s load-bearing half is the delivery log and not the schedule**, and the reason is [M05](../../docs/plans/M05-payout-system.md):91 `INV-M5-18` rather than anything new. That invariant is asserted *"on the QUERY, never on the job"*, evaluated independently of whether the sweep reported success, on the stated ground that **a job that reports success is not evidence that the work happened**. A second sweep with the same shape gets the same control rather than a new one: the delivery-failure alarm reads `report_deliveries` and never the job's own report, and `GS-288` pins the case where the job reports success and nothing arrived. **`due_at` is what makes that askable**, because without a stored window "nothing arrived" and "not due yet" return the same empty set, which is [`economic_calendar_loads`](../../docs/architecture/data-model/economic_calendar_loads.md)'s coverage bound one table over and one row up.
 
-**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->69<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
+**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->70<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
 
 | Aimed at | What actually refused it |
 |---|---|
@@ -462,7 +462,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->69<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->118<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->29<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->70<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->118<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->32<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -712,7 +712,7 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->118<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->29<!--/gen--> triggers**, across <!--gen:migration_files-->69<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->118<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->32<!--/gen--> triggers**, across <!--gen:migration_files-->70<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -823,7 +823,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->69<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->70<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -898,7 +898,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->69<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->70<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
 
 | | Before `0034` | After `0034` |
 |---|---|---|
@@ -2193,3 +2193,55 @@ and against `0001`..`0067` the same row is refused at the cast, `invalid_text_re
 **BEFORE THIS FILE THE ESTATE HELD ZERO `RENAME COLUMN` AND ZERO `DROP COLUMN` STATEMENTS**, measured over all 68 migrations then on disk. Every reader in this repository that parses `packages/db/migrations` for "the columns the schema declares" builds that answer as the union of `CREATE TABLE` bodies and `ADD COLUMN` clauses, and until `0075` that union WAS the installed schema. It is not any more, and E2 guarantees it never will be again: the superseded declaration is permanent.
 
 **Five readers were affected and only one of them names the column.** `RI-26` and the `ADR-216` fold in [`scoped-db.test.ts`](test/scoped-db.test.ts) each learned the rename, and the fold's `RENAME` refusal is what found itself: it was written to turn the suite red on exactly this shape so that the next session would read the ruling before writing a regex, and it did. [`ledger-posting-authority.test.ts`](../../apps/api/test/ledger-posting-authority.test.ts) pinned `0074` as the highest migration to prove a local absence and would have failed on any migration at all; it now asserts what its sentence means. **`dateColumns()` behind `CI-06m` still reads declarations**, which ADR-278 section 5 records as owed and the [`simulation_runs`](../../docs/architecture/data-model/simulation_runs.md) design record works around by carrying both names in one cell.
+
+---
+
+## 34. `0076` lands, and the control arrives before the row it controls (2026-08-30)
+
+**Session 475, [ADR-284](../../docs/decisions/ADR-284.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `284` and `0076`.** [`0074`](migrations/0074_firm_parameters.sql) gave the base account cap a row and shipped the table EMPTY on purpose, and [ADR-265](../../docs/decisions/ADR-265.md) gave it a door. Both entries closed on the same sentence: what is left is an empty table. **An empty table is a missing WRITER, a writer is an operator act, and an operator act on a config number is what constitution `D4` and [ADR-010](../../docs/decisions/ADR-010.md) name.** So this file installs the control and writes no row.
+
+### Three things were missing, measured at the catalogue rather than asserted
+
+Read out of a PostgreSQL 16.13 instance carrying `0001`..`0075` applied forward-only from empty under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| `uuid` columns on `firm_parameters` | **zero, over six columns** |
+| `admin_actions.subject_id` and `dual_control_approvals.subject_id` | both `uuid NOT NULL` (`0017:79`, `0016:229`) |
+| foreign keys referencing `operators` | **three, and NOT ONE of them on `dual_control_approvals`** |
+| `merit_app`'s grants on `firm_parameters` | `SELECT, INSERT, **UPDATE, DELETE**` |
+
+**THE FIRST TWO ROWS TOGETHER ARE THE BLOCKER.** The audit row [API_CONTRACT](../../docs/architecture/API_CONTRACT.md) section 8 requires of every admin mutation addresses its subject as `(text, uuid)`, so **it could not name a cap row at all**, and neither could an approval of one. That is `0048` item 0's shape a second time: a ruled act that is not performable against the merged schema, invisible because the table has zero rows. It was found by writing the insert.
+
+**THE THIRD MAKES "a second person" A STRING COMPARISON.** `dual_control_approvals_second_person` (`0016:250`) requires only that the approver's string DIFFER from the requester's. `0074` already resolves `firm_parameters.approved_by` into `operators`, so the REQUESTER was real by composition and the CHECKER was not, and the checker is the entire control. This is `0073`'s own finding about `0017:77`, standing one table over, on the table that IS the dual control.
+
+**THE FOURTH MAKES `0074`'s SUPERSESSION PROMISE A COMMENT.** DELETE is the quiet half: an UPDATE that moved the number now fails `FP-DC5` because the digest stops matching, while a DELETE fails nothing and removing the current row makes an older, higher cap current again with no new row, no approval and no audit trail.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `0001`..`0076` applied forward-only from empty under `ON_ERROR_STOP=1` | **clean**, and a second apply of `0001` correctly refused |
+| object counts after the set | **118 tables, 412 indexes, 516 checks, 32 triggers**: tables and checks UNCHANGED, `+2` indexes and `+3` triggers |
+| `firm_parameters` columns after the set | eight, with `id uuid NOT NULL` at ordinal 7 and `dual_control_approval_id uuid NOT NULL` at ordinal 8 |
+| `firm_parameters` constraints | the two `0074` CHECKs untouched, the `0074` primary key untouched at `(parameter, effective_from)`, `firm_parameters_id_uq`, `firm_parameters_approval_is_spent_once`, the approval foreign key, and both constraint triggers `DEFERRABLE INITIALLY DEFERRED` |
+| SUCCESS cases | **2 of 2 commit.** The whole ceremony with the cap row inserted BEFORE its `admin_actions` row, and a supersession on its own approval |
+| REJECTION cases | **14 of 14 refuse, each by its named tag.** `FP-DC2`..`FP-DC7`, `FP-A1` twice, `FP-S1` twice, `firm_parameters_approval_is_spent_once`, and `0016`'s and this file's own two constraints |
+| seeded defects | **3, each watched RED**, each restored from a byte copy with `sha256sum -c` reporting OK |
+
+**THE SUCCESS HALF CARRIES MOST OF THE WEIGHT HERE, WHICH IS `0034`'s LESSON AND `0048`'s DISCIPLINE.** A guard that lets NOTHING through passes every rejection assertion and reports nothing wrong, and every object in this file is a path that did not exist.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-284` | `firm_parameters` | `id uuid` and `dual_control_approval_id uuid`, two `UNIQUE`s, `FP-DC`, `FP-A`, `FP-S` | 0076 | **landed** |
+| `ADR-284` | `dual_control_approvals` | `requested_by` and `approved_by` become foreign keys into `operators(actor)` | 0076 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed.** `SD-M6-05` is the row that already exists; what lands here is the control over it, which no approved module document proposes as a delta. `0016`, `0017` and `0074` are NOT edited and are superseded by addition (constitution E2), which is `0028`'s, `0048`'s, `0068`'s, `0070`'s, `0072`'s and `0073`'s mechanism on this estate.
+
+### The part a reader should carry forward, and it is not the columns
+
+**THE DELAY WINDOW IS OWED AND IS DELIBERATELY ABSENT.** `D4` and [ADR-010](../../docs/decisions/ADR-010.md) both require *"dual control plus a delay window"* and **neither states a duration**; [SECURITY](../../docs/architecture/SECURITY.md) `C-10` restates the pair without one. The only duration nearby is the 48 hour cooling on a payout DESTINATION change, a different control on a different act. A number invented here is what `0074` refused to do with the cap itself and `0073` with the operator-session lifetime ceiling. **`FP-DC7` is the half that needs no number** and is not the window: it refuses a row dated before its own approval, so a backdated cap cannot rewrite what was in force while a purchase was being refused.
+
+**AND `price_floors` HAS THE SAME `uuid` GAP THIS FILE JUST CLOSED**, measured the same way: six columns, none of them a `uuid`, so an `admin_actions` row cannot name a price floor either. Carried forward for the slice that owns floors, beside `price_floors.approved_by` as a referent, which [ADR-252](../../docs/decisions/ADR-252.md) and [ADR-265](../../docs/decisions/ADR-265.md) already owe.

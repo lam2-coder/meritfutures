@@ -128,6 +128,19 @@
 //      now the SAME remaining half again, having been a different one between
 //      ADR-252 and ADR-265.
 //
+//      THE ROW NOW HAS A RULED WRITER AND STILL HAS NO CALLER, WHICH ARE TWO
+//      DIFFERENT SENTENCES AND THIS CLAUSE KEEPS THEM APART (ADR-284). `0076`
+//      installs the control the write owes at the DATABASE: a cap row cites an
+//      approved `dual_control_approvals` row that pins its own payload, both
+//      hands are active `owner` operators, the act appears in `admin_actions`,
+//      and the row is superseded rather than rewritten. So a cap written by
+//      hand past every control is now UNWRITABLE, which is the half that did
+//      not need an identity provider. WHAT IS STILL BEHIND ONE is the operator
+//      route that drives it: every admin mutation resolves its principal
+//      through `setAdminSessionSource`, which is the C-08 SSO purchase itself,
+//      and `operators` still has no writer. So this clause is NARROWED and not
+//      discharged, the table is still empty, and the door still throws.
+//
 //   2. THE LEDGER ARM, UNCHANGED. See `ledger` below, and ADR-238 ruling 7 for
 //      why ADR-176's remedy for `LT-01` does not transfer to `LT-08`.
 //

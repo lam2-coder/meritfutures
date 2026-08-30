@@ -475,7 +475,7 @@ Walked line by line at the gate. All five confirmed as written; recorded in [DEC
 
 **Inside the SQL, every folded column, index, constraint and table carries an inline `-- SD-nn` or `-- U-nn` marker.** A reader looking at a column does not have to leave the file to learn why it exists.
 
-### The <!--gen:migration_files-->69<!--/gen--> files, and which of them are money path
+### The <!--gen:migration_files-->70<!--/gen--> files, and which of them are money path
 
 `0001` extensions and enums, `0002` identity, `0003` kyc, `0004` catalog, `0005` affiliate program, `0006` commerce, `0007` accounts, `0008` risk, `0009` ledger, `0010` payouts, `0011` wallet, `0012` disputes and affiliate settlement, `0013` ingest, `0014` marks, `0015` rule states, `0016` treasury controls, `0017` events and audit, `0018` integrations, `0019` notifications and community, `0020` public surface, `0021` transparency, `0022` analytics journal, `0023` loyalty and graduation, `0024` offers, `0025` reserved sequence, `0026` roles and grants, `0027` triggers and invariants, `0028` supersede plan version immutability, `0029` phone identity and auth.
 
@@ -529,7 +529,7 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 
 ### Verification performed on `0029` (2026-08-16)
 
-**The full <!--gen:migration_files-->69<!--/gen--> file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`**, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->118<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->29<!--/gen--> triggers**. `0029` adds three tables, fourteen indexes and thirty-four check constraints, and **no trigger and no function**, so the trigger count is unchanged. The index and check figures are **emitted by the install job**, not derived from the DDL, for the reason [section 11 of DELTA_MANIFEST](../../../packages/db/DELTA_MANIFEST.md) records: a grep of `CREATE INDEX` misses every index Postgres builds behind a primary key or a unique constraint.
+**The full <!--gen:migration_files-->70<!--/gen--> file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`**, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->118<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->32<!--/gen--> triggers**. `0029` adds three tables, fourteen indexes and thirty-four check constraints, and **no trigger and no function**, so the trigger count is unchanged. The index and check figures are **emitted by the install job**, not derived from the DDL, for the reason [section 11 of DELTA_MANIFEST](../../../packages/db/DELTA_MANIFEST.md) records: a grep of `CREATE INDEX` misses every index Postgres builds behind a primary key or a unique constraint.
 
 **Forty-eight assertions, executed against the installed schema, one perturbation each. The probe leads with the success case**, which is `0028`'s transferable lesson: a probe that only ever attempts forbidden things passes against a guard that rejects everything.
 
