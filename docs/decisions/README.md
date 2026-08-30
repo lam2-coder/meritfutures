@@ -308,6 +308,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-292](ADR-292.md) | every CI run happens twice, the fix is one line per workflow, and the one line the row supplied does not work  (2026-08-30, status: proposed) |
 | [ADR-293](ADR-293.md) | slice 6's approval branch is buildable in one body and is BLOCKED BY ONE DECLARED RETURN TYPE the fence does not reach, and the lock handed over by ADR-291 is RULED: the payout path locks, as a port member and not inside `transact`  (2026-08-30, status: proposed) |
 | [ADR-294](ADR-294.md) | a crashed check is not a lower count. The runner reports PASS, FAIL and ERROR as three outcomes, keeps the denominator, and refuses to print the sentence that reads as a measurement (2026-08-30, status: proposed) |
+| [ADR-295](ADR-295.md) | slice 6's approval branch LANDED, and the lock ADR-293 ruled is STILL OWED because the fence that granted this file granted it for seven named lines  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
