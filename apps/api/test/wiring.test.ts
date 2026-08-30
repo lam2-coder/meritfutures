@@ -417,6 +417,15 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // resolves an `AccountDay`, and a table that holds a row. A clause that closes
   // on a money path is worth recording precisely because it is rare here; a
   // clause that closes and takes the port with it would be a different entry.
+  //
+  // AND ADR-258 IS THE SECOND CLAUSE TO CLOSE IN HALF, WHICH IS A DIFFERENT
+  // SHAPE AGAIN AND IS WHY IT GETS A LINE. The second clause said the adapter
+  // resolved NONE of an `AccountDay`'s six fields. It resolves five. What stops
+  // the fold is `external` alone, `ADR-248`'s ruling, and clause six was already
+  // the place that reason lives -- so the narrowing MOVES a blocker into a
+  // clause that already carried it rather than adding one. The port did not
+  // become wireable and the wired count does not move: `rule_states` still holds
+  // no rows, and the read half of that is now the only half left.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -432,14 +441,22 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'rather than reasoning about it. The schedule is ruled EXTERNAL and registered in ' +
     '`docs/ops/runbooks/CRON_INVENTORY.md`, because a timer inside a process nothing restarts ' +
     'is not a schedule and a long-lived process has no exit code to fail with. SECOND, THERE ' +
-    'IS A `BatchPorts` VALUE NOW AND IT SERVES FOUR OF TEN METHODS: `runNightlyBatch` ' +
+    'IS A `BatchPorts` VALUE NOW AND FIVE OF ITS TEN METHODS ANSWER, ONE OF THEM ONLY IN ' +
+    'PART: `runNightlyBatch` ' +
     '(`apps/worker/src/batch/nightly.ts:276`) takes a `BatchPorts`, its read half declares ' +
     'SEVEN methods and its write half THREE (`apps/worker/src/batch/ports.ts:265,336`), and ' +
     '`postgresBatchPorts` (`apps/worker/src/batch/adapter.ts`) serves the calendar watermark, ' +
     'the calendar slice, the accounts with a live mark and the accounts with stored state over ' +
-    "this deployable's one door. IT REFUSES `loadAccountDay` BY NAME, so the fold never " +
-    'starts: an `AccountDay` carries a resolved plan, a prior state, a mark, settlements, an ' +
-    'opened-on anchor and R-40s five context facts, and no adapter resolves them. THIRD, THE ' +
+    "this deployable's one door. THIS CLAUSE READ THAT `loadAccountDay` REFUSED BY NAME AND " +
+    'THAT NO ADAPTER RESOLVED ANY OF AN `AccountDay`s SIX FIELDS, AND ADR-258 MADE THE SECOND ' +
+    'HALF FALSE. `plan` is `resolvePlan` over the account`s PINNED `plan_versions.rules` and ' +
+    'its `plan_version_sizes` row, `prior` is a stored `rule_states` row rebuilt as a ' +
+    '`RuleState` through ADR-250`s decoder, `mark` is the unsuperseded `daily_marks` row, ' +
+    '`settlements` are the SETTLED `payout_requests` effective on the day, and `openedOn` is ' +
+    '`accounts.opened_on`; an account with no live mark is answered `null` rather than ' +
+    'refused. THE FOLD STILL DOES NOT START AND IT IS ONE FIELD THAT STOPS IT: `external` is ' +
+    'an `ExternalGates`, which ADR-248 ruled NOT CONSTRUCTIBLE, and clause SIX below is the ' +
+    'whole of that reason rather than a second one. THIRD, THE ' +
     'CODEC CLAUSE IS DISCHARGED, AND IT IS THE FIRST THING THIS ENTRY HAS LOST RATHER THAN ' +
     'REPHRASED. IT NARROWED TWICE AND THEN CLOSED. It read that writing a decoding would be ' +
     'inventing a corpus fact, which ADR-206 retired by ruling the encoding as the engine`s own ' +
@@ -449,13 +466,15 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'WHICH ADR-250 MADE FALSE: the codec is `encodeEngineGates` and `decodeEngineGates` in ' +
     '`packages/rules-engine/src/gates-codec.ts`, which is ADR-239 slice A`s home because BOTH ' +
     'deployables need the one predicate and neither can import the other, and ' +
-    '`apps/worker/src/batch/adapter.ts:473` INSTALLS it where it took the unwired refusal. The ' +
+    '`apps/worker/src/batch/adapter.ts:535` INSTALLS it where it took the unwired refusal. The ' +
     'round trip is EXECUTED rather than claimed: an engine-folded value survives encode, JSON ' +
     'and decode unchanged, and a cent past `Number.MAX_SAFE_INTEGER` comes back exact. THE ' +
     'PORT IS NOT WIRED BY ANY OF THAT AND THE WIRED COUNT DOES NOT MOVE, which is why the ' +
     'clause closing is worth stating rather than celebrating: the codec was the SMALLEST of ' +
-    'the things `state` waits on, and what it leaves standing is the adapter and the empty ' +
-    'table. THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
+    'the things `state` waits on, and what it left standing was the adapter and the empty ' +
+    'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
+    '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
+    'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
     '`PayoutTx.subject` (`routes/payouts.ts:428`) returns a ' +
     '`PayoutSubject` whose `state` (`routes/payouts.ts:331`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +

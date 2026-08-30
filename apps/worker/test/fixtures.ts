@@ -127,3 +127,132 @@ export const accountDay = (accountId: string, overrides: Partial<AccountDay> = {
   openedOn: DAY_ONE.tradingDay,
   ...overrides,
 });
+
+// =============================================================================
+// THE SAME PLAN AND THE SAME DAY, AS THE ROWS THAT HOLD THEM
+// =============================================================================
+// EXTRACTED FOR THIS FILE'S OWN REASON, ONE LAYER DOWN. `PLAN` above is
+// Appendix A.1 transcribed as a VALUE; everything below is the same contract as
+// the ROWS `plan_versions` and `plan_version_sizes` hold, taken from `DATA_MODEL`
+// section 11's example and the materialization `0004_catalog.sql` describes.
+// `account-day.test.ts` reads them through the adapter and asserts the result
+// equals `PLAN`, and `entrypoint-harness.ts` runs the real batch over them; two
+// hand-copies of a stored plan are two things that drift apart, and the drift
+// would be invisible because each copy would still resolve to something.
+
+/** THE `jsonb` ROUND TRIP. `ADR-206` section 5 measured this leg as the lossy one. */
+export const storedJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value)) as unknown;
+
+export const PLAN_VERSION_ID = 'core-eod-v1';
+
+/** `plan_versions.rules` for Core EOD, as `DATA_MODEL` section 11 writes it. */
+export const CORE_EOD_RULES = {
+  schema_version: 1,
+  phase_eval: {
+    enabled: true,
+    profit_target_bp: 600,
+    drawdown: {
+      type: 'trailing_eod',
+      amount_bp: 500,
+      lock: { enabled: false, at_profit_cents: null, floor_at_cents: null },
+    },
+    daily_loss_limit: { type: 'none', amount_bp: null },
+    min_trading_days: 1,
+    consistency: { enabled: false, max_day_share_bp: null, mode: 'pass_time_dilutable' },
+    max_days: null,
+  },
+  phase_funded: {
+    drawdown: {
+      type: 'trailing_eod',
+      amount_bp: 500,
+      lock: { enabled: true, at_profit_cents: null, floor_at_cents: null },
+    },
+    daily_loss_limit: { type: 'none', amount_bp: null },
+    min_trading_days: 0,
+    win_days: { required_count: 5, floor_bp: 30, reset_on_payout: true },
+    consistency: { enabled: true, max_day_share_bp: 3000, mode: 'payout_gated' },
+    buffer_bp: 200,
+    cadence_gap_trading_days: 5,
+    // M01 section 2.4 REQUIRES this key and DATA_MODEL section 11's example does
+    // not carry it, which `types.ts` records at the field. It is here at
+    // ADR-019's v1 value because a row the adapter can read has to carry it, and
+    // the disagreement is reported rather than folded.
+    min_settlement_lag_trading_days: 0,
+    payout_cap_schedule: [{ from_ordinal: 1, cap_bp: 300 }],
+    min_payout_cents: 10000,
+    split_bp: 9000,
+    max_payouts: 5,
+    post_payout_floor_rule: { mode: 'none' },
+  },
+};
+
+/** One row, in the property names `packages/db/src/schema.ts` declares. */
+export type StoredRow = Record<string, unknown>;
+
+export const planVersionRow = (rules: unknown = CORE_EOD_RULES): StoredRow => ({
+  id: PLAN_VERSION_ID,
+  rules: storedJson(rules),
+});
+
+/**
+ * The 50K size row, materialized as `0004_catalog.sql` describes.
+ *
+ * `floor_lock_floor_at_cents` is `size_cents + 10000` and
+ * `floor_lock_at_profit_cents` is `drawdown_cents + 10000`, which is
+ * `DATA_MODEL` section 11's M1-gate amendment stated for all three plans.
+ */
+export const sizeRow = (overrides: StoredRow = {}): StoredRow => ({
+  planVersionId: PLAN_VERSION_ID,
+  sizeCents: 5_000_000n,
+  drawdownCents: 250_000n,
+  profitTargetCents: 300_000n,
+  bufferCents: 100_000n,
+  winDayFloorCents: 15_000n,
+  payoutCapScheduleCents: storedJson([{ from_ordinal: 1, cap_cents: 150_000 }]),
+  dailyLossLimitCents: null,
+  floorLockEnabled: true,
+  floorLockAtProfitCents: 260_000n,
+  floorLockFloorAtCents: 5_010_000n,
+  ...overrides,
+});
+
+/** `0004:220`'s grid: four sizes on one version, and only one is any account's. */
+export const sizeGrid = (): readonly StoredRow[] => [
+  sizeRow({ sizeCents: 2_500_000n, drawdownCents: 125_000n, profitTargetCents: 150_000n }),
+  sizeRow(),
+  sizeRow({ sizeCents: 10_000_000n, drawdownCents: 500_000n, profitTargetCents: 600_000n }),
+  sizeRow({ sizeCents: 15_000_000n, drawdownCents: 750_000n, profitTargetCents: 900_000n }),
+];
+
+export const accountRow = (overrides: StoredRow = {}): StoredRow => ({
+  id: ACCOUNT_A,
+  planVersionId: PLAN_VERSION_ID,
+  sizeCents: 5_000_000n,
+  openedOn: DAY_ONE.tradingDay,
+  ...overrides,
+});
+
+/** `daily_marks.source_hash` is `bytea`, so the fixture holds BYTES. */
+export const SOURCE_BYTES = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+
+export const markRow = (overrides: StoredRow = {}): StoredRow => ({
+  accountId: ACCOUNT_A,
+  tradingDay: DAY_ONE.tradingDay,
+  openingBalanceCents: DAY_ONE.openingBalanceCents,
+  closingBalanceCents: DAY_ONE.closingBalanceCents,
+  highBalanceCents: DAY_ONE.highBalanceCents,
+  lowBalanceCents: DAY_ONE.lowBalanceCents,
+  realizedPnlCents: DAY_ONE.realizedPnlCents,
+  adjustmentCents: DAY_ONE.adjustmentCents,
+  fillCount: DAY_ONE.fillCount,
+  // STORED AND NOT READ. The engine DERIVES both (R-08, R-09), and a reader that
+  // took them would be an engine trusting the ingester's arithmetic.
+  tradedDay: true,
+  winDay: true,
+  sourceHash: SOURCE_BYTES,
+  supersededBy: null,
+  ...overrides,
+});
+
+/** What `markRow()` should resolve to: `DAY_ONE` with the hex of `SOURCE_BYTES`. */
+export const LIVE_MARK: DailyMark = { ...DAY_ONE, sourceHash: 'deadbeef' };
