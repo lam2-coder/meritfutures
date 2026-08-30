@@ -16,7 +16,7 @@
 | `measures` | `statistic_measure[]` | not null | **[ADR-032](../../decisions/ADR-032.md).** The declared measure set, and what STAT-C1 checks a publish run against. ST-01/02/07 `{rate}`; ST-03 `{total}`; ST-04 `{mean, median}`; ST-05/06 `{p50, p95}` |
 | `method_body_mdx` | text | not null | the published methodology page |
 | `adr_ref` | text | null | the ruling that fixed this definition |
-| `effective_from` | date | not null | **always in the future at write time** (INV-M12-07). A definition that takes effect retroactively is a definition chosen after seeing the number it produces **Unit: wall clock**, a definition validity window. |
+| `effective_from` | date | not null | **always in the future at write time** (INV-M12-07). A definition that takes effect retroactively is a definition chosen after seeing the number it produces **Unit: wall clock**, a definition validity window. **A DAY AND NOT AN INSTANT, ruled correct by [ADR-276](../../decisions/ADR-276.md) clause 1**: `version` carries identity in `statistic_definitions_code_version_uq`. **AND IT IS THE ONE PLACE A `wall clock` DAY MEETS THE EXCHANGE CALENDAR.** [`ports.ts`](../../../apps/worker/src/batch/ports.ts) states the adapter's obligation as `effective_from <= asOfTradingDay`, which is SOUND because it is an order comparison over two `YYYY-MM-DD` values and not day arithmetic. Adding to or subtracting from this value in days, or counting days between it and a trading day, is trading-day arithmetic on a wall-clock value and is wrong on roughly 104 days a year ([ADR-276](../../decisions/ADR-276.md) section 5) |
 | `superseded_by` | uuid | fk statistic_definitions, null, on delete restrict | |
 | `created_at` | timestamptz | not null default now() | |
 
