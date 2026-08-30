@@ -9,8 +9,8 @@
 //   node packages/tooling/checks/repo-invariants.mjs RI-01   run one
 //   node packages/tooling/checks/repo-invariants.mjs list    list them
 //
-// Exit code is 0 only when every check that ran reported PASS.
-//
+// Exit codes: 0 every check PASSED, 1 a check FAILED, 2 a usage error, and 3 a
+// check CRASHED, which is its own outcome and never a held invariant. ADR-294.
 // THE SAME TWO RULES gates.mjs IS WRITTEN UNDER, and for the same reason:
 //
 //   1. NEVER WEAKEN A CHECK TO PASS IT. A check that cannot verify the whole of
@@ -7979,46 +7979,132 @@ export const CHECKS = [
   ri33,
 ];
 
+// =============================================================================
+// THE REPORT, AND WHY A CRASH IS ITS OWN OUTCOME
+// =============================================================================
+// ADR-294. This runner used to count a check whose body threw into the same
+// tally as a check that found a violation, and then print the difference as
+//
+//     29 of 30 invariants hold.
+//
+// over a run of 30 checks that produced 29 passes, ZERO fails and ONE crash.
+// Every word of that line is the wrong shape. It reads as a measurement, it
+// puts the crashed check on the held side of the sentence by arithmetic, and a
+// session reading it cannot tell a real violation from a broken runner. Two
+// sessions hit it in one afternoon with `node_modules` absent, where RI-18's
+// lazy `typescript` load throws, and both reported the COUNT rather than the
+// CRASH, which is the direction this project can least afford to be wrong in:
+// header rule 2 says a check that cannot run is not a check that passed, and
+// the report was saying the opposite.
+//
+// So the tally is THREE-WAY and the denominator never moves. A crashed check is
+// reported ERROR, is counted apart from both PASS and FAIL, stays in the `of N`,
+// and takes the exit code to `EXIT.CRASHED` rather than sharing `EXIT.VIOLATED`
+// with a real finding. The `N of N invariants hold` sentence is printed ONLY on
+// a run where nothing crashed, because that sentence is a claim about a
+// completed measurement and a run holding an ERROR did not complete one.
+//
+// THE OUTCOME IS DECIDED HERE AND NOT INSIDE ANY CHECK, which is what makes it
+// hold for `ri11` and `ri18`, the two checks that live in other files and are
+// imported into `CHECKS`: they throw across a module boundary like any other
+// and this `try` is what reads them. The one crash it cannot see is a module
+// that throws while it is being IMPORTED, which kills the process before a
+// check runs at all. That is the reason RI-18 loads its compiler lazily, and it
+// is survivable for the same reason: node exits non-zero with a stack trace and
+// no summary, so it can never be mistaken for a count.
+
+/**
+ * The exit codes, named because the shell is where the distinction is spent.
+ *
+ * `CRASHED` is 3 rather than 2 because 2 already means a usage error, and it is
+ * separate from `VIOLATED` because "this tree breaks an invariant" and "this run
+ * did not measure the tree" are different facts that want different responses.
+ * It DOMINATES `VIOLATED` on a run that produced both: the findings you can see
+ * are the smaller news when a check went unread.
+ */
+export const EXIT = { OK: 0, VIOLATED: 1, USAGE: 2, CRASHED: 3 };
+
+/**
+ * Run `checks`, emitting one transcript line at a time, and return the tally.
+ *
+ * `emit` is a parameter rather than a bare `console.log` so the suite can read
+ * the transcript this file actually prints instead of a second copy of the
+ * wording, and so a long run still streams line by line instead of going quiet
+ * until the last check returns.
+ *
+ * @param {readonly Invariant[]} checks
+ * @param {{ root?: string, emit?: (line: string) => void }} [options]
+ * @returns {{ passed: number, failed: number, errored: number, total: number, exitCode: number }}
+ */
+export function runChecks(checks, options = {}) {
+  const { root = REPO_ROOT, emit = console.log } = options;
+  const total = checks.length;
+  let passed = 0;
+  let failed = 0;
+  let errored = 0;
+
+  for (const check of checks) {
+    /** @type {string[]} */
+    let findings;
+    try {
+      findings = check.run(root);
+    } catch (err) {
+      errored++;
+      emit(`ERROR  ${check.id}  ${check.title}  (THIS CHECK DID NOT RUN)`);
+      emit(`       ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    if (findings.length === 0) {
+      passed++;
+      emit(`PASS   ${check.id}  ${check.title}`);
+    } else {
+      failed++;
+      emit(`FAIL   ${check.id}  ${check.title}  (${findings.length})`);
+      for (const f of findings) emit(`       ${f}`);
+    }
+  }
+
+  emit('');
+  if (errored === 0) {
+    emit(
+      `${passed} of ${total} invariants hold.` +
+        (failed ? ' Each one is a property the scaffold exists to make impossible to lose.' : ''),
+    );
+  } else {
+    emit(`${errored} of ${total} check(s) COULD NOT RUN, so this run did not measure the tree.`);
+    emit(`${passed} passed, ${failed} failed, ${errored} errored, of ${total} check(s).`);
+    emit(
+      'A CHECK THAT CRASHED IS NOT A CHECK THAT HELD, so this run does not get to say ' +
+        `"${passed} of ${total} invariants hold": it is ${passed} measurement(s) and ` +
+        `${errored} unknown(s), and the unknown is where a violation hides. Fix the ` +
+        'ERROR above and run it again.',
+    );
+  }
+
+  return {
+    passed,
+    failed,
+    errored,
+    total,
+    exitCode: errored > 0 ? EXIT.CRASHED : failed > 0 ? EXIT.VIOLATED : EXIT.OK,
+  };
+}
+
 function main() {
   const [arg] = process.argv.slice(2);
 
   if (arg === 'list') {
     for (const c of CHECKS) console.log(`${c.id}  ${c.title}\n      covers: ${c.covers}\n`);
-    return 0;
+    return EXIT.OK;
   }
 
   const selected = arg ? CHECKS.filter((c) => c.id === arg) : CHECKS;
   if (selected.length === 0) {
     console.error(`no such check: ${arg}. Try: list`);
-    return 2;
+    return EXIT.USAGE;
   }
 
-  let failed = 0;
-  for (const check of selected) {
-    /** @type {string[]} */
-    let findings;
-    try {
-      findings = check.run(REPO_ROOT);
-    } catch (err) {
-      console.log(`ERROR  ${check.id}  ${check.title}`);
-      console.log(`       ${err instanceof Error ? err.message : String(err)}`);
-      failed++;
-      continue;
-    }
-    if (findings.length === 0) {
-      console.log(`PASS   ${check.id}  ${check.title}`);
-    } else {
-      failed++;
-      console.log(`FAIL   ${check.id}  ${check.title}  (${findings.length})`);
-      for (const f of findings) console.log(`       ${f}`);
-    }
-  }
-
-  console.log(
-    `\n${selected.length - failed} of ${selected.length} invariants hold.` +
-      (failed ? ' Each one is a property the scaffold exists to make impossible to lose.' : ''),
-  );
-  return failed ? 1 : 0;
+  return runChecks(selected).exitCode;
 }
 
 // Importable by the test that watches each check fail, runnable by CI-01.
