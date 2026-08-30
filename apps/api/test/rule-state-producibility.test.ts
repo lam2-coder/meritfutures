@@ -17,6 +17,14 @@
 // section 5 below, and it did not move when the worker landed because nothing
 // the worker landed touches it.
 //
+// **AND ADR-285 INVERTED A LINK RATHER THAN ADDING ONE, WHICH IS THE FIRST TIME
+// A CHECK IN THIS FILE HAS CHANGED DIRECTION.** Link 7's last-but-two case
+// required that `routes/payouts.ts` contain no `RuleStateAbsent` AT ALL, because
+// the absence of a refusal path was the finding. The path exists now, so the
+// same case asserts its PRESENCE, asserts that `RuleStateUnreadable` is still
+// NOT caught, and asserts that no arm of that route builds a `RuleState`. A
+// check deleted when its finding closes is a property nothing holds afterwards.
+//
 // THE FILE EXISTS BECAUSE OF THE DEFECT SESSION 426 NAMED: a comment cannot
 // fail. Every clause below was true when somebody wrote it, and the one that
 // went false went false quietly, in another fence, and propagated to four
@@ -929,31 +937,49 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     );
   });
 
-  test('and an ABSENT `rule_states` row has no path to a problem document either', () => {
-    // **THE SECOND INDEPENDENT GROUND, AND IT IS WHAT ANSWERS ROW `281`'s
-    // QUESTION.** The row asked whether the port refuses on an empty table or
-    // wires and answers honestly that there is no state for the day. THE SECOND
-    // ARM DOES NOT EXIST YET AND IT IS CODE RATHER THAN A VARIABLE.
+  test('and an ABSENT `rule_states` row now has an HONEST refusal rather than a 500', () => {
+    // **THE SECOND INDEPENDENT GROUND, AND IT IS THE ONE THAT MOVED. `ADR-285`.**
+    // Row `281` asked whether the port refuses on an empty table or wires and
+    // answers honestly that there is no state for the day, `ADR-283` answered
+    // that the second arm DID NOT EXIST, and this row built it.
     //
-    // `ruleStateOn` throws `RuleStateAbsent`, which is correct and is the
-    // property four sessions have refused to give up. But `unwiredOrThrow`
-    // RETHROWS anything that is not a `PayoutBackendUnwired`, so a wired backend
-    // meeting an unfolded day answers **500** and not the honest refusal. A 500
-    // on the door where money leaves the firm is a live-looking route emitting
-    // an internal error, which is the shape this port's own rule refuses.
+    // THE RETIRED ASSERTION IS DESCRIBED RATHER THAN LEFT IN PLACE. This link
+    // used to require that `payouts.ts` contain no `RuleStateAbsent` at all, on
+    // the ground that a wired backend meeting an unfolded day answered 500. That
+    // is now false and the check is INVERTED rather than deleted: an arm nothing
+    // asserts is an arm the next refactor removes.
     //
-    // **`ADR-283` RE-DERIVED THIS RATHER THAN CARRYING IT**, because it is now
-    // the LEAD reason on the entry and a lead reason nobody re-checked is how
-    // this port came to name its second-cheapest blocker three times.
+    // **THE PORT IS NOT WIRED BY ANY OF THIS**, which is why the two links
+    // around this one are the ones that still hold: the size row above and the
+    // absent `PayoutTx` below.
     const route = codeOf(join(REPO_ROOT, 'apps/api/src/routes/payouts.ts'));
-    expect(route).toContain('if (!(err instanceof PayoutBackendUnwired)) throw err;');
-    expect(
-      route,
-      'the route gained a refusal path for an absent row, so ADR-281 ruling 3 has moved',
-    ).not.toContain('RuleStateAbsent');
 
-    // AND THE READER STILL REFUSES, so the missing arm is the route's and never
-    // a licence to answer the absence in the reader.
+    // The rethrow is UNCHANGED, so the arm is a case beside it and never a
+    // widening of it: an `unwiredOrThrow` that stopped rethrowing would answer
+    // every internal fault on this route with a retryable 503.
+    expect(route).toContain('if (!(err instanceof PayoutBackendUnwired)) throw err;');
+
+    // THE ARM IS REACHED FROM THE TRANSACTION'S OWN CATCH, ahead of the rethrow.
+    expect(route).toContain(
+      'if (err instanceof RuleStateAbsent) return stateNotFolded(err, request, reply);',
+    );
+    expect(route).toContain(
+      "handlerProblem('service_unavailable', 'Service unavailable', 503, request.id),",
+    );
+
+    // **AND `RuleStateUnreadable` IS NOT CAUGHT, WHICH IS THE HALF THAT KEEPS
+    // THIS FROM BEING A BLANKET CATCH.** A malformed row is an internal error
+    // and a 503 would tell a trader to retry something no retry can fix.
+    expect(route).not.toContain('RuleStateUnreadable');
+
+    // **NO SYNTHESISED DEFAULT, WHICH IS THE PROPERTY FIVE SESSIONS REFUSED TO
+    // GIVE UP.** The honest arm builds a problem document and never a state:
+    // this route constructs no `RuleState` and calls no folding function.
+    expect(route).not.toMatch(/\bfoldRuleState\b/);
+    expect(route).not.toMatch(/:\s*RuleState\s*=/);
+
+    // AND THE READER STILL REFUSES, so the arm is the route's and never a
+    // licence to answer the absence where the row is read.
     expect(codeOf(join(REPO_ROOT, 'apps/api/src/rule-state-reader.ts'))).toContain(
       'throw new RuleStateAbsent',
     );
