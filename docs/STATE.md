@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->274<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->275<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -10893,3 +10893,33 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **Next.** Rows `285` and `286` remain the near-term path and neither was touched. The merge-ritual fix is not in this repository's code and [ADR-288](decisions/ADR-288.md) section 7 does not pretend to write it.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **30 of 30** invariants off the runner's own last line, **297 files / 7,223 passed / 6 skipped** against a baseline taken on this same tree before a line changed of **297 / 7,223 / 6**, a delta of **ZERO**, which is what a two-literal rename must report. Typecheck 0, lint 0, `format:check` clean. **Both `VG-1` halves run separately and each reports `no leaks found` and exits 0.** **`pnpm run verify` was NOT run and `falsify.mjs` was NOT run**, both forbidden by the row.
+
+---
+
+## 2026-08-30 - Session 480: an id with no supplier, and the field comes OUT of the frozen contract rather than being satisfied ([ADR-289](decisions/ADR-289.md), proposed)
+
+**Row `289`, [ADR-287](decisions/ADR-287.md) slice 1 and finding F2. THE RULING IS THAT THE FROZEN CONTRACT MOVES.** `eligibility_snapshot_id` is deleted from `PayoutResponse` in [API_CONTRACT](architecture/API_CONTRACT.md) section 6, and `PayoutTx.insertPayoutRequest` is ruled to return `Promise<void>`. [ADR-289](decisions/ADR-289.md), eight sections, `proposed` and UNSIGNED, **MONEY PATH with the `E2` read OWED**.
+
+**BOTH HALVES OF F2 WERE RE-DERIVED AT SOURCE AND BOTH HOLD.** The port declares `Promise<{ readonly eligibilitySnapshotId: string }>`, the route destructures it and writes it to the wire, and nothing supplies it: `eligibility_snapshot` in `packages/db/migrations` is two lines, a `jsonb` column and a comment, and the two spellings over `apps`, `packages` and `scripts` are seven lines in two files, every one of them the port, the route, or the port's own test fixture.
+
+**FIVE OF THE CITATIONS CARRYING THOSE FINDINGS DO NOT HOLD, AND THAT IS WHAT THE RE-DERIVATION WAS FOR.** [ADR-287](decisions/ADR-287.md) F2 cites `payouts.ts:588-566`, a **backwards range**, plus `:1177`, `:1226` and `:248`; the live lines are `588-590`, `:1201`, `:1250` and `:249`, and its wiring-count citation `:1337` is a fifth. **The cause is a half-applied repair rather than an oversight**: [ADR-285](decisions/ADR-285.md)'s build added 125 lines to that file and session 478's repoint pass moved F2's first citation **by its start only**. **Every finding survives its own drift**, which is the result worth recording either way.
+
+**THE DECISIVE ARGUMENT AGAINST THE OBVIOUS SHAPE IS A FACT THE ROW COULD NOT HAVE KNOWN.** Returning `payout_requests.id` is not merely a duplicate field: the route **generates that id itself with `randomUUID()` one line above the call** and hands it to the insert, so the port would return its own argument to a caller already holding it in a local. And the name would assert a separately addressable proof that [`0010:70-73`](../packages/db/migrations/0010_payouts.sql) refuses to create in its own comment, so if such a store is ever built the two identifiers diverge silently on the money path.
+
+**THE OTHER TWO SHAPES ARE REFUSED WITH REASONS RATHER THAN DISMISSED.** A minted uuid addresses nothing, no endpoint accepts one, and it does not survive a second read. A migration is refused in both sub-shapes: a snapshot table contradicts `0010`'s written reasoning and is an `E2` supersession that buys a second primary key for one row, and an id column on `payout_requests` itself is a second name for `id` with no referential meaning. **Because the migration is refused on the merits, NO NUMBER IS TAKEN AND NONE IS RESERVED**, which is the cleaner half of the row's own instruction.
+
+**THE REMOVAL BREAKS NO CLIENT AND THAT IS WHAT MAKES IT CHEAP RATHER THAN EXPENSIVE.** `usePayoutBackend` is `BLOCKED` and the live assertion reads `{ declared: 24, wired: 10, blocked: 14 }`, so no deployment has ever served this field. **Its one test is a tautology**: the fixture returns a value it invents from the request id and the assertion checks the response equals that invention.
+
+**THE FENCE HELD AND ONE FILE MOVED UNDER ITS CONDITIONAL ARM.** [API_CONTRACT](architecture/API_CONTRACT.md) was in the fence only if the ruling was that the contract moves. One deleted line and one bolded note in that section's own convention, written so the field is not restored by a later reader who finds it missing. **`apps/api/src/**` and `packages/db/**` are untouched.**
+
+**SEVEN OWED LINES ARE SPECIFIED AND NOT TAKEN.** Five in `payouts.ts` and two in `payouts.test.ts`, given as a checklist with the note that the numbers will move and the row that takes them matches on text. **No allocated row's fence reaches `apps/api/src/routes/payouts.ts`**, so they are owed to a row that has one, and **that row should run before slice 3 rather than inside slice 6**: a declared return value nothing can supply is exactly the invitation [ADR-287](decisions/ADR-287.md) diagnoses this port's whole history as accepting.
+
+**Registered and not built.** No gate binds [API_CONTRACT](architecture/API_CONTRACT.md) section 6's field list to `payouts.ts`. `RI-17` checks that endpoints resolve to routes, not that response shapes agree, **so the contract and the port are out of step until the owed row lands and nothing will say so.**
+
+**Recorded and not taken.** No trader-facing endpoint serves the eligibility snapshot at all; only the admin drill-down does, inline and keyed by `payout_request_id`. That gap is real, is separable, and is deliberately not this field's justification, because a trader endpoint would need no second identifier either.
+
+**LANDMINE, AND IT REACHES EVERY SESSION IN THIS CONTAINER.** The tree arrived with **no `node_modules`**, and `repo-invariants.mjs` reported **29 of 30** with `RI-18` erroring `Cannot find module 'typescript'`. That reads exactly like a broken invariant and is not one. `pnpm install --frozen-lockfile` restored **30 of 30**. **A session that reports an invariant count before installing reports a false one.**
+
+**Next.** Row `290` (session 481) owns slice 2, the `failure_note` and `timeline` ruling. Row `291` (session 482) owns slice 3, the first real payout backend, and `RI-32` is still free for it. The seven owed lines need a row of their own.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **30 of 30** invariants off the runner's own last line, **297 files / 7,223 passed / 6 skipped**, identical to session 479's figure as a docs-only change must be. Typecheck exit 0, lint exit 0, `format:check` reports `All matched files use Prettier code style!`. **`pnpm run verify` was NOT run and `falsify.mjs` was NOT run**, both forbidden by the row.
