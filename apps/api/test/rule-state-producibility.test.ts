@@ -37,6 +37,8 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
+import { decodePlanRules, PlanRulesCodecError } from '@merit/rules-engine';
+
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
 /** Every `.ts` file under a deployable's or a package's `src/`. */
@@ -782,26 +784,22 @@ describe('link 6: the READER exists, and the DAY it selects by now has a door', 
   });
 });
 
-describe('link 7: `plan` is the field no reason on this port has ever named, and it refuses', () => {
-  // **THE ENTRY'S SIXTEENTH-REVISION SUMMARY SENTENCE IS FALSE IN ITS FIRST
-  // CLAUSE, AND THAT IS `ADR-281`'s SUBJECT.** It read that `plan` waits on
-  // NOTHING because `ADR-233` catalogued `planVersions` and `planVersionSizes`.
-  // `ADR-233` gave this transaction the READ. It did not give it the DECODE,
-  // and `PayoutSubject.plan` is a `ResolvedPlan` rather than a row.
+describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller and named', () => {
+  // **`ADR-281` FOUND THAT THE ENTRY'S SIXTEENTH-REVISION SUMMARY WAS FALSE IN
+  // ITS FIRST CLAUSE**: it said `plan` waited on NOTHING because `ADR-233`
+  // catalogued `planVersions` and `planVersionSizes`. `ADR-233` gave this
+  // transaction the READ and not the DECODE, and `PayoutSubject.plan` is a
+  // `ResolvedPlan` rather than a row.
   //
-  // **THIS IS THE THIRD TIME THIS ENTRY HAS NAMED THE SECOND-CHEAPEST BLOCKER**,
-  // which is a failure mode `wiring.test.ts` has diagnosed in itself twice on
-  // other ports and once on this one. A session dispatched to remove what the
-  // entry named -- a scheduled run, and a calendar door that `ADR-268` has
-  // already built -- would have removed both and found the port still
-  // unwireable, with no written account of why.
-  //
-  // **AND THE SAME BLOCKER IS ALREADY LIVE ONE PORT OVER, ON THE SAME VALUE.**
-  // `setAdminReadSource`'s entry carries it for `readLiability` (`ADR-269`),
-  // and `EligibleFoldUnwired` states it in its own message. Two ports in one
-  // deployable wait on one decoding and only one of them said so.
+  // **`ADR-283` TOOK THE MOVE THAT ENTRY REGISTERED AND COULD NOT MAKE.**
+  // `decodePlanRules` (`packages/rules-engine/src/plan/rules-codec.ts`) is
+  // exported from the engine, `apps/api` has declared that package since session
+  // 252, and the blob half of the `ResolvedPlan` is a call somebody can write on
+  // the payout transaction. THE PORT STILL DOES NOT WIRE, and the cases below
+  // are what keeps this file from repeating the failure it diagnoses: three
+  // clauses NARROW and each is measured rather than described.
 
-  test('`PayoutSubject.plan` is a `ResolvedPlan`, and NO `apps/api` file produces one', () => {
+  test('`PayoutSubject.plan` is a `ResolvedPlan`, and NO `apps/api` file produces one yet', () => {
     // THE NEEDLE IS THE RESOLVER CALL AND NOT THE TYPE NAME, on link 6's own
     // reasoning: a file that NAMES `ResolvedPlan` is usually declaring a
     // parameter, and every consumer of the fold declares one. A file that
@@ -818,6 +816,8 @@ describe('link 7: `plan` is the field no reason on this port has ever named, and
     // resolver and `apps/worker` is the only deployable that calls it. A third
     // entry appearing under `apps/api/src` is this port's `plan` half landing,
     // and it turns this case red so the entry above cannot stay as it is.
+    // **`ADR-283` DID NOT MOVE THIS NUMBER AND SAYS SO**: it landed the decoding
+    // the resolver needs and wired nothing.
     expect(producers).toEqual([
       'apps/worker/src/batch/adapter.ts',
       'packages/rules-engine/src/plan/resolve.ts',
@@ -825,13 +825,12 @@ describe('link 7: `plan` is the field no reason on this port has ever named, and
     expect(producers.filter((path) => path.startsWith('apps/api/'))).toEqual([]);
   });
 
-  test('and the blocker is the DECODING rather than the declaration, which is now discharged', () => {
-    // **THE HALF THAT IS DISCHARGED, ASSERTED SO NOBODY RE-DERIVES IT.**
-    // `apps/api` declares `@merit/rules-engine` (session 252), so `resolvePlan`
-    // is reachable from this deployable. TWO SENTENCES IN THIS DEPLOYABLE STILL
-    // SAY IT IS NOT and `ADR-281` section 7 registers both; they are wrong about
-    // the reason and right about the conclusion, which is the shape this file
-    // exists to catch.
+  test('the DECODING is no longer the blocker, and the engine is where it landed', () => {
+    // **BOTH HALVES ARE NOW DISCHARGED AND EACH IS ASSERTED SO NOBODY
+    // RE-DERIVES IT.** The declaration half was discharged in session 252 and
+    // `ADR-281` section 7 found two sentences in this deployable still denying
+    // it; both are repaired by `ADR-283`, which is what makes this case a pair
+    // rather than a single assertion.
     const manifest = JSON.parse(readFileSync(join(REPO_ROOT, 'apps/api/package.json'), 'utf8')) as {
       dependencies?: Record<string, string>;
     };
@@ -839,30 +838,34 @@ describe('link 7: `plan` is the field no reason on this port has ever named, and
 
     const engineDoor = readFileSync(join(REPO_ROOT, 'packages/rules-engine/src/index.ts'), 'utf8');
     expect(engineDoor).toContain("export { resolvePlan } from './plan/resolve.ts';");
+    expect(engineDoor).toContain(
+      "export { decodePlanRules, PlanRulesCodecError } from './plan/rules-codec.ts';",
+    );
 
-    // **AND THE HALF THAT IS NOT.** `resolvePlan` takes a DECODED
-    // `PlanRulesJson`, and `plan_versions.rules` is `jsonb`, so a producer needs
-    // a decoder. The engine declares none: `PlanRulesJson` leaves that package
-    // as a TYPE and no function in it returns one.
+    // AND THE SIGNATURE IS THE ONE `resolvePlan` TAKES, which is the property a
+    // name in a barrel does not carry: a decoder returning something adjacent to
+    // `PlanRulesJson` would satisfy the export assertion and satisfy nothing
+    // else.
+    expect(codeOf(join(REPO_ROOT, 'packages/rules-engine/src/plan/rules-codec.ts'))).toContain(
+      "export function decodePlanRules(value: unknown, at = '$'): PlanRulesJson {",
+    );
     expect(codeOf(join(REPO_ROOT, 'packages/rules-engine/src/plan/resolve.ts'))).toContain(
       'export function resolvePlan(rules: PlanRulesJson, size: PlanVersionSizeRow): ResolvedPlan {',
     );
-    const engineSrc = deployableSources()
-      .filter((path) => rel(path).startsWith('packages/rules-engine/src/'))
-      .map((path) => codeOf(path))
-      .join('\n');
-    expect(
-      engineSrc,
-      'the engine gained a `rules` decoder, so `plan` may be buildable',
-    ).not.toMatch(/\)\s*:\s*PlanRulesJson\b/);
   });
 
-  test('and the TWO decoders that exist are in deployables `apps/api` cannot import', () => {
-    // **THE CENSUS IS OVER THE TREE RATHER THAN OVER A LIST**, on link 6's
-    // idiom, so a THIRD decoder landing anywhere turns this red rather than
-    // being noticed in review. `FM-16` is two statements of one predicate with
-    // nothing comparing them, and this blob fixes every cents value a payout is
-    // decided against.
+  test('the tree states this one predicate THREE times, and the census is held at exactly three', () => {
+    // **`FM-16` IS TWO STATEMENTS OF ONE PREDICATE WITH NOTHING COMPARING THEM,
+    // AND THIS TREE NOW HAS THREE.** That is stated rather than softened.
+    // `ADR-283` landed the HOME `ADR-239` slice A ruled, and the two copies it
+    // exists to retire live in `apps/worker/src/**` and `apps/site/src/**`,
+    // which row `283`'s fence declared out of bounds. Collapsing them is the row
+    // that follows and this census is what makes its completion visible: the
+    // list drops to one member the day it lands.
+    //
+    // **A FOURTH ENTRY IS THE FAILURE THIS CASE EXISTS TO CATCH**, and it is the
+    // shape `ADR-269` already refused one port over for this same value: a
+    // decoder written into `apps/api` because the engine's was not noticed.
     const decoders = deployableSources()
       .filter((path) => /\)\s*:\s*(?:PlanRulesJson|PublishedRules)\b/.test(codeOf(path)))
       .map(rel)
@@ -871,11 +874,12 @@ describe('link 7: `plan` is the field no reason on this port has ever named, and
     expect(decoders).toEqual([
       'apps/site/src/catalog/adapter.ts',
       'apps/worker/src/batch/adapter.ts',
+      'packages/rules-engine/src/plan/rules-codec.ts',
     ]);
     expect(decoders.filter((path) => path.startsWith('apps/api/'))).toEqual([]);
 
     // AND EACH IS WHAT IT IS SAID TO BE, because a census that named only the
-    // count would be satisfied by two files that had drifted into the pattern.
+    // count would be satisfied by three files that had drifted into the pattern.
     expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
       'function toPublishedRules(value: unknown, at: string): PublishedRules {',
     );
@@ -883,13 +887,46 @@ describe('link 7: `plan` is the field no reason on this port has ever named, and
       'function decodeRules(value: unknown, where: string): PlanRulesJson {',
     );
 
-    // **AND THE SHARED HOME IS RULED AND UNTAKEN.** `ADR-239` slice A puts it in
-    // `packages/rules-engine` beside `gates-codec.ts`, which is the same ruling
-    // `ADR-250` executed for `engine_gates` and `ADR-264` section 6 registered
-    // for `readRuleState`. The day it lands, the case above goes red.
-    expect(
-      readFileSync(join(REPO_ROOT, 'apps/api/src/admin-source/eligible-next-7d.ts'), 'utf8'),
-    ).toContain('ADR-239 slice A rules the shared home is ');
+    // **AND ONLY ONE OF THE THREE IS EXPORTED**, which is what makes it the home
+    // rather than a third peer: the other two are module-private to deployables
+    // nothing may import.
+    expect(codeOf(join(REPO_ROOT, 'packages/rules-engine/src/plan/rules-codec.ts'))).toContain(
+      'export function decodePlanRules',
+    );
+  });
+
+  test('what `plan` waits on now is the SIZE ROW, which is measured rather than assumed', () => {
+    // **THE HONEST RESIDUE, NAMED HERE SO THE NEXT SESSION DOES NOT DISCOVER
+    // IT.** `resolvePlan` takes TWO arguments and this row cleared the first.
+    // `ScopedTx.catalogRowAt` returns `Promise<unknown>`, so the size row arrives
+    // untyped exactly as the blob did, and one of its columns is itself `jsonb`
+    // carrying money.
+    const scoped = readFileSync(join(REPO_ROOT, 'packages/db/src/scoped-db.ts'), 'utf8');
+    expect(scoped).toContain('catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(');
+    expect(scoped).toContain('  ): Promise<unknown>;');
+
+    const migration = readFileSync(
+      join(REPO_ROOT, 'packages/db/migrations/0004_catalog.sql'),
+      'utf8',
+    );
+    expect(migration).toMatch(/payout_cap_schedule_cents\s+jsonb NOT NULL/);
+
+    // **AND IT IS NOT ONE PREDICATE STATED TWICE, WHICH IS WHY `ADR-283` DID NOT
+    // TAKE IT WITH THE BLOB.** The two size-row readers read two DIFFERENT
+    // sources under two different key spellings: `apps/worker` reads a driver row
+    // whose properties are `packages/db`'s camelCase, and `apps/site` reads a
+    // wire object under the stored snake_case column names. A single canonical
+    // decoder has to pick one spelling and make the other caller rename, which is
+    // a ruling somebody owns rather than a transcription.
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
+      "size_cents: bigintOf(row, 'sizeCents', at),",
+    );
+    expect(codeOf(join(REPO_ROOT, 'apps/site/src/catalog/adapter.ts'))).toContain(
+      "size_cents: bigintCents(field(source, 'size_cents', where), `${where}.size_cents`),",
+    );
+    expect(readFileSync(join(REPO_ROOT, 'packages/db/src/schema.ts'), 'utf8')).toContain(
+      "sizeCents: bigint('size_cents', { mode: 'bigint' }).notNull(),",
+    );
   });
 
   test('and an ABSENT `rule_states` row has no path to a problem document either', () => {
@@ -904,6 +941,10 @@ describe('link 7: `plan` is the field no reason on this port has ever named, and
     // meeting an unfolded day answers **500** and not the honest refusal. A 500
     // on the door where money leaves the firm is a live-looking route emitting
     // an internal error, which is the shape this port's own rule refuses.
+    //
+    // **`ADR-283` RE-DERIVED THIS RATHER THAN CARRYING IT**, because it is now
+    // the LEAD reason on the entry and a lead reason nobody re-checked is how
+    // this port came to name its second-cheapest blocker three times.
     const route = codeOf(join(REPO_ROOT, 'apps/api/src/routes/payouts.ts'));
     expect(route).toContain('if (!(err instanceof PayoutBackendUnwired)) throw err;');
     expect(
@@ -918,18 +959,108 @@ describe('link 7: `plan` is the field no reason on this port has ever named, and
     );
   });
 
-  test('and the entry no longer says the calendar is unreadable, because ADR-268 built the door', () => {
-    // THE CLAUSE `ADR-281` RETIRED, ASSERTED AS ABSENT, on link 4's idiom and
-    // for its reason: an entry still saying the day cannot be read sends the
-    // next session to build a door that landed two waves ago.
+  test('and NOTHING in this tree implements `PayoutTx`, which no clause may skip past', () => {
+    // **THE CLAUSE THAT OUTLIVES EVERY OTHER ONE.** `wiring.test.ts` clause FIVE
+    // has said it since `ADR-239` and it is the reason a discharged `plan` does
+    // not wire this port: there is no value to install. It is asserted here so a
+    // reader who watches `plan` and `state` close cannot conclude the port is one
+    // step from live.
+    const backends = deployableSources()
+      .filter((path) => /:\s*PayoutTx\b/.test(codeOf(path)) && !rel(path).endsWith('payouts.ts'))
+      .map(rel)
+      .sort();
+    expect(backends).toEqual([]);
+
+    expect(codeOf(join(REPO_ROOT, 'apps/api/src/start.ts'))).not.toContain('usePayoutBackend(');
+  });
+
+  test('and the entry names the decoding that LANDED rather than the one that was missing', () => {
+    // THE CLAUSE `ADR-283` RETIRED, ASSERTED AS ABSENT, on link 4's idiom and
+    // for its reason: an entry still saying the blob cannot be decoded sends the
+    // next session to build a codec that landed this wave.
     const reason = payoutReason();
     expect(reason).toContain('lastClosedTradingDay');
     expect(reason).toContain('ResolvedPlan');
-    expect(reason).toContain('toPublishedRules');
+    expect(reason).toContain('decodePlanRules');
 
-    // THE RETIRED SUMMARY, ASSEMBLED RATHER THAN WRITTEN OUT, so this file does
-    // not put the false sentence back into the repository's own grep results.
-    const retired = '`plan` waits on ' + 'NOTHING';
-    expect(reason).not.toContain(retired);
+    // THE TWO RETIRED SUMMARIES, ASSEMBLED RATHER THAN WRITTEN OUT, so this file
+    // does not put either false sentence back into the repository's own grep
+    // results.
+    expect(reason).not.toContain('`plan` waits on ' + 'NOTHING');
+    expect(reason).not.toContain('THE ENGINE DECLARES ' + 'NONE');
+  });
+});
+
+describe("link 8: DATA_MODEL section 11's own example, decoded rather than paraphrased", () => {
+  // **THESE CASES BELONG TO `packages/rules-engine` BY SUBJECT AND CANNOT LIVE
+  // THERE.** That package's tsconfig declares no `node` types, which is `M01`'s
+  // purity boundary reaching its test project, so `tsc --noEmit` refuses
+  // `node:fs` inside it. Widening that project to read a document would be
+  // spending the engine's I/O boundary on a test. This file already walks the
+  // tree, and the question these cases ask -- what this deployable can produce
+  // from a stored row -- is the question the file is named after.
+
+  /** The `plan_versions.rules` block of the data-model README, parsed. */
+  function corpusExample(): Record<string, unknown> {
+    const doc = readFileSync(join(REPO_ROOT, 'docs/architecture/data-model/README.md'), 'utf8');
+    const anchor = doc.indexOf('`plan_versions.rules` shape.');
+    expect(anchor, 'the data-model README no longer carries the rules example').toBeGreaterThan(0);
+    const open = doc.indexOf('```jsonc', anchor);
+    const start = doc.indexOf('\n', open) + 1;
+    return JSON.parse(doc.slice(start, doc.indexOf('```', start))) as Record<string, unknown>;
+  }
+
+  test('it carries `limits` and `kyc`, which are NOT on `PlanRulesJson`', () => {
+    // **THE REASON THIS CODEC TOLERATES AN UNDECLARED KEY AND `gates-codec.ts`
+    // DOES NOT.** The stored document is a SUPERSET by construction: `types.ts`
+    // says `limits` and `kyc` are outside this module because "what
+    // `validatePlan` may not see, it may not validate". A stray-key refusal here
+    // would refuse the corpus's own example, which is MEASURED rather than
+    // asserted.
+    expect(Object.keys(corpusExample()).sort()).toEqual([
+      'kyc',
+      'limits',
+      'phase_eval',
+      'phase_funded',
+      'schema_version',
+    ]);
+  });
+
+  test('and it is REFUSED, by the name of the key two approved documents disagree about', () => {
+    // **THIS IS ROW `283`'s QUESTION ANSWERED EXECUTABLY**: what happens to a
+    // document written before a rule existed. `M01` section 2.4 requires
+    // `min_settlement_lag_trading_days` and this example does not carry it, and
+    // `ADR-258` section 6 ruled one field over that the key is READ and never
+    // defaulted, "because a default here would be a plan parameter in
+    // application code, and it would be invisible". So the corpus's own example
+    // does not decode, LOUDLY and by name, rather than folding to `ADR-019`'s
+    // zero behind a reader's back.
+    //
+    // WHAT CLOSES IT IS ONE LINE IN ONE OF TWO APPROVED DOCUMENTS, WHICH IS AN
+    // ADR, and it is still cheap because no `plan_versions` row exists.
+    expect(() => decodePlanRules(corpusExample())).toThrow(PlanRulesCodecError);
+    expect(() => decodePlanRules(corpusExample())).toThrow(
+      /phase_funded\.min_settlement_lag_trading_days: is absent/,
+    );
+  });
+
+  test('and every OTHER key of the example decodes, so the refusal is that one key alone', () => {
+    // The example plus the single key `M01` requires. If anything else in the
+    // document disagreed with `PlanRulesJson`, this would name it instead, which
+    // is what makes the case above a statement about ONE disagreement rather
+    // than about a document nobody checked.
+    const example = corpusExample();
+    (example['phase_funded'] as Record<string, unknown>)['min_settlement_lag_trading_days'] = 0;
+    const decoded = decodePlanRules(example);
+
+    expect(decoded.schema_version).toBe(1);
+    expect(decoded.phase_funded.min_payout_cents).toBe(10_000n);
+    expect(decoded.phase_funded.split_bp).toBe(9000);
+    expect(decoded.phase_eval.max_days).toBeNull();
+
+    // AND THE UNDECLARED KEYS DID NOT SURVIVE INTO THE ENGINE'S VALUE, which is
+    // the other half of tolerating them: they are ignored rather than carried,
+    // so no rule downstream can grow a reader for one.
+    expect(Object.keys(decoded).sort()).toEqual(['phase_eval', 'phase_funded', 'schema_version']);
   });
 });

@@ -702,25 +702,53 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'sentence reads as live to every grep, and this entry has retired the same question that ' +
     'way twice already. IT SAID THE `plan` FIELD WAITED ON NOTHING, ON ADR-233`s AUTHORITY, ' +
     'AND ADR-233 GAVE THIS TRANSACTION THE READ AND NOT THE DECODE. `PayoutSubject.plan` is a ' +
-    '`ResolvedPlan` (`routes/payouts.ts:405`); `resolvePlan` takes a DECODED `PlanRulesJson` ' +
+    '`ResolvedPlan` (`routes/payouts.ts:419`); `resolvePlan` takes a DECODED `PlanRulesJson` ' +
     'and a decoded `PlanVersionSizeRow` (`packages/rules-engine/src/plan/resolve.ts:184`); and ' +
-    '`plan_versions.rules` is `jsonb`, so a catalogue row is a blob and not a plan. THE ' +
-    'DECODING EXISTS TWICE IN THIS REPOSITORY AND NEITHER COPY IS REACHABLE FROM HERE: ' +
-    '`toPublishedRules` (`apps/worker/src/batch/adapter.ts:1108`) and `decodeRules` ' +
-    '(`apps/site/src/catalog/adapter.ts:552`), and this deployable can import neither ' +
-    'deployable. THE ENGINE DECLARES NONE and `PlanRulesJson` leaves that package as a TYPE, ' +
-    'so the workspace declaration is not what refuses: `apps/api` has declared ' +
-    '`@merit/rules-engine` since session 252 and `resolvePlan` is exported ' +
-    '(`packages/rules-engine/src/index.ts:184`). A THIRD DECODER WRITTEN HERE WOULD BE `FM-16` ' +
-    'BY NAME ON THE MONEY PATH, over the blob that fixes every cents value a payout is decided ' +
-    'against, and ADR-269 REFUSED EXACTLY THAT ONE PORT OVER FOR THE SAME VALUE: ' +
-    '`EligibleFoldUnwired` states it in its own message and `setAdminReadSource`s entry above ' +
-    'carries it. ADR-239 slice A rules the shared home is `packages/rules-engine` beside ' +
-    '`gates-codec.ts`, which is where ADR-250 put this port`s other codec. THAT IS THE THIRD ' +
-    'TIME THIS ENTRY HAS NAMED THE SECOND-CHEAPEST BLOCKER, and it is the failure this file ' +
-    'diagnoses in itself rather than a new kind of miss: a session dispatched to remove what ' +
-    'this entry named would have removed a scheduled run and a calendar door that landed two ' +
-    'waves ago, found the route still answering 503, and had no written account of why. ' +
+    '`plan_versions.rules` is `jsonb`, so a catalogue row is a blob and not a plan. THAT WAS ' +
+    'THE THIRD TIME THIS ENTRY NAMED THE SECOND-CHEAPEST BLOCKER, and it is the failure this ' +
+    'file diagnoses in itself rather than a new kind of miss: a session dispatched to remove ' +
+    'what this entry named would have removed a scheduled run and a calendar door that landed ' +
+    'two waves ago, found the route still answering 503, and had no written account of why. ' +
+    'ADR-283 TOOK THE MOVE ADR-281 REGISTERED AND COULD NOT MAKE, AND THE BLOB HALF IS ' +
+    'DISCHARGED. `decodePlanRules` (`packages/rules-engine/src/plan/rules-codec.ts`) is ' +
+    'exported from the engine (`packages/rules-engine/src/index.ts`), `apps/api` has declared ' +
+    '`@merit/rules-engine` since session 252, and ADR-239 slice A is the home it landed in ' +
+    'beside `gates-codec.ts`, which is where ADR-250 put this port`s other codec. IT IS A ' +
+    'DECODE AND NOT A CAST: the return type is the engine`s own `PlanRulesJson`, so a document ' +
+    'that is not the shape THROWS `PlanRulesCodecError` naming the dotted path, and the day ' +
+    'the type grows a key the decoder fails to compile. TWO PROPERTIES DIFFER FROM ' +
+    '`gates-codec.ts` AND EACH HAS A DOCUMENT AS ITS REASON: an UNDECLARED key is tolerated, ' +
+    'because DATA_MODEL section 11 carries `limits` and `kyc` and `PlanRulesJson` deliberately ' +
+    'does not, so a stray-key refusal would refuse the corpus`s own example; and cents are ' +
+    'JSON NUMBERS rather than base-10 strings, because that example writes ' +
+    '`min_payout_cents: 10000`, with a string accepted beside a number and a number past ' +
+    '`Number.MAX_SAFE_INTEGER` refused rather than rounded. NO `CV-nn` IS RE-RUN AT READ AND ' +
+    'THAT IS A RULING RATHER THAN AN OMISSION: `validatePlan` TAKES the decoded type, so it is ' +
+    'not an alternative to decoding, and it needs EVERY size of the version, so a read holding ' +
+    'the account`s ONE pinned size would get an `ok` about a different question than the ' +
+    'publish gate answered. The read-time floor is the five refusals `resolvePlan` already ' +
+    'makes (CV-01, CV-03, CV-06, CV-16 and SD-10), and a row published before any OTHER ' +
+    '`CV-nn` existed decodes unchecked, which ADR-283 section 4 states rather than hides. AN ' +
+    'ABSENT KEY IS REFUSED AND NEVER DEFAULTED, on ADR-258 section 6`s ruling one field over, ' +
+    'so DATA_MODEL section 11`s OWN EXAMPLE does not decode: it carries no ' +
+    '`min_settlement_lag_trading_days`, which M01 section 2.4 requires, and ' +
+    '`rule-state-producibility.test.ts` link 8 decodes the document out of the README on every ' +
+    'run to prove it. WHAT `plan` WAITS ON NOW IS THE SIZE ROW AND IT IS SMALLER AND NAMED: ' +
+    '`ScopedTx.catalogRowAt` returns `Promise<unknown>` (`packages/db/src/scoped-db.ts:3620`) ' +
+    'and `plan_version_sizes.payout_cap_schedule_cents` is itself `jsonb` holding cents ' +
+    '(`packages/db/migrations/0004_catalog.sql:168`), so the second argument is a blob too. ' +
+    'ADR-283 DID NOT TAKE IT AND SAYS WHY: the two readers that exist read two DIFFERENT ' +
+    'sources under two different key spellings, `apps/worker` a driver row whose properties ' +
+    'are `packages/db`s camelCase and `apps/site` a wire object under the stored snake_case ' +
+    'column names, so it is NOT one predicate stated twice and a canonical decoder has to make ' +
+    'one caller rename, which is a ruling somebody owns. A FOURTH STATEMENT OF THE BLOB ' +
+    'WRITTEN HERE WOULD STILL BE `FM-16` ON THE MONEY PATH, and ADR-269 REFUSED EXACTLY THAT ' +
+    'ONE PORT OVER FOR THE SAME VALUE: `EligibleFoldUnwired` states it in its own message and ' +
+    '`setAdminReadSource`s entry above carries it. AND THE TREE STATES THE BLOB`s DECODING ' +
+    'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1108`) and ' +
+    '`decodeRules` (`apps/site/src/catalog/adapter.ts:552`) COLLAPSE ONTO THE ENGINE`s, which ' +
+    'row 283`s fence put out of bounds; link 7 holds that census at exactly three so a FOURTH ' +
+    'cannot arrive unnoticed and the retirement is visible the day it lands. ' +
     '`gates` STILL WAITS ON NOTHING (ADR-260) AND THAT IS RE-DERIVED RATHER THAN CARRIED: ' +
     '`ExternalGateFacts` takes raw scalars and two row lists, `identities` is `root` and ' +
     '`accounts`, `kycVerifications` and `payoutRequests` are `owned`, so every input is on this ' +
@@ -728,7 +756,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'EMPTY TABLE, AND ROW 281 ASKED WHETHER A PORT REFUSES ON ONE OR WIRES AND ANSWERS HONESTLY ' +
     'THAT THERE IS NO STATE FOR THE DAY. IT IS ANSWERED, AND THE ANSWER IS THAT THE SECOND ARM ' +
     'DOES NOT EXIST: `ruleStateOn` throws `RuleStateAbsent`, `unwiredOrThrow` ' +
-    '(`routes/payouts.ts:1372`) RETHROWS anything that is not a `PayoutBackendUnwired`, and a ' +
+    '(`routes/payouts.ts:1386`) RETHROWS anything that is not a `PayoutBackendUnwired`, and a ' +
     'wired backend meeting an unfolded day therefore answers 500 on the door where money leaves ' +
     'the firm. A 500 is not an honest answer that there is no state for the day; it is an ' +
     'internal error from a live-looking route, which is the shape this port has refused. ' +
@@ -737,12 +765,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'such a gap. A SYNTHESISED DEFAULT IS NOT A THIRD OPTION: `RuleStateAbsent` is a class and ' +
     'not an arm, and a fabricated `RuleState` is a payout basis nobody computed. ' +
     'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED AT TEN OF TWENTY-FOUR DECLARED ' +
-    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A SECOND TIME: every clause on this ' +
+    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A THIRD TIME: every clause on this ' +
     'entry until ADR-264 named something nobody had BUILT, ADR-268 closed the one that named a ' +
-    'READ, and what stands now is a decoding whose home is RULED and untaken plus a refusal arm ' +
-    'this deployable has never had. BOTH ARE CODE SOMEBODY WRITES IN THIS REPOSITORY, which is ' +
-    'what keeps this entry a liability that can expire: an entry whose last obstruction is an ' +
-    'operator fact ADR-241 ruled EXTERNAL is one nothing here could ever discharge. THE FIRM-READ CLAUSE IS ' +
+    'READ, ADR-281 found a decoding whose home was RULED and untaken, and ADR-283 TOOK IT. ' +
+    'WHAT STANDS NOW IS THREE THINGS AND NOT ONE, WHICH IS WHY A READER WHO WATCHED `plan` ' +
+    'NARROW MAY NOT CONCLUDE THIS PORT IS ONE STEP FROM LIVE: the SIZE ROW`s decoding, the ' +
+    'honest refusal arm for an absent `rule_states` row that this deployable has never had, ' +
+    'and the fact that NOTHING IN THIS TREE IMPLEMENTS `PayoutTx` AT ALL, which is clause FIVE ' +
+    'and has outlived every other clause here. ALL THREE ARE CODE SOMEBODY WRITES IN THIS ' +
+    'REPOSITORY, which is what keeps this entry a liability that can expire: an entry whose ' +
+    'last obstruction is an operator fact ADR-241 ruled EXTERNAL is one nothing here could ' +
+    'ever discharge. AND THE SMALLEST OF THE THREE IS NOT THE ONE THIS ENTRY LEADS WITH, ' +
+    'WHICH IS THE HABIT THIS FILE KEEPS CATCHING IN ITSELF: the refusal arm is the cheapest, ' +
+    'the size row is next, and the missing backend is the whole purchase. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:3392`), a closed list of five `firm` keys that includes ' +
