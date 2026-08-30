@@ -66,11 +66,15 @@
 // (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`:
 // `ledgerTransactions` (`packages/db/src/scope.ts:903`) and `ledgerEntries`
 // (`packages/db/src/scope.ts:894`); `ScopedTx.insert` takes
-// `OwnedTableKey` (`scoped-db.ts:3488`) and `insertUnder` takes
+// `OwnedTableKey` (`scoped-db.ts:3501`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
 // (`scoped-db.ts:2138`), a closed list of ONE. So the ONLY handle that
 // satisfies `LedgerTx` is `SystemTx.insert<K extends TableKey>`
-// (`scoped-db.ts:3138`), which is generic over EVERY TABLE IN THE ESTATE.
+// (`scoped-db.ts:3667`), which is generic over EVERY TABLE IN THE ESTATE. THAT
+// LAST NUMBER READ `3138` AND POINTED AT A REFUSAL STRING INSIDE `tradingDay`,
+// which is ADR-212's hazard on this file too: a citation broken by lines
+// inserted above it. ADR-281 moved this neighbourhood by thirteen lines and
+// repointed it at the declaration it names rather than shifting a wrong number.
 //
 // A DOOR IN `apps/api/src/db.ts` RETURNING SUCH A HANDLE WOULD BE `systemDb`
 // UNDER ANOTHER NAME, and ADR-172 clause 2 refuses it: admitting it to a
@@ -367,8 +371,37 @@ export interface PayoutSubject {
    * **AND IT DOES NOT WIRE THIS PORT.** Nothing in this tree implements
    * `PayoutTx` at all, and no deployment has run the nightly fold. `ADR-268`
    * section 8.
+   *
+   * **AND THE ABSENT ROW HAS NO REFUSAL PATH OUT OF THIS ROUTE, WHICH IS
+   * `ADR-281` RULING 3 AND IS THE HALF NOBODY HAD WRITTEN DOWN.**
+   * `unwiredOrThrow` at the foot of this file rethrows anything that is not a
+   * `PayoutBackendUnwired`, so a backend installed today would answer an
+   * unfolded day with a **500** rather than with the honest refusal this
+   * docblock describes. That arm is code somebody writes here; it is not a
+   * variable a deployment sets, and until it exists "wire and answer honestly"
+   * is not an option this route can take.
    */
   readonly state: RuleState;
+  /**
+   * THE PINNED PLAN VERSION AT THE ACCOUNT'S OWN SIZE, RESOLVED.
+   *
+   * **THIS FIELD HAD NO DOCBLOCK FOR SEVENTEEN REVISIONS OF `usePayoutBackend`'s
+   * REASON AND THE REASON SAID IT WAITED ON NOTHING. IT DOES NOT (`ADR-281`).**
+   * `ADR-233` catalogued `planVersions` and `planVersionSizes`, so a `ScopedTx`
+   * can READ both rows on this transaction. It cannot DECODE one:
+   * `plan_versions.rules` is `jsonb`, `resolvePlan` takes a decoded
+   * `PlanRulesJson`, and no decoding of that blob exists in this deployable or
+   * in the engine.
+   *
+   * **A BACKEND IMPLEMENTING `subject()` MAY NOT WRITE ONE HERE.** The two that
+   * exist are `toPublishedRules` (`apps/worker/src/batch/adapter.ts`) and
+   * `decodeRules` (`apps/site/src/catalog/adapter.ts`), neither importable from
+   * here, and a third statement of the blob that fixes every cents value a
+   * payout is decided against would be `FM-16` on the money path. `ADR-269`
+   * refused exactly that for `readLiability` one port over, on the same value.
+   * `ADR-239` slice A rules the shared home is `packages/rules-engine`, beside
+   * `gates-codec.ts`.
+   */
   readonly plan: ResolvedPlan;
   /**
    * `R-40` AND `R-38`'s FIVE CONTEXT FACTS, AND THEY ARE CONSTRUCTIBLE NOW.
@@ -399,9 +432,12 @@ export interface PayoutSubject {
    * WHY IN A WAY `ADR-264` MADE INCOMPLETE.** It read that `state` means reading
    * a `rule_states` row and that no scheduled run had written one; the reader
    * exists now (`../rule-state-reader.ts`) and the fold was measured writing a
-   * row on a seeded database, so what stands is a DEPLOYMENT that has run the
-   * job and the calendar read the field above names. That is `ADR-239` link 4
-   * and `ADR-264` link 6, and neither is this field's.
+   * row on a seeded database. **THE CALENDAR READ THAT SENTENCE ALSO NAMED IS
+   * DISCHARGED (`ADR-268`, re-derived at source by `ADR-281`):**
+   * `ScopedTx.lastClosedTradingDay()` is declared and implemented on this
+   * transaction. What stands on `state` is a DEPLOYMENT that has run the job
+   * and a refusal path for the row it has not written; what stands on `plan` is
+   * the decoding the field above names. Neither is this field's.
    */
   readonly gates: ExternalGates;
 }
