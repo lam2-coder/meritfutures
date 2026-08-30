@@ -21,10 +21,13 @@ import {
   clearingConditionPairs,
   DB_ADMITTED,
   DEPLOYABLES,
+  EXIT,
   REPO_ROOT,
+  runChecks,
   SURFACE_OWNER,
   needle,
 } from '../checks/repo-invariants.mjs';
+import { ri11 } from '../checks/ui-server-endpoints.mjs';
 import { SUBJECTS } from '../checks/response-shape-copies.mjs';
 
 // =============================================================================
@@ -3869,5 +3872,137 @@ describe('RI-31 refuses a generated line written twice, and only that', () => {
       `# Spans\n\nThe corpus holds ${SPAN} gates.\n\n\`\`\`\n${SPAN}\n${SPAN}\n\`\`\`\n`,
     );
     expect(findings('RI-31', root)).toEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The runner's own report: a crash is its own outcome
+// -----------------------------------------------------------------------------
+// ADR-294. Every case above asks whether a CHECK is honest. These ask whether
+// the RUNNER is, and the defect they pin is the one two sessions hit in one
+// afternoon: with `node_modules` absent, RI-18's lazy `typescript` load threw,
+// the runner folded that crash into the same counter as a violation, and then
+// printed `29 of 30 invariants hold.` The crashed check was on the HELD side of
+// that sentence by arithmetic, and the sentence still read as a measurement.
+//
+// EACH ONE WAS WATCHED FAILING, which for a report rather than a check means
+// restoring the arithmetic it refuses: the single `failed` counter and the one
+// summary line were put back inside `runChecks` and this block was run. FIVE OF
+// THE SIX WENT RED and the sixth stayed green, which is the result the fix
+// wants, because that one asserts the wording a run with NO crash keeps. The
+// full RED and the before and after CLI transcripts are in ADR-294 section 3.
+describe('the runner reports a crashed check apart from a passed and a failed one', () => {
+  const held = (id: string) => ({
+    id,
+    title: `${id} holds`,
+    covers: 'nothing. A fixture for the report, not an invariant.',
+    run: (): string[] => [],
+  });
+
+  const violated = (id: string) => ({
+    id,
+    title: `${id} is violated`,
+    covers: 'nothing. A fixture for the report, not an invariant.',
+    run: (): string[] => [`${id} found one thing`],
+  });
+
+  const crashes = (id: string) => ({
+    id,
+    title: `${id} cannot run`,
+    covers: 'nothing. A fixture for the report, not an invariant.',
+    run: (): string[] => {
+      throw new Error(`${id} could not reach its inputs`);
+    },
+  });
+
+  /** Run `checks` and collect the transcript the runner emits, line by line. */
+  const transcript = (
+    checks: readonly {
+      id: string;
+      title: string;
+      covers: string;
+      run: (root: string) => string[];
+    }[],
+    root = REPO_ROOT,
+  ): { lines: string[]; result: ReturnType<typeof runChecks> } => {
+    const lines: string[] = [];
+    const result = runChecks(checks, { root, emit: (line: string) => lines.push(line) });
+    return { lines, result };
+  };
+
+  test('a crash is an ERROR, counted apart from both PASS and FAIL', () => {
+    const { lines, result } = transcript([held('RI-A'), held('RI-B'), crashes('RI-C')]);
+    expect(result).toMatchObject({ passed: 2, failed: 0, errored: 1, total: 3 });
+    expect(lines).toContain('PASS   RI-A  RI-A holds');
+    expect(lines.find((line) => line.startsWith('ERROR  RI-C'))).toBe(
+      'ERROR  RI-C  RI-C cannot run  (THIS CHECK DID NOT RUN)',
+    );
+    expect(lines.some((line) => line.startsWith('FAIL   RI-C'))).toBe(false);
+  });
+
+  test('a run holding a crash never prints the invariants-hold sentence', () => {
+    // The shipped runner printed `2 of 3 invariants hold.` here, which is the
+    // whole defect: the sentence is a claim about a completed measurement and
+    // this run did not complete one.
+    const { lines } = transcript([held('RI-A'), held('RI-B'), crashes('RI-C')]);
+    expect(lines.some((line) => line.startsWith('2 of 3 invariants hold'))).toBe(false);
+    expect(lines).toContain('1 of 3 check(s) COULD NOT RUN, so this run did not measure the tree.');
+    expect(lines).toContain('2 passed, 0 failed, 1 errored, of 3 check(s).');
+  });
+
+  test('the crash is not subtracted from the denominator', () => {
+    // 30 checks producing 29 passes, 0 fails and 1 crash is not `29 of 30`, and
+    // it is not `29 of 29` either. The denominator is how many checks there
+    // were, so it does not move when one of them stops working.
+    const { lines, result } = transcript([held('RI-A'), crashes('RI-B')]);
+    expect(result.total).toBe(2);
+    for (const line of lines) expect(line).not.toContain('of 1 check');
+    expect(lines).toContain('1 passed, 0 failed, 1 errored, of 2 check(s).');
+  });
+
+  test('a crash exits CRASHED, and dominates a violation in the same run', () => {
+    expect(runChecks([held('RI-A'), crashes('RI-B')], { emit: () => {} }).exitCode).toBe(
+      EXIT.CRASHED,
+    );
+    const both = runChecks([violated('RI-A'), crashes('RI-B')], { emit: () => {} });
+    expect(both).toMatchObject({ passed: 0, failed: 1, errored: 1, exitCode: EXIT.CRASHED });
+    expect(EXIT.CRASHED).not.toBe(EXIT.VIOLATED);
+    expect(EXIT.CRASHED).not.toBe(EXIT.USAGE);
+  });
+
+  test('a check IMPORTED from another file crashes the same way', () => {
+    // RI-11 and RI-18 live in their own files and are imported into `CHECKS`,
+    // and RI-18 is the check that started this. The outcome is decided by the
+    // runner rather than inside any check, so a throw that crosses a module
+    // boundary is read exactly like a local one. Pointed at a tree that holds
+    // none of its inputs, RI-11 throws its own sentinel.
+    const root = mkdtempSync(join(tmpdir(), 'merit-runner-'));
+    seeded.push(root);
+    const { lines, result } = transcript([ri11], root);
+    expect(result).toMatchObject({ passed: 0, failed: 0, errored: 1, total: 1 });
+    expect(lines[0]).toContain('ERROR  RI-11');
+    expect(lines[0]).toContain('(THIS CHECK DID NOT RUN)');
+    expect(result.exitCode).toBe(EXIT.CRASHED);
+  });
+
+  test('a run with no crash keeps the wording and the exit code it always had', () => {
+    // The fix is narrow on purpose. Nothing that reads this output learns a new
+    // shape on a run where every check ran, so a green run still says `N of N
+    // invariants hold.` and a violated one still exits 1.
+    const clean = transcript([held('RI-A'), held('RI-B')]);
+    expect(clean.lines).toEqual([
+      'PASS   RI-A  RI-A holds',
+      'PASS   RI-B  RI-B holds',
+      '',
+      '2 of 2 invariants hold.',
+    ]);
+    expect(clean.result.exitCode).toBe(EXIT.OK);
+
+    const dirty = transcript([held('RI-A'), violated('RI-B')]);
+    expect(dirty.lines).toContain(
+      '1 of 2 invariants hold. Each one is a property the scaffold exists to make impossible to lose.',
+    );
+    expect(dirty.lines).toContain('       RI-B found one thing');
+    expect(dirty.result.exitCode).toBe(EXIT.VIOLATED);
   });
 });
