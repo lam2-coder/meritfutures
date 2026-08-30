@@ -366,7 +366,7 @@ const backend: PayoutBackend = {
       holdFlag: () => Promise.resolve(fixture.holdFlag),
       insertPayoutRequest: (row) => {
         stagedRequests.push(row);
-        return Promise.resolve({ eligibilitySnapshotId: `snap-${row.id}` });
+        return Promise.resolve();
       },
     };
     const value = await fn(tx);
@@ -496,7 +496,15 @@ describe('the honest path: an eligible trader is approved and the request commit
     expect(body.basis_trading_day).toBe(BASIS_DAY);
     expect(body.payout_ordinal).toBe(1);
     expect(body.estimated_settlement).toEqual(ESTIMATED_SETTLEMENT);
-    expect(body.eligibility_snapshot_id).toBe(`snap-${String(body.payout_request_id)}`);
+
+    // ADR-289 DELETED `eligibility_snapshot_id` AND THE ASSERTION GOES WITH THE
+    // FIELD RATHER THAN BEING REPOINTED. What stood here checked that the route
+    // forwarded what a fixture invented: the fixture returned `snap-${row.id}`
+    // and this line asserted the body carried `snap-${payout_request_id}`. It
+    // never proved a supplier existed, because there has never been one. THE
+    // ABSENCE IS ASSERTED INSTEAD, so a later reader who finds the field
+    // missing cannot restore it without this going red.
+    expect(body).not.toHaveProperty('eligibility_snapshot_id');
 
     // The row committed.
     expect(fixture.requests).toHaveLength(1);
@@ -1117,7 +1125,7 @@ describe('ADR-285: an absent `rule_states` row is an honest 503 and never a 500'
           holdFlag: () => Promise.resolve(fixture.holdFlag),
           insertPayoutRequest: (row) => {
             fixture.requests.push(row);
-            return Promise.resolve({ eligibilitySnapshotId: `snap-${row.id}` });
+            return Promise.resolve();
           },
         }),
     };
