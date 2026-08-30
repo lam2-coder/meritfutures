@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 // =============================================================================
 // INV-M4-01, standing in for a lint rule that does not exist yet
 // =============================================================================
@@ -59,18 +61,19 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-/**
- * Comments out, string literals kept.
- *
- * COMMENTS MUST GO OR THIS CHECK IS UNUSABLE. This repository's source is
- * mostly prose, and that prose quotes the contract: `floor_distance_cents`'s
- * own docblock in ../src/api/types.ts contains the words "balance - floor",
- * which is a hyphen beside a money word and is exactly the shape being hunted.
- * A check that fires on its own explanation gets disabled within a week.
- */
-function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
-}
+// COMMENTS OUT, STRING LITERALS KEPT.
+//
+// COMMENTS MUST GO OR THIS CHECK IS UNUSABLE. This repository's source is mostly
+// prose, and that prose quotes the contract: `floor_distance_cents`'s own
+// docblock in ../src/api/types.ts contains the words "balance - floor", which is
+// a hyphen beside a money word and is exactly the shape being hunted. A check
+// that fires on its own explanation gets disabled within a week.
+//
+// THE STRIPPER IS IMPORTED AND NOT DECLARED (ADR-279). The copy that stood here
+// was the two-replacement idiom and it emptied files rather than stripping them:
+// of the 66 `src/` files this suite walks, seven stripped shorter under it, and
+// `app/sign-in/page.ts` went to 180 characters of 5,221. This is an ABSENCE
+// check, so every one of those was a file it was reporting clean by not reading.
 
 /**
  * An arithmetic operator adjacent to a money-suffixed identifier.

@@ -31,6 +31,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../tooling/checks/strip-comments.mjs';
+
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
 
 const sourceFiles = (): readonly { readonly name: string; readonly text: string }[] =>
@@ -38,17 +40,16 @@ const sourceFiles = (): readonly { readonly name: string; readonly text: string 
     .filter((name) => name.endsWith('.ts'))
     .map((name) => ({ name, text: readFileSync(join(SRC, name), 'utf8') }));
 
-/**
- * Comments are stripped before every check.
- *
- * OTHERWISE THE FILE THAT EXPLAINS THE RULE FAILS IT. `types.ts` quotes
- * `150_000n` in the sentence that states `INV-M21-10`, and a scan that could not
- * tell a quotation from a constant would force the explanation out of the code,
- * which is the opposite of what any of this is for.
- */
-function stripComments(text: string): string {
-  return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
-}
+// COMMENTS ARE STRIPPED BEFORE EVERY CHECK, OTHERWISE THE FILE THAT EXPLAINS THE
+// RULE FAILS IT. `types.ts` quotes `150_000n` in the sentence that states
+// `INV-M21-10`, and a scan that could not tell a quotation from a constant would
+// force the explanation out of the code, which is the opposite of what any of
+// this is for.
+//
+// THE STRIPPER IS IMPORTED AND NOT DECLARED HERE (ADR-279). This file carried
+// its own two-replacement copy, which read a block-comment opener inside a line
+// comment as a real one and emptied the rest of the file into a phantom block.
+// `RI-30` is the leg that stops the copy coming back.
 
 describe('INV-M21-09: nothing here decides a rule', () => {
   it('reads a plan parameter in assertions.ts and nowhere else', () => {

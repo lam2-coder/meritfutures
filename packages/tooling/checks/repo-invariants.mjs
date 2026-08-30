@@ -6724,28 +6724,42 @@ const ri27 = {
 /**
  * The local-clock spellings, by group, with the admitted alternative named.
  *
- * @type {ReadonlyArray<readonly [string, RegExp, string]>}
+ * THE FOURTH COLUMN IS WHICH TEXT THE PATTERN READS, AND ADR-279 IS WHY IT
+ * EXISTS. Three of these four hunt a CALL, and a call cannot occur inside a
+ * string literal, so they read the text with literals BLANKED: otherwise
+ * `scripts/ci/falsify-ci.mjs`, whose whole job is to hold the TEXT of seeded
+ * violations, is a finding for carrying `value.toLocaleString()` as the
+ * CI-02/RE-D-02 seed. The FOURTH names an environment key AS A STRING, so
+ * blanking would delete the evidence and the leg would stop working; it reads
+ * the text with only comments removed. Both texts are the same length with the
+ * same newlines, so one `lineAt` is true of either.
+ *
+ * @type {ReadonlyArray<readonly [string, RegExp, string, 'blanked' | 'literal']>}
  */
 const LOCAL_CLOCK_READS = [
   [
     'reads',
     /\.get(FullYear|Month|Date|Day|Hours|Minutes|Seconds|Milliseconds|TimezoneOffset)\s*\(/g,
     'the `getUTC*` form',
+    'blanked',
   ],
   [
     'writes',
     /\.set(FullYear|Month|Date|Hours|Minutes|Seconds|Milliseconds)\s*\(/g,
     'the `setUTC*` form',
+    'blanked',
   ],
   [
     'renders through',
     /\.to(LocaleString|LocaleDateString|LocaleTimeString|DateString|TimeString)\s*\(/g,
     '`toISOString()`, which is UTC',
+    'blanked',
   ],
   [
     'asks for',
     /process\.env\s*(?:\[\s*['"]TZ['"]\s*\]|\.TZ\b)/g,
     'nothing: no Merit line needs it',
+    'literal',
   ],
 ];
 
@@ -6878,20 +6892,19 @@ const ri28 = {
     }
 
     for (const file of sources) {
-      // STRING LITERALS ARE BLANKED AS WELL AS COMMENTS, AND ADR-279 IS WHY.
-      // Every spelling below is a CALL or a member access, and none of them can
-      // occur inside a literal and mean anything. `scripts/ci/falsify-ci.mjs`
-      // is the file that proves it: its whole job is to hold the TEXT of seeded
-      // violations, and it carries `value.toLocaleString()` in a template
-      // literal as the CI-02/RE-D-02 seed. This check reported PASS on it for
-      // as long as it did only because its own stripper was deleting 40,000
-      // characters of that file by accident.
-      const code = stripComments(readFileSync(join(root, file), 'utf8'), { literals: 'blank' });
+      // TWO READINGS OF THE SAME FILE, THE SAME LENGTH AND THE SAME LINES.
+      // `withLiterals` has only comments removed; `code` also has every string
+      // literal's CONTENT blanked, character for character, so an index into
+      // one is the same index into the other. Which pattern reads which is
+      // stated per entry in `LOCAL_CLOCK_READS` and above each block below.
+      const source = readFileSync(join(root, file), 'utf8');
+      const withLiterals = stripComments(source);
+      const code = stripComments(source, { literals: 'blank' });
       /** @param {number} index */
       const lineAt = (index) => code.slice(0, index).split('\n').length;
 
-      for (const [verb, pattern, instead] of LOCAL_CLOCK_READS) {
-        for (const m of code.matchAll(pattern)) {
+      for (const [verb, pattern, instead, over] of LOCAL_CLOCK_READS) {
+        for (const m of (over === 'blanked' ? code : withLiterals).matchAll(pattern)) {
           findings.push(
             `${file}:${lineAt(m.index ?? 0)} ${verb} the process's local clock, as ` +
               `\`${(m[0] ?? '').trim()}\`. A calendar day has no timezone and an instant is ` +

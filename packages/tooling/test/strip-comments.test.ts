@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
@@ -27,6 +27,17 @@ const naive = (source: string): string =>
   source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 const BARREL = 'apps/worker/src/index.ts';
+
+/** Every JavaScript-family source file in the workspace, `node_modules` aside. */
+function sourceFilesUnder(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) sourceFilesUnder(full, out);
+    else if (/\.(ts|tsx|mts|mjs|js|jsx)$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
 
 describe('a block-comment opener inside a line comment', () => {
   test('opens a phantom block for the naive idiom and does not for the scanner', () => {
@@ -94,9 +105,14 @@ describe('what the scanner keeps', () => {
   });
 
   test('newlines survive a block comment, so a `file:line` is the line', () => {
-    const source = ['const first = 1;', '/*', ' * four', ' * lines', ' */', 'const sixth = 6;'].join(
-      '\n',
-    );
+    const source = [
+      'const first = 1;',
+      '/*',
+      ' * four',
+      ' * lines',
+      ' */',
+      'const sixth = 6;',
+    ].join('\n');
     const code = stripComments(source);
     expect(code.split('\n')).toHaveLength(6);
     expect(code.slice(0, code.indexOf('const sixth')).split('\n')).toHaveLength(6);
@@ -113,9 +129,10 @@ describe('what the scanner keeps', () => {
     // template whose SUBSTITUTION opens a second template. That scanner closed
     // the outer literal on the inner backtick and read the rest of the file
     // with its states inverted, which left real docblocks unstripped.
-    const source = ['const m = `a ${xs.map((x) => `<${x}>`).join()} b`;', '/* gone */ const n = 2;'].join(
-      '\n',
-    );
+    const source = [
+      'const m = `a ${xs.map((x) => `<${x}>`).join()} b`;',
+      '/* gone */ const n = 2;',
+    ].join('\n');
     const code = stripComments(source);
     expect(code).toContain('const n = 2;');
     expect(code).not.toContain('gone');
@@ -134,6 +151,27 @@ describe('literals: blank', () => {
     const source = 'const s = `hour ${at.getHours()} of ${day}`;';
     expect(stripComments(source, { literals: 'blank' })).toContain('at.getHours()');
     expect(stripComments(source, { literals: 'blank' })).not.toContain('hour');
+  });
+
+  test('the two modes agree on length and on every newline, over the whole tree', () => {
+    // `RI-28` DEPENDS ON THIS AND NOT ON A COMMENT. It reads one file twice,
+    // hunts three call spellings in the blanked text and the `process.env.TZ`
+    // key in the text that still holds literals, and reports `file:line` from a
+    // single `lineAt` over the blanked one. That is only true while an index
+    // into one reading is the same index into the other.
+    const files = sourceFilesUnder(REPO_ROOT);
+    expect(files.length).toBeGreaterThan(500);
+    const disagree = files.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      const keep = stripComments(source);
+      const blank = stripComments(source, { literals: 'blank' });
+      if (keep.length !== blank.length) return true;
+      for (let i = 0; i < keep.length; i++) {
+        if ((keep[i] === '\n') !== (blank[i] === '\n')) return true;
+      }
+      return false;
+    });
+    expect(disagree).toEqual([]);
   });
 
   test('quotes, length and newlines are preserved so every offset still maps', () => {

@@ -48,6 +48,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import type { SystemTx } from '@merit/db';
 import type { TradingDay } from '@merit/rules-engine';
 
@@ -66,101 +68,28 @@ const BARREL_REL = 'apps/worker/src/index.ts';
 
 const sourceOf = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
 
-/**
- * Comments stripped, on `RI-25`'s and `RI-27`'s seed.
- *
- * Every file this suite parses discusses this subject at length in its own
- * header, and two of them quote the retired identifiers in order to say they are
- * retired. A matcher that read the raw file would agree with the prose rather
- * than with the code.
- *
- * **THIS IS A SCANNER RATHER THAN THE TWO REPLACEMENTS EVERY OTHER STRIPPER IN
- * THIS TREE USES, AND A SEED IS WHY.** The idiom is
- * a block-comment replacement followed by a line-comment replacement, in that
- * order; so a block-comment OPENER written INSIDE a line comment opens a phantom
- * block that runs to the next real closer and takes every line of code between
- * them with it. `apps/worker/src/index.ts` carries two, both inside prose quoting
- * a glob, and under that idiom the barrel strips from 55,728 characters to 2,753:
- * the export list this suite is here to read is one of the things that
- * disappears, and every assertion over it passes VACUOUSLY. The seed that found
- * it added the retired guard back to the barrel's export list and the case
- * reported PASS.
- *
- * A `//` inside a block comment is the mirror of the same mistake and this
- * scanner is immune to it too, because it tracks one state rather than applying
- * two passes that each assume the other has not run.
- */
-function stripComments(source: string): string {
-  type State = 'code' | 'line' | 'block' | 'single' | 'double' | 'template';
-  let out = '';
-  let state: State = 'code';
-  let i = 0;
-
-  while (i < source.length) {
-    const char = source[i] as string;
-    const pair = source.slice(i, i + 2);
-
-    if (state === 'code') {
-      if (pair === '//') {
-        state = 'line';
-        i += 2;
-        continue;
-      }
-      if (pair === '/*') {
-        state = 'block';
-        i += 2;
-        continue;
-      }
-      if (char === "'") state = 'single';
-      else if (char === '"') state = 'double';
-      else if (char === '`') state = 'template';
-      out += char;
-      i += 1;
-      continue;
-    }
-
-    if (state === 'line') {
-      if (char === '\n') {
-        state = 'code';
-        out += '\n';
-      }
-      i += 1;
-      continue;
-    }
-
-    if (state === 'block') {
-      // NEWLINES ARE KEPT so a line-oriented assertion still reads true lines.
-      if (pair === '*/') {
-        state = 'code';
-        i += 2;
-        continue;
-      }
-      if (char === '\n') out += '\n';
-      i += 1;
-      continue;
-    }
-
-    // Inside a string literal, which is NOT stripped: `RI-27`'s own seed is that
-    // the refusals richest in explanation quote the table name in their detail.
-    out += char;
-    if (char === '\\') {
-      const next = source[i + 1];
-      if (next !== undefined) out += next;
-      i += 2;
-      continue;
-    }
-    if (
-      (state === 'single' && char === "'") ||
-      (state === 'double' && char === '"') ||
-      (state === 'template' && char === '`')
-    ) {
-      state = 'code';
-    }
-    i += 1;
-  }
-
-  return out;
-}
+// COMMENTS STRIPPED, ON `RI-25`'s AND `RI-27`'s SEED. Every file this suite
+// parses discusses this subject at length in its own header, and two of them
+// quote the retired identifiers in order to say they are retired. A matcher that
+// read the raw file would agree with the prose rather than with the code.
+//
+// **THE SCANNER ADR-277 WROTE HERE NOW LIVES IN THE SHARED HOME AND IS IMPORTED
+// (ADR-279).** Its reason stands verbatim: the idiom everywhere else in this
+// tree was a block-comment replacement followed by a line-comment replacement,
+// so a block-comment OPENER written inside a LINE comment opened a phantom block
+// that ran to the next real closer and took every line of code between them with
+// it. `apps/worker/src/index.ts` carries two, both inside prose quoting a glob,
+// and under that idiom the barrel strips from 55,728 characters to 2,753: the
+// export list this suite is here to read is one of the things that disappears,
+// and every assertion over it passes VACUOUSLY. Seed 13 is what found it.
+//
+// **ADR-279 ALSO FOUND ONE DEFECT IN THE VERSION THIS FILE USED TO HOLD**, on
+// three real files rather than by reading: a template SUBSTITUTION that opens a
+// SECOND template closed the outer literal on the inner backtick and inverted
+// every state after it, which left real docblocks unstripped in
+// `packages/rules-engine/src/external-gates.ts`, `repo-invariants.mjs` and
+// `scripts/ci/falsify-ci.mjs`. The shared home models `${...}` as code and this
+// suite gets that repair by importing rather than by an edit here.
 
 // -----------------------------------------------------------------------------
 // A door that holds rows rather than one that connects

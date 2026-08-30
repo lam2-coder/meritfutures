@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 // =============================================================================
 // The payouts segment's own gate, and the blind spot it exists to close
 // =============================================================================
@@ -44,17 +46,23 @@ function segmentFiles(dir: string): string[] {
 const FILES = segmentFiles(SEGMENT);
 const rel = (file: string): string => relative(join(HERE, '..'), file);
 
-/** Comments out. The prose in this tree quotes the shapes being hunted. */
-function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
-}
+// COMMENTS OUT: THE PROSE IN THIS TREE QUOTES THE SHAPES BEING HUNTED. Both
+// helpers are the shared home now (ADR-279) and neither is declared here.
+//
+// The copy that stood here was the two-replacement idiom, and it read a
+// block-comment OPENER written inside a LINE comment as a real one:
+// `src/app/payouts/page.ts`, one of the five files this suite parses, stripped
+// to 345 characters under it and strips to 594 under the scanner. Four of the
+// six cases below are ABSENCE assertions over that text.
+//
+// `expressionsOnly` was three more regexes over the result and is now one
+// argument. Its own version could not see a nested `${}`; blanking keeps the
+// quotes, the length and every newline, so a literal contributes no token and
+// no offset moves.
 
-/** Comments and string literals out, so only expressions remain. */
+/** Comments and string-literal CONTENT out, so only expressions remain. */
 function expressionsOnly(source: string): string {
-  return stripComments(source)
-    .replace(/`(?:\\.|\$\{[^}]*\}|[^`\\])*`/g, ' ')
-    .replace(/'(?:\\.|[^'\\])*'/g, ' ')
-    .replace(/"(?:\\.|[^"\\])*"/g, ' ');
+  return stripComments(source, { literals: 'blank' });
 }
 
 test('the segment exists and this check is looking at it', () => {

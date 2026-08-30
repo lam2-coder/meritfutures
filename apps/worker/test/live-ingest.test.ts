@@ -66,6 +66,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { TICK_REFUSALS, liveIngestClean, refuseTick, startLiveIngest } from '../src/live/ingest.ts';
 import type { LiveIngestReport, LiveIngestRun } from '../src/live/ingest.ts';
 import {
@@ -131,53 +133,20 @@ function cacheColumns(): string[] {
   return columns;
 }
 
-/**
- * Source with every comment removed and every string literal preserved.
- *
- * IT TRACKS QUOTES RATHER THAN MATCHING A REGEX, because the file it is pointed
- * at holds a multi-line SQL template literal and a naive stripper that met a
- * `//` inside one would remove code and pass this suite by deleting the thing it
- * is looking for.
- */
-function stripComments(code: string): string {
-  let out = '';
-  let index = 0;
-  let quote: string | null = null;
-  while (index < code.length) {
-    const char = code[index] ?? '';
-    const next = code[index + 1] ?? '';
-    if (quote !== null) {
-      out += char;
-      if (char === '\\') {
-        out += next;
-        index += 2;
-        continue;
-      }
-      if (char === quote) quote = null;
-      index += 1;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === '`') {
-      quote = char;
-      out += char;
-      index += 1;
-      continue;
-    }
-    if (char === '/' && next === '/') {
-      while (index < code.length && code[index] !== '\n') index += 1;
-      continue;
-    }
-    if (char === '/' && next === '*') {
-      index += 2;
-      while (index < code.length && !(code[index] === '*' && code[index + 1] === '/')) index += 1;
-      index += 2;
-      continue;
-    }
-    out += char;
-    index += 1;
-  }
-  return out;
-}
+// SOURCE WITH EVERY COMMENT REMOVED AND EVERY STRING LITERAL PRESERVED.
+//
+// IT TRACKS QUOTES RATHER THAN MATCHING A REGEX, because the file it is pointed
+// at holds a multi-line SQL template literal and a naive stripper that met a
+// `//` inside one would remove code and pass this suite by deleting the thing it
+// is looking for.
+//
+// **IMPORTED AND NOT DECLARED, ON ADR-279.** The scanner this file wrote by hand
+// was one of eight comment strippers in the tree and one of three that were
+// correct; it is now the shared home's, with two differences that are repairs
+// rather than changes. Newlines inside a BLOCK comment survive, so a caller that
+// reports `file:line` reports the line. And a template SUBSTITUTION is treated
+// as code, so a nested template no longer inverts the state, which is a defect
+// this file's version had and which showed on three real files.
 
 /** Every module specifier imported by one file. */
 function importsOf(code: string): string[] {

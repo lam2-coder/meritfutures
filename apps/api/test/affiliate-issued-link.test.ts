@@ -38,6 +38,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { productionAffiliateDeps } from '../src/routes/affiliate.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -82,9 +84,17 @@ function walk(dir: string): string[] {
   });
 }
 
-/** Source with line and block comments removed, so a comment is not evidence. */
-const stripComments = (text: string): string =>
-  text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/[^\n]*$/gm, '');
+// COMMENTS OUT, SO A COMMENT IS NOT EVIDENCE. Imported and not declared, per
+// ADR-279: this file's own copy was the two-replacement idiom in a third
+// spelling, and it read a block-comment OPENER written inside a LINE comment as
+// a real one. Nine of the 56 `apps/api/src` files it parses stripped shorter
+// under it than under the scanner, `src/index.ts` by more than half, and the
+// case below is an ABSENCE assertion, which is the direction that goes
+// vacuously GREEN over an emptied file rather than red.
+//
+// STRING LITERALS ARE KEPT, which is the default and is deliberate here: the
+// writer hunt matches `INSERT INTO affiliate_clicks`, and that is SQL text
+// inside a literal.
 
 describe('a click token is per CLICK, and the index is what says so', () => {
   test('`click_token` is NOT NULL, defaulted per row, and UNIQUE', () => {
