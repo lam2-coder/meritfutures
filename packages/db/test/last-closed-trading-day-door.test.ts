@@ -321,28 +321,42 @@ describe('a trading day is a YYYY-MM-DD string or it is a throw', () => {
 // 4b. A `Date` NEVER REACHES THE GUARD, AND WHAT RENDERS IT IS THE CROSSING
 //     ADR-146 CLAUSE 4 FORBIDS
 // -----------------------------------------------------------------------------
-// **THIS BLOCK ASSERTS A DEFECT RATHER THAN A CONTROL, AND IT IS OUTSIDE
-// ADR-268's FENCE TO REPAIR.** Two cases here originally asserted that a `Date`
+// **THIS BLOCK ASSERTED A DEFECT AND ADR-271 REPAIRED IT. THE CASES ARE KEPT AND
+// THEIR CLAIM IS WHAT MOVED.** Two cases here originally asserted that a `Date`
 // on a calendar row THROWS. Both went green-side-up, and measuring why produced
-// the largest finding of the session:
+// ADR-268's largest finding:
 //
 //   1. `pg` parses a `date` column (OID 1082) into a JS `Date` at the PROCESS'S
-//      LOCAL MIDNIGHT. Nothing in this workspace calls `setTypeParser`.
+//      LOCAL MIDNIGHT.
 //   2. Drizzle's `PgDateString.mapFromDriverValue` then renders that `Date` with
 //      `toISOString()`, which is UTC.
 //
-// So on a process whose `TZ` is east of UTC, the database's `2026-08-28` reaches
-// Merit code as `'2026-08-27'`. That is exactly `ADR-146` clause 4's forbidden
-// failure -- a UTC calendar date derived from a timestamp meeting an exchange CT
-// trading day -- performed by two libraries before any Merit line runs, on EVERY
-// `date` column in the estate rather than only on this door.
+// So on a process whose `TZ` was east of UTC, the database's `2026-08-28`
+// reached Merit code as `'2026-08-27'` -- `ADR-146` clause 4's forbidden failure
+// performed by two libraries before any Merit line ran, on EVERY `date` column
+// in the estate rather than only on this door.
 //
-// THE GUARD IS NOT LOOSENED AND THE CASES ARE NOT DELETED. What is asserted is
-// the behaviour that exists, so the day either library stops coercing, these
-// turn red rather than a trading day silently arriving off by one.
+// -----------------------------------------------------------------------------
+// WHAT ADR-271 CHANGED, AND WHY ONLY ONE OF THE THREE CASES BELOW COULD FEEL IT
+// -----------------------------------------------------------------------------
+// `client.ts` now installs `setTypeParser(1082, ...)` returning the wire text
+// verbatim, so step 1 no longer builds a `Date` and step 2's coercion is never
+// reached. The three-offset proof is `date-column-timezone.test.ts`.
+//
+// **ONLY THE THIRD CASE TURNED RED, AND THAT IS ITSELF THE FINDING.** The first
+// two compose their own rows and answer them through `drizzle-orm/pg-proxy`, so
+// they exercise drizzle's mapper and NEVER `pg`'s parser -- which is exactly why
+// a suite this thorough could pin a driver defect and not be able to fail on it.
+// **A test that supplies its own driver values cannot see a driver defect.** The
+// two cases keep their expected values, because drizzle's coercion is unchanged;
+// what they no longer are is a bug report. They now record the coercion the
+// parser exists to keep unreachable, and the case that says it is unreachable
+// lives one file over.
+//
+// THE GUARD IS STILL NOT LOOSENED AND NOTHING IS DELETED.
 
-describe('the date mapper renders before the door can refuse, which is the finding', () => {
-  test('a `Date` on a calendar row is rendered as a UTC day and the door never sees it', async () => {
+describe('the date mapper would still coerce, which is why nothing may reach it', () => {
+  test('a `Date` handed straight to the mapper is rendered as a UTC day, parser bypassed', async () => {
     const { source } = answering([
       calendarRow(new Date('2026-08-28T00:00:00Z'), new Date('2026-08-28T20:00:00Z')),
       calendarRow('2026-08-31', new Date('2026-08-31T20:00:00Z')),
@@ -352,10 +366,12 @@ describe('the date mapper renders before the door can refuse, which is the findi
   });
 
   test('THE RENDERING IS `toISOString`, so a local-midnight Date one zone east is the DAY BEFORE', async () => {
-    // The value below is what `pg` hands back for the database day `2026-08-28`
-    // in a process running at UTC+02:00. Merit code receives `2026-08-27`, and
-    // nothing between the two raises. THIS IS THE ASSERTION THAT IS A BUG
-    // REPORT: it passes today and it is not describing correct behaviour.
+    // The value below is what `pg` USED TO hand back for the database day
+    // `2026-08-28` in a process running at UTC+02:00, and drizzle's coercion of
+    // it is unchanged. THIS CASE WAS THE BUG REPORT AND IS NOW THE MOTIVE: it
+    // states what would happen again the day a `Date` reaches this mapper, which
+    // is what `setTypeParser(1082, ...)` makes impossible from the driver and
+    // what `RI-25` keeps anyone from undoing.
     const localMidnightAtPlusTwo = new Date('2026-08-27T22:00:00Z');
     const { source } = answering([
       calendarRow(localMidnightAtPlusTwo, new Date('2026-08-28T20:00:00Z')),
@@ -365,12 +381,24 @@ describe('the date mapper renders before the door can refuse, which is the findi
     await expect(lastClosedTradingDayStatement(source)).resolves.toBe('2026-08-27');
   });
 
-  test('nothing in this package installs a `date` type parser, which is why the above holds', () => {
+  // THE INVERTED ASSERTION. It read `expect(clientSrc).not.toContain(
+  // 'setTypeParser')` and its title was "nothing in this package installs a
+  // `date` type parser, which is why the above holds". It was the one case in
+  // this file the repair could turn red, and it did. **IT IS INVERTED RATHER
+  // THAN DELETED**, because the fact it pins is still the fact that decides
+  // whether the two cases above describe the estate or only describe drizzle.
+  //
+  // THE SECOND LEG IS UNCHANGED AND IT IS NOT A LEFTOVER. `scoped-db.ts` must
+  // still install NO parser: one parser in the one file that constructs the pool
+  // is the repair, and a second one anywhere is the per-reader correction ADR-271
+  // refused. `RI-25` asserts that across the whole tree.
+  test('the `date` type parser is installed, in `client.ts` and nowhere else', () => {
     const clientSrc = readFileSync(
       fileURLToPath(new URL('../src/client.ts', import.meta.url)),
       'utf8',
     );
-    expect(clientSrc).not.toContain('setTypeParser');
+    expect(clientSrc).toContain('setTypeParser');
+    expect(clientSrc).toContain('1082');
     expect(SCOPED_DB_SRC).not.toContain('setTypeParser');
   });
 });

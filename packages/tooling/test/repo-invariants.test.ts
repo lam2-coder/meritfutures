@@ -3068,3 +3068,111 @@ describe('RI-23 refuses a class B approval that is a signature in a test’s clo
     expect(findings('RI-23', root).join('\n')).toContain('found NO block carrying the marker');
   });
 });
+
+// -----------------------------------------------------------------------------
+// RI-25, whose subject is a defect that was LIVE ON `main` and asymmetric
+// -----------------------------------------------------------------------------
+// ADR-268 section 7 measured it and ADR-271 repaired it: `pg` parsed a `date`
+// (OID 1082) into a `Date` at the process's LOCAL MIDNIGHT, drizzle rendered
+// that with `toISOString()`, and the database's `2026-08-28` reached Merit code
+// as `'2026-08-27'` on every deployment east of UTC.
+//
+// THE FIXTURE CARRIES NO `client.ts`, so the clean-tree case above passes by the
+// silence RI-25's `covers` line states. Every case here writes one, which is
+// what puts the tree in the check's scope at all -- the first case below is that
+// pairing asserted rather than assumed.
+describe('RI-25 keeps one date type parser aimed at the day OID', () => {
+  const REPAIRED =
+    "import { Pool, types as pgTypes } from 'pg';\n" +
+    'const DATE_OID = 1082;\n' +
+    'export function dateWireText(wire) { return wire; }\n' +
+    'pgTypes.setTypeParser(DATE_OID, dateWireText);\n';
+
+  /** A tree in RI-25's scope: the fixture plus the one file that constructs the pool. */
+  const treeWithClient = (body: string): string => {
+    const root = cleanTree();
+    write(root, 'packages/db/src/client.ts', body);
+    return root;
+  };
+
+  test('the repaired file holds, and a tree with no client.ts is silent', () => {
+    expect(findings('RI-25', treeWithClient(REPAIRED))).toEqual([]);
+    // THE SILENCE IS ASSERTED RATHER THAN RELIED ON. If this stopped being
+    // silent, every case below would be reading a finding the seed did not
+    // cause, and if the SCOPE stopped working they would all pass for nothing.
+    expect(findings('RI-25', cleanTree())).toEqual([]);
+  });
+
+  test('a client.ts that installs no parser is the defect ADR-268 measured', () => {
+    const root = treeWithClient("import { Pool } from 'pg';\nexport const p = Pool;\n");
+    expect(findings('RI-25', root).join('\n')).toContain('calls setTypeParser nowhere');
+  });
+
+  test('a parser aimed at some other OID does not repair the day', () => {
+    const root = treeWithClient('pgTypes.setTypeParser(1700, (v) => v);\n');
+    expect(findings('RI-25', root).join('\n')).toContain('none of those is 1082');
+  });
+
+  test('THE THIRD TRAP: a parser on timestamptz is a finding even beside a correct one', () => {
+    const root = treeWithClient(REPAIRED + 'pgTypes.setTypeParser(1184, (v) => v);\n');
+    expect(findings('RI-25', root).join('\n')).toContain('OID 1184 (`timestamptz`)');
+  });
+
+  test('and on timestamp, which is the same answer for the same reason', () => {
+    const root = treeWithClient(REPAIRED + 'pgTypes.setTypeParser(1114, (v) => v);\n');
+    expect(findings('RI-25', root).join('\n')).toContain('OID 1114 (`timestamp`)');
+  });
+
+  test('THE SECOND TRAP: a second parser anywhere else in a src directory', () => {
+    const root = treeWithClient(REPAIRED);
+    write(root, 'apps/worker/src/db.ts', 'types.setTypeParser(1082, (v) => v);\n');
+    expect(findings('RI-25', root).join('\n')).toContain(
+      'apps/worker/src/db.ts names setTypeParser',
+    );
+  });
+
+  test('a test file naming it while asserting ABOUT it is not installing one', () => {
+    // THE DISTINCTION THE CHECK IS SCOPED ON, watched rather than trusted.
+    // `last-closed-trading-day-door.test.ts` and `date-column-timezone.test.ts`
+    // both hold this string in the real tree, and a check that read tests would
+    // report the repair's own controls as violations of it.
+    const root = treeWithClient(REPAIRED);
+    write(root, 'packages/db/test/x.test.ts', "expect(src).toContain('setTypeParser');\n");
+    write(root, 'packages/db/src/__tests__/y.ts', "expect(src).toContain('setTypeParser');\n");
+    expect(findings('RI-25', root)).toEqual([]);
+  });
+
+  test('the OID may be named through a constant, which is how client.ts names it', () => {
+    const named = treeWithClient('const DATE_OID = 1082;\nsetTypeParser(DATE_OID, (v) => v);\n');
+    expect(findings('RI-25', named)).toEqual([]);
+    // A constant that is NOT 1082 must still fail, or leg 1 would pass on any
+    // identifier at all and the OID check would be decorative.
+    const wrong = treeWithClient('const OID = 1700;\nsetTypeParser(OID, (v) => v);\n');
+    expect(findings('RI-25', wrong).join('\n')).toContain('none of those is 1082');
+  });
+
+  test('prose naming the call does not satisfy the call, which is RI-24s shape', () => {
+    const root = treeWithClient(
+      '// ADR-271 installs setTypeParser 1082 here, honestly it does\n' +
+        "import { Pool } from 'pg';\nexport const p = Pool;\n",
+    );
+    expect(findings('RI-25', root).join('\n')).toContain('calls setTypeParser nowhere');
+  });
+
+  test('THE CALL COMMENTED OUT IS THE CALL ABSENT, which is how a revert looks', () => {
+    // THIS CASE EXISTS BECAUSE THE SEED FOUND THE CHECK WRONG. RI-25's first
+    // version matched the raw file, so commenting the call out -- the exact
+    // shape of reverting this repair -- left the text in place and RI-25
+    // reported PASS while the estate was back to reading days at local
+    // midnight. Comments are stripped now, and this is that fix watched.
+    const root = treeWithClient(REPAIRED.replace(/^pgTypes\./m, '// pgTypes.'));
+    expect(findings('RI-25', root).join('\n')).toContain('calls setTypeParser nowhere');
+  });
+
+  test('a block comment quoting the whole repair does not satisfy it either', () => {
+    const root = treeWithClient(
+      `/* the repair reads:\n${REPAIRED}\n*/\nimport { Pool } from 'pg';\nexport const p = Pool;\n`,
+    );
+    expect(findings('RI-25', root).join('\n')).toContain('calls setTypeParser nowhere');
+  });
+});

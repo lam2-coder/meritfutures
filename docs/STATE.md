@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->256<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->257<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10487,3 +10487,23 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **THE PORT IS NOT WIRED.** `IMPLEMENTED_ADMIN_READS` does not gain `readLiability`, `composeAdminReadSource` still fills the gap with `AdminSourceNotComposed`, and `start.ts` is untouched. **Nothing here executes the nightly batch, opens a database, or renders a panel**, and the fold has never run against a real `rule_states` row.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **23 of 23** invariants off the runner's own last line, **290 files / 6,977 passed / 6 skipped** against a baseline of **289 / 6,947 / 6** measured on `origin/main` in a separate `git worktree`, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` and `falsify.mjs` were NOT run**: forbidden by this row, and the second mutates the working tree.
+
+---
+
+## 2026-08-30 - Session 462: a day that changes with the timezone ([ADR-271](decisions/ADR-271.md), proposed)
+
+**Row `271` granted the fence [ADR-268](decisions/ADR-268.md) lacked. The defect it measured is repaired: `pg` parsed a `date` (OID 1082) into a `Date` at the process's LOCAL midnight, drizzle rendered that with `toISOString()`, and the database day `2026-08-28` reached Merit code as `'2026-08-27'` on every deployment east of UTC.** One `setTypeParser(1082, wire => wire)` call at module scope in [`packages/db/src/client.ts`](../packages/db/src/client.ts). **The timestamp OIDs are untouched**, because an instant HAS a timezone and a calendar day does not.
+
+**THE REPAIR REMOVES AN INPUT RATHER THAN ADDING A CORRECTION, WHICH IS WHY IT IS ONE LINE.** Drizzle's `PgDateString.mapFromDriverValue` returns a `string` argument untouched, and its `toISOString()` branch runs only because `pg` built a `Date` first. **The library already held the right answer and never got to use it.** A per-reader fix would have been a second implementation of that branch, on 52 columns, forever.
+
+**THE ENUMERATION IS THE SUBSTANCE AND IT CAME BACK BOUNDED FOR STRUCTURAL REASONS.** No `{ mode: 'date' }` anywhere, so every `date` column is a `PgDateString` returning a `string` on both branches and **no reader's type changes**; a parser is read-direction only, so every `WHERE` and `ORDER BY` over a `date` is PostgreSQL's and untouched; `.execute(` appears nowhere in the source directories; and **all 14 `.select(` in the tree are in [`scoped-db.ts`](../packages/db/src/scoped-db.ts)**, so the reader enumeration is the door enumeration. **Confirmed by running: with the parser installed the estate showed exactly ONE failure, the assertion that encoded the defect.**
+
+**THE ROW'S KYC WARNING POINTED AT THE RULE THAT PREVENTS IT.** `kyc_verifications.expires_at` is `timestamptz`, and **[ADR-146](decisions/ADR-146.md) clause 2's suffix rule is what makes this blast radius enumerable at all**: an instant is `*_at`, a day is `*_day` or `*_on`, and the vocabularies do not overlap. A rule written as an API-surface refusal turned out to be load-bearing three layers down. **The same reading found the one column that breaks it**: `simulation_runs.calibration_observed_at` is a `date` wearing an `_at` suffix, the only one in the estate, reported and needing a migration this row does not grant.
+
+**THE DEFECT WAS ASYMMETRIC AND THAT IS HOW IT SURVIVED**, which [ADR-268](decisions/ADR-268.md) did not report: only offsets east of UTC failed, and **`America/Chicago`, the exchange's own zone, never did.**
+
+**PROVED BY RUNNING AND KEPT AS A CONTROL.** [`date-column-timezone.test.ts`](../packages/db/test/date-column-timezone.test.ts), 21 cases, no database, over all 52 `date` columns at five zones spanning UTC-11 to UTC+14, **watched RED at 11 of 21 and GREEN at 21 of 21**. **The three assertions [ADR-268](decisions/ADR-268.md) pinned moved and none was deleted, and only one could turn red**: the two `Date`-rendering cases answer rows through `pg-proxy` and never run `pg`'s parser, so **a test that supplies its own driver values cannot see a driver defect.**
+
+**`RI-25` MINTED, and the seed proved the check wrong before the check proved anything**: its first version matched the raw file and reported PASS with the call **commented out**, because `client.ts`'s own header explains the repair at length. Comments are stripped now, both forms are permanent cases, and it was watched red under four seeds with every restore `sha256sum -c` byte-identical.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **24 of 24** invariants off the runner's own last line, **292 files / 7,020 passed / 6 skipped** against a baseline of **291 / 6,987 / 6** measured on this tree before a byte changed, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, per the row.

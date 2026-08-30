@@ -5691,6 +5691,187 @@ const ri24 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-25  The `date` type parser is installed once, for OID 1082, in the one file
+//        that constructs the pool
+// -----------------------------------------------------------------------------
+// ADR-271's PROPERTY, HELD ACROSS THE TREE RATHER THAN INSIDE ONE PACKAGE.
+//
+// ADR-268 section 7 measured a defect that was live on `main`: `pg` parsed a
+// `date` (OID 1082) into a `Date` at the PROCESS'S LOCAL MIDNIGHT and drizzle's
+// `PgDateString.mapFromDriverValue` rendered that with `toISOString()`, so the
+// database's `2026-08-28` reached Merit code as `'2026-08-27'` on every
+// deployment east of UTC. ADR-271 repaired it with one `setTypeParser(1082, ...)`
+// in `packages/db/src/client.ts` returning the wire text verbatim.
+//
+// A UNIT TEST CAN PIN THAT FILE. IT CANNOT PIN THE TREE, and the two ways this
+// repair gets undone are both tree-shaped:
+//
+//   1. THE SECOND TRAP. Somebody meets a wrong day, does not find this entry,
+//      and corrects it AT THE READER -- or installs a SECOND parser somewhere
+//      else. A per-reader correction is the same defect multiplied, and a second
+//      parser makes which one wins depend on module import order. The parser is
+//      the one place the property can be made true for everything, and "one
+//      place" is a property of the whole tree.
+//   2. THE THIRD TRAP. Somebody generalises the fix to `1114` and `1184`.
+//      Merit stores instants in UTC deliberately (CLAUDE.md), so an instant HAS
+//      a timezone; handing `timestamptz` back as raw text would be a far larger
+//      and much quieter change than the one ADR-271 made.
+//
+// LEG 2 IS VACUOUSLY TRUE TODAY AND THAT IS THE ARGUMENT FOR WIRING IT NOW,
+// which is `assert_date_unit_shape.mjs`'s reasoning one layer up: no source file
+// outside `client.ts` names `setTypeParser` at all. A gate wired while it is
+// green, and watched failing on a seeded violation, is the cheapest it will ever
+// be. That assertion is the SQL half of the same subject -- no `timestamptz`
+// cast to `date`, no interval arithmetic against one -- and this is the half it
+// cannot see, because it reads migrations and the defect was in the driver.
+//
+// IT READS SOURCE DIRECTORIES ONLY, and that is deliberate rather than lax. A
+// test file legitimately holds the string while asserting ABOUT it: both
+// `last-closed-trading-day-door.test.ts` and `date-column-timezone.test.ts` do.
+// A file that INSTALLS a parser is a file under a `src/`, and scoping the scan
+// there is what keeps the check matching an act instead of a mention.
+//
+// WHAT IT CANNOT SEE: whether the parser is CORRECT. A `client.ts` installing
+// `setTypeParser(1082, (v) => somethingWrong(v))` passes here. That is
+// `date-column-timezone.test.ts`'s half, which runs both libraries at five
+// process timezones; this check is only that there is exactly one of them and
+// that it is aimed at the day OID.
+const CLIENT_FILE = 'packages/db/src/client.ts';
+
+const ri25 = {
+  id: 'RI-25',
+  title: 'One `date` type parser, for OID 1082, in the file that constructs the pool',
+  covers:
+    'A CALENDAR DAY HAS NO TIMEZONE, AND EXACTLY ONE PLACE KEEPS IT THAT WAY. ' +
+    `Three legs. ONE: \`${CLIENT_FILE}\` calls \`setTypeParser\` naming 1082, ` +
+    'which is ADR-271 repairing the defect ADR-268 section 7 measured. ' +
+    'TWO: NO OTHER SOURCE FILE INSTALLS ONE. Every `*.ts`, `*.mjs` and `*.js` ' +
+    'under an `apps/*/src`, `packages/*/src` or `scripts/` directory is read, ' +
+    'and naming `setTypeParser` anywhere but the one file is a finding -- ' +
+    'because a per-reader correction is the same defect multiplied and a second ' +
+    'parser makes the winner depend on import order. ' +
+    'THREE: THE TIMESTAMP OIDs ARE NOT TOUCHED. `client.ts` may not install a ' +
+    'parser for 1114 (`timestamp`) or 1184 (`timestamptz`): Merit stores ' +
+    'instants in UTC deliberately, so an instant HAS a timezone and keeps the ' +
+    'coercion a day must not get. ' +
+    'IT READS `src/` AND `scripts/` AND NOT TESTS, because a test file holds ' +
+    'the string while asserting about it and installing is an act, not a ' +
+    'mention. ' +
+    'WHAT IT CANNOT SEE: whether the parser is CORRECT. One returning the wrong ' +
+    'value passes here; `packages/db/test/date-column-timezone.test.ts` runs ' +
+    'both libraries at five process timezones and is that half. ' +
+    'SILENT on a tree that carries no `client.ts`, which is the synthetic ' +
+    'fixture. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    // SILENT ON A TREE THAT IS NOT THIS REPOSITORY, on RI-23's and RI-24's
+    // precedent. The synthetic scaffold fixture writes `scope.ts` and
+    // `scoped-db.ts` and no `client.ts`, and a tree with no file that
+    // constructs a pool has no parser to have installed.
+    if (!existsSync(join(root, CLIENT_FILE))) return findings;
+
+    const client = readFileSync(join(root, CLIENT_FILE), 'utf8');
+
+    // LEG 1. The call, and the OID it names. Matched as an INVOCATION rather
+    // than a mention, so the prose above the call cannot satisfy the check that
+    // the call exists -- which is the shape RI-24 states for `corpus.yml`.
+    //
+    // COMMENTS ARE STRIPPED FIRST, AND THE SEED THAT FOUND THAT IS RECORDED IN
+    // ADR-271. The first version of this check read the raw file, and
+    // commenting the call OUT -- which is precisely how this repair would be
+    // reverted -- left the `setTypeParser(DATE_OID` text in place and the check
+    // reported PASS on the restored defect. `client.ts`'s own header explains
+    // the repair at length and names the call, so the file that most needs
+    // checking is the one richest in text that looks like the thing.
+    const clientCode = stripComments(client);
+    const installs = [...clientCode.matchAll(/setTypeParser\s*\(\s*([A-Za-z0-9_]+)/g)].map(
+      (m) => m[1],
+    );
+    if (installs.length === 0) {
+      findings.push(
+        `${CLIENT_FILE} calls setTypeParser nowhere, so a \`date\` column is parsed by ` +
+          "`pg`'s default: a `Date` at the PROCESS'S LOCAL MIDNIGHT, which drizzle then " +
+          'renders with `toISOString()`. That is the ADR-146 clause 4 failure ADR-268 ' +
+          'section 7 measured, on all 52 `date` columns at once, live in every deployment ' +
+          'east of UTC. Restore the parser ADR-271 installed',
+      );
+    }
+
+    // The OID may be named through a constant, which `client.ts` does. Either
+    // the literal or a constant BOUND to the literal in the same file counts,
+    // and nothing else does.
+    const boundTo1082 = new Set(
+      [...clientCode.matchAll(/(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*1082\b/g)].map(
+        (m) => m[1],
+      ),
+    );
+    const aimedAtTheDay = installs.some((name) => name === '1082' || boundTo1082.has(name));
+    if (installs.length > 0 && !aimedAtTheDay) {
+      findings.push(
+        `${CLIENT_FILE} installs a type parser for ${installs.join(', ')} and none of those ` +
+          'is 1082, which is `date`. The OID this repair exists for is the DAY one. Name ' +
+          '1082, or a constant assigned 1082 in this file',
+      );
+    }
+
+    // LEG 3. The timestamp OIDs, which are a separate property and the opposite
+    // answer: an instant HAS a timezone.
+    for (const [name, oid] of [
+      ['timestamp', '1114'],
+      ['timestamptz', '1184'],
+    ]) {
+      if (installs.includes(oid)) {
+        findings.push(
+          `${CLIENT_FILE} installs a type parser for OID ${oid} (\`${name}\`). ADR-271 is ` +
+            'about a CALENDAR DAY, which has no timezone and was being given one. Merit ' +
+            'stores instants in UTC deliberately (CLAUDE.md), so an instant keeps the ' +
+            'coercion a day must not get. Remove it: only 1082 belongs here',
+        );
+      }
+    }
+
+    // LEG 2. The rest of the tree. Source and scripts only, for the reason in
+    // the header: a test names the string while asserting about it.
+    const sources = walk(root).filter((f) => {
+      if (f === CLIENT_FILE) return false;
+      if (!/\.(ts|mjs|js)$/.test(f)) return false;
+      if (/(^|\/)(test|tests|__tests__)\//.test(f)) return false;
+      if (/\.test\.[a-z]+$/.test(f)) return false;
+      return (
+        /^apps\/[^/]+\/src\//.test(f) || /^packages\/[^/]+\/src\//.test(f) || /^scripts\//.test(f)
+      );
+    });
+    for (const file of sources) {
+      if (readFileSync(join(root, file), 'utf8').includes('setTypeParser')) {
+        findings.push(
+          `${file} names setTypeParser and ${CLIENT_FILE} is the only file that may. ` +
+            'A SECOND PARSER MAKES THE WINNER DEPEND ON IMPORT ORDER, and correcting a day ' +
+            'at the reader is the same defect multiplied once per reader (ADR-271). The ' +
+            'parser is the one place the property can be made true for everything',
+        );
+      }
+    }
+
+    // A SENTINEL, on RI-24's precedent. Zero source files means the walk or the
+    // filter stopped matching, at which point leg 2 passes by having read
+    // nothing and the whole second trap is unguarded while the check reads PASS.
+    if (sources.length === 0) {
+      throw new Error(
+        'RI-25 found no source file under any `apps/*/src`, `packages/*/src` or `scripts/` ' +
+          `on a tree that DOES carry ${CLIENT_FILE}. Zero means the walk or the path filter ` +
+          'has moved, at which point leg 2 is asserting about an empty list and a second ' +
+          'type parser anywhere in the tree would report as absent',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -5715,6 +5896,7 @@ export const CHECKS = [
   ri22,
   ri23,
   ri24,
+  ri25,
 ];
 
 function main() {
