@@ -7,7 +7,7 @@
 | `version` | text | not null, pk part | |
 | `parameters` | jsonb | not null | |
 | `description` | text | not null | |
-| `effective_from` | date | not null | **Unit: wall clock**, a configuration validity window. |
+| `effective_from` | date | not null | **Unit: wall clock**, a configuration validity window. **A DAY AND NOT AN INSTANT, ruled correct by [ADR-276](../../decisions/ADR-276.md) clause 1.** `0008`'s own header asks for *"a RECORDED EFFECTIVE DATE rather than a deploy"*, and `version` carries the row's identity in the primary key, so `effective_from` is a window boundary and never a discriminator |
 | `effective_to` | date | null | null means current **Unit: wall clock**, the same. |
 | `is_sensitive` | boolean | not null default **true** | marks parameters that must never reach a trader. Default true, because a detector parameter that leaks tells the adversary exactly where the line is, and defaulting to safe means a new detector is protected before anyone remembers to protect it |
 | `created_at` | timestamptz | not null default now() | |

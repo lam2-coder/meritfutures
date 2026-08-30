@@ -289,6 +289,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-273](ADR-273.md) | the coverage check lives in the caller and that is safe exactly where a TYPE makes forgetting a compile error, so the split is ruled rather than moved and the census is closed by `RI-27`  (2026-08-30, status: proposed) |
 | [ADR-274](ADR-274.md) | five clocks and an operator was told about none of them, so `TZ` is written down as the one that decides nothing and a check keeps it that way  (2026-08-30, status: proposed) |
 | [ADR-275](ADR-275.md) | the register that names every invariant in this tree was read by nothing, so a check could land without its row with every gate green  (2026-08-30, status: proposed) |
+| [ADR-276](ADR-276.md) | one word, two temporal types, and the estate already tells them apart in six of nine places, so the finding is the three that say nothing rather than the collision  (2026-08-30, status: proposed) |
 | [ADR-277](ADR-277.md) | the worker's guard asked the right question of the wrong table, and the repair is a refusal plus a type, because the sharper half of the defect was on the branch that looked safe  (2026-08-30, status: proposed) |
 <!--/gen-->
 

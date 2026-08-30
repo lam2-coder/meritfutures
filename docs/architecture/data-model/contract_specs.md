@@ -10,7 +10,7 @@ Tick values per contract. B4 #14 exists because someone always hardcodes a multi
 | `tick_value_cents` | bigint | not null, check > 0 | |
 | `currency` | char(3) | not null default `'USD'` | |
 | `is_micro` | boolean | not null default false | |
-| `effective_from` | date | not null, pk part | **Unit: wall clock**, a configuration validity window, not a session. |
+| `effective_from` | date | not null, pk part | **Unit: wall clock**, a configuration validity window, not a session. **A DAY AND NOT AN INSTANT, ruled correct by [ADR-276](../../decisions/ADR-276.md) clause 1.** The key carries the day and there is no `version` column beside it, so the key itself rules ONE SPEC PER SYMBOL PER DAY. That is a claim about what the exchange publishes rather than a typing choice, and [ADR-276](../../decisions/ADR-276.md) section 9 flags it as the one of the nine whose reading is an inference from the key rather than from a comment |
 | `effective_to` | date | null | null means current **Unit: wall clock**, the same. |
 | `created_at` | timestamptz | not null default now() | |
 
