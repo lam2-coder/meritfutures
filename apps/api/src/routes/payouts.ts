@@ -171,6 +171,7 @@ import {
   type IdempotencyStore,
 } from '../idempotency.ts';
 import { defineRoutes } from '../registry.ts';
+import { RuleStateAbsent } from '../rule-state-reader.ts';
 import { PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX, problem, type Problem } from '../server.ts';
 import {
   requiredFactorTable,
@@ -372,14 +373,29 @@ export interface PayoutSubject {
    * `PayoutTx` at all, and no deployment has run the nightly fold. `ADR-268`
    * section 8.
    *
-   * **AND THE ABSENT ROW HAS NO REFUSAL PATH OUT OF THIS ROUTE, WHICH IS
-   * `ADR-281` RULING 3 AND IS THE HALF NOBODY HAD WRITTEN DOWN.**
-   * `unwiredOrThrow` at the foot of this file rethrows anything that is not a
-   * `PayoutBackendUnwired`, so a backend installed today would answer an
-   * unfolded day with a **500** rather than with the honest refusal this
-   * docblock describes. That arm is code somebody writes here; it is not a
-   * variable a deployment sets, and until it exists "wire and answer honestly"
-   * is not an option this route can take.
+   * **AND THE ABSENT ROW NOW HAS A REFUSAL PATH OUT OF THIS ROUTE, WHICH IS
+   * `ADR-285` AND WHICH `ADR-281` RULING 3 FOUND MISSING.** `unwiredOrThrow` at
+   * the foot of this file rethrows anything that is not a
+   * `PayoutBackendUnwired`, so a backend installed before that row answered an
+   * unfolded day with a **500**; `stateNotFolded` is the arm, it answers **503
+   * `service_unavailable`** with a generic `detail`, and the whole argument for
+   * that status is on that function. **THE REFUSAL IS STILL NEVER A STATE**: no
+   * arm of this route returns a `RuleState` it did not read.
+   *
+   * **AND A BACKEND MUST RESOLVE THE ACCOUNT BEFORE IT READS THE STATE.** This
+   * is `ADR-285` ruling 4 and it is a constraint the arm creates rather than one
+   * it inherits. `subject()` returning `null` is section 1's 404 for a resource
+   * the caller does not own, and 404 and 503 are DISTINGUISHABLE: an
+   * implementation that read `rule_states` first would hand a prober a 503 for
+   * every account of another identity, because a scoped read of a foreign
+   * account's rows is empty and an empty list is `RuleStateAbsent`. Section 1
+   * requires that this API not confirm the existence of other people's
+   * resources, so the ownership answer is FIRST and `RuleStateAbsent` may only
+   * escape for an account this handle can already see.
+   *
+   * **AND IT DOES NOT WIRE THIS PORT.** `ADR-256` ruling 12 permits wiring when
+   * the last gap is a thing the DEPLOYMENT sets; two gaps remain that are not,
+   * and `wiring.test.ts`'s entry names both.
    */
   readonly state: RuleState;
   /**
@@ -547,7 +563,15 @@ export interface PayoutTx {
    */
   identityStatus(): Promise<IdentityStatus>;
 
-  /** The account, or `null` for one this handle cannot see. Section 1's 404. */
+  /**
+   * The account, or `null` for one this handle cannot see. Section 1's 404.
+   *
+   * **THE OWNERSHIP ANSWER COMES BEFORE THE STATE READ AND THAT IS `ADR-285`
+   * RULING 4.** `RuleStateAbsent` now leaves this route as a 503, so an
+   * implementation that read `rule_states` ahead of the account would answer a
+   * prober 503 for every account of another identity rather than 404. The
+   * `state` docblock above carries the whole argument.
+   */
   subject(accountId: string): Promise<PayoutSubject | null>;
 
   /** `G-HOLD-REQUIRED`, resolved. `null` when no flag stands. */
@@ -1344,6 +1368,14 @@ export const PAYOUT_ENDPOINTS: readonly EndpointSpec[] = [
           // key read their own old refusal back.
           return err.refusal.send(reply, request.id);
         }
+        // `ADR-285`. THE ONLY PLACE THIS CAN ARRIVE, AND IT IS NOT FOLDED INTO
+        // `unwiredOrThrow`: the idempotency store cannot raise it, so a shared
+        // helper would claim a path that does not exist. `RuleStateUnreadable`
+        // is DELIBERATELY not caught here and stays a 500, because a row whose
+        // columns disagree with the schema that wrote them is an internal error
+        // and telling a trader to retry it would be telling them to retry
+        // something no retry can fix.
+        if (err instanceof RuleStateAbsent) return stateNotFolded(err, request, reply);
         return unwiredOrThrow(err, request, reply);
       }
 
@@ -1380,6 +1412,90 @@ function rawBodyOf(request: FastifyRequest): Uint8Array {
   if (typeof raw === 'string') return new TextEncoder().encode(raw);
   if (request.body === undefined || request.body === null) return new Uint8Array(0);
   return new TextEncoder().encode(JSON.stringify(request.body));
+}
+
+/**
+ * THE DAY THE NIGHTLY FOLD HAS NOT CLOSED, ANSWERED HONESTLY. `ADR-285`.
+ *
+ * **THIS IS THE ARM `ADR-281` RULING 3 FOUND MISSING AND `ADR-283` RANKED
+ * CHEAPEST OF THE THREE THINGS THIS PORT STILL WAITS ON.** `ruleStateOn`
+ * (`../rule-state-reader.ts`) raises `RuleStateAbsent` when no `rule_states`
+ * row exists for the account on the last closed trading day, and
+ * `unwiredOrThrow` below rethrows everything that is not a
+ * `PayoutBackendUnwired`, so before this function a wired backend meeting an
+ * unfolded day answered **500** on the door where money leaves the firm. A 500
+ * is an internal error from a live-looking route; the fold not having run is
+ * neither internal nor an error, and `../rule-state-reader.ts` says so in
+ * terms: an absence and a malformed row "are different operational days and the
+ * first one is not an error in the estate at all".
+ *
+ * **IT IS A REFUSAL AND IT IS NOT A DEFAULT STATE.** Nothing here builds a
+ * `RuleState`, carries one forward or zeroes one. `RuleStateAbsent` is a class
+ * and not an arm; a fabricated state is a payout basis nobody computed, and it
+ * is worse than a refusal because it looks like an answer.
+ *
+ * **THE CODE IS `service_unavailable` BECAUSE API_CONTRACT SECTION 2'S TABLE IS
+ * CLOSED**, on `gateIdentityStatus`'s own reasoning above and on
+ * `sendTurnstileRefusal`'s (`auth.ts`): a code this repository invents is a
+ * contract amendment and not a route. Section 2 defines 503 as *"Dependency
+ * down (PSP, Rise), safe to retry"* and the nightly fold is a dependency of
+ * this answer, ruled EXTERNAL by `ADR-241` and scheduled outside this
+ * repository. Retrying is exactly what the caller should do, which is the half
+ * of that row that decides it. **THE OTHER FOUR CANDIDATES ARE REFUSED AND FOR
+ * DIFFERENT REASONS.** `payout_not_eligible` would carry `gates` in which every
+ * gate passes, which is the false-eligibility-story shape `ADR-140` refused for
+ * the identity term one door up. `conflict` and `precondition_failed` both say
+ * the client acted, and the client did nothing. `internal_error` is what this
+ * arm exists to stop.
+ *
+ * **NO `Retry-After`.** RFC 9110 permits one on a 503 and this deployment has
+ * no honest value to put in it: `ADR-241` ruled the schedule EXTERNAL and
+ * registered it in `CRON_INVENTORY`, so a number here would be this repository
+ * asserting an operator fact it does not hold.
+ *
+ * **THE `detail` NAMES THE HEADER BECAUSE "RETRY" ALONE WOULD BE FALSE, AND
+ * THAT WAS MEASURED RATHER THAN REASONED.** A refusal is never stamped
+ * (`RefusalThrown` below), so the key this request claimed keeps a null
+ * response and `classify` (`../idempotency.ts`) calls such a row `in_flight`,
+ * which `problemForOutcome` answers **409 `conflict`**. A trader who took the
+ * word "retry" literally and resent the same key would meet a conflict rather
+ * than the verdict the fold has since produced. That is TRUE OF EVERY REFUSAL
+ * THIS ROUTE MAKES and is not created here; it matters here because this is the
+ * only refusal that is MERIT'S rather than the caller's, so it is the only one
+ * whose remedy is to come back unchanged. `ADR-285` section 6 reports it and
+ * does not repair it: `../idempotency.ts` is outside that row's fence and the
+ * rule reaches every endpoint that claims a key.
+ *
+ * **THE `detail` IS GENERIC AND THE DISCRIMINATOR AN OPERATOR NEEDS TRAVELS IN
+ * THE LOG.** Section 2: `detail` *"never leaks internals or other users'
+ * data"*, and `AuthBackendUnwired` (`auth.ts`) already rules this exact split
+ * for the two absences that share this status -- "different facts to an
+ * operator, so the reason travels with the error" and "the reason never reaches
+ * the response". The account and the day are logged; the body says only what
+ * the caller may do about it. It is logged at WARN rather than at ERROR for the
+ * reader's own reason: an unfolded day is not a fault in the estate.
+ *
+ * **AND IT DOES NOT WIRE THIS PORT.** `ADR-256` ruling 12 permits wiring when
+ * the last gap is a thing the DEPLOYMENT sets, and two gaps remain that are
+ * not: the size row's decoding, and the fact that nothing in this tree
+ * implements `PayoutTx` at all. `wiring.test.ts`'s entry names both.
+ */
+function stateNotFolded(
+  err: RuleStateAbsent,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): FastifyReply {
+  request.log.warn(
+    { err, accountId: err.accountId, tradingDay: err.tradingDay },
+    'no rule_states row for the last closed trading day; the nightly fold has not closed it',
+  );
+  return sendProblem(reply, {
+    ...handlerProblem('service_unavailable', 'Service unavailable', 503, request.id),
+    detail:
+      'Eligibility for the last closed trading day has not been computed for this account yet. ' +
+      'Nothing about this request is wrong and no payout decision has been reached. Retry later ' +
+      'with a new Idempotency-Key.',
+  });
 }
 
 /** An unwired backend is a 503 and never a 500. Anything else is the transport's. */
