@@ -33,11 +33,19 @@
 //
 // **`tradingDay` IS READ FROM THE CALENDAR AND NEVER FROM A CLOCK.** `ADR-146`
 // clause 4 forbids a UTC calendar date derived from an instant meeting an
-// exchange CT trading day, so `readLastClosedTradingDay` compares an instant
-// with an instant and READS the day off the row it selected.
-// `MERIT_BATCH_TRADING_DAY` overrides it, which `RB-01` needs to re-run a night
-// that failed, and an override the calendar does not carry is refused rather
-// than folded.
+// exchange CT trading day, so the fold compares an instant with an instant and
+// READS the day off the row it selected. `MERIT_BATCH_TRADING_DAY` overrides it,
+// which `RB-01` needs to re-run a night that failed.
+//
+// **AND NEITHER PATH GETS A DAY WITHOUT A COVERAGE VERDICT, WHICH IS `ADR-277`
+// AND IS A TYPE RATHER THAN A HABIT.** This function used to call a fold that
+// returned `TradingDay | null` and a guard named `calendarCarriesDay` whose
+// refusal said "outside coverage" while its query asked `trading_calendar` for a
+// ROW. Coverage is `trading_calendar_loads` and nothing in the schema ties the
+// two, so the batch folded days no load ever declared and stamped `rule_states`
+// with them. Both paths now come back as a `TradingDayAnchor` whose `tradingDay`
+// lives on the `anchored` arm ALONE: a future edit that forgets the verdict does
+// not compile.
 //
 // **`engineVersion` IS A DEPLOYMENT FACT AND THIS REPOSITORY DOES NOT KNOW IT.**
 // There is no `ENGINE_VERSION` constant in `packages/rules-engine`, measured over
@@ -62,11 +70,7 @@
 import type { TradingDay } from '@merit/rules-engine';
 
 import { runNightlyBatch, type NightlyBatchReport } from './batch/nightly.ts';
-import {
-  postgresBatchPorts,
-  calendarCarriesDay,
-  readLastClosedTradingDay,
-} from './batch/adapter.ts';
+import { anchorLastClosedDay, anchorNamedDay, postgresBatchPorts } from './batch/adapter.ts';
 import { LIVE_DB, type WorkerDb } from './db.ts';
 
 /** `Appendix B.5` worker concurrency, held at one until `FM-10`'s lock exists. */
@@ -126,6 +130,19 @@ const TRADING_DAY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
  * written nothing at all. `ADR-241` section 5 states the whole first-run
  * behaviour; the part that belongs in code is that the refusal happens ABOVE the
  * watermark read.
+ *
+ * **AN UNCOVERED DAY IS THE SAME KIND OF ANSWER AND IT WAS THE ONE THIS FUNCTION
+ * DID NOT HAVE.** `ADR-042` F-4 rules that a day outside `trading_calendar_loads`
+ * is UNKNOWN rather than a holiday, and `ADR-277` is why both branches below now
+ * refuse on one. The refusal is LOUD where a default is silent: a job that folds
+ * an uncovered day exits 0 having written a confident `YYYY-MM-DD` basis into
+ * every `rule_states` row for a night the estate never loaded, and `INV-04`'s
+ * replay later compares those rows against a calendar that never covered them.
+ *
+ * **NEITHER BRANCH DECIDES ANYTHING ABOUT COVERAGE ITSELF.** Each asks the
+ * adapter and narrows on `kind`. That split is `ADR-273` ruling 1's condition
+ * met: the value handed back does not carry a day until the verdict has been
+ * read.
  */
 export async function resolveTradingDay(io: WorkerJobIo): Promise<TradingDay> {
   const override = io.env[TRADING_DAY_VAR];
@@ -136,28 +153,25 @@ export async function resolveTradingDay(io: WorkerJobIo): Promise<TradingDay> {
         `${TRADING_DAY_VAR} is "${override}", which is not a YYYY-MM-DD trading day`,
       );
     }
-    const day = override as TradingDay;
-    if (!(await calendarCarriesDay(io.db, day))) {
+    const named = await anchorNamedDay(io.db, override as TradingDay);
+    if (named.kind !== 'anchored') {
       throw new WorkerJobRefusal(
         TRADING_DAY_VAR,
-        `${TRADING_DAY_VAR} names ${override} and \`trading_calendar\` has no row for it. A day ` +
-          'the calendar does not carry is a day outside coverage, and folding it would raise a ' +
-          'coverage miss on every account rather than closing anything',
+        `${TRADING_DAY_VAR} names ${override} and ${named.why}`,
       );
     }
-    return day;
+    return named.tradingDay;
   }
 
-  const lastClosed = await readLastClosedTradingDay(io.db, io.now());
-  if (lastClosed === null) {
+  const anchor = await anchorLastClosedDay(io.db, io.now());
+  if (anchor.kind !== 'anchored') {
     throw new WorkerJobRefusal(
       'tradingDay',
-      '`trading_calendar` carries no session that has already closed, so there is no day to ' +
-        `close. On a database nobody has loaded the exchange calendar into this is every day. Set ` +
-        `${TRADING_DAY_VAR} to fold a specific day once a calendar exists`,
+      `${anchor.why}. Set ${TRADING_DAY_VAR} to fold a specific day once the calendar and its ` +
+        'coverage both reach it',
     );
   }
-  return lastClosed;
+  return anchor.tradingDay;
 }
 
 /** The build identifier stamped on every row this run writes. */

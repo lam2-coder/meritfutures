@@ -182,15 +182,25 @@ export type {
 // because it is the composition this deployable's own suite substitutes a
 // recorder into, and a composition nobody can import is a composition nobody can
 // test.
+//
+// **TWO NAMES LEFT THIS LEG IN `ADR-277` AND THEIR ABSENCE IS THE REPAIR RATHER
+// THAN A TIDY-UP.** `readLastClosedTradingDay` handed every importer a
+// `TradingDay | null` in which `null` meant "no session has closed" and never
+// "outside coverage", and `calendarCarriesDay` answered a coverage-shaped
+// question off `trading_calendar`, which is the wrong table. Both are gone from
+// this barrel and from this deployable's exported surface; `anchorLastClosedDay`
+// and `anchorNamedDay` replace them and hand back a `TradingDayAnchor` carrying
+// the day on its `anchored` arm ALONE, so an importer that skips the coverage
+// verdict does not compile.
 export {
   BatchPortUnwired,
   BatchRowError,
-  calendarCarriesDay,
+  anchorLastClosedDay,
+  anchorNamedDay,
   postgresBatchPorts,
-  readLastClosedTradingDay,
   toCalendarSlice,
 } from './batch/adapter.ts';
-export type { BatchTx } from './batch/adapter.ts';
+export type { BatchTx, TradingDayAnchor } from './batch/adapter.ts';
 
 // SD-08. Exported because the replay self-audit is the other caller: it will
 // re-derive a state and hash it with THIS function, and a second implementation
