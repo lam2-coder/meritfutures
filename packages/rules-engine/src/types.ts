@@ -897,10 +897,13 @@ export type KycState = 'kyc_required' | 'pending' | 'verified' | 'rejected' | 'e
 /**
  * Context, never replayed (INV-23). Every field is resolved by the CALLER.
  *
- * M01 SECTION 2.1 IS NOT REPRODUCED VERBATIM AND ONE NOTE IS CONTESTED IN THE
- * CORPUS. `payoutsFrozen` is "account level OR identity level, RESOLVED BY THE
- * CALLER" and matches its source. `hasPayoutInFlight` reads "for this account"
- * in section 2.1 and "for this identity" in R-38's own row. ADR-248 rules NEITHER.
+ * M01 SECTION 2.1 IS NOT REPRODUCED VERBATIM AND ONE NOTE WAS CONTESTED UNTIL
+ * ADR-254. `payoutsFrozen` is "account level OR identity level, RESOLVED BY THE
+ * CALLER" and matches its source. `hasPayoutInFlight` read "for this account"
+ * in section 2.1 and "for this identity" in R-38's own row; ADR-248 found that
+ * and refused to rule it, and ADR-254 rules THE ACCOUNT. This interface wrote
+ * the losing half twice, on the interface and on the field, while claiming to
+ * reproduce section 2.1, which says account.
  */
 export interface ExternalGates {
   readonly accountStatus: AccountStatus;
@@ -908,7 +911,18 @@ export interface ExternalGates {
   /** Account level OR identity level, already resolved. */
   readonly payoutsFrozen: boolean;
   readonly reconBlocked: boolean;
-  /** R-38, outstanding external leg. THE GRAIN IS CONTESTED: ADR-248, unruled. */
+  /**
+   * R-38, RULED AT THE ACCOUNT (ADR-254).
+   *
+   * True when an `approved`, `frozen` or `held_pending_review` `payout_requests`
+   * row exists FOR THE SUBJECT ACCOUNT, which is `payout_requests_no_in_flight_uq`'s
+   * predicate. It is NOT the identity's: `AS-09` is ruled at the gate as
+   * visibility rather than a rule, so ten accounts may each hold one, and a
+   * resolver reading the identity would impose the extraction ceiling the corpus
+   * declined to impose. ADR-019's one-in-flight-per-identity rule is the
+   * EXTERNAL leg's, its object is `wallet_withdrawals`, and it does not read
+   * this field.
+   */
   readonly hasPayoutInFlight: boolean;
 }
 

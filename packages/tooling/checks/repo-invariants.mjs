@@ -5509,6 +5509,188 @@ const ri23 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-24  Every scripts/db assertion is run and pinned
+// -----------------------------------------------------------------------------
+// OI-07's FIFTH OCCURRENCE, AND IT WAS LIVE ON `main` WHEN THIS CHECK WAS
+// WRITTEN, IN THE HALF THE GATE THAT CLOSED OI-07 CANNOT SEE.
+//
+// `CI-06s` asserts that every `scripts/db/probe_*.sql` on disk is run by a step
+// in `corpus.yml` AND pinned by `CI-06h`'s needle list, in both directions. Its
+// on-disk scan is `/^probe_[a-z0-9_]+\.sql$/`. The directory also holds
+// ASSERTIONS -- `assert_*.sql` and `assert_*.mjs` -- and those match nothing in
+// that pattern.
+//
+// MEASURED BEFORE THIS CHECK EXISTED, on the tree as merged:
+// `assert_append_only_grants.mjs` and `assert_date_unit_shape.mjs` were on disk,
+// were wired at `corpus.yml`, and were pinned by NOTHING. Deleting either step
+// would have been a silent change with every gate green -- which is OI-07's
+// sentence word for word, four occurrences after the pattern was declared and one
+// gate after it was supposedly closed. The first is OI-03's entire
+// implementation, the only reader of the database's grants in this repository;
+// the second is the only refusal of interval arithmetic against a date column.
+//
+// WIRING AND PINNING ARE TWO EDITS IN TWO FILES and that is the whole mechanism,
+// as `CI-06s` states it. This check is that gate's predicate over the other
+// family of files, kept as a separate `RI-nn` rather than folded into `CI-06s`
+// because `CI-06s`'s scope is written into its own `covers` line and into its
+// STRATEGY row, and widening a gate's stated subject in place is how a row stops
+// describing what runs.
+//
+// WHAT IT CANNOT SEE, on `CI-06s`'s own precedent: whether the assertion asserts
+// anything. A file that is run and pinned and holds one comment passes here.
+const ri24 = {
+  id: 'RI-24',
+  title: 'Every scripts/db assertion is run by corpus.yml and pinned by CI-06h',
+  covers:
+    'AN ASSERTION IS RUN AND PINNED, IN BOTH DIRECTIONS. Every ' +
+    '`scripts/db/assert_*.sql` and `scripts/db/assert_*.mjs` on disk appears as ' +
+    'an invoked STEP in `.github/workflows/corpus.yml` and as a needle in ' +
+    "`CI-06h`'s required list in `scripts/corpus/gates.mjs`, and every such " +
+    'filename that list names exists on disk. ' +
+    'THIS IS `CI-06s` OVER THE FILES `CI-06s` CANNOT SEE: that gate scans ' +
+    '`/^probe_[a-z0-9_]+\\.sql$/` and the assertions match none of it. ' +
+    'IT MATCHES THE INVOCATION AND NOT THE MENTION: a `.sql` assertion counts ' +
+    'when it is the `-f scripts/db/<file>` argument of a psql call and a `.mjs` ' +
+    'one when it is the argument of `node scripts/db/<file>`, so a filename ' +
+    'appearing only in a workflow comment is claimed as nothing. `corpus.yml` ' +
+    'names `assert_append_only_grants.mjs` in prose above the step that runs it, ' +
+    'which is the near-miss a loose parser reads as coverage. ' +
+    "THE PINNED SIDE IS READ FROM `CI-06h`'s BLOCK ALONE, on `CI-06s`'s " +
+    'precedent, because `gates.mjs` names these files in its own comments and a ' +
+    'gate counting its own comment as a pin reports every file pinned the day it ' +
+    'is written. ' +
+    'WHAT IT CANNOT SEE: whether the assertion asserts anything, which is the ' +
+    'same boundary `CI-06s` states. A file run and pinned that holds one comment ' +
+    'passes here. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const dir = 'scripts/db';
+    const workflow = '.github/workflows/corpus.yml';
+
+    const onDisk = existsSync(join(root, dir))
+      ? readdirSync(join(root, dir))
+          .filter((f) => /^assert_[a-z0-9_]+\.(sql|mjs)$/.test(f))
+          .sort()
+      : [];
+
+    // SILENT ON A TREE THAT IS NOT THIS REPOSITORY, on RI-23's precedent. The
+    // synthetic scaffold fixture carries neither corpus.yml nor scripts/db, and
+    // a tree with no corpus workflow has nothing for an assertion to be unwired
+    // from. The pairing is what makes this safe rather than an exemption: a tree
+    // WITH the workflow and no assertion on disk is the "reader stopped
+    // matching" case and throws below.
+    if (!existsSync(join(root, workflow))) {
+      if (onDisk.length === 0) return findings;
+      findings.push(
+        `${workflow} is missing and ${dir} holds ${String(onDisk.length)} assertion(s), ` +
+          'so none of them is run at all',
+      );
+      return findings;
+    }
+    const wf = readFileSync(join(root, workflow), 'utf8');
+
+    // The INVOCATION. `-f` for the psql form, the bare argument for the node one.
+    const wired = new Set();
+    for (const m of wf.matchAll(/psql\b[^\n]*?-f\s+scripts\/db\/(assert_[a-z0-9_]+\.sql)/g)) {
+      wired.add(m[1]);
+    }
+    for (const m of wf.matchAll(/\bnode\s+scripts\/db\/(assert_[a-z0-9_]+\.mjs)/g)) {
+      wired.add(m[1]);
+    }
+
+    // CI-06h's block, bounded exactly as CI-06s bounds it: from the declaration
+    // to the NEXT top-level gate declaration, whichever letter that is, so this
+    // file's prose and the rest of gates.mjs are both outside the window.
+    const gatesPath = join(root, 'scripts/corpus/gates.mjs');
+    if (!existsSync(gatesPath)) {
+      findings.push(
+        'scripts/corpus/gates.mjs is missing, so CI-06h pins nothing and every ' +
+          'assertion below is unpinned for a reason this check cannot report usefully',
+      );
+      return findings;
+    }
+    const gates = readFileSync(gatesPath, 'utf8');
+    const from = gates.indexOf('\nconst ci06h = {');
+    const after = from === -1 ? -1 : gates.slice(from + 1).search(/\nconst ci06[a-z] = \{/);
+    const to = after === -1 ? gates.length : from + 1 + after;
+    const pinned = new Set();
+    if (from !== -1) {
+      for (const m of gates.slice(from, to).matchAll(/'(assert_[a-z0-9_]+\.(?:sql|mjs))'/g)) {
+        pinned.add(m[1]);
+      }
+    }
+
+    for (const file of onDisk) {
+      if (!wired.has(file)) {
+        findings.push(
+          `${dir}/${file} exists and no step in ${workflow} invokes it. An assertion ` +
+            `that ships beside a fix and never runs again is the same object as the ` +
+            `golden test that was missing (OI-07). Add a step that runs it`,
+        );
+      }
+      if (!pinned.has(file)) {
+        findings.push(
+          `${dir}/${file} is not pinned by CI-06h's required-needle list, so deleting ` +
+            `its workflow step would be a silent change rather than a gate failure. ` +
+            `THIS IS OI-07's SHAPE, in the half CI-06s cannot see: that gate reads ` +
+            `probe_*.sql only. Add the filename to the list in ci06h's run()`,
+        );
+      }
+    }
+
+    // The stale direction, which is the one nobody looks in: a list naming
+    // something that no longer exists still looks complete.
+    for (const file of [...pinned].sort()) {
+      if (!onDisk.includes(file)) {
+        findings.push(
+          `CI-06h pins ${file} and no file under ${dir} provides it. The needle asserts ` +
+            `a step nobody can delete because the assertion is already gone, so CI-06h ` +
+            `passes while proving nothing about it. Remove the needle or restore the file`,
+        );
+      }
+    }
+    for (const file of [...wired].sort()) {
+      if (!onDisk.includes(file)) {
+        findings.push(
+          `${workflow} invokes ${dir}/${file} and no such file exists, so the job fails ` +
+            `at that step rather than proving anything`,
+        );
+      }
+    }
+
+    // Sentinels, on CI-06s's precedent. Each zero means a reader stopped
+    // matching, at which point every file passes for the wrong reason.
+    if (onDisk.length === 0) {
+      throw new Error(
+        `RI-24 found no assert_* file under ${dir} on a tree that DOES carry ${workflow}. ` +
+          'This repository has held assert_no_floats.sql since the P1 scaffold, so zero ' +
+          'here means the directory or the naming has moved and this check is asserting ' +
+          'about a tree it did not read. A tree carrying neither is a fixture and returns ' +
+          'silently above',
+      );
+    }
+    if (wired.size === 0) {
+      throw new Error(
+        `RI-24 matched no assertion invocation in ${workflow}. Zero means the step form ` +
+          'has moved, at which point every assertion reads as unwired and the findings ' +
+          'above are noise rather than evidence',
+      );
+    }
+    if (pinned.size === 0) {
+      throw new Error(
+        "RI-24 read no assert_* filename out of CI-06h's block. Zero means the block " +
+          'bounds or the needle form have moved, and every assertion would then report ' +
+          'as unpinned',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -5532,6 +5714,7 @@ export const CHECKS = [
   ri21,
   ri22,
   ri23,
+  ri24,
 ];
 
 function main() {

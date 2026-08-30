@@ -104,7 +104,7 @@ export function evaluatePayout(
   const reconClear: ReconClearGate = { pass: !external.reconBlocked };
 
   // ---------------------------------------------------------------------------
-  // R-38  one payout in flight, ON THE EXTERNAL LEG ONLY
+  // R-38  one payout in flight, PER ACCOUNT, ON `payout_requests`
   // ---------------------------------------------------------------------------
   // AS-01 is the attack and it very nearly works: every request is individually
   // correct, every gate passes, and "on CORE-50K that converts one qualifying
@@ -113,10 +113,22 @@ export function evaluatePayout(
   // unique index is the second, "so the engine is not the only line of defence".
   //
   // [ADR-019](../../../docs/decisions/ADR-019.md) narrowed it to the external
-  // leg: "the internal leg completes in one transaction, so there is no window
-  // for a second request to arrive inside and AS-01 is STRUCTURALLY RESOLVED
-  // rather than gated. The rule survives on the external leg as the liability
-  // control it always was."
+  // leg, on the premise that "the internal leg completes in one transaction, so
+  // there is no window for a second request to arrive inside". THAT PREMISE DID
+  // NOT SURVIVE THE YEAR: [ADR-040](../../../docs/decisions/ADR-040.md) put
+  // `held_pending_review` BEFORE approval, which is an outstanding request with
+  // nothing posted against it, and it re-created SD-09's unique index ON
+  // `payout_requests (account_id)` rather than dropping it.
+  //
+  // SO THE GRAIN IS THE ACCOUNT AND IT IS RULED:
+  // [ADR-254](../../../docs/decisions/ADR-254.md). M01 stated it both ways and
+  // this file transcribed the losing half twice; the amendment moves M01's two
+  // R-38 rows and leaves every other account-grained source standing.
+  // ADR-019's one-in-flight-PER-IDENTITY rule is real and is a DIFFERENT rule:
+  // its object is `wallet_withdrawals`, its enforcement is the withdrawal
+  // handler because that leg's open index is plain rather than unique
+  // ([ADR-158](../../../docs/decisions/ADR-158.md) finding 8), and it never
+  // reads this field.
   //
   // IT IS NOT IN `gates` AND THAT IS API_CONTRACT's SHAPE. M01 section 2.2 names
   // API_CONTRACT's `gates` object as the shape of `FullGateResults`, and that
@@ -126,13 +138,14 @@ export function evaluatePayout(
   // `contextEligible`, and it is reported on its own field rather than being
   // smuggled into a published shape that does not have a slot for it.
   //
-  // WHICH REQUEST STATUSES COUNT AS OUTSTANDING IS THE CALLER'S, and it has
-  // moved twice since M01 was frozen. M01's own comment on `hasPayoutInFlight`
-  // still reads `approved | transferring | frozen`; ADR-028 retired
-  // `transferring` and ADR-040 added `held_pending_review`, and STATE records
-  // that M01 is the one document FOLD-02's sweep has not reached. The engine
-  // reads a resolved boolean, so the drift cannot reach the arithmetic here, and
-  // it is recorded rather than fixed because editing a frozen document is an ADR.
+  // WHICH REQUEST STATUSES COUNT AS OUTSTANDING IS THE CALLER'S, and it moved
+  // twice after M01 was frozen. THIS COMMENT RECORDED THE DRIFT AS UNFIXED AND
+  // IT IS FIXED: it read that M01's own comment on `hasPayoutInFlight` carried
+  // the pre-ADR-028 vocabulary, which was true from 2026-08-14 until ADR-254
+  // folded M01's four sites onto `approved | frozen | held_pending_review`. The
+  // engine still reads a RESOLVED boolean, so the vocabulary never could reach
+  // the arithmetic here; what it could reach, and did, was every reader who
+  // took the comment beside the field for the rule.
   const noPayoutInFlight = { pass: !external.hasPayoutInFlight };
 
   const gates: FullGateResults = {
