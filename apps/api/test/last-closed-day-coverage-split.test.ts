@@ -41,8 +41,8 @@
 // held by the compiler is invisible to a suite that only runs values.
 //
 // WHAT THIS FILE DOES NOT COVER: the tree. A fifth statement of the fold landing
-// in some other package is a property of the whole repository and `RI-26` is its
-// home. One case here RUNS `RI-26` so both halves move under `pnpm vitest run`,
+// in some other package is a property of the whole repository and `RI-27` is its
+// home. One case here RUNS `RI-27` so both halves move under `pnpm vitest run`,
 // and that is the only place the two overlap.
 // =============================================================================
 
@@ -338,12 +338,12 @@ describe('the worker fold consults no coverage, and neither does its caller', ()
 });
 
 // =============================================================================
-// 4. THE TREE CENSUS, WHICH IS `RI-26`'s AND IS RUN HERE
+// 4. THE TREE CENSUS, WHICH IS `RI-27`'s AND IS RUN HERE
 // =============================================================================
 
-describe('RI-26 holds on this tree', () => {
+describe('RI-27 holds on this tree', () => {
   it('reports no finding', async () => {
-    // ONE CASE, AND IT IS THE ONLY OVERLAP BETWEEN THE TWO HALVES. `RI-26`
+    // ONE CASE, AND IT IS THE ONLY OVERLAP BETWEEN THE TWO HALVES. `RI-27`
     // owns the tree census because a fifth statement of the fold can land in
     // any package; this file owns the behaviour and the file-local fence. This
     // case exists so a session running only `pnpm vitest run` still moves the
@@ -352,7 +352,7 @@ describe('RI-26 holds on this tree', () => {
       pathToFileURL(join(ROOT, 'packages/tooling/checks/repo-invariants.mjs')).href
     );
     const ri26 = (checks.CHECKS as { id: string; run(root: string): string[] }[]).find(
-      (c) => c.id === 'RI-26',
+      (c) => c.id === 'RI-27',
     );
     expect(ri26).toBeDefined();
     expect(ri26?.run(ROOT)).toEqual([]);
