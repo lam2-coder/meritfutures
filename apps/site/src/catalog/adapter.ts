@@ -104,8 +104,9 @@ import type {
   PublishedFloorLock,
   PublishedFundedPhase,
   PublishedWinDays,
-  SizeCapScheduleStep,
 } from '@merit/rules-engine';
+
+import { decodeCapScheduleCents } from '@merit/rules-engine';
 
 import type { ContentDocument, ContentKind } from '../content/documents.ts';
 import type { PublishedStatistic, StatisticMeasure, StatisticUnit } from '../stats/published.ts';
@@ -503,7 +504,14 @@ function decodeSizeRow(
       field(source, 'win_day_floor_cents', where),
       `${where}.win_day_floor_cents`,
     ),
-    payout_cap_schedule_cents: decodeCapSteps(
+    // **ADR-302's COLLAPSE, AND THIS SIDE OF IT IS BEHAVIOUR-PRESERVING.**
+    // `decodeCapSteps` stood here and stated, in this file's own helpers, exactly
+    // what the engine's codec now states once for all three readers of the
+    // column. What changes is the class of the refusal, which is
+    // `CapScheduleCodecError` and no longer `SiteAdapterError`; `siteCatalog`
+    // (`../app/build.ts`) catches every throw from a catalogue read and logs it,
+    // and nothing in this app branches on the class.
+    payout_cap_schedule_cents: decodeCapScheduleCents(
       field(source, 'payout_cap_schedule_cents', where),
       `${where}.payout_cap_schedule_cents`,
     ),
@@ -515,17 +523,6 @@ function decodeSizeRow(
     floor_lock_at_profit_cents: nullableCents(source, 'floor_lock_at_profit_cents', where),
     floor_lock_floor_at_cents: nullableCents(source, 'floor_lock_floor_at_cents', where),
   };
-}
-
-function decodeCapSteps(value: unknown, where: string): readonly SizeCapScheduleStep[] {
-  return list(value, where).map((step, index) => {
-    const at = `${where}[${index}]`;
-    const source = record(step, at);
-    return {
-      from_ordinal: integer(field(source, 'from_ordinal', at), `${at}.from_ordinal`),
-      cap_cents: bigintCents(field(source, 'cap_cents', at), `${at}.cap_cents`),
-    };
-  });
 }
 
 // -----------------------------------------------------------------------------

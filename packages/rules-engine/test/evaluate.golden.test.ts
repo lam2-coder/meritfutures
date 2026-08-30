@@ -134,6 +134,7 @@ import * as engine from '../src/index.ts';
 test('the engine entry point is the whole public surface, and it is this exact list', () => {
   expect(Object.keys(engine).sort()).toEqual([
     'CalendarSliceError',
+    'CapScheduleCodecError',
     'ENGINE_GATE_LEAVES',
     'EXCLUDED_COLUMNS',
     'EngineGatesCodecError',
@@ -152,6 +153,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'buildCalendarSlice',
     'buildSessionCalendar',
     'canonicalStateSerialization',
+    'decodeCapScheduleCents',
     'decodeEngineGates',
     'decodePlanRules',
     'encodeEngineGates',
@@ -232,6 +234,22 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // third one `apps/api` needs. `PlanRulesCodecError` is the seventh error class,
 // on `EngineGatesCodecError`'s reason unchanged.
 //
+// ADR-302 IS THE SEVENTH AND IT IS THE FIRST WHOSE ARGUMENT IS A COUNT THAT
+// ALREADY STOOD AT THREE, AND THE FIRST WHERE ALL OF THEM ARE RETIRED IN THE
+// SAME DIFF: thirty-three names to THIRTY-FIVE, nineteen functions to TWENTY,
+// and the error classes from seven to EIGHT. `decodeCapScheduleCents` had
+// `toCapScheduleCents` (`apps/worker`), `decodeCapSteps` (`apps/site`) and
+// `readCapSchedule` (`apps/api`) reading the same two stored keys out of the
+// same `jsonb` column with nothing comparing them, AND THE THIRD HAD ALREADY
+// DIVERGED ON THE MONEY: it admitted a `cap_cents` past
+// `Number.MAX_SAFE_INTEGER` and handed back the rounded double, and refused the
+// base-10 string ADR-283 ruling 5 blessed. So withholding it here would not have
+// prevented a decoder, it would have left the divergence live; and adding it
+// WITHOUT retiring the three would have been a FOURTH statement of the payout
+// ceiling, which ADR-286 refused and ADR-269 refused before it for this same
+// value. `CapScheduleCodecError` is the eighth error class, on
+// `EngineGatesCodecError`'s reason unchanged.
+//
 // **AND THE ENCODE HALF IS DELIBERATELY ABSENT, WHICH IS WHERE THIS DIFFERS FROM
 // ADR-250.** `gates-codec.ts` exports BOTH directions because the worker writes
 // `rule_states.engine_gates` through `RuleStateWriterIo`. NOTHING in this
@@ -239,7 +257,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // path validates a document somebody authored. An encoder here would be a second
 // statement of the shape with no caller to keep it honest, which is the thing
 // this gate exists to refuse rather than an omission it should catch.
-test('of the thirty-three names, exactly nineteen are non-class functions after ADR-283', () => {
+test('of the thirty-five names, exactly twenty are non-class functions after ADR-302', () => {
   const functions = Object.keys(engine)
     .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
     .sort();
@@ -249,6 +267,7 @@ test('of the thirty-three names, exactly nineteen are non-class functions after 
   // the difference. `IMPLEMENTED_RULES` and the three tables are values.
   const classes = [
     'CalendarSliceError',
+    'CapScheduleCodecError',
     'EngineGatesCodecError',
     'EngineInvariantError',
     'ExternalGatesRefusal',
@@ -262,6 +281,7 @@ test('of the thirty-three names, exactly nineteen are non-class functions after 
     'buildCalendarSlice',
     'buildSessionCalendar',
     'canonicalStateSerialization',
+    'decodeCapScheduleCents',
     'decodeEngineGates',
     'decodePlanRules',
     'encodeEngineGates',

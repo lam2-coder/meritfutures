@@ -311,6 +311,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-295](ADR-295.md) | slice 6's approval branch LANDED, and the lock ADR-293 ruled is STILL OWED because the fence that granted this file granted it for seven named lines  (2026-08-30, status: proposed) |
 | [ADR-297](ADR-297.md) | a column that cannot be null, and the null is not the defect. `payout_requests.approved_at` holds the REQUEST instant on every row, it is the only one of four state timestamps not bound to its state, and the repair is a SUPERSESSION whose number is RESERVED AND NOT WRITTEN  (2026-08-30, status: proposed) |
 | [ADR-299](ADR-299.md) | the home is the DOOR, because its `unknown` was never ruled and it has NO CALLER; the decoder splits at the line that actually exists rather than at the one ADR-286 drew; and the cap schedule is dispatched FIRST  (2026-08-30, status: proposed) |
+| [ADR-302](ADR-302.md) | three readers of one payout ceiling, one of them wrong on the money in both directions, collapsed onto a single codec in the diff that wrote it  (2026-08-30, status: proposed) |
 | [ADR-304](ADR-304.md) | a commission is not the firm's, and it is not a seventh scope class away either. `affiliate_commissions` is ONE COLUMN away, the column is the one the other three tables on this rail already carry, and `0078` is RESERVED AND NOT WRITTEN (2026-08-30, status: proposed) |
 <!--/gen-->
 
