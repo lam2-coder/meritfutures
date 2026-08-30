@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->245<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->246<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10263,3 +10263,27 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **LANDMINE, STILL AT ITS LIMIT AND NOT TOUCHED.** `docs/STATE.md` carries the `gen:adr_count` paragraph **EIGHT** times against `RI-12`'s ceiling of eight. This row's permission is `append` and this append adds no ninth copy, but **the next session that appends a section quoting that line turns `RI-12` RED**. Whoever holds a row with a `STATE` rewrite permission should take it.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **22 of 22** invariants off the runner's own last line, **279 files / 6,721 passed / 6 skipped** against a stashed baseline of **278 / 6,698 / 6** on this same tree, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**: forbidden by this row and it mutates the working tree.
+
+---
+
+## 2026-08-30 - Session 452: the composition that does not exist ([ADR-261](decisions/ADR-261.md), proposed)
+
+**[ADR-261](decisions/ADR-261.md), `status: proposed`, UNSIGNED. NOT the money path, and it is the trader's PUBLIC PROOF. No migration reserved or taken; `0075` is still next.**
+
+**THE SLICE [ADR-256](decisions/ADR-256.md) NAMED AND DECLINED TO TAKE IS TAKEN, AND THE IMAGE PORT IS WIRED.** [`apps/api/src/certificate-image-source.ts`](../apps/api/src/certificate-image-source.ts) composes `db.publicLookup` for the row, `databaseVerifySource`'s `certificate_verifications` append and `renderCertificateCard` into one `CertificateImageSource`, and [`start.ts`](../apps/api/src/start.ts) installs it. **The wired count moves 8 to 9 and the blocked list 16 to 15.** What is left is `MERIT_CERTIFICATE_CARD_MAX_AGE_SECONDS`, named and valued nowhere ([ADR-012](decisions/ADR-012.md)), which IS a thing a deployment sets, so [ADR-226](decisions/ADR-226.md) and [ADR-229](decisions/ADR-229.md)'s rule fires where [ADR-256](decisions/ADR-256.md) ruled it did not.
+
+**THE TRAP HAD A SECOND FACE ON THE PORT THIS SLICE WIRES.** A deferred code never renders ([ADR-168](decisions/ADR-168.md) foreclosure 4), so every refusal the render makes is one only a code whose row ISSUED can reach. A deployment whose `MERIT_VERIFY_DISCLOSURE` carried a character the typeface cannot draw would answer **404 for a deferred code and 500 for an issued one**, which is [ADR-246](decisions/ADR-246.md) clause 8's shape built out of configuration instead of a half-wiring. **The whole configuration is therefore read and refused before the door is opened**, `assertCopy` and `cacheControl` lifted out of the render, so a misconfigured deployment answers 503 for every code alike. **Asserted on the recorder's call list being EMPTY rather than on the status codes being equal**, so a branch added below it cannot re-open the oracle.
+
+**ONE WRITER OF `certificate_verifications` AND NOT TWO.** The append arm is `databaseVerifySource(db, env).record` delegated to, because `code_hash` is a pseudonym and a second digest would make one code hash two ways depending on which row observed it.
+
+**`useCertificateBackend` IS NOT WIRED AND THE REASON HAS STOPPED BEING A MISSING PIECE.** Four of its five absences have gone, including the row its field addresses answering, and the fifth is an ORIGIN, which a deployment sets. What still refuses is a **guard** reading the origin before the caller's rows, and a guard is CODE, so the port is **one smaller slice from wireable rather than one variable from wired**. [`certificate-ports.test.ts`](../apps/api/test/certificate-ports.test.ts) executes it: the entry must name the origin AND the guard.
+
+**FOUR CASES ALREADY IN THE TREE WENT RED BEFORE ANY WAS REWRITTEN**, each written by an earlier entry to do exactly that, and one of them found that the `CertificateCard` sweep counts MENTIONS rather than producers: the fourth file was `start.ts`'s own new comment, so the COMMENT was reworded and the assertion was not widened. **SIX seeded defects besides**, each restored byte identical under `sha256sum -c`.
+
+**THE RENDERER'S ISOLATION IS UNSPENT.** It still imports exactly `node:crypto` and `node:zlib`, `routes/certificates.ts` still imports no renderer, and both are asserted, which is why the composition is its own module rather than a function in the route.
+
+**THE RATE LIMIT IS NOW OVERDUE IN A RUNNING PROCESS.** [ADR-256](decisions/ADR-256.md)'s approval block put the ordering question to a founder and this entry answered it in one direction; **the revert is one line in [`start.ts`](../apps/api/src/start.ts)** and everything else stands.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **23 of 23** invariants off the runner's own last line, **283 files / 6,797 passed / 6 skipped** against a stashed baseline of **282 / 6,779 / 6** on this same tree, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**: forbidden by this row and it mutates the working tree.
+
+**THE LANDMINE THREE LOGS HAVE CARRIED IS RE-DERIVED AND IS STILL NOT THERE.** `docs/STATE.md` holds the `gen:adr_count` paragraph **ONCE**, measured on this tree before this append; session 449 established it and session 450 confirmed it, and session 447's log repeats the inherited EIGHT.
