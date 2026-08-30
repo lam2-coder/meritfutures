@@ -196,16 +196,16 @@ import {
  * words, and the disclosure is WORSE at arity two rather than milder: at three
  * a member learns a set, at two they learn precisely who.
  *
- * `affiliate_commissions` IS STILL ABSENT AND ITS REASON MOVED ONE CLASS ALONG
- * RATHER THAN GOING AWAY. Its only path to an identity is `attribution_id uuid
- * NOT NULL REFERENCES attributions(id)`, and `attributions` is now a `TableKey`,
- * so a `derived` rule through it COMPILES where before it could not be written
- * at all. It would then throw the first time anybody read the table, for
- * `raw_ingest_rows`' reason exactly: `scopePredicate` recurses into the via
- * table and the `pair` branch of that switch refuses, so a derivation chain
- * terminates at `owned` or at `root` or it does not terminate. The suite refuses
- * it by name. Registering this table needs a ruling about what a row derived
- * from a two-party row belongs to, and ADR-106 does not make it.
+ * `affiliate_commissions` IS STILL ABSENT AND IT IS ONE COLUMN AWAY RATHER THAN
+ * ONE CLASS AWAY. Its only path to an identity is `attribution_id uuid NOT NULL
+ * REFERENCES attributions(id)`; `attributions` is `pair`, so a `derived` rule
+ * through it COMPILES and then THROWS, because `scopePredicate` recurses and a
+ * chain terminates at `owned` or at `root` or it does not terminate. This
+ * paragraph asked for a ruling for a wave after ADR-253 made it: no member of
+ * the six fits and `firm` is FALSE here. ADR-304 rules there is NO SEVENTH -- a
+ * class would key live money to `affiliate_identity_id`, which `0012` freezes at
+ * purchase, while the statement that PAYS keys on `affiliates` as it stands --
+ * so the repair is `affiliate_id`, and `0078` is reserved and NOT WRITTEN.
  *
  * `identity_merges` IS ABSENT AND IT IS NO LONGER UNREGISTRABLE. It is the
  * fourth table in this tree carrying two `REFERENCES identities(id)` columns --
