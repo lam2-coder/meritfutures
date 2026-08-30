@@ -306,6 +306,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-290](ADR-290.md) | two fields with no column. `failure_note` is a RULED ABSENCE with its column and its writer both specified and neither written, and `timeline`'s source is NAMED as `events` and is EMPTY because that table has no producer  (2026-08-30, status: proposed) |
 | [ADR-291](ADR-291.md) | the first real payout backend, and it is two members of seven on purpose. `transact` opens the transaction every later slice reads on, `identityStatus()` answers, and the other five refuse visibly  (2026-08-30, status: proposed) |
 | [ADR-292](ADR-292.md) | every CI run happens twice, the fix is one line per workflow, and the one line the row supplied does not work  (2026-08-30, status: proposed) |
+| [ADR-293](ADR-293.md) | slice 6's approval branch is buildable in one body and is BLOCKED BY ONE DECLARED RETURN TYPE the fence does not reach, and the lock handed over by ADR-291 is RULED: the payout path locks, as a port member and not inside `transact`  (2026-08-30, status: proposed) |
 | [ADR-294](ADR-294.md) | a crashed check is not a lower count. The runner reports PASS, FAIL and ERROR as three outcomes, keeps the denominator, and refuses to print the sentence that reads as a measurement (2026-08-30, status: proposed) |
 <!--/gen-->
 
