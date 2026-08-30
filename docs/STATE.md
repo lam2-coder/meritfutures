@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-29
+last_updated: 2026-08-30
 ---
 
 # STATE
@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->240<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->241<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10157,3 +10157,11 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **WHERE THIS IS MOST LIKELY WRONG.** The round trip is through `JSON.parse` and not through Postgres: no database was reachable, and what is NOT executed is that `jsonb` accepts this bag and that the table's `CHECK` constraints admit the row it sits in. `ADR-206` section 6 measured both on a real row and this session relies on that rather than repeating it. **And the decoder is stricter than any approved document requires**, which is a judgement flagged for the `E2` read: a strict decoder is a control on a money path and it is also a way to answer 503 on a row that is merely untidy.
 
 **A FINDING REGISTERED RATHER THAN REPAIRED.** Session 436 recorded that `STATE.md` carried the `gen:adr_count` paragraph TWICE, verbatim. **It now carries it FOUR times**, and the generator updated all four. `RI-12`'s ceiling is eight identical lines in one file, so every count is green and what the duplication costs is headroom. Not touched here: it is a keep-both merge artefact rather than a claim, and it is outside this row's fence.
+
+**THE PROBE ROW `259` SAID WAS NOT RUN HAS BEEN RUN ON EVERY PUSH SINCE IT WAS WRITTEN, AND THE SEED THAT REPORTED OTHERWISE CANNOT BE INSTALLED.** [ADR-259](decisions/ADR-259.md). [`corpus.yml`](../.github/workflows/corpus.yml)'s `migrations` job is `CI-06h`, it declares a `postgres:16` service, and it runs [`probe_ledger_constraints.sql`](../scripts/db/probe_ledger_constraints.sql) after applying every migration forward from empty, so `LEDGER-K3` reads the migration's own copy of the eighth code's scope. [ADR-247](decisions/ADR-247.md) section 7's claim is TRUE of `CI-02` and FALSE of CI. **And its seed, `('withdrawals_in_flight', 'liability', 'identity')` in [`0056`](../packages/db/migrations/0056_eighth_ledger_code.sql), violates `ledger_accounts_scope_identity`**: that INSERT names no `identity_id`, the set fails to apply at `CI-06h`'s first step, and no probe is reached. **A green suite against a migration set that does not install is not evidence that a copy is unwatched.**
+
+**THE GAP THAT IS REAL IS SEVEN CODES WIDE AND IT IS THE ROW RATHER THAN THE MIGRATION.** `ledger_accounts_kind_matches_code` binds a row's KIND to its CODE with `ELSE false`; **nothing binds its SCOPE**, and one INSERT per code against a `0074` database found a wrong-scope row **ACCEPTED FOR ALL EIGHT**. `LEDGER-K3` defends one of them as a `'firm'` literal and the provisioning block defends three more as a SQL array, so the tree holds FOUR copies of the fact and none of them is a comparison. [`assert_ledger_scope_agrees.mjs`](../scripts/db/assert_ledger_scope_agrees.mjs) holds no copy: it imports `LEDGER_ACCOUNT_SCOPE` and reads `pg_constraint` and `ledger_accounts`. **Five migration-level seeds applied to COPIES of the set: the existing probe passes two of them and this reddens both.** The TypeScript side is a census rather than one code, all eight flipped, `typecheck` exit 1 and vitest RED on every one.
+
+**`OI-07` HAS NOW HAPPENED FIVE TIMES AND THE FIFTH WAS LIVE ON `main`, IN THE HALF `CI-06s` CANNOT SEE.** That gate scans `probe_*.sql` only. [`assert_append_only_grants.mjs`](../scripts/db/assert_append_only_grants.mjs), which is `OI-03`'s entire implementation and the only reader of the database's grants in this repository, and [`assert_date_unit_shape.mjs`](../scripts/db/assert_date_unit_shape.mjs) were on disk, were wired, and were pinned by **nothing**, so deleting either step was a silent change with every gate green. **`RI-24` is taken, went RED on both on its first run, and both needles are added in the same commit and labelled as a finding.** `CI-06s` is deliberately not widened: its subject is written into its own `covers` line and its STRATEGY row.
+
+**TWO THINGS ARE OWED AND NAMED RATHER THAN TAKEN.** `RI-24` has **no seeded-violation case**, because [`repo-invariants.test.ts`](../packages/tooling/test/repo-invariants.test.ts) is outside row `259`'s fence and a fence is not widened to finish; the next row holding `packages/tooling/test/**` should take it first. And **the scope-per-code CHECK is the larger repair and is not written**: it would make the finding above unrepresentable rather than merely observed, in the shape [ADR-186](decisions/ADR-186.md) gave `kind`, and it is a migration this row reserves no number for.
