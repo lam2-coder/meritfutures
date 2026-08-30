@@ -105,24 +105,38 @@ test('2.2 a job that refuses its inputs exits non-zero and names the input', () 
   expect(result.stderr).toContain('trading_calendar');
 });
 
-test('2.3 a refusing PORT, mid-batch, also exits non-zero', () => {
+test('2.3 a REFUSED account, mid-batch, also exits non-zero', () => {
   // THE CASE THAT MATTERS MOST, because it is the one an operator will actually
-  // meet: the day resolved, the watermark was read, the fold started, and a port
-  // this deployment has not wired refused. `runNightlyBatch` does not catch,
-  // `main` does not catch, and the entry point does not catch.
-  const result = run(HARNESS, ['refusing-port'], {});
+  // meet: the day resolved, the watermark was read, the fold started, and one
+  // account could not be folded. `runNightlyBatch` does not catch, `main` does
+  // not catch, and the entry point does not catch.
+  //
+  // **THIS CASE HAS MOVED TWICE AND IS STRONGEST NOW.** It began as an unwired
+  // PORT refusing before it read anything, which proved only that a throw leaves
+  // a status. `ADR-258` made the port resolve five fields first. `ADR-260`
+  // resolved the sixth, so there is no unwired port left on the nightly path,
+  // and what is under test is the refusal `ADR-260` OWES: an account whose
+  // `accounts.status` is `provisioning_pending`, the member `account_status`
+  // declares and `AccountStatus` does not.
+  //
+  // **THE PROCESS IS THE POINT.** A unit test can assert that a function throws.
+  // Only a spawned process can assert that the throw is not swallowed between
+  // the resolver and the supervisor, which is the whole of what `ADR-241` bought
+  // and the thing a permissive default would have silently taken back.
+  const result = run(HARNESS, ['refusing-gates'], {});
   expect(result.status).toBeGreaterThan(0);
-  expect(result.stderr).toContain('BatchPortUnwired');
-  expect(result.stderr).toContain('loadAccountDay');
+  expect(result.stderr).toContain('ExternalGatesRefusal');
+  expect(result.stderr).toContain('provisioning_pending');
 
-  // AND `ADR-258` MAKES THE CASE SAY MORE THAN IT DID. The port used to refuse
-  // before reading anything, so this process proved only that a throw leaves a
-  // status. It now resolves the plan, the prior, the mark, the settlements and
-  // the anchor first, so what this run measures is that the deployment reaches
-  // `ADR-248`'s one field and stops there -- and the witness in the message is
-  // what an operator reads to see how far it got.
-  expect(result.stderr).toContain('AccountDay.external');
-  expect(result.stderr).toContain('The other five resolved');
+  // AND THE MESSAGE NAMES THE ACCOUNT AND THE LEG, because an operator meeting
+  // this holds an account id and needs to know which of five columns to look at.
+  expect(result.stderr).toContain('accountStatus');
+  expect(result.stderr).toContain('0f8fad5b');
+
+  // AND IT DOES NOT SUGGEST A DEFAULT WOULD HAVE BEEN SAFER, which is the one
+  // conclusion a reader of this failure must not draw. ADR-248 section 8 ruled
+  // both directions unsafe and the message carries it.
+  expect(result.stderr).toContain('VETOES');
 });
 
 // -----------------------------------------------------------------------------

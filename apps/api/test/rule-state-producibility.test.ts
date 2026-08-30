@@ -204,13 +204,23 @@ describe('link 2: a `BatchPorts` value IS constructed under `src/`, and it serve
       ).toContain(': BatchPorts = ');
   });
 
-  test('and the six refusals each carry a blocker, so a red batch names what to build', () => {
+  test('and the FOUR refusals left each carry a blocker, so a red batch names what to build', () => {
     // A PORT THAT RETURNED A PLAUSIBLE VALUE WOULD BE WORSE THAN ONE THAT
     // REFUSES, because `runNightlyBatch` counts a `written` outcome per account
     // that did not throw. Each refusal below is a `BatchPortUnwired` naming the
     // method, and the message carries the slice that clears it.
+    //
+    // **THE COUNT WAS FIVE AND `loadAccountDay` HAS LEFT IT.** This case named
+    // that port among the refusals and went RED on ADR-260 without being seeded,
+    // which is what a census is for. It is asserted in the other direction
+    // rather than deleted: the port is named as one that must NOT refuse, so an
+    // unwired arm restored to it is a named failure and not a silent return to
+    // where this file started.
     const adapter = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'));
-    for (const port of ['loadAccountDay', 'accountDaysFrom', 'storedRuleStates'])
+    expect(adapter, 'loadAccountDay refuses again').not.toContain(
+      "new BatchPortUnwired('loadAccountDay'",
+    );
+    for (const port of ['accountDaysFrom', 'storedRuleStates'])
       expect(adapter, `${port} no longer refuses by name`).toContain(
         `new BatchPortUnwired('${port}'`,
       );
@@ -218,6 +228,23 @@ describe('link 2: a `BatchPorts` value IS constructed under `src/`, and it serve
       expect(adapter, `${port} no longer refuses by name`).toContain(
         `new BatchPortUnwired('${port}'`,
       );
+
+    // AND THE TWO THAT STILL REFUSE ON THE READ SIDE ARE OFF `runNightlyBatch`'s
+    // PATH, WHICH IS WHY "THE FOLD COMPLETES" AND "THE ADAPTER IS WHOLE" ARE
+    // DIFFERENT SENTENCES. That function calls five methods and every one of
+    // them answers; `accountDaysFrom` and `storedRuleStates` are the replay
+    // audit's, and `runReplayAudit` is unscheduled.
+    const nightly = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/nightly.ts'));
+    for (const port of ['accountDaysFrom', 'storedRuleStates'])
+      expect(nightly, `${port} is on the nightly path after all`).not.toContain(port);
+    for (const port of [
+      'calendarWatermark',
+      'calendarSlice',
+      'accountsWithLiveMark',
+      'loadAccountDay',
+      'writeRuleState',
+    ])
+      expect(nightly, `${port} left the nightly path`).toContain(port);
 
     // **AND THE WRITE PORT IS COMPOSED ON A REAL ENCODER NOW.** This assertion
     // read that the adapter took `UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates`,
@@ -334,29 +361,47 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
   // arrive at `subject()` with a `RuleState` in hand and still have no third
   // argument for it.
 
-  test('no `ExternalGates` value is resolved from a row anywhere under a `src/`', () => {
+  test('exactly ONE `ExternalGates` producer ships under a `src/`, and no deployable holds it', () => {
+    // **THIS CASE READ "no `ExternalGates` value is resolved from a row anywhere
+    // under a `src/`" AND ADR-260 MADE IT FALSE WITHOUT ANYTHING BEING SEEDED.**
+    // It was written by ADR-248 to pin the absence, sliced out of the tree rather
+    // than typed, expressly so that the resolver landing would be a FAILURE
+    // rather than silence. The resolver landed and it failed. It is rewritten
+    // onto the resolved side and it keeps asserting the thing that still matters,
+    // which is not the count.
+    //
     // THE NEEDLE IS THE OBJECT KEY AND NOT THE TYPE NAME, because a file that
     // NAMES `ExternalGates` is usually declaring a parameter, which is the
-    // opposite of producing one: seven files name it in code and five of those
-    // are the engine declaring, re-exporting or consuming the type. A literal
-    // must carry every member, so `hasPayoutInFlight:` finds the construction
-    // and the annotation does not.
+    // opposite of producing one. A literal must carry every member, so
+    // `hasPayoutInFlight:` finds the construction and the annotation does not.
     const producers = deployableSources()
       .filter((path) => codeOf(path).includes('hasPayoutInFlight:'))
       .map(rel)
       .sort();
 
-    // NEITHER OF THESE TWO READS A DATABASE AND THAT IS WHY THE COUNT IS NOT THE
-    // ANSWER. `types.ts` DECLARES the field, which is the interface itself.
-    // `trial.ts` RAISES one member on a value its own caller handed it
-    // (`...context`), inside a Monte Carlo loop in a package whose manifest
-    // declares the engine and the simulator and no database at all. So the
-    // estate has no function that turns `accounts`, `identities` and
-    // `payout_requests` into this record, on either deployable's door.
+    // **THE PROPERTY IS THAT NO `apps/*` FILE IS ON THIS LIST, AND IT IS A
+    // STRONGER PROPERTY THAN THE ABSENCE IT REPLACES.** `external-gates.ts` is
+    // the one narrowing, `types.ts` DECLARES the field, and `trial.ts` RAISES one
+    // member on a value its own caller handed it inside a Monte Carlo loop. A
+    // deployable appearing here would be `FM-16` by name: `apps/worker` builds
+    // `AccountDay.external` and `apps/api` builds `PayoutSubject.gates`, neither
+    // can import the other, and a literal in either would be a second answer to
+    // the seven-versus-six question with nothing comparing the two.
     expect(producers).toEqual([
       'packages/harness/src/trial.ts',
+      'packages/rules-engine/src/external-gates.ts',
       'packages/rules-engine/src/types.ts',
     ]);
+    expect(producers.filter((path) => path.startsWith('apps/'))).toEqual([]);
+
+    // AND THE ONE PRODUCER IS REACHED BY BOTH DEPLOYABLES THROUGH THE BARREL,
+    // which is what makes the sentence above a design rather than a coincidence.
+    expect(codeOf(join(REPO_ROOT, 'packages/rules-engine/src/index.ts'))).toContain(
+      'resolveExternalGates',
+    );
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
+      'resolveExternalGates',
+    );
 
     // NON-VACUITY, on link 2's own precedent: the identical predicate is shown
     // finding the values that DO exist, all of them fixtures and none of them

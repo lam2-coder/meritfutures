@@ -273,7 +273,10 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-257](ADR-257.md) | four fields arrive at two slots, `ok` is the engine's and is not recomputed, and the field with nowhere to go is integer cents (2026-08-29, status: proposed) |
 | [ADR-258](ADR-258.md) | the fold's blocker was one field and not six, `prior` is a smaller read than the port ADR-250 left refusing, and the plan decoder this slice needed already exists one deployable over (2026-08-30, status: proposed) |
 | [ADR-259](ADR-259.md) | the probe is run, the seed that reported it unwatched cannot be installed at all, and the gap that is real is that nothing binds scope to code (2026-08-30, status: proposed) |
+| [ADR-260](ADR-260.md) | the resolver nobody had written, the seventh account status refused rather than admitted, and the nightly fold that now completes because of it  (2026-08-30, status: proposed) |
+| [ADR-261](ADR-261.md) | the composition ADR-256 named is written and the image port is wired, its refusal is moved in front of the door so a deferral cannot decide it, and the list port turns out to wait on a guard rather than on a variable (2026-08-30, status: proposed) |
 | [ADR-262](ADR-262.md) | the affiliate is resolved inside `packages/db` and leaves as a bit, the counterparty stamp is a registry field rather than an assumption, and the two `AffiliateRef` declarations were never one shape (2026-08-30, status: proposed) |
+| [ADR-263](ADR-263.md) | the edge had a guard, a clock and a database behind it and no door, and what moves is one paragraph of a frozen contract rather than a route this session invented  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

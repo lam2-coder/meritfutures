@@ -138,8 +138,10 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'EXCLUDED_COLUMNS',
     'EngineGatesCodecError',
     'EngineInvariantError',
+    'ExternalGatesRefusal',
     'HASHED_COLUMNS',
     'IMPLEMENTED_RULES',
+    'PAYOUT_IN_FLIGHT_STATUSES',
     'PROJECTION_ASSUMPTIONS',
     'PROJECTION_CAVEAT',
     'ReplayAssertionError',
@@ -157,6 +159,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'nextTradingDayAfter',
     'projectPayout',
     'replay',
+    'resolveExternalGates',
     'resolvePlan',
     'stateHash',
     'tradingDayAt',
@@ -202,7 +205,21 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // from four to FIVE. The counts here are read off the merged surface rather
 // than added up from the two prose paragraphs, because that addition is exactly
 // the step this gate exists to refuse.
-test('of the twenty-eight names, exactly seventeen are non-class functions after ADR-250 and ADR-251', () => {
+//
+// ADR-260 IS THE FIFTH AND IT IS THE ONLY ONE SO FAR WHOSE NEW FUNCTION READS NO
+// RULE AT ALL: twenty-eight names to THIRTY-ONE, seventeen functions to
+// EIGHTEEN, and the error classes from five to SIX. `resolveExternalGates`
+// narrows four columns into the two unions `types.ts` declares and decides
+// nothing about R-40 or R-41, which is why section 1.3's "a way for a caller to
+// reimplement a rule slightly differently" does not reach it: there is no rule
+// here to reimplement. What withholding it would produce is TWO narrowings, one
+// per deployable, which is the `FM-16` the codec above was moved here to close.
+// `PAYOUT_IN_FLIGHT_STATUSES` is a frozen table in the class `HASHED_COLUMNS`
+// and `ENGINE_GATE_LEAVES` are in, and it is ADR-254 finding 4's own remedy: the
+// status set is written out in five places, and a constant is only a control if
+// a caller can name it. `ExternalGatesRefusal` is the sixth error class, on
+// `EngineGatesCodecError`'s reason unchanged.
+test('of the thirty-one names, exactly eighteen are non-class functions after ADR-260', () => {
   const functions = Object.keys(engine)
     .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
     .sort();
@@ -214,6 +231,7 @@ test('of the twenty-eight names, exactly seventeen are non-class functions after
     'CalendarSliceError',
     'EngineGatesCodecError',
     'EngineInvariantError',
+    'ExternalGatesRefusal',
     'ReplayAssertionError',
     'StateHashError',
   ];
@@ -231,6 +249,7 @@ test('of the twenty-eight names, exactly seventeen are non-class functions after
     'nextTradingDayAfter',
     'projectPayout',
     'replay',
+    'resolveExternalGates',
     'resolvePlan',
     'stateHash',
     'tradingDayAt',

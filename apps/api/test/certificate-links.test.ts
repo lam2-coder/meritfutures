@@ -175,20 +175,28 @@ test('the sweep reaches the source it claims to, so an empty answer is not an em
   expect(namingIn('CertificateBackendUnwired')).toContain('apps/api/src/routes/certificates.ts');
 });
 
-test('CertificateCard is named in two shipped files, the port and the renderer', () => {
-  // THIS CASE WAS WRITTEN TO GO RED ON EXACTLY THIS DIFF AND IT DID. ADR-240
-  // clause 11: "THE DAY A RENDERER LANDS, THAT CASE GOES RED AND THE ENTRY
-  // EXPIRES", which is `RI-22` leg 3's shape at test scale. It read
-  // `['apps/api/src/routes/certificates.ts']`, ADR-256 landed the renderer, and
-  // the case is REWRITTEN rather than deleted: what it measured was an absence
-  // and what it measures now is the SHAPE the ruling put in the absence's place.
+test('CertificateCard is named in three shipped files: the port, the renderer, the composition', () => {
+  // THIS CASE WENT RED TWICE AND HAS BEEN REWRITTEN TWICE, WHICH IS THE CONTROL
+  // WORKING RATHER THAN A COUNT DRIFTING. ADR-240 clause 11 wrote it as an
+  // ABSENCE measurement reading `['apps/api/src/routes/certificates.ts']` and
+  // said "the day a renderer lands, that case goes red and the entry expires";
+  // ADR-256 landed the renderer and it read two; ADR-261 landed the composition
+  // that puts the two database arms and the render together and it reads three.
   //
-  // TWO FILES AND NO THIRD. The port declares the type and `CertificateLookup`
-  // carries it; the renderer is the one producer. A third file naming it is a
-  // second producer, and ADR-249 clause 1 rules that where the bytes come from
-  // is a deployment shape rather than something a source tree grows twice.
+  // THREE ROLES AND NO FOURTH, AND THE ROLES ARE WHAT THE CASE IS ABOUT. The
+  // port DECLARES the type and `CertificateLookup` carries it; the renderer
+  // PRODUCES the bytes; the composition is the one thing that calls the second
+  // to satisfy the first. A fourth file is a second producer or a second
+  // composition, and ADR-249 clause 1 rules that where the bytes come from is a
+  // deployment shape rather than something a source tree grows twice.
+  //
+  // THE PRODUCER HALF IS CARRIED BY THE CASE BELOW AND IT DID NOT MOVE. This
+  // sweep is a substring sweep and cannot tell a consumer from a producer, so a
+  // count of three here would be satisfied by a second renderer. `image/png`
+  // still appears in exactly TWO files, and the composition is not one of them.
   expect(namingIn('CertificateCard')).toEqual([
     'apps/api/src/certificate-card.ts',
+    'apps/api/src/certificate-image-source.ts',
     'apps/api/src/routes/certificates.ts',
   ]);
 });
