@@ -103,3 +103,86 @@ cb2d8a6f15de98dce7dfacb40733ea1be35dbce2:docs/sessions/2026-08-27-session-255.md
 # tree and carries no commit in its fingerprint.
 docs/sessions/2026-08-27-session-254.md:generic-api-key:178
 docs/sessions/2026-08-27-session-255.md:generic-api-key:206
+
+# =============================================================================
+# THE SECOND ENTRY, SESSION 479, ADR-288. READ THE HEADER ABOVE FIRST: IT SAYS
+# ADDING TO THIS FILE IS A DIFFERENT DECISION FROM WRITING IT, AND IT IS RIGHT.
+# =============================================================================
+# WHAT THE FINDING IS
+# -----------------------------------------------------------------------------
+# `generic-api-key` fired twice on `apps/api/test/payouts.test.ts`, at lines
+# 1151 and 1170 of commit `00cb1bbb`, session 476's payout-refusal case. Both
+# values are TEST FIXTURE IDEMPOTENCY KEYS: hyphenated English words with an ADR
+# number interleaved. The digit run is the whole of the defect, because it lifts
+# a short readable label over the rule's entropy floor; the measured entropies
+# were 3.640 and 3.682. No credential, no vendor, no wiring: `POST
+# /accounts/:accountId/payout` refuses before it reaches a backend, and the
+# values were typed by hand into a fixture. The literals are NOT reproduced in
+# this file, in ADR-288 or in the session log, because a document quoting them
+# would carry the finding into the record of the finding.
+#
+# -----------------------------------------------------------------------------
+# WHY THIS IS NOT THE REPAIR FOUR EARLIER SESSIONS REFUSED
+# -----------------------------------------------------------------------------
+# THIS REPOSITORY HAS REFUSED A SUPPRESSION FOUR TIMES AND REWRITTEN HISTORY
+# INSTEAD, and a session reaching for this file owes those refusals an answer.
+# `docs/STATE.md:4219` and `:4286` both close on the same sentence: a
+# `.gitleaksignore` fingerprint "buys green by keeping the thing that should not
+# be there". `:3769` refuses a `.gitleaks.toml` allowlist because it "exempts
+# the PATH permanently where the defect was one STRING once". `:7224` rewrites
+# the commit rather than pinning it.
+#
+# ALL FOUR WERE ON UNMERGED BRANCHES AND EVERY ONE OF THEM SAYS SO. `:3769`,
+# `:4219` and `:4286` each record a rebase plus `--force-with-lease` over the
+# session's OWN commits, authorised by the founder before it was run, on a
+# branch `main` did not yet carry. THE REFUSAL PRESUPPOSES THE REMOVAL IS
+# AVAILABLE. `00cb1bbb` is an ancestor of `origin/main` (`git merge-base
+# --is-ancestor` exits 0), so the only removal is a rewrite of the default
+# branch, which invalidates every checkout and every open branch in the
+# repository. ADR-288 and this row forbid it outright.
+#
+# AND THE SHAPE IS DIFFERENT IN A WAY THAT MATTERS INDEPENDENTLY. `:3769`'s two
+# values were "a real provider's webhook-secret prefix plus sixteen hex
+# characters: a credential BY SHAPE", and `:4219`'s was a real base64 image
+# header bound to `const secret`. Those are things that should not be there
+# whether or not a scanner notices. A lowercase hyphenated English label is not
+# a credential by shape, by entropy or by origin, and no rewrite of history
+# would be spent on it if the scanner were silent.
+#
+# -----------------------------------------------------------------------------
+# WHAT IS SUPPRESSED, EXACTLY
+# -----------------------------------------------------------------------------
+# TWO POINTS IN A HISTORY THAT CANNOT CHANGE. A `git` fingerprint is
+# `commit:file:rule:startline` and every field is pinned, so neither entry can
+# suppress the same rule in another file, at another line, or in any commit that
+# does not already exist. THE RULE IS UNTOUCHED: `generic-api-key` still runs at
+# full strength over every commit and every file, and ADR-288 section 5 records
+# a seeded fake credential in this very test file being caught with these
+# entries in place.
+#
+# NO `dir` ENTRY IS ADDED AND THAT IS THE POINT. The working tree was REPAIRED
+# rather than suppressed: both fixtures were renamed forward to this file's own
+# `idem-<word>` convention in the same commit, so `gitleaks dir .` finds nothing
+# to ignore. A `dir` entry here would have been the weakening, because the tree
+# is the half that could still be fixed. Only the immutable half is pinned.
+#
+# THE HONEST COST IS THE SAME ONE THE HEADER ABOVE NAMES: a secret committed at
+# exactly one of these two (commit, file, line) points would be suppressed. A
+# commit's content is fixed once written, so that is impossible rather than
+# unlikely.
+#
+# -----------------------------------------------------------------------------
+# THE DEFECT THAT PUT THESE HERE WAS NOT A FIXTURE NAME
+# -----------------------------------------------------------------------------
+# `CI-05` FAILED ON ALL THREE OF #632, #633 AND #634 AND ALL THREE WERE MERGED.
+# The merge ritual read six local checks and never opened the pull request's own
+# CI. Had it looked once, `00cb1bbb` would have been on an unmerged branch, the
+# rewrite would have been available, and this file would have gained nothing.
+# ADR-288 section 7 is that finding. A THIRD ENTRY HERE IS EVIDENCE THAT THE
+# PROCESS FIX DID NOT LAND, AND SHOULD BE TREATED THAT WAY.
+# =============================================================================
+
+# apps/api/test/payouts.test.ts, the refusal case's first fixture key.
+00cb1bbb4362b5e5f3cdd92fd255dec12e41d71a:apps/api/test/payouts.test.ts:generic-api-key:1151
+# The same case's post-fold fixture key.
+00cb1bbb4362b5e5f3cdd92fd255dec12e41d71a:apps/api/test/payouts.test.ts:generic-api-key:1170

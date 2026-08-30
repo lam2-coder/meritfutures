@@ -1148,7 +1148,16 @@ describe('ADR-285: an absent `rule_states` row is an honest 503 and never a 500'
 
   it('does NOT stamp the key, and a retry therefore needs a NEW one', async () => {
     usePayoutBackend(raising(new RuleStateAbsent(ACCOUNT, BASIS_DAY)));
-    const key = 'idem-285-absent';
+    // THE FIXTURE NAMES ON THIS CASE CARRY NO DIGITS AND THAT IS DELIBERATE.
+    // `VG-1`'s `generic-api-key` rule fires on a `key`-shaped binding beside a
+    // literal whose Shannon entropy clears its floor, and interleaving a digit
+    // run into a hyphenated word is the cheapest way there is to clear it. The
+    // two spellings this case shipped with on 2026-08-30 did exactly that and
+    // turned `CI-05` red on `main`; they are described in ADR-288 and NOT
+    // reproduced here, because a comment quoting them would reintroduce the
+    // finding in the file that records it. Every other fixture in this file is
+    // already `idem-<word>`, which is why nothing tripped before.
+    const key = 'idem-absent';
 
     const refused = await requestPayout({ idempotencyKey: key });
     expect(refused.statusCode).toBe(503);
@@ -1167,7 +1176,7 @@ describe('ADR-285: an absent `rule_states` row is an honest 503 and never a 500'
 
     // AND A NEW KEY GETS THE REAL ANSWER, which is the admission that stops
     // this case from passing against a route that refuses everything.
-    const fresh = await requestPayout({ idempotencyKey: 'idem-285-after-fold' });
+    const fresh = await requestPayout({ idempotencyKey: 'idem-after-fold' });
     expect(fresh.statusCode).toBe(200);
     expect(fresh.json().status).toBe('approved');
   });
