@@ -3178,9 +3178,187 @@ describe('RI-25 keeps one date type parser aimed at the day OID', () => {
 });
 
 // -----------------------------------------------------------------------------
-// RI-26, the other half of the same subject
+// RI-26, whose subject is a name that is FALSE rather than a name that is silent
 // -----------------------------------------------------------------------------
-// RI-25 keeps the DRIVER from giving a calendar day a timezone. RI-26 keeps
+// ADR-272. The check has two legs and each is asserted in BOTH directions, so
+// the fixture has to carry the ruled exceptions rather than a clean estate: an
+// exception set that is never observed to be violated is the same shape as a
+// reader that stopped reading, and the check is supposed to say so.
+//
+// EVERY CASE HERE WRITES A MIGRATIONS DIRECTORY, because a tree without one is
+// silent by design and would pass every case for the wrong reason.
+describe('RI-26 keeps a temporal column name honest about its own type', () => {
+  /**
+   * The two ruled exceptions, in the migrations RI-26 names as their witnesses,
+   * plus enough ordinary schema for the legs to have a population.
+   */
+  const CATALOG =
+    'CREATE TABLE geo_restrictions (\n' +
+    '  effective_from  date NOT NULL,\n' +
+    '  created_at      timestamptz NOT NULL\n' +
+    ');\n';
+  const SIMULATION_RUNS =
+    '-- THE DAY THE FIGURES WERE OBSERVED. `calibration_observed_at` is a `date`\n' +
+    '-- and not a timestamptz, and this header says so at length.\n' +
+    'CREATE TABLE simulation_runs (\n' +
+    '  calibration_observed_at date NOT NULL,\n' +
+    '  started_at              timestamptz NOT NULL\n' +
+    ');\n';
+  const FIRM_PARAMETERS =
+    'CREATE TABLE firm_parameters (\n' +
+    '  effective_from  timestamptz NOT NULL,\n' +
+    '  created_at      timestamptz NOT NULL\n' +
+    ');\n';
+  const ESTATE: Record<string, string> = {
+    '0004_catalog.sql': CATALOG,
+    '0045_simulation_runs.sql': SIMULATION_RUNS,
+    '0074_firm_parameters.sql': FIRM_PARAMETERS,
+  };
+
+  /** The estate as it stands, with named files replaced or added. */
+  const estate = (overrides: Record<string, string> = {}): string => {
+    const root = cleanTree();
+    for (const [file, body] of Object.entries({ ...ESTATE, ...overrides })) {
+      write(root, `packages/db/migrations/${file}`, body);
+    }
+    return root;
+  };
+
+  test('the estate as it stands holds, both exceptions observed', () => {
+    expect(findings('RI-26', estate())).toEqual([]);
+  });
+
+  test('the real repository holds', () => {
+    expect(findings('RI-26', REPO_ROOT)).toEqual([]);
+  });
+
+  // LEG 1, FORWARD.
+  test('a NEW `_at` column declared `date` is a finding', () => {
+    const root = estate({
+      '0050_new.sql': 'CREATE TABLE things (\n  reviewed_at date NOT NULL\n);\n',
+    });
+    expect(findings('RI-26', root).join('\n')).toContain('reviewed_at is declared `date`');
+  });
+
+  test('`ADD COLUMN` reaches it too, which a `CREATE TABLE` reader would miss', () => {
+    const root = estate({
+      '0050_new.sql': 'ALTER TABLE accounts\n  ADD COLUMN reviewed_at date NOT NULL;\n',
+    });
+    expect(findings('RI-26', root).join('\n')).toContain('reviewed_at is declared `date`');
+  });
+
+  // LEG 1, REVERSE. The repair landing is what makes the entry stale, and the
+  // check has to say so or the exception outlives its ground.
+  test('repairing the ruled `_at` exception turns the entry stale, which is a finding', () => {
+    const root = estate({
+      '0045_simulation_runs.sql': SIMULATION_RUNS.replace(
+        'calibration_observed_at date',
+        'calibration_observed_on date',
+      ),
+    });
+    expect(findings('RI-26', root).join('\n')).toContain(
+      'carries calibration_observed_at as a ruled `_at` exception',
+    );
+  });
+
+  // LEG 2, FORWARD.
+  test('one name declared `date` in one table and `timestamptz` in another is a finding', () => {
+    const root = estate({
+      '0050_new.sql': 'CREATE TABLE windows (\n  period_start date NOT NULL\n);\n',
+      '0051_new.sql': 'CREATE TABLE spans (\n  period_start timestamptz NOT NULL\n);\n',
+    });
+    expect(findings('RI-26', root).join('\n')).toContain('period_start is declared `date`');
+  });
+
+  test('`timestamp with time zone` spelled long-form is an instant, not a third thing', () => {
+    const root = estate({
+      '0050_new.sql':
+        'CREATE TABLE windows (\n  audited_at timestamp with time zone NOT NULL\n);\n',
+    });
+    expect(findings('RI-26', root)).toEqual([]);
+  });
+
+  // LEG 2, REVERSE.
+  test('repairing the ruled collision turns that entry stale, which is a finding', () => {
+    const root = estate({
+      '0074_firm_parameters.sql': FIRM_PARAMETERS.replace(
+        'effective_from  timestamptz',
+        'effective_at    timestamptz',
+      ),
+    });
+    expect(findings('RI-26', root).join('\n')).toContain(
+      'carries effective_from as a ruled day/instant collision',
+    );
+  });
+
+  // THE RULING ITSELF, WATCHED. ADR-272 section 3 rules that a suffix lying
+  // ACROSS type families is not this defect, and a check is the only place that
+  // ruling can be wrong in a way somebody notices.
+  test('`_day` on a boolean and `_on` on an array are NOT findings, which is the ruling', () => {
+    const root = estate({
+      '0050_new.sql':
+        'CREATE TABLE daily_marks (\n' +
+        '  trading_day date NOT NULL,\n' +
+        '  traded_day  boolean NOT NULL,\n' +
+        '  win_day     boolean NOT NULL,\n' +
+        "  breaks_on   text[] NOT NULL DEFAULT '{}'\n" +
+        ');\n',
+    });
+    expect(findings('RI-26', root)).toEqual([]);
+  });
+
+  // RI-25's SEED, ONE FILE TYPE OVER. A migration in this estate carries more
+  // prose than DDL and `0045`'s header discusses its own defect by name, so a
+  // reader that did not strip comments would find the subject in the sentence
+  // about the subject.
+  test('a comment describing a bad column does not declare one', () => {
+    const root = estate({
+      '0050_new.sql':
+        '-- A column named `reviewed_at date NOT NULL` would be the ADR-272 defect.\n' +
+        '/* reviewed_at date NOT NULL, */\n' +
+        'CREATE TABLE things (\n  reviewed_at timestamptz NOT NULL\n);\n',
+    });
+    expect(findings('RI-26', root)).toEqual([]);
+  });
+
+  test('a plpgsql DECLARE block is not a table, so its local variables are not columns', () => {
+    const root = estate({
+      '0050_new.sql':
+        'CREATE FUNCTION f() RETURNS trigger LANGUAGE plpgsql AS $$\n' +
+        'DECLARE\n' +
+        '  fold_extent date;\n' +
+        '  checked_at  date;\n' +
+        'BEGIN\n' +
+        '  RETURN NULL;\n' +
+        'END;\n' +
+        '$$;\n',
+    });
+    expect(findings('RI-26', root)).toEqual([]);
+  });
+
+  // THE READER'S OWN FAILURE, AND IT THROWS RATHER THAN PASSING. A tree
+  // carrying the witness migrations and parsing to nothing is not a repaired
+  // estate; it is a check that has stopped reading.
+  test('witness migrations present and nothing parsed is a THROW, never a pass', () => {
+    const root = estate(
+      Object.fromEntries(
+        Object.entries(ESTATE).map(([file, body]) => [
+          file,
+          body
+            .split('\n')
+            .map((line) => `-- ${line}`)
+            .join('\n'),
+        ]),
+      ),
+    );
+    expect(() => findings('RI-26', root)).toThrow(/has stopped|reader or the comment stripper/);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// RI-28, the other half of the same subject
+// -----------------------------------------------------------------------------
+// RI-25 keeps the DRIVER from giving a calendar day a timezone. RI-28 keeps
 // MERIT'S OWN LINES from asking what the process's timezone is, which is the
 // larger half: the driver was one library doing one coercion, and this is every
 // line anybody writes from here on (ADR-274).
@@ -3189,8 +3367,8 @@ describe('RI-25 keeps one date type parser aimed at the day OID', () => {
 // several `apps/*/src` files. So the clean-tree cases above are a real pass over
 // a non-empty file list rather than a silence, and the seeds here write into
 // that same scope.
-describe('RI-26 refuses a process-local clock in shipped source', () => {
-  /** A tree in RI-26's scope: the fixture plus one source file carrying the seed. */
+describe('RI-28 refuses a process-local clock in shipped source', () => {
+  /** A tree in RI-28's scope: the fixture plus one source file carrying the seed. */
   const treeWithSource = (body: string): string => {
     const root = cleanTree();
     write(root, 'apps/api/src/clock-seed.ts', body);
@@ -3199,14 +3377,14 @@ describe('RI-26 refuses a process-local clock in shipped source', () => {
 
   test('the clean fixture holds, and the scope it holds over is not empty', () => {
     const root = cleanTree();
-    expect(findings('RI-26', root)).toEqual([]);
+    expect(findings('RI-28', root)).toEqual([]);
     // THE PASS IS ASSERTED TO BE A REAL ONE. A filter that stopped matching
     // would make every case in this block pass by reading nothing, so the
     // admitted spellings are exercised here and the sentinel is exercised in
     // the throwing direction in the last case of this block.
     expect(
       findings(
-        'RI-26',
+        'RI-28',
         treeWithSource(
           'const a = new Date(Date.UTC(2026, 7, 28)).getUTCDate();\n' +
             'const b = new Date(`2026-08-28T00:00:00Z`).toISOString();\n' +
@@ -3244,8 +3422,8 @@ describe('RI-26 refuses a process-local clock in shipped source', () => {
       "export const f = new Intl.DateTimeFormat('en-US', { hour: '2-digit' });\n",
       'naming no `timeZone`',
     ],
-  ])('RI-26 catches %s', (_what, body, needle) => {
-    expect(findings('RI-26', treeWithSource(body)).join('\n')).toContain(needle);
+  ])('RI-28 catches %s', (_what, body, needle) => {
+    expect(findings('RI-28', treeWithSource(body)).join('\n')).toContain(needle);
   });
 
   test('a `getUTC*` read is the admitted spelling and is not the getter it contains', () => {
@@ -3253,7 +3431,7 @@ describe('RI-26 refuses a process-local clock in shipped source', () => {
     // this case is what keeps a future widening of the pattern from banning the
     // one spelling the check exists to send people to.
     expect(
-      findings('RI-26', treeWithSource('export const u = new Date(1).getUTCDate();\n')),
+      findings('RI-28', treeWithSource('export const u = new Date(1).getUTCDate();\n')),
     ).toEqual([]);
   });
 
@@ -3270,7 +3448,7 @@ describe('RI-26 refuses a process-local clock in shipped source', () => {
       '// process.env.TZ. See ADR-274.\n' +
       '/* nor new Date(2026, 7, 28), nor Intl.DateTimeFormat("en-US", {}) */\n' +
       'export const ok = new Date(Date.UTC(2026, 7, 28)).toISOString();\n';
-    expect(findings('RI-26', treeWithSource(prose))).toEqual([]);
+    expect(findings('RI-28', treeWithSource(prose))).toEqual([]);
   });
 
   test('a trailing comma is not a second argument', () => {
@@ -3279,7 +3457,7 @@ describe('RI-26 refuses a process-local clock in shipped source', () => {
     // as a local construction while this check was being written.
     const wrapped =
       'export const e = new Date(\n  Date.UTC(2026, 7, 28) + 1000,\n).toISOString();\n';
-    expect(findings('RI-26', treeWithSource(wrapped))).toEqual([]);
+    expect(findings('RI-28', treeWithSource(wrapped))).toEqual([]);
   });
 
   test('a test file is out of scope, because building one on purpose is not using one', () => {
@@ -3290,18 +3468,18 @@ describe('RI-26 refuses a process-local clock in shipped source', () => {
       'const x = new Date(2026, 7, 28);\n',
     );
     write(root, 'apps/api/src/e2e/pass.ts', 'const y = new Date().getHours();\n');
-    expect(findings('RI-26', root)).toEqual([]);
+    expect(findings('RI-28', root)).toEqual([]);
   });
 
   test('a scope that matches nothing THROWS rather than reporting a clean tree', () => {
     // THE DIRECTION THAT MATTERS, and it is the one every case above depends
-    // on. RI-26 is an ABSENCE check, so a path filter that stopped matching
+    // on. RI-28 is an ABSENCE check, so a path filter that stopped matching
     // reports PASS about an empty list while a local clock read anywhere in the
     // tree goes unseen. That failure is silent in a way a presence check's is
     // not, which is why the sentinel is a throw and not a finding.
     const root = mkdtempSync(join(tmpdir(), 'merit-invariants-empty-'));
     seeded.push(root);
     write(root, 'docs/STATE.md', '# not source\n');
-    expect(() => findings('RI-26', root)).toThrow(/found no source file/);
+    expect(() => findings('RI-28', root)).toThrow(/found no source file/);
   });
 });

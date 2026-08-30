@@ -5873,7 +5873,669 @@ const ri25 = {
 };
 
 // -----------------------------------------------------------------------------
-// RI-26  No shipped source file reads the process's local clock
+// RI-26  A TEMPORAL COLUMN'S NAME IS NOT FALSE ABOUT ITS OWN TYPE
+// -----------------------------------------------------------------------------
+// ADR-272'S PROPERTY, AND IT IS THE ONE ADR-271 SECTION 3 ALREADY REASONED FROM
+// WITH NOTHING CHECKING IT.
+//
+// That entry bounded a live type parser's blast radius with this sentence: "an
+// instant is spelled `*_at` and a day is spelled `*_day` or `*_on`, so the two
+// vocabularies do not overlap and a parser aimed at one cannot reach the other.
+// The rule was written as an API-surface refusal and it turns out to have been
+// load bearing three layers down." A property a repair has already been argued
+// from is a rule, whatever document it was written in, and until this check the
+// argument was carried entirely by whoever named a column.
+//
+// THE PROPERTY IS NARROWER THAN "EVERY DATE COLUMN ANNOUNCES ITSELF", AND
+// ADR-272 SECTION 3 IS WHY. A name that lies WITHIN the temporal vocabulary --
+// `*_at` on a `date` -- hands a reader a wrong answer of the right shape, and
+// nothing downstream can tell. A name that lies ACROSS type families --
+// `daily_marks.win_day boolean` -- is refused by the first type the compiler,
+// the driver or the planner gives it. Only the first survives contact with a
+// type system, so only the first is a defect and only the first is checked here.
+//
+// TWO LEGS, EACH ASSERTED IN BOTH DIRECTIONS on `0027`'s float-column idiom,
+// which data-model/README.md states as this estate's own shape for a ruled
+// exception set: "an unlisted column fails, and so does a stale entry naming a
+// column that no longer exists."
+//
+//   LEG 1  NO `*_at` COLUMN IS DECLARED WITH A NON-INSTANT TYPE. One ruled
+//          exception, `simulation_runs.calibration_observed_at`, whose repair
+//          ADR-272 section 5 specifies and does not take.
+//   LEG 2  NO COLUMN NAME IS DECLARED WITH A DAY TYPE IN ONE TABLE AND AN
+//          INSTANT TYPE IN ANOTHER. One ruled exception, `effective_from`, a
+//          `date` in six tables and a `timestamptz` in three. THIS LEG IS WHY
+//          LEG 1 ALONE WOULD HAVE BEEN THE WRONG CHECK: the estate's measured
+//          ambiguity arrived through a name carrying no suffix at all, so a
+//          check reading only suffixes would have reported a clean tree over
+//          nine tables that disagree about what one word means.
+//
+// AN EXCEPTION IS ASSERTED ONLY WHERE ITS WITNESS MIGRATIONS ARE PRESENT, and
+// that is a scoping rule rather than an escape hatch. An entry claims that a
+// NAMED FILE declares a bad column; on a tree without that file the claim is
+// not false, it is not about that tree. The synthetic fixture is such a tree.
+// On a tree that DOES carry the witnesses, the stale-entry half is also the
+// sentinel and it is stronger than a zero count: if the reader stops matching
+// -- the DDL shape moves, the comment stripper breaks, the directory moves --
+// the ruled exceptions stop being observed and BOTH legs report. A broken
+// reader turns this check RED rather than green, which is the failure mode
+// RI-24 and RI-25 each needed a separate sentinel to reach.
+//
+// WHAT IT CANNOT SEE, stated rather than left to be discovered.
+//   (1) IT READS DDL AND NOT A DATABASE. A column added by a function body, by
+//       `EXECUTE`, or from outside this directory is invisible here.
+//   (2) IT READS `CREATE TABLE` BODIES AND `ADD COLUMN` CLAUSES ONLY, so a
+//       plpgsql `DECLARE` block is excluded by construction: `0048:645`
+//       declares `fold_extent date` as a local variable and is not a column.
+//   (3) IT SAYS NOTHING ABOUT WHICH CALENDAR A DAY IS ON. `*_day` and `*_on`
+//       are one vocabulary member here; API_CONTRACT section 1 makes both
+//       exchange trading days and `chargeback_window_ends_on` is the card
+//       networks' clock wearing the same suffix. ADR-272 section 6 records that
+//       drift as owed, and no type settles it.
+//   (4) IT CANNOT TELL A TRUE NAME FROM A MEANINGLESS ONE. `zzz_at timestamptz`
+//       passes both legs.
+const MIGRATIONS_DIR = 'packages/db/migrations';
+
+// The two members of the temporal vocabulary, and nothing else is one. `time`
+// and `interval` are neither a day nor an instant and the suffix rule has never
+// been about them.
+const DAY_TYPES = new Set(['date']);
+const INSTANT_TYPES = new Set(['timestamptz', 'timestamp with time zone', 'timestamp']);
+
+// THE RULED EXCEPTIONS. Each carries the migrations that WITNESS it and the
+// ground it was ruled on. They are objects and not bare names because an entry
+// with no stated ground is how an exception set becomes a suppression list, and
+// an entry with no witness is one that can never be shown to be stale.
+const AT_SUFFIX_EXCEPTIONS = new Map([
+  [
+    'calibration_observed_at',
+    {
+      witnesses: ['0045_simulation_runs.sql'],
+      ground:
+        'ADR-272 clause 3. `0045:103` declares it `date NOT NULL`. The rename ADR-272 ' +
+        'section 5 specifies needs `scripts/db/probe_publish_decision_is_sound.sql` and ' +
+        '`scripts/db/probe_simulation_decision_record.sql`, both run by `corpus.yml` and ' +
+        "pinned in CI-06h's list, and ALLOCATION row 272 fences neither",
+    },
+  ],
+]);
+const NAME_TYPE_COLLISION_EXCEPTIONS = new Map([
+  [
+    'effective_from',
+    {
+      witnesses: ['0004_catalog.sql', '0074_firm_parameters.sql'],
+      ground:
+        'ADR-272 clause 4. `date` in geo_restrictions, contract_specs, ' +
+        'detector_definitions, statistic_definitions, loyalty_criteria and ' +
+        'identity_signal_weights; `timestamptz` in wallet_spend_limits, price_floors and ' +
+        'firm_parameters. Nine tables across nine merged migrations, and ADR-272 ' +
+        'section 5 is why that repair is not one session',
+    },
+  ],
+]);
+
+/**
+ * SQL comments out, on RI-25's seed.
+ *
+ * A migration in this estate carries more prose than DDL, and `0045`'s own
+ * header names `calibration_observed_at` in three sentences ABOUT the column.
+ * A reader that did not strip comments would find the subject in the text
+ * discussing the subject, which is exactly how RI-25's first version passed on
+ * a restored defect.
+ *
+ * @param {string} sql
+ * @returns {string}
+ */
+function stripSqlComments(sql) {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '');
+}
+
+/**
+ * A type phrase reduced to a temporal vocabulary member, or `null` for anything
+ * that is not one.
+ *
+ * @param {string} raw
+ * @returns {string | null}
+ */
+function temporalType(raw) {
+  const words = raw.trim().toLowerCase().split(/\s+/);
+  if (words[0] === 'date') return 'date';
+  if (words[0] === 'timestamptz') return 'timestamptz';
+  if (words[0] === 'timestamp') {
+    return words.slice(0, 4).join(' ') === 'timestamp with time zone'
+      ? 'timestamp with time zone'
+      : 'timestamp';
+  }
+  return null;
+}
+
+/**
+ * One `CREATE TABLE` body split on its TOP-LEVEL commas, so that a `CHECK (a,
+ * b)` or a `numeric(10, 2)` is one segment rather than two.
+ *
+ * @param {string} body
+ * @returns {string[]}
+ */
+function topLevelSegments(body) {
+  /** @type {string[]} */
+  const segments = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of body) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) {
+      segments.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  segments.push(current);
+  return segments;
+}
+
+/**
+ * A column definition with a temporal type, or `null` for a table-level
+ * constraint and for every column that is not one.
+ *
+ * @param {string} segment
+ * @returns {{ name: string, type: string } | null}
+ */
+function temporalColumnFrom(segment) {
+  const trimmed = segment.trim();
+  if (trimmed === '') return null;
+  if (/^(constraint|primary|unique|check|foreign|exclude|like|deferrable)\b/i.test(trimmed)) {
+    return null;
+  }
+  const m = /^([a-z_][a-z0-9_]*)\s+([a-z][a-z ]*)/i.exec(trimmed);
+  const name = m?.[1];
+  const declared = m?.[2];
+  if (name === undefined || declared === undefined) return null;
+  const type = temporalType(declared);
+  return type === null ? null : { name: name.toLowerCase(), type };
+}
+
+/**
+ * Every temporal column DECLARED by one migration.
+ *
+ * `CREATE TABLE` bodies are found by paren depth rather than by line shape,
+ * because a body closed on the same line as its last column is legal DDL and a
+ * line-anchored reader would swallow the rest of the file as one table.
+ *
+ * @param {string} sql
+ * @returns {{ name: string, type: string }[]}
+ */
+function temporalColumnsIn(sql) {
+  const code = stripSqlComments(sql);
+  /** @type {{ name: string, type: string }[]} */
+  const out = [];
+
+  const create = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[a-z_][a-z0-9_."]*\s*\(/gi;
+  for (let m = create.exec(code); m !== null; m = create.exec(code)) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    const start = i;
+    for (; i < code.length && depth > 0; i += 1) {
+      if (code[i] === '(') depth += 1;
+      else if (code[i] === ')') depth -= 1;
+    }
+    if (depth !== 0) continue;
+    for (const segment of topLevelSegments(code.slice(start, i - 1))) {
+      const column = temporalColumnFrom(segment);
+      if (column !== null) out.push(column);
+    }
+  }
+
+  // NINE OF THE ESTATE'S TEMPORAL COLUMNS ARRIVE THIS WAY and every one would
+  // be invisible to a reader that only knew `CREATE TABLE`.
+  const add = /\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s+([a-z][a-z ]*)/gi;
+  for (let m = add.exec(code); m !== null; m = add.exec(code)) {
+    const name = m[1];
+    const declared = m[2];
+    if (name === undefined || declared === undefined) continue;
+    const type = temporalType(declared);
+    if (type !== null) out.push({ name: name.toLowerCase(), type });
+  }
+
+  return out;
+}
+
+const ri26 = {
+  id: 'RI-26',
+  title: 'A temporal column name is not false about its own type',
+  covers:
+    'A NAME THAT LIES INSIDE THE TEMPORAL VOCABULARY IS UNDETECTABLE AND A NAME ' +
+    'THAT LIES ACROSS TYPE FAMILIES IS NOT, so only the first is checked. ' +
+    `Population: every column declared by a \`CREATE TABLE\` body or an \`ADD COLUMN\` ` +
+    `clause under \`${MIGRATIONS_DIR}\`, comments stripped first. ` +
+    'LEG 1: NO `*_at` COLUMN IS DECLARED WITH A NON-INSTANT TYPE. ADR-146 ' +
+    'clause 2 makes `*_at` an assertion that the value is an RFC 3339 UTC ' +
+    'instant, and ADR-271 section 3 bounded a live type parser from the ' +
+    'schema-level half of that rule holding. ' +
+    'LEG 2: NO COLUMN NAME IS DECLARED WITH A DAY TYPE IN ONE TABLE AND AN ' +
+    'INSTANT TYPE IN ANOTHER -- the same harm reached through a name carrying ' +
+    'no suffix at all, which is why leg 1 alone was the wrong check. ' +
+    "BOTH LEGS BITE IN BOTH DIRECTIONS on `0027`'s idiom: an unlisted violator " +
+    'fails and so does a ruled exception that has stopped being one, so the day ' +
+    'either is repaired this check names the entry to retire. An exception is ' +
+    'asserted only where the migrations it names are present, because an entry ' +
+    'about `0045` is not a claim about a tree without `0045`. ' +
+    'NOT CHECKED, AND RULED RATHER THAN MISSED (ADR-272 section 3): `*_day` and ' +
+    '`*_on` on a NON-temporal type. `daily_marks.traded_day`, ' +
+    '`daily_marks.win_day` and `trading_calendar.is_half_day` are `boolean`, ' +
+    '`loyalty_criteria.breaks_on` is `text[]`; each is refused by the first type ' +
+    'anything gives it, which is precisely what a `date` wearing `_at` is not. ' +
+    'WHAT IT CANNOT SEE: a database, a column built by `EXECUTE`, WHICH ' +
+    'CALENDAR a day is on (ADR-272 section 6 records that drift as owed), and ' +
+    'whether a name means anything -- `zzz_at timestamptz` passes both legs. ' +
+    'SILENT on a tree carrying no migrations directory. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    // SILENT ON A TREE THAT DECLARES NO SCHEMA, on RI-23, RI-24 and RI-25's
+    // precedent. The witness rule below is what keeps this from being a way to
+    // pass: on a tree that DOES carry the cited migrations, silence is a
+    // finding rather than a skip.
+    const dir = join(root, MIGRATIONS_DIR);
+    if (!existsSync(dir)) return findings;
+
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
+    const present = new Set(files);
+
+    /** @type {Map<string, Map<string, string[]>>} column name -> type -> migrations */
+    const declared = new Map();
+    for (const file of files) {
+      for (const { name, type } of temporalColumnsIn(readFileSync(join(dir, file), 'utf8'))) {
+        const byType = declared.get(name) ?? new Map();
+        byType.set(type, [...(byType.get(type) ?? []), file]);
+        declared.set(name, byType);
+      }
+    }
+
+    /** @param {{ witnesses: string[] }} entry */
+    const witnessed = (entry) => entry.witnesses.every((w) => present.has(w));
+
+    // LEG 1. The suffix, and the type behind it.
+    /** @type {Set<string>} */
+    const atViolators = new Set();
+    for (const [name, byType] of declared) {
+      if (!name.endsWith('_at')) continue;
+      for (const type of byType.keys()) {
+        if (INSTANT_TYPES.has(type)) continue;
+        atViolators.add(name);
+        if (AT_SUFFIX_EXCEPTIONS.has(name)) continue;
+        findings.push(
+          `${name} is declared \`${type}\` in ${(byType.get(type) ?? []).join(', ')}, and a ` +
+            'name ending `_at` is ADR-146 clause 2 asserting that the value is an RFC 3339 ' +
+            'UTC instant. The name is false about its own column, which is the one shape of ' +
+            'wrongness no type system downstream can catch, and ADR-271 section 3 bounded a ' +
+            "live type parser's blast radius from this property holding. Rename it by a " +
+            'superseding migration, or rule the exception into RI-26 with its ground',
+        );
+      }
+    }
+    for (const [name, entry] of AT_SUFFIX_EXCEPTIONS) {
+      if (!witnessed(entry) || atViolators.has(name)) continue;
+      findings.push(
+        `RI-26 carries ${name} as a ruled \`_at\` exception (${entry.ground}) and this tree ` +
+          `carries ${entry.witnesses.join(', ')}, yet no column of that name is declared with ` +
+          'a non-instant type any more. Either the repair landed and this entry is stale, or ' +
+          'the reader stopped matching and every violator in the estate now reports as ' +
+          'absent. Retire the entry or fix the reader',
+      );
+    }
+
+    // LEG 2. One name, two temporal types, and no suffix to have warned anyone.
+    /** @type {Set<string>} */
+    const collisions = new Set();
+    for (const [name, byType] of declared) {
+      const days = [...byType.keys()].filter((t) => DAY_TYPES.has(t));
+      const instants = [...byType.keys()].filter((t) => INSTANT_TYPES.has(t));
+      if (days.length === 0 || instants.length === 0) continue;
+      collisions.add(name);
+      if (NAME_TYPE_COLLISION_EXCEPTIONS.has(name)) continue;
+      const where = (/** @type {string} */ t) => `\`${t}\` in ${(byType.get(t) ?? []).join(', ')}`;
+      findings.push(
+        `${name} is declared ${days.map(where).join('; ')} and ${instants.map(where).join('; ')}. ` +
+          'One name denotes a DAY in one table and an INSTANT in another, so reading the name ' +
+          "settles nothing and no suffix warns anybody. This is ADR-146 clause 2's harm " +
+          'arriving through a name that makes no claim at all (ADR-272 section 4). Give one ' +
+          'side a name that says which it is, or rule the exception into RI-26 with its ground',
+      );
+    }
+    for (const [name, entry] of NAME_TYPE_COLLISION_EXCEPTIONS) {
+      if (!witnessed(entry) || collisions.has(name)) continue;
+      findings.push(
+        `RI-26 carries ${name} as a ruled day/instant collision (${entry.ground}) and this ` +
+          `tree carries ${entry.witnesses.join(', ')}, yet the name no longer collides. ` +
+          'Either the repair landed and this entry is stale, or the reader stopped matching. ' +
+          'Retire the entry or fix the reader',
+      );
+    }
+
+    // A THROW BESIDE THE STALE-ENTRY HALF, for the one case the stale-entry
+    // half reports too gently: a tree carrying every witness migration and
+    // parsing to nothing at all is not a repaired estate, it is a reader that
+    // has stopped reading, and a check that cannot reach its inputs throws
+    // rather than reporting findings (this file's rule 2).
+    const witnesses = [...AT_SUFFIX_EXCEPTIONS.values(), ...NAME_TYPE_COLLISION_EXCEPTIONS.values()]
+      .flatMap((entry) => entry.witnesses)
+      .filter((w) => present.has(w));
+    if (witnesses.length > 0 && declared.size === 0) {
+      throw new Error(
+        `RI-26 found no \`date\` and no \`timestamptz\` column under ${MIGRATIONS_DIR} on a ` +
+          `tree that carries ${witnesses.join(', ')}. Those migrations declare both, so zero ` +
+          'means the `CREATE TABLE` reader or the comment stripper has moved and every ' +
+          'column in the schema now reports as untyped',
+      );
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// RI-27  Every statement of the last-closed-trading-day fold is registered, and
+//        each one's coverage disposition is the one the register claims
+// -----------------------------------------------------------------------------
+// ADR-273's PROPERTY, AND IT IS A PROPERTY OF THE TREE RATHER THAN OF A FILE.
+//
+// `R-06` permits an eligibility verdict against exactly one day, the LAST CLOSED
+// one, and `ADR-042` F-4 rules that the last closed day MERIT KNOWS ABOUT is a
+// different answer from the last closed day: a day outside `trading_calendar_loads`
+// is UNKNOWN and unknown is not a holiday. `0032`'s own header calls confusing
+// the two "the single most silent failure available to this table", because the
+// wrong answer is a confident `YYYY-MM-DD` that every gate downstream reads
+// without complaint.
+//
+// THE FOLD IS STATED THREE TIMES IN THIS TREE AND THE THREE PUT THE COVERAGE
+// READ IN THREE DIFFERENT PLACES. ADR-273 ruled that this is safe wherever a
+// TYPE makes forgetting a compile error and unsafe wherever only a convention
+// does, and registered the one site where nothing holds it at all. What the
+// ruling cannot do is survive a FOURTH statement landing in a package nobody
+// was looking at, which is exactly the shape ADR-268 measured when it found the
+// first two disagreeing.
+//
+// SO THE CENSUS IS THE CHECK. Every source file whose CODE names a session-close
+// instant is either on the register with a stated disposition or is a finding.
+// The needle is the close instant rather than the phrase "last closed day",
+// because a fold is written with the column and named whatever its author likes:
+// `readLastClosedTradingDay`, `lastClosedDay` and `lastClosedTradingDayStatement`
+// are three names for one predicate already.
+//
+// COMMENTS ARE STRIPPED, ON `RI-25`'s SEED. That check's first version read the
+// raw file and reported PASS with the call commented out, because the file's own
+// header explained the repair at length. Every file on this register discusses
+// this subject in prose; matching a mention would make the register agree with
+// itself.
+//
+// LEG 2 IS WHAT KEEPS THE REGISTER FROM BECOMING A LIST OF NAMES. A file
+// registered as consulting coverage must NAME THE COVERAGE TABLE in code, and
+// the one registered as consulting none must not. Both directions are findings:
+// coverage disappearing from a site that had it is the regression, and coverage
+// APPEARING at the site that lacks it is good news that makes this register and
+// ADR-273's finding 1 stale, which a reader needs told rather than hidden.
+//
+// WHAT IT CANNOT SEE: whether a fold that reads both tables reads them
+// CORRECTLY, and whether a file-local fold has acquired a second caller inside
+// its own module. Both are `apps/api/test/last-closed-day-coverage-split.test.ts`'s
+// half, which drives the real readers over a calendar loaded past its coverage
+// and parses `liability.ts` for the one-caller property. This check is only that
+// the census is closed and that each entry is still what it says it is.
+
+/**
+ * A READ of `trading_calendar_loads`, MATCHED AS AN ACT RATHER THAN A MENTION.
+ *
+ * THE SEED THAT PROVED THE FIRST VERSION WRONG IS RECORDED IN ADR-273 SECTION 7.
+ * Leg 2 originally asked whether the file NAMED the table at all, and
+ * `liability.ts` was seeded by pointing `anchorCalendar` at `trading_calendar`
+ * instead: the check reported PASS, because that module's three `uncovered`
+ * refusals each quote the table name inside their own detail string. Comments
+ * are stripped and STRING LITERALS ARE NOT, so on this subject the files richest
+ * in explanatory text are the ones a mention-matcher cannot see through. This is
+ * `RI-25`'s seed one class over.
+ *
+ * Two forms, and they are the two idioms this estate has: `ADR-112`'s keyed
+ * accessor (`tx.rows('tradingCalendarLoads')`) and the drizzle table handle
+ * (`TABLES.tradingCalendarLoads`). A THIRD idiom would report as absent, which
+ * is the fail-closed direction: the finding names the file and a reader adds the
+ * form.
+ */
+const READS_THE_LOADS_TABLE =
+  /(?:\.\s*(?:rows|rowsWhere|rowAt)\s*\(\s*['"]tradingCalendarLoads['"]|\bTABLES\s*\.\s*tradingCalendarLoads\b)/;
+
+/** Identifiers that mean "this file handles a session close instant". */
+const CLOSE_INSTANT = /\b(?:sessionCloseAt|session_close_at|closeAtMs|closeMs)\b/;
+
+/**
+ * Every source file that may name one, and what it does with it.
+ *
+ * `coverage` IS THE ASSERTION AND NOT A LABEL. `consulted` means the file's own
+ * code names `trading_calendar_loads`; `absent` means it must not; `n/a` is a
+ * file that declares, registers or WRITES the column and folds nothing, so
+ * coverage is not its question.
+ */
+const CLOSE_INSTANT_REGISTER = [
+  {
+    rel: 'apps/api/src/admin-source/liability.ts',
+    coverage: 'consulted',
+    what:
+      'FOLDS. `lastClosedDay`, module-private, whose one caller `anchorCalendar` reads ' +
+      '`trading_calendar_loads` and returns a discriminated union: the anchored day is ' +
+      'unreachable without narrowing past an `uncovered` arm (ADR-273 ruling 2)',
+  },
+  {
+    rel: 'apps/worker/src/batch/adapter.ts',
+    coverage: 'absent',
+    what:
+      'FOLDS, AND CONSULTS NO COVERAGE AT ALL. `readLastClosedTradingDay`, exported, ' +
+      'returning `TradingDay | null` where `null` means "no session has closed" and never ' +
+      '"outside coverage". THE REGISTERED GAP: ADR-268 finding 2 reported it, ADR-273 ' +
+      'finding 1 re-derived it, and `apps/worker` was outside both fences',
+  },
+  {
+    rel: 'packages/db/src/scoped-db.ts',
+    coverage: 'consulted',
+    what:
+      'FOLDS. `lastClosedTradingDayStatement`, the fourth named door (ADR-268), which reads ' +
+      'BOTH tables itself and refuses an exhausted or gapped calendar. Nothing to forget',
+  },
+  {
+    rel: 'packages/rules-engine/src/calendar.ts',
+    coverage: 'required-input',
+    what:
+      'FOLDS A DIFFERENT QUESTION, `tradingDayAt`, and is the strongest of the four shapes: ' +
+      '`SessionCalendarSource` REQUIRES both `sessions` and `coverage`, so a calendar cannot ' +
+      'be BUILT without coverage, and the answer type carries `outside_coverage`. IT NAMES ' +
+      'NO TABLE AND MUST NOT: the engine is pure and reads no schema, so its coverage read ' +
+      'is a field of its own input type rather than a query',
+  },
+  {
+    rel: 'packages/db/src/schema.ts',
+    coverage: 'n/a',
+    what: 'DECLARES the column. Folds nothing',
+  },
+  {
+    rel: 'packages/db/src/scope.ts',
+    coverage: 'n/a',
+    what: "REGISTERS the table and names the column inside `tradingCalendar`'s `why`. Folds nothing",
+  },
+  {
+    rel: 'packages/db/src/seed/calendars/generate.mjs',
+    coverage: 'n/a',
+    what: 'WRITES the column. The loader PRODUCES coverage rather than consulting it',
+  },
+];
+
+const ri27 = {
+  id: 'RI-27',
+  title: 'Every last-closed-day fold is registered, with the coverage disposition it claims',
+  covers:
+    'A CONFIDENT DAY FOR A DATE THE ESTATE KNOWS NOTHING ABOUT IS A WRONG PAYOUT ' +
+    'BASIS (ADR-042 F-4, ADR-273). Two legs. ONE: THE CENSUS IS CLOSED. Every ' +
+    '`*.ts`, `*.mjs` and `*.js` under an `apps/*/src`, `packages/*/src` or ' +
+    '`scripts/` directory is read with COMMENTS STRIPPED, and a file whose code ' +
+    'names a session-close instant (`sessionCloseAt`, `session_close_at`, ' +
+    '`closeAtMs`, `closeMs`) must be one of the ' +
+    `${String(CLOSE_INSTANT_REGISTER.length)} registered sites. An unregistered ` +
+    'one is a candidate FOURTH statement of `R-06`’s selection and needs an ADR; ' +
+    'a registered one that no longer names it means the register is stale. ' +
+    'TWO: EACH DISPOSITION STILL HOLDS. A site registered as consulting coverage ' +
+    "must READ it — `.rows('tradingCalendarLoads')` or " +
+    '`TABLES.tradingCalendarLoads`, an ACT and never a mention, because every ' +
+    'refusal on this subject quotes the table name in its own detail string; ' +
+    'the PURE one must instead ' +
+    'declare a `readonly coverage` input and an `outside_coverage` answer, ' +
+    'because an engine that reads no schema owes the read as a field rather ' +
+    'than as a query; and the one registered as consulting none must name ' +
+    'neither — in BOTH directions, because coverage vanishing is the regression ' +
+    'and coverage arriving makes this register and ADR-273 finding 1 stale. ' +
+    'THE NEEDLE IS THE COLUMN AND NOT THE PHRASE, because one predicate already ' +
+    'carries three names in this tree. ' +
+    'IT READS `src/` AND `scripts/` AND NOT TESTS, on RI-25’s reading: a suite ' +
+    'names the identifier while asserting about it. ' +
+    'WHAT IT CANNOT SEE: whether a two-table fold reads them CORRECTLY, and ' +
+    'whether a file-local fold has gained a second caller inside its own module. ' +
+    'Both are `apps/api/test/last-closed-day-coverage-split.test.ts`’s half. ' +
+    'SILENT on a tree where NO source file handles a session close at all, ' +
+    'which is the synthetic fixture: silence is keyed on the subject rather ' +
+    'than on a registered path, because the fixture writes stubs at two of ' +
+    'those paths. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const present = CLOSE_INSTANT_REGISTER.filter((entry) => existsSync(join(root, entry.rel)));
+
+    const sources = walk(root).filter((f) => {
+      if (!/\.(ts|tsx|mjs|js)$/.test(f)) return false;
+      if (/(^|\/)(test|tests|__tests__)\//.test(f)) return false;
+      if (/\.test\.[a-z]+$/.test(f)) return false;
+      return (
+        /^apps\/[^/]+\/src\//.test(f) || /^packages\/[^/]+\/src\//.test(f) || /^scripts\//.test(f)
+      );
+    });
+
+    // A SENTINEL, on RI-24's and RI-25's precedent. Zero source files on a tree
+    // that DOES carry a registered file means the walk or the path filter has
+    // moved, at which point leg 1 passes by having read nothing and a fourth
+    // statement of the fold anywhere in the tree reports as absent.
+    if (sources.length === 0 && present.length > 0) {
+      throw new Error(
+        'RI-27 found no source file under any `apps/*/src`, `packages/*/src` or `scripts/` ' +
+          'on a tree that DOES carry a registered fold. Zero means the walk or the path ' +
+          'filter has moved, at which point leg 1 is asserting about an empty list',
+      );
+    }
+
+    /** Every source file whose CODE handles a session close instant, read once. */
+    const naming = new Set(
+      sources.filter((f) => CLOSE_INSTANT.test(stripComments(readFileSync(join(root, f), 'utf8')))),
+    );
+
+    // SILENT ON A TREE THAT HOLDS NO CALENDAR AT ALL, on RI-23, RI-24 and
+    // RI-25's precedent, and the condition is the SUBJECT rather than a file
+    // name. The synthetic scaffold fixture writes a `scope.ts` and a
+    // `scoped-db.ts` of its own, so keying silence on a registered PATH would
+    // have made this check report a stale register against a stub; keying it on
+    // whether any file in the tree handles a session close is the question this
+    // check is actually about, and a tree with no fold has no census to close.
+    if (naming.size === 0) return findings;
+
+    const registered = new Map(CLOSE_INSTANT_REGISTER.map((entry) => [entry.rel, entry]));
+
+    // LEG 1. The census, in both directions.
+    for (const file of sources) {
+      const names = naming.has(file);
+      const entry = registered.get(file);
+
+      if (names && entry === undefined) {
+        findings.push(
+          `${file} names a session-close instant in CODE and is not on RI-27's register. ` +
+            'A file that handles `session_close_at` is a candidate statement of `R-06`’s ' +
+            'selection, and this tree already holds three of them putting the coverage read ' +
+            'in three different places (ADR-273). Either it folds a last-closed day, in ' +
+            'which case an ADR rules where its coverage check lives before it acquires a ' +
+            'caller, or it does not, in which case add it to the register with `coverage: ' +
+            "'n/a'` and say what it does",
+        );
+      }
+
+      if (!names && entry !== undefined) {
+        findings.push(
+          `${file} is on RI-27's register as "${entry.what}" and its code no longer names a ` +
+            'session-close instant. The register is stale: either the fold moved, in which ' +
+            'case the new home needs its row here, or the file stopped being about this ' +
+            'subject, in which case remove the row and say so in ADR-273’s successor',
+        );
+      }
+    }
+
+    // LEG 2. Each disposition, asked of the file rather than of the register.
+    for (const entry of present) {
+      if (entry.coverage === 'n/a') continue;
+      const code = stripComments(readFileSync(join(root, entry.rel), 'utf8'));
+      const consults = READS_THE_LOADS_TABLE.test(code);
+
+      // A PURE MODULE CANNOT NAME A TABLE AND IS NOT EXCUSED FROM COVERAGE.
+      // `packages/rules-engine` reads no schema by construction, so the read it
+      // owes is a REQUIRED FIELD of its own input type and an answer that can
+      // say `outside_coverage`. Asserting the table name of it would be asking
+      // the engine to import a database.
+      if (entry.coverage === 'required-input') {
+        const declares = code.indexOf('interface SessionCalendarSource {');
+        const block = declares === -1 ? '' : code.slice(declares, code.indexOf('}', declares));
+        if (
+          !/\breadonly coverage\s*:\s*readonly CoverageInterval\[\]/.test(block) ||
+          !code.includes('outside_coverage')
+        ) {
+          findings.push(
+            `${entry.rel} is registered as taking coverage AS A REQUIRED INPUT ` +
+              `("${entry.what}") and its code no longer declares a \`readonly coverage\` ` +
+              'field or no longer carries the `outside_coverage` answer. A calendar that can ' +
+              'be built without coverage places an instant inside a span nobody loaded, and ' +
+              'ADR-042 F-4 rules that day UNKNOWN rather than a session',
+          );
+        }
+        continue;
+      }
+
+      if (entry.coverage === 'consulted' && !consults) {
+        findings.push(
+          `${entry.rel} is registered as CONSULTING coverage ("${entry.what}") and its code ` +
+            "does not READ the loads table: no `.rows('tradingCalendarLoads')` and no " +
+            '`TABLES.tradingCalendarLoads`. A MENTION IS NOT A READ and this check will not ' +
+            "accept one, because every refusal on this subject quotes the table's name in " +
+            'its own detail string. A last-closed-day fold without the coverage read answers ' +
+            'a CONFIDENT day for a date outside `trading_calendar_loads`, which ADR-042 F-4 ' +
+            'rules UNKNOWN and 0032 calls the single most silent failure available to this ' +
+            'table',
+        );
+      }
+
+      if (entry.coverage === 'absent' && consults) {
+        findings.push(
+          `${entry.rel} is registered as consulting NO coverage ("${entry.what}") and its ` +
+            'code now names the loads table. THIS IS THE GAP CLOSING AND IT IS GOOD NEWS, ' +
+            'and it makes this register and ADR-273 finding 1 wrong. Change this row to ' +
+            "`coverage: 'consulted'` in the same commit and record the repair, so the next " +
+            'reader is not told a gap exists that somebody already closed',
+        );
+      }
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// RI-28  No shipped source file reads the process's local clock
 // -----------------------------------------------------------------------------
 // ADR-274's PROPERTY, AND IT IS THE REASON A DEPLOYMENT'S `TZ` DOES NOT DECIDE
 // ANYTHING. ADR-268 section 7 ended on the sentence this check exists to make
@@ -6017,8 +6679,8 @@ function callArguments(code, open) {
   return { text: code.slice(open + 1, close), args };
 }
 
-const ri26 = {
-  id: 'RI-26',
+const ri28 = {
+  id: 'RI-28',
   title: 'No shipped source file reads the process timezone',
   covers:
     'A DEPLOYMENT`S `TZ` DECIDES NOTHING BECAUSE NO SHIPPED LINE ASKS WHAT IT IS ' +
@@ -6076,7 +6738,7 @@ const ri26 = {
     // files, so this fires on a broken filter rather than on a small tree.
     if (sources.length === 0) {
       throw new Error(
-        'RI-26 found no source file under any `apps/*/src`, `packages/*/src` or `scripts/`. ' +
+        'RI-28 found no source file under any `apps/*/src`, `packages/*/src` or `scripts/`. ' +
           'Zero means the walk or the path filter has moved, at which point every leg is ' +
           'asserting about an empty list and a local clock read anywhere in the tree would ' +
           'report as absent',
@@ -6155,6 +6817,8 @@ export const CHECKS = [
   ri24,
   ri25,
   ri26,
+  ri27,
+  ri28,
 ];
 
 function main() {
