@@ -70,19 +70,36 @@ import { expect, test } from 'vitest';
 // should not read it as a sixteenth.
 //
 // -----------------------------------------------------------------------------
-// THE LIST HAS SHRUNK ONCE ON A COMPOSITION RATHER THAN ON A DOOR (ADR-261)
+// THE LIST HAS NOW SHRUNK TWICE ON THE SAME ARTEFACT, IN ORDER (ADR-261, ADR-266)
 // -----------------------------------------------------------------------------
-// `useCertificateImageSource`'s entry is GONE from below, which is assertion 2
-// above doing its job: `start.ts` installs `databaseCertificateImageSource` and
-// a blocked port that is also wired fails. It is worth one sentence here
-// because of WHAT it waited on. Its last obstruction was not a door, a secret
-// or a vendor: ADR-231 built the read, `db.firm` always held the append and
-// ADR-256 landed the renderer, and what did not exist was anything that put the
-// three TOGETHER. ADR-256 ruling 12 named that gap and refused to wire past it,
-// on the ground that ADR-226 and ADR-229 permit wiring when the last gap is a
-// thing THE DEPLOYMENT SETS and "a composition that does not exist is not such
-// a gap". ADR-261 wrote the composition, which is why this entry expired and
-// `useCertificateBackend`'s did not.
+// BOTH CARD ENTRIES ARE GONE from below, which is assertion 2 above doing its
+// job twice: `start.ts` installs `databaseCertificateImageSource` and
+// `databaseCertificateBackend`, and a blocked port that is also wired fails.
+//
+// `useCertificateImageSource` WENT FIRST AND ITS LAST OBSTRUCTION WAS NOT A
+// DOOR, A SECRET OR A VENDOR. ADR-231 built the read, `db.firm` always held the
+// append and ADR-256 landed the renderer, and what did not exist was anything
+// that put the three TOGETHER. ADR-256 ruling 12 named that gap and refused to
+// wire past it, on the ground that ADR-226 and ADR-229 permit wiring when the
+// last gap is a thing THE DEPLOYMENT SETS and "a composition that does not exist
+// is not such a gap". ADR-261 wrote the composition.
+//
+// `useCertificateBackend` WENT SECOND AND THAT ORDER IS ADR-256 RULING 13.
+// ADR-246 had read the two as ONE deliverable that would "expire together or not
+// at all"; ruling 13 narrowed that to "expire in ORDER", with this one
+// downstream, because the sentence keeping it shut was "publishing a link to a
+// trader is publishing a promise that bytes are there" and it is the IMAGE port
+// answering that discharges it. Its own last obstruction was a GUARD rather than
+// a variable: `projectCertificate` never calls `links` for a deferred row, so a
+// live read beside a refusing signer answered by the state of the caller's own
+// rows (ADR-246 clause 8), and ADR-261 section 5 ruled that check is code rather
+// than configuration. ADR-266 wrote it, in the read arm, ahead of the accessor.
+//
+// SO NEITHER ENTRY EXPIRED ON A VARIABLE, AND THAT IS THE PART WORTH KEEPING.
+// Both were "one SMALLER slice from wireable rather than one VARIABLE from
+// wired", and in both cases the slice was a piece of code somebody had to write.
+// A reader tempted to close a remaining entry below by naming an environment
+// variable should read those two sentences before deciding this one is like them.
 // =============================================================================
 
 const HERE = import.meta.dirname;
@@ -826,49 +843,6 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'that citation was always for THIS clause rather than for the `ApiDb` one beside it. ' +
     'EVERY ABSENCE ABOVE IS EXECUTED in `test/internal-ops-constructibility.test.ts` rather than ' +
     'stated here, so the day any of them lifts a case goes red and this entry expires.',
-  useCertificateBackend:
-    'ONE FIELD OF ONE RESPONSE, AND ADR-246 READ THE THREE CERTIFICATE PORTS AS A SET AND FOUND ' +
-    'THAT THIS ONE AND `useCertificateImageSource` WAIT ON THE SAME ABSENT THING. THEY DO NOT ANY ' +
-    'MORE: ADR-256 ruling 13 narrowed that set reading to say the two expire in ORDER rather than ' +
-    'together, ADR-261 wired the other one, and THIS ENTRY IS WHAT IS LEFT BEHIND IT. ' +
-    '`databaseCertificateBackend` still exists (`routes/certificates.ts:692`) and its read arm is ' +
-    'constructible today through `db.scoped`; its second parameter still has no supplier. ' +
-    "THE `verify_url` CLAUSE IS DISCHARGED AND IS REWRITTEN RATHER THAN DELETED, on RI-14's " +
-    'rule that a false sentence removed leaves nothing for the next reader to check. It read ' +
-    'that the path is "named by M11 and DEFINED BY NO SECTION of the contract" (ADR-168 ' +
-    'foreclosure 1), and API_CONTRACT section 6.3 has carried a `GET /verify/:code` row since ' +
-    'ADR-170, `routes/verify.ts` implements it, and `start.ts` wires `databaseVerifySource(LIVE_DB)` ' +
-    'today. What that half waits on is an ORIGIN, which is a deployment fact ADR-012 keeps out of ' +
-    'this repository and which one named environment variable would close. ' +
-    'AND `image_url` HAS RUN OUT OF ABSENCES TO NAME, WHICH IS WHY THIS ENTRY IS NOW THE ' +
-    'INTERESTING ONE. It was the signer, the column and the renderer; ADR-249 ruled that this ' +
-    'card carries NO SIGNATURE AT ALL and that the address is `origin` plus the path this file ' +
-    'already serves, DERIVED FROM `code` at projection time, so `certificates` needs no ' +
-    'image-location column and NO MIGRATION NUMBER WAS RESERVED OR TAKEN; ADR-256 landed ' +
-    '`renderCertificateCard`; and ADR-261 composed the two database arms with the render into ' +
-    '`src/certificate-image-source.ts` and INSTALLED IT, so the row this field addresses ANSWERS. ' +
-    'The sentence that kept this port shut for three entries, "publishing a link to a trader is ' +
-    'publishing a promise that bytes are there", HAS EXPIRED: the bytes are there. What is left ' +
-    'of the field is an ORIGIN, and an origin IS a thing a deployment sets. ' +
-    'SO THE ONLY REASON THIS PORT IS STILL BLOCKED IS THE ONE THAT WAS NEVER A MISSING PIECE, ' +
-    'AND ADR-261 SECTION 5 RULES IT DOES NOT LIFT WITH A VARIABLE. `projectCertificate` never ' +
-    'calls `links` for a deferred row (ADR-168 foreclosure 4), so a backend with a live read and ' +
-    'a refusing `links` answers 200 to a trader whose certificates are all deferred and refuses ' +
-    'the trader beside them whose certificate issued. THAT IS A RESPONSE DECIDED BY THE STATE OF ' +
-    "THE CALLER'S OWN ROWS, it is executed in `test/certificate-ports.test.ts`, and it is why " +
-    'raising the wired count here has been refused however the refusal is dressed. ADR-246 ' +
-    'repaired the status code of that refusal (503 rather than 500, on ADR-240 section 4) and ' +
-    'deliberately did NOT wire the port. ' +
-    'THE REMAINING GAP IS AN ORIGIN AND A GUARD, AND THE GUARD IS CODE. ADR-226 and ADR-229 ' +
-    'permit wiring when the only remaining gap is a thing the DEPLOYMENT SETS. The origin is one. ' +
-    'A check that reads the origin BEFORE the rows are read and refuses the whole request, so ' +
-    'that the answer can never be decided by which certificates the caller happens to hold, is ' +
-    'not one: it is code, and nothing in this tree has written it. `routes/verify.ts` holds ' +
-    'exactly that shape for its own copy table and `src/certificate-image-source.ts` holds it for ' +
-    'the image row, so the shape is settled and the writing is not done. THIS PORT IS THEREFORE ' +
-    'ONE SMALLER SLICE FROM WIREABLE RATHER THAN ONE VARIABLE FROM WIRED, which is ADR-256 ' +
-    'ruling 12 held rather than eroded on the way past: a composition that does not exist is not ' +
-    'a gap a deployment can close, and neither is a guard that does not exist.',
   useCertificateRevokeBackend:
     'READ BY ADR-246 AS THE THIRD OF THE THREE CERTIFICATE PORTS AND LEFT EXACTLY WHERE IT ' +
     'STOOD: it is the one of the three that is NOT about the card, so the card landing does ' +
@@ -1061,7 +1035,6 @@ test('every database adapter written in this deployable is installed or accounte
 
   // An adapter whose PORT is blocked is accounted for by that port's entry.
   const accountedByPort = new Set([
-    'databaseCertificateBackend',
     'databaseIdempotencyStore',
     // `useWithdrawalBackend` is blocked, and its own entry above carries the
     // reason, so its adapter is accounted for by it.
@@ -1088,5 +1061,5 @@ test('the wired count is reported, so a regression is a number and not a paragra
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 24, wired: 9, blocked: 15 });
+  }).toStrictEqual({ declared: 24, wired: 10, blocked: 14 });
 });

@@ -277,6 +277,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-261](ADR-261.md) | the composition ADR-256 named is written and the image port is wired, its refusal is moved in front of the door so a deferral cannot decide it, and the list port turns out to wait on a guard rather than on a variable (2026-08-30, status: proposed) |
 | [ADR-262](ADR-262.md) | the affiliate is resolved inside `packages/db` and leaves as a bit, the counterparty stamp is a registry field rather than an assumption, and the two `AffiliateRef` declarations were never one shape (2026-08-30, status: proposed) |
 | [ADR-263](ADR-263.md) | the edge had a guard, a clock and a database behind it and no door, and what moves is one paragraph of a frozen contract rather than a route this session invented  (2026-08-30, status: proposed) |
+| [ADR-266](ADR-266.md) | the guard ADR-261 named is written, the list port's refusal is moved into the read arm so a deferral cannot decide it, and the second of the two card ports is wired (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
