@@ -120,22 +120,54 @@ test('ADR-252: the base cap has a home, in exactly one migration, and it is not 
   expect(declaringLinesMatching('base_account_cap integer')).toHaveLength(0);
 });
 
-test('ADR-252: what still refuses the cap is the catalogue door, and the list has not moved', () => {
-  // THE NARROWED HALF. `accountCap()` is a `CheckoutTx` method and a scoped
-  // transaction refuses every firm key outside `CATALOG_TABLE_KEYS`. The day
-  // this key joins that list is the day the clause changes again, and this case
-  // is what turns red on it.
-  expect(SCOPED_DB).not.toContain('firmParameters');
+test('ADR-265: the catalogue list did not move, and the door is a named one instead', () => {
+  // THIS CASE WAS WATCHED RED BY ADR-265 AND IS ASKED NARROWER RATHER THAN
+  // LOOSER. It read `expect(SCOPED_DB).not.toContain('firmParameters')`, which
+  // is a question about whether the NAME appears anywhere in a 3,900 line file.
+  // The claim was always about the LIST: a scoped transaction refuses every firm
+  // key outside `CATALOG_TABLE_KEYS`, and the day this key JOINS THAT LIST is
+  // the day the clause changes. ADR-265 put the name in the file and kept it out
+  // of the list, which the old form could not tell apart from an admission.
+  const list = SCOPED_DB.slice(
+    SCOPED_DB.indexOf('export const CATALOG_TABLE_KEYS = ['),
+    SCOPED_DB.indexOf('] as const satisfies readonly FirmTableKey[];'),
+  );
+  expect(list).not.toContain('firmParameters');
   expect(SCOPED_DB).toContain("export const CATALOG_TABLE_KEYS = [\n  'coupons',");
 });
 
-test('ADR-252: the table ships empty, so an absent row is what any reader will meet', () => {
+test('ADR-265: the door exists, it is on the SCOPED handle, and it hands out one integer', () => {
+  // `INV-M3-15` requires the restriction check at the same point in the
+  // transaction as the cap and `gateIdentity` performs both in one call, so a
+  // cap read through `ApiDb.firm` before the transaction opens is a cap that may
+  // have been superseded by the time the purchase commits. That is why the door
+  // is a `ScopedTx` method rather than a firm read.
+  expect(SCOPED_DB).toContain('effectiveAccountCap(): Promise<number>;');
+  expect(SCOPED_DB).toContain('export async function effectiveAccountCapStatement(');
+});
+
+test('ADR-265: the fold is inside the door, so no handler holds the exception', () => {
+  // THE TRAP: a door that returned the base and let a caller remember
+  // `identities.max_accounts_override` is a control that will be forgotten
+  // exactly once, on the endpoint that sells accounts. `checkout.ts` reads the
+  // override NOWHERE, and this is the case that turns red the day it starts to.
+  expect(SCOPED_DB).toContain("propertyForColumn(identityTable, 'max_accounts_override')");
+  const handlerReads = CHECKOUT.split('\n').filter((line) => {
+    const text = line.trimStart();
+    const isComment = text.startsWith('*') || text.startsWith('//') || text.startsWith('/*');
+    return line.includes('max_accounts_override') && !isComment;
+  });
+  expect(handlerReads).toHaveLength(0);
+});
+
+test('ADR-252 and ADR-265: the table ships empty, so a refusal is what the reader meets', () => {
   // NO SEED ANYWHERE IN THE SET AND NO WRITER IN ANY `src/`. The trap the row
   // named first is that an implementation folds that absence into an unlimited
-  // cap; nothing here can assert what an unwritten reader does, and this is the
-  // fact that reader will meet.
+  // cap. The door does not: it throws, and the sentence is asserted in both
+  // files, so the day either loses it the case rather than a buyer finds out.
   expect(declaringLinesMatching('INSERT INTO firm_parameters')).toHaveLength(0);
-  expect(CHECKOUT).toContain('AN ABSENT ROW IS NO CAP AND IT IS NOT AN');
+  expect(CHECKOUT).toContain('AN ABSENT ROW IS NO CAP');
+  expect(SCOPED_DB).toContain('AN ABSENT ROW IS NO CAP AND NOT AN UNLIMITED ONE');
 });
 
 // -----------------------------------------------------------------------------
