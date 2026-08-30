@@ -37,7 +37,7 @@ about a table.
 **Types**
 - Money: `bigint`, always **integer cents**, always non-negative unless the column explicitly represents a signed movement (`ledger_entries.amount_cents`, `daily_marks.realized_pnl_cents`). Never `numeric`, never `float`.
 - Ratios: `integer` **basis points**. Never a float, never a percentage string.
-- Timestamps: `timestamptz`, stored UTC. Trading dates: `date`, and always the exchange trading day, never a UTC calendar date derived from a timestamp.
+- Timestamps: `timestamptz`, stored UTC. Trading dates: `date`, and always the exchange trading day, never a UTC calendar date derived from a timestamp. **A `date` column is not always a trading date, and which clock answers it is DECLARED rather than inferred**: see **Temporal columns** below.
 - Enums: Postgres native `enum` types for closed sets that change rarely (phases, statuses), `text` with a `check` constraint for sets expected to grow. Each choice is noted per column.
 - JSON: `jsonb` only, always with a documented shape, always validated by zod at the write boundary. `jsonb` is used for vendor payloads, rule configs, and evidence, never as a way to avoid designing columns.
 
@@ -106,6 +106,24 @@ live_account_state
 - Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 97 tables carry `updated_at`**; the rest are either append-only or written once. (`identity_restriction_episodes`, added by `0031`, does not: an episode is opened once and closed once, and both transitions carry their own actor and timestamp.)
 - Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 98 tables carry `updated_at`**; the rest are either append-only or written once. (The figure was thirty of 96 until `0032` added two append-only tables, which is why the numerator did not move.)
 - Nothing is ever soft-deleted with a boolean. Lifecycle is a status enum with an event trail. The one soft delete in the schema is `journal_entries.deleted_at`, and it is a **tombstone for a hard-delete job** rather than an end state (§10).
+
+**Temporal columns** (added under [ADR-276](../../decisions/ADR-276.md), which narrows [ADR-272](../../decisions/ADR-272.md) clause 5)
+
+- **Every `date` column declares its unit in its own design-record row**, as the exact marker `**Unit: <token>**`, from a vocabulary closed at three by [ADR-042](../../decisions/ADR-042.md) and widened in definition only by [ADR-082](../../decisions/ADR-082.md). [`CI-06m`](../../testing/STRATEGY.md) refuses a `date` column that declares none, and refuses a token outside the set.
+
+  | Token | What answers this date |
+  |---|---|
+  | `trading day` | the exchange CT trading day, answered only by `TradingCalendar` |
+  | `wall clock` | Merit's own clock, answered only by `now()` |
+  | `rail clock` | a third party's own clock, quoted and never computed by Merit: a payment rail's, a calibration vendor's, any counterparty whose day Merit reads and never derives |
+
+  The gate checks that a token is declared and never that it is the RIGHT one. **Most `date` columns in this schema are trading days and a substantial minority are not**, which is why the Types bullet above cannot be read as a rule about every `date` column.
+
+- **A `timestamptz` column declares no unit and deliberately carries no `**Unit:**` marker.** `CI-06m` collects `date` columns and reads the marker on those rows only, so a marker written on a `timestamptz` row would be checked by nothing while looking exactly like one that is. Where an instant's clock is worth stating, the design record states it in prose.
+
+- **A column name may be SILENT about its temporal type and may not be FALSE about it** ([ADR-272](../../decisions/ADR-272.md) clause 3). `{instant, day}` is the vocabulary a name can lie inside: `*_at` asserts an instant, `*_day` and `*_on` assert a day, and a name carrying none of the three asserts nothing and is acceptable. A suffix that lies ACROSS type families, `win_day boolean`, is not this defect: the first type the compiler, the driver or the planner gives it refuses it, and only the undetectable one needs a rule.
+
+- **A silent name that denotes MORE THAN ONE temporal type must declare which one it holds at every site, in the design record, or be renamed** ([ADR-276](../../decisions/ADR-276.md) clause 4). `effective_from` is the estate's one such name, a `date` in six tables and a `timestamptz` in three, and it is ruled CORRECT: the two types answer two questions and the question is decidable from the DDL alone, **must two supersessions of one subject inside one calendar day be distinguishable?** Where they must, the column is a `timestamptz` and is the sole non-subject member of the primary key; where they need not, it is a `date`. Each of the nine says which in its own `effective_from` row. `RI-26` reports any table that adopts this name with a third disposition.
 
 **Naming**: `snake_case`, plural table names, `_cents` and `_bp` suffixes are mandatory on money and ratio columns, `_at` on timestamps, `_on` on dates. A column named `amount` without a unit suffix is a review reject.
 

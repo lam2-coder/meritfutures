@@ -582,7 +582,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'WHICH ADR-250 MADE FALSE: the codec is `encodeEngineGates` and `decodeEngineGates` in ' +
     '`packages/rules-engine/src/gates-codec.ts`, which is ADR-239 slice A`s home because BOTH ' +
     'deployables need the one predicate and neither can import the other, and ' +
-    '`apps/worker/src/batch/adapter.ts:535` INSTALLS it where it took the unwired refusal. The ' +
+    '`apps/worker/src/batch/adapter.ts:798` INSTALLS it where it took the unwired refusal. The ' +
     'round trip is EXECUTED rather than claimed: an engine-folded value survives encode, JSON ' +
     'and decode unchanged, and a cent past `Number.MAX_SAFE_INTEGER` comes back exact. THE ' +
     'PORT IS NOT WIRED BY ANY OF THAT AND THE WIRED COUNT DOES NOT MOVE, which is why the ' +

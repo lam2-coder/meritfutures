@@ -46,6 +46,29 @@ const SESSION = {
   sessionCloseAt: CLOSED_AT,
 };
 
+// **THE SESSION AHEAD AND THE LOAD ARE `ADR-277` AND NEITHER IS DECORATION.**
+// This harness used to hold ONE calendar row and no `trading_calendar_loads` row
+// at all, and `main` folded it happily, which is the defect that entry repairs:
+// a calendar whose last row has already closed is EXHAUSTED, so the day it hands
+// back is the last day Merit knows about rather than the last CLOSED one, and a
+// day no load declares is UNKNOWN rather than a holiday (ADR-042 F-4). A harness
+// that kept the old rows would be asserting that a real process completes on an
+// estate the deployment now refuses, which is the reverse of what it is for.
+//
+// So the estate below is the smallest REAL one: a session that has closed at
+// `NOW`, a session that has not, and ONE load spanning both. `TR-01`: whether CME
+// traded on either day is not asserted and is not what this harness measures.
+const AHEAD = {
+  tradingDay: '2026-08-31',
+  isHalfDay: false,
+  isHoliday: false,
+  halted: false,
+  sessionCloseAt: new Date('2026-08-31T21:00:00Z'),
+};
+
+/** One load, spanning both days, because two adjacent loads are not one interval. */
+const LOAD = { coverageStartDay: '2026-08-01', coverageEndDay: '2026-09-30' };
+
 // THE MID-BATCH REFUSAL MOVED TWICE AND THE MODE IS RENAMED WITH IT, WHICH IS A
 // CORRECTNESS POINT RATHER THAN TIDYING.
 //
@@ -75,7 +98,13 @@ const REFUSED_ACCOUNT = accountRow({ openedOn: DAY, status: 'provisioning_pendin
 
 function rowsFor(key: string): unknown[] {
   const refusing = MODE === 'refusing-gates';
-  if (key === 'tradingCalendar') return MODE === 'empty-calendar' ? [] : [SESSION];
+  const empty = MODE === 'empty-calendar';
+  if (key === 'tradingCalendar') return empty ? [] : [SESSION, AHEAD];
+  // A DATABASE NOBODY LOADED HAS NO COVERAGE FACT EITHER, which is the whole
+  // point of `empty-calendar`: the refusal it watches is about a deployment that
+  // has loaded nothing, and a load row beside an empty calendar would be a state
+  // `0032` calls a bug in the load.
+  if (key === 'tradingCalendarLoads') return empty ? [] : [LOAD];
   if (key === 'tradingCalendarRevisions') return [];
   if (key === 'dailyMarks') return refusing ? [markRow({ tradingDay: DAY })] : [];
   if (key === 'ruleStates') return [];

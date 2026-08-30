@@ -9,7 +9,7 @@
 | `weight_bp` | integer | not null, check between 0 and 10000 | basis points, like every ratio in this schema |
 | `tier` | text | not null, check in (`v1`,`v1x`,`post_launch`) | so a v1.x weight cannot be switched on by a config edit that predates the data it needs |
 | `rationale` | text | not null | |
-| `effective_from` | date | not null | **Unit: wall clock**, a configuration validity window. |
+| `effective_from` | date | not null | **Unit: wall clock**, a configuration validity window. **A DAY AND NOT AN INSTANT, ruled correct by [ADR-276](../../decisions/ADR-276.md) clause 1.** Reviewed configuration, tuned through a diff rather than through a console; `version` carries identity in `(signal_kind, link_kind, version)`. The table is RESERVED and empty at launch, so the column has no reader at all today |
 | `effective_to` | date | null | **Unit: wall clock**, the same. |
 | `approved_by` | text | not null | |
 | `created_at` | timestamptz | not null default now() | |

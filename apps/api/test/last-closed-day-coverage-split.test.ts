@@ -10,6 +10,13 @@
 // coverage at all", while `lastClosedDay` here has a CALLER, `anchorCalendar`,
 // that "then checks `trading_calendar_loads` and can answer `uncovered`".
 //
+// **THAT DISAGREEMENT IS OVER, AND SECTION 3 IS WHERE THIS FILE RECORDS IT.**
+// `ADR-277` repaired the worker half: both of its branches read
+// `trading_calendar_loads` and hand back a discriminated union. The sentence
+// above is quoted as the comment that STANDS in `scoped-db.ts` and is now stale
+// on its worker clause; repairing it is a `packages/db` edit that ADR-277 was
+// fenced out of and that `RI-27` cannot see, and ADR-277 section 6 reports it.
+//
 // `ADR-042` F-4 is what makes the difference matter: a day outside
 // `trading_calendar_loads` is UNKNOWN and unknown is not a holiday. So a fold
 // that skips the coverage read hands back a CONFIDENT day for a date the estate
@@ -307,31 +314,53 @@ describe('the coverage check cannot be forgotten by a consumer of the anchor', (
 });
 
 // =============================================================================
-// 3. THE REGISTERED GAP, MEASURED RATHER THAN QUOTED
+// 3. THE GAP THAT WAS REGISTERED HERE, AND IS NOW CLOSED
 // =============================================================================
+// **THIS SECTION MEASURED A DEFECT AND THE DEFECT IS REPAIRED, SO IT MEASURES
+// THE REPAIR.** `ADR-273` registered `apps/worker`'s fold as the one place
+// nothing held the split and left it as finding 1, because `apps/worker` was
+// outside that row's fence. `ADR-277` is that row and this is the co-motion the
+// repair could not avoid: two of the three cases below asserted, in terms, that
+// the worker fold was EXPORTED and that neither worker file named the loads
+// table, and there is no version of closing the gap that leaves those green.
+// `ADR-277` section 6 states the fence departure rather than performing it
+// quietly; a founder who prefers the old assertions restored has one file to
+// revert.
+//
+// **THE ASSERTIONS ARE INVERTED, NOT DELETED.** This suite's subject is where
+// the coverage read lives on each fold, and that subject did not change: what
+// changed is the answer for one of them. A section removed here would leave the
+// census in `RI-27` and nothing at all running the behavioural half for
+// `apps/worker`, which is the direction that loses coverage.
 
-describe('the worker fold consults no coverage, and neither does its caller', () => {
-  it('`readLastClosedTradingDay` is EXPORTED and names no coverage table', () => {
-    // **ADR-268 FINDING 2 RE-DERIVED AT THIS COMMIT RATHER THAN CARRIED.** This
-    // is the other half of the split and it is the half with nothing holding
-    // it: the fold is exported, so its callers are unbounded by construction,
-    // and the module that holds it never names `trading_calendar_loads`.
+describe('the worker fold now consults coverage, and so does its caller', () => {
+  it('the coverage-blind fold is no longer exported, and the adapter names the loads table', () => {
+    // **`ADR-273` SECTION 10 NAMED THIS EXACT SHAPE AS THE ONE A CENSUS CANNOT
+    // SEE**: a fold that satisfies `RI-27` completely while handing its caller a
+    // bare `string | null`. `readLastClosedTradingDay` was that shape and was
+    // exported, so its callers were unbounded by construction. It is
+    // module-private now, and what leaves the module is a discriminated union.
     const code = stripComments(sourceOf(WORKER_ADAPTER_REL));
 
-    expect(code).toMatch(/\bexport async function readLastClosedTradingDay\b/);
-    expect(code).not.toContain('tradingCalendarLoads');
-    expect(code).not.toContain('trading_calendar_loads');
+    expect(code).not.toMatch(/\bexport\s+(?:async\s+)?function\s+readLastClosedTradingDay\b/);
+    expect(code).not.toMatch(/\bexport\s+(?:async\s+)?function\s+calendarCarriesDay\b/);
+    expect(code).toContain('tradingCalendarLoads');
+    expect(code).toMatch(/export type TradingDayAnchor/);
   });
 
-  it('its one caller today reads `trading_calendar` and never the loads table', () => {
-    // `resolveTradingDay`'s override path DOES ask a coverage-shaped question
-    // and asks it of the WRONG TABLE: `calendarCarriesDay` reads
-    // `trading_calendar`, which says a day is a session and never says anybody
-    // loaded it. So the caller does not supply what the fold omits.
+  it('its caller narrows on a verdict rather than asking `trading_calendar` for a row', () => {
+    // `calendarCarriesDay` DID ask a coverage-shaped question and asked it of
+    // the wrong table: a `trading_calendar` row says a day IS a session and
+    // never says anybody loaded it, while its refusal text said "outside
+    // coverage". The caller now reads a `TradingDayAnchor` on both branches and
+    // names no table itself, so the coverage read still has ONE statement in
+    // this deployable rather than two.
     const code = stripComments(sourceOf(WORKER_JOB_REL));
 
-    expect(code).toContain('readLastClosedTradingDay(');
-    expect(code).toContain('calendarCarriesDay(');
+    expect(code).not.toContain('readLastClosedTradingDay');
+    expect(code).not.toContain('calendarCarriesDay');
+    expect(code).toContain('anchorLastClosedDay(');
+    expect(code).toContain('anchorNamedDay(');
     expect(code).not.toContain('tradingCalendarLoads');
     expect(code).not.toContain('trading_calendar_loads');
   });

@@ -6460,12 +6460,17 @@ const CLOSE_INSTANT_REGISTER = [
   },
   {
     rel: 'apps/worker/src/batch/adapter.ts',
-    coverage: 'absent',
+    coverage: 'consulted',
     what:
-      'FOLDS, AND CONSULTS NO COVERAGE AT ALL. `readLastClosedTradingDay`, exported, ' +
-      'returning `TradingDay | null` where `null` means "no session has closed" and never ' +
-      '"outside coverage". THE REGISTERED GAP: ADR-268 finding 2 reported it, ADR-273 ' +
-      'finding 1 re-derived it, and `apps/worker` was outside both fences',
+      'FOLDS, AND THE GAP IS CLOSED (ADR-277). `anchorLastClosedDay` and `anchorNamedDay` read ' +
+      'BOTH tables in ONE transaction and return a `TradingDayAnchor` carrying the day on its ' +
+      '`anchored` arm ALONE, so the caller cannot skip the verdict and compile. The fold itself ' +
+      'is module-private now: `readLastClosedTradingDay` was exported and handed out a bare ' +
+      '`TradingDay | null`, and `calendarCarriesDay` asked a coverage-shaped question of ' +
+      '`trading_calendar`. THIS ROW READ `absent` FOR ONE WAVE AND THIS CHECK IS WHAT DEMANDED ' +
+      'THE EDIT: ADR-268 finding 2 reported the fold, ADR-273 finding 1 enlarged it to the ' +
+      'caller and registered it here precisely so that the session repairing it could not ' +
+      'leave the register saying a gap exists that somebody had closed',
   },
   {
     rel: 'packages/db/src/scoped-db.ts',
@@ -6920,6 +6925,205 @@ const ri28 = {
   },
 };
 
+// ADR-275's PROPERTY: THE REGISTER THAT NAMES THESE CHECKS IS READ BY NOTHING,
+// SO A CHECK CAN LAND WITHOUT ITS ROW AND NO GATE IN THIS TREE NOTICES.
+//
+// The register is the `RI-nn` table in `docs/decisions/ALLOCATION.md`. Its own
+// rule, written above it, is that "THE ROWS ARE READ OUT OF repo-invariants.mjs's
+// `CHECKS` ARRAY, NEVER TYPED", and until this check nothing enforced either
+// half of that sentence. The evidence is not anecdotal: `RI-14`, `RI-19`,
+// `RI-20` and `RI-25` each landed without their row, and in wave BA three of
+// the last four numbers were spent without their row or without their number.
+//
+// WHAT IT FOUND ON ITS FIRST RUN, and all of it was invisible to every other
+// gate: `RI-11` was in `CHECKS` with NO ROW AT ALL, and four rows -- `RI-08`,
+// `RI-18`, `RI-27` and `RI-28` -- did not carry the title the live array holds,
+// two of them while asserting in their own text that the title was copied out
+// of it. `RI-08`'s and `RI-18`'s titles are COMPUTED from a list in the check,
+// which is exactly the case a typed copy cannot survive.
+//
+// THREE LEGS, THE FIRST TWO IN BOTH DIRECTIONS on `0027`'s idiom.
+//
+//   1. CHECK -> ROW. Every `id` in the live `CHECKS` array has exactly one row.
+//   2. ROW -> CHECK. Every `RI-nn` row names a check that exists. A row whose
+//      id is in `CHECKS` is satisfied by that. A row whose id is NOT -- `RI-17`
+//      is the one on this tree, and its own cell says so -- must name, as a
+//      markdown link, a source file that exists and that carries the id. That
+//      is derived from the row rather than from a list kept here, because a
+//      list of exemptions inside the check is the second copy this register
+//      exists to end.
+//   3. TITLE DRIFT, and it is where the value is. The third column must carry
+//      the live title VERBATIM. A row whose title has drifted is a row nobody
+//      re-read, and a computed title makes that certain rather than likely.
+//
+// A MALFORMED ROW IS A FINDING RATHER THAN A SKIP. A line that opens with a
+// backticked `RI-nn` cell and does not carry the register's three cells is an
+// orphan fragment: `RI-23`'s row sat that way for a wave, seen by no table gate
+// because `CI-06/table-row-width` never parsed it as part of any table.
+//
+// WHAT IT CANNOT SEE, AND IT IS THE HALF THAT LET ONE WAVE SPEND ONE NUMBER
+// THREE TIMES. Nothing here reads the register's next-free note against a
+// DISPATCH, because a dispatch is not a file in this repository. ADR-275
+// section 6 rules that rather than inventing a control nobody runs, on
+// ADR-274's precedent one wave earlier with `TZ`.
+
+/** The document holding the invariant register, relative to the repo root. */
+const REGISTER_DOC = 'docs/decisions/ALLOCATION.md';
+
+/** A register body row: a backticked `RI-nn` in the first cell. */
+const REGISTER_ROW = /^\|\s*`(RI-\d+)`\s*\|/;
+
+/** Cells split on unescaped pipes, so a `\|` inside a title stays in its cell. */
+const CELL_SPLIT = /(?<!\\)\|/;
+
+/** The extensions a register row may name as a check's home. */
+const CHECK_HOME = /\.(ts|tsx|mts|mjs|js)$/;
+
+const ri29 = {
+  id: 'RI-29',
+  title: 'Every check has one register row and every register row has a check, with the live title',
+  covers:
+    'THE `RI-nn` REGISTER IN `docs/decisions/ALLOCATION.md` AGAINST THE LIVE ' +
+    '`CHECKS` ARRAY, BOTH DIRECTIONS (ADR-275). Every line in that document ' +
+    'opening with a backticked `RI-nn` cell is a register row, wherever it ' +
+    'sits, so an orphan fragment outside the table is read rather than ' +
+    'skipped. FIRST: every `id` in `CHECKS` has EXACTLY ONE row, so a check ' +
+    'landing without its row is a finding instead of being invisible. ' +
+    'SECOND: every row names a check that EXISTS -- membership of `CHECKS` ' +
+    'for a row whose id is in it, and otherwise a markdown link in the row`s ' +
+    'own third cell to a `.ts`, `.tsx`, `.mts`, `.mjs` or `.js` file that ' +
+    'exists and carries the id. `RI-17` is the one such row on this tree and ' +
+    'its cell already names its home. NO EXEMPTION LIST IS KEPT HERE, ' +
+    'because a list of exceptions inside the check is the second copy this ' +
+    'register exists to end. THIRD: the third cell carries the live `title` ' +
+    'VERBATIM, which is the register`s own stated rule and the leg that ' +
+    'catches a row nobody re-read. A THREE-CELL SHAPE IS REQUIRED, on ' +
+    '`CI-06/table-row-width`s blind spot: that gate never parses a fragment ' +
+    'sitting outside a table, and `RI-23`s row sat that way for a wave. ' +
+    'IT ASSERTS NOTHING ABOUT THE SECOND AND THIRD COLUMNS BEYOND ' +
+    'CONTAINMENT: a row may say more than the title and usually does, and a ' +
+    'row that names a home file which merely MENTIONS the id passes, which ' +
+    'is a text read and is stated rather than implied. AND IT CANNOT SEE A ' +
+    'DISPATCH: nothing here reads the register`s next-free note against the ' +
+    'prompts a wave is dispatched with, which is what let one wave reserve ' +
+    'one number three times, and a dispatch is not a file in this ' +
+    'repository. ADR-275 section 6 rules that rather than inventing a ' +
+    'control nobody runs. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const docPath = join(root, REGISTER_DOC);
+    if (!existsSync(docPath)) {
+      throw new Error(
+        `RI-29 cannot run: ${REGISTER_DOC} does not exist, and it is the register this ` +
+          'check reads. A missing register is not an empty one',
+      );
+    }
+
+    /** @type {Map<string, { line: number, cells: string[] }[]>} */
+    const rows = new Map();
+    const lines = readFileSync(docPath, 'utf8').split('\n');
+    lines.forEach((text, index) => {
+      const matched = REGISTER_ROW.exec(text);
+      if (matched === null) return;
+      const id = matched[1] ?? '';
+      const cells = text
+        .split(CELL_SPLIT)
+        .slice(1, -1)
+        .map((cell) => cell.trim());
+      const seen = rows.get(id) ?? [];
+      seen.push({ line: index + 1, cells });
+      rows.set(id, seen);
+    });
+
+    // A SENTINEL, on RI-24's, RI-25's and RI-28's precedent. Zero rows means
+    // the register moved, was renamed, or stopped being written as a table --
+    // at which point leg 2 and leg 3 are asserting about an empty list. Leg 1
+    // would still be loud, and that is exactly the trap: it would report every
+    // check as unregistered and name the wrong defect. Zero is an ERROR.
+    if (rows.size === 0) {
+      throw new Error(
+        `RI-29 found no \`RI-nn\` row in ${REGISTER_DOC}. Zero means the register moved or ` +
+          'stopped being a table, at which point the row-to-check and title legs assert ' +
+          'about an empty list and the check-to-row leg names the wrong defect',
+      );
+    }
+
+    for (const [id, seen] of rows) {
+      for (const row of seen) {
+        if (row.cells.length === 3) continue;
+        findings.push(
+          `${REGISTER_DOC}:${row.line} opens a \`${id}\` register row carrying ` +
+            `${row.cells.length} cell(s) where the register declares 3. A fragment sitting ` +
+            'outside the table is read by no table gate: `CI-06/table-row-width` parses ' +
+            'rows of tables and this is not one. Fold it back into the register as ' +
+            'Number, Claimed by, What it asserts',
+        );
+      }
+      if (seen.length > 1) {
+        findings.push(
+          `${REGISTER_DOC}:${seen.map((row) => row.line).join(',')} holds ${seen.length} ` +
+            `register rows for \`${id}\` where the register admits exactly one. Two rows ` +
+            'for one number is how a renumber gets recorded in one place and missed in ' +
+            'the other. Amend the row in place rather than joining it (ADR-065 T3)',
+        );
+      }
+    }
+
+    const live = new Set(CHECKS.map((check) => check.id));
+
+    for (const check of CHECKS) {
+      if (rows.has(check.id)) continue;
+      findings.push(
+        `${REGISTER_DOC} carries no register row for \`${check.id}\`, which the live ` +
+          `\`CHECKS\` array holds with the title "${check.title}". A check that lands ` +
+          'without its row is invisible to every other gate in this tree, which is ' +
+          'the defect ADR-275 exists for. Write the row in the same commit as the check',
+      );
+    }
+
+    const registerDir = dirname(REGISTER_DOC);
+    for (const [id, seen] of rows) {
+      if (live.has(id)) continue;
+      for (const row of seen) {
+        const named = [...row.cells.join(' ').matchAll(/\]\(([^)\s]+)\)/g)]
+          .map((match) => match[1] ?? '')
+          .filter((target) => CHECK_HOME.test(target));
+        const backing = named.find((target) => {
+          const abs = resolve(root, registerDir, target);
+          return existsSync(abs) && readFileSync(abs, 'utf8').includes(id);
+        });
+        if (backing !== undefined) continue;
+        findings.push(
+          `${REGISTER_DOC}:${row.line} registers \`${id}\`, which is not in the live ` +
+            '`CHECKS` array and whose row names no source file that exists and carries ' +
+            'the id. A number in the register with no check behind it is a claim about ' +
+            'a control nobody runs. Either the check is gone and the row should say so, ' +
+            'or the row should link the file it lives in, as `RI-17`s row does',
+        );
+      }
+    }
+
+    for (const check of CHECKS) {
+      for (const row of rows.get(check.id) ?? []) {
+        const asserts = row.cells[2];
+        if (asserts === undefined || asserts.includes(check.title)) continue;
+        findings.push(
+          `${REGISTER_DOC}:${row.line} states what \`${check.id}\` asserts without ` +
+            `carrying the title the live \`CHECKS\` array holds: "${check.title}". The ` +
+            'register`s own rule is that a row`s title is read out of that array and ' +
+            'never typed, so a title that has drifted is a row nobody re-read. Copy it ' +
+            'out of the array rather than restating it',
+        );
+      }
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -6948,6 +7152,7 @@ export const CHECKS = [
   ri26,
   ri27,
   ri28,
+  ri29,
 ];
 
 function main() {
