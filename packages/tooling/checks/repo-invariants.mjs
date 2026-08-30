@@ -7416,6 +7416,178 @@ const ri30 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-31  No document repeats a whole line that carries a generated span
+// -----------------------------------------------------------------------------
+//
+// RI-12 IS A CEILING OF 8 AND IT CATCHES THE EIGHTH DOUBLING. That is not a
+// criticism of its number, which ADR-282 measured and found CORRECT: a ceiling
+// of 7 goes red on `docs/reviews/2026-08-20-admin-parity-audit.md`, which heads
+// EIGHT separate tables with one identical 94-character header row, and 6 and 5
+// each add another legitimate document. RI-12's own header says a zero would be
+// a check nobody could keep green and the number is 29, not a handful. So the
+// ceiling cannot fall and a second, sharper discriminator is the only way in.
+//
+// THE DISCRIMINATOR IS THE SPAN, AND THE PROPERTY IS ABOUT THE LINE. A `<!--gen:`
+// span is written by `gates.mjs generate`, so a line carrying one is generated
+// output rather than prose that happens to rhyme. It needs no length floor and
+// no ceiling at all. Both halves of that sentence are load-bearing:
+//
+//   A SPAN legitimately appears many times in one file. `gate_count` occurs 192
+//   times under `docs/`, TWICE ON A SINGLE LINE wherever a document writes
+//   "N of N", and every one is correct. A check keyed on the span NAME would be
+//   unusable, so this one never looks at the name.
+//
+//   A LINE carrying one is not legitimately repeated. Measured over the whole
+//   corpus at the commit that wrote this: 175 gen-carrying lines under `docs/`
+//   over 34 files, and the number appearing byte-identically in two different
+//   files is ZERO. The same query rendered in two sections is a real thing and
+//   this corpus writes it as two DIFFERENT sentences -- `DELTA_MANIFEST` renders
+//   `migration_files` under two "Install verification, from empty" headings, for
+//   `0033` and for `0034`, in two differently worded lines.
+//
+// IT WAS TESTED AGAINST THE MERGES IT CLAIMS TO CATCH RATHER THAN ASSERTED. The
+// dispatcher hand-collapsed this defect at `ca2f86f`, `ce026dd` and `c3e7293`,
+// each time with every gate green, and EVERY LINE REMOVED BY ALL THREE CARRIES A
+// SPAN. Three for three, where RI-12 was nought for three because each stood at
+// two or three copies. It also partitions RI-12's own scope cleanly: of the 37
+// long lines that repeated inside one file, the 8 carrying a span were all
+// defects and the 29 that did not include every legitimate one.
+//
+// AND IT WAS ASKED FOR THREE DAYS BEFORE RI-12 LANDED WITHOUT IT. `docs/STATE.md`
+// records, in session 174's section on 2026-08-24: "The `gen:adr_count` line is
+// DUPLICATED VERBATIM in both STATE and INDEX ... `CI-06g` cannot see it: the
+// gate rewrites every span it finds and compares each to its own query, so two
+// identical copies both pass." That is right and nothing about CI-06g should
+// change: it is the COUNT gate and this is not a count defect. 4,672 correct
+// copies of one correct span is what a count gate looks like on a broken file.
+//
+// THE SCOPE IS THE GENERATOR'S, WHICH IS EVERY TRACKED `.md` AND NOT `docs/`.
+// The row that commissioned this measured `docs/` and fenced four files there.
+// `gates.mjs`'s `markdownFiles()` is `allFiles()` filtered by extension and
+// walks the repository, and `packages/db/DELTA_MANIFEST.md` held SEVEN more of
+// these, at up to seven copies, sharing the `manifest_changes` and
+// `migration_files` spans with the four. A check scoped to `docs/` would have
+// reported PASS over 7 of the 15 live instances of the defect it is named for,
+// which is ADR-279's finding about RI-28 repeated one wave later. The walk here
+// additionally skips `dist`, `build`, `coverage` and `.next`, which the
+// generator's does not; the two enumerate the same 1,158 files on this tree and
+// the difference is build output that carries no markdown.
+//
+// WHAT IT DOES NOT COVER, stated rather than left to be discovered. It reads
+// WHOLE LINES, so a duplicated paragraph whose lines were reflowed passes, and
+// so does a doubled line that differs by one character. It says nothing about
+// whether the span's VALUE is right, which is CI-06g's job. It cannot see a
+// duplicate ACROSS two files, and that is deliberate: zero exist today and a
+// cross-file rule would fire on two documents that legitimately share a
+// sentence. And it is blind to a doubled line carrying no span, which is
+// RI-12's half and the reason RI-12 stays.
+//
+/** The opener of a generated span, which is what makes a line generated output. */
+const GENERATED_SPAN = '<!--gen:';
+
+/**
+ * A document with its fenced code blocks masked, using `gates.mjs`'s own
+ * expression rather than a second one.
+ *
+ * A SPAN SHOWN INSIDE A FENCE IS DOCUMENTATION OF THE FORM AND NOT A SPAN.
+ * STRATEGY's CI-06g section carries the worked example, and the generator masks
+ * it for exactly that reason, so a check about generated lines that did not
+ * would disagree with the thing it is checking. Measured to change nothing on
+ * this tree, which is why it is here for correctness rather than for a number.
+ *
+ * @param {string} body
+ * @returns {string}
+ */
+function maskedFences(body) {
+  return body.replace(/^```[\s\S]*?^```/gm, (block) => block.replace(/</g, '\0'));
+}
+
+/** @type {Invariant} */
+const ri31 = {
+  id: 'RI-31',
+  title: 'No document repeats a whole line that carries a generated span',
+  covers:
+    'EVERY `.md` IN THE TREE, which is `gates.mjs`s `markdownFiles()` scope ' +
+    'and NOT RI-12`s `docs/`, read whole-line with fenced blocks masked the ' +
+    'way the generator masks them. A line containing a `<!--gen:` span may ' +
+    'appear AT MOST ONCE in one file. NO LENGTH FLOOR AND NO CEILING, and ' +
+    'both are derived: the structural repetition RI-12 needs a floor and a ' +
+    'ceiling for -- rules, table separators, quote markers, fences, a table ' +
+    'header row heading eight tables -- carries no span, and of 175 ' +
+    'gen-carrying lines under `docs/` the number repeating byte-identically ' +
+    'in two files was ZERO. IT IS KEYED ON THE LINE AND NEVER ON THE SPAN ' +
+    'NAME: `gate_count` occurs 192 times, twice on one line wherever a ' +
+    'document writes "N of N", and all of it is correct. IT SAYS NOTHING ' +
+    'ABOUT THE VALUE, which is CI-06g`s, and CI-06g is blind to this by ' +
+    'construction because it rewrites every copy and compares each to its ' +
+    'own query: STATE.md reached 4,672 copies of one span with that gate ' +
+    'green. IT DOES NOT READ ACROSS FILES and it does not see a reflowed ' +
+    'duplicate or one differing by a character. RI-12 STAYS: its ceiling is ' +
+    'saturated by a legitimate line and this check does not replace it. No ' +
+    'database. ADR-282.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const documents = walk(root).filter((rel) => rel.endsWith('.md'));
+
+    // SENTINEL ONE. Zero markdown means the walk moved or the extension test
+    // stopped matching, at which point this check reports PASS having opened
+    // nothing. An absence check over an empty scope is worse than none, which
+    // is ADR-274's rule and ADR-279's whole subject.
+    if (documents.length === 0) {
+      throw new Error(
+        'RI-31 walked no `.md` file at all. Zero means the walk or the extension test has ' +
+          'moved, at which point this check reports PASS over a corpus it never opened',
+      );
+    }
+
+    let generatedLines = 0;
+
+    for (const rel of documents) {
+      /** @type {Map<string, number[]>} */
+      const seen = new Map();
+      maskedFences(readFileSync(join(root, rel), 'utf8'))
+        .split('\n')
+        .forEach((line, index) => {
+          if (!line.includes(GENERATED_SPAN)) return;
+          generatedLines++;
+          const trimmed = line.trim();
+          seen.set(trimmed, [...(seen.get(trimmed) ?? []), index + 1]);
+        });
+
+      for (const [line, at] of seen) {
+        if (at.length < 2) continue;
+        findings.push(
+          `${rel}:${at.join(',')} carries one generated line ${at.length} times where a ` +
+            'generated line is written once. `RI-12` is silent because its ceiling is 8 and ' +
+            '`CI-06g` is silent because it rewrites every copy and compares each to its own ' +
+            `query. Keep the first and delete the rest: ${line.slice(0, 90)}...`,
+        );
+      }
+    }
+
+    // SENTINEL TWO, AND IT IS THE ONE THAT MATTERS. This check's scope is not a
+    // directory, it is a COMMENT SYNTAX. Rename the span form, or edit
+    // `maskedFences` into swallowing a whole document, and the scope empties
+    // while every line above still runs and still finds nothing. The tree
+    // carries 170 of these lines, so zero is never a small tree; it is a
+    // broken reader. RI-29's sentinel is the idiom.
+    if (generatedLines === 0) {
+      throw new Error(
+        `RI-31 found no line carrying a \`${GENERATED_SPAN}\` span in ${String(documents.length)} ` +
+          'markdown file(s). Zero means the span form was renamed or the fence mask now ' +
+          'swallows whole documents, at which point this check asserts about an empty list ' +
+          'and reports PASS over every doubled generated line in the tree',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -7446,6 +7618,7 @@ export const CHECKS = [
   ri28,
   ri29,
   ri30,
+  ri31,
 ];
 
 function main() {
