@@ -87,7 +87,27 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # ADR-292. THE GROUP IS KEYED ON A VALUE THAT IS THE SAME STRING ON BOTH
+  # EVENTS, AND THAT IS THE WHOLE FIX. This workflow declares `push` and
+  # `pull_request`, so every push to a branch with an open pull request starts
+  # TWO runs on the identical commit. `github.ref` is `refs/heads/<branch>` on
+  # the first and `refs/pull/<n>/merge` on the second, so the two landed in
+  # DIFFERENT groups and `cancel-in-progress` never saw them as siblings.
+  #
+  # `github.head_ref` is set ONLY on `pull_request` and holds the source branch
+  # name; on `push` it is empty and `github.ref_name` is that same branch name.
+  # So both events render one string and the later run cancels the earlier.
+  #
+  # THE IDIOM `${{ github.event.pull_request.number || github.ref }}` IS THE ONE
+  # THIS ROW WAS DISPATCHED WITH AND IT DOES NOT WORK: it renders `7` on the
+  # pull request and `refs/heads/<branch>` on the push, which are two groups
+  # again. ADR-292 section 2 carries the table both were read off.
+  #
+  # NEITHER TRIGGER IS REMOVED AND `branches` IS NOT NARROWED. `main` still runs
+  # on push, which is what CI-08's own `Runs on` cell in STRATEGY requires, and
+  # deleting a trigger to stop a duplicate is weakening a gate to pass it.
+  # `RI-33` holds this line by rendering it under both event contexts.
+  group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:

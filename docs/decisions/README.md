@@ -305,6 +305,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-289](ADR-289.md) | `eligibility_snapshot_id` names a resource the schema deliberately refuses to create, so it comes OUT of the frozen contract and OUT of the port shape  (2026-08-30, status: proposed) |
 | [ADR-290](ADR-290.md) | two fields with no column. `failure_note` is a RULED ABSENCE with its column and its writer both specified and neither written, and `timeline`'s source is NAMED as `events` and is EMPTY because that table has no producer  (2026-08-30, status: proposed) |
 | [ADR-291](ADR-291.md) | the first real payout backend, and it is two members of seven on purpose. `transact` opens the transaction every later slice reads on, `identityStatus()` answers, and the other five refuse visibly  (2026-08-30, status: proposed) |
+| [ADR-292](ADR-292.md) | every CI run happens twice, the fix is one line per workflow, and the one line the row supplied does not work  (2026-08-30, status: proposed) |
 | [ADR-294](ADR-294.md) | a crashed check is not a lower count. The runner reports PASS, FAIL and ERROR as three outcomes, keeps the denominator, and refuses to print the sentence that reads as a measurement (2026-08-30, status: proposed) |
 <!--/gen-->
 
