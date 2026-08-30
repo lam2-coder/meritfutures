@@ -1,21 +1,25 @@
 // =============================================================================
 // apps/api/src/payout-backend.ts
 // =============================================================================
-// THE FIRST LINE OF PAYOUT PERSISTENCE THIS TREE HAS EVER HAD, AND IT IS THREE
-// MEMBERS OF SEVEN ON PURPOSE.
+// THE FIRST LINE OF PAYOUT PERSISTENCE THIS TREE HAS EVER HAD, AND IT IS FOUR
+// MEMBERS OF EIGHT ON PURPOSE.
 //
 // `wiring.test.ts`'s `usePayoutBackend` entry has carried one clause longer than
 // any other: "NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`". ADR-287 enumerated
 // what implementing it would cost and found nine sessions, of which this file is
-// slice 3. ADR-291 is this file's ruling, and ADR-295 added slice 6.
+// slice 3. ADR-291 is this file's ruling, ADR-295 added slice 6, and ADR-301
+// added the lock ADR-293 ruled and ADR-295's fence could not reach.
 //
 // -----------------------------------------------------------------------------
 // WHAT ANSWERS, AND WHAT REFUSES
 // -----------------------------------------------------------------------------
-// `PayoutBackend` and `PayoutTx` carry SEVEN members between them. THREE answer
+// `PayoutBackend` and `PayoutTx` carry EIGHT members between them. FOUR answer
 // here and FOUR reject with `PayoutBackendUnwired`:
 //
 //   transact            ANSWERS. The scoped door, opened once per request.
+//   lockScope           ANSWERS. `ScopedTx.lockScope`, delegated in one line.
+//                       ADR-293 section 3.5, built by ADR-301. THE LOCK IS NOT
+//                       TAKEN IN `transact` and the decision function calls it.
 //   identityStatus      ANSWERS. `identities.status`, decoded to one of three.
 //   insertPayoutRequest ANSWERS ON THE APPROVAL BRANCH ONLY. ADR-287 slice 6,
 //                       ruled by ADR-295. ITS HOLD BRANCH REFUSES, and that is
@@ -191,15 +195,16 @@ export function postgresPayoutBackend(db: ApiDb): PayoutBackend {
      * the imprecise version, which is exactly the class of error
      * `MERIT_BUILD_MASTER_PROMPT`'s "caution learned the hard way" names.
      *
-     * AND THE RULED MEMBER IS NOT BUILT YET, WHICH IS STATED HERE RATHER THAN
-     * LEFT TO BE INFERRED FROM ITS ABSENCE. `PayoutTx` declares no `lockScope`,
-     * so there is nothing for this object to implement; the declaration and the
-     * call are two lines of `routes/payouts.ts` that ADR-295's fence does not
-     * reach, and ADR-295 section 5 records them as OWED. Until they land, the
-     * read-then-write this file's `insertPayoutRequest` creates is protected
-     * only by `payout_requests_no_in_flight_uq`, which ADR-293 section 3.3
-     * measured as a BACKSTOP and not the control. THE PATH IS NOT REACHABLE IN
-     * THE MEANTIME: `start.ts` does not call `usePayoutBackend`.
+     * AND THE RULED MEMBER IS BUILT NOW, WHICH IS WHERE THIS PARAGRAPH USED TO
+     * SAY IT WAS OWED. ADR-301 landed `PayoutTx.lockScope()`, the delegation
+     * below it, and the call as `decidePayout`'s first statement, so the
+     * read-then-write this file's `insertPayoutRequest` creates is serialised
+     * by the lock rather than backstopped by
+     * `payout_requests_no_in_flight_uq` alone. ADR-293 section 3.3 measured
+     * that index as a BACKSTOP and not the control, in two directions: it
+     * turns a contract-specified 409 into a 500, and it is keyed PER ACCOUNT
+     * where the exposure question the schema denormalises `identity_id` for is
+     * PER IDENTITY. Both directions are the lock's now.
      *
      * THE HANDLE DOES NOT ESCAPE, AND IT IS HELD BY SHAPE RATHER THAN BY A
      * FLAG. `transact` takes the unit of work instead of handing a `PayoutTx`
@@ -220,6 +225,26 @@ export function postgresPayoutBackend(db: ApiDb): PayoutBackend {
          * check this object just as well and would leave that census blind.
          */
         const tx: PayoutTx = {
+          /**
+           * `INV-M20-01`'s per-identity lock, and the WHOLE BODY IS THE
+           * DELEGATION.
+           *
+           * IT IS `ScopedTx.lockScope` AND NOTHING ELSE, exactly as
+           * `databaseWithdrawalBackend` (`routes/wallet-withdrawals.ts`) writes
+           * the same member: the handle is already bound to one identity, the
+           * accessor's verb takes no argument, and there is therefore no
+           * address anywhere on this path a caller could point at somebody
+           * else. An advisory lock through `sqlExecutor` says the same thing
+           * without the tenancy conjunct and is refused by name in ADR-157.
+           *
+           * NOTHING IS DECIDED HERE AND THAT IS THE POINT. `decidePayout` calls
+           * this as its first statement and the ORDER is the control; this
+           * object only makes the member callable.
+           */
+          lockScope: async (): Promise<void> => {
+            await handle.lockScope();
+          },
+
           /**
            * `identities.status` for the caller. ADR-140's door.
            *

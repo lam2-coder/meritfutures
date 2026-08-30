@@ -553,6 +553,38 @@ export interface PayoutRequestInsert {
  */
 export interface PayoutTx {
   /**
+   * `INV-M20-01`'s per-identity lock, held until this transaction ends.
+   *
+   * IT IS THE FIRST THING `decidePayout` DOES AND THE ORDER IS THE CONTROL.
+   * `ADR-293` section 3.5: `G-NO-IN-FLIGHT` is READ through {@link subject},
+   * DECIDED in memory and the row is WRITTEN against that decision, and the
+   * clamp on `approved_cents` is the second read-then-write and the money one.
+   * A gate evaluated before the lock is evaluated against a state another
+   * transaction can still change. `payout_requests_no_in_flight_uq`
+   * (`0031_payout_hold_and_identity_restriction.sql`) is a BACKSTOP and not the
+   * control: unlocked, the loser of a race reaches the insert and takes a
+   * unique violation, which is not a {@link PayoutBackendUnwired}, is not
+   * caught by `unwiredOrThrow`, and is therefore a 500 where API_CONTRACT
+   * section 6 names a 409.
+   *
+   * IT TAKES NO ARGUMENT, AND THAT IS THE WHOLE OF ITS SAFETY. It locks the
+   * identity this handle is already bound to, so there is no address here to
+   * point at somebody else. An implementation is `ScopedTx.lockScope` and
+   * nothing else; an advisory lock through `sqlExecutor` is refused by name in
+   * `ADR-157` and is not reachable from this file. `WithdrawalTx.lockScope`
+   * (`wallet-withdrawals.ts`) and `CheckoutTx.lockScope` (`checkout.ts`) are
+   * the two independent precedents and both are worded this way.
+   *
+   * IT IS NOT A LINE INSIDE `PayoutBackend.transact` AND `ADR-293` SECTION 3.4
+   * IS WHY. No adapter in this tree locks inside `transact`: both existing ones
+   * expose the member and their DECISION FUNCTION calls it. A lock hidden in
+   * `transact` would put the ordering that makes the gate a control outside the
+   * one function a reader checks orderings in, which is the ordered function
+   * API_CONTRACT section 6's sentence is transcribed into.
+   */
+  lockScope(): Promise<void>;
+
+  /**
    * `identities.status` for the caller. `ADR-140`'s door.
    *
    * IT TAKES NO ACCOUNT AND THAT IS THE RULING IN THE SIGNATURE. The refusal is
@@ -1099,6 +1131,16 @@ export function snapshotOf(evaluation: PayoutEvaluation, minimumAmountPass: bool
 /**
  * The whole ordered server behavior, inside one transaction.
  *
+ * THE LOCK IS FIRST AND EVERY GATE BELOW IS DECIDED UNDER IT. `ADR-293` section
+ * 3.5, on `decideWithdrawal`'s placement and `checkout.ts`'s: a gate evaluated
+ * before the lock is evaluated against a state another transaction can still
+ * change, and `G-NO-IN-FLIGHT` below is read, decided and written against in
+ * that order. THIS DOES NOT DISTURB `ADR-140`, which orders the identity-status
+ * refusal ahead of everything read ABOUT THE ACCOUNT: `lockScope()` reads
+ * nothing about the account and takes no address, and putting it first
+ * additionally puts `identityStatus()`'s own read under the lock, which is
+ * strictly the safer of the two orders.
+ *
  * THE ORDER IS API_CONTRACT SECTION 6's SENTENCE WITH `ADR-140`'s DOOR AHEAD OF
  * IT. "Server behavior, in order: re-evaluate eligibility against the last
  * closed day, resolve the effective request, clamp server-side, persist the
@@ -1131,6 +1173,8 @@ async function decidePayout(args: {
   readonly at: Date;
 }): Promise<PayoutResponse | Refusal> {
   const { tx, accountId, requestedCents, idempotencyKey, at } = args;
+
+  await tx.lockScope();
 
   // `ADR-140`. NOTHING ABOUT THE ACCOUNT HAS BEEN READ AT THIS LINE.
   const identityGate = gateIdentityStatus(await tx.identityStatus());

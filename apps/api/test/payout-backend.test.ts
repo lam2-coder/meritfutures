@@ -1,13 +1,13 @@
 // =============================================================================
 // apps/api/test/payout-backend.test.ts
 // =============================================================================
-// THE FIRST `PayoutTx` IN THIS TREE, ASSERTED AS THE TWO-OF-SEVEN SHAPE IT IS.
+// THE FIRST `PayoutTx` IN THIS TREE, ASSERTED AS THE FOUR-OF-EIGHT SHAPE IT IS.
 //
-// ADR-291 (ADR-287 slice 3). What this file watches is not only that the two
-// live members answer, but that the FIVE THAT DO NOT REFUSE VISIBLY: a member
-// that quietly returned a plausible value would be a fixture approving payouts,
-// and every one of the five is unbuilt for a reason ADR-287 names at a primary
-// source.
+// ADR-291 (ADR-287 slice 3), then ADR-295's approval branch and ADR-301's lock.
+// What this file watches is not only that the live members answer, but that the
+// FOUR THAT DO NOT REFUSE VISIBLY: a member that quietly returned a plausible
+// value would be a fixture approving payouts, and every one of the four is
+// unbuilt for a reason ADR-287 names at a primary source.
 //
 // IT DRIVES THE ADAPTER AGAINST `db-recorder.ts` AND NOT AGAINST A DATABASE, on
 // that file's own stated boundary: what a recorder proves is WHICH DOOR was
@@ -88,13 +88,64 @@ describe('transact opens the scoped door and binds the identity once', () => {
     ).rejects.toBe(boom);
   });
 
-  it('takes NO lock, so a later slice adding one is a visible decision', async () => {
-    // ADR-291 registers the lock as slice 6's question rather than answering it.
-    // `databaseWithdrawalBackend` locks first because its handler reads a
-    // balance and then writes against it; nothing on this transaction does yet.
+  it('takes NO lock, which ADR-293 section 3.4 DECIDED rather than left unanswered', async () => {
+    // ADR-291 registered the lock as slice 6's question; ADR-293 section 3.5
+    // answered it and ADR-301 built the answer, and the answer is that the
+    // payout path locks THROUGH A PORT MEMBER THE DECISION FUNCTION CALLS. No
+    // adapter in this tree locks inside `transact`: `databaseWithdrawalBackend`
+    // and `checkout.ts` both EXPOSE the member and their decision function
+    // calls it. A lock here would put the ordering that makes the gate a
+    // control outside the one function a reader checks orderings in.
+    //
+    // SO THIS CASE IS NOW A REFUSAL AND NOT A GAP. A session that moved
+    // `lockScope()` into `transact` to save a line at the call site goes red
+    // here, which is the property worth holding.
     const recorder = backendOver([identityRow('active')]);
     await postgresPayoutBackend(recorder.db).transact(SESSION, (tx) => tx.identityStatus());
     expect(recorder.calls.map((c) => c.verb)).toStrictEqual(['rows']);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// `lockScope()`. ONE LINE, AND THE LINE IS A DELEGATION
+// -----------------------------------------------------------------------------
+
+describe('lockScope delegates to the scoped handle and adds nothing', () => {
+  it('reaches `ScopedTx.lockScope` through the SCOPED door, on the session identity', async () => {
+    const recorder = backendOver([]);
+    await postgresPayoutBackend(recorder.db).transact(SESSION, (tx) => tx.lockScope());
+
+    expect(recorder.calls).toStrictEqual([
+      { door: 'scoped', identityId: IDENTITY, verb: 'lockScope', key: '' },
+    ]);
+  });
+
+  it('reads NOTHING and names NO table, which is the whole of its safety', async () => {
+    // ADR-293 section 3.3: the accessor's verb takes no argument, so it locks
+    // the identity the handle is already bound to and there is no address on
+    // this path a caller could point at somebody else. A delegation that named
+    // a key or took an account id would be a different member.
+    const recorder = backendOver([identityRow('active')]);
+    await postgresPayoutBackend(recorder.db).transact(SESSION, (tx) => tx.lockScope());
+
+    expect(recorder.calls.map((c) => c.verb)).toStrictEqual(['lockScope']);
+    expect(recorder.calls.every((c) => c.address === undefined && c.values === undefined)).toBe(
+      true,
+    );
+  });
+
+  it('DISCARDS the row the accessor locked, so no route holds it', async () => {
+    // `ScopedTx.lockScope` is a locking select and answers the `identities` row
+    // it locked; the port declares `Promise<void>`. THE RECORDER ANSWERS A ROW
+    // HERE FOR THAT REASON: against a recorder that answered `undefined` this
+    // case would pass over nothing, and what it is for is the delegation that
+    // forwards instead of awaiting. A route holding an `identities` row it did
+    // not ask for is a read nothing on this path declared.
+    const recorder = recordingDb({ locks: identityRow('active'), ...NO_PRE_IDENTITY_DOORS });
+    const answered = await postgresPayoutBackend(recorder.db).transact(SESSION, (tx) =>
+      tx.lockScope(),
+    );
+    expect(answered).toBeUndefined();
   });
 });
 
