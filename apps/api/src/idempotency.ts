@@ -53,7 +53,7 @@
 //
 // THAT LIST IS THE HALF EVERYBODY NOTICES AND IT IS NOT THE HALF THAT DECIDES
 // THIS FILE. Admitting a third `SystemReason` member would not help, because
-// `scoped-db.ts:694-704` and `713-723` pass `undefined` where the statement
+// `scoped-db.ts:695-705` and `714-724` pass `undefined` where the statement
 // builders take a `WHERE` clause, and the transaction handles expose no
 // parameter that could supply one. `systemTx.update('idempotencyKeys', ...)`
 // renders no predicate and WRITES EVERY ROW IN THE TABLE. On this table that is

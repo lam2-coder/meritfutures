@@ -26,14 +26,18 @@ import type { AffiliateRef, AttributionInput, AttributionRow, ClickRef } from '.
 
 const BUYER = 'identity-buyer';
 
+// SOMEBODY ELSE, WHICH IS NOW A BOOLEAN RATHER THAN A UUID (ADR-262). The fold
+// no longer holds an affiliate identity to compare against: `packages/db`
+// resolves the affiliate inside the checkout transaction, compares there, and
+// hands this shape the result.
 const CODE_AFFILIATE: AffiliateRef = {
   affiliateId: 'affiliate-code',
-  identityId: 'identity-code-affiliate',
+  isBuyer: false,
 };
 
 const CLICK_AFFILIATE: AffiliateRef = {
   affiliateId: 'affiliate-click',
-  identityId: 'identity-click-affiliate',
+  isBuyer: false,
 };
 
 const AT = new Date('2026-08-26T12:00:00.000Z');
@@ -62,8 +66,21 @@ function input(over: Partial<AttributionInput> = {}): AttributionInput {
  * `0012_disputes_and_affiliate_settlement.sql:116` and read as the database
  * reads it.
  */
-function literalSelfDealIsVoid(row: AttributionRow): boolean {
-  return row.buyerIdentityId !== row.affiliateIdentityId || row.voided;
+function literalSelfDealIsVoid(each: AttributionInput, row: AttributionRow): boolean {
+  // THE ROW NO LONGER CARRIES `affiliate_identity_id` AND THE CONSTRAINT STILL
+  // GOVERNS IT (ADR-262). `ScopedTx.insertAsParty` stamps that column by
+  // resolving `affiliate_id` to `affiliates.identity_id`, so the two columns
+  // name one person exactly when the ref this row was folded from says
+  // `isBuyer`. That is what is read back here.
+  return !isBuyerOf(each, row.affiliateId) || row.voided;
+}
+
+/** The bit the accessor will stamp this row's affiliate identity from. */
+function isBuyerOf(each: AttributionInput, affiliateId: string): boolean {
+  for (const ref of [each.codeAffiliate, each.click?.affiliate ?? null]) {
+    if (ref !== null && ref.affiliateId === affiliateId) return ref.isBuyer;
+  }
+  throw new Error(`no affiliate in this input is ${affiliateId}`);
 }
 
 /** `attributions_void_is_explained`, from the same file at :109. */
@@ -146,7 +163,7 @@ describe('resolveAttribution: the 30 day window', () => {
 });
 
 describe('INV-M8-03: the literal self-deal is VOIDED and never attributed', () => {
-  const SELF: AffiliateRef = { affiliateId: 'affiliate-self', identityId: BUYER };
+  const SELF: AffiliateRef = { affiliateId: 'affiliate-self', isBuyer: true };
 
   it('voids a code override where the buyer IS the affiliate', () => {
     const decision = resolveAttribution(input({ codeAffiliate: SELF }));
@@ -226,7 +243,7 @@ describe('INV-M8-03: the scored self-deal', () => {
 });
 
 describe('every row this fold can emit satisfies the constraints that will receive it', () => {
-  const SELF: AffiliateRef = { affiliateId: 'affiliate-self', identityId: BUYER };
+  const SELF: AffiliateRef = { affiliateId: 'affiliate-self', isBuyer: true };
 
   const CASES: readonly AttributionInput[] = [
     input(),
@@ -249,7 +266,7 @@ describe('every row this fold can emit satisfies the constraints that will recei
     for (const each of CASES) {
       const decision = resolveAttribution(each);
       if (decision.kind === 'none') continue;
-      expect(literalSelfDealIsVoid(decision.row)).toBe(true);
+      expect(literalSelfDealIsVoid(each, decision.row)).toBe(true);
     }
   });
 
@@ -269,11 +286,13 @@ describe('every row this fold can emit satisfies the constraints that will recei
     }
   });
 
-  it('never leaves an affiliate identity empty on an emitted row', () => {
+  it('never leaves the affiliate id empty on an emitted row', () => {
+    // `affiliate_id` IS THE COLUMN THE ACCESSOR RESOLVES THE COUNTERPARTY FROM
+    // (ADR-262), so an empty one is a row whose second party cannot be found.
     for (const each of CASES) {
       const decision = resolveAttribution(each);
       if (decision.kind === 'none') continue;
-      expect(decision.row.affiliateIdentityId).not.toBe('');
+      expect(decision.row.affiliateId).not.toBe('');
       expect(decision.row.buyerIdentityId).toBe(BUYER);
     }
   });

@@ -6,8 +6,8 @@ import { expect, test } from 'vitest';
 // CI-02, the `unit` project.
 //
 // =============================================================================
-// THE THREE THINGS THAT REFUSE `POST /checkout`, EACH PINNED AT ITS OWN PRIMARY
-// SOURCE RATHER THAN AT THE SENTENCE THAT DESCRIBES IT
+// WHAT REFUSES `POST /checkout`, EACH PINNED AT ITS OWN PRIMARY SOURCE RATHER
+// THAN AT THE SENTENCE THAT DESCRIBES IT
 // =============================================================================
 // `useCheckoutBackend`'s entry in `wiring.test.ts` has lost its LEAD blocker
 // twice in one week, to ADR-230 and to ADR-233, and the route answered 503 after
@@ -15,10 +15,15 @@ import { expect, test } from 'vitest';
 // successor inherits: a session dispatched to remove what the entry named would
 // have removed it and found the route still refusing.
 //
-// SO THIS FILE ASSERTS THE BLOCKERS RATHER THAN DESCRIBING THEM. ADR-238 rules
+// SO THIS FILE ASSERTS THE BLOCKERS RATHER THAN DESCRIBING THEM. ADR-238 ruled
 // all three, and every clause of that ruling has a case here reading the file
 // the clause is about. The day a door lands, the case for it turns red and the
 // session that landed it is the one holding the entry.
+//
+// THAT IS WHAT HAPPENED TO THE SECOND ONE AND THE FILE RECORDS IT RATHER THAN
+// FORGETTING IT. ADR-262 built the remedy ADR-238 ruling 2 named, so the cases
+// under blocker 2 now assert the REFUSAL that still stands (neither table became
+// readable) beside the SHAPE that discharged the need for it. TWO REMAIN.
 //
 // -----------------------------------------------------------------------------
 // WHY IT READS SOURCE AS TEXT, WHICH IS UNUSUAL AND DELIBERATE
@@ -134,8 +139,14 @@ test('ADR-252: the table ships empty, so an absent row is what any reader will m
 });
 
 // -----------------------------------------------------------------------------
-// BLOCKER 2. A CROSS-IDENTITY READ. ADR-238 ruling 2, refusing it a second time
+// BLOCKER 2 IS DISCHARGED. ADR-262 BUILT THE REMEDY ADR-238 ruling 2 NAMED
 // -----------------------------------------------------------------------------
+// THE CLAUSE IS NOT DELETED AND THE GROUND UNDER IT IS NOT EITHER, which is the
+// distinction this file exists to keep: what ADR-233 section 5 and ADR-238
+// ruling 2 refused was a READ GRANT, and refusing it is still correct. What
+// changed is that the port no longer needs one. The first two cases below are
+// the refusal, unmoved and still asserted; the third is the remedy, and it turns
+// red if the uuid comes back.
 
 test('ADR-238 ruling 2: the rows the buyer would have to read still belong to the affiliate', () => {
   expect(SCOPE).toContain("  affiliates: {\n    class: 'owned',\n    column: 'identity_id',");
@@ -152,15 +163,33 @@ test('ADR-238 ruling 2: the catalogue door ADR-233 built does not reach either t
   expect(list).toContain("'coupons'");
 });
 
-test('ADR-238 ruling 2: the fold still needs the affiliate IDENTITY and not only the affiliate', () => {
-  // The remedy ruling 2 names is a door that resolves the affiliate INSIDE
-  // `packages/db` and hands the handler one bit rather than a uuid. It is not
-  // available while `AffiliateRef` carries `identityId`, and `packages/affiliate`
-  // is outside this session's fence, which is why the blocker survives the
-  // ruling that names its remedy.
+test('ADR-262: the fold takes a BIT where it used to take the affiliate identity', () => {
+  // THE SHAPE IS THE RULING. There is no field on `AffiliateRef` to put a uuid
+  // in, so `apps/api` cannot leak what it never receives, and the comparison
+  // that needed the uuid is made where the value lives.
   expect(ATTRIBUTION).toContain('export interface AffiliateRef {');
-  expect(ATTRIBUTION).toContain('  readonly identityId: string;');
-  expect(ATTRIBUTION).toContain('if (buyerIdentityId === affiliate.identityId) {');
+  expect(ATTRIBUTION).toContain('  readonly isBuyer: boolean;');
+  expect(ATTRIBUTION).not.toContain('  readonly identityId: string;');
+  expect(ATTRIBUTION).toContain('if (affiliate.isBuyer) {');
+});
+
+test('ADR-262: the two doors resolve the affiliate inside `packages/db` and project a bit', () => {
+  expect(SCOPED_DB).toContain('export interface AttributionAffiliate {');
+  expect(SCOPED_DB).toContain('  readonly isBuyer: boolean;');
+  expect(SCOPED_DB).toContain('attributionAffiliate(affiliateId: string)');
+  expect(SCOPED_DB).toContain('attributionClick(clickToken: string)');
+  // AND THE PORT SIDE HOLDS NO UUID EITHER. `checkout.ts` names neither door's
+  // return type nor an affiliate identity anywhere in the file.
+  expect(CHECKOUT).not.toContain('affiliateIdentityId');
+});
+
+test("ADR-262: `attributions`' counterparty is RESOLVED by the registry, not supplied", () => {
+  // THE STAMP APPLIED TO THE COUNTERPARTY, which is ADR-238 ruling 2's own
+  // words for the remedy. An `attributions` insert now takes NEITHER identity.
+  const rule = SCOPE.slice(SCOPE.indexOf('  attributions: {'), SCOPE.indexOf('  otpChallenges: {'));
+  expect(rule).toContain("      counterparty: {\n        by: 'resolved',");
+  expect(rule).toContain("        from: 'affiliate_id',");
+  expect(rule).toContain("        via: 'affiliates',");
 });
 
 // -----------------------------------------------------------------------------

@@ -273,6 +273,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-257](ADR-257.md) | four fields arrive at two slots, `ok` is the engine's and is not recomputed, and the field with nowhere to go is integer cents (2026-08-29, status: proposed) |
 | [ADR-258](ADR-258.md) | the fold's blocker was one field and not six, `prior` is a smaller read than the port ADR-250 left refusing, and the plan decoder this slice needed already exists one deployable over (2026-08-30, status: proposed) |
 | [ADR-259](ADR-259.md) | the probe is run, the seed that reported it unwatched cannot be installed at all, and the gap that is real is that nothing binds scope to code (2026-08-30, status: proposed) |
+| [ADR-262](ADR-262.md) | the affiliate is resolved inside `packages/db` and leaves as a bit, the counterparty stamp is a registry field rather than an assumption, and the two `AffiliateRef` declarations were never one shape (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

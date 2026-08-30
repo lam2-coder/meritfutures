@@ -133,14 +133,17 @@ const SIZE: PlanVersionSizeRow = {
   resetPriceCents: 24_900n,
 };
 
+// SOMEBODY ELSE, AS A BIT (ADR-262). An `AffiliateRef` carries no identity any
+// more: `packages/db` resolves the affiliate inside the checkout transaction and
+// hands this handler `isBuyer` rather than `affiliates.identity_id`.
 const CODE_AFFILIATE: AffiliateRef = {
   affiliateId: 'affiliate-code',
-  identityId: 'identity-code-affiliate',
+  isBuyer: false,
 };
 
 const CLICK_AFFILIATE: AffiliateRef = {
   affiliateId: 'affiliate-click',
-  identityId: 'identity-click-affiliate',
+  isBuyer: false,
 };
 
 const CLICK_TOKEN = 'click-token-live';
@@ -963,7 +966,7 @@ describe('attribution resolves inside the checkout transaction', () => {
     fixture = { ...fixture, committed: emptyStore() };
     const selfCoupon = baseCoupon({
       couponId: 'coupon-self',
-      affiliate: { affiliateId: 'affiliate-self', identityId: BUYER_IDENTITY },
+      affiliate: { affiliateId: 'affiliate-self', isBuyer: true },
     });
     (COUPONS as Record<string, CouponRow>)['SELFDEAL'] = selfCoupon;
     await call({
@@ -1824,7 +1827,7 @@ describe('the contract-conformant body is untouched, which is what makes this a 
 //
 // ONE RESIDUAL, STATED. The KYC member is exercised at `pending` and the row
 // says `expired`. Both refuse through the same `kycState !== 'verified'` at
-// `checkout.ts:1650`, and `KycState` carries `expired` at `checkout.ts:574`, so
+// `checkout.ts:1650`, and `KycState` carries `expired` at `checkout.ts:585`, so
 // no case names the row's own word.
 describe('INV-M20-06: the enumerated gate set, one case per member', () => {
   beforeEach(() => {

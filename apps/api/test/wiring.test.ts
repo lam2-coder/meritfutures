@@ -526,7 +526,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`routes/wallet-withdrawals.ts`) refuses a second open `wallet_withdrawals` row for one ' +
     'identity IN THE HANDLER, because that legs open index is plain rather than unique ' +
     '(ADR-158 finding 8). SO WHAT THIS LEG NOW WAITS ON IS A RESOLVER, ON A TABLE THIS PORT ' +
-    'ALREADY REACHES: `payoutRequests` is `owned` (`scope.ts:1152`), and ADR-254 ' +
+    'ALREADY REACHES: `payoutRequests` is `owned` (`scope.ts:1217`), and ADR-254 ' +
     'DELIBERATELY DID NOT BUILD IT. `gates` IS STILL NOT CONSTRUCTIBLE AND THE PORT IS STILL ' +
     'BLOCKED, on the OTHER unresolved leg rather than on this one: `accountStatus` is not a ' +
     'total map, what `provisioning_pending` means to the engine is the ruling ADR-248 refused ' +
@@ -547,7 +547,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'widened union, and an adapter and a row are still absent. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +
+    '(`packages/db/src/scoped-db.ts:2905`), a closed list of five `firm` keys that includes ' +
     "`planVersions` and `planVersionSizes`, so `PayoutTx.subject`'s `ResolvedPlan` inputs are " +
     'readable ON THE PAYOUT TRANSACTION and the two-transaction remedy ADR-211 clause 2 ruled ' +
     'is not needed. AN OLDER CLAUSE IS KEPT AS HISTORY BECAUSE IT WAS FALSE: this entry once ' +
@@ -562,7 +562,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'four links on every CI-01 pass, because a reason naming the second-cheapest blocker ' +
     'retires the question for every reader after it and this entry has done that twice. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
-    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1152`, and ' +
+    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1217`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
     'beside a `transact` whose `subject` rejects would put a live-looking route in front of the ' +
     'arm that approves payouts. MONEY PATH.',
@@ -626,17 +626,18 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // here going stale now turns a case red rather than waiting for a reader.
   // ---------------------------------------------------------------------------
   useCheckoutBackend:
-    'A CAP WHOSE ROW EXISTS AND WHOSE DOOR DOES NOT, A CROSS-IDENTITY READ AND THE LEDGER ARM. ' +
-    'THREE CLAUSES STILL, AND THE FIRST IS NARROWED RATHER THAN DELETED (ADR-252, on ADR-238 ' +
-    'ruling 1). THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
+    'A CAP WHOSE ROW EXISTS AND WHOSE DOOR DOES NOT, AND THE LEDGER ARM. ' +
+    'TWO CLAUSES NOW: THE FIRST IS NARROWED RATHER THAN DELETED (ADR-252, on ADR-238 ' +
+    'ruling 1) AND THE CROSS-IDENTITY READ IS DELETED (ADR-262). THE `firm` READ CLAUSE THIS ' +
+    'ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
     '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
-    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2558`), whose five members are exactly ' +
+    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2905`), whose five members are exactly ' +
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
     '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
-    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:802`) runs before the ' +
+    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:813`) runs before the ' +
     'plan on the purchase path and before `resetTarget` on the reset path, and its `maxAccounts` ' +
-    '(`routes/checkout.ts:557`) NOW HAS A COLUMN AND STILL HAS NO DOOR. ADR-238 ruling 1 ruled ' +
+    '(`routes/checkout.ts:568`) NOW HAS A COLUMN AND STILL HAS NO DOOR. ADR-238 ruling 1 ruled ' +
     "the base cap the FIRM'S number and refused `limits.max_accounts_per_entity` in all three of " +
     'its available forms, because that leaf is PER PLAN VERSION while `liveAccounts` beside it ' +
     "is this identity's total across EVERY plan: reading the purchased version makes the " +
@@ -660,20 +661,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1529`) ABOUT THE SAME ' +
     'NUMBER AND NO LONGER FOR THE IDENTICAL FINDING: that method reads through `ApiDb.firm`, ' +
     'which needs no catalogue admission, so its remaining half is the empty table alone. THE TWO ' +
-    'ENTRIES WERE ONE REFUSAL FOR AS LONG AS NEITHER HAD A SOURCE AND THEY ARE TWO NOW. SECOND, ' +
-    'A ROW THE BUYER MUST SEE THAT BELONGS TO THE AFFILIATE, REFUSED A SECOND ' +
-    'TIME: `clickByToken` (`routes/checkout.ts:831`) returns a `ClickRef` whose `affiliate` ' +
-    'carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
-    '(`routes/checkout.ts:805`); `affiliates` is scope class `owned` on `identity_id` ' +
-    '(`packages/db/src/scope.ts:1119`) and `affiliate_clicks` is `derived` through it ' +
-    '(`packages/db/src/scope.ts:1135`), so the row belongs to somebody else and the disclosure ' +
-    'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of either ' +
-    'returns the empty set and `resolveAttribution` folds every referral as organic, which is a ' +
-    'wrong answer that RETURNS ROWS. ADR-238 RULING 2 NAMES WHAT THE PORT MUST DO INSTEAD AND IT ' +
-    'IS NOT A READ: a door that resolves the affiliate INSIDE `packages/db` and hands this ' +
-    "handler a BIT rather than a uuid, which is ADR-230's `insertAsParty` stamp applied to the " +
-    'counterparty. IT IS UNAVAILABLE WHILE `AffiliateRef` CARRIES `identityId` and ' +
-    "`packages/affiliate` was outside that entry's fence. THIRD, THE LEDGER ARM, AND ADR-165's " +
+    'ENTRIES WERE ONE REFUSAL FOR AS LONG AS NEITHER HAD A SOURCE AND THEY ARE TWO NOW. ' +
+    'THE CROSS-IDENTITY READ THIS ENTRY CARRIED SECOND IS DISCHARGED AND IS DELETED RATHER ' +
+    'THAN NARROWED (ADR-262). IT IS THE THIRD CLAUSE THIS ENTRY HAS LOST IN A WEEK AND THE ' +
+    'FIRST DISCHARGED WITHOUT A READ GRANT: neither table became readable, and both refusals ' +
+    'are still asserted -- `affiliates` is scope class `owned` on `identity_id` and ' +
+    '`affiliate_clicks` is `derived` through it, and `CATALOG_TABLE_KEYS` reaches neither. ' +
+    'WHAT MOVED IS THE SHAPE THE PORT ASKS FOR: an `AffiliateRef` carries `isBuyer` instead of ' +
+    '`identityId`, `ScopedTx` gained `attributionAffiliate` and `attributionClick`, which ' +
+    'resolve the affiliate inside the transaction and project the answer to a bit, and ' +
+    '`PairRule` now records that `attributions` resolves its counterparty from `affiliate_id`, ' +
+    'so `insertAsParty` STAMPS `affiliate_identity_id` and the insert takes NEITHER identity ' +
+    "from the caller. That is ADR-238 ruling 2's own remedy, which is ADR-230's stamp applied " +
+    "to the counterparty. SECOND AND LAST, THE LEDGER ARM, AND ADR-165's " +
     'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:969`) is a ' +
     '`LedgerTx`, which only `SystemTx` satisfies because `ledger_transactions` and ' +
     '`ledger_entries` are both `derived` rather than `firm`, `SystemReason` is still exactly two ' +
@@ -776,12 +776,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`apps/worker/src/recon/sweep.ts` writes the rows, every field maps to a column of ' +
     '`0014_marks.sql`, and the exact filter is ALREADY WRITTEN in this deployable at ' +
     '`admin-source/liability.ts:1193`. What refuses it is THE DOOR: `reconciliations` is scope ' +
-    'class `derived` (`packages/db/src/scope.ts:1341`), so `firm` refuses the key AT COMPILE ' +
+    'class `derived` (`packages/db/src/scope.ts:1406`), so `firm` refuses the key AT COMPILE ' +
     'TIME and `scoped` has no identity on this surface, and ADR-171 clause 1 refuses the ' +
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
     '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
-    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3044`) at the one reason ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3420`) at the one reason ' +
     '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
     'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
     'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +
@@ -907,12 +907,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'assertion verifier is not. SECOND AND INDEPENDENT: ' +
     '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
-    'class `owned` on `identity_id` (`packages/db/src/scope.ts:886`). `db.firm` refuses that key ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:951`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1507-1509`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1579-1581`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
-    '(`packages/db/src/scope.ts:1035`), so the audit half alone has a door and the subject half ' +
+    '(`packages/db/src/scope.ts:1100`), so the audit half alone has a door and the subject half ' +
     "does not, which is the one-live-arm shape this file refuses on `usePayoutBackend`'s stated " +
     'rule. ADR-231 DOES NOT REACH THIS ONE AND THE REASON IS THE ADDRESS: `db.publicLookup` is ' +
     'READ ONLY and its vocabulary is `certificates` by `code`, while this route locks and ' +

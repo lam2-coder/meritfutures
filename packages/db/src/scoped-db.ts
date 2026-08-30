@@ -77,6 +77,7 @@ import {
   SCOPE_RULES,
   TABLES,
   type FirmTableKey,
+  type PairCounterparty,
   type PairTableKey,
   type ScopeRule,
   type ScopedTableKey,
@@ -2417,6 +2418,27 @@ export async function pairInsertStatement(
     );
   }
 
+  // WHERE THE COUNTERPARTY COMES FROM IS THE REGISTRY'S ANSWER AND NOT THIS
+  // FUNCTION'S (ADR-262). One arm asks the caller, as ADR-230 always did; the
+  // other resolves it here and never hands it back.
+  if (rule.writer.counterparty.by === 'resolved') {
+    const resolved = await resolvedCounterparty(
+      source,
+      key,
+      table,
+      counterpartyProperty,
+      counterpartyColumn,
+      rule.writer.counterparty,
+      values,
+    );
+    // BOTH IDENTITY COLUMNS ARE STAMPED AND NEITHER IS A PARAMETER, which is
+    // this arm's whole point: an `attributions` insert takes no identity at all.
+    await source
+      .insert(table)
+      .values({ ...values, [counterpartyProperty]: resolved, [writerProperty]: identityId });
+    return;
+  }
+
   // AND THE COUNTERPARTY IS REQUIRED IN EXACTLY ONE SPELLING, which is
   // `insertUnderStatement`'s guard for its own reason: Drizzle keys a values
   // object by PROPERTY name, so a caller writing the SQL spelling would have the
@@ -2451,6 +2473,331 @@ export async function pairInsertStatement(
   // THE STAMP IS THE LAST WORD AND THE CALLER WAS ALREADY REFUSED ABOVE, which
   // is `scopedInsertStatement`'s order and its reason.
   await source.insert(table).values({ ...values, [writerProperty]: identityId });
+}
+
+/**
+ * Follow a `by: 'resolved'` counterparty to the identity it addresses, INSIDE
+ * the caller's own transaction, and hand back the uuid to be stamped.
+ *
+ * EVERY REFUSAL HERE FIRES BEFORE THE INSERT IS BUILT, on `pairInsertStatement`'s
+ * own stated order: a refusal that threw after the INSERT would be a refusal
+ * that wrote the row. The one refusal that CANNOT fire before a statement is
+ * sent is the resolution missing, and that one sends a SELECT and no INSERT.
+ *
+ * THE READ IS ON `source` AND NOT ON `client()`, which is `insertUnderStatement`'s
+ * reason word for word: outside the transaction it is a race, and the value is
+ * about to become a column of a row this transaction commits.
+ *
+ * IT RETURNS A UUID INTO THIS FILE AND THE UUID GOES NO FURTHER. The door that
+ * calls it builds no `RETURNING` clause and returns `void`, so ADR-106's
+ * disclosure ground is ABSENT here in exactly the sense ADR-230 established: the
+ * counterparty's identity is read, written, and never returned to anybody.
+ */
+async function resolvedCounterparty(
+  source: StatementSource,
+  key: PartyWritableTableKey,
+  table: PgTable,
+  counterpartyProperty: string,
+  counterpartyColumn: string,
+  counterparty: Extract<PairCounterparty, { by: 'resolved' }>,
+  values: WriteValues,
+): Promise<unknown> {
+  // THE CALLER IS REFUSED THE COUNTERPARTY IN BOTH SPELLINGS, which is the
+  // writer column's own refusal arriving on the second column. Under this arm
+  // there is no parameter through which EITHER identity could be supplied, so
+  // "the handler cannot leak what it never receives" is a property of the
+  // signature rather than of the handler's care.
+  for (const named of Object.keys(values)) {
+    if (named !== counterpartyColumn && named !== counterpartyProperty) continue;
+    throw new Error(
+      `"${named}" is ${key}'s counterparty column and its registry rule says that column is ` +
+        `RESOLVED from "${counterparty.from}" rather than supplied. A caller that could name it ` +
+        'would be a caller that had already been handed the identity this door exists to keep ' +
+        'inside packages/db.',
+    );
+  }
+
+  const fromProperty = propertyForColumn(table, counterparty.from);
+  if (fromProperty === undefined) {
+    throw new Error(
+      `${key}'s counterparty is registered as resolved from "${counterparty.from}", and this ` +
+        'table declares no such column. The registry and the schema have drifted.',
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(values, fromProperty)) {
+    throw new Error(
+      `an insert into ${key} as a party must name "${fromProperty}", which is the column its ` +
+        `counterparty is RESOLVED from. The handle stamps its own identity and this row's ` +
+        'other party is looked up from that value, so a row naming neither is a pair row with ' +
+        'one party.',
+    );
+  }
+  const address = values[fromProperty];
+  if (address === null || address === undefined) {
+    throw new Error(
+      `"${fromProperty}" is ${address === null ? 'null' : 'undefined'} in an insert into ${key} ` +
+        'as a party, and it is the value the counterparty is resolved from. Equality against ' +
+        'NULL matches no row, so it is refused rather than read as an unresolved insert.',
+    );
+  }
+
+  // THE VIA TABLE MUST CARRY AN IDENTITY OF ITS OWN, and the column is read out
+  // of the registry rather than restated on the counterparty rule: one statement
+  // of a fact is the whole reason this file keeps a registry.
+  const viaRule: ScopeRule = SCOPE_RULES[counterparty.via];
+  if (viaRule.class !== 'owned' || viaRule.nullable) {
+    throw new Error(
+      `${key}'s counterparty resolves through ${counterparty.via}, whose rule is ` +
+        `"${viaRule.class}"${viaRule.class === 'owned' ? ' on a NULLABLE column' : ''}. A ` +
+        'resolution reads ONE identity off that row, so the table has to declare exactly one ' +
+        'and declare it NOT NULL. The registry moved and this rule did not follow it.',
+    );
+  }
+  const via = TABLES[counterparty.via] as PgTable;
+  const identityProperty = propertyForColumn(via, viaRule.column);
+  if (identityProperty === undefined) {
+    throw new Error(
+      `the registry names "${viaRule.column}" as ${counterparty.via}'s identity column and the ` +
+        'table declares no such column. The registry and the schema have drifted.',
+    );
+  }
+
+  const found = (await source
+    .select()
+    .from(via)
+    .where(eq(columnByName(via, counterparty.foreignColumn), address))) as unknown[];
+  if (found.length === 0) {
+    throw new Error(
+      `no row of ${counterparty.via} with ${counterparty.foreignColumn} = the value named for ` +
+        `"${fromProperty}" exists, so this ${key} row's counterparty cannot be resolved. The ` +
+        'row is NOT written.',
+    );
+  }
+  if (found.length > 1) {
+    throw new Error(
+      `resolving the counterparty of a ${key} row matched ${found.length} rows of ` +
+        `${counterparty.via}. "${counterparty.foreignColumn}" is addressed as unique here and ` +
+        'the database disagreed.',
+    );
+  }
+  const identity = (found[0] as Record<string, unknown>)[identityProperty];
+  if (identity === null || identity === undefined) {
+    throw new Error(
+      `${counterparty.via}.${viaRule.column} came back ${identity === null ? 'null' : 'absent'} ` +
+        `while resolving a ${key} counterparty, and the registry declares it NOT NULL. The row ` +
+        'is NOT written.',
+    );
+  }
+  return identity;
+}
+
+// =============================================================================
+// RESOLVING A COUNTERPARTY WITHOUT DISCLOSING ONE (ADR-262)
+// =============================================================================
+// `POST /checkout` HAS TO KNOW ONE THING ABOUT THE AFFILIATE AND IT IS NOT WHO
+// THEY ARE. `attributions_literal_self_deal_is_void` needs the answer to "is
+// this affiliate the buyer", and `attributions.affiliate_identity_id` needs a
+// uuid the door above now stamps. ADR-238 ruling 2 refused the read that would
+// have supplied both -- `affiliates` is `owned` on `identity_id` and
+// `affiliate_clicks` is `derived` through it, so the rows belong to somebody
+// else and a buyer-scoped read returns the EMPTY SET, folding every referral as
+// organic, which is a wrong answer that returns rows.
+//
+// THE REMEDY IT NAMED IS THIS SECTION: resolve the affiliate HERE and hand the
+// handler A BIT RATHER THAN A UUID.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS NOT THE READ THAT WAS REFUSED TWICE
+// -----------------------------------------------------------------------------
+// The refusal was never about a SELECT running. `packages/db` is where every
+// SELECT in this estate runs, and `client()` is unexported permanently (ADR-084
+// section 9). The refusal is about a uuid CROSSING OUT of this package into a
+// handler that proved a different identity. Nothing below returns one: the
+// projections are declared, they are two fields and three fields, and the suite
+// asserts the KEY SET rather than a field, so a column added to either shape
+// later fails a case instead of shipping.
+//
+// WHAT THE BIT DISCLOSES IS NOTHING, AND ADR-238 ALREADY SAID SO IN THE
+// SENTENCE THAT NAMED THIS REMEDY: "a buyer using their own code knows it is
+// theirs, and a buyer using somebody else's learns only that it is not theirs,
+// which names nobody."
+//
+// AND THE CLICK'S OTHER TWO COLUMNS ARE THE BUYER'S OWN ACT. `clickId` is a
+// surrogate `bigint` and `clickedAt` is when this buyer followed a link, which
+// is the input `withinLastTouchWindow` folds. `affiliate_clicks_token_uq` makes
+// the token name exactly one row, so no traversal of the affiliate's other
+// clicks is reachable from here. `ip`, `user_agent`, `click_fingerprint`,
+// `referrer_host` and `suspicious_reason` are the five the registry's own rule
+// calls the trap, and none of them is projected.
+//
+// TWO NAMED DOORS AND NOT ONE GENERIC ONE, WHICH IS ADR-233's CHOICE AND ITS
+// REASON. A general "is this owned row mine" verb would be an ORACLE over every
+// `owned` table in the registry, answerable about any row a caller could name.
+// The argument a door owes here is not "the bit is small"; it is that ONE
+// handler on ONE path needs this answer inside its own transaction, and each of
+// the two below names the port method it exists for.
+
+/**
+ * An affiliate, as a transaction that must not learn who they are sees one.
+ *
+ * `affiliateId` IS NOT AN IDENTITY AND THE DISTINCTION IS THE WHOLE POINT. It is
+ * `affiliates.id`, a row of the affiliate PROGRAM, and it is already the buyer's
+ * to hold: `coupons.affiliate_id` is a column of a `firm` catalogue row that
+ * `catalogRowAt` returns whole. What was never theirs is `affiliates.identity_id`,
+ * and it is not here.
+ */
+export interface AttributionAffiliate {
+  /** `affiliates.id`. The program row, never the person. */
+  readonly affiliateId: string;
+  /**
+   * Is this affiliate the identity this handle is bound to?
+   *
+   * THE ONE BIT `attributions_literal_self_deal_is_void` NEEDS. It is computed
+   * here, against `affiliates.identity_id`, and the value it was computed from
+   * is discarded in the same expression.
+   */
+  readonly isBuyer: boolean;
+}
+
+/**
+ * One `affiliate_clicks` row, with its affiliate resolved to a bit.
+ *
+ * PROJECTED AND NOT RETURNED WHOLE. `CheckoutTx.clickByToken`'s `ClickRef` is
+ * structurally this shape one package over, and `@merit/affiliate` is named
+ * separately on purpose: neither package depends on the other, which is
+ * `SqlExecutor` and `JobTransaction`'s construction exactly, and the suite BINDS
+ * the two shapes by reading that package's source rather than by restating it.
+ */
+export interface AttributionClick {
+  /** `affiliate_clicks.id`, a `bigint GENERATED ALWAYS AS IDENTITY`. */
+  readonly clickId: bigint;
+  /** The affiliate the click belongs to, as a bit. */
+  readonly affiliate: AttributionAffiliate;
+  /** `affiliate_clicks.clicked_at`. When THIS BUYER followed the link. */
+  readonly clickedAt: Date;
+}
+
+/**
+ * Resolve one `affiliates` row to its id and one bit. ADR-262.
+ *
+ * `null` MEANS THE ID NAMES NO ROW AND IT IS AN ORDINARY ANSWER RATHER THAN A
+ * CONTRADICTION: `coupons.affiliate_id` is a nullable column of a firm row that
+ * outlives the affiliate it names, so a code whose affiliate is gone falls
+ * through to last touch, which `AttributionInput.codeAffiliate` already
+ * documents as the correct answer rather than a missing branch.
+ *
+ * NO SCOPE PREDICATE IS APPLIED AND APPLYING ONE IS THE DEFECT THIS EXISTS TO
+ * REMOVE. `affiliates` is `owned` by the affiliate, so a buyer-scoped read
+ * returns the empty set for every referral that is not a self-deal -- which is
+ * ADR-238 ruling 2's "wrong answer that RETURNS ROWS". The read is unscoped and
+ * the RESULT is a boolean, which is where the narrowing lives.
+ */
+export async function attributionAffiliateStatement(
+  source: StatementSource,
+  identityId: IdentityId,
+  affiliateId: string,
+): Promise<AttributionAffiliate | null> {
+  const rule: ScopeRule = SCOPE_RULES.affiliates;
+  if (rule.class !== 'owned' || rule.nullable) {
+    throw new Error(
+      `affiliates is registered "${rule.class}" and this door reads ONE identity off that row ` +
+        'to compute a boolean. The registry moved and this door did not follow it.',
+    );
+  }
+  const table = TABLES.affiliates as PgTable;
+  const identityProperty = propertyForColumn(table, rule.column);
+  const idProperty = propertyForColumn(table, 'id');
+  if (identityProperty === undefined || idProperty === undefined) {
+    throw new Error('affiliates declares no `id` or no identity column. The schema has drifted.');
+  }
+  const found = (await selectStatement(
+    source,
+    'affiliates',
+    eq(columnByName(table, 'id'), affiliateId),
+  )) as unknown[];
+  const row = oneOrNone('affiliates', found) as Record<string, unknown> | undefined;
+  if (row === undefined) return null;
+  // THE UUID IS COMPARED AND DISCARDED IN ONE EXPRESSION. There is no local
+  // holding it past this line and no field on the return shape to put it in.
+  return {
+    affiliateId: String(row[idProperty]),
+    isBuyer: row[identityProperty] === identityId,
+  };
+}
+
+/**
+ * Resolve one click token to its click and its affiliate's bit. ADR-262.
+ *
+ * TWO STATEMENTS AND NOT A JOIN, on `insertUnderStatement`'s reason for reading
+ * the parent separately: the second read is the same read `attributionAffiliate`
+ * performs for the code path, so there is one resolution of an affiliate in this
+ * file rather than two that must agree. Both run on `source`, which is the
+ * caller's open transaction.
+ *
+ * A TOKEN NAMING NO CLICK IS `null` AND THE AFFILIATE IS NEVER ASKED FOR. A
+ * click whose affiliate row is GONE is a THROW instead, because
+ * `affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` says
+ * that row cannot be gone: returning `null` there would fold a database
+ * contradiction into "this buyer arrived organically".
+ */
+export async function attributionClickStatement(
+  source: StatementSource,
+  identityId: IdentityId,
+  clickToken: string,
+): Promise<AttributionClick | null> {
+  // THE JOIN IS READ OUT OF THE REGISTRY. `affiliateClicks` is `derived` via
+  // `affiliates` on `affiliate_id -> id`, which is the same edge this door
+  // walks, so walking a literal here would be a second statement of it.
+  const rule: ScopeRule = SCOPE_RULES.affiliateClicks;
+  if (rule.class !== 'derived' || rule.via !== 'affiliates') {
+    throw new Error(
+      `affiliate_clicks is registered "${rule.class}" and this door walks its edge to ` +
+        'affiliates. The registry moved and this door did not follow it.',
+    );
+  }
+  const table = TABLES.affiliateClicks as PgTable;
+  const properties = ['id', 'click_token', 'clicked_at', rule.localColumn].map((column) => {
+    const property = propertyForColumn(table, column);
+    if (property === undefined) {
+      throw new Error(`affiliate_clicks declares no column named ${column}. The schema drifted.`);
+    }
+    return property;
+  });
+  const [idProperty, , clickedAtProperty, affiliateProperty] = properties as [
+    string,
+    string,
+    string,
+    string,
+  ];
+
+  const found = (await selectStatement(
+    source,
+    'affiliateClicks',
+    eq(columnByName(table, 'click_token'), clickToken),
+  )) as unknown[];
+  const click = oneOrNone('affiliateClicks', found) as Record<string, unknown> | undefined;
+  if (click === undefined) return null;
+
+  const affiliate = await attributionAffiliateStatement(
+    source,
+    identityId,
+    String(click[affiliateProperty]),
+  );
+  if (affiliate === null) {
+    throw new Error(
+      'a click token resolved to a row whose affiliate does not exist, and `affiliate_id uuid ' +
+        'NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` says it cannot. Returning no ' +
+        'attribution here would fold a database contradiction into an organic sale.',
+    );
+  }
+  // PROJECTED FIELD BY FIELD AND NEVER SPREAD. A spread would hand out `ip`,
+  // `user_agent`, `click_fingerprint`, `referrer_host` and `suspicious_reason`
+  // the day somebody widened the SELECT.
+  return {
+    clickId: click[idProperty] as bigint,
+    affiliate,
+    clickedAt: click[clickedAtProperty] as Date,
+  };
 }
 
 // =============================================================================
@@ -2691,6 +3038,26 @@ export interface ScopedTx extends TxCommon {
    * every authority below `systemDb(reason)`.
    */
   insertAsParty<K extends PartyWritableTableKey>(key: K, values: WriteValues): Promise<void>;
+  /**
+   * One `affiliates` row, resolved to its id and ONE BIT (ADR-262).
+   *
+   * `CheckoutTx.couponByCode` IS THE READ THIS EXISTS FOR. A coupon is a `firm`
+   * catalogue row and `catalogRowAt` already returns its `affiliate_id`; what
+   * the handler must not learn is the identity behind it, so this returns a
+   * boolean and there is no field on the shape to put a uuid in.
+   */
+  attributionAffiliate(affiliateId: string): Promise<AttributionAffiliate | null>;
+  /**
+   * One `affiliate_clicks` row a token names, with its affiliate as a bit
+   * (ADR-262).
+   *
+   * `CheckoutTx.clickByToken` IS THE READ THIS EXISTS FOR, and it is the one
+   * ADR-233 and ADR-238 each refused: `affiliate_clicks` is `derived` through
+   * `affiliates`, so a buyer-scoped read returns the empty set and folds every
+   * referral as organic. The read here is unscoped and the RESULT is projected
+   * to three fields, which is where the narrowing lives.
+   */
+  attributionClick(clickToken: string): Promise<AttributionClick | null>;
   /** Rows matching a filter, ANDed with this identity's scope. Many rows. */
   rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
     key: K,
@@ -2865,6 +3232,15 @@ export function scopedTx(
       // FROM. This method takes a key and a row, exactly like `insert`, and the
       // stamped column is the registry's answer rather than this call site's.
       await pairInsertStatement(source, key, identityId, values);
+    },
+    async attributionAffiliate(affiliateId: string): Promise<AttributionAffiliate | null> {
+      // ON `source`, WHICH IS THIS TRANSACTION. The bit decides whether the row
+      // the same transaction writes is voided, so reading it on a second
+      // connection would decide a self-deal against committed state.
+      return await attributionAffiliateStatement(source, identityId, affiliateId);
+    },
+    async attributionClick(clickToken: string): Promise<AttributionClick | null> {
+      return await attributionClickStatement(source, identityId, clickToken);
     },
     async rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
       key: K,

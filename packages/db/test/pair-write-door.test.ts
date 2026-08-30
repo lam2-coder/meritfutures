@@ -50,6 +50,7 @@ import {
   TABLE_KEYS,
   scopePredicate,
   type IdentityId,
+  type PairCounterparty,
   type ScopedTableKey,
   type TableKey,
 } from '../src/index.ts';
@@ -137,10 +138,85 @@ function partyColumns(key: PartyWritableTableKey): {
   return { writer, counterparty: writer === rule.columnA ? rule.columnB : rule.columnA };
 }
 
-/** A minimal legal values object: the counterparty and nothing else. */
+/** How this table's counterparty is filled. ADR-262 put the answer in the registry. */
+function counterpartyRule(key: PartyWritableTableKey): PairCounterparty {
+  const rule = SCOPE_RULES[key as TableKey];
+  if (rule.class !== 'pair' || rule.writer.by !== 'party')
+    throw new Error(`${key} is not party-writable`);
+  return rule.writer.counterparty;
+}
+
+/**
+ * The party-writable tables split by WHERE THE COUNTERPARTY COMES FROM.
+ *
+ * `FROM_CALLER` IS EMPTY AS OF ADR-262 AND THAT IS ASSERTED RATHER THAN LEFT AS
+ * A SILENCE, in section 2b: `attributions` was the arm's only member and its
+ * counterparty is resolved now. The loops below are written over the split so
+ * that a `pair` table joining either arm is exercised the day it is registered.
+ */
+const RESOLVED = PARTY_WRITABLE.filter((k) => counterpartyRule(k).by === 'resolved');
+const FROM_CALLER = PARTY_WRITABLE.filter((k) => counterpartyRule(k).by === 'caller');
+
+/** The Drizzle property names of one table, in the order a `SELECT *` returns them. */
+function rowOf(key: TableKey, values: Readonly<Record<string, unknown>>): unknown[] {
+  const properties = Object.keys(getTableColumns(TABLES[key] as PgTable));
+  const row = new Array(properties.length).fill(null) as unknown[];
+  for (const [sqlName, value] of Object.entries(values)) {
+    row[properties.indexOf(propertyFor(key, sqlName))] = value;
+  }
+  return row;
+}
+
+/**
+ * A recording handle that also ANSWERS the resolution a `resolved` table sends.
+ *
+ * The door reads the counterparty's row on `source`, so a handle answering no
+ * rows would make every insert below throw the resolution's own refusal. The
+ * answer carries one column, the identity the registry names, and every other
+ * column is null.
+ */
+function recordingFor(
+  key: PartyWritableTableKey,
+  identity: string = COUNTERPARTY,
+): { source: StatementSource; sent: Sent[] } {
+  const counterparty = counterpartyRule(key);
+  if (counterparty.by !== 'resolved') return recording();
+  const viaRule = SCOPE_RULES[counterparty.via];
+  if (viaRule.class !== 'owned') throw new Error(`${counterparty.via} carries no identity column`);
+  const answer = [rowOf(counterparty.via, { [viaRule.column]: identity })];
+  const sent: Sent[] = [];
+  const source: StatementSource = drizzle(async (sql: string, params: unknown[]) => {
+    sent.push({ sql, params });
+    return { rows: sent.length === 1 ? answer : [] };
+  });
+  return { source, sent };
+}
+
+/** How many statements one legal insert sends: a resolution plus the insert, or just the insert. */
+function statementCount(key: PartyWritableTableKey): number {
+  return counterpartyRule(key).by === 'resolved' ? 2 : 1;
+}
+
+/** The INSERT among the statements one legal call sent. */
+function insertOf(sent: readonly Sent[], key: PartyWritableTableKey): Sent {
+  return sent[statementCount(key) - 1] as Sent;
+}
+
+/**
+ * A minimal legal values object, per arm.
+ *
+ * On the `caller` arm it is the counterparty and nothing else, which is what
+ * ADR-230 built. On the `resolved` arm it is the NON-IDENTITY column the
+ * counterparty is looked up from, and there is no spelling of an identity the
+ * caller could add: ADR-262's whole point is that a caller cannot leak what it
+ * never receives.
+ */
 function counterpartyValues(key: PartyWritableTableKey): Record<string, unknown> {
-  const { counterparty } = partyColumns(key);
-  return { [propertyFor(key, counterparty)]: COUNTERPARTY };
+  const counterparty = counterpartyRule(key);
+  if (counterparty.by === 'resolved') {
+    return { [propertyFor(key, counterparty.from)]: 'the-counterparty-row' };
+  }
+  return { [propertyFor(key, partyColumns(key).counterparty)]: COUNTERPARTY };
 }
 
 // =============================================================================
@@ -196,15 +272,17 @@ describe('every pair rule declares who may write it, and the answer is checkable
 describe('the party write door writes only rows the handle is a party to', () => {
   test('the writer column is bound to the identity the HANDLE carries, on every statement', async () => {
     for (const key of PARTY_WRITABLE) {
-      const { source, sent } = recording();
+      const { source, sent } = recordingFor(key);
       await pairInsertStatement(source, key, IDENTITY, counterpartyValues(key));
-      expect(sent, key).toHaveLength(1);
-      const statement = sent[0] as Sent;
+      expect(sent, key).toHaveLength(statementCount(key));
+      const statement = insertOf(sent, key);
       const { writer, counterparty } = partyColumns(key);
       expect(statement.sql, key).toMatch(/^insert into /);
       expect(statement.sql, key).toContain(`"${writer}"`);
       expect(statement.sql, key).toContain(`"${counterparty}"`);
-      // THE BIND, AND THIS IS THE ASSERTION THE WHOLE DOOR EXISTS FOR.
+      // THE BIND, AND THIS IS THE ASSERTION THE WHOLE DOOR EXISTS FOR. On the
+      // `resolved` arm the second value was never the caller's either: it came
+      // out of the row the first statement read.
       expect(statement.params, key).toContain(IDENTITY);
       expect(statement.params, key).toContain(COUNTERPARTY);
     }
@@ -221,7 +299,7 @@ describe('the party write door writes only rows the handle is a party to', () =>
       const writerProperty = propertyFor(key, writer);
 
       for (const spelling of new Set([writer, writerProperty])) {
-        const { source, sent } = recording();
+        const { source, sent } = recordingFor(key);
         await expect(
           pairInsertStatement(source, key, IDENTITY, {
             ...counterpartyValues(key),
@@ -234,10 +312,9 @@ describe('the party write door writes only rows the handle is a party to', () =>
         expect(sent, `${key}.${spelling}`).toHaveLength(0);
       }
 
-      const { source, sent } = recording();
+      const { source, sent } = recordingFor(key);
       await pairInsertStatement(source, key, IDENTITY, counterpartyValues(key));
-      const statement = sent[0] as Sent;
-      expect(statement.params, key).not.toContain(OTHER);
+      expect(insertOf(sent, key).params, key).not.toContain(OTHER);
     }
   });
 
@@ -246,18 +323,21 @@ describe('the party write door writes only rows the handle is a party to', () =>
     // refused everything would pass every assertion in this file, so the same
     // call on a second handle is run and the bind is asserted to have changed.
     for (const key of PARTY_WRITABLE) {
-      const first = recording();
+      const first = recordingFor(key);
       await pairInsertStatement(first.source, key, IDENTITY, counterpartyValues(key));
-      const second = recording();
+      const second = recordingFor(key);
       await pairInsertStatement(second.source, key, OTHER, counterpartyValues(key));
-      expect((first.sent[0] as Sent).params, key).toContain(IDENTITY);
-      expect((second.sent[0] as Sent).params, key).toContain(OTHER);
-      expect((second.sent[0] as Sent).params, key).not.toContain(IDENTITY);
+      expect(insertOf(first.sent, key).params, key).toContain(IDENTITY);
+      expect(insertOf(second.sent, key).params, key).toContain(OTHER);
+      expect(insertOf(second.sent, key).params, key).not.toContain(IDENTITY);
     }
   });
 
   test('the counterparty is required, in one spelling, and may not be null', async () => {
-    for (const key of PARTY_WRITABLE) {
+    // THE `caller` ARM ONLY. A table whose counterparty is RESOLVED has no
+    // counterparty parameter to require, and section 2b is where that arm's
+    // refusals are asserted instead.
+    for (const key of FROM_CALLER) {
       const { counterparty } = partyColumns(key);
       const counterpartyProperty = propertyFor(key, counterparty);
 
@@ -293,31 +373,89 @@ describe('the party write door writes only rows the handle is a party to', () =>
     // refusing it would make the evidence unwritable, so the permission is
     // asserted rather than left to be a side effect.
     for (const key of PARTY_WRITABLE) {
-      const { counterparty } = partyColumns(key);
-      const { source, sent } = recording();
-      await pairInsertStatement(source, key, IDENTITY, {
-        [propertyFor(key, counterparty)]: IDENTITY,
-      });
-      expect(sent, key).toHaveLength(1);
+      const counterparty = counterpartyRule(key);
+      // ON THE `resolved` ARM THE SELF-DEAL ROW IS THE ONE WHERE THE RESOLUTION
+      // COMES BACK AS THE HANDLE'S OWN IDENTITY, and the door must stamp it
+      // rather than refuse it. `attributions_literal_self_deal_is_void` is what
+      // makes that row legal and SD-M8-05 is what makes it required.
+      const { source, sent } =
+        counterparty.by === 'resolved' ? recordingFor(key, IDENTITY) : recording();
+      const values =
+        counterparty.by === 'resolved'
+          ? counterpartyValues(key)
+          : { [propertyFor(key, partyColumns(key).counterparty)]: IDENTITY };
+      await pairInsertStatement(source, key, IDENTITY, values);
+      expect(sent, key).toHaveLength(statementCount(key));
+      expect(
+        insertOf(sent, key).params.filter((p) => p === IDENTITY),
+        key,
+      ).toHaveLength(2);
     }
   });
 
   test('the door builds no RETURNING clause, which is why no read was created', async () => {
     for (const key of PARTY_WRITABLE) {
-      const { source, sent } = recording();
+      const { source, sent } = recordingFor(key);
       const answer = await pairInsertStatement(source, key, IDENTITY, counterpartyValues(key));
       expect(answer, key).toBeUndefined();
-      expect((sent[0] as Sent).sql.toLowerCase(), key).not.toContain('returning');
+      expect(insertOf(sent, key).sql.toLowerCase(), key).not.toContain('returning');
     }
   });
 
   test('`insertAsParty` on a scoped transaction is the same door', async () => {
     for (const key of PARTY_WRITABLE) {
-      const { source, sent } = recording();
+      const { source, sent } = recordingFor(key);
       await scopedTx(source, recordingConn(), IDENTITY).insertAsParty(key, counterpartyValues(key));
-      expect(sent, key).toHaveLength(1);
-      expect((sent[0] as Sent).params, key).toContain(IDENTITY);
+      expect(sent, key).toHaveLength(statementCount(key));
+      expect(insertOf(sent, key).params, key).toContain(IDENTITY);
     }
+  });
+});
+
+// =============================================================================
+// 2b. WHERE THE COUNTERPARTY COMES FROM IS A FIELD NOW (ADR-262)
+// =============================================================================
+describe('every party writer declares where the counterparty comes from', () => {
+  test('the answer is one of two words and it carries a reason', () => {
+    // TOTALITY IS ALREADY A COMPILE ERROR -- `counterparty` is not optional on
+    // the `party` arm. This is the half a type cannot state.
+    for (const key of PARTY_WRITABLE) {
+      const counterparty = counterpartyRule(key);
+      expect(['caller', 'resolved'], key).toContain(counterparty.by);
+      expect(counterparty.why.length, key).toBeGreaterThan(80);
+    }
+  });
+
+  test('a resolution names a NON-IDENTITY column and a table that carries one', () => {
+    // THE TWO WAYS A RESOLUTION COULD BE WRONG, both of which the door throws on
+    // and both of which are cheaper to catch here. A `from` that WAS one of the
+    // two identity columns would be a caller naming the identity through a
+    // second name; a `via` that carries no identity of its own is a stamp with
+    // nothing to read.
+    for (const key of RESOLVED) {
+      const counterparty = counterpartyRule(key);
+      if (counterparty.by !== 'resolved') continue;
+      const { writer, counterparty: other } = partyColumns(key);
+      expect([writer, other], key).not.toContain(counterparty.from);
+      const viaRule = SCOPE_RULES[counterparty.via];
+      expect(viaRule.class, `${key} via ${counterparty.via}`).toBe('owned');
+      if (viaRule.class !== 'owned') continue;
+      expect(viaRule.nullable, `${key} via ${counterparty.via}`).toBe(false);
+    }
+  });
+
+  test('the `caller` arm has NO member today, and the loops above say so out loud', () => {
+    // ADR-230 BUILT THAT ARM AND `attributions` WAS ITS ONLY MEMBER, and ADR-262
+    // moved it. So the three refusals the caller arm carries -- the counterparty
+    // required, the SQL spelling refused, a null counterparty refused -- are
+    // UNEXERCISED as of this commit, and that is recorded here rather than left
+    // as a quiet gap in a green suite. The arm is kept because it is the answer
+    // a `pair` table takes when the caller genuinely holds the other party, and
+    // the loops in section 2 are written over the split, so the day one is
+    // registered they start running without an edit.
+    expect(FROM_CALLER).toEqual([]);
+    expect(RESOLVED.length).toBeGreaterThan(0);
+    expect([...RESOLVED, ...FROM_CALLER].sort()).toEqual([...PARTY_WRITABLE].sort());
   });
 });
 

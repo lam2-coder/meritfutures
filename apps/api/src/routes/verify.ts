@@ -160,7 +160,7 @@
 //
 // SO ALL THREE ARMS ARE LIVE AND `databaseVerifySource` BELOW IS THE BACKEND.
 // `record` always could be: `certificate_verifications` is scope class `firm`
-// (`packages/db/src/scope.ts:1401`), so `db.firm` has been able to write it all
+// (`packages/db/src/scope.ts:1466`), so `db.firm` has been able to write it all
 // along, and `presentation` is deployment configuration rather than a read.
 //
 // THE REFUSAL THAT STOOD HERE IS KEPT AS A RULE RATHER THAN RETIRED AS A
