@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->249<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->250<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10307,6 +10307,26 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **23 of 23** invariants off the runner's own last line, **283 files / 6,797 passed / 6 skipped** against a stashed baseline of **282 / 6,779 / 6** on this same tree, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**: forbidden by this row and it mutates the working tree.
 
 **THE LANDMINE THREE LOGS HAVE CARRIED IS RE-DERIVED AND IS STILL NOT THERE.** `docs/STATE.md` holds the `gen:adr_count` paragraph **ONCE**, measured on this tree before this append; session 449 established it and session 450 confirmed it, and session 447's log repeats the inherited EIGHT.
+
+## 2026-08-30 - Session 456: the account cap gets a door that hands out one number ([ADR-265](decisions/ADR-265.md), proposed)
+
+**[ADR-265](decisions/ADR-265.md), `status: proposed`, UNSIGNED. MONEY PATH: `POST /checkout` is how money enters the firm and this is the number its first line reads. `E2` READ OWED, and two are inherited on [ADR-252](decisions/ADR-252.md) and [ADR-238](decisions/ADR-238.md). NO MIGRATION NUMBER IS TAKEN OR RESERVED; `0075` is still next.**
+
+**THE DOOR IS `ScopedTx.effectiveAccountCap()`.** It takes no argument, reads the latest `firm_parameters` row for `base_account_cap` whose `effective_from` has ARRIVED, reads `identities.max_accounts_override` on the handle's own row, and **resolves both INSIDE `packages/db` and hands back ONE INTEGER**. The exception is folded in the door precisely so that no handler has to remember it, which the dispatching row named as the control that gets forgotten exactly once.
+
+**THE FINDING IS THAT THE SIZED REMAINDER WAS THE TRAP.** [ADR-252](decisions/ADR-252.md) section 10 called a `CATALOG_TABLE_KEYS` admission *"the whole remainder of `useCheckoutBackend`'s clause 1"*, and it is **REFUSED rather than deferred**. `refuseUncatalogued`'s admission test is met, so the objection is not that the argument fails: it is that a catalogue read hands out ROWS, so the caller does the effective dating (`ORDER BY` and `LIMIT` have no shape in this accessor), folds the exception itself, and a key in that list is a read of every member the vocabulary ever admits. **The list is still five, no key changed key sets, and this is [ADR-262](decisions/ADR-262.md)'s construction applied to a `firm` table: the narrowing lives in the RESULT.**
+
+**THE OVERRIDE WINS IN BOTH DIRECTIONS AND THE CLAMP IS THE PLAUSIBLE WRONG DOOR.** `Math.max` deletes an operator's smaller number and `Math.min` deletes B4 #17's grandfathered merge. **AN ABSENT BASE ROW THROWS, AND IT THROWS BEFORE THE IDENTITY IS READ**, which is the order being the control: an override carries no approver and no written reason, `firm_parameters.approved_by` is a foreign key into `operators`, and a fallback would promote the exception into the firm's number on exactly the deployment nobody configured. The return type is `number`, so no caller has an absent value to fold into `Infinity`.
+
+**THE TWO PORTS ARE ONE FINDING AGAIN AND THE SYMMETRY IS THE POINT.** [ADR-252](decisions/ADR-252.md) ruling 7 found they had STOPPED being one finding because `accountCap()` needed an admission and `readMe` did not; **the difference between them was the CONSTRUCTION half and one construction now serves both**, because `readMe` assembles every other field of `Me` through the same scoped door. What is left of either is the EMPTY TABLE. **One asymmetry survives and is recorded**: a refused purchase fails closed on an endpoint already answering 503, while a `Me` that cannot be assembled makes the whole of `GET /me` unavailable.
+
+**BOTH ENTRIES NARROWED, NEITHER PORT WIRED.** `useCheckoutBackend` keeps the `LT-08` arm, which `M20` pins to the purchase transaction by name; `start.ts` is untouched; `grep -rn effectiveAccountCap apps/api/src` returns 4 lines and every one is prose.
+
+**FOUR RED EVENTS AND TWO ARE SHIPPED.** `RI-20` turned red on shipped source with no seed, because the entry's own quoted grep said *"returns nothing"* and returned 3. A shipped case of `checkout-backend-blockers.test.ts` read `not.toContain('firmParameters')` over a 3,900 line file when the claim was always about the LIST, and **the old form could not tell a named door from an admission**, so it is repaired by asking a narrower question. The new suite was watched **21 of 24 RED** on the unmodified tree, with the three passers named as future-watching rather than counted as evidence. And **two cases passed for the wrong reason**: Drizzle's `integer` mapper runs `parseInt` before any guard in this tree runs, so a numeric string never reaches the check those cases named; neither the cases nor the guard were loosened. **Six seeded defects, each watched firing, each restored with `sha256sum -c` OK.**
+
+**13 CITATIONS REPAIRED, TWO OF WHICH WERE THE ROW'S OWN** and had drifted by 12 before this branch changed a byte. **`prettier` IS AN EDIT** and moved every pointer again by 14 after they had been derived, which is the third session to pay for that ordering.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **23 of 23** invariants off the runner's own last line, **287 files / 6,911 passed / 6 skipped** against a baseline of **286 / 6,884 / 6** measured on this tree before a byte changed, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` and `falsify.mjs` were NOT run**: the row forbids the first by name and the second mutates the working tree.
 
 ## 2026-08-30 - Session 454: the withdrawal a trader could not close now has a door ([ADR-263](decisions/ADR-263.md), proposed)
 

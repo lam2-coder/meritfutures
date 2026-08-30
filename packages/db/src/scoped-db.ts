@@ -50,6 +50,7 @@
 
 import {
   and,
+  desc,
   eq,
   exists,
   getTableColumns,
@@ -2801,6 +2802,223 @@ export async function attributionClickStatement(
 }
 
 // =============================================================================
+// THE THIRD NAMED DOOR: THE ACCOUNT CAP, RESOLVED (ADR-265)
+// =============================================================================
+// `CheckoutTx.accountCap()` is the FIRST line of both checkout handlers and
+// `databaseAuthBackend`'s `readMe` answers `Me.max_accounts` off the same
+// number. Both have refused for their whole lives, and after ADR-252 both
+// refused for the same one-clause reason: the number NOW HAS A COLUMN AND STILL
+// HAS NO DOOR.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS A NAMED DOOR AND NOT A `CATALOG_TABLE_KEYS` ADMISSION
+// -----------------------------------------------------------------------------
+// ADR-252 section 10 sized the remainder of this work as "one member plus
+// ADR-233's argument" in the list below, and that sizing is REFUSED here rather
+// than deferred. `refuseUncatalogued`'s own admission test is met by this table,
+// so the objection is not that the argument fails. It is that the READ IS THE
+// WRONG SHAPE:
+//
+//   1. A CATALOGUE READ HANDS OUT ROWS AND THE CALLER FOLDS THEM. The cap is
+//      TWO rows on TWO tables -- the firm's base and `identities
+//      .max_accounts_override`, which the column's own name says is the
+//      EXCEPTION to it -- and a caller holding the base is a caller who has to
+//      remember the exception. That is a control that will be forgotten exactly
+//      once, on the endpoint that sells accounts.
+//   2. THE CATALOGUE DOOR CANNOT DO THE EFFECTIVE DATING EITHER. `0074` is
+//      supersession dated, so the read is the LATEST row whose `effective_from`
+//      HAS ARRIVED, and ADR-112's foreclosure 3 records that `ORDER BY` and
+//      `LIMIT` have no shape in this accessor. `catalogRowsWhere` would return
+//      every superseded cap the firm has ever set and the caller would pick one.
+//   3. AN ADMISSION IS PER TABLE AND THIS TABLE IS A VOCABULARY. `firm_
+//      parameters` admits one member today and a later ADR may admit others; a
+//      key in the list is a read of ALL of them, forever, by anybody holding a
+//      scoped transaction. This door names one parameter and returns one
+//      integer.
+//
+// SO THE LIST STAYS AT FIVE, AND THIS IS ADR-262's CONSTRUCTION APPLIED TO A
+// `firm` TABLE. `attributionAffiliate` reads an `owned` row unscoped and returns
+// a bit; this reads a `firm` row unscoped and returns an integer. Neither is a
+// read grant, and in both cases the narrowing lives in the RESULT rather than in
+// the predicate. The argument a door owes is that ONE decision on ONE path needs
+// this answer inside its own transaction, and `INV-M3-15` is that argument in
+// the corpus's own words: it requires the restriction check at the same point in
+// the transaction as the cap, and `gateIdentity` performs both in one call. A
+// cap read through `db.firm` before the transaction opens is a cap that may have
+// been superseded by the time the purchase commits, which is a supersession
+// dated table's characteristic failure.
+//
+// -----------------------------------------------------------------------------
+// AND `ORDER BY` AND `LIMIT` ARRIVE THE WAY `FOR UPDATE` DID
+// -----------------------------------------------------------------------------
+// Inside a NAMED statement builder with no caller-supplied option, exactly as
+// `lockingSelectStatement` took `FOR UPDATE`. Nothing below is reachable with a
+// column or a direction somebody passes, so the accessor gains one read that
+// orders rather than a general `orderBy`, and ADR-112's foreclosure holds for
+// every other caller.
+
+/** The one parameter of the closed vocabulary `0074` opened with. */
+const BASE_ACCOUNT_CAP = 'base_account_cap';
+
+/**
+ * One registry rule, read as a `ScopeRule` rather than as the literal it is.
+ *
+ * THE INDIRECTION IS LOAD BEARING AND IT IS NOT STYLE. `SCOPE_RULES` is `as
+ * const`, so `SCOPE_RULES.firmParameters` has the singleton type `{ class:
+ * 'firm' }` and TypeScript narrows a direct assignment to it: a guard reading
+ * `rule.class !== 'firm'` then has type `never` inside its own branch, and the
+ * compiler refuses the message that names what the class became. THE GUARD IS
+ * ABOUT THE FUTURE RATHER THAN ABOUT THIS COMPILE. A registration is a line a
+ * later session edits, and the day one moves, this door is reading the wrong
+ * kind of row -- unfiltered where a tenancy column now exists -- which is the
+ * one failure mode a compile cannot catch, because it recompiles clean.
+ */
+function registeredRule(key: TableKey): ScopeRule {
+  return SCOPE_RULES[key];
+}
+
+/**
+ * The latest row of one firm parameter whose `effective_from` HAS ARRIVED.
+ *
+ * `now()` IS THE DATABASE'S AND NOT THE CALLER'S, which inside a transaction is
+ * that transaction's start time. A clock passed in would be a clock the caller
+ * could move, on a read that decides whether somebody may buy.
+ *
+ * THE SHAPE IS `firm_parameters_current_idx`'s, which `0074` declares for this
+ * read and names in its own comment: `(parameter, effective_from DESC)`.
+ */
+function effectiveFirmParameterStatement(source: StatementSource, parameter: string): unknown {
+  const table = TABLES.firmParameters as PgTable;
+  return source
+    .select()
+    .from(table)
+    .where(
+      bothOf(
+        eq(columnByName(table, 'parameter'), parameter),
+        lte(columnByName(table, 'effective_from'), sql`now()`),
+      ),
+    )
+    .orderBy(desc(columnByName(table, 'effective_from')))
+    .limit(1);
+}
+
+/** A cap is a COUNT of accounts. Not cents, not a float, and never zero. */
+function positiveIntegerCap(where: string, value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    throw new Error(
+      `${where} is not a positive integer and a cap has to be one. Both columns are ` +
+        '`integer` with `CHECK (> 0)` at the database (`firm_parameters_base_account_cap_is_' +
+        'positive` and `0002:47`), so a value that reaches here failing this has crossed the ' +
+        'driver as something else, and it would be compared against a count of live accounts.',
+    );
+  }
+  return value;
+}
+
+/**
+ * THE ACCOUNT CAP THIS IDENTITY IS HELD TO, RESOLVED. ADR-265.
+ *
+ * ONE NUMBER OUT, AND THERE IS NO SHAPE HERE TO PUT A SECOND ONE IN. The base
+ * and the exception are folded HERE, because a door that returned the base and
+ * left `identities.max_accounts_override` to the caller would be a control
+ * remembered by whoever wrote the first caller and forgotten by whoever writes
+ * the second.
+ *
+ * THE OVERRIDE WINS IN BOTH DIRECTIONS AND NEITHER `Math.max` NOR `Math.min` IS
+ * CORRECT. The column is an OVERRIDE rather than a bound: `0002:47` names
+ * "grandfathered merges (B4 #17), where an identity is over cap through no
+ * purchase of its own", which needs a LARGER number, and an identity under
+ * review needs a smaller one. A door that clamped either way would silently
+ * refuse to apply half the exceptions an operator writes.
+ *
+ * AN ABSENT BASE ROW THROWS, AND IT THROWS BEFORE THE IDENTITY IS READ.
+ * ADR-252 ruling 5: "folding an absent row into an unlimited cap, or skipping
+ * the comparison when the read returns nothing, is a control that answers yes to
+ * everybody on the endpoint that sells accounts". A deployment that has not set
+ * the firm's number has not authorised selling an unbounded number of accounts.
+ * The ORDER of the two reads is what makes that unconditional: an override
+ * carries no approver and no written reason, `firm_parameters` carries both, and
+ * a door that read the identity first and fell back would promote the exception
+ * into the firm's number on exactly the deployment nobody configured.
+ *
+ * THE RETURN TYPE IS `number` AND THAT IS THE CONTROL RATHER THAN THE SIGNATURE.
+ * A `number | null` is a value `?? Infinity` can be written against in one
+ * character, and `Infinity` is the answer this whole entry exists to refuse.
+ */
+export async function effectiveAccountCapStatement(
+  source: StatementSource,
+  identityId: IdentityId,
+): Promise<number> {
+  // THE CLASSES ARE READ OUT OF THE REGISTRY RATHER THAN ASSUMED, on
+  // `attributionAffiliateStatement`'s idiom. This door reads a `firm` table
+  // unfiltered and a `root` table scoped, and if either registration moves, the
+  // read below is the wrong read rather than a failing one.
+  const firmRule = registeredRule('firmParameters');
+  if (firmRule.class !== 'firm') {
+    throw new Error(
+      `firm_parameters is registered "${firmRule.class}" and this door reads it UNFILTERED as ` +
+        'a row belonging to nobody. The registry moved and this door did not follow it.',
+    );
+  }
+  const identityRule = registeredRule('identities');
+  if (identityRule.class !== 'root') {
+    throw new Error(
+      `identities is registered "${identityRule.class}" and this door reads the handle's own ` +
+        'row through `scopePredicate`. The registry moved and this door did not follow it.',
+    );
+  }
+
+  const capTable = TABLES.firmParameters as PgTable;
+  const valueProperty = propertyForColumn(capTable, 'integer_value');
+  if (valueProperty === undefined) {
+    throw new Error('firm_parameters declares no `integer_value` column. The schema has drifted.');
+  }
+
+  // 1. THE FIRM'S NUMBER, FIRST AND UNCONDITIONALLY.
+  const effective = (await effectiveFirmParameterStatement(source, BASE_ACCOUNT_CAP)) as unknown[];
+  const capRow = effective[0] as Record<string, unknown> | undefined;
+  if (capRow === undefined) {
+    throw new Error(
+      `no firm_parameters row for ${BASE_ACCOUNT_CAP} has taken effect, so this deployment has ` +
+        'no account cap. AN ABSENT ROW IS NO CAP AND NOT AN UNLIMITED ONE (ADR-252 ruling 5, ' +
+        'ADR-265): a deployment that has not set the firm number has not authorised selling an ' +
+        'unbounded number of accounts. `identities.max_accounts_override` is deliberately not ' +
+        'consulted here, because it is the EXCEPTION to a base rather than a base of its own -- ' +
+        'it carries no approver and no written reason, and the row that carries both is the row ' +
+        'that is missing. Write one: `0074_firm_parameters.sql`, approved by an `operators` row.',
+    );
+  }
+  const base = positiveIntegerCap('firm_parameters.integer_value', capRow[valueProperty]);
+
+  // 2. THE PER-ENTITY EXCEPTION, ON THE HANDLE'S OWN ROW.
+  const identityTable = TABLES.identities as PgTable;
+  const overrideProperty = propertyForColumn(identityTable, 'max_accounts_override');
+  if (overrideProperty === undefined) {
+    throw new Error('identities declares no `max_accounts_override` column. The schema drifted.');
+  }
+  const found = (await selectStatement(
+    source,
+    'identities',
+    scopePredicate('identities', identityId),
+  )) as unknown[];
+  const identity = oneOrNone('identities', found) as Record<string, unknown> | undefined;
+  if (identity === undefined) {
+    throw new Error(
+      'this handle is bound to an identity with no `identities` row, and `scopedDb` is the only ' +
+        'producer of one. Answering the firm base here would hand a cap to a caller this ' +
+        'transaction cannot place, which is a database contradiction folded into a business ' +
+        'answer.',
+    );
+  }
+
+  const override = identity[overrideProperty];
+  if (override === null || override === undefined) return base;
+  // THE FOLD, AND IT IS ONE EXPRESSION SO THERE IS NOWHERE FOR A SECOND NUMBER
+  // TO SURVIVE PAST IT.
+  return positiveIntegerCap('identities.max_accounts_override', override);
+}
+
+// =============================================================================
 // READING A ROW THAT BELONGS TO NOBODY, INSIDE THE TRANSACTION THAT WRITES
 // (ADR-233)
 // =============================================================================
@@ -3058,6 +3276,24 @@ export interface ScopedTx extends TxCommon {
    * to three fields, which is where the narrowing lives.
    */
   attributionClick(clickToken: string): Promise<AttributionClick | null>;
+  /**
+   * THE ACCOUNT CAP THIS HANDLE'S IDENTITY IS HELD TO, RESOLVED (ADR-265).
+   *
+   * `CheckoutTx.accountCap()` AND `Me.max_accounts` ARE THE READS THIS EXISTS
+   * FOR, and they are two callers of ONE number: the firm's base
+   * (`firm_parameters.base_account_cap`, `0074`) with `identities
+   * .max_accounts_override` folded over it. THE FOLD IS HERE rather than at
+   * either call site, because a door that returned the base and left the
+   * exception to the caller is a control the second caller forgets.
+   *
+   * IT TAKES NO ARGUMENT AT ALL, on `lockScope`'s reason: there is no address a
+   * caller could point at somebody else's cap.
+   *
+   * IT THROWS WHERE NO BASE ROW HAS TAKEN EFFECT. An absent row is NO CAP and
+   * not an unlimited one, and the return type is `number` so that there is no
+   * absent value for a caller to fold into `Infinity`.
+   */
+  effectiveAccountCap(): Promise<number>;
   /** Rows matching a filter, ANDed with this identity's scope. Many rows. */
   rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
     key: K,
@@ -3241,6 +3477,14 @@ export function scopedTx(
     },
     async attributionClick(clickToken: string): Promise<AttributionClick | null> {
       return await attributionClickStatement(source, identityId, clickToken);
+    },
+    async effectiveAccountCap(): Promise<number> {
+      // ON `source`, WHICH IS THIS TRANSACTION, AND `INV-M3-15` IS WHY RATHER
+      // THAN CONVENTION: the restriction check and the cap are one call of
+      // `gateIdentity`, and `firm_parameters` is supersession dated, so a cap
+      // read on a second connection is a cap that may have moved before the
+      // purchase commits.
+      return await effectiveAccountCapStatement(source, identityId);
     },
     async rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
       key: K,

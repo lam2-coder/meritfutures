@@ -163,7 +163,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   go stale the way the claim it replaces did.
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
-  // (`packages/db/src/scoped-db.ts:267`) and ADR-165 ruled it gains no member, so
+  // (`packages/db/src/scoped-db.ts:269`) and ADR-165 ruled it gains no member, so
   // the vocabulary was never the obstacle either. ADR-171 section 9 states the
   // condition under which the door becomes takeable: the slice that lands an
   // `AdminSessionSource` a deployment can install, because that is the first
@@ -579,7 +579,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'reader. THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:2905`), a closed list of five `firm` keys that includes ' +
+    '(`packages/db/src/scoped-db.ts:3123`), a closed list of five `firm` keys that includes ' +
     "`planVersions` and `planVersionSizes`, so `PayoutTx.subject`'s `ResolvedPlan` inputs are " +
     'readable ON THE PAYOUT TRANSACTION and the two-transaction remedy ADR-211 clause 2 ruled ' +
     'is not needed. AN OLDER CLAUSE IS KEPT AS HISTORY BECAUSE IT WAS FALSE: this entry once ' +
@@ -658,18 +658,17 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // here going stale now turns a case red rather than waiting for a reader.
   // ---------------------------------------------------------------------------
   useCheckoutBackend:
-    'A CAP WHOSE ROW EXISTS AND WHOSE DOOR DOES NOT, AND THE LEDGER ARM. ' +
-    'TWO CLAUSES NOW: THE FIRST IS NARROWED RATHER THAN DELETED (ADR-252, on ADR-238 ' +
-    'ruling 1) AND THE CROSS-IDENTITY READ IS DELETED (ADR-262). THE `firm` READ CLAUSE THIS ' +
-    'ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
+    'A CAP WHOSE ROW AND DOOR BOTH EXIST AND WHOSE TABLE IS EMPTY, AND THE LEDGER ARM. ' +
+    'TWO CLAUSES STILL: THE FIRST IS NARROWED FOR THE SECOND TIME IN A WEEK AND NOT DELETED ' +
+    '(ADR-252, then ADR-265, both on ADR-238 ruling 1) AND THE CROSS-IDENTITY READ IS DELETED ' +
+    '(ADR-262). THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
     '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
-    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2905`), whose five members are exactly ' +
+    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3123`), whose five members are exactly ' +
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
     '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
-    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:813`) runs before the ' +
-    'plan on the purchase path and before `resetTarget` on the reset path, and its `maxAccounts` ' +
-    '(`routes/checkout.ts:568`) NOW HAS A COLUMN AND STILL HAS NO DOOR. ADR-238 ruling 1 ruled ' +
+    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:825`) runs before the ' +
+    'plan on the purchase path and before `resetTarget` on the reset path. ADR-238 ruling 1 ruled ' +
     "the base cap the FIRM'S number and refused `limits.max_accounts_per_entity` in all three of " +
     'its available forms, because that leaf is PER PLAN VERSION while `liveAccounts` beside it ' +
     "is this identity's total across EVERY plan: reading the purchased version makes the " +
@@ -680,20 +679,32 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '1 line, which is `0074_firm_parameters.sql`, and it creates `base_account_cap` on ' +
     "`price_floors`' shape with its approver a foreign key into `operators`. THE EXCEPTION IS " +
     'UNTOUCHED AND 0002 IS NOT EDITED: `grep -rn max_accounts_override ' +
-    'packages/db/migrations/0002_identity.sql` returns 1 line. WHAT REMAINS IS A DOOR AND NOT A ' +
-    'COLUMN, WHICH IS THE NARROWING: `accountCap()` is a method of `CheckoutTx`, which is a ' +
-    'SCOPED transaction, and a scoped transaction refuses every firm key outside ' +
-    '`CATALOG_TABLE_KEYS` -- five members -- and `grep -rn firmParameters ' +
-    'packages/db/src/scoped-db.ts` returns nothing. THE READ CANNOT MOVE OUTSIDE THE ' +
-    'TRANSACTION EITHER, because `INV-M3-15` requires the restriction check at the same point in ' +
-    'the transaction as the cap and `gateIdentity` performs both in one call. AND THE TABLE ' +
-    'SHIPS EMPTY, WHICH NO DOOR FIXES: nothing under any `src/` writes a `firm_parameters` row ' +
-    'or an `operators` row, and AN ABSENT ROW IS NO CAP RATHER THAN AN UNLIMITED ONE, so the ' +
-    'slice that writes this read owes a REFUSAL there before it owes anything else. ' +
-    '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1529`) ABOUT THE SAME ' +
-    'NUMBER AND NO LONGER FOR THE IDENTICAL FINDING: that method reads through `ApiDb.firm`, ' +
-    'which needs no catalogue admission, so its remaining half is the empty table alone. THE TWO ' +
-    'ENTRIES WERE ONE REFUSAL FOR AS LONG AS NEITHER HAD A SOURCE AND THEY ARE TWO NOW. ' +
+    'packages/db/migrations/0002_identity.sql` returns 1 line. AND ADR-265 BUILT THE DOOR, SO ' +
+    'THE CLAUSE THAT SAID "NO DOOR" IS SPENT: `grep -rn effectiveAccountCap ' +
+    'packages/db/src/scoped-db.ts` returns 4 lines, which are the declaration on `ScopedTx`, ' +
+    'the implementation, the statement function and its call. IT IS A NAMED DOOR AND NOT A ' +
+    'CATALOGUE ADMISSION, WHICH IS THE PART WORTH READING: ADR-252 section 10 sized the ' +
+    'remainder of this clause as one member added to `CATALOG_TABLE_KEYS`, and ADR-265 REFUSED ' +
+    'that sizing rather than deferring it. A catalogue read hands out ROWS, so the caller would ' +
+    'do the effective dating this supersession dated table needs and would fold ' +
+    '`identities.max_accounts_override` itself, which is the control a second caller forgets. ' +
+    'The door resolves both and returns ONE INTEGER, the list is still five members, and this ' +
+    'port is where the difference would have been paid. THE READ STILL CANNOT MOVE OUTSIDE THE ' +
+    'TRANSACTION, WHICH IS WHY THE DOOR IS ON THE SCOPED HANDLE: `INV-M3-15` requires the ' +
+    'restriction check at the same point in the transaction as the cap and `gateIdentity` ' +
+    'performs both in one call. WHAT IS LEFT OF CLAUSE 1 IS THE EMPTY TABLE ALONE, WHICH NO ' +
+    'DOOR FIXES: nothing under any `src/` writes a `firm_parameters` row or an `operators` row, ' +
+    'and AN ABSENT ROW IS NO CAP RATHER THAN AN UNLIMITED ONE, so the door THROWS there, before ' +
+    'it reads the identity, and its return type is `number` so no caller has an absent value to ' +
+    'fold into `Infinity`. THAT IS THE REFUSAL ADR-252 SAID THIS SLICE OWED. ' +
+    '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1539`) ABOUT THE SAME ' +
+    'NUMBER AND IS ONE FINDING WITH THIS ONE AGAIN: ADR-252 found the two had STOPPED being one ' +
+    'finding, because this port needed a catalogue admission and that one did not; ADR-265 built ' +
+    'a named door instead of taking the admission, so the construction half is gone from both ' +
+    'and the empty table is all that is left of either. THE DIFFERENCE BETWEEN THEM WAS THE ' +
+    'DOOR AND THERE IS ONE DOOR. THE PORT IS NOT WIRED AND `effectiveAccountCap` IS CALLED ' +
+    'NOWHERE IN `apps/api`: `grep -rn effectiveAccountCap apps/api/src` returns 4 lines and ' +
+    'every one of them is prose. ' +
     'THE CROSS-IDENTITY READ THIS ENTRY CARRIED SECOND IS DISCHARGED AND IS DELETED RATHER ' +
     'THAN NARROWED (ADR-262). IT IS THE THIRD CLAUSE THIS ENTRY HAS LOST IN A WEEK AND THE ' +
     'FIRST DISCHARGED WITHOUT A READ GRANT: neither table became readable, and both refusals ' +
@@ -706,10 +717,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'so `insertAsParty` STAMPS `affiliate_identity_id` and the insert takes NEITHER identity ' +
     "from the caller. That is ADR-238 ruling 2's own remedy, which is ADR-230's stamp applied " +
     "to the counterparty. SECOND AND LAST, THE LEDGER ARM, AND ADR-165's " +
-    'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:969`) is a ' +
+    'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:1030`) is a ' +
     '`LedgerTx`, which only `SystemTx` satisfies because `ledger_transactions` and ' +
     '`ledger_entries` are both `derived` rather than `firm`, `SystemReason` is still exactly two ' +
-    'members (`packages/db/src/scoped-db.ts:267`) and `ApiDb` still declares no door that yields ' +
+    'members (`packages/db/src/scoped-db.ts:269`) and `ApiDb` still declares no door that yields ' +
     'a `SystemTx`. ADR-238 RULING 3 ADDS THE HALF ADR-165 DID NOT REACH: ADR-176 cleared the ' +
     'same obstruction for `LT-01` by DELETING `PayoutTx.ledger` and posting later at a system ' +
     'authority, and that remedy does NOT transfer, because M20 pins `LT-08` to the purchase ' +
@@ -813,7 +824,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
     '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
-    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3420`) at the one reason ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3445`) at the one reason ' +
     '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
     'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
     'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +
