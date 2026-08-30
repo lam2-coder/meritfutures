@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->281<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->282<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11065,3 +11065,27 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped** with a delta of **ZERO**, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row. **No GitHub access: no PR was opened and nothing was merged.**
+
+---
+
+## 2026-08-30 - Session 492: one predicate, three statements, one of them wrong on the money in both directions ([ADR-302](decisions/ADR-302.md), proposed)
+
+**`plan_version_sizes.payout_cap_schedule_cents` IS DECODED ONCE NOW, AND ALL THREE READERS WERE RETIRED IN THE COMMIT THAT WROTE THE CODEC.** Row `302`, [ADR-302](decisions/ADR-302.md), twelve sections, `proposed` and UNSIGNED. `ADR-299` section 7's row, dispatched ahead of the door row and taken whole.
+
+**THE DIVERGENCE WAS RE-DERIVED AT SOURCE BEFORE IT WAS REPAIRED AND IT HOLDS, AND IT IS LARGER THAN THE ROW SAID BY ONE FIELD.** `readCapSchedule` ([`routes/catalog.ts:1219`](../apps/api/src/routes/catalog.ts) on `origin/main`) tested `Number.isInteger`, which is TRUE of `2 ** 53 + 1`, and then converted with `BigInt`, so a `cap_cents` past `Number.MAX_SAFE_INTEGER` was **admitted and handed back rounded**; it **refused the base-10 string** [ADR-283](decisions/ADR-283.md) ruling 5 blessed; and it held **`from_ordinal`** to `Number.isInteger` where both peers held it to `Number.isSafeInteger`. **All three of the row's line citations were EXACT on `origin/main`**, which is reported because the row warned they might not be and a session that assumed drift would have repointed correct pointers.
+
+**THE NAMED TRAP WAS DISARMED BY ORDERING RATHER THAN BY LUCK.** The codec without the collapse is a FOURTH statement of the payout ceiling, which [ADR-286](decisions/ADR-286.md) refused and [ADR-269](decisions/ADR-269.md) refused before it for this same value. `decodeCapScheduleCents` was added, exported, and `toCapScheduleCents`, `decodeCapSteps` and `readCapSchedule` deleted with their call sites repointed, **all in one commit**, so there is no commit on this branch at which the tree holds four. The tests landed second, on a tree that was already correct.
+
+**THE COLLAPSE IS ASYMMETRIC AND THAT IS WHY THE ROW WAS WORTH AN `E2` READ.** `apps/worker` and `apps/site` are behaviour-preserving to the byte on what they admit and refuse, changing only the CLASS of the refusal, which `decodeEngineGates` has done unwrapped through both those adapters since [ADR-250](decisions/ADR-250.md). **`apps/api` gains the refusal of an unsafe `cap_cents` and of an unsafe `from_ordinal` and loses the refusal of the base-10 string.**
+
+**THE HARM IS TRACED TO THE TRADER RATHER THAN ASSERTED, AND THE HONEST VERSION IS NARROWER ON ONE HALF AND WIDER ON THE OTHER.** The endpoint publishes only the ordinal-1 rung, through `capAtFirstOrdinal` and then `centsToJson`, which refuses a `bigint` past the same ceiling: so the rounded value was caught one function later and answered 500 for a different reason, and a rounded rung at ordinal two or above was admitted, carried, and silently never rendered. **The string half is what was costing something and it cost the entire public catalogue**, a 500 on every plan for a row the worker and the site read fine. **Both halves were reachable**: [`0004:168`](../packages/db/migrations/0004_catalog.sql) is `jsonb NOT NULL` with no CHECK on its contents and [`admin-writes.ts:1767`](../apps/api/src/routes/admin-writes.ts) passes the steps through unchecked.
+
+**THE STOP CONDITION IS MET.** Link 7's cap-schedule census reads **ONE**, and the divergence case [ADR-286](decisions/ADR-286.md) wrote as RED-on-repair went red and is rewritten to assert the repaired property in both directions. **[ADR-286](decisions/ADR-286.md) section 7 item 1 is CLOSED.**
+
+**AND A SECOND FINDING, IN THE GATE THAT WAS SUPPOSED TO CATCH THIS.** Two of that census's three per-file needles quoted a `from_ordinal:` line that exists **verbatim a second time in the same file**, in the basis-point reader for `plan_versions.rules`, so each would have stayed green on a file whose cents reader had been deleted. **Found by running the rewritten case rather than by reading it.** The needles are now `cap_cents` lines, which are unique, and the two basis-point readers are asserted still present so a later session does not read this collapse as reaching them. **Whether the same pattern is load-bearing in that file's other censuses is a question this row did not have the fence to ask.**
+
+**NO MIGRATION, NO `RI-nn` MINTED, `RI-38` LEFT FREE, `packages/db/**` UNTOUCHED, `CATALOG_TABLE_KEYS` NOT WIDENED, THE SIZE ROW NOT TAKEN, `API_CONTRACT` NOT EDITED. NOTHING IS WIRED AND NO WIRING COUNT MOVES.** The engine's public surface grows by exactly two names, thirty-three to thirty-five, nineteen functions to twenty.
+
+**The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **299 files / 7,290 passed / 6 skipped** against session 487's 298 / 7,249 / 6, a delta of **+1 file and +41 cases, all of them this row's codec suite**; typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row.
