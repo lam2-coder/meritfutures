@@ -114,6 +114,15 @@ test('2.3 a refusing PORT, mid-batch, also exits non-zero', () => {
   expect(result.status).toBeGreaterThan(0);
   expect(result.stderr).toContain('BatchPortUnwired');
   expect(result.stderr).toContain('loadAccountDay');
+
+  // AND `ADR-258` MAKES THE CASE SAY MORE THAN IT DID. The port used to refuse
+  // before reading anything, so this process proved only that a throw leaves a
+  // status. It now resolves the plan, the prior, the mark, the settlements and
+  // the anchor first, so what this run measures is that the deployment reaches
+  // `ADR-248`'s one field and stops there -- and the witness in the message is
+  // what an operator reads to see how far it got.
+  expect(result.stderr).toContain('AccountDay.external');
+  expect(result.stderr).toContain('The other five resolved');
 });
 
 // -----------------------------------------------------------------------------
