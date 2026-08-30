@@ -754,8 +754,11 @@ describe('link 6: the READER exists, and the DAY it selects by now has a door', 
     // the interesting members would be a filter somebody tuned. Two of these
     // SELECT A DAY, three DECLARE the column, and one is the door.
     //
-    //   `apps/worker/src/batch/adapter.ts`      SELECTS. `readLastClosedTradingDay`,
-    //                                           consults no coverage at all.
+    //   `apps/worker/src/batch/adapter.ts`      SELECTS. `anchorLastClosedDay`, which
+    //                                           reads BOTH tables in ONE transaction and
+    //                                           hands back a discriminated union (ADR-277).
+    //                                           THE COVERAGE-BLIND FOLD THIS LINE USED TO
+    //                                           NAME LEFT THE EXPORTED SURFACE ENTIRELY.
     //   `apps/api/src/admin-source/liability.ts` SELECTS. `lastClosedDay`, whose
     //                                           caller `anchorCalendar` does.
     //   `packages/db/src/scoped-db.ts`          THE DOOR. ADR-268.
@@ -776,5 +779,157 @@ describe('link 6: the READER exists, and the DAY it selects by now has a door', 
       'packages/db/src/scoped-db.ts',
       'packages/rules-engine/src/calendar.ts',
     ]);
+  });
+});
+
+describe('link 7: `plan` is the field no reason on this port has ever named, and it refuses', () => {
+  // **THE ENTRY'S SIXTEENTH-REVISION SUMMARY SENTENCE IS FALSE IN ITS FIRST
+  // CLAUSE, AND THAT IS `ADR-281`'s SUBJECT.** It read that `plan` waits on
+  // NOTHING because `ADR-233` catalogued `planVersions` and `planVersionSizes`.
+  // `ADR-233` gave this transaction the READ. It did not give it the DECODE,
+  // and `PayoutSubject.plan` is a `ResolvedPlan` rather than a row.
+  //
+  // **THIS IS THE THIRD TIME THIS ENTRY HAS NAMED THE SECOND-CHEAPEST BLOCKER**,
+  // which is a failure mode `wiring.test.ts` has diagnosed in itself twice on
+  // other ports and once on this one. A session dispatched to remove what the
+  // entry named -- a scheduled run, and a calendar door that `ADR-268` has
+  // already built -- would have removed both and found the port still
+  // unwireable, with no written account of why.
+  //
+  // **AND THE SAME BLOCKER IS ALREADY LIVE ONE PORT OVER, ON THE SAME VALUE.**
+  // `setAdminReadSource`'s entry carries it for `readLiability` (`ADR-269`),
+  // and `EligibleFoldUnwired` states it in its own message. Two ports in one
+  // deployable wait on one decoding and only one of them said so.
+
+  test('`PayoutSubject.plan` is a `ResolvedPlan`, and NO `apps/api` file produces one', () => {
+    // THE NEEDLE IS THE RESOLVER CALL AND NOT THE TYPE NAME, on link 6's own
+    // reasoning: a file that NAMES `ResolvedPlan` is usually declaring a
+    // parameter, and every consumer of the fold declares one. A file that
+    // CALLS `resolvePlan(` is producing the value.
+    const route = codeOf(join(REPO_ROOT, 'apps/api/src/routes/payouts.ts'));
+    expect(route).toContain('readonly plan: ResolvedPlan;');
+
+    const producers = deployableSources()
+      .filter((path) => codeOf(path).includes('resolvePlan('))
+      .map(rel)
+      .sort();
+
+    // **TWO, AND ONE OF THEM IS THE DECLARATION.** The engine declares the
+    // resolver and `apps/worker` is the only deployable that calls it. A third
+    // entry appearing under `apps/api/src` is this port's `plan` half landing,
+    // and it turns this case red so the entry above cannot stay as it is.
+    expect(producers).toEqual([
+      'apps/worker/src/batch/adapter.ts',
+      'packages/rules-engine/src/plan/resolve.ts',
+    ]);
+    expect(producers.filter((path) => path.startsWith('apps/api/'))).toEqual([]);
+  });
+
+  test('and the blocker is the DECODING rather than the declaration, which is now discharged', () => {
+    // **THE HALF THAT IS DISCHARGED, ASSERTED SO NOBODY RE-DERIVES IT.**
+    // `apps/api` declares `@merit/rules-engine` (session 252), so `resolvePlan`
+    // is reachable from this deployable. TWO SENTENCES IN THIS DEPLOYABLE STILL
+    // SAY IT IS NOT and `ADR-281` section 7 registers both; they are wrong about
+    // the reason and right about the conclusion, which is the shape this file
+    // exists to catch.
+    const manifest = JSON.parse(readFileSync(join(REPO_ROOT, 'apps/api/package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+    };
+    expect(manifest.dependencies?.['@merit/rules-engine']).toBe('workspace:*');
+
+    const engineDoor = readFileSync(join(REPO_ROOT, 'packages/rules-engine/src/index.ts'), 'utf8');
+    expect(engineDoor).toContain("export { resolvePlan } from './plan/resolve.ts';");
+
+    // **AND THE HALF THAT IS NOT.** `resolvePlan` takes a DECODED
+    // `PlanRulesJson`, and `plan_versions.rules` is `jsonb`, so a producer needs
+    // a decoder. The engine declares none: `PlanRulesJson` leaves that package
+    // as a TYPE and no function in it returns one.
+    expect(codeOf(join(REPO_ROOT, 'packages/rules-engine/src/plan/resolve.ts'))).toContain(
+      'export function resolvePlan(rules: PlanRulesJson, size: PlanVersionSizeRow): ResolvedPlan {',
+    );
+    const engineSrc = deployableSources()
+      .filter((path) => rel(path).startsWith('packages/rules-engine/src/'))
+      .map((path) => codeOf(path))
+      .join('\n');
+    expect(
+      engineSrc,
+      'the engine gained a `rules` decoder, so `plan` may be buildable',
+    ).not.toMatch(/\)\s*:\s*PlanRulesJson\b/);
+  });
+
+  test('and the TWO decoders that exist are in deployables `apps/api` cannot import', () => {
+    // **THE CENSUS IS OVER THE TREE RATHER THAN OVER A LIST**, on link 6's
+    // idiom, so a THIRD decoder landing anywhere turns this red rather than
+    // being noticed in review. `FM-16` is two statements of one predicate with
+    // nothing comparing them, and this blob fixes every cents value a payout is
+    // decided against.
+    const decoders = deployableSources()
+      .filter((path) => /\)\s*:\s*(?:PlanRulesJson|PublishedRules)\b/.test(codeOf(path)))
+      .map(rel)
+      .sort();
+
+    expect(decoders).toEqual([
+      'apps/site/src/catalog/adapter.ts',
+      'apps/worker/src/batch/adapter.ts',
+    ]);
+    expect(decoders.filter((path) => path.startsWith('apps/api/'))).toEqual([]);
+
+    // AND EACH IS WHAT IT IS SAID TO BE, because a census that named only the
+    // count would be satisfied by two files that had drifted into the pattern.
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
+      'function toPublishedRules(value: unknown, at: string): PublishedRules {',
+    );
+    expect(codeOf(join(REPO_ROOT, 'apps/site/src/catalog/adapter.ts'))).toContain(
+      'function decodeRules(value: unknown, where: string): PlanRulesJson {',
+    );
+
+    // **AND THE SHARED HOME IS RULED AND UNTAKEN.** `ADR-239` slice A puts it in
+    // `packages/rules-engine` beside `gates-codec.ts`, which is the same ruling
+    // `ADR-250` executed for `engine_gates` and `ADR-264` section 6 registered
+    // for `readRuleState`. The day it lands, the case above goes red.
+    expect(
+      readFileSync(join(REPO_ROOT, 'apps/api/src/admin-source/eligible-next-7d.ts'), 'utf8'),
+    ).toContain('ADR-239 slice A rules the shared home is ');
+  });
+
+  test('and an ABSENT `rule_states` row has no path to a problem document either', () => {
+    // **THE SECOND INDEPENDENT GROUND, AND IT IS WHAT ANSWERS ROW `281`'s
+    // QUESTION.** The row asked whether the port refuses on an empty table or
+    // wires and answers honestly that there is no state for the day. THE SECOND
+    // ARM DOES NOT EXIST YET AND IT IS CODE RATHER THAN A VARIABLE.
+    //
+    // `ruleStateOn` throws `RuleStateAbsent`, which is correct and is the
+    // property four sessions have refused to give up. But `unwiredOrThrow`
+    // RETHROWS anything that is not a `PayoutBackendUnwired`, so a wired backend
+    // meeting an unfolded day answers **500** and not the honest refusal. A 500
+    // on the door where money leaves the firm is a live-looking route emitting
+    // an internal error, which is the shape this port's own rule refuses.
+    const route = codeOf(join(REPO_ROOT, 'apps/api/src/routes/payouts.ts'));
+    expect(route).toContain('if (!(err instanceof PayoutBackendUnwired)) throw err;');
+    expect(
+      route,
+      'the route gained a refusal path for an absent row, so ADR-281 ruling 3 has moved',
+    ).not.toContain('RuleStateAbsent');
+
+    // AND THE READER STILL REFUSES, so the missing arm is the route's and never
+    // a licence to answer the absence in the reader.
+    expect(codeOf(join(REPO_ROOT, 'apps/api/src/rule-state-reader.ts'))).toContain(
+      'throw new RuleStateAbsent',
+    );
+  });
+
+  test('and the entry no longer says the calendar is unreadable, because ADR-268 built the door', () => {
+    // THE CLAUSE `ADR-281` RETIRED, ASSERTED AS ABSENT, on link 4's idiom and
+    // for its reason: an entry still saying the day cannot be read sends the
+    // next session to build a door that landed two waves ago.
+    const reason = payoutReason();
+    expect(reason).toContain('lastClosedTradingDay');
+    expect(reason).toContain('ResolvedPlan');
+    expect(reason).toContain('toPublishedRules');
+
+    // THE RETIRED SUMMARY, ASSEMBLED RATHER THAN WRITTEN OUT, so this file does
+    // not put the false sentence back into the repository's own grep results.
+    const retired = '`plan` waits on ' + 'NOTHING';
+    expect(reason).not.toContain(retired);
   });
 });
