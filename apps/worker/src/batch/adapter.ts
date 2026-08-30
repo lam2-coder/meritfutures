@@ -12,7 +12,7 @@
 // deployable has exactly one file naming that package, and this file is not it.
 //
 // -----------------------------------------------------------------------------
-// FOUR OF TEN ARE WHOLE, ONE IS FIVE FIELDS OF SIX, AND FIVE REFUSE BY NAME
+// FIVE OF TEN ARE WHOLE AND FIVE REFUSE BY NAME
 // -----------------------------------------------------------------------------
 // `databaseAccountReads` serves one of four and `databaseAuthBackend` four of
 // sixteen, and in every case the refusal carries the blocker rather than a
@@ -26,22 +26,43 @@
 // | `calendarSlice`          | SERVED. `trading_calendar`, sessions and coverage|
 // | `accountsWithLiveMark`   | SERVED. `daily_marks` for the day, unsuperseded  |
 // | `accountsWithStoredState`| SERVED. every `rule_states.account_id`           |
-// | `loadAccountDay`         | FIVE FIELDS OF SIX. `external` refuses, ADR-248  |
-// | `accountDaysFrom`        | REFUSES. `loadAccountDay`'s blocker, per account |
+// | `loadAccountDay`         | SERVED. SIX FIELDS OF SIX, `ADR-260`             |
+// | `accountDaysFrom`        | REFUSES. INV-04's whole-history walk is unwritten |
 // | `storedRuleStates`       | REFUSES. no `RuleStateRow` READER, ADR-239 B     |
 // | `writeRuleState`         | COMPOSED AND WHOLE, `ADR-250`. See below          |
 // | `raiseReconciliation`    | REFUSES. no event writer in this deployable      |
 // | `raiseDivergence`        | REFUSES. no event writer in this deployable      |
 //
-// **THE `loadAccountDay` ROW READ "REFUSES. six fields, and `prior` needs the
-// codec" AND EVERY CLAUSE OF IT IS NOW FALSE.** It was written when
-// `decodeEngineGates` did not exist. `ADR-250` landed the codec, and the half
-// of that reason nobody re-derived is that `prior` is a `RuleState` and NOT a
-// `RuleStateRow`: it carries no `contextGates`, no `stateHash` and no
-// `calendarRevisionId`, so it is a STRICTLY SMALLER read than `storedRuleStates`
-// and the codec was the whole of what it was missing. `ADR-250` section 7 said
-// so of the row and not of this field. Five of the six resolve here and one does
-// not; `ACCOUNT_DAY_BLOCKER` names that one and nothing else.
+// **THE `loadAccountDay` ROW HAS READ "REFUSES" AND THEN "FIVE OF SIX", AND IT
+// NOW READS SERVED.** It said six fields refused and `prior` needed a codec;
+// `ADR-250` landed the codec and `ADR-258` resolved five. The sixth was
+// `external`, which `ADR-248` ruled NOT CONSTRUCTIBLE because `hasPayoutInFlight`
+// was a predicate `M01` stated at two grains. **`ADR-254` RULED THAT GRAIN
+// ACCOUNT AND AMENDED `M01`**, so the field stopped waiting on a decision and
+// started waiting on a resolver, and `ADR-260` wrote it. The constant that
+// carried this port's blocker is DELETED rather than reworded, because there is
+// no blocker to name; its identifier is not written out here, on the rule
+// `wiring.test.ts` states for retired reasons -- a name reproduced beside a
+// claim that it is gone reads as live to every grep and to every predicate
+// asserting its absence.
+//
+// **THE CONSEQUENCE IS LOUD AND IS STATED HERE RATHER THAN DISCOVERED IN A
+// REPORT: THE NIGHTLY FOLD NOW COMPLETES ON THIS DEPLOYABLE.** `runNightlyBatch`
+// calls exactly `calendarWatermark`, `calendarSlice`, `accountsWithLiveMark`,
+// `loadAccountDay` and `writeRuleState`, and every one of the five now answers.
+// `accountDaysFrom` and `storedRuleStates` still refuse and neither is on that
+// path; they are the replay audit's, which is unscheduled. So the sixth field
+// resolving is not a comment change: it is the batch writing `rule_states` rows
+// where it stopped at the first account before.
+//
+// **AND THE RESOLVER REFUSES PER ACCOUNT RATHER THAN NEVER.** `resolveExternalGates`
+// throws an `ExternalGatesRefusal` naming the leg, and the loudest case is the
+// one `ADR-260` was sent at: an account whose `accounts.status` is
+// `provisioning_pending`, which `account_status` declares and `AccountStatus`
+// does not. That stops the batch, which is correct, because a daily mark
+// arriving for an account still being provisioned is an anomaly and not a day to
+// fold. `nightly.ts` does not catch, `main` does not catch, and the process
+// leaves a non-zero status.
 //
 // **THE WRITE PORT IS COMPOSED RATHER THAN WRITTEN AND THAT IS THE POINT.**
 // `writeRuleStateVia` in `state-writer.ts` already holds every column, every
@@ -85,11 +106,19 @@
 // distinct read on the accessor rather than a filter term.
 // =============================================================================
 
-import type { BreachKind, CalendarSlice, Phase, TradingDay } from '@merit/rules-engine';
+import type {
+  BreachKind,
+  CalendarSlice,
+  ExternalGates,
+  KycChainRow,
+  Phase,
+  TradingDay,
+} from '@merit/rules-engine';
 import {
   buildCalendarSlice,
   decodeEngineGates,
   encodeEngineGates,
+  resolveExternalGates,
   resolvePlan,
 } from '@merit/rules-engine';
 
@@ -137,40 +166,26 @@ export class BatchPortUnwired extends Error {
 }
 
 /**
- * The blocker `loadAccountDay` and `accountDaysFrom` share, NARROWED TO ONE FIELD.
+ * `accountDaysFrom`'s blocker, WHICH IS NOW ITS OWN AND IS ALL THAT IS LEFT OF IT.
  *
- * **THIS CONSTANT NAMED SIX FIELDS AND RESOLVED NONE OF THEM. IT NOW NAMES ONE.**
- * `plan`, `prior`, `mark`, `settlements` and `openedOn` are all read below, off
- * tables this deployable's one door already reaches. `external` is not, and it is
- * not a resolver nobody has written: `ADR-248` ruled it NOT CONSTRUCTIBLE because
- * `hasPayoutInFlight` is a predicate `M01` states at two grains, and a value
- * invented for any of R-40's five is a veto that never fires on the door where
- * money leaves the firm.
- */
-const ACCOUNT_DAY_BLOCKER =
-  '`AccountDay.external` is an `ExternalGates`, which ADR-248 ruled NOT CONSTRUCTIBLE in this ' +
-  'deployable: `hasPayoutInFlight` reads R-38, and M01 states R-38 at the ACCOUNT grain in ' +
-  'section 2.1 and at the IDENTITY grain in Group F, which differ by exactly the identities ' +
-  'holding more than one account. A resolver written here would pick the winner of an open ' +
-  'corpus question inside a worker, and both a permissive and a refusing default are wrong: one ' +
-  'pays a trader R-38 would stop and the other denies every eligible trader while reading as a ' +
-  'working gate. THE OTHER FIVE FIELDS RESOLVE AND ARE RESOLVED BEFORE THIS THROWS, so the ' +
-  'refusal is about the gates and about nothing else. It clears when the grain is RULED';
-
-/**
- * `accountDaysFrom`'s blocker, which is `loadAccountDay`'s AND ONE MORE.
+ * **IT USED TO BE `loadAccountDay`'s BLOCKER PLUS ONE MORE, AND THE FIRST HALF IS
+ * GONE.** `ADR-260` resolved `external`, so the shared constant this string was
+ * built on top of no longer exists, and what remains is the half that was always
+ * this port's alone: `INV-04`'s left-hand side is every day from day one, which
+ * is a walk over the account's whole mark history rather than one call repeated.
+ * No session has written that walk.
  *
- * **IT IS NOT THE SAME REASON AND SHARING THE CONSTANT WOULD SAY IT WAS.** This
- * port is `INV-04`'s left-hand side: every day from day one, which is a walk
- * over the account's whole mark history rather than one call repeated. Nothing
- * in this session built that walk, and the day it is built it still cannot
- * return, because every element of the array carries the same `external`.
+ * SPLITTING THE TWO WAS `ADR-258`'s CALL AND IT IS WHY THIS READS CORRECTLY
+ * TODAY: a shared constant would now name a discharged blocker on a port that
+ * still refuses for a reason nobody has touched.
  */
 const ACCOUNT_DAYS_FROM_BLOCKER =
-  `${ACCOUNT_DAY_BLOCKER}. AND THIS PORT OWES A SECOND THING: it is INV-04's whole input ` +
-  'history rather than one day, so it is a walk over every live `daily_marks` row for the ' +
-  'account with a per-day prior, and no session has written that walk. Both are owed and the ' +
-  'gates are the one that is not a matter of typing it';
+  "it is INV-04's whole input history rather than one day, so it is a walk over every live " +
+  '`daily_marks` row for the account with a per-day prior, and no session has written that ' +
+  'walk. `loadAccountDay` serves ONE day off the same tables (ADR-258, ADR-260), so what this ' +
+  'port owes is the walk and not a field: a per-day loop over that reader would re-read the ' +
+  'plan, the identity and the chain once per day, which is the shape this port exists to ' +
+  'replace rather than to wrap';
 
 /** The blocker every `engine_gates` READ shares. `ADR-239` slice A. */
 const DECODER_BLOCKER =
@@ -483,29 +498,34 @@ function readPort(db: WorkerDb): BatchReadPort {
     },
 
     /**
-     * One account's inputs for one day: `null` when it has no live mark, five
-     * of six fields when it has, and a refusal naming `external`.
+     * One account's inputs for one day: `null` when it has no live mark, and all
+     * SIX fields when it has.
      *
-     * **THE FIVE ARE RESOLVED BEFORE THE SIXTH REFUSES, AND THE ORDER IS THE
-     * CLAIM.** A port that threw on the field name without reading anything
-     * would be asserting that the other five are unreachable, which is what the
-     * retired reason said and is no longer true. Reading them first makes the
-     * refusal a MEASUREMENT per account-day: the plan resolved, the prior
-     * decoded, the mark was live, the settlements landed on this day, and the
-     * anchor was read, and then `ADR-248`'s field stopped it. The cost is one
-     * account's reads on a batch that was going to stop at the first account
-     * anyway.
+     * **THIS PORT REFUSED SIX FIELDS, THEN ONE, AND NOW REFUSES NONE.** The last
+     * one was `external`, `ADR-248` ruled it not constructible on a contradiction
+     * in a frozen plan, `ADR-254` ruled the contradiction, and `ADR-260` wrote
+     * the resolver. There is no unwired arm left on this method.
+     *
+     * **IT CAN STILL THROW, AND THAT IS A PER-ACCOUNT FACT RATHER THAN A PORT
+     * THAT IS NOT WIRED.** `resolveExternalGates` refuses a leg it cannot
+     * derive -- an `accounts.status` the engine's union does not admit, a KYC
+     * chain with no single head, a `payout_requests.status` outside the declared
+     * vocabulary -- because `R-41` conjoins all five as VETOES and a fact
+     * defaulted to the permissive value is a veto that never fires. The
+     * `ExternalGatesRefusal` names the account and every failing leg, and it
+     * stops the batch, which is what a fold refuses to do with an invented input.
      *
      * **THE `null` ARM IS A WHOLE ANSWER AND NOT A SMALLER REFUSAL.** `ports.ts`
      * declares it -- "or `null` if it has no live mark" -- and `nightly.ts`
      * counts it as `absent` rather than as a failure, so an account whose mark
      * was superseded between the partition read and this call is answered
-     * correctly today.
+     * correctly today. **AN ACCOUNT THE RESOLVER REFUSES IS NOT ANSWERED `null`**:
+     * that arm means no mark, and reusing it for an unfoldable account would hide
+     * a mark that arrived for an account still being provisioned behind a count
+     * of accounts that had no data.
      */
     async loadAccountDay(accountId: string, tradingDay: TradingDay): Promise<AccountDay | null> {
-      const day = await db.batch(async (tx) => resolveAccountDay(tx, accountId, tradingDay));
-      if (day === null) return null;
-      throw new BatchPortUnwired('loadAccountDay', `${ACCOUNT_DAY_BLOCKER}. ${witness(day)}`);
+      return await db.batch(async (tx) => resolveAccountDay(tx, accountId, tradingDay));
     },
 
     accountDaysFrom(): Promise<never> {
@@ -586,16 +606,40 @@ export function postgresBatchPorts(db: WorkerDb): BatchPorts {
 // the codec merged.
 //
 // -----------------------------------------------------------------------------
-// THE SIXTH FIELD IS NOT WRITTEN HERE AND THE REASON IS A RULING
+// THE SIXTH FIELD IS RESOLVED HERE AND NARROWED SOMEWHERE ELSE, ON PURPOSE
 // -----------------------------------------------------------------------------
-// `ADR-248` ruling 3: `ExternalGates` is NOT CONSTRUCTIBLE in this deployable.
-// Three of its five facts resolve off registered tables and two do not, and the
-// one that matters is `hasPayoutInFlight`: `M01` section 2.1 declares R-38 at
-// the ACCOUNT grain and Group F restates it at the IDENTITY grain, `M01` is
-// FROZEN, and both sentences are in it. `evaluatePayout` conjoins all five as
-// VETOES (`R-41`), so a value invented for any of them is a gate that never
-// fires on the path where money leaves the firm. Nothing below writes one, and
-// no permissive or refusing default stands in for one.
+// `ADR-248` ruling 3 read that this deployable might not construct an
+// `ExternalGates` at all, on the ground that `hasPayoutInFlight` was a predicate
+// `M01` stated at two grains. The retired sentence is PARAPHRASED rather than
+// quoted, for the reason one section up. `ADR-254` RULED THE GRAIN ACCOUNT and amended `M01`, so
+// what was left was a resolver rather than a ruling, and `ADR-260` is it.
+//
+// **THIS FILE READS THE ROWS AND `packages/rules-engine/src/external-gates.ts`
+// READS THE VALUES, AND THE SPLIT IS THE WHOLE DESIGN.** `resolveExternalGates`
+// takes the RAW column values and returns the record or refuses by leg; nothing
+// below narrows `accounts.status`, decides what `provisioning_pending` means,
+// picks the head of a KYC chain or classifies a payout status. Those are one
+// predicate that TWO deployables need -- this one for `AccountDay.external` and
+// `apps/api` for `PayoutSubject.gates` -- neither can import the other, and the
+// engine declares no workspace dependency, so it is the only place both arrows
+// already point. An answer written here and a second one there is `FM-16` by
+// name, which is the defect `ADR-239` slice A moved the gates codec to close.
+//
+// **AND NOTHING HERE DEFAULTS.** `evaluatePayout` conjoins all five as VETOES
+// (`R-41`), so a value invented for any of them is a gate that never fires on the
+// path where money leaves the firm. A row this reader cannot read is a
+// `BatchRowError` and a value the resolver cannot derive is an
+// `ExternalGatesRefusal`. Neither is a `false`.
+//
+// **THE FOUR TABLES ARE ALL REACHABLE ON THIS DOOR AND THE READ IS FOUR MORE PER
+// ACCOUNT-DAY.** `identities` at the account's `identity_id`, every
+// `kyc_verifications` row of that identity, and every `payout_requests` row of
+// this account, plus the `accounts` row this function already holds.
+// `payout_requests` is read TWICE per account-day -- once here for the statuses
+// and once in `settlementsOn` for the settled rows -- and that is stated rather
+// than hidden: both reads are on ONE transaction and therefore on one snapshot,
+// so they cannot disagree, and merging them would put a settlement filter and a
+// gate filter in one loop where the next reader has to work out which is which.
 //
 // -----------------------------------------------------------------------------
 // A SECOND DECODER OF `plan_versions.rules` EXISTS AND THIS IS THE SECOND ONE
@@ -630,15 +674,6 @@ export function postgresBatchPorts(db: WorkerDb): BatchPorts {
 // here, so both are refused rather than rounded: a cap silently reduced by
 // rounding is a payout ceiling nobody published.
 // =============================================================================
-
-/**
- * An `AccountDay` with the one field this deployable may not construct removed.
- *
- * DERIVED FROM THE PORT RATHER THAN RESTATED, which is `BatchTx`'s own idiom at
- * the top of this file: if `ports.ts` grows a field, this type grows with it and
- * `resolveAccountDay` fails to compile, which is what a derived type is for.
- */
-export type AccountDayInputs = Omit<AccountDay, 'external'>;
 
 /** The two arguments `resolvePlan` takes, named off the function rather than re-imported. */
 type PublishedRules = Parameters<typeof resolvePlan>[0];
@@ -1233,7 +1268,7 @@ export async function resolveAccountDay(
   tx: BatchTx,
   accountId: string,
   tradingDay: TradingDay,
-): Promise<AccountDayInputs | null> {
+): Promise<AccountDay | null> {
   const mark = await liveMark(tx, accountId, tradingDay);
   if (mark === null) return null;
 
@@ -1250,10 +1285,75 @@ export async function resolveAccountDay(
     prior: await priorState(tx, accountId, tradingDay),
     mark,
     settlements: await settlementsOn(tx, accountId, tradingDay),
+    // R-40 AND R-38's INPUTS, resolved LAST because they are the reads this
+    // function grew and the four before them are the ones it was proved on.
+    external: await externalGates(tx, account, accountId),
     // R-32's anchor, READ AND NEVER DERIVED (ADR-051). `accounts.opened_on` is
     // `date NOT NULL`, so an account row that exists carries one.
     openedOn: text(account, 'openedOn', 'accounts') as TradingDay,
   };
+}
+
+/**
+ * The five context facts, read off four tables and narrowed by the engine.
+ *
+ * **EVERY VALUE HANDED OVER IS THE RAW COLUMN.** `accounts.status` goes across
+ * as the `text` this reader found, not as an `AccountStatus`, because narrowing
+ * it here would be the second place the seven-versus-six question is answered
+ * and `external-gates.ts` exists to hold it in one. The same is true of
+ * `kyc_verifications.state` and `payout_requests.status`.
+ *
+ * **THE IDENTITY ROW IS REQUIRED AND ITS ABSENCE IS `missing()` RATHER THAN A
+ * FALSE.** `accounts.identity_id` is `uuid NOT NULL REFERENCES identities(id)`,
+ * so an account whose owner cannot be read is a foreign key that did not hold,
+ * and `identities.payouts_frozen` is a VETO: reading it as `false` because the
+ * row was not there is the exact shape `R-41` makes expensive.
+ *
+ * **THE KYC READ IS THE WHOLE CHAIN AND NOT THE HEAD.** `SD-M19-01` makes a
+ * re-verification a NEW ROW pointing at the one it supersedes, so the head is a
+ * property of the SET and cannot be addressed. `scope.ts` puts `supersedes`
+ * inside the identity, so the chain never leaves it.
+ *
+ * **THE PAYOUT READ IS EVERY ROW OF THIS ACCOUNT AND THE STATUS FILTER IS THE
+ * ENGINE'S.** A filter here would be a sixth copy of
+ * `payout_requests_no_in_flight_uq`'s predicate with nothing comparing it, which
+ * is what `ADR-254` finding 4 asked the resolver not to be.
+ */
+async function externalGates(
+  tx: BatchTx,
+  account: Record<string, unknown>,
+  accountId: string,
+): Promise<ExternalGates> {
+  const identityId = text(account, 'identityId', 'accounts');
+  const identity = asRow(
+    (await tx.rowAt('identities', { id: identityId })) ?? missing('identities', identityId),
+    'identities',
+  );
+
+  const kycChain: KycChainRow[] = (await tx.rowsWhere('kycVerifications', { identityId })).map(
+    (value) => {
+      const row = asRow(value, 'kycVerifications');
+      return {
+        id: text(row, 'id', 'kycVerifications'),
+        state: text(row, 'state', 'kycVerifications'),
+        supersedes: textOrNull(row, 'supersedes', 'kycVerifications'),
+      };
+    },
+  );
+
+  const payoutRequestStatuses = (await tx.rowsWhere('payoutRequests', { accountId })).map((value) =>
+    text(asRow(value, 'payoutRequests'), 'status', 'payoutRequests'),
+  );
+
+  return resolveExternalGates({
+    accountId,
+    accountStatus: text(account, 'status', 'accounts'),
+    identityPayoutsFrozen: flag(identity, 'payoutsFrozen', 'identities'),
+    accountPayoutsFrozen: flag(account, 'payoutsFrozen', 'accounts'),
+    reconBlocked: flag(account, 'reconBlocked', 'accounts'),
+    kycChain,
+    payoutRequestStatuses,
+  });
 }
 
 /** A row a NOT NULL foreign key says must exist. */
@@ -1351,21 +1451,11 @@ async function priorState(
   return latest === null ? null : toRuleState(latest, `rule_states[${accountId}:${latestDay}]`);
 }
 
-/**
- * What the five resolved to, carried into the refusal message.
- *
- * **A REFUSAL THAT NAMES ONLY THE MISSING FIELD IS INDISTINGUISHABLE FROM A
- * PORT THAT READ NOTHING**, and this port's whole claim is that it read
- * everything else. So the message carries the evidence: an operator meeting this
- * throw can see that the plan resolved, that the prior decoded, and that the
- * only thing between this batch and a `rule_states` row is `R-38`'s grain.
- */
-function witness(day: AccountDayInputs): string {
-  const prior = day.prior === null ? 'null (the account`s first day)' : day.prior.tradingDay;
-  return (
-    `The other five resolved for account ${day.accountId} on ${day.mark.tradingDay}: plan ` +
-    `${day.plan.planVersionId} at ${day.plan.sizeCents.toString(10)} cents, prior ${prior}, a ` +
-    `live mark, ${String(day.settlements.length)} settlement(s) effective on the day, and ` +
-    `opened_on ${day.openedOn}`
-  );
-}
+// `witness()` LIVED HERE AND IS DELETED WITH THE REFUSAL IT SERVED. `ADR-258`
+// built it so that `loadAccountDay`'s throw carried evidence of the five fields
+// that HAD resolved, on the ground that "a refusal that names only the missing
+// field is indistinguishable from a port that read nothing". There is no refusal
+// on this port any more, so keeping the function would be keeping a message for
+// a throw nothing reaches. What replaces it is narrower and is the engine's:
+// `ExternalGatesRefusal` names the account and every leg it could not derive,
+// which is the same property applied to the failure that DOES remain.

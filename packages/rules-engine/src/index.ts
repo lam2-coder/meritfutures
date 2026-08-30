@@ -269,10 +269,41 @@ export { validatePlan } from './plan/validate.ts';
 // reader of the column has the stored shape in the type system rather than in a
 // comment. `EngineGatesCodecError` is the same case: a refusal a caller must be
 // able to name is a refusal a caller must be able to catch.
+//
+// `resolveExternalGates` IS THE ELEVENTH NAME AND ADR-078's TEST GIVES THE SAME
+// ANSWER AGAIN, FOR THE SAME REASON AND ON THE SAME TWO CALLERS. Section 1.3's
+// rationale is "every additional export is a way for a caller to reimplement a
+// rule slightly differently", and this function REIMPLEMENTS NO RULE: `R-40` and
+// `R-41` are `evaluatePayout`'s and nothing here decides whether a gate passes.
+// What it owns is the NARROWING between four columns and the two unions
+// `types.ts` declares, and `ExternalGates` is required by BOTH deployables --
+// `apps/worker` builds `AccountDay.external` for the nightly fold and `apps/api`
+// builds `PayoutSubject.gates` for the payout route. Withholding it does not
+// produce one narrowing: it produces two, one per deployable, which is `FM-16`
+// and is what the codec above is here to avoid.
+//
+// AND THE COST OF WITHHOLDING IS ALREADY VISIBLE ONE LEG DOWN RATHER THAN
+// PREDICTED. `currentKycState` is written out TWICE under `apps/api/src/routes/`
+// because a route module importing another route module is an edge that
+// directory has decided it will not have, so the head-of-chain reading already
+// exists in two copies with nothing comparing them.
+//
+// `PAYOUT_IN_FLIGHT_STATUSES` RIDES WITH IT AND IS THE POINT RATHER THAN A
+// CONVENIENCE. `ADR-254` section 8 finding 4 recorded that this status set is
+// written out in five places and that "nothing pins the resolver that does not
+// exist yet", with the cheapest control being that it import a constant rather
+// than a literal. The constant is only a control if a caller can name it.
+// `ExternalGatesRefusal` is `EngineGatesCodecError`'s case unchanged: a refusal a
+// caller must be able to catch is a refusal a caller must be able to name.
 export { advanceDay, initialState } from './day/advance.ts';
 export { applySettlement } from './payout/settle.ts';
 export { evaluatePayout } from './payout/evaluate.ts';
 export { decodeEngineGates, encodeEngineGates, EngineGatesCodecError } from './gates-codec.ts';
+export {
+  ExternalGatesRefusal,
+  PAYOUT_IN_FLIGHT_STATUSES,
+  resolveExternalGates,
+} from './external-gates.ts';
 export { PROJECTION_ASSUMPTIONS, PROJECTION_CAVEAT, projectPayout } from './payout/project.ts';
 export { replay, ReplayAssertionError } from './replay.ts';
 export {
@@ -292,6 +323,7 @@ export type {
   StoredTradedDaysGate,
   StoredWinDaysGate,
 } from './gates-codec.ts';
+export type { ExternalGateFacts, KycChainRow } from './external-gates.ts';
 export type { PayoutContext } from './payout/evaluate.ts';
 export type {
   PayoutProjection,
