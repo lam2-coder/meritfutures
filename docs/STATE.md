@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->239<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->240<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10129,3 +10129,31 @@ not in this row's verification list and it mutates the working tree.
 **A LANDMINE THAT MOVED AND IS NOW AT ITS LIMIT.** `docs/STATE.md` carries the `gen:adr_count` paragraph **EIGHT** times and `RI-12`'s ceiling is **eight**. [Session 439](sessions/2026-08-29-session-439.md) recorded four and called the cost headroom. **There is no headroom left: a ninth copy turns `RI-12` RED.** This row's `STATE` permission is `append` and the duplicates are keep-both merge artefacts rather than claims, so they are reported rather than collapsed.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **22 of 22** invariants off the runner's own last line, **272 files / 6,608 passed / 6 skipped** against a baseline of **271 / 6,597 / 6** reproduced on this same tree before a byte changed, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**: forbidden by this row and it mutates the working tree.
+
+---
+
+## `R-38` is ACCOUNT grained, and the corpus was not split about behaviour (2026-08-29, row `254`)
+
+**[ADR-254](decisions/ADR-254.md), `status: proposed`, UNSIGNED. MONEY PATH, `E2` READ OWED. NO MIGRATION NUMBER IS TAKEN:** `0075` was read as the next free number at branch time and **returns to the pool**, because the ruling upholds the live index rather than superseding it. No file under `packages/db/` is edited.
+
+> **`hasPayoutInFlight` is true when an `approved`, `frozen` or `held_pending_review` `payout_requests` row exists FOR THE SUBJECT ACCOUNT, which is `payout_requests_no_in_flight_uq`'s predicate, and it is never the identity's.**
+
+**THE TIEBREAK WAS ALREADY BUILT AND IT IS NOT PLAN VERSUS INDEX.** [`0031:104-106`](../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) is `CREATE UNIQUE INDEX ... ON payout_requests (account_id)`, and [`M01:283`](plans/M01-rules-engine.md) is `SD-09`, **M01's own schema delta**, declaring it at `(account_id)`. **The index is the plan's delta built faithfully, so the contradiction was always M01 against itself, at two lines.**
+
+**THE LOSING READING IS THE IDENTITY AND IT LOST ON FIVE GROUNDS, NOT ON THE INDEX.** [ADR-019](decisions/ADR-019.md) migrated `G-NO-IN-FLIGHT` to the external leg because *"there is no window in which an internal payout is in flight"*; [ADR-040](decisions/ADR-040.md) put `held_pending_review` **before** approval, ruled *"A held request is outstanding"*, and **re-created the account-grained unique index rather than dropping it**. ADR-040 also named M01's `SD-09` and its `hasPayoutInFlight` comment as **its own** unswept sites. The losing sentence is satisfiable on **neither** table, because `payout_status` has no `transferring` and `wallet_withdrawal_status` has no `frozen`, so its status set came from the internal leg and only its grain word came from ADR-019. The conservative reading would impose the extraction ceiling **`OQ-7` declined to impose**. And an identity gate is cross-account state, which AS-09 says a pure fold may not hold.
+
+**THE SOURCE THAT SETTLES IT WAS NEVER QUOTED BY [ADR-248](decisions/ADR-248.md) OR BY THE ROW.** [`M01:965`](plans/M01-rules-engine.md), AS-09's own attack: *"AS-01's in-flight rule does not help because each account has its own."* And [`STATE_MACHINES:405`](architecture/STATE_MACHINES.md), the authoritative drawing corrected under ADR-040, reads *"No `payout_requests` row for this account"* and pins itself to the index predicate. **Nine sources take the account and two take the identity, one of the two transcribing the other. The question was open only inside M01.**
+
+**AND THE TWO READINGS ARE TWO RULES RATHER THAN ONE, WHICH IS THE TRANSFERABLE HALF.** [ADR-158](decisions/ADR-158.md) finding 8 already calls `G-NO-IN-FLIGHT` *"a UNIQUE index on the internal leg and a plain index on the external one"*. ADR-019's one-in-flight-per-identity rule is real, is founder-ruled, is **not amended**, and is **already built and shipping** as `gateNoInFlight` in [`routes/wallet-withdrawals.ts`](../apps/api/src/routes/wallet-withdrawals.ts), which never reads `ExternalGates`. **A guard name is not a rule identity.**
+
+**M01 MOVES AT FOUR LINES AND THE HALVES ARE SEPARATED SO ONE CAN BE REJECTED.** `531` and `544` are the grain, **ruled here**, with the retired sentence kept and marked under `**THIS ROW READ**`. `207` and `283` are the status vocabulary, **ADR-040's own named remainder folded here** because re-pointing `531` at `payout_requests` while writing `transferring` would create the `C-02` defect rather than inherit it. **M01 was the last of the four sites that sweep did not reach.**
+
+**BUILT**: [`apps/api/test/r38-grain.test.ts`](../apps/api/test/r38-grain.test.ts), **20 cases, all twenty watched RED** -- seven on the committed tree and thirteen on thirteen seeded defects, every file restored `sha256sum` identical. **One seed found a hole in the assertion rather than in the tree**, and the case now compares the predicate CLAUSE against the statuses parsed from the live index.
+
+**NO RESOLVER IS BUILT AND NO PORT IS WIRED.** `usePayoutBackend` narrows from *"`gates` waits on a RULING"* to *"one ruling and one resolver"*, because `accountStatus` is still not a total map and **what `provisioning_pending` means to the engine is now the only thing between `gates` and constructible.** The next row on this port belongs at that ruling.
+
+**TWO FENCE DEFECTS ARE DECLARED RATHER THAN BURIED.** Row `254` fenced the executed assertion to `packages/rules-engine/test/**`, and that package sets `types: []` so that *"an I/O call inside this package is a COMPILE ERROR"*: a file-reading assertion is **impossible** there, the boundary is right, and the suite lands in `apps/api/test/` with `types` **not** widened. And two cases in [`rule-state-producibility.test.ts`](../apps/api/test/rule-state-producibility.test.ts), written by ADR-248 to pin the contradiction and sliced out of M01 rather than typed, **went RED on the amendment without being seeded**, exactly as they were built to.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **22 of 22** invariants off the runner's own last line, **278 files / 6,686 passed / 6 skipped** against a baseline of **277 / 6,666 / 6** reproduced on this tree before a byte changed, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**: forbidden by this row and it mutates the working tree.
+
+**A LANDMINE CORRECTED.** Session 445 recorded this file carrying the `gen:adr_count` line **eight** times against `RI-12`'s ceiling of eight. It measures **five** here and `RI-12` is green. **Re-measure a ceiling before treating it as reached.**
