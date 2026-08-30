@@ -11084,6 +11084,8 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 
 **Next.** One non-money row taking both: a `scratchpad/` entry in `.gitignore`, and one sentence in `RI-31`'s header pointing at [EC-158](edge-cases/EC-158.md) and [ADR-300](decisions/ADR-300.md). Neither is urgent and both are cheap.
 
+**No pull request was opened and the branch still ends mergeable.** `gh` is not installed and `api.github.com` answers 403 for this session, *"GitHub access is not enabled for this session"*. `git push` works through the git proxy, so the branch is on `origin`; `origin/main` was merged in after the first push, the merge was clean, and `RI-31` is green on the result. **The pull request is owed.**
+
 **The container landmine got worse rather than better: this session's repository was not present at all on arrival.** `/home/user` was empty, there was no git repository, and the clone had to be requested and run before anything could be read. `node_modules` was then absent as well, restored by `pnpm install --frozen-lockfile` and never committed.
 
 The position after this row, each command run separately and each exit code read with no pipe: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped** against a baseline of **298 / 7,249 / 6** measured on this tree before the first edit, a delta of **zero**, lint exit 0 and `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row, and `falsify.mjs` was not run: it mutates the working tree. See [session 491](sessions/2026-08-30-session-491.md).
