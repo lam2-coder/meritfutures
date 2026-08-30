@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->257<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->258<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10507,3 +10507,25 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **`RI-25` MINTED, and the seed proved the check wrong before the check proved anything**: its first version matched the raw file and reported PASS with the call **commented out**, because `client.ts`'s own header explains the repair at length. Comments are stripped now, both forms are permanent cases, and it was watched red under four seeds with every restore `sha256sum -c` byte-identical.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **24 of 24** invariants off the runner's own last line, **292 files / 7,020 passed / 6 skipped** against a baseline of **291 / 6,987 / 6** measured on this tree before a byte changed, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, per the row.
+
+---
+
+## 2026-08-30 - Session 463: a column that lies about its type, and six that only decline to say ([ADR-272](decisions/ADR-272.md), proposed)
+
+**[ADR-272](decisions/ADR-272.md), `proposed`, UNSIGNED. NOT MONEY BY CONTENT AND NOT BY BLAST RADIUS**: no DDL, no reader and no value moves, and the only executable thing that lands is a check.
+
+**THE CONVENTION QUESTION IS ANSWERED AND THE ANSWER IS NEITHER OF THE TWO ROW `272` OFFERED.** [ADR-146](decisions/ADR-146.md) clause 2 reads *"a RESPONSE FIELD named `*_at` ... AT THE POINT OF PROJECTION"* and reaches no column name at all. What makes the schema-level property a rule anyway is that [ADR-271](decisions/ADR-271.md) section 3 shipped a global `setTypeParser(1082, ...)` and bounded its blast radius by arguing the two vocabularies do not overlap. **A property a landed repair has been argued from is a rule, whatever document it was written in**, and until now nothing checked it.
+
+**THE RULE IS NARROWER THAN THE CONVENTION IT COMES FROM: a column name may be SILENT about its temporal type and may not be FALSE about it.** A name that lies INSIDE the `{instant, day}` vocabulary hands a reader a wrong answer of the RIGHT SHAPE, both types being `string` in drizzle and both ordering lexicographically, so nothing downstream refuses it. One that lies ACROSS type families is refused by the first type anything gives it. **That clause disposes of four columns no list carried**: `daily_marks.traded_day`, `daily_marks.win_day` and `trading_calendar.is_half_day` are `boolean`, `loyalty_criteria.breaks_on` is `text[]`, two of them on the payout basis, ruled acceptable rather than missed.
+
+**FINDING 1 UPHELD AND MEASURED.** `simulation_runs.calibration_observed_at` is **1 of 321 `*_at` column declarations** and the only non-instant in the estate. **FINDING 2 IS SHORT BY ONE NAME AND EIGHT DECLARATIONS**: seven distinct silent names over fourteen declarations, `affiliate_commissions.payable_after` on no list.
+
+**AND THE CHECK FOUND THE DECIDING FACT BEFORE THE ENTRY KNEW TO LOOK FOR IT.** Run first with EMPTY exception sets, `RI-26` reported two findings and the second was in no list anywhere: **`effective_from` is a `date` in SIX tables and a `timestamptz` in THREE.** Nine tables, one word, two temporal types, and nothing saying so. That is clause 2's harm arriving through a name that makes no claim at all, which is why leg 1 alone would have been the wrong check. **The row's second trap is upheld for the other six** and they are not churned: each denotes exactly one type everywhere it appears.
+
+**NEITHER REPAIR LANDS AND THE FENCE IS THE REASON RATHER THAN A JUDGEMENT.** The reader set is five files, two of them `scripts/db` probes that `corpus.yml` runs and `CI-06h` pins, and row `272` fences neither. **The rename is SPECIFIED to `calibration_observed_on`, never `_day`**, because API_CONTRACT section 1 makes `*_day` an exchange trading day and a calibration observation is on no exchange calendar, so `_day` would trade one false assertion for a second. **NO MIGRATION NUMBER TAKEN OR RESERVED**, `0074` still the highest.
+
+**`RI-26` MINTED**, next free number, row in the same commit. Two legs, each asserted in BOTH DIRECTIONS on `0027`'s float-column idiom, and each ruled exception carries its ground and its WITNESS migrations, so the stale-entry half is also the sentinel: a reader that stops reading turns the check RED rather than green. **Watched RED before GREEN on the real tree under four seeds**, both directions of both legs, every restore `sha256sum -c` byte-identical, plus twelve permanent cases in the suite.
+
+**TWO REGISTER DEFECTS REPAIRED UNDER CITATION-REPAIR RIGHTS.** **`RI-25` had no row at all**, although [ADR-271](decisions/ADR-271.md) section 8 states it was *"minted here with its row in the same commit"* and the note still read *"`RI-25` IS THE NEXT FREE NUMBER"*: `RI-14`'s defect for the THIRD time. **`RI-23`'s row was short a cell** and rendered as prose outside its own table, carried by `CI-06/table-row-width` as one of 17 ragged rows and by `CI-06v` as a one-line orphan under its minimum length; **adding two rows beside it turned that silent report into a failure.**
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **25 of 25** invariants off the runner's own last line, **293 files / 7,063 passed / 6 skipped**, of which 13 are new here (12 written cases plus `RI-26`'s automatic enrolment in the clean-tree case), typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, per the row, and `falsify.mjs` was not run.
