@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->270<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->271<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10790,3 +10790,25 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **AND THE FOURTH WAS A PRE-EXISTING LEAK THIS DIFF ONLY EXPOSED.** `keyed-accessor.test.ts` swept `ALTER` with `[\s\S]*?` over every migration CONCATENATED, so one match spanned FILES and attributed `firm_parameters_id_uq` to `purchases`, eleven migrations away. It fails in both directions at once: a key the database enforces reads as invented, and one it does not enforce reads as real. **The repair is one token**, because a statement cannot contain a `;`.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **29 of 29** invariants off the runner's own last line, **296 files / 7,152 passed / 6 skipped** against a baseline of **296 / 7,149 / 6**, a delta of the three cases added to `checkout-backend-blockers.test.ts`. Typecheck clean, lint clean, `format:check` clean. **`pnpm run verify` was NOT run** and `falsify.mjs` was not run, both forbidden by the row. **The port is not wired and the count does not move: 10 wired of 24 declared, 14 blocked.**
+
+---
+
+## 2026-08-30 - Session 478: the whole purchase, enumerated, and the critical path out of 503 runs through a lawyer ([ADR-287](decisions/ADR-287.md), proposed)
+
+**Row `287` was the third of the three obstructions `usePayoutBackend`'s entry names, the one that entry calls "the whole purchase", and it is a PLANNING row whose deliverable is a plan.** [ADR-287](decisions/ADR-287.md), ten sections, `proposed` and UNSIGNED, **MONEY PATH with the `E2` read OWED and six inherited**. **No `src/` line moved, no test changed, no migration was written, no `RI-nn` was minted, `0077` is still next, and the counts do not move at ten wired of twenty-four declared with fourteen blocked.**
+
+**The surface is FOUR methods and not more.** `identityStatus`, `subject`, `holdFlag` and `insertPayoutRequest` (`routes/payouts.ts:548`, `:551`, `:554`, `:564`), plus the carrier's `transact`, `listPayouts` and `idempotency` (`:572,575,586`), which are named because a `PayoutTx` nobody can open is not an implementation. Both of the dispatcher's facts hold.
+
+**One method is buildable today, one is buildable except in two legs already dispatched to rows `285` and `286`, and both of those were re-derived live rather than inherited.** `unwiredOrThrow` still rethrows at `routes/payouts.ts:1387` and no size-row decoder exists in any of the four `src/` trees.
+
+**AND THE TWO THIS ROW FOUND ARE VALUES WITH NO SUPPLIER RATHER THAN DOORS WITH NO IMPLEMENTATION, WHICH IS A KIND OF ABSENCE EIGHTEEN REVISIONS OF THAT ENTRY HAVE NEVER NAMED.** `insertPayoutRequest` must return an `eligibilitySnapshotId` and no such id exists anywhere: `0010_payouts.sql:70-73` argues in its own comment against a snapshot table, and `eligibility_snapshot_id` occurs exactly once in all of `docs/`, at `API_CONTRACT.md:490`. `HoldFlag` needs a `tosClause` and a `reason`, `risk_flags` carries seventeen columns and neither is among them (`0008_risk.sql:114-170`), and `payout_requests_hold_is_complete` (`0031:63-72`) makes both NOT NULL on a hold, **so the hold branch of the money path is unwritable on this tree.**
+
+**An inherited claim was checked and is half false.** The entry says `listPayouts` and `idempotency` are both constructible today. `idempotency` is; `listPayouts` is not, because `failure_note` has no column and [API_CONTRACT](architecture/API_CONTRACT.md) line 1356 says so in the corpus's own words, and `timeline` has no ruled source.
+
+**Founder-owed, named separately and not planned around: `HoldFlag.tosClause` stops at counsel.** [TOS_CLAUSES](legal/TOS_CLAUSES.md) is a drafting brief for counsel that carries no drafted prose by design, so there is no clause identifier vocabulary at all, and `DEP-M7-05` owes the open clauses to Wave 4 legal. Nothing was stubbed to get past it. The SSO purchase, the Rithmic call and a Postmark account were each checked and none gates a line of `PayoutTx`.
+
+**The size is nine sessions and it is not rounded down**: three rulings, five builds and the installation, each with a stop condition. **Seven are schedulable, slice 8 is not schedulable at all, and slice 9 depends on it, so no sequence of sessions alone takes this route off 503.** The shortening move is named as a founder choice rather than assumed.
+
+**Next.** Rows `285` and `286` remain the near-term path. Slices 1 and 2 are rulings and can be dispatched immediately. Findings `F1`, `F2` and `F4` are owed to `usePayoutBackend`'s entry by a row whose fence reaches `apps/api/test/**`, and `F4` corrects a claim that entry makes today.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **30 of 30** invariants off the runner's own last line, **297 files / 7,215 passed / 6 skipped**, measured against a baseline taken by stashing this branch's whole diff on this same tree and re-running: **297 / 7,215 / 6**, a delta of **ZERO**, which is what a planning row that changes no test must report. Typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run and `falsify.mjs` was NOT run**, both forbidden by the row.
