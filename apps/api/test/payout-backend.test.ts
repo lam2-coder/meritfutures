@@ -23,6 +23,7 @@ import { PayoutRowError, postgresPayoutBackend } from '../src/payout-backend.ts'
 import { identityScope } from '../src/idempotency.ts';
 import { PayoutBackendUnwired } from '../src/routes/payouts.ts';
 import type { AuthSession } from '../src/routes/auth.ts';
+import type { PayoutRequestInsert } from '../src/routes/payouts.ts';
 
 const IDENTITY = '0199c7a1-1111-7000-8000-000000000501';
 
@@ -191,20 +192,221 @@ describe('a row the schema says cannot exist raises rather than defaulting', () 
 });
 
 // -----------------------------------------------------------------------------
-// THE FIVE THAT REFUSE. THE WHOLE SHAPE OF THIS SLICE
+// `insertPayoutRequest()`. THE APPROVAL BRANCH, AND ONLY THE APPROVAL BRANCH
+// -----------------------------------------------------------------------------
+// ADR-287 slice 6, ruled by ADR-295. WHAT THIS BLOCK WATCHES IS THE THREE TRAPS
+// ADR-287 finding F3 recorded, because every one of them fails SILENTLY: two
+// fields of the insert shape have no column and their values are already stored
+// elsewhere, one `NOT NULL` column is absent from the shape and is derived, and
+// the tenancy column is the handle's to stamp and the caller's to leave alone.
+// A body that got any of the three wrong would still compile.
+
+const ACCOUNT = '0199c7a1-5555-7000-8000-000000000501';
+const PLAN_VERSION = '0199c7a1-6666-7000-8000-000000000501';
+const REQUEST = '0199c7a1-7777-7000-8000-000000000501';
+
+/**
+ * One approval-branch row.
+ *
+ * EVERY MONEY FIELD IS A `bigint` LITERAL AND NOT A NUMBER, which is the
+ * corpus rule applied to a fixture rather than only to source: `Cents` is
+ * `bigint` and the four columns are `bigint NOT NULL`, so a fixture written in
+ * `number` would be asserting against a row this code never receives.
+ */
+function approvalRow(over: Partial<PayoutRequestInsert> = {}): PayoutRequestInsert {
+  return {
+    id: REQUEST,
+    accountId: ACCOUNT,
+    idempotencyKey: 'client-token-1',
+    status: 'approved',
+    basisTradingDay: '2026-08-28',
+    ordinal: 1,
+    requestedCents: 100_000n,
+    approvedCents: 90_000n,
+    traderCents: 81_000n,
+    firmCents: 9_000n,
+    splitBp: 9000,
+    clampReason: 'withdrawable',
+    eligibilitySnapshot: { clamp: { reason: 'withdrawable', split_bp: 9000 } },
+    hold: null,
+    ...over,
+  };
+}
+
+/** The `accounts` row the derivation reads, in `packages/db`'s property spelling. */
+function accountRow(planVersionId: unknown = PLAN_VERSION): Record<string, unknown> {
+  return { id: ACCOUNT, planVersionId };
+}
+
+describe('insertPayoutRequest writes the approval row and derives what the shape omits', () => {
+  /** Drive one insert over a seeded `accounts` reply. */
+  function write(
+    rowAt: unknown,
+    row: PayoutRequestInsert = approvalRow(),
+  ): { readonly run: Promise<void>; readonly recorder: ReturnType<typeof recordingDb> } {
+    const recorder = recordingDb({ rowAt, ...NO_PRE_IDENTITY_DOORS });
+    return {
+      recorder,
+      run: postgresPayoutBackend(recorder.db).transact(SESSION, (tx) =>
+        tx.insertPayoutRequest(row),
+      ),
+    };
+  }
+
+  it('reads `accounts` on THE SAME TRANSACTION and inserts through the scoped door', async () => {
+    const { run, recorder } = write(accountRow());
+    await run;
+
+    // ONE DOOR, ONE IDENTITY, TWO VERBS IN ORDER. The derivation cannot be a
+    // second connection: `plan_version_id` is copied FOR PROVABILITY and a copy
+    // taken on another snapshot is a provenance nobody can reproduce.
+    expect(recorder.calls.map((c) => c.door)).toStrictEqual(['scoped', 'scoped']);
+    expect(recorder.calls.map((c) => c.identityId)).toStrictEqual([IDENTITY, IDENTITY]);
+    expect(recorder.calls.map((c) => `${c.verb} ${c.key}`)).toStrictEqual([
+      'rowAt accounts',
+      'insert payoutRequests',
+    ]);
+    expect(recorder.calls[0]?.address).toStrictEqual({ id: ACCOUNT });
+  });
+
+  it('writes ELEVEN of the shape s FOURTEEN fields plus the DERIVED `plan_version_id`', async () => {
+    const { run, recorder } = write(accountRow());
+    await run;
+
+    // THE WHOLE ASSERTION IS `toStrictEqual` AND NOT A FIELD-BY-FIELD WALK, so
+    // a twelfth key arriving is a failure rather than something nobody checked.
+    expect(recorder.calls[1]?.values).toStrictEqual({
+      id: REQUEST,
+      accountId: ACCOUNT,
+      planVersionId: PLAN_VERSION,
+      requestedCents: 100_000n,
+      approvedCents: 90_000n,
+      traderCents: 81_000n,
+      firmCents: 9_000n,
+      basisTradingDay: '2026-08-28',
+      eligibilitySnapshot: { clamp: { reason: 'withdrawable', split_bp: 9000 } },
+      status: 'approved',
+      idempotencyKey: 'client-token-1',
+      payoutOrdinal: 1,
+    });
+  });
+
+  it('names NEITHER `splitBp` NOR `clampReason`, and drops NEITHER VALUE', async () => {
+    // ADR-287 F3'S LANDMINE, AS A PROPERTY. Neither has a column and both are
+    // already inside the snapshot, so the correct action is to write neither
+    // AND to drop neither, which is ONE action rather than two. A body that
+    // added a column would state one money fact twice; a body that stripped the
+    // snapshot would lose the only copy.
+    const { run, recorder } = write(accountRow());
+    await run;
+
+    const values = recorder.calls[1]?.values as Record<string, unknown>;
+    for (const absent of ['splitBp', 'split_bp', 'clampReason', 'clamp_reason'])
+      expect(Object.keys(values)).not.toContain(absent);
+    expect(values['eligibilitySnapshot']).toStrictEqual({
+      clamp: { reason: 'withdrawable', split_bp: 9000 },
+    });
+  });
+
+  it('names NO tenancy column, because the handle stamps it', async () => {
+    // `payout_requests` is scope class `owned` on `identity_id`, and
+    // `packages/db` REFUSES an insert that names it. Asserted here so a later
+    // body cannot "fix" a `NOT NULL` column by supplying a value the door is
+    // built to reject.
+    const { run, recorder } = write(accountRow());
+    await run;
+
+    const values = recorder.calls[1]?.values as Record<string, unknown>;
+    for (const absent of ['identityId', 'identity_id'])
+      expect(Object.keys(values)).not.toContain(absent);
+  });
+
+  it('every money value reaching the insert is a `bigint` and never a number', async () => {
+    const { run, recorder } = write(accountRow());
+    await run;
+
+    const values = recorder.calls[1]?.values as Record<string, unknown>;
+    for (const field of ['requestedCents', 'approvedCents', 'traderCents', 'firmCents'])
+      expect(typeof values[field]).toBe('bigint');
+  });
+
+  it('REFUSES rather than defaulting when the `accounts` read comes back empty', async () => {
+    // A scoped read of a foreign or absent account is `undefined`, and
+    // `plan_version_id` is `NOT NULL`. THE REFUSAL IS A `PayoutRowError` AND SO
+    // A 500, never a `PayoutBackendUnwired`: nothing is down and a retry fixes
+    // nothing.
+    const { run, recorder } = write(undefined);
+    await expect(run).rejects.toBeInstanceOf(PayoutRowError);
+    await expect(run).rejects.not.toBeInstanceOf(PayoutBackendUnwired);
+
+    // AND NO ROW WAS WRITTEN. The refusal is BEFORE the insert and not after.
+    expect(recorder.calls.map((c) => c.verb)).toStrictEqual(['rowAt']);
+  });
+
+  it('REFUSES when `accounts.plan_version_id` does not read back as text', async () => {
+    const { run, recorder } = write(accountRow(null));
+    await expect(run).rejects.toBeInstanceOf(PayoutRowError);
+    expect(recorder.calls.map((c) => c.verb)).toStrictEqual(['rowAt']);
+  });
+
+  it('REFUSES a row carrying a HOLD, by name, and opens no door at all', async () => {
+    // ADR-287 SLICE 8, WHICH CANNOT BE SCHEDULED. `HoldFlag.tosClause` has no
+    // value space in this repository and `DEP-M7-05` owes the clauses to
+    // counsel. A hold citing a clause Merit has not published is worse than an
+    // unwired route, so this arm refuses rather than writing five columns whose
+    // contents nobody has drafted.
+    const { run, recorder } = write(
+      accountRow(),
+      approvalRow({
+        status: 'held_pending_review',
+        hold: {
+          heldAt: '2026-08-30T12:00:00.000Z',
+          holdExpiresAt: '2026-09-01T12:00:00.000Z',
+          holdFlagId: '0199c7a1-8888-7000-8000-000000000501',
+          holdTosClause: 'a clause id no session may invent',
+          holdReason: 'a reason no session may invent',
+        },
+      }),
+    );
+
+    const refusal = await run.then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(refusal).toBeInstanceOf(PayoutBackendUnwired);
+    expect((refusal as Error).message).toContain(
+      'PayoutBackend.insertPayoutRequest.hold is not wired',
+    );
+    expect(recorder.calls).toStrictEqual([]);
+  });
+
+  it('REFUSES a half-shaped row from either side, on the CHECK constraint s own shape', async () => {
+    // `payout_requests_hold_is_complete` admits `hold` present WITH
+    // `held_pending_review`, or neither. THE PREDICATE HERE IS TWO SIDED FOR
+    // THE SAME REASON: a row that is half of either would otherwise reach a
+    // CHECK constraint and come back as a 500 on a request nobody could
+    // diagnose.
+    const heldWithoutHold = write(accountRow(), approvalRow({ status: 'held_pending_review' }));
+    await expect(heldWithoutHold.run).rejects.toBeInstanceOf(PayoutBackendUnwired);
+    expect(heldWithoutHold.recorder.calls).toStrictEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE FOUR THAT REFUSE. THE WHOLE SHAPE OF THIS SLICE
 // -----------------------------------------------------------------------------
 
-describe('the five unbuilt members refuse VISIBLY and by name', () => {
+describe('the four unbuilt members refuse VISIBLY and by name', () => {
   /** Every `PayoutTx` member ADR-287 leaves to a later slice. */
-  const TX_MEMBERS = ['subject', 'holdFlag', 'insertPayoutRequest'] as const;
+  const TX_MEMBERS = ['subject', 'holdFlag'] as const;
 
   it.each(TX_MEMBERS)('`%s` rejects with `PayoutBackendUnwired` naming itself', async (name) => {
     const recorder = backendOver([identityRow('active')]);
     const refusal = await postgresPayoutBackend(recorder.db)
       .transact(SESSION, (tx) =>
-        // The three take different arguments and the refusal predates every one
-        // of them, so the call is made through the interface rather than shaped
-        // per member: what is asserted is that NOTHING is read before it.
+        // The two take different arguments and the refusal predates both, so
+        // the call is made through the interface rather than shaped per member:
+        // what is asserted is that NOTHING is read before it.
         (tx[name] as (arg: never) => Promise<unknown>)('account' as never),
       )
       .then(
