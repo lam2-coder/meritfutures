@@ -1718,6 +1718,42 @@ const ci06h = {
           'members in declaration order, or that no CHECK has re-listed a ' +
           'vocabulary the type already carries',
       ],
+      // ADR-259. THE ONLY READER THAT HOLDS NO COPY OF THE SCOPE MAP. Every
+      // other database-side assertion about which class is firm-scoped and
+      // which is per-identity writes the answer out again: LEDGER-K3 as a
+      // 'firm' literal, the provisioning block as a SQL array of three codes.
+      // Deleting this step deletes the only thing that reads
+      // LEDGER_ACCOUNT_SCOPE out of packages/ledger/src/accounts.ts and
+      // compares it against pg_constraint and ledger_accounts, and it takes
+      // with it the wrong-scope row in BOTH directions for the seven codes
+      // LEDGER-K3 does not name -- which was measured accepted by every
+      // constraint on the table, for all eight codes.
+      // ADR-259, AND THESE TWO ARE A FINDING RATHER THAN AN ADDITION. Both were
+      // on disk and wired at corpus.yml and pinned by NOTHING, which is OI-07's
+      // sentence exactly -- "deleting the step is how it stops running" -- in
+      // the half CI-06s cannot see, because that gate scans probe_*.sql only.
+      // RI-24 found them on its first run. assert_append_only_grants.mjs is
+      // OI-03's entire implementation and the only reader of the database's
+      // grants in this repository; assert_date_unit_shape.mjs is the only
+      // refusal of interval arithmetic against a date column, and it is the one
+      // step here that runs in the `integrity` job rather than this one, which
+      // is why the needle is a filename and not a job.
+      [
+        'assert_append_only_grants.mjs',
+        "OI-03's append-only assertion is no longer run, so nothing reads the " +
+          "database's grants against DATA_MODEL section 1 (ADR-128)",
+      ],
+      [
+        'assert_date_unit_shape.mjs',
+        'the date-unit shape check is no longer run, so interval arithmetic ' +
+          'against a date column is unrefused again',
+      ],
+      [
+        'assert_ledger_scope_agrees.mjs',
+        "the library's scope map is no longer compared against the installed " +
+          'chart, so a firm-scoped trader_wallet row or an identity-scoped ' +
+          'reserve row is legal and unread again (ADR-259)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);

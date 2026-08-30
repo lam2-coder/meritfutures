@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-18
+last_updated: 2026-08-30
 ---
 
 # DECISIONS (ADR registry)
@@ -271,6 +271,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-255](ADR-255.md) | `0038`'s reversal pointer is not the linkage the reason wanted, the absent column is absent by ruling, and the entry named the one of four that was discharged (2026-08-29, status: proposed) |
 | [ADR-257](ADR-257.md) | four fields arrive at two slots, `ok` is the engine's and is not recomputed, and the field with nowhere to go is integer cents (2026-08-29, status: proposed) |
 | [ADR-258](ADR-258.md) | the fold's blocker was one field and not six, `prior` is a smaller read than the port ADR-250 left refusing, and the plan decoder this slice needed already exists one deployable over (2026-08-30, status: proposed) |
+| [ADR-259](ADR-259.md) | the probe is run, the seed that reported it unwatched cannot be installed at all, and the gap that is real is that nothing binds scope to code (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

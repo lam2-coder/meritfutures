@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-18
+last_updated: 2026-08-30
 ---
 
 # INDEX: The Map
@@ -35,6 +35,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [scripts/db/probe_reversible_contact_addresses.sql](../scripts/db/probe_reversible_contact_addresses.sql) | 37 assertions on `ADR-046`'s sealed addresses, the **plaintext floor** that makes `INV-M10-12` a constraint, the evidence foreign keys and the `merit_dispatcher` grants ([ADR-046](decisions/ADR-046.md), `OQ-M10-06`). **Fifteen success cases**, and the only assertions in the install job that watch a GRANT by attempting the write as the role | approved | founder |
 | [scripts/db/probe_rule_states_calendar_revision.sql](../scripts/db/probe_rule_states_calendar_revision.sql) | 10 assertions on [ADR-047](decisions/ADR-047.md)'s calendar watermark on `rule_states` (`OQ-P2-02`, `0035`). **Six success cases before any rejection**, because here the dangerous edit is a **tightening** and no inventory of refusals can see one: a `NOT NULL` passes all four rejections and refuses every state row the engine writes until the calendar has been corrected once. Asserts the watermark is over the **whole calendar** rather than this row's own day, and that the `state_hash` contract still names the column as **excluded** | approved | founder |
 | [scripts/db/assert_date_unit_shape.mjs](../scripts/db/assert_date_unit_shape.mjs) | **[ADR-042](decisions/ADR-042.md)'s SQL shape check.** No `interval` arithmetic against a `date` column and no `timestamptz` cast to `date`, across the migration set. **Vacuously true today**, which is the argument for wiring it: `0029` to `0031` made `interval '48 hours'` idiomatic on the money path. `--falsify` watches it fire on five seeded violations and leave four legitimate constructs alone, including `interval '48 hours'` against a `timestamptz`, which is the ruled unit | approved | founder |
+| [scripts/db/assert_ledger_scope_agrees.mjs](../scripts/db/assert_ledger_scope_agrees.mjs) | **[ADR-259](decisions/ADR-259.md)'s scope comparison, and the only reader in this tree that holds NO copy of the map.** `LEDGER_ACCOUNT_SCOPE` is imported from [`accounts.ts`](../packages/ledger/src/accounts.ts) and compared against `pg_constraint` and `ledger_accounts` on a live database: the declared vocabulary, every row's scope, and the codes `0054`'s trigger opens for a fresh identity, each in both directions. **Nothing binds scope to code in the DDL** and a wrong-scope row was measured accepted for all eight codes; `LEDGER-K3` defends one of them, as a literal. `--falsify`, six seeds, every one rolled back | approved | claude |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |

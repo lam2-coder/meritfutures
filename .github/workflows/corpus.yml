@@ -718,3 +718,35 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/db/assert_append_only_grants.mjs
+      # ADR-259. THE LIBRARY'S SCOPE MAP AND THE DATABASE'S ROWS ARE ONE MAP.
+      #
+      # ADR-247 section 7 recorded that seeding 0056's row to identity left the
+      # vitest suite green and concluded that the migration's copy of the scope
+      # was unwatched. Both halves were wrong and both were re-measured: this job
+      # already runs probe_ledger_constraints.sql against a real database, so
+      # LEDGER-K3 has read the migration's copy on every push since ADR-187; and
+      # that seed is unrepresentable, because ledger_accounts_scope_identity
+      # refuses an identity-scoped row with a null identity_id and the seeded 0056
+      # therefore fails to apply at all.
+      #
+      # WHAT IS REAL IS THAT NOTHING BINDS SCOPE TO CODE. kind_matches_code is a
+      # closed CASE over all eight codes; there is no equivalent for scope, and a
+      # wrong-scope row was measured ACCEPTED for all eight. LEDGER-K3 defends one
+      # of them, in a hand-written literal, and the provisioning block above
+      # defends the other three in a SQL array literal. Both are further copies of
+      # the fact rather than readers of it.
+      #
+      # This step holds no copy: it imports LEDGER_ACCOUNT_SCOPE from
+      # packages/ledger/src/accounts.ts and reads pg_constraint and
+      # ledger_accounts, and compares. --falsify runs FIRST, because an assertion
+      # only ever run against a schema that satisfies it reports PASS in exactly
+      # the same way as one narrowed until it reads nothing.
+      - name: The ledger scope comparison is falsifiable (ADR-259)
+        run: |
+          set -euo pipefail
+          node scripts/db/assert_ledger_scope_agrees.mjs --falsify
+
+      - name: LEDGER_ACCOUNT_SCOPE agrees with the installed chart (ADR-259)
+        run: |
+          set -euo pipefail
+          node scripts/db/assert_ledger_scope_agrees.mjs
