@@ -305,6 +305,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-289](ADR-289.md) | `eligibility_snapshot_id` names a resource the schema deliberately refuses to create, so it comes OUT of the frozen contract and OUT of the port shape  (2026-08-30, status: proposed) |
 | [ADR-290](ADR-290.md) | two fields with no column. `failure_note` is a RULED ABSENCE with its column and its writer both specified and neither written, and `timeline`'s source is NAMED as `events` and is EMPTY because that table has no producer  (2026-08-30, status: proposed) |
 | [ADR-291](ADR-291.md) | the first real payout backend, and it is two members of seven on purpose. `transact` opens the transaction every later slice reads on, `identityStatus()` answers, and the other five refuse visibly  (2026-08-30, status: proposed) |
+| [ADR-293](ADR-293.md) | slice 6's approval branch is buildable in one body and is BLOCKED BY ONE DECLARED RETURN TYPE the fence does not reach, and the lock handed over by ADR-291 is RULED: the payout path locks, as a port member and not inside `transact`  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
