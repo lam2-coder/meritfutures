@@ -672,8 +672,26 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(ADR-146 clause 4); and `routes/payouts.ts:355` instructs a backend to call it. SO THE ' +
     'READ CLAUSE IS DISCHARGED AND IS DELETED FROM THE SUMMARY BELOW RATHER THAN KEPT BESIDE A ' +
     'DOOR THAT LANDED, which is assertion 2 of this file`s own three working a third time. ' +
-    'FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
-    'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
+    'FIFTH, AND THE CLAUSE THAT OUTLIVED EVERY OTHER ONE HAS NARROWED FOR THE FIRST TIME ' +
+    'RATHER THAN CLOSED. It read that this tree held no implementation of `PayoutTx` at all, and ' +
+    'ADR-291 made that false. The retired wording is paraphrased rather than quoted, because a ' +
+    'reason that reproduces its own retired sentence reads as live to every grep, and this entry ' +
+    'has retired a question that way four times already. **THE VALUE EXISTS AND IT IS TWO ' +
+    'MEMBERS OF SEVEN**: `postgresPayoutBackend` (`apps/api/src/payout-backend.ts`) implements ' +
+    '`transact`, which opens the scoped door on the session identity and is the ONE transaction ' +
+    'every later slice reads on, and `identityStatus()`, which reads `identities` as scope class ' +
+    '`root` and decodes `identity_status` to one of three or RAISES. **ITS OTHER FIVE MEMBERS ' +
+    'REJECT WITH `PayoutBackendUnwired` AND THAT IS THE WHOLE SHAPE RATHER THAN A STAGE OF IT**: ' +
+    '`subject`, `holdFlag` and `insertPayoutRequest` are ADR-287 slices 4 to 6 and 8, ' +
+    '`listPayouts` is slice 7, and `idempotency` IS THE ONE THAT COULD ANSWER TODAY AND ' +
+    'DELIBERATELY DOES NOT, on this entry`s own closing sentence below. SO WHAT THIS CLAUSE ' +
+    'NAMES NOW IS FIVE MEMBERS AND NOT A PORT: `apps/api/test/payout-backend.test.ts` drives ' +
+    'the adapter over `db-recorder.ts` and asserts each of the five refusing BEFORE it reads ' +
+    'anything, and `rule-state-producibility.test.ts` holds the census at EXACTLY ONE ' +
+    'implementing file so a second cannot arrive unnoticed. AND THE FOLD RULING IS UNCHANGED ' +
+    'AND STILL BINDS EVERY SLICE AFTER THIS ONE: THE API DOES NOT GET TO ' +
+    'FOLD A `RuleState` ITSELF AND ADR-239 RULES IT. `INV-M5-02` (`M05:81`) is that both ' +
+    'endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
     "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
     'detectable, computed on the one path no replay audit reads. ' +
@@ -834,8 +852,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ADR-285 IS THE FIRST CLAUSE TO CLOSE ON A REFUSAL PATH RATHER THAN ON A CAPABILITY. ' +
     'WHAT STANDS NOW IS TWO THINGS AND NOT THREE, WHICH IS WHY A READER WHO WATCHED THE ' +
     'CHEAPEST OF THE THREE CLOSE MAY NOT CONCLUDE THIS PORT IS ONE STEP FROM LIVE: the SIZE ' +
-    'ROW`s decoding, and the fact that NOTHING IN THIS TREE IMPLEMENTS `PayoutTx` AT ALL, which ' +
-    'is clause FIVE and has outlived every other clause here. BOTH ARE CODE SOMEBODY WRITES IN ' +
+    'ROW`s decoding, and the FIVE REFUSING MEMBERS of the backend that now exists, which is ' +
+    'clause FIVE narrowed by ADR-291 rather than discharged. BOTH ARE CODE SOMEBODY WRITES IN ' +
     'THIS REPOSITORY, which is what keeps this entry a liability that can expire: an entry whose ' +
     'last obstruction is an operator fact ADR-241 ruled EXTERNAL is one nothing here could ' +
     'ever discharge. ADR-256 RULING 12 IS WHY REMOVING THE CHEAPEST DID NOT WIRE ANYTHING: ' +
@@ -880,7 +898,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'both constructible today (`payoutRequests` is `owned`, `scope.ts:1217`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
     'beside a `transact` whose `subject` rejects would put a live-looking route in front of the ' +
-    'arm that approves payouts. MONEY PATH.',
+    'arm that approves payouts. **AND THAT SENTENCE STOPPED BEING A WARNING AND BECAME A ' +
+    'PROPERTY THE DAY THE BACKEND LANDED**: ADR-291 built `transact` and left BOTH of those ' +
+    'members rejecting, `payout-backend.test.ts` asserts the unwired store in all three of its ' +
+    'methods, and `rule-state-producibility.test.ts` asserts the module names no ' +
+    '`databaseIdempotencyStore`, so installing either one is a session deleting a test rather ' +
+    'than a session forgetting a paragraph. MONEY PATH.',
   // ---------------------------------------------------------------------------
   // THE REVENUE PATH, AND ITS ENTRY NAMED TWO OF FOUR OBSTRUCTIONS. ADR-230.
   //
