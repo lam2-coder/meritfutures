@@ -285,6 +285,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-269](ADR-269.md) | a blocker whose every term is spent while its figure stays absent was stated one layer too high, the fold that names the layer underneath, and a liability figure that says which of its terms are measured  (2026-08-30, status: proposed) |
 | [ADR-270](ADR-270.md) | what posts a ledger entry is decided by who the transaction's opener serves, a posting may move to a clock exactly where its pinned check resolves no caller, and both refusals stand  (2026-08-30, status: proposed) |
 | [ADR-271](ADR-271.md) | a calendar day has no timezone, so the `date` type parser hands back the wire text and the crossing two libraries were performing has nowhere left to happen  (2026-08-30, status: proposed) |
+| [ADR-273](ADR-273.md) | the coverage check lives in the caller and that is safe exactly where a TYPE makes forgetting a compile error, so the split is ruled rather than moved and the census is closed by `RI-26`  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
