@@ -30,6 +30,10 @@ export const bp = (n: number): BasisPoints => n as BasisPoints;
 
 export const ACCOUNT_A = '0f8fad5b-d9cb-469f-a165-70867728950e';
 export const ACCOUNT_B = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+/** The identity both accounts hang off. `accounts.identity_id` is `uuid NOT NULL`. */
+export const IDENTITY_A = 'b1f6f0de-3e2a-4a4d-9f38-2c5f8d6a1c40';
+/** One `kyc_verifications` row's id, so a chain can be built from two of them. */
+export const KYC_INITIAL = 'c2a7f19b-5d34-4c8e-8b21-9e0d7a4f3b52';
 export const ENGINE_VERSION = 'engine-test';
 
 // -----------------------------------------------------------------------------
@@ -224,11 +228,42 @@ export const sizeGrid = (): readonly StoredRow[] => [
   sizeRow({ sizeCents: 15_000_000n, drawdownCents: 750_000n, profitTargetCents: 900_000n }),
 ];
 
+// THE FOUR CONTEXT COLUMNS ARE HERE BECAUSE `ADR-260` READS THEM AND NOT AS
+// PADDING. `identity_id`, `status`, `payouts_frozen` and `recon_blocked` are all
+// `NOT NULL` in `0007`, so a fixture without them is a row the schema cannot
+// hold; the defaults are the CLEAR account, matching `CLEAR` above, and every
+// case that is about a veto overrides one of them.
 export const accountRow = (overrides: StoredRow = {}): StoredRow => ({
   id: ACCOUNT_A,
+  identityId: IDENTITY_A,
   planVersionId: PLAN_VERSION_ID,
   sizeCents: 5_000_000n,
+  status: 'active',
   openedOn: DAY_ONE.tradingDay,
+  payoutsFrozen: false,
+  reconBlocked: false,
+  ...overrides,
+});
+
+/** One `identities` row. `payouts_frozen` is the OWNER's half of the freeze. */
+export const identityRow = (overrides: StoredRow = {}): StoredRow => ({
+  id: IDENTITY_A,
+  status: 'active',
+  payoutsFrozen: false,
+  ...overrides,
+});
+
+/**
+ * One `kyc_verifications` row.
+ *
+ * `supersedes` DEFAULTS TO `null`, which `0003`'s CHECK makes the shape of an
+ * INITIAL verification, so one call is a one-row chain whose head is itself.
+ */
+export const kycRow = (overrides: StoredRow = {}): StoredRow => ({
+  id: KYC_INITIAL,
+  identityId: IDENTITY_A,
+  state: 'verified',
+  supersedes: null,
   ...overrides,
 });
 

@@ -49,10 +49,16 @@
 // fake.
 // =============================================================================
 
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, test } from 'vitest';
 
 import type { SystemTx } from '@merit/db';
-import { encodeEngineGates } from '@merit/rules-engine';
+import {
+  encodeEngineGates,
+  ExternalGatesRefusal,
+  PAYOUT_IN_FLIGHT_STATUSES,
+} from '@merit/rules-engine';
 
 import { BatchPortUnwired, BatchRowError, postgresBatchPorts } from '../src/batch/adapter.ts';
 import type { BatchTx } from '../src/batch/adapter.ts';
@@ -64,14 +70,17 @@ import {
   ACCOUNT_A,
   ACCOUNT_B,
   CALENDAR,
+  CLEAR,
   CORE_EOD_RULES,
   DAY_ONE,
   ENGINE_VERSION,
+  KYC_INITIAL,
   LIVE_MARK,
   PLAN,
-  PLAN_VERSION_ID,
   accountDay,
   accountRow,
+  identityRow,
+  kycRow,
   markRow,
   planVersionRow,
   sizeGrid,
@@ -175,10 +184,19 @@ function payoutRow(overrides: Row = {}): Row {
   };
 }
 
-/** The whole world, with every table this reader touches populated. */
+/**
+ * The whole world, with every table this reader touches populated.
+ *
+ * **IT GREW TWO TABLES WITH `ADR-260` AND THE DEFAULT IS THE CLEAR ACCOUNT.**
+ * `identities` is the account's owner and `kycVerifications` is a one-row chain
+ * whose head is `verified`, so `world()` resolves to `CLEAR` and every case
+ * about a veto overrides exactly one thing.
+ */
 function world(overrides: Partial<Record<string, readonly Row[]>> = {}): Tables {
   return {
     accounts: [accountRow()],
+    identities: [identityRow()],
+    kycVerifications: [kycRow()],
     planVersions: [planVersionRow()],
     planVersionSizes: sizeGrid(),
     dailyMarks: [markRow()],
@@ -451,61 +469,262 @@ describe('4. a stored value this reader cannot read stops the batch by name', ()
 });
 
 // -----------------------------------------------------------------------------
-// 5. The port, and the one field that still refuses
+// 5. The port, which now answers whole
 // -----------------------------------------------------------------------------
 
-describe('5. `loadAccountDay` answers what it can and refuses on `external` alone', () => {
+describe('5. `loadAccountDay` answers a WHOLE `AccountDay` and refuses no field', () => {
   test('5.1 an account with no live mark is answered `null` over the real port', async () => {
     const ports = postgresBatchPorts(dbOf(world({ dailyMarks: [] })));
 
     expect(await ports.read.loadAccountDay(ACCOUNT_A, DAY)).toBeNull();
   });
 
-  test('5.2 an account WITH a live mark refuses, and the refusal names `AccountDay.external`', async () => {
+  test('5.2 an account WITH a live mark resolves, and `external` is the sixth field', async () => {
+    // **THE CASE THIS FILE WAS BUILT AROUND, INVERTED.** It asserted a refusal
+    // naming `AccountDay.external` from `ADR-258` until `ADR-260` wrote the
+    // resolver, and the inversion is the deliverable rather than a test repair:
+    // the port that stopped the fold at the first account now returns every
+    // field the fold takes.
     const ports = postgresBatchPorts(dbOf(world()));
+    const day = await ports.read.loadAccountDay(ACCOUNT_A, DAY);
 
-    await expect(ports.read.loadAccountDay(ACCOUNT_A, DAY)).rejects.toThrow(BatchPortUnwired);
-    await expect(ports.read.loadAccountDay(ACCOUNT_A, DAY)).rejects.toThrow(
-      /`AccountDay.external` is an `ExternalGates`/,
-    );
+    expect(day).not.toBeNull();
+    expect(day?.external).toEqual(CLEAR);
   });
 
-  test('5.3 the refusal cites ADR-248 and R-38`s two grains, and NOT the codec', async () => {
-    // A REASON THAT NAMED A DISCHARGED BLOCKER IS THE DEFECT THIS ROW WAS SENT
-    // TO FIND. The retired wording is asserted GONE and the live one asserted
-    // present, both from the message the port actually throws.
+  test('5.3 the retired refusal is GONE from this port rather than reworded', async () => {
+    // A REASON THAT NAMED A DISCHARGED BLOCKER IS THE DEFECT THIS FILE'S OWN
+    // SECTION 5 WAS BUILT TO FIND, and the same predicate now runs in the other
+    // direction. If any arm of this port still threw `BatchPortUnwired`, or the
+    // retired sentence survived anywhere the port can reach, this goes red.
     const ports = postgresBatchPorts(dbOf(world()));
-    const error = await ports.read.loadAccountDay(ACCOUNT_A, DAY).catch((e: unknown) => e);
-    const message = error instanceof Error ? error.message : String(error);
 
-    expect(message).toContain('ADR-248');
-    expect(message).toContain('R-38');
-    expect(message).not.toContain('codec');
-    expect(message).not.toContain('DECODER');
+    await expect(ports.read.loadAccountDay(ACCOUNT_A, DAY)).resolves.not.toBeNull();
+    const source = readFileSync(new URL('../src/batch/adapter.ts', import.meta.url), 'utf8');
+    expect(source).not.toContain('ACCOUNT_DAY_BLOCKER');
+    expect(source).not.toContain('NOT CONSTRUCTIBLE in this');
   });
 
-  test('5.4 the refusal carries the WITNESS that the other five resolved', async () => {
-    // A refusal that named only the missing field is indistinguishable from a
-    // port that read nothing, and reading everything else is this slice's whole
-    // claim.
+  test('5.4 the whole day is what the fold takes, and the fold takes it', async () => {
+    // THE STRONGEST FORM OF "SIX OF SIX" AVAILABLE HERE: the value the reader
+    // returns is handed to `foldAccountDay` unmodified, which is what
+    // `runNightlyBatch` does with it, and the fold produces a row. A day missing
+    // a field would not compile; a day carrying a wrong one folds to a different
+    // row, and `contextGates` below is where `external` lands.
     const ports = postgresBatchPorts(dbOf(world()));
-    const error = await ports.read.loadAccountDay(ACCOUNT_A, DAY).catch((e: unknown) => e);
-    const message = error instanceof Error ? error.message : String(error);
+    const day = await ports.read.loadAccountDay(ACCOUNT_A, DAY);
+    if (day === null) throw new Error('the fixture day resolved to null');
 
-    expect(message).toContain('The other five resolved');
-    expect(message).toContain(ACCOUNT_A);
-    expect(message).toContain(PLAN_VERSION_ID);
-    expect(message).toContain('5000000 cents');
-    expect(message).toContain(`opened_on ${DAY}`);
+    const fold = foldAccountDay(day, CALENDAR, ENGINE_VERSION, 1);
+
+    expect(fold.kind).toBe('row');
+    if (fold.kind !== 'row') return;
+    expect(fold.row.contextGates.accountActive.status).toBe('active');
+    expect(fold.row.contextGates.kycVerified.state).toBe('verified');
+    expect(fold.row.contextGates.notFrozen.pass).toBe(true);
+    expect(fold.row.contextGates.reconClear.pass).toBe(true);
+    expect(fold.row.contextGates.noPayoutInFlight.pass).toBe(true);
   });
 
-  test('5.5 `accountDaysFrom` refuses on the gates AND on a walk nobody wrote', async () => {
+  test('5.5 `accountDaysFrom` still refuses, and its reason no longer names the gates', async () => {
+    // **THE SPLIT `ADR-258` MADE IS WHAT KEEPS THIS HONEST.** Had the two ports
+    // shared one blocker constant, discharging `external` would have left this
+    // port refusing with a reason that is now false. It refuses on the walk,
+    // which nobody has written.
     const ports = postgresBatchPorts(dbOf(world()));
     const error = await ports.read.accountDaysFrom(ACCOUNT_A).catch((e: unknown) => e);
     const message = error instanceof Error ? error.message : String(error);
 
-    expect(message).toContain('AccountDay.external');
+    expect(error).toBeInstanceOf(BatchPortUnwired);
     expect(message).toContain('INV-04');
     expect(message).toContain('no session has written that walk');
+    expect(message).not.toContain('AccountDay.external');
+    expect(message).not.toContain('ADR-248');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 6. `external`: five facts off four tables, and no permissive default on any leg
+// -----------------------------------------------------------------------------
+// **THE NARROWING IS NOT TESTED HERE AND THAT IS THE DIVISION OF LABOUR RATHER
+// THAN A GAP.** `packages/rules-engine/test/external-gates.test.ts` owns what
+// `resolveExternalGates` DOES with a value; this section owns which COLUMN each
+// value comes from, which is the half a pure test cannot see. So every case
+// below moves a column and reads the member, and the pair is the wiring.
+
+describe('6. the sixth field is five facts read off four tables', () => {
+  const gatesOf = async (tables: Tables) => (await resolve(tables))?.external;
+
+  test('6.1 the clear account resolves to `CLEAR`, every member of it', async () => {
+    expect(await gatesOf(world())).toEqual(CLEAR);
+  });
+
+  test('6.2 `payoutsFrozen` is the IDENTITY`s flag OR the ACCOUNT`s, and each alone is enough', async () => {
+    // **THE `OR` IS THE WHOLE FACT AND A READER THAT TOOK ONE SIDE WOULD PASS
+    // THE OTHER CASE.** `0002:50` and `0007:83` are two columns because an
+    // investigation can be about one account or about a person, and an account
+    // rendered `false` while its owner is frozen is a gate saying pay them.
+    expect(
+      (await gatesOf(world({ identities: [identityRow({ payoutsFrozen: true })] })))?.payoutsFrozen,
+    ).toBe(true);
+    expect(
+      (await gatesOf(world({ accounts: [accountRow({ payoutsFrozen: true })] })))?.payoutsFrozen,
+    ).toBe(true);
+    expect((await gatesOf(world()))?.payoutsFrozen).toBe(false);
+  });
+
+  test('6.3 `reconBlocked` is the ACCOUNT`s column and has no identity half', async () => {
+    // `0007:87`. The identity row below carries no such column at all, which is
+    // the schema rather than the fixture: there is no `identities.recon_blocked`.
+    expect(
+      (await gatesOf(world({ accounts: [accountRow({ reconBlocked: true })] })))?.reconBlocked,
+    ).toBe(true);
+  });
+
+  test('6.4 `accountStatus` is `accounts.status`, carried through unnarrowed', async () => {
+    expect(
+      (await gatesOf(world({ accounts: [accountRow({ status: 'breached' })] })))?.accountStatus,
+    ).toBe('breached');
+  });
+
+  test('6.5 `provisioning_pending` REFUSES rather than folding, and names the account', async () => {
+    // **THE TRAP, RUN.** `account_status` declares SEVEN members and
+    // `AccountStatus` takes SIX. The seventh is refused here rather than
+    // admitted, because widening the engine's union to make this map total would
+    // amend a frozen plan through a type and would decide, in a reader, what a
+    // half-provisioned account is worth to R-40.
+    const tables = world({ accounts: [accountRow({ status: 'provisioning_pending' })] });
+    const error = await resolve(tables).catch((e: unknown) => e);
+    const message = error instanceof Error ? error.message : String(error);
+
+    expect(error).toBeInstanceOf(ExternalGatesRefusal);
+    expect(message).toContain('provisioning_pending');
+    expect(message).toContain(ACCOUNT_A);
+    // AND IT IS NOT ANSWERED `null`. That arm means no live mark, and reusing it
+    // would count this account as `absent` in the nightly report.
+    expect(error).not.toBeNull();
+  });
+
+  test('6.6 `kycState` is the head of the supersession chain and not the newest row', async () => {
+    // `SD-M19-01`: a re-verification is a NEW ROW pointing at the one it
+    // supersedes, so the head is the row NOTHING supersedes. The superseded row
+    // below says `verified` and the head says `expired`; a reader taking the
+    // first row of the chain would pay somebody whose verification lapsed.
+    const chain = [
+      kycRow({ id: KYC_INITIAL, state: 'verified' }),
+      kycRow({
+        id: 'd3b8a2c4-1f56-4e79-9a03-6b7c8d5e4f21',
+        state: 'expired',
+        supersedes: KYC_INITIAL,
+      }),
+    ];
+
+    expect((await gatesOf(world({ kycVerifications: chain })))?.kycState).toBe('expired');
+  });
+
+  test('6.7 no `kyc_verifications` row at all is `kyc_required`, which is a READING', async () => {
+    // The enum's own word for an identity that has never been verified. It is
+    // the refusing value on R-40's second gate, so it is safe, and it is a fact
+    // about the rows rather than a default chosen when they could not be read.
+    expect((await gatesOf(world({ kycVerifications: [] })))?.kycState).toBe('kyc_required');
+  });
+
+  test('6.8 a chain with TWO heads REFUSES rather than failing closed to `kyc_required`', async () => {
+    // **THIS IS WHERE THIS RESOLVER DIVERGES FROM THE TWO ROUTE READERS, ON
+    // PURPOSE.** `currentKycState` answers `kyc_required` on an ambiguous chain,
+    // and on a door that DISPLAYS the value that is right. Here the value is
+    // folded into a stored row, where `kyc_required` is indistinguishable from
+    // "we could not tell".
+    const chain = [
+      kycRow({ id: KYC_INITIAL }),
+      kycRow({ id: 'd3b8a2c4-1f56-4e79-9a03-6b7c8d5e4f21' }),
+    ];
+    const error = await resolve(world({ kycVerifications: chain })).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ExternalGatesRefusal);
+    expect((error as ExternalGatesRefusal).legs).toEqual(['kycState']);
+  });
+
+  test('6.9 the chain read is the OWNING identity`s and travels through `identity_id`', async () => {
+    // A reader that took every `kyc_verifications` row it could see would read
+    // another identity's chain into this account's gate. The row below belongs
+    // to nobody this account owns, so the account's own chain is empty and the
+    // answer is `kyc_required` rather than `verified`.
+    const chain = [kycRow({ identityId: '9d1e2f3a-4b5c-4d6e-8f70-a1b2c3d4e5f6' })];
+
+    expect((await gatesOf(world({ kycVerifications: chain })))?.kycState).toBe('kyc_required');
+  });
+
+  test('6.10 `hasPayoutInFlight` is true on each of the THREE statuses the index names', async () => {
+    // `payout_requests_no_in_flight_uq`'s predicate, ruled at the ACCOUNT by
+    // ADR-254. Each status is asserted separately, because a set comparison
+    // green on two of three is a veto that fires two thirds of the time.
+    for (const status of PAYOUT_IN_FLIGHT_STATUSES)
+      expect(
+        (await gatesOf(world({ payoutRequests: [payoutRow({ status })] })))?.hasPayoutInFlight,
+        `\`${status}\` is in the index predicate and did not read as in flight`,
+      ).toBe(true);
+  });
+
+  test('6.11 and false on the two the index does NOT name', async () => {
+    for (const status of ['settled', 'failed'])
+      expect(
+        (await gatesOf(world({ payoutRequests: [payoutRow({ status })] })))?.hasPayoutInFlight,
+        `\`${status}\` is outside the index predicate and read as in flight`,
+      ).toBe(false);
+  });
+
+  test('6.12 it is the SUBJECT ACCOUNT`s rows and never the identity`s (ADR-254)', async () => {
+    // **THE GRAIN, RUN.** An in-flight request on a SIBLING account of the same
+    // identity does not raise this account's flag. The identity reading would
+    // refuse nine of a copy trader's ten accounts under a ceiling `OQ-7`
+    // declined to impose.
+    const sibling = payoutRow({ accountId: ACCOUNT_B, status: 'approved' });
+
+    expect((await gatesOf(world({ payoutRequests: [sibling] })))?.hasPayoutInFlight).toBe(false);
+  });
+
+  test('6.13 a `payout_requests.status` outside the declared vocabulary REFUSES', async () => {
+    // **THE VOCABULARY HAS MOVED TWICE ON THIS TABLE** (ADR-028 retired
+    // `transferring`, ADR-040 added `held_pending_review`), so a sixth member is
+    // the likely future. Reading it as not-in-flight would be R-38 stopping
+    // nobody, which is the permissive default this row forbids on every leg.
+    const error = await resolve(
+      world({ payoutRequests: [payoutRow({ status: 'transferring' })] }),
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ExternalGatesRefusal);
+    expect((error as ExternalGatesRefusal).legs).toEqual(['hasPayoutInFlight']);
+  });
+
+  test('6.14 an `identities` row a NOT NULL foreign key requires is REFUSED, never `false`', async () => {
+    // `accounts.identity_id` is `uuid NOT NULL REFERENCES identities(id)`, so an
+    // owner that cannot be read is a foreign key that did not hold.
+    // `identities.payouts_frozen` is a VETO, and reading it as `false` because
+    // the row was absent is exactly the shape `R-41` makes expensive.
+    await expect(resolve(world({ identities: [] }))).rejects.toThrow(/identities holds no row/);
+  });
+
+  test('6.15 every refusing leg is reported at ONCE rather than one run at a time', async () => {
+    // `R-41` conjoins all five, so the useful report is the whole set: a
+    // resolver throwing on the first bad column sends an operator back three
+    // times for three columns of one account.
+    const error = await resolve(
+      world({
+        accounts: [accountRow({ status: 'provisioning_pending' })],
+        kycVerifications: [
+          kycRow({ id: KYC_INITIAL }),
+          kycRow({ id: 'd3b8a2c4-1f56-4e79-9a03-6b7c8d5e4f21' }),
+        ],
+        payoutRequests: [payoutRow({ status: 'transferring' })],
+      }),
+    ).catch((e: unknown) => e);
+
+    expect((error as ExternalGatesRefusal).legs).toEqual([
+      'accountStatus',
+      'kycState',
+      'hasPayoutInFlight',
+    ]);
+    expect((error as ExternalGatesRefusal).accountId).toBe(ACCOUNT_A);
   });
 });

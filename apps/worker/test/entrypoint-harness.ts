@@ -15,15 +15,18 @@
 // It takes no database. `src/start.ts` is the file that carries `LIVE_DB`, and
 // `test/entrypoint.test.ts` watches THAT one fail against an unset
 // `DATABASE_URL`. What this file adds is the two outcomes that need a working
-// door: a run that completes, and a run whose port refuses.
+// door: a run that completes, and a run the resolver refuses mid-batch.
 // =============================================================================
 
 import { main, type WorkerJobIo } from '../src/index.ts';
 import type { WorkerDb } from '../src/db.ts';
 import {
   ACCOUNT_A,
+  IDENTITY_A,
   PLAN_VERSION_ID,
   accountRow,
+  identityRow,
+  kycRow,
   markRow,
   planVersionRow,
   sizeRow,
@@ -43,33 +46,52 @@ const SESSION = {
   sessionCloseAt: CLOSED_AT,
 };
 
-// THE `refusing-port` MODE NOW CARRIES A WHOLE ACCOUNT DAY AND THAT IS THE
-// POINT RATHER THAN SETUP. `ADR-258` made `loadAccountDay` resolve five of an
-// `AccountDay`'s six fields, so a stub mark with two keys on it no longer
-// reaches the refusal: it reaches a `BatchRowError` about a column, which is a
-// different fact and would let case 2.3 pass while proving nothing about a
-// PORT. The rows below are `fixtures.ts`'s, which are `DATA_MODEL` section 11's
-// plan and the materialized grid, so this harness refuses where the deployment
-// refuses: after the plan resolved, the prior read and the mark was live, on
-// `external` and on nothing else.
+// THE MID-BATCH REFUSAL MOVED TWICE AND THE MODE IS RENAMED WITH IT, WHICH IS A
+// CORRECTNESS POINT RATHER THAN TIDYING.
+//
+// It was `refusing-port` because `loadAccountDay` was a port this deployment had
+// not wired. `ADR-258` made it resolve five of six fields and this harness grew a
+// whole account day so the run would reach the refusal rather than a
+// `BatchRowError` about a column. **`ADR-260` RESOLVED THE SIXTH, SO THERE IS NO
+// UNWIRED PORT LEFT ON THE NIGHTLY PATH AT ALL** and a mode still called
+// `refusing-port` would be asserting a fact that is no longer true of any port
+// this run touches.
+//
+// **WHAT IS LEFT IS THE REFUSAL THAT MATTERS MORE**, and case 2.3 is stronger for
+// it: the account below carries `accounts.status = 'provisioning_pending'`, the
+// member `account_status` declares and `AccountStatus` does not, so
+// `resolveExternalGates` refuses the `accountStatus` leg. That is the trap
+// `ADR-260` was sent at, run end to end through a real process: the day resolved,
+// the watermark was read, the plan resolved, the mark was live, and the resolver
+// stopped rather than widening a union to make a map total. `runNightlyBatch`
+// does not catch, `main` does not catch, and the entry point does not catch.
+//
+// The rows are `fixtures.ts`'s, which are `DATA_MODEL` section 11's plan and the
+// materialized grid, so this harness refuses where the deployment refuses.
 const DAY = SESSION.tradingDay;
 
+/** The account the refusing mode folds: everything clear except the one status. */
+const REFUSED_ACCOUNT = accountRow({ openedOn: DAY, status: 'provisioning_pending' });
+
 function rowsFor(key: string): unknown[] {
-  const refusing = MODE === 'refusing-port';
+  const refusing = MODE === 'refusing-gates';
   if (key === 'tradingCalendar') return MODE === 'empty-calendar' ? [] : [SESSION];
   if (key === 'tradingCalendarRevisions') return [];
   if (key === 'dailyMarks') return refusing ? [markRow({ tradingDay: DAY })] : [];
   if (key === 'ruleStates') return [];
-  if (key === 'accounts') return refusing ? [accountRow({ openedOn: DAY })] : [];
+  if (key === 'accounts') return refusing ? [REFUSED_ACCOUNT] : [];
+  if (key === 'identities') return refusing ? [identityRow()] : [];
+  if (key === 'kycVerifications') return refusing ? [kycRow()] : [];
   if (key === 'planVersions') return refusing ? [planVersionRow()] : [];
   if (key === 'planVersionSizes') return refusing ? [sizeRow()] : [];
   if (key === 'payoutRequests') return [];
   throw new Error(`the harness has no rows for ${key}`);
 }
 
-/** The two addresses this path takes, answered by key rather than by predicate. */
+/** The addresses this path takes, answered by key rather than by predicate. */
 function rowAt(key: string, at: Record<string, unknown>): unknown {
-  if (key === 'accounts') return at['id'] === ACCOUNT_A ? accountRow({ openedOn: DAY }) : undefined;
+  if (key === 'accounts') return at['id'] === ACCOUNT_A ? REFUSED_ACCOUNT : undefined;
+  if (key === 'identities') return at['id'] === IDENTITY_A ? identityRow() : undefined;
   if (key === 'planVersions') return at['id'] === PLAN_VERSION_ID ? planVersionRow() : undefined;
   throw new Error(`the harness has no address for ${key}`);
 }

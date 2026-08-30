@@ -426,6 +426,28 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // clause that already carried it rather than adding one. The port did not
   // become wireable and the wired count does not move: `rule_states` still holds
   // no rows, and the read half of that is now the only half left.
+  //
+  // AND ADR-260 IS THE THIRD CLAUSE TO CLOSE OUTRIGHT, WHICH HAS NOW HAPPENED
+  // TWICE IN THIS ENTRY'S LIFE AGAINST FOURTEEN REPHRASINGS, AND IT IS THE FIRST
+  // TIME A CLAUSE HAS CLOSED ON A FIELD RATHER THAN ON A MODULE. Clause six
+  // asked what `gates` waits on and the answer moved three times: ADR-248 said a
+  // ruling nobody may make, ADR-254 said a resolver nobody has written, and
+  // ADR-260 wrote it. `resolveExternalGates` is in
+  // `packages/rules-engine/src/external-gates.ts`, both deployables reach it
+  // through the barrel, `apps/worker/src/batch/adapter.ts` calls it and
+  // `loadAccountDay` now serves six fields of six.
+  //
+  // **THE PORT STILL DOES NOT BECOME WIREABLE AND THE WIRED COUNT DOES NOT MOVE,
+  // AND THE REASON IS NOW A SINGLE ONE.** `PayoutSubject` has three fields;
+  // `plan` was discharged by ADR-233, `gates` is discharged here, and `state` is
+  // a `RuleState` that this deployment must READ from a `rule_states` row. The
+  // fold that writes such a row completes on the worker as of this entry, and
+  // NO SCHEDULED RUN HAS WRITTEN ONE AGAINST A DATABASE, so what stands between
+  // this port and a wiring is a run and a reader rather than five distinct
+  // absences. A clause closing on a money path is worth stating rather than
+  // celebrating; an entry down to ONE blocker is worth stating twice, because
+  // this file's own repeated finding is that a reason naming the second-cheapest
+  // blocker retires the question for every reader after it.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -448,15 +470,20 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`postgresBatchPorts` (`apps/worker/src/batch/adapter.ts`) serves the calendar watermark, ' +
     'the calendar slice, the accounts with a live mark and the accounts with stored state over ' +
     "this deployable's one door. THIS CLAUSE READ THAT `loadAccountDay` REFUSED BY NAME AND " +
-    'THAT NO ADAPTER RESOLVED ANY OF AN `AccountDay`s SIX FIELDS, AND ADR-258 MADE THE SECOND ' +
-    'HALF FALSE. `plan` is `resolvePlan` over the account`s PINNED `plan_versions.rules` and ' +
+    'THAT NO ADAPTER RESOLVED ANY OF AN `AccountDay`s SIX FIELDS; ADR-258 MADE THE SECOND ' +
+    'HALF FALSE AND ADR-260 MADE THE FIRST. `plan` is `resolvePlan` over the account`s PINNED ' +
+    '`plan_versions.rules` and ' +
     'its `plan_version_sizes` row, `prior` is a stored `rule_states` row rebuilt as a ' +
     '`RuleState` through ADR-250`s decoder, `mark` is the unsuperseded `daily_marks` row, ' +
-    '`settlements` are the SETTLED `payout_requests` effective on the day, and `openedOn` is ' +
-    '`accounts.opened_on`; an account with no live mark is answered `null` rather than ' +
-    'refused. THE FOLD STILL DOES NOT START AND IT IS ONE FIELD THAT STOPS IT: `external` is ' +
-    'an `ExternalGates`, which ADR-248 ruled NOT CONSTRUCTIBLE, and clause SIX below is the ' +
-    'whole of that reason rather than a second one. THIRD, THE ' +
+    '`settlements` are the SETTLED `payout_requests` effective on the day, `openedOn` is ' +
+    '`accounts.opened_on`, and `external` is `resolveExternalGates` over four tables; an ' +
+    'account with no live mark is answered `null` rather than ' +
+    'refused. **SO THE FOLD COMPLETES**: `runNightlyBatch` calls calendarWatermark, ' +
+    'calendarSlice, accountsWithLiveMark, loadAccountDay and writeRuleState, and every one of ' +
+    'the five answers. `accountDaysFrom` and `storedRuleStates` still refuse and NEITHER IS ON ' +
+    'THAT PATH: both are the replay audit`s and `runReplayAudit` is unscheduled. WHAT IS LEFT ' +
+    'IS THAT NO RUN HAS HAPPENED AGAINST A DATABASE, which is a smaller thing than a port and ' +
+    'is clause FOUR rather than this one. THIRD, THE ' +
     'CODEC CLAUSE IS DISCHARGED, AND IT IS THE FIRST THING THIS ENTRY HAS LOST RATHER THAN ' +
     'REPHRASED. IT NARROWED TWICE AND THEN CLOSED. It read that writing a decoding would be ' +
     'inventing a corpus fact, which ADR-206 retired by ruling the encoding as the engine`s own ' +
@@ -475,76 +502,65 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:428`) returns a ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:458`) returns a ' +
     '`PayoutSubject` whose `state` (`routes/payouts.ts:331`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
     '`decodeEngineGates` is what rebuilds one from the other. ' +
     'FOURTH, `rule_states` HOLDS NO ROWS, so a backend installed today would compute a ' +
     'confident payout verdict off an empty table, which is a wrong answer where a 503 is an ' +
-    'honest one. FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
+    'honest one. **THIS CLAUSE IS THE LAST ONE STANDING AND IT CHANGED CHARACTER WITHOUT ' +
+    'CHANGING WORDS**: it used to be one of five absences and it is now the only one, because ' +
+    'the fold that writes the row completes as of ADR-260 and what is missing is a RUN rather ' +
+    'than a capability. A reader who wants this port moving should send the next row at a ' +
+    'scheduled run and a `RuleStateRow` reader, and at nothing else on this list. ' +
+    'FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
     'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
     "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
-    'detectable, computed on the one path no replay audit reads. SIXTH, AND IT IS NOT UNDER THE ' +
-    '`RuleState` AT ALL: `PayoutSubject` (`routes/payouts.ts:329`) CARRIES THREE FIELDS AND THIS ' +
-    'ENTRY HAS ONLY EVER NAMED TWO. `state` is clauses one to four and `plan` was discharged by ' +
-    'ADR-233; `gates` is an `ExternalGates` (`routes/payouts.ts:333`) and NO VALUE OF IT IS ' +
-    'RESOLVED FROM A ROW ANYWHERE UNDER A `src/`. Swept comment-stripped over every `.ts` under ' +
-    'every `apps/*/src` and `packages/*/src`, the object key `hasPayoutInFlight:` appears in ' +
-    'TWO files: `packages/rules-engine/src/types.ts`, which DECLARES the field, and ' +
-    '`packages/harness/src/trial.ts`, which raises one member on a value its caller handed it ' +
-    'inside a Monte Carlo loop whose package declares no database. Every constructed value is a ' +
-    'fixture or `scripts/demo/fold.ts`. THE FIVE FACTS SPLIT THREE AND TWO, AND THE ENTRY ' +
-    'NARROWS BY ADR-248 RATHER THAN REPEATING THAT A RESOLVER IS MISSING. THREE RESOLVE: ' +
-    '`payoutsFrozen` is `identities.payouts_frozen` (`0002_identity.sql:50`) OR ' +
-    '`accounts.payouts_frozen` (`0007_accounts.sql:83`), which `admin-source/search.ts` ' +
-    'already works out and states; `reconBlocked` is `accounts.recon_blocked` ' +
-    '(`0007_accounts.sql:87`) and has no identity half; and `kycState` is the head of the ' +
-    'supersession chain over `kyc_verifications.state` (`0003_kyc.sql:51`), which ' +
-    '`currentKycState` (`apps/api/src/routes/wallet-withdrawals.ts:471`) ALREADY RESOLVES AND ' +
-    'FAILS CLOSED ON, on another money door. TWO DO NOT. THE ACCOUNT-STATUS LEG CANNOT BE A ' +
-    'TOTAL MAP: `account_status` ' +
+    'SIXTH, AND THE CLAUSE THAT HAS MOVED MOST IS NOW CLOSED. ' +
+    '`PayoutSubject` (`routes/payouts.ts:329`) CARRIES THREE FIELDS AND THIS ENTRY NAMED ONLY ' +
+    'TWO FOR ELEVEN REVISIONS. `state` is clauses one to four, `plan` was discharged by ' +
+    'ADR-233, and `gates` is an `ExternalGates` WHICH IS NOW CONSTRUCTIBLE. THE CLAUSE MOVED ' +
+    'THREE TIMES AND IS RECORDED THAT WAY BECAUSE EACH MOVE WAS A DIFFERENT KIND OF THING. ' +
+    'ADR-248 read that NO value of it was resolved from a row anywhere under a `src/` and ' +
+    'ruled it unbuildable, because `hasPayoutInFlight` had no predicate to read: `M01` stated ' +
+    'R-38 at the ACCOUNT grain in section 2.1 and at the IDENTITY grain in Group F, and both ' +
+    'sentences were inside a FROZEN plan. ADR-254 RULED THE GRAIN ACCOUNT, amended M01`s two ' +
+    'R-38 rows with the retired wording kept and marked, and left the leg waiting on a ' +
+    'resolver somebody writes rather than a decision somebody makes. ADR-260 WROTE IT. ' +
+    '`resolveExternalGates` (`packages/rules-engine/src/external-gates.ts`) takes the RAW ' +
+    'column values and returns the record or refuses BY LEG: `payoutsFrozen` is ' +
+    '`identities.payouts_frozen` (`0002_identity.sql:50`) OR `accounts.payouts_frozen` ' +
+    '(`0007_accounts.sql:83`), `reconBlocked` is `accounts.recon_blocked` ' +
+    '(`0007_accounts.sql:87`) with no identity half, `kycState` is the head of the ' +
+    'supersession chain over `kyc_verifications.state` (`0003_kyc.sql:51`), `accountStatus` is ' +
+    '`accounts.status` (`0007_accounts.sql:60`), and `hasPayoutInFlight` is an `approved`, ' +
+    '`frozen` or `held_pending_review` `payout_requests` row FOR THE SUBJECT ACCOUNT, which is ' +
+    '`payout_requests_no_in_flight_uq`s predicate (`0031_payout_hold_and_identity_restriction.sql:104-106`). ' +
+    'ITS HOME IS THE ENGINE AND THAT IS ADR-239 SLICE A`s ARGUMENT UNCHANGED: TWO deployables ' +
+    'need the one narrowing, `apps/worker` for `AccountDay.external` and this port for ' +
+    '`PayoutSubject.gates`, neither can import the other, and that package declares no ' +
+    'workspace dependency at all, so a resolver in each would be `FM-16` by name. THE ' +
+    'SEVEN-VERSUS-SIX GAP IS CLOSED BY A REFUSAL AND NOT BY A WIDER UNION: `account_status` ' +
     'declares SEVEN members (`0001_extensions_and_enums.sql:47`) and `AccountStatus` ' +
-    '(`packages/rules-engine/src/types.ts:891`) takes SIX, the difference being ' +
-    '`provisioning_pending`, and `M01:203` carries the same six, so the engine transcribed its ' +
-    'source correctly and the resolver owes a REFUSAL rather than a widened union. THE ' +
-    'IN-FLIGHT LEG WAS A CONTRADICTED PREDICATE RATHER THAN A MISSING FUNCTION AND ADR-254 ' +
-    'RULED IT AT THE ACCOUNT, SO THIS CLAUSE NARROWS FROM A RULING NOBODY HAD MADE TO A READ ' +
-    'SOMEBODY CAN WRITE, which is the move ADR-206 made on the codec one clause up. IT READ ' +
-    'that a resolver picking either grain would be a route ruling a contradiction inside a ' +
-    'FROZEN plan, and that was true until the plan moved. `hasPayoutInFlight` is an ' +
-    '`approved`, `frozen` or `held_pending_review` `payout_requests` row FOR THE SUBJECT ' +
-    'ACCOUNT: `M01:207` and `M01:283` always said account, `EC-040`, `M05:87`, `M01:861`s ' +
-    'AS-01 residual and AS-09s own "each account has its own" say it too, STATE_MACHINES ' +
-    'draws G-NO-IN-FLIGHT as a `payout_requests` row "for this account", and the live SD-09 ' +
-    'index (`payout_requests (account_id)`, ' +
-    '`0031_payout_hold_and_identity_restriction.sql:105`) is UNIQUE and enforces it. ' +
-    '`M01:531` and `M01:544` stated it at the identity and are AMENDED, with the retired ' +
-    'sentence kept and marked. AND ADR-019s ONE-IN-FLIGHT-PER-IDENTITY RULE IS A DIFFERENT ' +
-    'RULE ON A DIFFERENT TABLE AND IS ALREADY SERVED: `gateNoInFlight` ' +
-    '(`routes/wallet-withdrawals.ts`) refuses a second open `wallet_withdrawals` row for one ' +
-    'identity IN THE HANDLER, because that legs open index is plain rather than unique ' +
-    '(ADR-158 finding 8). SO WHAT THIS LEG NOW WAITS ON IS A RESOLVER, ON A TABLE THIS PORT ' +
-    'ALREADY REACHES: `payoutRequests` is `owned` (`scope.ts:1152`), and ADR-254 ' +
-    'DELIBERATELY DID NOT BUILD IT. `gates` IS STILL NOT CONSTRUCTIBLE AND THE PORT IS STILL ' +
-    'BLOCKED, on the OTHER unresolved leg rather than on this one: `accountStatus` is not a ' +
-    'total map, what `provisioning_pending` means to the engine is the ruling ADR-248 refused ' +
-    'to make and nobody has made, and a record literal must carry every member, so a partial ' +
-    'resolver is not a smaller resolver. THIS CLAUSE ' +
-    'DID NOT MOVE WHEN THE WORKER LANDED because nothing ADR-241 built touches it, and it is ' +
-    'NOT DOWNSTREAM OF THE CODEC EITHER: `rule_states.context_gates` is `NOT NULL` ' +
-    '(`0015_rule_states.sql:130`) and `AccountDay.external` is required ' +
-    '(`apps/worker/src/batch/ports.ts:87`), so this resolver is UPSTREAM of the row rather ' +
-    'than the independent fourth slice ADR-245 section 6 sized. SO THE THREE FIELDS WAIT ON ' +
-    'THREE DIFFERENT THINGS AND THE FOURTEENTH REVISION OF THIS REASON SAYS SO, BECAUSE TWO ' +
-    'OF THE THREE MOVED IN ONE NIGHT AND NEITHER SESSION COULD SEE THE OTHER: `state` waited ' +
-    'on a codec, an adapter and a row and NOW WAITS ON TWO, because ADR-250 landed the codec; ' +
-    '`plan` waits on NOTHING and ADR-233 discharged it; and `gates` NO LONGER WAITS ON A ' +
-    'RULING AT ALL, because ADR-254 ruled the R-38 grain ACCOUNT, so what it waits on is a ' +
-    'RESOLVER somebody writes rather than a decision somebody makes. THE PORT IS UNCHANGED ' +
-    'AND THE WIRED COUNT IS UNCHANGED: `accountStatus` still owes a refusal rather than a ' +
-    'widened union, and an adapter and a row are still absent. THE FIRM-READ CLAUSE IS ' +
+    '(`packages/rules-engine/src/types.ts:891`) takes SIX, `M01:203` carries the same six so ' +
+    'the engine transcribed its source correctly, and the resolver REFUSES ' +
+    '`provisioning_pending` rather than admitting it, because an account still being ' +
+    'provisioned is not an account whose payout verdict is meaningful and widening the union ' +
+    'would amend a frozen plan through a type. NO LEG TAKES A DEFAULT, PERMISSIVE OR ' +
+    'REFUSING: `R-41` conjoins all five as VETOES, so a fact defaulted to the permissive value ' +
+    'is a veto that never fires and a refusing default denies every eligible trader while ' +
+    'reading as a working gate (ADR-248 section 8), and a row that cannot be read raises an ' +
+    '`ExternalGatesRefusal` naming the account and every failing leg. AND ADR-019s ' +
+    'ONE-IN-FLIGHT-PER-IDENTITY RULE IS A DIFFERENT RULE ON A DIFFERENT TABLE AND IS ALREADY ' +
+    'SERVED: `gateNoInFlight` (`routes/wallet-withdrawals.ts`) refuses a second open ' +
+    '`wallet_withdrawals` row for one identity IN THE HANDLER, because that legs open index is ' +
+    'plain rather than unique (ADR-158 finding 8), and it does not read this field. ' +
+    'SO THE THREE FIELDS NOW WAIT ON ONE THING BETWEEN THEM AND THE FIFTEENTH REVISION OF ' +
+    'THIS REASON SAYS SO: `plan` waits on NOTHING (ADR-233), `gates` waits on NOTHING ' +
+    '(ADR-260), and `state` waits on a `rule_states` ROW, which is a scheduled run and a ' +
+    'reader. THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +
@@ -555,7 +571,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`breached` and `breach_kind` are all three columns of `rule_states` as of ' +
     '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
     'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
-    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:438-439` states "no member of ' +
+    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:468-469` states "no member of ' +
     'this interface that a scoped door cannot serve", which ADR-233 makes TRUE of the ' +
     'catalogue half and leaves false of `state`. EVERY CLAUSE ABOVE IS A PREDICATE SOMEWHERE ' +
     'AND NOT ONLY A SENTENCE HERE: `apps/api/test/rule-state-producibility.test.ts` runs the ' +
