@@ -11089,3 +11089,5 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **299 files / 7,290 passed / 6 skipped** against session 487's 298 / 7,249 / 6, a delta of **+1 file and +41 cases, all of them this row's codec suite**; typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row.
+
+**NO GITHUB ACCESS: NO PULL REQUEST WAS OPENED AND NOTHING WAS MERGED**, as in session 487. The branch is pushed and left mergeable, and `origin/main` moved mid-session and was **fetched and merged in rather than rebased**, with every gate re-run on the merged tree.
