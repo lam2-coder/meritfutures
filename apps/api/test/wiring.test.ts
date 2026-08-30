@@ -792,36 +792,35 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'snake_case is asking `packages/db` to stop mapping. **AND THE PAYOUT PATH IS ON THE ' +
     'DRIVER SIDE OF THAT SPLIT, SO IT NEEDS NO RENAME FROM ANYBODY**: this deployable already ' +
     'reads `plan_version_sizes` off this door under the driver spelling, at ' +
-    '`readSize` (`apps/api/src/routes/catalog.ts:1242`), which is a THIRD size-row reader ' +
+    '`readSize` (`apps/api/src/routes/catalog.ts:1211`), which is a THIRD size-row reader ' +
     'ADR-283`s count did not reach because it returns a LOCAL row type rather than the ' +
     'engine`s. **SO THE RESIDUE IS A HOME AND NOT A RULING, AND THAT IS THE FIRST TIME THIS ' +
     'CLAUSE HAS NAMED IT**: a driver-side decoder has to know `packages/db`s property names, ' +
     '`RI-01` forbids the engine from knowing them and that package`s own manifest says it ' +
     'never may, and `apps/api` and `apps/worker` cannot import each other, so `toSizeRow` ' +
-    '(`apps/worker/src/batch/adapter.ts:1295`) fits this port exactly and is unreachable from ' +
+    '(`apps/worker/src/batch/adapter.ts:1296`) fits this port exactly and is unreachable from ' +
     'it. ADR-239 slice A`s argument PUT `gates-codec.ts` in the engine and the same argument ' +
     'read in the other direction KEEPS this one out. **AND THE ONE `FM-16` IN THIS AREA IS THE ' +
     'CAP SCHEDULE RATHER THAN THE ROW, WHICH IS THE FINDING ADR-283 COULD NOT SEE FROM WHERE ' +
     'IT STOOD**: the spelling ruling does not reach INSIDE the `jsonb`, where every reader asks ' +
-    'for the same two stored keys, so `payout_cap_schedule_cents` is one predicate stated ' +
-    'THREE times, by `toCapScheduleCents` (`apps/worker/src/batch/adapter.ts:1320`), ' +
-    '`decodeCapSteps` (`apps/site/src/catalog/adapter.ts:520`) and `readCapSchedule` ' +
-    '(`apps/api/src/routes/catalog.ts:1219`), with nothing comparing them. **AND THEY HAVE ' +
-    'ALREADY DIVERGED, ON THIS DEPLOYABLE`s SIDE, ON THE MONEY.** The first two admit a ' +
-    'cents value as a safe-integer number or a base-10 string of digits and REFUSE a number ' +
-    'past `Number.MAX_SAFE_INTEGER`; the third tests `Number.isInteger`, which is true of ' +
-    '`2 ** 53 + 1`, and converts with `BigInt`, so a cap arrives ROUNDED and a payout ceiling ' +
-    'nobody published is what a trader is paid against. It is REPORTED AND NOT REPAIRED ' +
-    'because `apps/api/src/**` is outside row 286`s fence, and ADR-286 section 7 item 1 owns ' +
-    'it. A FOURTH STATEMENT OF EITHER BLOB WRITTEN HERE WOULD STILL BE `FM-16` ON THE MONEY ' +
-    'PATH, and ADR-269 REFUSED EXACTLY THAT ONE PORT OVER FOR THE SAME VALUE: ' +
-    '`EligibleFoldUnwired` states it in its own message and `setAdminReadSource`s entry above ' +
-    'carries it. AND THE TREE STATES THE RULES BLOB`s DECODING ' +
-    'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1108`) and ' +
-    '`decodeRules` (`apps/site/src/catalog/adapter.ts:552`) COLLAPSE ONTO THE ENGINE`s, which ' +
+    'for the same two stored keys, so `payout_cap_schedule_cents` WAS one predicate stated ' +
+    'THREE times, by `toCapScheduleCents` (`apps/worker`), `decodeCapSteps` (`apps/site`) and ' +
+    '`readCapSchedule` (`apps/api/src/routes/catalog.ts`), with nothing comparing them -- AND ' +
+    'THE THIRD HAD DIVERGED ON THE MONEY, admitting a `cap_cents` past ' +
+    '`Number.MAX_SAFE_INTEGER` and handing back the rounded double while refusing the base-10 ' +
+    'string ADR-283 ruling 5 blessed, which its two peers did neither of. **ADR-302 CLOSED IT ' +
+    'AND THE CENSUS IS NOW ONE**: `decodeCapScheduleCents` ' +
+    '(`packages/rules-engine/src/plan/cap-schedule-codec.ts`) states it once and ALL THREE ' +
+    'READERS WERE RETIRED IN THE DIFF THAT ADDED IT, which is what kept the codec from being ' +
+    'the FOURTH statement ADR-286 refused and ADR-269 refused one port over for this same ' +
+    'value: `EligibleFoldUnwired` states it in its own message and `setAdminReadSource`s entry ' +
+    'above carries it. ADR-286 section 7 item 1 is CLOSED. ' +
+    'AND THE TREE STILL STATES THE RULES BLOB`s DECODING ' +
+    'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1109`) and ' +
+    '`decodeRules` (`apps/site/src/catalog/adapter.ts:549`) COLLAPSE ONTO THE ENGINE`s, which ' +
     'row 283`s fence put out of bounds; link 7 holds that census at exactly three, holds the ' +
-    'cap-schedule census at three beside it, and asserts the divergence above as a live ' +
-    'property so a FOURTH cannot arrive unnoticed and each retirement is visible the day it ' +
+    'cap-schedule census at ONE beside it, and asserts the repaired cap-schedule property so a ' +
+    'SECOND cannot arrive unnoticed and each remaining retirement is visible the day it ' +
     'lands. ' +
     '`gates` STILL WAITS ON NOTHING (ADR-260) AND THAT IS RE-DERIVED RATHER THAN CARRIED: ' +
     '`ExternalGateFacts` takes raw scalars and two row lists, `identities` is `root` and ' +
