@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->271<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->272<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10790,6 +10790,36 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **AND THE FOURTH WAS A PRE-EXISTING LEAK THIS DIFF ONLY EXPOSED.** `keyed-accessor.test.ts` swept `ALTER` with `[\s\S]*?` over every migration CONCATENATED, so one match spanned FILES and attributed `firm_parameters_id_uq` to `purchases`, eleven migrations away. It fails in both directions at once: a key the database enforces reads as invented, and one it does not enforce reads as real. **The repair is one token**, because a statement cannot contain a `;`.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **29 of 29** invariants off the runner's own last line, **296 files / 7,152 passed / 6 skipped** against a baseline of **296 / 7,149 / 6**, a delta of the three cases added to `checkout-backend-blockers.test.ts`. Typecheck clean, lint clean, `format:check` clean. **`pnpm run verify` was NOT run** and `falsify.mjs` was not run, both forbidden by the row. **The port is not wired and the count does not move: 10 wired of 24 declared, 14 blocked.**
+
+## 2026-08-30 - Session 476: a 500 on the door where money leaves the firm, and the honest arm is a refusal rather than a state ([ADR-285](decisions/ADR-285.md), proposed)
+
+**Row `285` was the cheapest of the three things [ADR-283](decisions/ADR-283.md) left standing on `usePayoutBackend`, and it was the one that entry deliberately did not lead with.** Row `281` asked whether the payout port refuses on an empty `rule_states` table or wires and answers honestly that there is no state for the day; ADR-283 answered that the second arm **did not exist**. [ADR-285](decisions/ADR-285.md), twelve sections, `proposed` and UNSIGNED, **MONEY PATH with the `E2` read OWED and three inherited** ([ADR-283](decisions/ADR-283.md), [ADR-281](decisions/ADR-281.md), [ADR-264](decisions/ADR-264.md)).
+
+**THE 500 WAS WATCHED BEFORE ANYTHING CHANGED.** Two cases written against the unpatched tree measured *`expected 500 to be 503`* on `POST /accounts/:accountId/payout`. The row's two citations were re-derived first and both held, with the `unwiredOrThrow` pointer one line out: the predicate is verbatim at `payouts.ts:1387` and `:1386` was the declaration line.
+
+**THE ARM IS BUILT AND IT IS A REFUSAL.** `stateNotFolded` answers an absent `rule_states` row with **503 `service_unavailable`** and a generic `detail`, out of the payout transaction's own catch and ahead of the rethrow, which is unchanged. **Nothing in the diff constructs, zeroes or carries forward a `RuleState`.** `RuleStateAbsent` is still a class and not an arm, and the reader still throws.
+
+**NO CANONICAL CODE IS INVENTED AND THE FOUR ALTERNATIVES ARE EACH REFUSED ON THEIR OWN GROUND.** API_CONTRACT section 2's table is CLOSED and that document is outside this fence, which is `gateIdentityStatus`'s and `sendTurnstileRefusal`'s own boundary. **`payout_not_eligible` is refused on [ADR-140](decisions/ADR-140.md)'s own finding**: its breakdown would show every gate PASSING, and a trader is not ineligible because Merit has not run a batch. `conflict` and `precondition_failed` both say the client acted and the client did nothing; `internal_error` is what the arm exists to remove. **No `Retry-After`**, because [ADR-241](decisions/ADR-241.md) ruled the schedule EXTERNAL.
+
+**`RuleStateUnreadable` IS DELIBERATELY NOT CAUGHT AND STAYS A 500**, asserted as a case beside the two at 503. It is the control that stops the pair from being satisfied by a blanket catch, and a seeded widening of the guard was watched RED on it.
+
+**A CONSTRAINT NOBODY HAD NAMED WAS FOUND BY BUILDING THE ARM.** A 503 and a 404 are now DISTINGUISHABLE, and a scoped read of a foreign account's `rule_states` rows is EMPTY, so a `subject()` that read the state before it resolved the account would hand a prober 503 for every account of every other identity where API_CONTRACT section 1 requires 404. **Before this diff that failure was invisible, because both answers were the same 500.** The requirement is written into two docblocks and the entry, and it is **not enforced**, which the ADR states rather than hides.
+
+**A SECOND FINDING IS REPORTED AND NOT REPAIRED, AND IT WAS FOUND BY WRITING THE ASSERTION THE WRONG WAY ROUND.** An unstamped refusal leaves the idempotency key claimed forever, so a retry with the SAME key is `409 conflict` and never the verdict the fold has since produced. The case expected `200` and measured `409`. It is true of **every** refusal this route makes, `apps/api/src/idempotency.ts` is out of fence, and the `detail` therefore names the `Idempotency-Key` header because *retry* alone would have been false. The 409 is also what proves the 503 was not stamped.
+
+**THE PORT IS NOT WIRED AND THIS ROW DOES NOT CLAIM TO WIRE IT** ([ADR-256](decisions/ADR-256.md) ruling 12). Wired stays **10 of 24 declared, 14 blocked**, `start.ts` is untouched, and both payout routes still answer 503 before reaching a transaction. **The entry is REWRITTEN rather than shrunk**: three obstructions became two, the size row (row `286`) is now the cheapest and the missing `PayoutTx` (row `287`) is the whole purchase, and the order is stated so the next session does not rediscover it.
+
+**A CHECK WAS INVERTED RATHER THAN DELETED**, which is the first time one in `rule-state-producibility.test.ts` has changed direction. Link 7's case required that `payouts.ts` contain no `RuleStateAbsent` at all, because the absence of a refusal path was the finding; it now asserts the path's presence, that `RuleStateUnreadable` is still uncaught, and that no `RuleState` is built.
+
+**`RI-32` IS NOT MINTED AND THE NUMBER STAYS FREE.** All three properties belong to one file in one deployable, and `rule-state-producibility.test.ts` already holds every other clause of this port's reason. **Seed 1 turned it RED without any new invariant**, which is the measurement that says the existing home is sufficient. `packages/tooling/**` is unedited.
+
+**THREE SEEDS FIRED ON THE LANDED FILES** (the arm's dispatch line deleted, the guard widened to `err.name.startsWith('RuleState')`, the trading day interpolated into `detail`), every restore verified byte-identical with `sha256sum -c` and `git status` checked after. **`RI-15` went RED on this diff's own drift** and five citations in `wiring.test.ts` are repointed, plus one in `ALLOCATION` that `RI-16` caught; the controls found them rather than a reader.
+
+**TWO FENCE EXTENSIONS ARE DECLARED**, both GENERATED registry spans that `gates.mjs generate` writes and `CI-06g` checks: `docs/decisions/README.md`, which is [ADR-283](decisions/ADR-283.md)'s own, and `docs/sessions/README.md`, which this log's arrival moves.
+
+**WHAT IS OWED AND IS NOT DONE.** `GET /accounts/:accountId/eligibility` reaches the same reader and is outside this fence; `INV-M5-02` makes the absent row ONE blocker across TWO endpoints, and whether that endpoint wants the same 503 or a shape that says which gates are unknown is a real question rather than a transcription.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **30 of 30** invariants off the runner's own last line, **297 files / 7,218 passed / 6 skipped** against a baseline of **297 / 7,215 / 6** measured on this tree before the first edit, a delta of exactly the three cases added. Typecheck clean, lint clean, `format:check` clean. **`pnpm run verify` was NOT run** and `falsify.mjs` was not run, both forbidden by the row. See [session 476](sessions/2026-08-30-session-476.md).
 
 ---
 

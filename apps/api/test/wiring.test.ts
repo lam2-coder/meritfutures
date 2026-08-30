@@ -537,6 +537,26 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // costs is "with nothing comparing them", and that half is paid: SD-08's
   // digest is computed by the writer, stored in `bytea`, and re-derived from
   // the state the reader rebuilds.
+  //
+  // AND ADR-285 IS THE FIRST CLAUSE ON THIS ENTRY TO CLOSE ON A REFUSAL PATH
+  // RATHER THAN ON A CAPABILITY, WHICH IS A DIFFERENT SHAPE FROM EVERY CLAUSE
+  // BEFORE IT. The earlier ones named something nobody had BUILT -- a job, an
+  // adapter, a codec, a resolver, a reader, a door, a decoding -- and closed
+  // when somebody built it. This one named what the route DID WITH A THROW: an
+  // absent `rule_states` row left the payout transaction and became a 500,
+  // because the only refusal this file's foot recognised was an unwired
+  // backend. Nothing was missing from the estate; the ANSWER was.
+  //
+  // THE PORT DID NOT BECOME WIREABLE AND THE WIRED COUNT DOES NOT MOVE, and
+  // ADR-256 ruling 12 is why: wiring is permitted when the last gap is a thing
+  // THE DEPLOYMENT SETS, and neither of the two gaps left is one. What ADR-285
+  // bought is that the day this port IS wired, the deployment's first unfolded
+  // morning is a 503 a trader can read rather than an internal error, and that
+  // is worth having BEFORE the wiring rather than after it.
+  //
+  // AND THE ENTRY IS REWRITTEN RATHER THAN SHRUNK, ON THIS FILE'S OWN REPEATED
+  // FINDING. Three obstructions became two, and a reader who saw only the
+  // shrink would conclude this port is one step from live for the fourth time.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -591,8 +611,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:537`) returns a ' +
-    '`PayoutSubject` whose `state` (`routes/payouts.ts:384`) is a `RuleState`, ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:575`) returns a ' +
+    '`PayoutSubject` whose `state` (`routes/payouts.ts:400`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
     '`decodeEngineGates` is what rebuilds one from the other. ' +
@@ -649,7 +669,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'payout transaction itself; `lastClosedTradingDayStatement` (`:3224`) reads both calendar ' +
     'tables and throws on an empty calendar, an EXHAUSTED one and a coverage gap alike; the ' +
     'return type is `string` so no caller holds an absent value to fold a UTC date into ' +
-    '(ADR-146 clause 4); and `routes/payouts.ts:354` instructs a backend to call it. SO THE ' +
+    '(ADR-146 clause 4); and `routes/payouts.ts:355` instructs a backend to call it. SO THE ' +
     'READ CLAUSE IS DISCHARGED AND IS DELETED FROM THE SUMMARY BELOW RATHER THAN KEPT BESIDE A ' +
     'DOOR THAT LANDED, which is assertion 2 of this file`s own three working a third time. ' +
     'FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
@@ -658,7 +678,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
     'detectable, computed on the one path no replay audit reads. ' +
     'SIXTH, AND THE CLAUSE THAT HAS MOVED MOST IS NOW CLOSED. ' +
-    '`PayoutSubject` (`routes/payouts.ts:333`) CARRIES THREE FIELDS AND THIS ENTRY NAMED ONLY ' +
+    '`PayoutSubject` (`routes/payouts.ts:334`) CARRIES THREE FIELDS AND THIS ENTRY NAMED ONLY ' +
     'TWO FOR ELEVEN REVISIONS. `state` is clauses one to four, `plan` was discharged by ' +
     'ADR-233, and `gates` is an `ExternalGates` WHICH IS NOW CONSTRUCTIBLE. THE CLAUSE MOVED ' +
     'THREE TIMES AND IS RECORDED THAT WAY BECAUSE EACH MOVE WAS A DIFFERENT KIND OF THING. ' +
@@ -702,7 +722,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'sentence reads as live to every grep, and this entry has retired the same question that ' +
     'way twice already. IT SAID THE `plan` FIELD WAITED ON NOTHING, ON ADR-233`s AUTHORITY, ' +
     'AND ADR-233 GAVE THIS TRANSACTION THE READ AND NOT THE DECODE. `PayoutSubject.plan` is a ' +
-    '`ResolvedPlan` (`routes/payouts.ts:419`); `resolvePlan` takes a DECODED `PlanRulesJson` ' +
+    '`ResolvedPlan` (`routes/payouts.ts:435`); `resolvePlan` takes a DECODED `PlanRulesJson` ' +
     'and a decoded `PlanVersionSizeRow` (`packages/rules-engine/src/plan/resolve.ts:184`); and ' +
     '`plan_versions.rules` is `jsonb`, so a catalogue row is a blob and not a plan. THAT WAS ' +
     'THE THIRD TIME THIS ENTRY NAMED THE SECOND-CHEAPEST BLOCKER, and it is the failure this ' +
@@ -788,32 +808,48 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`gates` STILL WAITS ON NOTHING (ADR-260) AND THAT IS RE-DERIVED RATHER THAN CARRIED: ' +
     '`ExternalGateFacts` takes raw scalars and two row lists, `identities` is `root` and ' +
     '`accounts`, `kycVerifications` and `payoutRequests` are `owned`, so every input is on this ' +
-    'transaction. AND `state` NO LONGER WAITS ON A READ AT ALL. WHAT IS LEFT OF IT IS THE ' +
-    'EMPTY TABLE, AND ROW 281 ASKED WHETHER A PORT REFUSES ON ONE OR WIRES AND ANSWERS HONESTLY ' +
-    'THAT THERE IS NO STATE FOR THE DAY. IT IS ANSWERED, AND THE ANSWER IS THAT THE SECOND ARM ' +
-    'DOES NOT EXIST: `ruleStateOn` throws `RuleStateAbsent`, `unwiredOrThrow` ' +
-    '(`routes/payouts.ts:1386`) RETHROWS anything that is not a `PayoutBackendUnwired`, and a ' +
-    'wired backend meeting an unfolded day therefore answers 500 on the door where money leaves ' +
-    'the firm. A 500 is not an honest answer that there is no state for the day; it is an ' +
-    'internal error from a live-looking route, which is the shape this port has refused. ' +
-    'ADR-256 ruling 12 is the standing rule and it decides this arm: wiring is permitted when ' +
-    'the last gap is a thing THE DEPLOYMENT SETS, and a composition that does not exist is not ' +
-    'such a gap. A SYNTHESISED DEFAULT IS NOT A THIRD OPTION: `RuleStateAbsent` is a class and ' +
-    'not an arm, and a fabricated `RuleState` is a payout basis nobody computed. ' +
+    'transaction. AND `state` NO LONGER WAITS ON A READ, ON A CODEC OR ON A REFUSAL ARM. ' +
+    'ROW 281 ASKED WHETHER A PORT REFUSES ON AN EMPTY TABLE OR WIRES AND ANSWERS HONESTLY THAT ' +
+    'THERE IS NO STATE FOR THE DAY, ADR-283 ANSWERED THAT THE SECOND ARM DID NOT EXIST, AND ' +
+    'ADR-285 BUILT IT. The retired wording is paraphrased rather than quoted, because a reason ' +
+    'that reproduces its own retired sentence reads as live to every grep, and this entry has ' +
+    'retired a question that way three times already. IT READ THAT `unwiredOrThrow` RETHREW ' +
+    'EVERYTHING THAT WAS NOT A `PayoutBackendUnwired`, so a wired backend meeting an unfolded ' +
+    'day answered 500 on the door where money leaves the firm. THE RETHROW IS UNCHANGED AND THE ' +
+    'ARM SITS BESIDE IT: `stateNotFolded` (`routes/payouts.ts`) answers an absent row with 503 ' +
+    '`service_unavailable` and a generic `detail`, out of the payout transaction`s own catch. ' +
+    'NO CANONICAL CODE IS INVENTED, because API_CONTRACT section 2`s table is CLOSED and section ' +
+    '2 defines 503 as a dependency that is down and safe to retry, which is what an unrun fold ' +
+    'is; `payout_not_eligible` is refused because its `gates` breakdown would show every gate ' +
+    'PASSING, which is ADR-140`s false-eligibility-story shape one door up. AND THE REFUSAL IS ' +
+    'STILL NEVER A STATE: `RuleStateAbsent` is a class and not an arm, a fabricated `RuleState` ' +
+    'is a payout basis nobody computed, and `rule-state-producibility.test.ts` link 7 asserts ' +
+    'this route builds none. `RuleStateUnreadable` IS DELIBERATELY NOT CAUGHT and stays a 500, ' +
+    'because a row whose columns disagree with the schema that wrote them is an internal error ' +
+    'and a retryable status would tell a trader to retry what no retry can fix. ' +
     'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED AT TEN OF TWENTY-FOUR DECLARED ' +
-    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A THIRD TIME: every clause on this ' +
+    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A FOURTH TIME: every clause on this ' +
     'entry until ADR-264 named something nobody had BUILT, ADR-268 closed the one that named a ' +
-    'READ, ADR-281 found a decoding whose home was RULED and untaken, and ADR-283 TOOK IT. ' +
-    'WHAT STANDS NOW IS THREE THINGS AND NOT ONE, WHICH IS WHY A READER WHO WATCHED `plan` ' +
-    'NARROW MAY NOT CONCLUDE THIS PORT IS ONE STEP FROM LIVE: the SIZE ROW`s decoding, the ' +
-    'honest refusal arm for an absent `rule_states` row that this deployable has never had, ' +
-    'and the fact that NOTHING IN THIS TREE IMPLEMENTS `PayoutTx` AT ALL, which is clause FIVE ' +
-    'and has outlived every other clause here. ALL THREE ARE CODE SOMEBODY WRITES IN THIS ' +
-    'REPOSITORY, which is what keeps this entry a liability that can expire: an entry whose ' +
+    'READ, ADR-281 found a decoding whose home was RULED and untaken, ADR-283 TOOK IT, and ' +
+    'ADR-285 IS THE FIRST CLAUSE TO CLOSE ON A REFUSAL PATH RATHER THAN ON A CAPABILITY. ' +
+    'WHAT STANDS NOW IS TWO THINGS AND NOT THREE, WHICH IS WHY A READER WHO WATCHED THE ' +
+    'CHEAPEST OF THE THREE CLOSE MAY NOT CONCLUDE THIS PORT IS ONE STEP FROM LIVE: the SIZE ' +
+    'ROW`s decoding, and the fact that NOTHING IN THIS TREE IMPLEMENTS `PayoutTx` AT ALL, which ' +
+    'is clause FIVE and has outlived every other clause here. BOTH ARE CODE SOMEBODY WRITES IN ' +
+    'THIS REPOSITORY, which is what keeps this entry a liability that can expire: an entry whose ' +
     'last obstruction is an operator fact ADR-241 ruled EXTERNAL is one nothing here could ' +
-    'ever discharge. AND THE SMALLEST OF THE THREE IS NOT THE ONE THIS ENTRY LEADS WITH, ' +
-    'WHICH IS THE HABIT THIS FILE KEEPS CATCHING IN ITSELF: the refusal arm is the cheapest, ' +
-    'the size row is next, and the missing backend is the whole purchase. THE FIRM-READ CLAUSE IS ' +
+    'ever discharge. ADR-256 RULING 12 IS WHY REMOVING THE CHEAPEST DID NOT WIRE ANYTHING: ' +
+    'wiring is permitted when the last gap is a thing THE DEPLOYMENT SETS, and a composition ' +
+    'that does not exist is not such a gap. AND THE ENTRY IS REWRITTEN RATHER THAN SHRUNK FOR ' +
+    'THE HABIT THIS FILE KEEPS CATCHING IN ITSELF: the size row is now the cheapest of the two ' +
+    'and the missing backend is the whole purchase, so the ORDER is stated here and a session ' +
+    'dispatched at this entry does not have to rediscover it. ' +
+    'A CONSTRAINT ON ANY FUTURE `PayoutTx` LANDED WITH THE ARM AND IS REGISTERED HERE RATHER ' +
+    'THAN LEFT FOR AN IMPLEMENTER TO MEET: `subject()` MUST resolve ownership BEFORE it reads ' +
+    '`rule_states`, because 404 and 503 are distinguishable and a scoped read of a foreign ' +
+    'account`s rows is EMPTY, so a state-first implementation would answer a prober 503 for ' +
+    'every account of another identity where API_CONTRACT section 1 requires 404. ' +
+    'THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:3392`), a closed list of five `firm` keys that includes ' +
@@ -824,7 +860,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`breached` and `breach_kind` are all three columns of `rule_states` as of ' +
     '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
     'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
-    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:547-548` states "no member of ' +
+    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:585-586` states "no member of ' +
     'this interface that a scoped door cannot serve", which ADR-233 makes TRUE of the ' +
     'catalogue half and leaves false of `state`. EVERY CLAUSE ABOVE IS A PREDICATE SOMEWHERE ' +
     'AND NOT ONLY A SENTENCE HERE: `apps/api/test/rule-state-producibility.test.ts` runs the ' +

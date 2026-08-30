@@ -80,6 +80,7 @@ import {
   type IdempotencyScope,
   type IdempotencyStore,
 } from '../src/idempotency.ts';
+import { RuleStateAbsent, RuleStateUnreadable } from '../src/rule-state-reader.ts';
 import {
   SESSION_COOKIE,
   UNWIRED_AUTH_BACKEND,
@@ -1070,6 +1071,116 @@ describe('an unwired deployment answers 503 and never approves', () => {
     const posted = await requestPayout();
     expect(posted.statusCode).toBe(503);
     expect(posted.json().code).toBe('service_unavailable');
+    expect(fixture.requests).toHaveLength(0);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE DAY THE NIGHTLY FOLD HAS NOT CLOSED, WHICH USED TO BE A 500. `ADR-285`
+// -----------------------------------------------------------------------------
+// `ruleStateOn` raises `RuleStateAbsent` when no `rule_states` row exists for
+// the account on the last closed trading day, and `unwiredOrThrow` rethrew
+// anything that was not a `PayoutBackendUnwired`, so the throw reached
+// `server.ts`'s error handler and became `500 internal_error` ON THE DOOR WHERE
+// MONEY LEAVES THE FIRM.
+//
+// THE THREE CASES BELOW ARE A DISCRIMINATING SET AND NOT ONE ASSERTION IN THREE
+// SHAPES. An arm that caught everything would pass the first and fail the
+// second; an arm that caught nothing fails the first; and the honest path above
+// is the admission that stops "refuse everything" from passing.
+//
+//   ABSENT          -> 503 with a detail. The fold has not run. Retry.
+//   UNREADABLE      -> 500. A row whose columns disagree with the schema IS an
+//                      internal error, and calling it a 503 would tell a trader
+//                      to retry a request no retry can fix.
+//   NOTHING WRITES  -> the fixture writes STRAIGHT THROUGH here rather than
+//                      staging, so an empty `requests` is a fact about the
+//                      route and not about the fake.
+// -----------------------------------------------------------------------------
+
+describe('ADR-285: an absent `rule_states` row is an honest 503 and never a 500', () => {
+  /**
+   * A backend whose `subject()` raises, with a write-through insert.
+   *
+   * The staged fixture above cannot express this: its `transact` merges only
+   * when the handler RETURNS, so an empty `requests` after a throw would be a
+   * property of the fake. Here the insert appends immediately, and the
+   * assertion that nothing was written is therefore about the route.
+   */
+  function raising(err: Error): PayoutBackend {
+    return {
+      ...backend,
+      transact: <T>(_session: AuthSession, fn: (tx: PayoutTx) => Promise<T>): Promise<T> =>
+        fn({
+          identityStatus: () => Promise.resolve(fixture.identityStatus),
+          subject: () => Promise.reject(err),
+          holdFlag: () => Promise.resolve(fixture.holdFlag),
+          insertPayoutRequest: (row) => {
+            fixture.requests.push(row);
+            return Promise.resolve({ eligibilitySnapshotId: `snap-${row.id}` });
+          },
+        }),
+    };
+  }
+
+  it('answers 503 service_unavailable with a detail, and approves nothing', async () => {
+    usePayoutBackend(raising(new RuleStateAbsent(ACCOUNT, BASIS_DAY)));
+
+    const res = await requestPayout();
+
+    expect(res.statusCode).toBe(503);
+    const body = res.json();
+    expect(body.code).toBe('service_unavailable');
+    expect(body.type).toBe('https://meritfutures.com/problems/service_unavailable');
+    expect(body.title).toBe('Service unavailable');
+    // THE DETAIL IS THE DISCRIMINATOR AND IT CARRIES NO INTERNAL. Section 2:
+    // `detail` "never leaks internals or other users' data". The account, the
+    // day and the table go to the log; the body says what the caller may do.
+    expect(typeof body.detail).toBe('string');
+    expect(body.detail).not.toContain('rule_states');
+    expect(body.detail).not.toContain(ACCOUNT);
+    expect(body.detail).not.toContain(BASIS_DAY);
+    // AND IT NAMES THE HEADER, because the case below measures that the same
+    // key answers 409 rather than the retry the first sentence invites.
+    expect(body.detail).toContain('Idempotency-Key');
+    expect(fixture.requests).toHaveLength(0);
+  });
+
+  it('does NOT stamp the key, and a retry therefore needs a NEW one', async () => {
+    usePayoutBackend(raising(new RuleStateAbsent(ACCOUNT, BASIS_DAY)));
+    const key = 'idem-285-absent';
+
+    const refused = await requestPayout({ idempotencyKey: key });
+    expect(refused.statusCode).toBe(503);
+
+    // THE SAME KEY, THE SAME BODY, A WIRED FOLD, AND THE ANSWER IS 409 RATHER
+    // THAN EITHER 200 OR A REPLAYED 503. THAT PAIR IS THE MEASUREMENT AND IT IS
+    // WHY THE `detail` NAMES THE HEADER. A refusal is never stamped
+    // (`RefusalThrown` above says why), so `idempotency_keys` keeps a claimed
+    // row with a null response and `classify` calls that `in_flight` FOREVER.
+    // The 409 proves the 503 was not stamped: a stamped one would replay 503
+    // verbatim here.
+    usePayoutBackend(backend);
+    const sameKey = await requestPayout({ idempotencyKey: key });
+    expect(sameKey.statusCode).toBe(409);
+    expect(sameKey.json().code).toBe('conflict');
+
+    // AND A NEW KEY GETS THE REAL ANSWER, which is the admission that stops
+    // this case from passing against a route that refuses everything.
+    const fresh = await requestPayout({ idempotencyKey: 'idem-285-after-fold' });
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.json().status).toBe('approved');
+  });
+
+  it('leaves an UNREADABLE row a 500, because a malformed row is not a schedule', async () => {
+    usePayoutBackend(
+      raising(new RuleStateUnreadable('rule_states[x:y]', 'two rows carry this account and day')),
+    );
+
+    const res = await requestPayout();
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json().code).toBe('internal_error');
     expect(fixture.requests).toHaveLength(0);
   });
 });
