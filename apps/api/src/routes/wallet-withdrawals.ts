@@ -75,8 +75,31 @@
 // SIGN is not a caller's to write: `packages/ledger/src/posting.ts` applies it
 // in exactly one place, `+amountCents` on the debit and `-amountCents` on the
 // credit, and a caller names a debit account, a credit account and a POSITIVE
-// amount. `LT-06` debits `trader_wallet` (identity) and credits `firm_treasury`
-// (M05 section 2.1).
+// amount. `LT-06` debits `trader_wallet` (identity) and credits
+// `withdrawals_in_flight`, the firm-scoped `liability` ADR-181 derived and
+// ADR-187 minted, seeded by `0056` so `chart.ts`'s `resolve` finds it (M05
+// section 2.1). THIS SENTENCE READ `credits firm_treasury` UNTIL ADR-267 AND
+// THAT WAS FALSE WHEN IT WAS WRITTEN: ADR-180 had already ruled the leg is NOT
+// `firm_treasury`, because `firm_treasury` is an `asset` and a credit to it
+// derecognizes cash, which is exactly the recognition timing ADR-027, ADR-033,
+// ADR-067 and `0038` each refused in turn on `LT-01`. No cash moves at an
+// approval, so this posting names no cash account at all.
+//
+// -----------------------------------------------------------------------------
+// AND THE POSTING CANNOT LEAVE THIS TRANSACTION THE WAY `LT-01`'s DID
+// -----------------------------------------------------------------------------
+// ADR-267 rules the question the paragraph above invites, which is whether
+// ADR-176's remedy transfers. IT DOES NOT. `LT-01` CREDITS the wallet and
+// `LT-06` DEBITS it, M20 section 3.3a separates the payout hold from the wallet
+// halt by exactly that fact and calls it "the whole of the difference between
+// the two legs", and INV-M20-01 requires every wallet debit to be checked
+// against the live position INSIDE THE SAME TRANSACTION. The key half of
+// ADR-176 is already paid here -- `decideWithdrawal` stores the trader's key on
+// the row -- and the remedy still fails, which is what shows the obstruction is
+// the posting's TIMING rather than its key. `lt06-posting-timing.test.ts` runs
+// all of it. What is owed is a driver that performs the TRANSITION and the
+// POSTING together at a system authority, which is a move out of `apps/api`
+// rather than a split inside it.
 //
 // -----------------------------------------------------------------------------
 // `C-27` ALREADY REFUSES THIS FROM A NON-ELEVATED SESSION AND THIS FILE ADDS NO
