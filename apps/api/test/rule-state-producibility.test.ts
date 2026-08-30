@@ -45,7 +45,12 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { decodePlanRules, PlanRulesCodecError } from '@merit/rules-engine';
+import {
+  CapScheduleCodecError,
+  decodeCapScheduleCents,
+  decodePlanRules,
+  PlanRulesCodecError,
+} from '@merit/rules-engine';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
@@ -1003,119 +1008,140 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     );
   });
 
-  test('the ONE `FM-16` here is the CAP SCHEDULE, and its census is THREE and not two', () => {
-    // **`ADR-286` RULING 5, AND IT IS THE FINDING `ADR-283` COULD NOT SEE FROM
-    // WHERE IT STOOD.** That entry counted the readers of the size ROW and found
-    // two. The `jsonb` COLUMN inside the row has a THIRD reader, and it is
-    // invisible to a count of size-row readers because it returns a LOCAL step
-    // type rather than the engine's.
+  test('the ONE `FM-16` here WAS the CAP SCHEDULE, and its census is now ONE', () => {
+    // **`ADR-302`, AND THIS CASE IS THE ROW'S STOP CONDITION RATHER THAN
+    // PAPERWORK AFTER IT.** It read THREE and refused a fourth. It now reads ONE.
     //
-    // **AND ALL THREE SPELL THE BLOB'S OWN KEYS IDENTICALLY.** `from_ordinal` and
-    // `cap_cents` are what Postgres stores and what every reader asks for, so the
-    // spelling ruling above does not reach inside the column: this half IS one
-    // predicate stated three times, which is `FM-16` by name on the value that
-    // fixes a payout ceiling.
-    // **THE NEEDLE IS THE QUOTED KEY AND NOT THE NAME**, and the difference is
-    // the whole census. A file that reads `'cap_cents'` as a STRING is pulling it
-    // out of an untyped bag, which is a decode; a file that writes `.cap_cents` is
-    // reading a field off a value somebody already decoded, which is a use. The
-    // broad question returns eleven files and five of them are consumers,
-    // `apps/portal/src/view/eligibility.ts` and `packages/rules-engine/src/plan/
-    // resolve.ts` among them. Measured before this list was written.
+    // The retired framing, described rather than left in place, because this file
+    // is asserted against by grep and a retired sentence left standing reads as
+    // live: `ADR-286` ruling 5 counted the readers of the size ROW and found two,
+    // then found that the `jsonb` COLUMN inside the row had a THIRD reader
+    // invisible to that count because it returned a LOCAL step type rather than
+    // the engine's. All three spelled the blob's own keys identically, because
+    // `from_ordinal` and `cap_cents` are what Postgres stores and what every
+    // reader asks for, so the spelling ruling that keeps the size ROW apart never
+    // reached inside the column. That half WAS one predicate stated three times,
+    // on the value that fixes a payout ceiling.
+    //
+    // **THE NEEDLE IS STILL THE QUOTED KEY AND NOT THE NAME**, and the difference
+    // is still the whole census. A file that reads `'cap_cents'` as a STRING is
+    // pulling it out of an untyped bag, which is a decode; a file that writes
+    // `.cap_cents` is reading a field off a value somebody already decoded, which
+    // is a use. The broad question returns eleven files and five of them are
+    // consumers, `apps/portal/src/view/eligibility.ts` and
+    // `packages/rules-engine/src/plan/resolve.ts` among them.
     const readers = deployableSources()
       .filter((path) => /'cap_cents'/.test(codeOf(path)))
       .map(rel)
       .sort();
 
-    expect(readers).toEqual([
-      'apps/api/src/routes/catalog.ts',
-      'apps/site/src/catalog/adapter.ts',
-      'apps/worker/src/batch/adapter.ts',
-    ]);
+    expect(readers).toEqual(['packages/rules-engine/src/plan/cap-schedule-codec.ts']);
 
-    // THE THREE DECODERS, NAMED, because a census satisfied by a count would be
-    // satisfied by three files that had drifted into the pattern. The engine's
-    // three entries above DECLARE and CONSUME the step; they decode nothing.
+    // THE ONE DECODER, NAMED, because a census satisfied by a count would be
+    // satisfied by one file that had drifted into the pattern. The engine's other
+    // entries DECLARE and CONSUME the step; they decode nothing.
+    expect(
+      codeOf(join(REPO_ROOT, 'packages/rules-engine/src/plan/cap-schedule-codec.ts')),
+    ).toContain("cap_cents: cents(bag, 'cap_cents', path),");
+
+    // AND ALL THREE DEPLOYABLE-SIDE STATEMENTS ARE GONE. The census above would
+    // already be red if any of them survived; these three say WHICH one came
+    // back.
+    //
+    // **THE NEEDLE IS THE `cap_cents` LINE AND NOT THE `from_ordinal` ONE, AND
+    // THAT IS A CORRECTION TO THIS CASE RATHER THAN A STYLE CHOICE.** Until
+    // `ADR-302` two of the three assertions here quoted
+    // `from_ordinal: jsonInteger(...)` and `from_ordinal: integer(...)`, and
+    // BOTH LINES EXIST VERBATIM A SECOND TIME IN THE SAME TWO FILES, in
+    // `toCapScheduleBp` (`apps/worker/src/batch/adapter.ts`) and
+    // `decodeCapScheduleBp` (`apps/site/src/catalog/adapter.ts`), which decode
+    // `plan_versions.rules`' BASIS-POINT schedule and not this column at all. So
+    // those two needles would have stayed green on a file whose cents reader had
+    // been deleted. The `'cap_cents'` sweep above was the control that actually
+    // held; these lines are now chosen to be unique to the cents reader too.
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).not.toContain(
+      "cap_cents: jsonCents(jsonField(source, 'cap_cents', where), `${where}.cap_cents`),",
+    );
+    expect(codeOf(join(REPO_ROOT, 'apps/site/src/catalog/adapter.ts'))).not.toContain(
+      "cap_cents: bigintCents(field(source, 'cap_cents', at), `${at}.cap_cents`),",
+    );
+    expect(codeOf(join(REPO_ROOT, 'apps/api/src/routes/catalog.ts'))).not.toContain(
+      'function readCapSchedule(',
+    );
+
+    // AND THE TWO BASIS-POINT READERS ARE STILL THERE AND ARE NOT THIS ROW'S,
+    // asserted so a future session does not read the deletions above as reaching
+    // them. `cap_bp` lives in `plan_versions.rules` and `ADR-283`'s codec is the
+    // one that would collapse it.
     expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
-      "from_ordinal: jsonInteger(jsonField(source, 'from_ordinal', where), `${where}.from_ordinal`),",
+      "cap_bp: jsonInteger(jsonField(source, 'cap_bp', where), `${where}.cap_bp`),",
     );
     expect(codeOf(join(REPO_ROOT, 'apps/site/src/catalog/adapter.ts'))).toContain(
-      "from_ordinal: integer(field(source, 'from_ordinal', at), `${at}.from_ordinal`),",
-    );
-    expect(codeOf(join(REPO_ROOT, 'apps/api/src/routes/catalog.ts'))).toContain(
-      'function readCapSchedule(raw: unknown, planVersionId: string): readonly CapScheduleStep[] {',
+      "cap_bp: integer(field(source, 'cap_bp', at), `${at}.cap_bp`),",
     );
 
-    // AND NO DECODER FOR IT LIVES IN THE ENGINE YET, which is what `ADR-286`
-    // ruling 6 declines to change in this fence. A fourth statement written here
-    // instead of a collapse is the trap row `286` named; this list going to four
-    // is that trap arriving, and it is right for this case to go red. The day the
-    // collapse lands the list drops to `packages/rules-engine` plus whatever has
-    // not been retired, which is what makes the follow-up checkable.
-    expect(readers.filter((path) => path.startsWith('packages/'))).toEqual([]);
+    // AND ALL THREE NOW CALL THE ENGINE'S, which is what separates a collapse
+    // from three deletions plus a fourth statement nobody reaches. `ADR-286`
+    // refused a fourth and `ADR-269` refused one before it for this same value,
+    // and `ADR-299` section 7 named a session that wrote the codec without this
+    // as having made the tree WORSE.
+    for (const path of [
+      'apps/worker/src/batch/adapter.ts',
+      'apps/site/src/catalog/adapter.ts',
+      'apps/api/src/routes/catalog.ts',
+    ])
+      expect(codeOf(join(REPO_ROOT, path)), `${path} does not call the engine's codec`).toContain(
+        'decodeCapScheduleCents(',
+      );
   });
 
-  test('and the THIRD statement of it DIVERGES, on the money, in `apps/api`', () => {
-    // **`ADR-286` RULING 7. THIS IS THE "WITH NOTHING COMPARING THEM" HALF OF
-    // `FM-16` COLLECTING, AND IT IS REPORTED RATHER THAN REPAIRED BECAUSE
-    // `apps/api/src/**` IS OUTSIDE ROW `286`'s FENCE.**
+  test('and the THIRD statement no longer DIVERGES, because there is no third statement', () => {
+    // **THIS CASE WAS WRITTEN BY `ADR-286` RULING 7 AS RED-ON-REPAIR AND THE
+    // REPAIR HAS LANDED, SO IT IS REWRITTEN TO ASSERT THE REPAIRED PROPERTY
+    // RATHER THAN DELETED.** `ADR-299` section 7 made that rewrite the row's stop
+    // condition. What it used to assert, paraphrased so this file does not put
+    // the false sentence back into its own grep results: that `apps/worker` and
+    // `apps/site` each admitted a cents value as a safe-integer JSON number or a
+    // base-10 string of digits and each refused a number past
+    // `Number.MAX_SAFE_INTEGER`, while `apps/api`'s copy tested `Number.isInteger`
+    // -- TRUE of `2 ** 53 + 1` -- and then converted with `BigInt`, taking the
+    // rounded double, and refused the string outright. The divergence ran in BOTH
+    // directions on a served money value.
     //
-    // `apps/worker` and `apps/site` both admit a cents value as a safe-integer
-    // JSON number OR as a base-10 string of digits, and both REFUSE a number past
-    // `Number.MAX_SAFE_INTEGER` rather than rounding it. `apps/api`'s copy does
-    // neither: it tests `Number.isInteger`, which is TRUE of `2 ** 53 + 1` and of
-    // `1e20`, and then converts with `BigInt`, which takes the rounded double.
-    // A cap silently reduced is a payout ceiling nobody published, and a base-10
-    // string -- the rendering `ADR-283` ruling 5 blessed as the only one that
-    // survives above the ceiling -- is refused outright by the same two lines.
-    const worker = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'));
-    const site = codeOf(join(REPO_ROOT, 'apps/site/src/catalog/adapter.ts'));
-    const api = codeOf(join(REPO_ROOT, 'apps/api/src/routes/catalog.ts'));
+    // THE PROPERTY IS NOW ASSERTED OF THE ONE STATEMENT, because there is nothing
+    // left to compare it to.
+    const codec = codeOf(join(REPO_ROOT, 'packages/rules-engine/src/plan/cap-schedule-codec.ts'));
 
-    for (const [where, source] of [
-      ['apps/worker', worker],
-      ['apps/site', site],
-    ] as const) {
-      expect(source, `${where} stopped refusing an unsafe cents number`).toContain(
-        'Number.isSafeInteger(value)',
-      );
-      expect(source, `${where} stopped admitting a base-10 cents string`).toMatch(
-        /typeof value === 'string' && \/\^-\?\\d\+\$\/\.test\(value\)/,
-      );
-    }
-
-    // THE DIVERGENCE, ASSERTED AS THE LIVE PROPERTY IT IS. When this case goes
-    // red because `apps/api` now reads `Number.isSafeInteger`, the finding has
-    // been repaired and `ADR-286` section 7 item 1 is closed.
-    //
-    // **THE QUESTION IS ASKED OF THE FUNCTION AND NOT OF THE FILE**, because
-    // `routes/catalog.ts` reads the `bigint` COLUMNS through a helper that does
-    // check `Number.isSafeInteger`, and a file-wide question would report the
-    // file safe on the strength of the reader that is not the one in question.
-    const capReader = api.slice(api.indexOf('function readCapSchedule('));
-    const readCapSchedule = capReader.slice(0, capReader.indexOf('\nfunction '));
-    expect(readCapSchedule, 'the cap-schedule reader was renamed or removed').toContain(
-      'CatalogRowError',
+    expect(codec, 'the codec stopped refusing an unsafe cents number').toContain(
+      'Number.isSafeInteger(value)',
+    );
+    expect(codec, 'the codec stopped admitting a base-10 cents string').toContain(
+      "if (typeof value === 'string') {",
+    );
+    expect(codec, 'the codec admits a number past the ceiling again').not.toContain(
+      'Number.isInteger(',
     );
 
-    expect(
-      readCapSchedule,
-      'apps/api`s cap-schedule reader now refuses an unsafe cents number, so ADR-286 item 1 is closed',
-    ).toContain("if (typeof cap !== 'number' || !Number.isInteger(cap))");
-    expect(readCapSchedule).not.toContain('Number.isSafeInteger');
-
-    // AND IT ADMITS NO BASE-10 STRING, which is the second half of the same two
-    // lines and the rendering `ADR-283` ruling 5 ruled the only one that survives
-    // above the ceiling. So the divergence runs in BOTH directions: this reader
-    // takes a number the others refuse and refuses a string the others take.
-    expect(readCapSchedule).not.toContain("typeof cap === 'string'");
-
-    // AND THE ROUNDING IS EXECUTED RATHER THAN REASONED ABOUT, because a claim
-    // about a double is the kind this file has been wrong about before.
+    // AND THE REFUSAL IS EXECUTED RATHER THAN READ OFF THE SOURCE, because a
+    // claim about a double is the kind this file has been wrong about before and
+    // a source sweep cannot tell a live check from a quoted one.
     const stored = JSON.parse('{"cap_cents":9007199254740993}') as { cap_cents: number };
     expect(Number.isInteger(stored.cap_cents)).toBe(true);
     expect(Number.isSafeInteger(stored.cap_cents)).toBe(false);
     expect(BigInt(stored.cap_cents)).toBe(9_007_199_254_740_992n);
+
+    // THE ROUNDING ABOVE IS WHAT THE OLD READER RETURNED. THIS IS WHAT THE
+    // COLLAPSE RETURNS INSTEAD, on the same stored bytes.
+    expect(() =>
+      decodeCapScheduleCents([{ from_ordinal: 1, cap_cents: stored.cap_cents }]),
+    ).toThrow(CapScheduleCodecError);
+
+    // AND THE OTHER DIRECTION: the rendering `ADR-283` ruling 5 ruled the only
+    // one that survives above the ceiling is ADMITTED, EXACTLY, by the reader
+    // that used to refuse it.
+    expect(decodeCapScheduleCents([{ from_ordinal: 1, cap_cents: '9007199254740993' }])).toEqual([
+      { from_ordinal: 1, cap_cents: 9_007_199_254_740_993n },
+    ]);
   });
 
   test('and an ABSENT `rule_states` row now has an HONEST refusal rather than a 500', () => {
