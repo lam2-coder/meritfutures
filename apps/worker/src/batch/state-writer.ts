@@ -73,17 +73,17 @@
 // `ENGINE_GATE_LEAVES`' dotted paths, in the ENGINE's field names, with every
 // `*Cents` leaf a base-10 string.
 //
-// **AND THE SEAM BELOW STAYS, WHICH IS A RULING RATHER THAN AN OVERSIGHT.**
-// What is DECLARED is not yet IMPLEMENTED: no adapter in this tree encodes to
-// that shape, `ADR-206` is `status: proposed` with an UNSIGNED approval line,
-// and the encoder is a later slice's rather than this one's. **A PORT THAT
-// REFUSES IS THE CORRECT STATE UNTIL AN ENCODER EXISTS**, and this session's own
-// attempt at that encoder is recorded in
-// `docs/sessions/2026-08-29-session-395.md` section 3 rather than kept, along
-// with the one thing building it taught: **the guard below loses its only
-// witness the moment the encoder's return type is strong enough to forbid a
-// bigint**, so the slice that writes it owes a case at the CALL SITE and not
-// only one that calls `refuseUnstorableJson` directly.
+// **AND THE SEAM BELOW STAYS, WHICH IS A RULING RATHER THAN AN OVERSIGHT.** It
+// read "no adapter in this tree encodes to that shape" and `ADR-250` made that
+// false while leaving the seam exactly where it was: the encoder was a later
+// slice's, that slice is `ADR-239` slice A, it landed at
+// `packages/rules-engine/src/gates-codec.ts`, and `adapter.ts` INSTALLS it.
+// `ADR-206` is still `status: proposed` with an UNSIGNED approval line.
+// Session 395's own attempt at that encoder is recorded in
+// `docs/sessions/2026-08-29-session-395.md` section 3 rather than kept, with
+// the one thing it taught: **the guard below loses its only witness the moment
+// the encoder's return type is strong enough to forbid a bigint**, so the slice
+// that writes it owes a case at the CALL SITE, and suite section 7 is it.
 //
 // **THIS FILE THEREFORE TAKES THE ENCODING AS A PARAMETER AND SUPPLIES NONE.**
 // {@link RuleStateWriterIo.encodeEngineGates} is injected, and
@@ -322,8 +322,8 @@ export interface RuleStateWriterIo {
   /**
    * The value that goes into `rule_states.engine_gates`.
    *
-   * **NO IMPLEMENTATION OF THIS METHOD SHIPS IN THIS FILE OR IN THIS
-   * DEPLOYABLE**, and {@link UNWIRED_RULE_STATE_WRITER_IO} refuses it by name.
+   * **NO IMPLEMENTATION OF THIS METHOD IS WRITTEN UNDER THIS DEPLOYABLE'S
+   * `src/`**, and {@link UNWIRED_RULE_STATE_WRITER_IO} refuses it by name.
    *
    * **THIS PARAGRAPH READ "A PRIMARY SOURCE DECLARING THE STORED ENCODING IS
    * `B5` TERM 2 AND IS AN AMENDMENT TO THE CORPUS RATHER THAN A LINE OF CODE",
@@ -336,14 +336,14 @@ export interface RuleStateWriterIo {
    * `ENGINE_GATE_LEAVES`, so the column and column 19 of the hash read one list
    * rather than two copies of one list.
    *
-   * **WHAT IS OWED IS THEREFORE A CODEC AND NO LONGER A RULING**, which is a
-   * smaller and differently shaped debt: term 2's DECLARATION is discharged and
-   * term 2's IMPLEMENTATION is not. Session 429 repaired this sentence rather
-   * than the port that quotes it (`apps/api/test/wiring.test.ts`, narrowed in
-   * the same commit), and `ADR-239` records why the decoder's home is
-   * `packages/rules-engine` rather than here: `readLiability` cannot import
-   * `apps/worker`, so an encoder here and a decoder there is `FM-16`'s two
-   * statements of one predicate with nothing comparing them.
+   * **WHAT WAS OWED WAS A CODEC AND `ADR-250` WROTE IT**, so term 2 is now
+   * discharged in both halves. Session 429 repaired this sentence rather than
+   * the port that quotes it (`apps/api/test/wiring.test.ts`, narrowed in the
+   * same commit), and `ADR-239` slice A records why the codec's home is
+   * `packages/rules-engine` rather than here: `apps/api` decodes the same
+   * column and cannot import `apps/worker`, so an encoder here and a decoder
+   * there is `FM-16`'s two statements of one predicate with nothing comparing
+   * them. `adapter.ts` INSTALLS that codec; this file still writes none.
    *
    * Its return is `unknown` and not a JSON type, because a JSON type here would
    * be this file choosing the outer shape (an object? an array of leaves?) while

@@ -28,8 +28,8 @@
 // | `accountsWithStoredState`| SERVED. every `rule_states.account_id`           |
 // | `loadAccountDay`         | REFUSES. six fields, and `prior` needs the codec |
 // | `accountDaysFrom`        | REFUSES. `loadAccountDay`'s blocker, per account |
-// | `storedRuleStates`       | REFUSES. `engine_gates` has no DECODER           |
-// | `writeRuleState`         | COMPOSED, one leg short. See below               |
+// | `storedRuleStates`       | REFUSES. no `RuleStateRow` READER, ADR-239 B     |
+// | `writeRuleState`         | COMPOSED AND WHOLE, `ADR-250`. See below          |
 // | `raiseReconciliation`    | REFUSES. no event writer in this deployable      |
 // | `raiseDivergence`        | REFUSES. no event writer in this deployable      |
 //
@@ -42,8 +42,8 @@
 // `readLiability` in `apps/api` needs the DECODER and cannot import
 // `apps/worker`, so an encoder here and a decoder there is `FM-16`, two
 // statements of one predicate with nothing comparing them. So the encoder leg
-// is `UNWIRED_RULE_STATE_WRITER_IO`'s, which throws `RuleStateWriterUnwired` by
-// name, and the day the codec lands this file changes by one property.
+// was `UNWIRED_RULE_STATE_WRITER_IO`'s UNTIL `ADR-250` landed that slice at
+// `gates-codec.ts`; this file now IMPORTS the encoder, in that one property.
 //
 // **THE REFUSALS ARE NOT A WEAKER POSITION THAN THE EXIT-0 THIS ROW REPLACES.**
 // A port that throws stops the batch, `runNightlyBatch` does not catch, `main`
@@ -76,11 +76,11 @@
 // =============================================================================
 
 import type { CalendarSlice, TradingDay } from '@merit/rules-engine';
-import { buildCalendarSlice } from '@merit/rules-engine';
+import { buildCalendarSlice, encodeEngineGates } from '@merit/rules-engine';
 
 import type { WorkerDb } from '../db.ts';
 import type { BatchPorts, BatchReadPort, BatchWritePort } from './ports.ts';
-import { UNWIRED_RULE_STATE_WRITER_IO, writeRuleStateVia } from './state-writer.ts';
+import { writeRuleStateVia } from './state-writer.ts';
 
 /**
  * The transaction the one door hands out, named without importing `@merit/db`.
@@ -134,11 +134,11 @@ const ACCOUNT_DAY_BLOCKER =
 
 /** The blocker every `engine_gates` READ shares. `ADR-239` slice A. */
 const DECODER_BLOCKER =
-  '`rule_states.engine_gates` has a ruled ENCODING (ADR-206) and no CODEC. `RuleStateRow` types ' +
-  'the field as an `EngineGateResults`, whose cents are `bigint`, and ADR-206 section 5 measured ' +
-  'that rebuilding one from `JSON.parse` requires the base-10 strings it rules for exactly this ' +
-  'read. The decoder`s home is `packages/rules-engine`, because `apps/api` needs the same one ' +
-  'and cannot import `apps/worker` (ADR-239 slice A)';
+  'THE CODEC LANDED (ADR-250) AND THIS REASON NARROWS TO WHAT IS LEFT. ' +
+  '`decodeEngineGates` (`packages/rules-engine/src/gates-codec.ts`) rebuilds an ' +
+  '`EngineGateResults` whose cents are `bigint`, and this file imports its encoder. ' +
+  'WHAT IS ABSENT IS A `RuleStateRow` READER: one jsonb leaf decoded is not a row rebuilt, ' +
+  '`contextGates` has its own stored shape, and the rest of that read is ADR-239 slice B';
 
 /** The blocker both event channels share. */
 const EVENT_SINK_BLOCKER =
@@ -461,16 +461,16 @@ function writePort(db: WorkerDb): BatchWritePort {
     /**
      * One `rule_states` row, through the writer that already owns the columns.
      *
-     * THE DOOR IS REAL AND THE ENCODER IS NOT, and both halves arrive on one
-     * `RuleStateWriterIo` because `state-writer.ts` put them there so that "a
-     * deployment installs a door and an encoding together or installs neither".
-     * This deployment installs the door and takes the unwired encoder, so the
-     * write reaches `RuleStateWriterUnwired('encodeEngineGates')` and the batch
-     * fails loudly with the name of the slice that clears it.
+     * **THE DOOR AND THE ENCODER ARE BOTH REAL NOW**, and this paragraph read
+     * the opposite until `ADR-250`: the write reached
+     * `RuleStateWriterUnwired('encodeEngineGates')` and the batch refused.
+     * `state-writer.ts` put both halves on one `RuleStateWriterIo` so that "a
+     * deployment installs a door and an encoding together or installs neither",
+     * and the encoder is IMPORTED, not written here (`ADR-239` A, `FM-16`).
      */
     writeRuleState: writeRuleStateVia({
       transact: (fn) => db.batch((tx) => fn(tx)),
-      encodeEngineGates: UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates,
+      encodeEngineGates,
     }),
 
     raiseReconciliation(): Promise<never> {

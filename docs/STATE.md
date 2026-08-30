@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->240<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->241<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10131,6 +10131,32 @@ not in this row's verification list and it mutates the working tree.
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **22 of 22** invariants off the runner's own last line, **272 files / 6,608 passed / 6 skipped** against a baseline of **271 / 6,597 / 6** reproduced on this same tree before a byte changed, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**: forbidden by this row and it mutates the working tree.
 
 ---
+
+## 2026-08-29 - Session 440: the codec a ruling already wrote, and the two files it touched are line neutral ([ADR-250](decisions/ADR-250.md), proposed)
+
+**[ADR-250](decisions/ADR-250.md), `status: proposed`, UNSIGNED. MONEY PATH, `E2` READ OWED, AND AN `E2` DEBT INHERITED UNDER IT.** [ADR-206](decisions/ADR-206.md) is itself `proposed` and unsigned, and this row transcribed it, so the two entries should be read together and in that order: a founder who moves `ADR-206`'s ruling 2 or ruling 3 moves this module with it. **No migration number and no `RI-` number were taken.**
+
+**THE MODULE EXISTS AND NOTHING IN IT WAS CHOSEN.** [`packages/rules-engine/src/gates-codec.ts`](../packages/rules-engine/src/gates-codec.ts) holds `encodeEngineGates` and `decodeEngineGates` over the engine's own `EngineGateResults`: six groups, twenty-five leaves, the engine's field names, every cents leaf a base-10 string and every other leaf its JSON primitive. Every shape came out of [`rule_states.md`](architecture/data-model/rule_states.md) and [ADR-206](decisions/ADR-206.md).
+
+**THE HOME IS `ADR-239` SLICE A's AND THE ARGUMENT WAS RE-DERIVED RATHER THAN CITED.** Two deployables need the one predicate: `apps/worker` encodes through `RuleStateWriterIo` and `apps/api` decodes because `PayoutSubject.state` is a `RuleState`. Neither can import the other and the engine declares no workspace dependency at all, so **an encoder in the worker and a decoder in the API is `FM-16` by name**, which is the defect class `ADR-206` was written to close rather than to move one level down.
+
+**THE ASSERTION IS A ROUND TRIP AND THE RED WAS BEHAVIOURAL ON UNMODIFIED SHIPPED SOURCE.** Driven with a row `foldAccountDay` produced, the deployment's own composed writer threw `RuleStateWriterUnwired` and four cases were red; [`adapter.ts:473`](../apps/worker/src/batch/adapter.ts) now installs the real encoder where it took the throwing one. **Every case that matters goes out through `JSON.stringify` and back through `JSON.parse` before it is compared**, because an object copy would have carried the `bigint` the codec exists to keep out of the column. A cent past `Number.MAX_SAFE_INTEGER` survives that leg as a string and is REFUSED as a number, which is `ADR-206` section 5 executed.
+
+**FOUR SEEDS FIRED AND EACH WAS RESTORED**, three of them the three ways `projectGates` differs from the store: the dropped leaf, the renamed leaf, a cents leaf rendered as a JSON number, and a decoder that stops refusing an undeclared group.
+
+**THE TRAP WAS NOT SPRUNG.** The wire shape was read at its own file and its three losses re-derived leaf by leaf; nothing was reused from it. **And `ENGINE_GATE_LEAVES` is deliberately NOT imported by the module**: building the bag from a path list means splitting each dotted path and indexing back into the value, which is `M01` section 1.4's banned key iteration in a costume. The two copies are COMPARED in the suite instead, which is `ADR-206` section 8's own recommendation.
+
+**BOTH EDITED SOURCE FILES ARE LINE NEUTRAL AND THAT IS A CONTROL RATHER THAN A STYLE.** A first draft of the comment repairs drifted [`state-writer.ts`](../apps/worker/src/batch/state-writer.ts) by 24 lines and [`adapter.ts`](../apps/worker/src/batch/adapter.ts) by 32. **`RI-15` and `RI-16` both went RED**, naming the `ALLOCATION` row and the port entry and how far each citation had drifted. The edits were rewritten to fit the original line budget rather than the citations repointed, so `git diff --numstat` reports equal insertions and deletions on both files and **not one pointer into either moved**.
+
+**THE PORT IS NOT WIRED AND THE WIRED COUNT DOES NOT MOVE.** `usePayoutBackend` stays `BLOCKED`, and its third clause CLOSED rather than being rephrased for a thirteenth time, which is the first clause that entry has ever lost. What it leaves standing is larger than what it took: `loadAccountDay` still refuses so the fold never starts, `rule_states` still holds no rows, and `gates` is untouched because [ADR-248](decisions/ADR-248.md) ruled it not constructible.
+
+**`storedRuleStates` STILL REFUSES AND ITS REASON IS NARROWED RATHER THAN DELETED.** That reason named the codec because from the adapter's side the codec looked like the whole of what was missing. It is not: a `RuleStateRow` is twenty-odd columns read back and rebuilt, and **one `jsonb` leaf decoded is not a row rebuilt**.
+
+**TWO FENCE EXTENSIONS WERE TAKEN AND BOTH ARE DECLARED IN [ADR-250](decisions/ADR-250.md) SECTION 9.** `packages/rules-engine/test/**`, on a mechanical ground rather than a tidy one: Stryker mutates that package's `src/**/*.ts` against that package's own vitest config, which includes only its `test/`, so a codec suite living in `apps/worker` would leave every codec mutant a survivor in `CI-09`'s report. And one repointed assertion plus one stale case title in `apps/api/test/rule-state-producibility.test.ts`, which the in-fence adapter change made false. **Neither was taken to make anything pass, and the repointed assertion is strictly stronger than the one it replaced.**
+
+**WHERE THIS IS MOST LIKELY WRONG.** The round trip is through `JSON.parse` and not through Postgres: no database was reachable, and what is NOT executed is that `jsonb` accepts this bag and that the table's `CHECK` constraints admit the row it sits in. `ADR-206` section 6 measured both on a real row and this session relies on that rather than repeating it. **And the decoder is stricter than any approved document requires**, which is a judgement flagged for the `E2` read: a strict decoder is a control on a money path and it is also a way to answer 503 on a row that is merely untidy.
+
+**A FINDING REGISTERED RATHER THAN REPAIRED.** Session 436 recorded that `STATE.md` carried the `gen:adr_count` paragraph TWICE, verbatim. **It now carries it FOUR times**, and the generator updated all four. `RI-12`'s ceiling is eight identical lines in one file, so every count is green and what the duplication costs is headroom. Not touched here: it is a keep-both merge artefact rather than a claim, and it is outside this row's fence.
 
 ## `R-38` is ACCOUNT grained, and the corpus was not split about behaviour (2026-08-29, row `254`)
 

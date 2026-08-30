@@ -247,9 +247,32 @@ export { validatePlan } from './plan/validate.ts';
 // an oversight: `projectPayout` reaches it, so no capability is lost by
 // withholding it, and it is the half a caller could most easily use to build a
 // second conjunction.
+// `encodeEngineGates` AND `decodeEngineGates` ARE THE NINTH AND TENTH NAMES, AND
+// ADR-078's TEST GIVES THE SAME ANSWER IT GAVE `replay` AND `hash.ts`. Section
+// 1.3's rationale is the only thing that decides an export here: "every
+// additional export is a way for a caller to reimplement a rule slightly
+// differently".
+//
+// WITHHOLDING DEFEATS IT, AND BOTH CALLERS ARE ALREADY NAMED. `ADR-239` slice A
+// ruled this codec's home to be this package because TWO deployables need the
+// one predicate: `apps/worker` ENCODES into `rule_states.engine_gates` through
+// `RuleStateWriterIo`, and `apps/api` DECODES back out of it because
+// `PayoutSubject.state` is a `RuleState`. Neither can import the other, and this
+// package declares no workspace dependency at all, so a withheld codec is not a
+// codec nobody writes: it is TWO codecs, one per deployable, which is `FM-16` by
+// name and is the two-statements-of-one-predicate defect `ADR-206` exists to
+// close rather than to relocate.
+//
+// `StoredEngineGates` AND ITS SIX GROUP TYPES RIDE WITH THEM, on the reasoning
+// `StateHashError` and `EngineEvent` are exported under: they compute nothing
+// and have no second implementation to drift from. What they buy is that a
+// reader of the column has the stored shape in the type system rather than in a
+// comment. `EngineGatesCodecError` is the same case: a refusal a caller must be
+// able to name is a refusal a caller must be able to catch.
 export { advanceDay, initialState } from './day/advance.ts';
 export { applySettlement } from './payout/settle.ts';
 export { evaluatePayout } from './payout/evaluate.ts';
+export { decodeEngineGates, encodeEngineGates, EngineGatesCodecError } from './gates-codec.ts';
 export { PROJECTION_ASSUMPTIONS, PROJECTION_CAVEAT, projectPayout } from './payout/project.ts';
 export { replay, ReplayAssertionError } from './replay.ts';
 export {
@@ -260,6 +283,15 @@ export {
   StateHashError,
   stateHash,
 } from './hash.ts';
+export type {
+  StoredBufferGate,
+  StoredCadenceGapGate,
+  StoredConsistencyGate,
+  StoredEngineGates,
+  StoredMinimumAmountGate,
+  StoredTradedDaysGate,
+  StoredWinDaysGate,
+} from './gates-codec.ts';
 export type { PayoutContext } from './payout/evaluate.ts';
 export type {
   PayoutProjection,

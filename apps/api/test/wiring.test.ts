@@ -388,6 +388,20 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // be built, which is why this entry narrows rather than shrinks. A leg that
   // moves from "nobody may decide this" to "nobody has written this" is worth
   // recording precisely because it looks like progress and is not a wiring.
+  //
+  // AND ADR-250 IS THE FIRST TIME A CLAUSE ON THIS ENTRY HAS CLOSED RATHER THAN
+  // BEEN REPHRASED, WHICH IS WORTH THE PARAGRAPH BECAUSE THE OTHER TWELVE
+  // REVISIONS WERE THE OPPOSITE SHAPE. The third clause moved from "a decoding
+  // would be inventing a corpus fact" to "a ruling exists and a module does not"
+  // to nothing at all: `encodeEngineGates` and `decodeEngineGates` are in
+  // `packages/rules-engine/src/gates-codec.ts`, `adapter.ts` installs the
+  // encoder where it took the unwired refusal, and the round trip is executed.
+  // THE PORT DID NOT BECOME WIREABLE AND THE WIRED COUNT DOES NOT MOVE. What
+  // the codec was is the SMALLEST of the three things `state` waits on, and the
+  // two that remain are the ones ADR-239 sized as larger: an adapter that
+  // resolves an `AccountDay`, and a table that holds a row. A clause that closes
+  // on a money path is worth recording precisely because it is rare here; a
+  // clause that closes and takes the port with it would be a different entry.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -411,19 +425,27 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "this deployable's one door. IT REFUSES `loadAccountDay` BY NAME, so the fold never " +
     'starts: an `AccountDay` carries a resolved plan, a prior state, a mark, settlements, an ' +
     'opened-on anchor and R-40s five context facts, and no adapter resolves them. THIRD, THE ' +
-    'WRITER WOULD REFUSE ON A CODEC THAT IS RULED ' +
-    'AND UNWRITTEN, AND THIS CLAUSE NARROWED SINCE ADR-233: ' +
-    '`RuleStateWriterIo.encodeEngineGates` (`apps/worker/src/batch/state-writer.ts:354`) has no ' +
-    'implementation under any `src/` and `UNWIRED_RULE_STATE_WRITER_IO` throws by name, but ' +
-    'the stored shape is NO LONGER UNDECLARED. This entry read that writing a decoding would be ' +
-    "inventing a corpus fact; ADR-206 ruled the encoding as the engine's own value, six groups " +
-    'and twenty-five leaves with every cents leaf a base-10 string, and ' +
-    '`docs/architecture/data-model/rule_states.md` reproduces it in full. SO THE BLOCKER MOVED ' +
-    'FROM A RULING NOBODY HAD MADE TO A MODULE NOBODY HAS TYPED, and it binds the READ this ' +
-    'port needs as hard as the write: `PayoutTx.subject` (`routes/payouts.ts:428`) returns a ' +
+    'CODEC CLAUSE IS DISCHARGED, AND IT IS THE FIRST THING THIS ENTRY HAS LOST RATHER THAN ' +
+    'REPHRASED. IT NARROWED TWICE AND THEN CLOSED. It read that writing a decoding would be ' +
+    'inventing a corpus fact, which ADR-206 retired by ruling the encoding as the engine`s own ' +
+    'value, six groups and twenty-five leaves with every cents leaf a base-10 string. It then ' +
+    'read that `RuleStateWriterIo.encodeEngineGates` ' +
+    '(`apps/worker/src/batch/state-writer.ts:354`) had no implementation under any `src/`, ' +
+    'WHICH ADR-250 MADE FALSE: the codec is `encodeEngineGates` and `decodeEngineGates` in ' +
+    '`packages/rules-engine/src/gates-codec.ts`, which is ADR-239 slice A`s home because BOTH ' +
+    'deployables need the one predicate and neither can import the other, and ' +
+    '`apps/worker/src/batch/adapter.ts:473` INSTALLS it where it took the unwired refusal. The ' +
+    'round trip is EXECUTED rather than claimed: an engine-folded value survives encode, JSON ' +
+    'and decode unchanged, and a cent past `Number.MAX_SAFE_INTEGER` comes back exact. THE ' +
+    'PORT IS NOT WIRED BY ANY OF THAT AND THE WIRED COUNT DOES NOT MOVE, which is why the ' +
+    'clause closing is worth stating rather than celebrating: the codec was the SMALLEST of ' +
+    'the things `state` waits on, and what it leaves standing is the adapter and the empty ' +
+    'table. THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:428`) returns a ' +
     '`PayoutSubject` whose `state` (`routes/payouts.ts:331`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
-    '(`packages/rules-engine/src/types.ts:975`), and `rule_states.engine_gates` is `jsonb`. ' +
+    '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
+    '`decodeEngineGates` is what rebuilds one from the other. ' +
     'FOURTH, `rule_states` HOLDS NO ROWS, so a backend installed today would compute a ' +
     'confident payout verdict off an empty table, which is a wrong answer where a 503 is an ' +
     'honest one. FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
@@ -481,10 +503,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`0015_rule_states.sql:130`) and `AccountDay.external` is required ' +
     '(`apps/worker/src/batch/ports.ts:87`), so this resolver is UPSTREAM of the row rather ' +
     'than the independent fourth slice ADR-245 section 6 sized. SO THE THREE FIELDS WAIT ON ' +
-    'THREE DIFFERENT THINGS AND THE TWELFTH REVISION OF THIS REASON SAYS SO: `state` waits on ' +
-    'a codec, an adapter and a row, which is clauses one to four; `plan` waits on NOTHING and ' +
-    'ADR-233 discharged it; `gates` waits on ONE ruling and one resolver, and it USED to wait ' +
-    'on two rulings. THE FIRM-READ CLAUSE IS ' +
+    'THREE DIFFERENT THINGS AND THE FOURTEENTH REVISION OF THIS REASON SAYS SO, BECAUSE TWO ' +
+    'OF THE THREE MOVED IN ONE NIGHT AND NEITHER SESSION COULD SEE THE OTHER: `state` waited ' +
+    'on a codec, an adapter and a row and NOW WAITS ON TWO, because ADR-250 landed the codec; ' +
+    '`plan` waits on NOTHING and ADR-233 discharged it; and `gates` NO LONGER WAITS ON A ' +
+    'RULING AT ALL, because ADR-254 ruled the R-38 grain ACCOUNT, so what it waits on is a ' +
+    'RESOLVER somebody writes rather than a decision somebody makes. THE PORT IS UNCHANGED ' +
+    'AND THE WIRED COUNT IS UNCHANGED: `accountStatus` still owes a refusal rather than a ' +
+    'widened union, and an adapter and a row are still absent. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:2558`), a closed list of five `firm` keys that includes ' +

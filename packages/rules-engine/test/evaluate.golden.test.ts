@@ -136,6 +136,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'CalendarSliceError',
     'ENGINE_GATE_LEAVES',
     'EXCLUDED_COLUMNS',
+    'EngineGatesCodecError',
     'EngineInvariantError',
     'HASHED_COLUMNS',
     'IMPLEMENTED_RULES',
@@ -148,6 +149,8 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'buildCalendarSlice',
     'buildSessionCalendar',
     'canonicalStateSerialization',
+    'decodeEngineGates',
+    'encodeEngineGates',
     'evaluatePayout',
     'initialState',
     'lookupCalendarDay',
@@ -177,12 +180,29 @@ test('the engine entry point is the whole public surface, and it is this exact l
 // and `PROJECTION_CAVEAT` are frozen tables in the class `HASHED_COLUMNS` and
 // `ENGINE_GATE_LEAVES` are in. TWELVE FUNCTIONS BECOME THIRTEEN.
 //
+// ADR-250 IS THE FOURTH AND IT IS THE FIRST TO ADD TWO FUNCTIONS AT ONCE:
+// twenty-three names to TWENTY-SIX, gaining `encodeEngineGates`,
+// `decodeEngineGates` and the class `EngineGatesCodecError`. Section 1.3's
+// rationale is what admits them and ADR-239 slice A is where it was applied:
+// TWO deployables need this one predicate and neither can import the other, so
+// a withheld codec is not a codec nobody writes, it is TWO codecs, which is the
+// `FM-16` that ADR-206 exists to close. THIRTEEN FUNCTIONS BECOME FIFTEEN and
+// the error classes go from four to FIVE.
+//
 // ADR-251 IS THE FOURTH AND IT IS THE ONLY ONE WHOSE TWO NEW NAMES ARE BOTH
 // FUNCTIONS: twenty-three names to TWENTY-FIVE, thirteen functions to FIFTEEN.
 // The types travel with them and are erased, so they add no name here. THIS
 // GATE CAUGHT THE ADDITION rather than being updated alongside it, which is
 // what it is for: the export surface is a ruling and not a consequence.
-test('of the twenty-five names, exactly fifteen are functions and ADR-251 added two', () => {
+// **ADR-250 AND ADR-251 LANDED IN ONE MERGE AND EACH PARAGRAPH ABOVE COUNTED
+// ONLY ITS OWN ARRIVAL**, which is why neither number above is the number
+// asserted below. Both were written against twenty-three and neither could see
+// the other. MEASURED ON THE MERGED TREE: twenty-three names become
+// TWENTY-EIGHT, thirteen functions become SEVENTEEN, and the error classes go
+// from four to FIVE. The counts here are read off the merged surface rather
+// than added up from the two prose paragraphs, because that addition is exactly
+// the step this gate exists to refuse.
+test('of the twenty-eight names, exactly seventeen are non-class functions after ADR-250 and ADR-251', () => {
   const functions = Object.keys(engine)
     .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
     .sort();
@@ -192,6 +212,7 @@ test('of the twenty-five names, exactly fifteen are functions and ADR-251 added 
   // the difference. `IMPLEMENTED_RULES` and the three tables are values.
   const classes = [
     'CalendarSliceError',
+    'EngineGatesCodecError',
     'EngineInvariantError',
     'ReplayAssertionError',
     'StateHashError',
@@ -202,6 +223,8 @@ test('of the twenty-five names, exactly fifteen are functions and ADR-251 added 
     'buildCalendarSlice',
     'buildSessionCalendar',
     'canonicalStateSerialization',
+    'decodeEngineGates',
+    'encodeEngineGates',
     'evaluatePayout',
     'initialState',
     'lookupCalendarDay',

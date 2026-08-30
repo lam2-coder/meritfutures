@@ -52,8 +52,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 import type { SystemTx } from '@merit/db';
+import { decodeEngineGates, encodeEngineGates } from '@merit/rules-engine';
 import type { EngineGateResults } from '@merit/rules-engine';
 
+import { postgresBatchPorts } from '../src/batch/adapter.ts';
 import { foldAccountDay } from '../src/batch/nightly.ts';
 import type { RuleStateRow } from '../src/batch/ports.ts';
 import {
@@ -68,6 +70,7 @@ import {
   writeRuleStateVia,
 } from '../src/batch/state-writer.ts';
 import type { RuleStateTx, RuleStateValues, RuleStateWriterIo } from '../src/batch/state-writer.ts';
+import type { WorkerDb } from '../src/db.ts';
 import { WORKER_BARREL_LEGS } from '../src/index.ts';
 import { ACCOUNT_A, CALENDAR, DAY_ONE, ENGINE_VERSION, accountDay } from './fixtures.ts';
 
@@ -685,10 +688,18 @@ describe('5. every refusal is typed and names what a reader needs', () => {
     await expect(UNWIRED_RULE_STATE_WRITER_IO.transact(async () => 1)).rejects.toThrow(/transact/);
   });
 
-  test('5.6 no encoding for engine_gates ships in this deployable’s source', async () => {
-    // `B5` TERM 2 IS NOT CLEARED HERE AND THIS IS THE MECHANICAL FORM OF THAT.
-    // The only `encodeEngineGates` implementation under `src/` is the unwired
-    // refusal; every other one in this workspace is a test's or a probe's.
+  test('5.6 no encoding for engine_gates is WRITTEN in this deployable’s source', async () => {
+    // **THIS CASE USED TO ASSERT THAT NO ENCODING SHIPPED AT ALL AND ADR-250
+    // MADE THAT FALSE.** The title and this comment are repaired rather than
+    // the predicate, because the predicate was never about whether an encoding
+    // was INSTALLED: it is about whether one is WRITTEN here. `adapter.ts` now
+    // installs `encodeEngineGates` IMPORTED from `@merit/rules-engine`, which
+    // is ADR-239 slice A's ruling on the codec's home, and a second
+    // transcription of ADR-206 appearing under this `src/` is still the defect
+    // this case exists to catch: `apps/api` decodes the same column and cannot
+    // import `apps/worker`, so an encoder written here would be one half of
+    // `FM-16`.
+    //
     // THE PREDICATE IS "HOW MANY `RuleStateWriterIo` VALUES DOES THIS
     // DEPLOYABLE'S SOURCE HOLD", swept over `src/` rather than over this one
     // file, because the file an encoder would arrive in is the file nobody has
@@ -696,7 +707,10 @@ describe('5. every refusal is typed and names what a reader needs', () => {
     // AND IT WAS WRONG IN BOTH DIRECTIONS: it counted the mapping's own
     // parameter, which is where an encoding ARRIVES rather than where one is
     // written, and it would have missed an installed `Io` assembled field by
-    // field.
+    // field. **IT IS ALSO WHY THIS CASE STAYED GREEN ACROSS ADR-250**: the
+    // installed encoder is a property on an object literal handed to
+    // `writeRuleStateVia`, not a second `RuleStateWriterIo` value, so what the
+    // sweep counts did not move when the deployment gained an encoding.
     const declarations: string[] = [];
     for (const file of sourceFiles())
       for (const match of readFileSync(file, 'utf8').matchAll(
@@ -753,5 +767,109 @@ describe('6. the door is this deployable’s and nothing here widens it', () => 
 
   test('6.4 the module is a declared leg of the barrel', () => {
     expect(WORKER_BARREL_LEGS).toContain('./batch/state-writer.ts');
+  });
+});
+
+// =============================================================================
+// 7. THE ENCODING THIS DEPLOYMENT INSTALLS
+// =============================================================================
+// `state-writer.ts` header section 2 left this file one instruction and it is
+// the reason section 7 exists rather than a second case in section 2: "the
+// guard below loses its only witness the moment the encoder's return type is
+// strong enough to forbid a bigint, so the slice that writes it owes a case at
+// the CALL SITE and not only one that calls `refuseUnstorableJson` directly."
+//
+// `encodeEngineGates` now returns a `StoredEngineGates`, whose every cents leaf
+// is a `string`, so no encoder this deployable installs can hand the guard a
+// `bigint` and `tsc` is what says so. Section 2's seeds therefore still exercise
+// the guard over hand-built shapes and prove nothing about the WRITE PATH. These
+// cases are the write path: the value that actually reaches
+// `RuleStateValues.engineGates` on a row the ENGINE folded.
+//
+// AND THE ASSERTION IS A ROUND TRIP RATHER THAN AN ENCODE, because the port
+// waiting on this column READS it. `packages/rules-engine/test/gates-codec.test.ts`
+// owns the codec's own control; what is owed HERE is that the composed writer
+// puts a decodable bag in the column.
+
+describe('7. the deployment installs an encoding and the column round-trips', () => {
+  /** A door that records rather than one that connects. */
+  function recordingDb(): { readonly db: WorkerDb; readonly inserts: RuleStateValues[] } {
+    const inserts: RuleStateValues[] = [];
+    return {
+      inserts,
+      db: {
+        batch<T>(fn: (tx: SystemTx) => Promise<T>): Promise<T> {
+          const tx = {
+            insert: (_key: string, values: RuleStateValues) => {
+              inserts.push(values);
+              return Promise.resolve([values]);
+            },
+          };
+          return fn(tx as unknown as SystemTx);
+        },
+      },
+    };
+  }
+
+  test('7.1 the installed writer ENCODES rather than refusing by name', async () => {
+    // THE RED THIS CASE WAS WATCHED AT: `adapter.ts` took
+    // `UNWIRED_RULE_STATE_WRITER_IO.encodeEngineGates`, so this deployment
+    // installed a door and no encoding and the batch reached the writer and
+    // threw `RuleStateWriterUnwired`. ADR-250 installs the codec ADR-206 ruled
+    // and ADR-239 sized, and `state-writer.ts`'s own condition is met: a
+    // deployment installs a door and an encoding together or installs neither.
+    const { db, inserts } = recordingDb();
+
+    await postgresBatchPorts(db).write.writeRuleState(foldedRow());
+
+    expect(inserts).toHaveLength(1);
+  });
+
+  test('7.2 what lands in `engine_gates` decodes back to the gates the engine folded', async () => {
+    const row = foldedRow();
+    const { db, inserts } = recordingDb();
+
+    await postgresBatchPorts(db).write.writeRuleState(row);
+
+    // THROUGH JSON, because that is the leg `ADR-206` section 5 measured a
+    // number losing a cent on and an object copy does not.
+    const stored: unknown = JSON.parse(JSON.stringify(inserts[0]?.engineGates));
+    expect(decodeEngineGates(stored)).toStrictEqual(row.engineGates);
+  });
+
+  test('7.3 every cents leaf reaches the column as a base-10 string and not a number', async () => {
+    const { db, inserts } = recordingDb();
+    await postgresBatchPorts(db).write.writeRuleState(foldedRow());
+
+    const bag = inserts[0]?.engineGates as Record<string, Record<string, unknown>>;
+    for (const [group, leaf] of [
+      ['winDays', 'floorCents'],
+      ['buffer', 'haveCents'],
+      ['buffer', 'needCents'],
+      ['consistency', 'profitNeededToDiluteCents'],
+      ['minimumAmount', 'withdrawableCents'],
+      ['minimumAmount', 'capCents'],
+      ['minimumAmount', 'minPayoutCents'],
+    ] as const)
+      expect(typeof bag[group]?.[leaf], `${group}.${leaf} is not a string`).toBe('string');
+  });
+
+  test('7.4 a breached fold round-trips too, so the case is not one shape of gates', async () => {
+    const row = breachedRow();
+    const { db, inserts } = recordingDb();
+
+    await postgresBatchPorts(db).write.writeRuleState(row);
+
+    const stored: unknown = JSON.parse(JSON.stringify(inserts[0]?.engineGates));
+    expect(decodeEngineGates(stored)).toStrictEqual(row.engineGates);
+  });
+
+  test('7.5 the guard still admits what the installed encoder produces', () => {
+    // NON-VACUITY FOR SECTION 2. The guard is upstream of the query builder and
+    // it must pass the one encoding this deployment actually installs, or every
+    // night's write would refuse at a column name instead of at a defect.
+    expect(() =>
+      refuseUnstorableJson('engine_gates', encodeEngineGates(foldedRow().engineGates)),
+    ).not.toThrow();
   });
 });
