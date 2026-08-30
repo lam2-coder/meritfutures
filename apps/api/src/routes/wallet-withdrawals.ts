@@ -173,6 +173,21 @@ export const WITHDRAWALS_PATH = '/wallet/withdrawals';
 export const WITHDRAWALS_ENDPOINT = `POST ${WITHDRAWALS_PATH}`;
 
 /**
+ * API_CONTRACT section 6.2's `POST /wallet/withdrawals/:withdrawalId/cancel`.
+ * ADR-263.
+ *
+ * COMPOSED FROM THE CREATION PATH AND NOT RESTATED. The two rows are one
+ * resource, and a second literal is a second thing a rename can leave behind.
+ *
+ * THE CONTRACT ROW IT SERVES IS AN AMENDMENT AND THE PARAGRAPH IT REPLACES IS
+ * QUOTED WHERE IT WAS. API_CONTRACT section 6.2 read *"There is no endpoint
+ * that cancels a withdrawal"* and named `G-TRADER-CANCELS` *"as owed rather
+ * than invented"*; ADR-263 moves that one paragraph and nothing else in the
+ * document, so this route transcribes a contract row rather than inventing one.
+ */
+export const WITHDRAWAL_CANCEL_PATH = `${WITHDRAWALS_PATH}/:withdrawalId/cancel`;
+
+/**
  * The minimum, `10000` INTEGER CENTS.
  *
  * API_CONTRACT section 6.2: "The minimum is `10000` integer cents (M05 section
@@ -262,6 +277,30 @@ export interface WithdrawalResponse {
   readonly provenance_review: boolean;
   /** `halt: null` -- "a withdrawal cannot be created halted". */
   readonly halt: null;
+}
+
+/**
+ * What `POST /wallet/withdrawals/:withdrawalId/cancel` answers. ADR-263.
+ *
+ * THREE FIELDS, AND THE SHORTNESS IS THE SAME RULING {@link
+ * CANCELLATION_HOLDS} CARRIES. The creation response is the trader's receipt
+ * for a request that is going somewhere; a cancellation is the trader taking
+ * that request back, so what they need told is which row moved, that it is
+ * closed, and when. Re-rendering the amount, the destination and the
+ * composition here would restate a row this call did not read for that purpose
+ * and would make a second reader of `source_provenance_summary` out of the one
+ * door that does not need it.
+ *
+ * `status` IS THE LITERAL AND NOT {@link WithdrawalStatus}. `cancelled` is the
+ * only status this door can answer 200 on: every other outcome is a hold and a
+ * hold is a refusal document, so a wider type here would advertise a value the
+ * response can never carry (ADR-040's rule, applied one door over).
+ */
+export interface WithdrawalCancellationResponse {
+  readonly withdrawal_id: string;
+  readonly status: 'cancelled';
+  /** `wallet_withdrawals.cancelled_at`, which `0072` added for this. */
+  readonly cancelled_at: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -1860,13 +1899,15 @@ export const TERMINAL_EDGE_FINDINGS = [
       'cancelled discharges nothing "because LT-06 never posted -- cancelled is reachable only ' +
       'from requested and cooling, both BEFORE approval, so its net is a sum over zero rows".',
     ruled:
-      'RULED AND BUILT. decideCancellation and driveCancellation below are the edge, and 0072 ' +
-      'is the half of it the database owes: WD-C1 rested that whole sentence on an arrow set ' +
-      'NOTHING ENFORCED, and an UPDATE from approved to cancelled landed against this estate ' +
-      'until 0072 refused it. WHAT IS STILL OWED IS A DOOR. API_CONTRACT states that there is ' +
-      'no endpoint that cancels a withdrawal and names it "as owed rather than invented", and ' +
-      'that document is outside this fence, so the transition is written and guarded here and ' +
-      'called by nothing, which is ADR-232 shape one edge over.',
+      'RULED, BUILT AND NOW DRIVEN THROUGH A DOOR. decideCancellation and driveCancellation ' +
+      'below are the edge, and 0072 is the half of it the database owes: WD-C1 rested that ' +
+      'whole sentence on an arrow set NOTHING ENFORCED, and an UPDATE from approved to ' +
+      'cancelled landed against this estate until 0072 refused it. THE SENTENCE THAT STOOD ' +
+      'HERE UNTIL ADR-263 READ "WHAT IS STILL OWED IS A DOOR", on the ground that API_CONTRACT ' +
+      'stated there was no endpoint that cancels a withdrawal and named the route "as owed ' +
+      'rather than invented". ADR-263 moved that one paragraph and POST ' +
+      '/wallet/withdrawals/:withdrawalId/cancel serves it, so this finding is the one of the ' +
+      'three that is CLOSED. The other two are open for reasons that are not a door.',
     sources: [
       'packages/db/migrations/0057_terminal_withdrawal_obligation.sql',
       'packages/db/migrations/0072_terminal_withdrawal_transitions.sql',
@@ -2012,6 +2053,54 @@ export async function driveCancellation(args: {
 }
 
 /**
+ * A {@link CancellationHold} as the refusal the door sends. ADR-263.
+ *
+ * BOTH HOLDS ARE `conflict` AND `409`, AND THE CODE IS NOT THIS FILE'S TO
+ * CHOOSE. API_CONTRACT section 2's code table is CLOSED -- `payouts.ts` records
+ * that and {@link INSUFFICIENT_FUNDS} pays the price of the one exception --
+ * and a cancellation refused for either reason is a request against a row whose
+ * STATE will not take it, which is what `conflict` names. Minting a
+ * `not_cancellable` code would be widening a closed vocabulary to improve a
+ * message, and the `detail` carries what the code cannot.
+ *
+ * `not_cancellable` ANSWERS THREE DIFFERENT SITUATIONS WITH ONE BYTE-IDENTICAL
+ * DOCUMENT AND THAT IS THE CONTROL RATHER THAN AN IMPRECISION. A withdrawal id
+ * that names no row, one that names another trader's row, and one that names
+ * the caller's own row at a status `G-TRADER-CANCELS` is not drawn from all
+ * arrive here as `not_cancellable`, because {@link driveCancellation} reads
+ * through an accessor that has already scoped the rows to the caller. A detail
+ * naming the row's current status would answer the first two apart from the
+ * third, which is the question of whether an arbitrary withdrawal id belongs to
+ * somebody else -- and section 13's ruling 1 is that existence is not confirmed
+ * to a stranger. So the sentence is written about the MACHINE and never about
+ * the row.
+ *
+ * THE HALT IS THE ONE HOLD THAT MAY NAME ITSELF, and the ground is that it is
+ * already the trader's to see: section 6.2 renders the halt to the trader as
+ * `{ halted_at, resolves_by } | null` on a subsequent read, so a refusal that
+ * says a halt is running discloses nothing that door does not. It is a separate
+ * detail because a trader told only "this cannot be cancelled" would retry, and
+ * a trader told an investigation is open knows to wait for it.
+ */
+export function cancellationRefusal(hold: CancellationHold): Refusal {
+  if (hold === 'halted')
+    return refuse(
+      'conflict',
+      'Conflict',
+      409,
+      'This withdrawal is held while an investigation is open and cannot be cancelled until ' +
+        'the hold is released.',
+    );
+  return refuse(
+    'conflict',
+    'Conflict',
+    409,
+    'This withdrawal cannot be cancelled. `G-TRADER-CANCELS` is drawn from `requested` and ' +
+      'from `cooling` and from no other status.',
+  );
+}
+
+/**
  * The refusal for a composition that came up short against a balance that said
  * it would not.
  *
@@ -2103,6 +2192,24 @@ function unwiredOrThrow(err: unknown, request: FastifyRequest, reply: FastifyRep
  * the `idempotency_key_reuse` check slightly WEAKER than section 1 specifies
  * and never stronger.
  */
+/**
+ * `:withdrawalId`, or `null` when the segment is absent or empty.
+ *
+ * A `null` HERE IS ANSWERED AS `not_cancellable` AND NOT AS A VALIDATION ERROR,
+ * which is one refusal fewer rather than one shape more. Fastify cannot match
+ * this route without a non-empty segment, so the branch is unreachable through
+ * the transport; what it is really answering is "this id names no row", which
+ * is the answer {@link cancellationRefusal} already gives to an id that names
+ * nothing, and giving it a second spelling would tell a caller the difference
+ * between a malformed id and a stranger's.
+ */
+function withdrawalIdParam(request: FastifyRequest): string | null {
+  const params: unknown = request.params;
+  if (typeof params !== 'object' || params === null) return null;
+  const value = (params as Record<string, unknown>)['withdrawalId'];
+  return typeof value === 'string' && value !== '' ? value : null;
+}
+
 function rawBodyOf(request: FastifyRequest): Uint8Array {
   const raw = (request as { rawBody?: unknown }).rawBody;
   if (raw instanceof Uint8Array) return raw;
@@ -2218,6 +2325,112 @@ export const WITHDRAWAL_ENDPOINTS: readonly EndpointSpec[] = [
         return unwiredOrThrow(err, request, reply);
       }
       return response;
+    }),
+  },
+  // ---------------------------------------------------------------------------
+  // API_CONTRACT section 6.2's `POST /wallet/withdrawals/:withdrawalId/cancel`,
+  // WHICH IS THE DOOR ADR-234 LEFT OWED. ADR-263
+  // ---------------------------------------------------------------------------
+  // `driveCancellation` HAS BEEN WRITTEN, GUARDED AND TESTED SINCE ADR-234 AND
+  // NOTHING CALLED IT, and the consequence was not academic: every open status
+  // is a member of `OPEN_WITHDRAWAL_STATUSES`, so a wired deployment gave a
+  // trader a withdrawal they could open and no way to close, and `gateNoInFlight`
+  // then refused that identity's every later withdrawal behind a screen saying
+  // one was in flight. THE EDGE EXISTED AND HAD NO DOOR.
+  //
+  // THE FACTOR IS `passkey or dual_channel` AND NO `c27` TAG IS SET, AND THE
+  // TWO HALVES OF THAT ARE DECIDED SEPARATELY.
+  //
+  //   THE TAG IS WITHHELD BECAUSE C-27's ACTION LIST IS CLOSED AT THREE and
+  //   `auth.ts` says so in terms: "a fourth sensitive action is a ruling and not
+  //   a value". C-27 names payout destination change, contact change and
+  //   external withdrawal. A cancellation is money STAYING, so tagging it
+  //   `external withdrawal` would record that this door performs the act C-27
+  //   guards, which is false, and CI-06k reads section 12's matrix rather than
+  //   this field either way.
+  //
+  //   THE FACTOR IS TAKEN ANYWAY AND THE GROUND IS THE RESOURCE RATHER THAN THE
+  //   ACT: a single-factor session may not alter a `wallet_withdrawals` row that
+  //   a single-factor session could not have created. AND IT COSTS THE TRADER
+  //   NOTHING THEY HAVE NOT ALREADY PAID, which is the answer to the obvious
+  //   objection that a guard on this arrow is the lockout arriving by another
+  //   route. A withdrawal exists only because an ELEVATED session opened it, and
+  //   a trader who cannot elevate cannot open the next one either, so elevation
+  //   here never converts a reversible refusal into a permanent one: it holds
+  //   the release for exactly as long as it holds the request. ADR-263 section
+  //   4 records what a founder read may overturn and it is one field.
+  //
+  // NO IDEMPOTENCY KEY, AND THE SAFETY IS A PROPERTY RATHER THAN A PROMISE.
+  // Section 1's required set is four endpoints and the creation's membership is
+  // "required by the schema rather than by this sentence" -- `wallet_withdrawals.
+  // idempotency_key` is `text NOT NULL`. THIS DOOR WRITES NO ROW. A retry finds
+  // the row already `cancelled`, `decideCancellation` holds `not_cancellable`
+  // and NOTHING IS WRITTEN A SECOND TIME, so the key would be protecting a write
+  // that a retry does not perform. THE COST IS STATED RATHER THAN HIDDEN: a
+  // client whose first response was lost reads `409` on the retry instead of the
+  // original `200`, and has to re-read the withdrawal to learn it succeeded.
+  //
+  // AND THAT RETRY IS THE ONE PLACE THE DATABASE DOES NOT BACK THIS HANDLER UP,
+  // WHICH IS WHY THE `not_cancellable` HOLD IS LOAD BEARING RATHER THAN
+  // COSMETIC. `0072`'s trigger fires `WHEN (OLD.status IS DISTINCT FROM
+  // NEW.status ...)`, so an UPDATE writing `cancelled` over `cancelled` does not
+  // fire it at all and both CHECKs are satisfied by the row it produces:
+  // EXECUTED against PostgreSQL 16 with every migration applied, a second
+  // cancellation of an already-cancelled row LANDS and MOVES `cancelled_at`.
+  // The status is immutable at the database and the terminal CLOCK is not, so
+  // the application check is what stands between a retried cancel and a moved
+  // record of when a trader took their money back (ADR-263 section 3).
+  //
+  // ON EVERY OTHER ARROW THE DATABASE IS THE BACKSTOP AND THE HANDLER IS NOT
+  // ALONE. `WD-C2` refuses `approved --> cancelled`, `transferring -->
+  // cancelled` and any UPDATE that leaves a terminal status, so a cancellation
+  // that raced an approval past `lockScope()` would be refused by the trigger
+  // rather than merely by `decideCancellation`. SUCH A REFUSAL REACHING THIS
+  // HANDLER IS A 500 AND DELIBERATELY NOT A 409: it means the application check
+  // and the database disagreed about one row, which is a defect in this
+  // deployment and not a fact about the caller's request, and parsing a
+  // constraint name out of a driver error to answer it politely would put a
+  // second reader of `WD-C2` in the one place nothing would ever check it.
+  {
+    method: 'POST',
+    path: WITHDRAWAL_CANCEL_PATH,
+    required: 'passkey or dual_channel',
+    handle: withSessionContext(async ({ request, reply, session }) => {
+      const id = withdrawalIdParam(request);
+      const active = currentWithdrawalBackend();
+      const at = active.now();
+
+      let outcome: CancellationOutcome;
+      try {
+        // THE WHOLE TRANSITION IS ONE TRANSACTION AND THE HANDLER DECIDES
+        // NOTHING. `driveCancellation` takes the lock, reads the row and
+        // decides; this door supplies the id, the clock and the wire.
+        //
+        // A HOLD IS RETURNED OUT OF THE TRANSACTION AND NOT THROWN OUT OF IT,
+        // WHICH IS THE OPPOSITE OF THE CREATION DOOR AND FOR THE CREATION
+        // DOOR'S OWN REASON. `RefusalThrown` exists there because a refusal
+        // decided after `registerDestination` must roll back a write, and
+        // `first_seen_at` is immutable under `PAYOUT-DEST-C1`. THIS PATH WRITES
+        // NOTHING ON A HOLD: the only write in it is `cancelWithdrawal`, which
+        // the decision reaches or does not, so the transaction that commits
+        // after a hold commits nothing at all and a throw would buy a rollback
+        // of no rows.
+        outcome = await active.transact(session, (tx) =>
+          driveCancellation({ tx, id: id ?? '', at }),
+        );
+      } catch (err) {
+        return unwiredOrThrow(err, request, reply);
+      }
+
+      if (outcome.decision.kind === 'hold')
+        return cancellationRefusal(outcome.decision.hold).send(reply, request.id);
+
+      const body: WithdrawalCancellationResponse = {
+        withdrawal_id: outcome.id,
+        status: 'cancelled',
+        cancelled_at: outcome.decision.values.cancelledAt.toISOString(),
+      };
+      return body;
     }),
   },
 ];

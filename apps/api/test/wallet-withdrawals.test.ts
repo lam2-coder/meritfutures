@@ -80,6 +80,8 @@ import {
   WALLET_PROVENANCES,
   WITHDRAWALS_ENDPOINT,
   WITHDRAWALS_PATH,
+  WITHDRAWAL_CANCEL_PATH,
+  WITHDRAWAL_ENDPOINTS,
   WITHDRAWAL_REQUIRED_FACTORS,
   balanceOf,
   centsFromJson,
@@ -113,6 +115,7 @@ import {
   type WalletEntryRow,
   type WithdrawalBackend,
   type ApprovalHand,
+  type WithdrawalCancellationResponse,
   type CancellationOutcome,
   type WithdrawalApprovalCandidate,
   type WithdrawalApprovalValues,
@@ -432,6 +435,30 @@ function withdraw(
   });
 }
 
+/**
+ * `POST /wallet/withdrawals/:withdrawalId/cancel`, over the transport. ADR-263.
+ *
+ * IT SENDS NO `Idempotency-Key` AND NO BODY, because the row states neither.
+ * The one option is the cookie, so the elevation case drives the same helper
+ * every other case does rather than a second one written to fail.
+ */
+async function cancelOverHttp(
+  id: string,
+  options: { token?: string | undefined } = {},
+): Promise<LightMyRequestResponse> {
+  const { app } = buildServer({ surface: 'public', modules: onDisk });
+  const headers: Record<string, string> = {};
+  const token = 'token' in options ? options.token : TOKEN;
+  if (token !== undefined) headers['cookie'] = `${SESSION_COOKIE}=${token}`;
+  const res = await app.inject({
+    method: 'POST',
+    url: `${BASE_PATH}${WITHDRAWAL_CANCEL_PATH.replace(':withdrawalId', id)}`,
+    headers,
+  });
+  await app.close();
+  return res;
+}
+
 beforeEach(() => {
   reset();
   sessionFor = SESSION;
@@ -449,19 +476,36 @@ afterEach(() => {
 // -----------------------------------------------------------------------------
 
 describe('the endpoint is declared as API_CONTRACT section 6.2 and section 12 write it', () => {
-  it('requires elevation and carries the C-27 action', () => {
+  it('requires elevation on BOTH rows, and the cancel row carries no C-27 action', () => {
+    // ADR-263 NARROWS THIS ASSERTION RATHER THAN WIDENING IT: the map is
+    // compared WHOLE, so the cancel row could not have been added without this
+    // line moving, which is what makes the second row a decision somebody took
+    // rather than a route that appeared.
     expect(WITHDRAWAL_REQUIRED_FACTORS).toStrictEqual({
       'POST /wallet/withdrawals': 'passkey or dual_channel',
+      'POST /wallet/withdrawals/:withdrawalId/cancel': 'passkey or dual_channel',
     });
+
+    // AND THE TAG IS THE HALF THE FACTOR DOES NOT SAY. C-27's action list is
+    // closed at three and a cancellation is money STAYING, so the cancel row
+    // declares the factor and NOT the action. A `c27` here would record that
+    // this door performs the act C-27 guards.
+    const cancelSpec = WITHDRAWAL_ENDPOINTS.find((spec) => spec.path === WITHDRAWAL_CANCEL_PATH);
+    expect(cancelSpec?.c27).toBeUndefined();
+    expect(WITHDRAWAL_ENDPOINTS.find((spec) => spec.path === WITHDRAWALS_PATH)?.c27).toBe(
+      'external withdrawal',
+    );
   });
 
   it('is registered on the PUBLIC surface and withheld from the operator one', () => {
     const publicSide = buildServer({ surface: 'public', modules: onDisk }).report;
     const operator = buildServer({ surface: 'operator', modules: onDisk }).report;
-    expect(publicSide.registered).toContain(WITHDRAWALS_ENDPOINT);
-    expect(publicSide.withheld).not.toContain(WITHDRAWALS_ENDPOINT);
-    expect(operator.withheld).toContain(WITHDRAWALS_ENDPOINT);
-    expect(operator.registered).not.toContain(WITHDRAWALS_ENDPOINT);
+    for (const endpoint of [WITHDRAWALS_ENDPOINT, `POST ${WITHDRAWAL_CANCEL_PATH}`]) {
+      expect(publicSide.registered, endpoint).toContain(endpoint);
+      expect(publicSide.withheld, endpoint).not.toContain(endpoint);
+      expect(operator.withheld, endpoint).toContain(endpoint);
+      expect(operator.registered, endpoint).not.toContain(endpoint);
+    }
   });
 
   it('names the endpoint the idempotency layer stores against', () => {
@@ -1876,9 +1920,15 @@ describe('`G-TRADER-CANCELS`, decided', () => {
 
   it('holds every status that is not one of the two tails', () => {
     // TOTAL OVER THE ENUM rather than over the cases somebody remembered, which
-    // is `decideApproval`'s discipline. The three terminal ones matter most:
-    // `0072` refuses leaving a terminal status, so a driver that re-cancelled a
-    // cancelled row would be refused at the statement rather than here.
+    // is `decideApproval`'s discipline. The three terminal ones matter most,
+    // AND THIS COMMENT READ THAT `0072` WOULD CATCH A RE-CANCEL ANYWAY: "a
+    // driver that re-cancelled a cancelled row would be refused at the
+    // statement rather than here". IT IS FALSE AND ADR-263 SECTION 3 MEASURED
+    // IT. `0072`'s trigger fires `WHEN (OLD.status IS DISTINCT FROM
+    // NEW.status ...)`, so `cancelled` written over `cancelled` never reaches
+    // it; EXECUTED against PostgreSQL 16.13 with every migration applied, that
+    // UPDATE lands and MOVES `cancelled_at`. This hold is the only thing
+    // refusing it, on the door as in the driver.
     for (const status of [...OPEN_WITHDRAWAL_STATUSES, ...TERMINAL_WITHDRAWAL_STATUSES]) {
       if ((CANCELLABLE_STATUSES as readonly string[]).includes(status)) continue;
       expect(
@@ -2049,5 +2099,190 @@ describe('THE NO-LOCKOUT PROPERTY, closed end to end and not planted', () => {
       hold: 'not_cancellable',
     });
     expect((await withdraw()).statusCode).toBe(409);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE DOOR. ADR-263
+// -----------------------------------------------------------------------------
+
+describe('THE DOOR THE EDGE DID NOT HAVE, driven over HTTP', () => {
+  it('THE DELIVERABLE: request, refuse the second, CANCEL OVER HTTP, and the third is accepted', async () => {
+    // THE PROPERTY THIS SESSION EXISTS FOR, AND EVERY STEP OF IT IS DRIVEN BY
+    // THE THING THAT DRIVES IT. ADR-234 closed this sequence against
+    // `driveCancellation` called from the suite; a trader cannot call a
+    // function. What is asserted here is that a CLIENT can close a withdrawal,
+    // which is the difference between an edge and a door.
+    settledDestination();
+
+    const first = await withdraw();
+    expect(first.statusCode, 'the first withdrawal').toBe(200);
+    const id = first.json().withdrawal_id as string;
+
+    expect((await withdraw()).statusCode, 'the second, while the first is open').toBe(409);
+
+    const closed = await cancelOverHttp(id);
+    expect(closed.statusCode, 'the cancellation').toBe(200);
+    expect(closed.json()).toStrictEqual({
+      withdrawal_id: id,
+      status: 'cancelled',
+      cancelled_at: NOW.toISOString(),
+    } satisfies WithdrawalCancellationResponse);
+
+    // THE ROW MOVED, AND IT MOVED THROUGH THE ACCESSOR METHOD THAT WRITES IT.
+    expect(fixture.cancelled).toStrictEqual([
+      { id, values: { status: 'cancelled', cancelledAt: NOW, updatedAt: NOW } },
+    ]);
+    expect(withdrawalReleasesIdentity(String(fixture.withdrawals[0]?.['status']))).toBe(true);
+
+    expect((await withdraw()).statusCode, 'the third, after the cancellation').toBe(200);
+    expect(fixture.written).toHaveLength(2);
+  });
+
+  it('and the third is refused when the cancellation is the only step removed', async () => {
+    // THE FALSIFIER FOR THE CASE ABOVE, at the door rather than at the driver.
+    settledDestination();
+
+    expect((await withdraw()).statusCode).toBe(200);
+    expect((await withdraw()).statusCode).toBe(409);
+    expect((await withdraw()).statusCode).toBe(409);
+    expect(fixture.cancelled).toStrictEqual([]);
+  });
+
+  it('answers ONE byte-identical document for an unknown id and for a row past `approved`', async () => {
+    // THE INDISTINGUISHABILITY, ASSERTED AS AN EQUALITY RATHER THAN DESCRIBED.
+    // `driveCancellation` holds `not_cancellable` for a row that does not
+    // exist, a row of another identity's and the caller's own row at a status
+    // `G-TRADER-CANCELS` is not drawn from, and section 13's ruling 1 is that
+    // existence is not confirmed to a stranger. A detail naming the row's
+    // status would tell the first two apart from the third.
+    fixture.withdrawals = [openRow({ status: 'approved' })];
+
+    const past = await cancelOverHttp('withdrawal-1');
+    const unknown = await cancelOverHttp('withdrawal-nobody-has');
+
+    expect(past.statusCode).toBe(409);
+    expect(unknown.statusCode).toBe(409);
+    expect(past.json()).toStrictEqual({ ...unknown.json(), instance: past.json().instance });
+    expect(past.json().code).toBe('conflict');
+    expect(String(past.json().detail)).toContain('G-TRADER-CANCELS');
+    expect(String(past.json().detail)).not.toContain('approved');
+    expect(fixture.cancelled).toStrictEqual([]);
+  });
+
+  it('answers a DIFFERENT detail for a halted row, which the trader may already see', async () => {
+    // The halt is rendered to the trader on a subsequent read (section 6.2), so
+    // naming it discloses nothing this surface withholds, and a trader told
+    // only "this cannot be cancelled" would retry a refusal that is waiting on
+    // an investigation.
+    fixture.withdrawals = [openRow({ frozenAt: NOW })];
+
+    const halted = await cancelOverHttp('withdrawal-1');
+    expect(halted.statusCode).toBe(409);
+    expect(halted.json().code).toBe('conflict');
+    expect(String(halted.json().detail)).toContain('investigation');
+
+    fixture.withdrawals = [openRow({ status: 'approved' })];
+    const other = await cancelOverHttp('withdrawal-1');
+    expect(halted.json().detail).not.toBe(other.json().detail);
+    expect(fixture.cancelled).toStrictEqual([]);
+  });
+
+  it('THE RETRY WRITES NOTHING, AND THAT IS WHAT KEEPS THE CLOCK STILL', async () => {
+    // THIS IS THE ASSERTION THAT STANDS IN FOR A CONSTRAINT THE DATABASE DOES
+    // NOT HAVE, AND IT WAS MEASURED RATHER THAN ASSUMED. `0072`'s trigger fires
+    // `WHEN (OLD.status IS DISTINCT FROM NEW.status ...)`, so an UPDATE writing
+    // `cancelled` over `cancelled` never reaches it and both CHECKs are
+    // satisfied by the row it produces. EXECUTED against PostgreSQL 16.13 with
+    // all 68 migrations applied forward-only from empty: a second cancellation of an already-cancelled
+    // row LANDS and MOVES `cancelled_at`, and an UPDATE of the clock alone
+    // backdated it to 2020 (ADR-263 section 3). The status is immutable at the
+    // database; the terminal CLOCK is not. So the `not_cancellable` hold is the
+    // whole control on this path and there is no second one underneath it.
+    settledDestination();
+    const id = (await withdraw()).json().withdrawal_id as string;
+
+    expect((await cancelOverHttp(id)).statusCode).toBe(200);
+    const retry = await cancelOverHttp(id);
+
+    expect(retry.statusCode, 'the retry').toBe(409);
+    expect(fixture.cancelled, 'ONE write, and the clock did not move').toStrictEqual([
+      { id, values: { status: 'cancelled', cancelledAt: NOW, updatedAt: NOW } },
+    ]);
+  });
+
+  it('refuses a non-elevated session before the handler body runs', async () => {
+    // C-27's machinery is `authorize`'s and this module adds no second refusal,
+    // which is the creation row's rule applied to the row beside it. The
+    // evidence that the handler never ran is that the transaction never opened.
+    fixture.withdrawals = [openRow()];
+    sessionFor = UNELEVATED;
+
+    const res = await cancelOverHttp('withdrawal-1');
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('forbidden');
+    expect(fixture.calls).toStrictEqual([]);
+    expect(fixture.cancelled).toStrictEqual([]);
+  });
+
+  it('answers 401 with no session at all, and never 403', async () => {
+    fixture.withdrawals = [openRow()];
+
+    const res = await cancelOverHttp('withdrawal-1', { token: undefined });
+
+    expect(res.statusCode).toBe(401);
+    expect(fixture.calls).toStrictEqual([]);
+  });
+
+  it('answers 503 on an unwired deployment rather than a fixture cancellation', async () => {
+    // The same rule the creation door takes: a backend that answered plausibly
+    // would be a fixture telling a trader their request is closed when no row
+    // moved. `unwiredOrThrow` is what makes it a 503 and not a 500.
+    useWithdrawalBackend(UNWIRED_WITHDRAWAL_BACKEND);
+
+    const res = await cancelOverHttp('withdrawal-1');
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json().code).toBe('service_unavailable');
+  });
+
+  it('cancels the row it was addressed at and leaves the identity`s others alone', async () => {
+    fixture.withdrawals = [openRow(), openRow({ id: 'withdrawal-2', status: 'cooling' })];
+
+    expect((await cancelOverHttp('withdrawal-2')).statusCode).toBe(200);
+
+    expect(fixture.withdrawals[0]?.['status']).toBe('requested');
+    expect(fixture.withdrawals[1]?.['status']).toBe('cancelled');
+  });
+
+  it('takes the per-identity lock before it reads, through the door as through the driver', async () => {
+    fixture.withdrawals = [openRow()];
+
+    await cancelOverHttp('withdrawal-1');
+
+    expect(fixture.calls[0]).toBe('lockScope');
+  });
+
+  it('cancels from `cooling` as well, which is the second tail section 3.2 draws', async () => {
+    fixture.withdrawals = [openRow({ status: 'cooling' })];
+
+    expect((await cancelOverHttp('withdrawal-1')).statusCode).toBe(200);
+    expect(fixture.withdrawals[0]?.['status']).toBe('cancelled');
+  });
+
+  it('is the ONLY door that reaches a terminal status, and the other two are still shut', async () => {
+    // ADR-263 BUILDS ONE EDGE'S DOOR AND NAMES THE OTHER TWO. `settled` and
+    // `failed` are drawn only out of `transferring`, which is reached by
+    // enqueueing on a rail that has no adapter and no importer, so no route in
+    // this deployable can put a withdrawal into either. Asserted over the
+    // registered surface rather than argued, so the day a settlement door lands
+    // this line is what says the finding is due a re-read.
+    const registered = buildServer({ surface: 'public', modules: onDisk }).report.registered;
+    const withdrawalDoors = registered.filter((endpoint) =>
+      endpoint.includes(`${WITHDRAWALS_PATH}/`),
+    );
+
+    expect(withdrawalDoors).toStrictEqual([`POST ${WITHDRAWAL_CANCEL_PATH}`]);
   });
 });
