@@ -487,7 +487,6 @@ type PayoutResponse = {
   basis_trading_day: string;
   payout_ordinal: number;
   estimated_settlement: { min_business_days: number; max_business_days: number };
-  eligibility_snapshot_id: string;
   hold: {                             // present only when status is held_pending_review
     held_at: string;
     resolves_by: string;              // hold_expires_at, 48 hours. ADR-040
@@ -497,6 +496,8 @@ type PayoutResponse = {
 ```
 Auth: session, owner. Idempotency: required. Rate limit: 10 per day per account, 20 per day per identity. Anti-bot: Turnstile.
 Errors: `payout_not_eligible` (422, body includes the full `gates` object so the client shows exactly what is missing), `payouts_frozen`, `identity_restricted`, `kyc_required`, `validation_failed` (amount non-integer, zero, or negative), `conflict` (a payout is already in flight for this account, **and a held request is in flight**).
+
+**This response carried `eligibility_snapshot_id: string` until [ADR-289](../decisions/ADR-289.md), and the field is REMOVED rather than supplied.** The eligibility snapshot is `payout_requests.eligibility_snapshot`, a `jsonb` column written exactly once and always read with its parent, which [`0010_payouts.sql`](../../packages/db/migrations/0010_payouts.sql) chose over a separate table in its own comment because *"a join here would add a way for THE PROOF AND THE DECISION to disagree"*. **So the snapshot has no identity separate from its parent row, and the identifier that reaches it is `payout_request_id`, which this response already carries.** Nothing in the schema ever supplied a snapshot id, no endpoint in this contract accepts one, and the admin drill-down that serves the snapshot serves it inline keyed by `payout_request_id`. A field naming a separately addressable proof would assert a resource the data model deliberately refuses to create. **Do not restore it.**
 
 **A hold is a 200 carrying `held_pending_review`, not an error.** [ADR-040](../decisions/ADR-040.md): the hold is entered when an unresolved high-severity flag stands at request time, and **the request succeeded** — it exists, it holds its ordinal, it carries a full evaluated decision, and it has a deadline. Returning a 422 would put a state with a clock into the vocabulary of a refusal, which is the reading zero denial exists to prevent. **Every money field is populated on a held response**, because the decision is computed and frozen at request time and only the ledger posting is deferred: release is mechanical and re-evaluates nothing, which is `INV-M5-02`, the number shown is the number sent.
 
