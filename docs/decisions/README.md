@@ -295,6 +295,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-279](ADR-279.md) | a stripper that eats the file, and the count in the row was seven where the tree holds twenty-nine (2026-08-30, status: proposed) |
 | [ADR-280](ADR-280.md) | the wire pair is correct and the wire pair was undeclared, so nothing is renamed and a validator that promised RFC 3339 and checked `isNaN` becomes the refusal it always said it was (2026-08-30, status: proposed) |
 | [ADR-281](ADR-281.md) | the door was already built, and the field nobody wrote a reason for is what refuses  (2026-08-30, status: proposed) |
+| [ADR-282](ADR-282.md) | a generated line is never written twice, and the fence had to reach the generator before the check could say so  (2026-08-30, status: proposed) |
 | [ADR-283](ADR-283.md) | the decode ADR-233 did not give the payout transaction, and the validation that lives at PUBLISH cannot be re-run at READ because it takes the value the read is trying to build  (2026-08-30, status: proposed) |
 <!--/gen-->
 
