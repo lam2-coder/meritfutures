@@ -67,6 +67,10 @@ import certificatesModule, {
   CERTIFICATES_MAX_LIMIT,
   CERTIFICATES_PATH,
   CERTIFICATES_REQUIRED_FACTORS,
+  CERTIFICATE_ORIGIN_VAR,
+  certificateLinks,
+  certificateOrigin,
+  CertificateBackendUnconfigured,
   CertificateBackendUnwired,
   CertificateImageError,
   CertificateImageUnwired,
@@ -92,6 +96,8 @@ import certificatesModule, {
   type CertificateObservation,
   type CertificateRow,
 } from '../src/routes/certificates.ts';
+import { VERIFY_PATH } from '../src/routes/verify.ts';
+import type { Environment } from '../src/surface.ts';
 import { recordingDb } from './db-recorder.ts';
 
 // -----------------------------------------------------------------------------
@@ -223,10 +229,18 @@ function threeStates(): Row[] {
   ];
 }
 
+/**
+ * A hand-built signer, for the `projectCertificate` cases that assert on the
+ * PROJECTION rather than on the adapter. It is deliberately NOT
+ * `certificateLinks`: those cases are about which rows reach a signer at all.
+ */
 const LINKS = (code: string): CertificateLinks => ({
   verify_url: `https://merit.example/verify/${code}`,
   image_url: `https://cards.example/${code}/image.png?sig=abc`,
 });
+
+/** A configured deployment, for the adapter cases. No real hostname (ADR-012). */
+const ORIGIN_SET: Environment = { [CERTIFICATE_ORIGIN_VAR]: 'https://cards.example.invalid' };
 
 // -----------------------------------------------------------------------------
 // The harness
@@ -251,7 +265,7 @@ async function call(options: {
 /** Install the list backend over a seeded set. Returns the recorder's calls. */
 function wireList(rows: Row[]): ReturnType<typeof recordingDb>['calls'] {
   const { db, calls } = recordingDb({ rows });
-  useCertificateBackend(databaseCertificateBackend(db, LINKS));
+  useCertificateBackend(databaseCertificateBackend(db, ORIGIN_SET));
   return calls;
 }
 
@@ -756,6 +770,117 @@ describe('the list reads through the scoped door and no other', () => {
     ]);
     // No firm door, no `sqlExecutor`, no second table.
     expect(calls.some((c) => c.door === 'firm')).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The origin, which is the whole of what the port waited on after ADR-261
+// -----------------------------------------------------------------------------
+
+describe('the origin is refused totally, and it is refused before any row', () => {
+  test('an absent, blank, non-URL, cleartext or path-carrying origin all refuse alike', () => {
+    // FIVE SHAPES AND ONE ANSWER. Each is a deployment that has not finished
+    // configuring this row, and the class is the same for all five so no caller
+    // can tell them apart from a response.
+    const refused: Environment[] = [
+      {},
+      { [CERTIFICATE_ORIGIN_VAR]: '   ' },
+      { [CERTIFICATE_ORIGIN_VAR]: 'cards.example.invalid' },
+      { [CERTIFICATE_ORIGIN_VAR]: 'http://cards.example.invalid' },
+      { [CERTIFICATE_ORIGIN_VAR]: 'https://cards.example.invalid/share' },
+    ];
+    for (const env of refused)
+      expect(() => certificateOrigin(env), JSON.stringify(env)).toThrow(
+        CertificateBackendUnconfigured,
+      );
+  });
+
+  test('the accepted origin is `URL.origin` and never the raw string', () => {
+    // A TRAILING SLASH IS THE ONE THAT WOULD SURVIVE A CARELESS READER, because
+    // `https://h/` and `https://h` differ only where the base path is joined.
+    expect(certificateOrigin({ [CERTIFICATE_ORIGIN_VAR]: 'https://cards.example.invalid/' })).toBe(
+      'https://cards.example.invalid',
+    );
+    expect(
+      certificateOrigin({ [CERTIFICATE_ORIGIN_VAR]: '  https://cards.example.invalid  ' }),
+    ).toBe('https://cards.example.invalid');
+  });
+
+  test('the refusal names the variable and never a value', () => {
+    // ADR-012 AT TEST SCALE. The message an operator reads must name the thing
+    // to set and must not echo whatever they set it to, because this message
+    // reaches a log.
+    let message = '';
+    try {
+      certificateOrigin({ [CERTIFICATE_ORIGIN_VAR]: 'http://secret-host.invalid' });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain(CERTIFICATE_ORIGIN_VAR);
+    expect(message).not.toContain('secret-host');
+  });
+});
+
+describe('the two links are the two rows this deployable serves', () => {
+  test('both are absolute, both carry the base path, and both address this process', () => {
+    const links = certificateLinks('https://cards.example.invalid', 'CODE-AAAA');
+    expect(links).toStrictEqual({
+      verify_url: `https://cards.example.invalid${BASE_PATH}/verify/CODE-AAAA`,
+      image_url: `https://cards.example.invalid${BASE_PATH}/certificates/CODE-AAAA/image.png`,
+    });
+  });
+
+  test("the verify link is `verify.ts`' own path and not a second spelling of it", () => {
+    // `routes/certificates.ts` WRITES THAT PATH OUT because importing it would
+    // close a module cycle: `routes/verify.ts` imports `narrowClaims` from
+    // there at run time. TWO SPELLINGS OF ONE PATH IS A DRIFT, so the two are
+    // bound here rather than left to agree by inspection.
+    const code = 'CODE-AAAA';
+    expect(certificateLinks('https://cards.example.invalid', code).verify_url).toBe(
+      `https://cards.example.invalid${BASE_PATH}${VERIFY_PATH.replace(':code', code)}`,
+    );
+  });
+
+  test('the image link is the route constant and not a second spelling of it', () => {
+    const code = 'CODE-AAAA';
+    expect(certificateLinks('https://cards.example.invalid', code).image_url).toBe(
+      `https://cards.example.invalid${BASE_PATH}${CERTIFICATE_IMAGE_PATH.replace(':code', code)}`,
+    );
+  });
+
+  test('a code carrying a URL delimiter is encoded rather than pasted', () => {
+    // `certificates.code` IS `text NOT NULL` WITH NO ALPHABET CHECK (ADR-235
+    // section 6.1 leaves that bound owed), so what keeps the column sane is
+    // `RI-22` and the mint being the only writer, which is a property of this
+    // tree rather than of the database. A raw `/` here would mint a URL
+    // addressing a different row.
+    const links = certificateLinks('https://cards.example.invalid', 'a/b?c#d');
+    expect(links.verify_url).toBe(`https://cards.example.invalid${BASE_PATH}/verify/a%2Fb%3Fc%23d`);
+    expect(new URL(links.image_url).pathname).toBe(
+      `${BASE_PATH}/certificates/a%2Fb%3Fc%23d/image.png`,
+    );
+  });
+
+  test('the projected links survive `assertUrl`, which is what the wire sees', async () => {
+    // THE ROUND TRIP RATHER THAN THE FUNCTION. `projectCertificate` runs both
+    // fields through `assertUrl`, so a link the adapter mints and the projection
+    // rejects would be a 500 nothing below this line would catch.
+    wireList(threeStates());
+    const res = await call({ path: CERTIFICATES_PATH, token: TOKEN_A });
+    expect(res.statusCode).toBe(200);
+    for (const item of res.json<CertificateListResponse>().data) {
+      if (item.state === 'deferred') {
+        expect(item.verify_url).toBeNull();
+        expect(item.image_url).toBeNull();
+        continue;
+      }
+      expect(item.verify_url).toBe(
+        certificateLinks('https://cards.example.invalid', item.code ?? '').verify_url,
+      );
+      expect(item.image_url).toBe(
+        certificateLinks('https://cards.example.invalid', item.code ?? '').image_url,
+      );
+    }
   });
 });
 

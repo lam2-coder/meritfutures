@@ -70,19 +70,36 @@ import { expect, test } from 'vitest';
 // should not read it as a sixteenth.
 //
 // -----------------------------------------------------------------------------
-// THE LIST HAS SHRUNK ONCE ON A COMPOSITION RATHER THAN ON A DOOR (ADR-261)
+// THE LIST HAS NOW SHRUNK TWICE ON THE SAME ARTEFACT, IN ORDER (ADR-261, ADR-266)
 // -----------------------------------------------------------------------------
-// `useCertificateImageSource`'s entry is GONE from below, which is assertion 2
-// above doing its job: `start.ts` installs `databaseCertificateImageSource` and
-// a blocked port that is also wired fails. It is worth one sentence here
-// because of WHAT it waited on. Its last obstruction was not a door, a secret
-// or a vendor: ADR-231 built the read, `db.firm` always held the append and
-// ADR-256 landed the renderer, and what did not exist was anything that put the
-// three TOGETHER. ADR-256 ruling 12 named that gap and refused to wire past it,
-// on the ground that ADR-226 and ADR-229 permit wiring when the last gap is a
-// thing THE DEPLOYMENT SETS and "a composition that does not exist is not such
-// a gap". ADR-261 wrote the composition, which is why this entry expired and
-// `useCertificateBackend`'s did not.
+// BOTH CARD ENTRIES ARE GONE from below, which is assertion 2 above doing its
+// job twice: `start.ts` installs `databaseCertificateImageSource` and
+// `databaseCertificateBackend`, and a blocked port that is also wired fails.
+//
+// `useCertificateImageSource` WENT FIRST AND ITS LAST OBSTRUCTION WAS NOT A
+// DOOR, A SECRET OR A VENDOR. ADR-231 built the read, `db.firm` always held the
+// append and ADR-256 landed the renderer, and what did not exist was anything
+// that put the three TOGETHER. ADR-256 ruling 12 named that gap and refused to
+// wire past it, on the ground that ADR-226 and ADR-229 permit wiring when the
+// last gap is a thing THE DEPLOYMENT SETS and "a composition that does not exist
+// is not such a gap". ADR-261 wrote the composition.
+//
+// `useCertificateBackend` WENT SECOND AND THAT ORDER IS ADR-256 RULING 13.
+// ADR-246 had read the two as ONE deliverable that would "expire together or not
+// at all"; ruling 13 narrowed that to "expire in ORDER", with this one
+// downstream, because the sentence keeping it shut was "publishing a link to a
+// trader is publishing a promise that bytes are there" and it is the IMAGE port
+// answering that discharges it. Its own last obstruction was a GUARD rather than
+// a variable: `projectCertificate` never calls `links` for a deferred row, so a
+// live read beside a refusing signer answered by the state of the caller's own
+// rows (ADR-246 clause 8), and ADR-261 section 5 ruled that check is code rather
+// than configuration. ADR-266 wrote it, in the read arm, ahead of the accessor.
+//
+// SO NEITHER ENTRY EXPIRED ON A VARIABLE, AND THAT IS THE PART WORTH KEEPING.
+// Both were "one SMALLER slice from wireable rather than one VARIABLE from
+// wired", and in both cases the slice was a piece of code somebody had to write.
+// A reader tempted to close a remaining entry below by naming an environment
+// variable should read those two sentences before deciding this one is like them.
 // =============================================================================
 
 const HERE = import.meta.dirname;
@@ -163,7 +180,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   go stale the way the claim it replaces did.
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
-  // (`packages/db/src/scoped-db.ts:267`) and ADR-165 ruled it gains no member, so
+  // (`packages/db/src/scoped-db.ts:269`) and ADR-165 ruled it gains no member, so
   // the vocabulary was never the obstacle either. ADR-171 section 9 states the
   // condition under which the door becomes takeable: the slice that lands an
   // `AdminSessionSource` a deployment can install, because that is the first
@@ -463,6 +480,38 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // celebrating; an entry down to ONE blocker is worth stating twice, because
   // this file's own repeated finding is that a reason naming the second-cheapest
   // blocker retires the question for every reader after it.
+  //
+  // AND ADR-264 IS THE FIRST ENTRY ON THIS PORT TO SETTLE A CLAUSE BY RUNNING
+  // SOMETHING, WHICH IS WHY IT GETS ITS OWN PARAGRAPH AFTER SIXTEEN REVISIONS OF
+  // READING. Clause four said `rule_states` holds no rows and that the fold
+  // "completes"; completing and PERSISTING are different claims and this entry
+  // had never held the second. It does now: `0001` to `0074` applied to an empty
+  // PostgreSQL 16, one account seeded with one live mark, `apps/worker`'s own
+  // entrypoint run, and the table went from zero rows to one. The read half is
+  // built in the same entry and `apps/api/src/rule-state-reader.ts` is the
+  // module.
+  //
+  // **THE PORT STILL DOES NOT BECOME WIREABLE AND THE REASON IS A DIFFERENT KIND
+  // OF THING FROM EVERY REASON BEFORE IT.** Sixteen revisions have named
+  // something nobody had BUILT: a job, an adapter, a codec, a resolver, a
+  // reader. What stands now is that no DEPLOYMENT has run the job, which
+  // ADR-241 ruled external and this repository cannot assert, and one read on
+  // the wrong door: `R-06` permits only the last closed trading day, and
+  // `tradingCalendar` is `firm` and outside `CATALOG_TABLE_KEYS`, so the
+  // transaction that reads the state cannot read the day that decides which
+  // state it may read. `apps/api/test/rule-state-producibility.test.ts` runs
+  // that as link 6 on every CI-01 pass, because it is a clause this entry
+  // discovered rather than inherited and a comment cannot fail.
+  //
+  // AND A SECOND TRANSCRIPTION OF A `rule_states` ROW NOW SHIPS, WHICH IS
+  // REGISTERED HERE RATHER THAN LEFT FOR A SWEEP TO FIND. `toRuleState` in
+  // `apps/worker/src/batch/adapter.ts` and `readRuleState` in `apps/api` read
+  // the same twenty-two values and neither deployable can import the other,
+  // which is `FM-16` by name; its home is `packages/rules-engine` beside
+  // `gates-codec.ts` and ADR-264's row does not fence that package. What FM-16
+  // costs is "with nothing comparing them", and that half is paid: SD-08's
+  // digest is computed by the writer, stored in `bytea`, and re-derived from
+  // the state the reader rebuilds.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -517,18 +566,38 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:458`) returns a ' +
-    '`PayoutSubject` whose `state` (`routes/payouts.ts:331`) is a `RuleState`, ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:486`) returns a ' +
+    '`PayoutSubject` whose `state` (`routes/payouts.ts:356`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
     '`decodeEngineGates` is what rebuilds one from the other. ' +
-    'FOURTH, `rule_states` HOLDS NO ROWS, so a backend installed today would compute a ' +
-    'confident payout verdict off an empty table, which is a wrong answer where a 503 is an ' +
-    'honest one. **THIS CLAUSE IS THE LAST ONE STANDING AND IT CHANGED CHARACTER WITHOUT ' +
-    'CHANGING WORDS**: it used to be one of five absences and it is now the only one, because ' +
-    'the fold that writes the row completes as of ADR-260 and what is missing is a RUN rather ' +
-    'than a capability. A reader who wants this port moving should send the next row at a ' +
-    'scheduled run and a `RuleStateRow` reader, and at nothing else on this list. ' +
+    'FOURTH, THIS CLAUSE READ THAT `rule_states` HOLDS NO ROWS AND THAT A BACKEND INSTALLED ' +
+    'TODAY WOULD COMPUTE A CONFIDENT PAYOUT VERDICT OFF AN EMPTY TABLE, AND ADR-264 SETTLED ' +
+    'BOTH HALVES OF IT BY RUNNING RATHER THAN BY READING. The retired wording is paraphrased ' +
+    'rather than quoted, because a reason that reproduces its own retired sentence reads as ' +
+    'live to every grep. **THE FOLD WRITES A ROW AND THAT IS MEASURED**: migrations `0001` to ' +
+    '`0074` applied forward-only to an empty PostgreSQL 16, one identity, one plan version, ' +
+    'one account and one live `daily_marks` row seeded, `apps/worker`s own entrypoint invoked ' +
+    'at `node --experimental-strip-types src/start.ts`, and the table went from zero rows to ' +
+    'one, reported `written: 1` and exited 0. **AND THE READ HALF IS BUILT**: ' +
+    '`readRuleState` and `ruleStateOn` (`apps/api/src/rule-state-reader.ts`) rebuild the ' +
+    'engine`s `RuleState` from that row, `apps/api/test/rule-state-reader.test.ts` re-derives ' +
+    'SD-08`s digest over the rebuilt state and compares it with the `state_hash` PostgreSQL ' +
+    'holds, and the thirty-two bytes agree. SO WHAT IS ABSENT IS NEITHER A CAPABILITY NOR A ' +
+    'ROW THIS REPOSITORY COULD PRODUCE: it is that NO SCHEDULED RUN HAS HAPPENED IN A ' +
+    'DEPLOYMENT, which is an operator fact ADR-241 ruled EXTERNAL and registered in ' +
+    '`CRON_INVENTORY`, and a reader that answered an absent row with anything at all would be ' +
+    'the wrong answer this clause has refused five times. AN ABSENT ROW IS A REFUSAL AND ' +
+    'NEVER A DEFAULT VERDICT: `RuleStateAbsent` is a class and not an arm. ' +
+    'SEVENTH IS WHAT WAS UNDER IT AND NO REASON ON THIS PORT HAD EVER NAMED IT: `R-06` ' +
+    'permits ONE day, the LAST CLOSED one, so `subject()` must select the stored row BY DAY; ' +
+    'the calendar that says which day that is is `tradingCalendar`, whose scope class is ' +
+    '`firm` and which is NOT one of the five members of `CATALOG_TABLE_KEYS` ' +
+    '(`packages/db/src/scoped-db.ts:2905`), so the payout transaction cannot read it. ' +
+    '`databaseEconomicCalendar` reads the same table in this deployable on `ApiDb.firm`, so ' +
+    'this is ADR-211 clause 2`s TWO-TRANSACTION REMEDY needed again on the CALENDAR half ' +
+    'after ADR-233 removed the need for it on the catalogue half, or a sixth catalogued key. ' +
+    'BOTH ARE SOMEBODY`s RULING AND ADR-264 TOOK NEITHER. ' +
     'FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
     'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
@@ -573,13 +642,16 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'SERVED: `gateNoInFlight` (`routes/wallet-withdrawals.ts`) refuses a second open ' +
     '`wallet_withdrawals` row for one identity IN THE HANDLER, because that legs open index is ' +
     'plain rather than unique (ADR-158 finding 8), and it does not read this field. ' +
-    'SO THE THREE FIELDS NOW WAIT ON ONE THING BETWEEN THEM AND THE FIFTEENTH REVISION OF ' +
-    'THIS REASON SAYS SO: `plan` waits on NOTHING (ADR-233), `gates` waits on NOTHING ' +
-    '(ADR-260), and `state` waits on a `rule_states` ROW, which is a scheduled run and a ' +
-    'reader. THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED. THE FIRM-READ CLAUSE IS ' +
+    'SO THE THREE FIELDS WAIT ON ONE THING BETWEEN THEM AND THE SIXTEENTH REVISION OF THIS ' +
+    'REASON SAYS WHAT IT IS: `plan` waits on NOTHING (ADR-233), `gates` waits on NOTHING ' +
+    '(ADR-260), and `state` waits on NO CAPABILITY EITHER. It waits on a DEPLOYMENT that has ' +
+    'run the job, and on a way to read the calendar on the transaction that reads the state. ' +
+    'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED, AND THE REASON FOR THAT IS NEW: ' +
+    'every clause on this entry until ADR-264 named something nobody had built, and the one ' +
+    'that stands now names something nobody has RUN plus one read on the wrong door. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:2905`), a closed list of five `firm` keys that includes ' +
+    '(`packages/db/src/scoped-db.ts:3123`), a closed list of five `firm` keys that includes ' +
     "`planVersions` and `planVersionSizes`, so `PayoutTx.subject`'s `ResolvedPlan` inputs are " +
     'readable ON THE PAYOUT TRANSACTION and the two-transaction remedy ADR-211 clause 2 ruled ' +
     'is not needed. AN OLDER CLAUSE IS KEPT AS HISTORY BECAUSE IT WAS FALSE: this entry once ' +
@@ -587,7 +659,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`breached` and `breach_kind` are all three columns of `rule_states` as of ' +
     '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
     'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
-    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:468-469` states "no member of ' +
+    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:496-497` states "no member of ' +
     'this interface that a scoped door cannot serve", which ADR-233 makes TRUE of the ' +
     'catalogue half and leaves false of `state`. EVERY CLAUSE ABOVE IS A PREDICATE SOMEWHERE ' +
     'AND NOT ONLY A SENTENCE HERE: `apps/api/test/rule-state-producibility.test.ts` runs the ' +
@@ -658,18 +730,17 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // here going stale now turns a case red rather than waiting for a reader.
   // ---------------------------------------------------------------------------
   useCheckoutBackend:
-    'A CAP WHOSE ROW EXISTS AND WHOSE DOOR DOES NOT, AND THE LEDGER ARM. ' +
-    'TWO CLAUSES NOW: THE FIRST IS NARROWED RATHER THAN DELETED (ADR-252, on ADR-238 ' +
-    'ruling 1) AND THE CROSS-IDENTITY READ IS DELETED (ADR-262). THE `firm` READ CLAUSE THIS ' +
-    'ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
+    'A CAP WHOSE ROW AND DOOR BOTH EXIST AND WHOSE TABLE IS EMPTY, AND THE LEDGER ARM. ' +
+    'TWO CLAUSES STILL: THE FIRST IS NARROWED FOR THE SECOND TIME IN A WEEK AND NOT DELETED ' +
+    '(ADR-252, then ADR-265, both on ADR-238 ruling 1) AND THE CROSS-IDENTITY READ IS DELETED ' +
+    '(ADR-262). THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
     '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
-    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:2905`), whose five members are exactly ' +
+    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3123`), whose five members are exactly ' +
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
     '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
-    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:813`) runs before the ' +
-    'plan on the purchase path and before `resetTarget` on the reset path, and its `maxAccounts` ' +
-    '(`routes/checkout.ts:568`) NOW HAS A COLUMN AND STILL HAS NO DOOR. ADR-238 ruling 1 ruled ' +
+    'THE FIRST LINE OF BOTH HANDLERS: `accountCap()` (`routes/checkout.ts:825`) runs before the ' +
+    'plan on the purchase path and before `resetTarget` on the reset path. ADR-238 ruling 1 ruled ' +
     "the base cap the FIRM'S number and refused `limits.max_accounts_per_entity` in all three of " +
     'its available forms, because that leaf is PER PLAN VERSION while `liveAccounts` beside it ' +
     "is this identity's total across EVERY plan: reading the purchased version makes the " +
@@ -680,20 +751,32 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '1 line, which is `0074_firm_parameters.sql`, and it creates `base_account_cap` on ' +
     "`price_floors`' shape with its approver a foreign key into `operators`. THE EXCEPTION IS " +
     'UNTOUCHED AND 0002 IS NOT EDITED: `grep -rn max_accounts_override ' +
-    'packages/db/migrations/0002_identity.sql` returns 1 line. WHAT REMAINS IS A DOOR AND NOT A ' +
-    'COLUMN, WHICH IS THE NARROWING: `accountCap()` is a method of `CheckoutTx`, which is a ' +
-    'SCOPED transaction, and a scoped transaction refuses every firm key outside ' +
-    '`CATALOG_TABLE_KEYS` -- five members -- and `grep -rn firmParameters ' +
-    'packages/db/src/scoped-db.ts` returns nothing. THE READ CANNOT MOVE OUTSIDE THE ' +
-    'TRANSACTION EITHER, because `INV-M3-15` requires the restriction check at the same point in ' +
-    'the transaction as the cap and `gateIdentity` performs both in one call. AND THE TABLE ' +
-    'SHIPS EMPTY, WHICH NO DOOR FIXES: nothing under any `src/` writes a `firm_parameters` row ' +
-    'or an `operators` row, and AN ABSENT ROW IS NO CAP RATHER THAN AN UNLIMITED ONE, so the ' +
-    'slice that writes this read owes a REFUSAL there before it owes anything else. ' +
-    '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1529`) ABOUT THE SAME ' +
-    'NUMBER AND NO LONGER FOR THE IDENTICAL FINDING: that method reads through `ApiDb.firm`, ' +
-    'which needs no catalogue admission, so its remaining half is the empty table alone. THE TWO ' +
-    'ENTRIES WERE ONE REFUSAL FOR AS LONG AS NEITHER HAD A SOURCE AND THEY ARE TWO NOW. ' +
+    'packages/db/migrations/0002_identity.sql` returns 1 line. AND ADR-265 BUILT THE DOOR, SO ' +
+    'THE CLAUSE THAT SAID "NO DOOR" IS SPENT: `grep -rn effectiveAccountCap ' +
+    'packages/db/src/scoped-db.ts` returns 4 lines, which are the declaration on `ScopedTx`, ' +
+    'the implementation, the statement function and its call. IT IS A NAMED DOOR AND NOT A ' +
+    'CATALOGUE ADMISSION, WHICH IS THE PART WORTH READING: ADR-252 section 10 sized the ' +
+    'remainder of this clause as one member added to `CATALOG_TABLE_KEYS`, and ADR-265 REFUSED ' +
+    'that sizing rather than deferring it. A catalogue read hands out ROWS, so the caller would ' +
+    'do the effective dating this supersession dated table needs and would fold ' +
+    '`identities.max_accounts_override` itself, which is the control a second caller forgets. ' +
+    'The door resolves both and returns ONE INTEGER, the list is still five members, and this ' +
+    'port is where the difference would have been paid. THE READ STILL CANNOT MOVE OUTSIDE THE ' +
+    'TRANSACTION, WHICH IS WHY THE DOOR IS ON THE SCOPED HANDLE: `INV-M3-15` requires the ' +
+    'restriction check at the same point in the transaction as the cap and `gateIdentity` ' +
+    'performs both in one call. WHAT IS LEFT OF CLAUSE 1 IS THE EMPTY TABLE ALONE, WHICH NO ' +
+    'DOOR FIXES: nothing under any `src/` writes a `firm_parameters` row or an `operators` row, ' +
+    'and AN ABSENT ROW IS NO CAP RATHER THAN AN UNLIMITED ONE, so the door THROWS there, before ' +
+    'it reads the identity, and its return type is `number` so no caller has an absent value to ' +
+    'fold into `Infinity`. THAT IS THE REFUSAL ADR-252 SAID THIS SLICE OWED. ' +
+    '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1539`) ABOUT THE SAME ' +
+    'NUMBER AND IS ONE FINDING WITH THIS ONE AGAIN: ADR-252 found the two had STOPPED being one ' +
+    'finding, because this port needed a catalogue admission and that one did not; ADR-265 built ' +
+    'a named door instead of taking the admission, so the construction half is gone from both ' +
+    'and the empty table is all that is left of either. THE DIFFERENCE BETWEEN THEM WAS THE ' +
+    'DOOR AND THERE IS ONE DOOR. THE PORT IS NOT WIRED AND `effectiveAccountCap` IS CALLED ' +
+    'NOWHERE IN `apps/api`: `grep -rn effectiveAccountCap apps/api/src` returns 4 lines and ' +
+    'every one of them is prose. ' +
     'THE CROSS-IDENTITY READ THIS ENTRY CARRIED SECOND IS DISCHARGED AND IS DELETED RATHER ' +
     'THAN NARROWED (ADR-262). IT IS THE THIRD CLAUSE THIS ENTRY HAS LOST IN A WEEK AND THE ' +
     'FIRST DISCHARGED WITHOUT A READ GRANT: neither table became readable, and both refusals ' +
@@ -706,10 +789,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'so `insertAsParty` STAMPS `affiliate_identity_id` and the insert takes NEITHER identity ' +
     "from the caller. That is ADR-238 ruling 2's own remedy, which is ADR-230's stamp applied " +
     "to the counterparty. SECOND AND LAST, THE LEDGER ARM, AND ADR-165's " +
-    'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:969`) is a ' +
+    'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:1030`) is a ' +
     '`LedgerTx`, which only `SystemTx` satisfies because `ledger_transactions` and ' +
     '`ledger_entries` are both `derived` rather than `firm`, `SystemReason` is still exactly two ' +
-    'members (`packages/db/src/scoped-db.ts:267`) and `ApiDb` still declares no door that yields ' +
+    'members (`packages/db/src/scoped-db.ts:269`) and `ApiDb` still declares no door that yields ' +
     'a `SystemTx`. ADR-238 RULING 3 ADDS THE HALF ADR-165 DID NOT REACH: ADR-176 cleared the ' +
     'same obstruction for `LT-01` by DELETING `PayoutTx.ledger` and posting later at a system ' +
     'authority, and that remedy does NOT transfer, because M20 pins `LT-08` to the purchase ' +
@@ -813,7 +896,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
     '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
-    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3420`) at the one reason ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3445`) at the one reason ' +
     '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
     'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
     'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +
@@ -826,49 +909,6 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'that citation was always for THIS clause rather than for the `ApiDb` one beside it. ' +
     'EVERY ABSENCE ABOVE IS EXECUTED in `test/internal-ops-constructibility.test.ts` rather than ' +
     'stated here, so the day any of them lifts a case goes red and this entry expires.',
-  useCertificateBackend:
-    'ONE FIELD OF ONE RESPONSE, AND ADR-246 READ THE THREE CERTIFICATE PORTS AS A SET AND FOUND ' +
-    'THAT THIS ONE AND `useCertificateImageSource` WAIT ON THE SAME ABSENT THING. THEY DO NOT ANY ' +
-    'MORE: ADR-256 ruling 13 narrowed that set reading to say the two expire in ORDER rather than ' +
-    'together, ADR-261 wired the other one, and THIS ENTRY IS WHAT IS LEFT BEHIND IT. ' +
-    '`databaseCertificateBackend` still exists (`routes/certificates.ts:692`) and its read arm is ' +
-    'constructible today through `db.scoped`; its second parameter still has no supplier. ' +
-    "THE `verify_url` CLAUSE IS DISCHARGED AND IS REWRITTEN RATHER THAN DELETED, on RI-14's " +
-    'rule that a false sentence removed leaves nothing for the next reader to check. It read ' +
-    'that the path is "named by M11 and DEFINED BY NO SECTION of the contract" (ADR-168 ' +
-    'foreclosure 1), and API_CONTRACT section 6.3 has carried a `GET /verify/:code` row since ' +
-    'ADR-170, `routes/verify.ts` implements it, and `start.ts` wires `databaseVerifySource(LIVE_DB)` ' +
-    'today. What that half waits on is an ORIGIN, which is a deployment fact ADR-012 keeps out of ' +
-    'this repository and which one named environment variable would close. ' +
-    'AND `image_url` HAS RUN OUT OF ABSENCES TO NAME, WHICH IS WHY THIS ENTRY IS NOW THE ' +
-    'INTERESTING ONE. It was the signer, the column and the renderer; ADR-249 ruled that this ' +
-    'card carries NO SIGNATURE AT ALL and that the address is `origin` plus the path this file ' +
-    'already serves, DERIVED FROM `code` at projection time, so `certificates` needs no ' +
-    'image-location column and NO MIGRATION NUMBER WAS RESERVED OR TAKEN; ADR-256 landed ' +
-    '`renderCertificateCard`; and ADR-261 composed the two database arms with the render into ' +
-    '`src/certificate-image-source.ts` and INSTALLED IT, so the row this field addresses ANSWERS. ' +
-    'The sentence that kept this port shut for three entries, "publishing a link to a trader is ' +
-    'publishing a promise that bytes are there", HAS EXPIRED: the bytes are there. What is left ' +
-    'of the field is an ORIGIN, and an origin IS a thing a deployment sets. ' +
-    'SO THE ONLY REASON THIS PORT IS STILL BLOCKED IS THE ONE THAT WAS NEVER A MISSING PIECE, ' +
-    'AND ADR-261 SECTION 5 RULES IT DOES NOT LIFT WITH A VARIABLE. `projectCertificate` never ' +
-    'calls `links` for a deferred row (ADR-168 foreclosure 4), so a backend with a live read and ' +
-    'a refusing `links` answers 200 to a trader whose certificates are all deferred and refuses ' +
-    'the trader beside them whose certificate issued. THAT IS A RESPONSE DECIDED BY THE STATE OF ' +
-    "THE CALLER'S OWN ROWS, it is executed in `test/certificate-ports.test.ts`, and it is why " +
-    'raising the wired count here has been refused however the refusal is dressed. ADR-246 ' +
-    'repaired the status code of that refusal (503 rather than 500, on ADR-240 section 4) and ' +
-    'deliberately did NOT wire the port. ' +
-    'THE REMAINING GAP IS AN ORIGIN AND A GUARD, AND THE GUARD IS CODE. ADR-226 and ADR-229 ' +
-    'permit wiring when the only remaining gap is a thing the DEPLOYMENT SETS. The origin is one. ' +
-    'A check that reads the origin BEFORE the rows are read and refuses the whole request, so ' +
-    'that the answer can never be decided by which certificates the caller happens to hold, is ' +
-    'not one: it is code, and nothing in this tree has written it. `routes/verify.ts` holds ' +
-    'exactly that shape for its own copy table and `src/certificate-image-source.ts` holds it for ' +
-    'the image row, so the shape is settled and the writing is not done. THIS PORT IS THEREFORE ' +
-    'ONE SMALLER SLICE FROM WIREABLE RATHER THAN ONE VARIABLE FROM WIRED, which is ADR-256 ' +
-    'ruling 12 held rather than eroded on the way past: a composition that does not exist is not ' +
-    'a gap a deployment can close, and neither is a guard that does not exist.',
   useCertificateRevokeBackend:
     'READ BY ADR-246 AS THE THIRD OF THE THREE CERTIFICATE PORTS AND LEFT EXACTLY WHERE IT ' +
     'STOOD: it is the one of the three that is NOT about the card, so the card landing does ' +
@@ -1081,7 +1121,6 @@ test('every database adapter written in this deployable is installed or accounte
 
   // An adapter whose PORT is blocked is accounted for by that port's entry.
   const accountedByPort = new Set([
-    'databaseCertificateBackend',
     'databaseIdempotencyStore',
     // `useWithdrawalBackend` is blocked, and its own entry above carries the
     // reason, so its adapter is accounted for by it.
@@ -1108,5 +1147,5 @@ test('the wired count is reported, so a regression is a number and not a paragra
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 24, wired: 9, blocked: 15 });
+  }).toStrictEqual({ declared: 24, wired: 10, blocked: 14 });
 });

@@ -603,3 +603,112 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
     expect(superseded).toEqual(['approved', 'frozen']);
   });
 });
+
+describe('link 6: the READER exists now, and the DAY it must select by does not reach it', () => {
+  // **THE FIRST LINK ON THIS LIST TO CLOSE ON THIS DEPLOYABLE'S OWN SIDE.**
+  // Links 1 to 3 were all `apps/worker`'s: a job nothing called, an adapter that
+  // refused, a codec nobody had written. Link 4 is the empty table. What was
+  // never a link at all, because nobody had asked for it, is the thing that
+  // turns a stored row into the `RuleState` `PayoutSubject.state` declares, and
+  // `ADR-264` writes it.
+  //
+  // AND THE LINK UNDER IT IS NEW, WHICH IS THIS ENTRY'S FIFTH TIME. `R-06` is
+  // that no endpoint may evaluate eligibility against anything other than the
+  // LAST CLOSED DAY. The reader therefore takes the day as an argument and has
+  // no `latest` arm; the caller is the only thing that could know which day the
+  // calendar says is closed, and a scoped payout transaction cannot read the
+  // calendar at all.
+
+  test('one `rule_states` row reader ships under a `src/` in THIS deployable, and it refuses absence', () => {
+    // THE NEEDLE IS THE CODEC CALL AND NOT THE TYPE NAME, on link 5's own
+    // reasoning: a file that NAMES `RuleState` is usually declaring a parameter.
+    // A rebuilt state must carry `engineGates`, and `ADR-250` put the only
+    // decoding of that column in the engine, so `decodeEngineGates(` finds every
+    // rebuilder in the tree and finds nothing else.
+    const rebuilders = deployableSources()
+      .filter((path) => codeOf(path).includes('decodeEngineGates('))
+      .map(rel)
+      .sort();
+
+    // **TWO, AND THE SECOND ONE IS `FM-16` BY NAME.** `apps/worker` rebuilds a
+    // `prior` and `apps/api` rebuilds a `PayoutSubject.state`, neither can
+    // import the other, and `ADR-264` section 6 registers the finding and names
+    // its home as `packages/rules-engine` beside `gates-codec.ts`. What that
+    // failure mode costs is "with nothing comparing them", and
+    // `rule-state-reader.test.ts` supplies the comparator: `SD-08`'s digest,
+    // computed by the writer and stored in `bytea`, re-derived from the state
+    // the reader rebuilds.
+    // The engine's own file is on the list because it DECLARES the function,
+    // which is the shape link 5 already met on `hasPayoutInFlight:` and is the
+    // reason both halves are asserted rather than only the count.
+    expect(rebuilders).toEqual([
+      'apps/api/src/rule-state-reader.ts',
+      'apps/worker/src/batch/adapter.ts',
+      'packages/rules-engine/src/gates-codec.ts',
+    ]);
+    expect(rebuilders.filter((path) => path.startsWith('apps/'))).toEqual([
+      'apps/api/src/rule-state-reader.ts',
+      'apps/worker/src/batch/adapter.ts',
+    ]);
+
+    // AND THE READER HAS NO ARM THAT ANSWERS AN ABSENT ROW, which is the
+    // property four sessions have refused to give up and which a sweep can keep
+    // true. A `latest` function appearing in that module would be `R-06`
+    // violated by an ordering; a `??` on a column would be a gate that never
+    // fires.
+    const reader = codeOf(join(REPO_ROOT, 'apps/api/src/rule-state-reader.ts'));
+    expect(reader, 'the reader gained a fallback that selects a row by ordering').not.toMatch(
+      /\blatest\b/,
+    );
+    expect(reader, 'the reader gained a default for a column it could not read').not.toContain(
+      '??',
+    );
+    expect(reader).toContain('throw new RuleStateAbsent');
+  });
+
+  test('and `tradingCalendar` is `firm` and OUTSIDE the five keys ADR-233 catalogued', () => {
+    // **THE BLOCKER UNDER THE READER, DERIVED ON THIS TREE RATHER THAN
+    // ASSERTED.** `subject()` runs on the payout transaction, which is a
+    // `ScopedTx`. `ADR-233` gave that handle a `firm`-class read over
+    // `CATALOG_TABLE_KEYS`, a CLOSED list, and the calendar is not on it. So the
+    // one fact that decides WHICH stored row `R-06` permits is unreadable
+    // exactly where the state is read.
+    const scoped = readFileSync(join(REPO_ROOT, 'packages/db/src/scoped-db.ts'), 'utf8');
+    const list = scoped.slice(scoped.indexOf('export const CATALOG_TABLE_KEYS = ['));
+    const catalogued = [...list.slice(0, list.indexOf(']')).matchAll(/'(\w+)'/g)].map(
+      (match) => match[1] ?? '',
+    );
+
+    expect(catalogued).toEqual([
+      'coupons',
+      'geoRestrictions',
+      'midHealth',
+      'planVersions',
+      'planVersionSizes',
+    ]);
+    expect(catalogued).not.toContain('tradingCalendar');
+    expect(catalogued).not.toContain('tradingCalendarLoads');
+
+    // AND THE CLASS IS `firm`, WHICH IS WHAT PUTS IT OUT OF REACH OF EVERY
+    // SCOPED METHOD RATHER THAN ONLY OFF THAT LIST. `ScopedTableKey` is
+    // `Exclude<TableKey, FirmTableKey | PairTableKey>`, so `rows`, `rowsWhere`
+    // and `rowAt` cannot be handed this key either.
+    const registry = readFileSync(join(REPO_ROOT, 'packages/db/src/scope.ts'), 'utf8');
+    const entry = registry.slice(registry.indexOf('\n  tradingCalendar: {'));
+    expect(entry.slice(0, entry.indexOf('\n  },'))).toContain("class: 'firm'");
+
+    // **AND THE READ EXISTS IN THIS DEPLOYABLE, ON A DIFFERENT DOOR, WHICH IS
+    // WHY THIS IS A SECOND TRANSACTION RATHER THAN A MISSING CAPABILITY.**
+    // `databaseEconomicCalendar` reads the same table through `ApiDb.firm`. So
+    // what `subject()` needs is `ADR-211` clause 2's two-transaction remedy,
+    // which `ADR-233` removed the need for on the CATALOGUE half and which
+    // nothing has ruled on the CALENDAR half, or a sixth catalogued key. Both
+    // are somebody's ruling and `ADR-264` takes neither.
+    const api = codeOf(join(REPO_ROOT, 'apps/api/src/routes/economic-calendar.ts'));
+    expect(api).toContain("tx.rowsWhere('tradingCalendar'");
+    expect(api).toContain('db.firm(');
+    expect(codeOf(join(REPO_ROOT, 'apps/api/src/db.ts'))).toContain(
+      'firm<T>(fn: (tx: FirmTx) => Promise<T>): Promise<T>;',
+    );
+  });
+});

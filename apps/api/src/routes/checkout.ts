@@ -113,15 +113,20 @@
 // blocker and missed its cheapest (ADR-238 ruling 1). TWO REMAIN, AND THE
 // SECOND OF THE THREE IS DISCHARGED BY ADR-262:
 //
-//   1. A CAP WITH NO SOURCE. `accountCap()` runs before anything else on the
-//      purchase path and on the reset path alike, and its `maxAccounts` has no
-//      column in any migration: the one line a search for the name reaches is
-//      `identities.max_accounts_override`, the per-entity EXCEPTION.
-//      `databaseAuthBackend` refuses `readMe` for the identical finding about
-//      the same number on `GET /me`. ADR-238 ruling 1 rules the BASE cap the
-//      firm's number rather than a plan's, and rules that it is not read from
-//      `plan_versions.rules` in any of the three forms available. ADR-252 built
-//      the home and wired nothing to it, so what remains is a DOOR.
+//   1. A CAP WITH A SOURCE, A DOOR, AND NO ROW. `accountCap()` runs before
+//      anything else on the purchase path and on the reset path alike. ADR-238
+//      ruling 1 rules the BASE cap the firm's number rather than a plan's and
+//      refuses `plan_versions.rules` in all three of its available forms;
+//      ADR-252 built the home (`0074_firm_parameters.sql`) and wired nothing to
+//      it; ADR-265 built the door, `ScopedTx.effectiveAccountCap()`, which
+//      resolves the base against `identities.max_accounts_override` inside this
+//      transaction and returns one integer. WHAT IS LEFT IS AN EMPTY TABLE:
+//      nothing under any `src/` writes a `firm_parameters` row or the
+//      `operators` row its approver references, so the door REFUSES on every
+//      deployment this tree can produce, and that refusal is correct rather than
+//      a defect. `databaseAuthBackend` refuses `readMe` on `GET /me` for what is
+//      now the SAME remaining half again, having been a different one between
+//      ADR-252 and ADR-265.
 //
 //   2. THE LEDGER ARM, UNCHANGED. See `ledger` below, and ADR-238 ruling 3 for
 //      why ADR-176's remedy for `LT-01` does not transfer to `LT-08`.
@@ -520,8 +525,8 @@ export interface AccountCapRow {
   /** Live accounts this IDENTITY holds. Every plan, not the one being bought. */
   readonly liveAccounts: number;
   /**
-   * The identity's cap. THE BASE NOW HAS A ROW AND THIS TRANSACTION STILL
-   * CANNOT REACH IT.
+   * The identity's cap. THE BASE HAS A ROW, THE TRANSACTION HAS A DOOR, AND
+   * WHAT IS LEFT IS AN EMPTY TABLE.
    *
    * THIS DOCBLOCK SAID `max_accounts_override` FOLDED OVER "THE PLAN DEFAULT"
    * AND ADR-238 RULING 1 RULED THAT SOURCE WRONG RATHER THAN MISSING. The
@@ -538,32 +543,39 @@ export interface AccountCapRow {
    * `firm_parameters` (`0074`) holds `base_account_cap` on `price_floors`'
    * shape, effective dated, superseded rather than updated, its approver a
    * foreign key into `operators`. It is registered `firm` in
-   * `packages/db/src/scope.ts`, so `ApiDb.firm` reaches it and `FirmTx.rowsWhere`
-   * types against it. WHAT REMAINS IS A DOOR AND NOT A COLUMN, and it is
-   * narrower than what stood here: `accountCap()` is a method of `CheckoutTx`,
-   * which is a SCOPED transaction, and a scoped transaction refuses every firm
-   * key that is not in `CATALOG_TABLE_KEYS`. That list is five members and this
-   * key is deliberately not one of them.
+   * `packages/db/src/scope.ts`.
    *
-   * THE READ CANNOT SIMPLY MOVE OUTSIDE THE TRANSACTION, which is the shortcut
-   * to check before reaching for `db.firm` beside it. `INV-M3-15` requires the
-   * restriction check at the same point in the transaction as the cap and
-   * `gateIdentity` performs both in one call, so a cap read before the
-   * transaction opens is a cap that may have been superseded by the time the
-   * purchase commits. `refuseUncatalogued` in `packages/db/src/scoped-db.ts`
-   * states the admission argument in its own message and this table satisfies
-   * it: a request handler holding an identity must read the row INSIDE its own
-   * transaction. Making that argument is a diff on `packages/db` with an ADR,
-   * and ADR-252 did not make it.
+   * AND ADR-265 BUILT THE DOOR. `ScopedTx.effectiveAccountCap()` returns ONE
+   * INTEGER and an implementation of the method below is now one call:
+   * `maxAccounts` is that number and nothing else. THE FOLD IS NOT THIS FILE'S
+   * AND MUST NOT BECOME THIS FILE'S. `identities.max_accounts_override` is the
+   * per-entity EXCEPTION and the firm row is the BASE, and the door resolves
+   * both before it answers, precisely so that no handler has to remember the
+   * second one. A caller here that reads the override again, or that compares
+   * `liveAccounts` against anything but this number, has re-opened the control
+   * the door closed.
    *
-   * AND THE TABLE SHIPS EMPTY, WHICH IS THE HALF NO DOOR FIXES. Nothing in this
-   * repository writes a `firm_parameters` row, so an implementation with the
-   * door in hand reads NOTHING. AN ABSENT ROW IS NO CAP AND IT IS NOT AN
-   * UNLIMITED ONE: folding an absent row into `Infinity`, or skipping the
-   * comparison when the read returns nothing, is a control that answers yes to
-   * everybody on the endpoint that sells accounts. Whichever slice writes this
-   * read owes a REFUSAL there, on `IdentityStatus`' precedent elsewhere in this
-   * file, and it owes it before it owes anything else.
+   * THE READ COULD NOT SIMPLY MOVE OUTSIDE THE TRANSACTION AND THAT IS WHY THE
+   * DOOR IS ON THE SCOPED HANDLE. `INV-M3-15` requires the restriction check at
+   * the same point in the transaction as the cap and `gateIdentity` performs
+   * both in one call, so a cap read through `db.firm` before the transaction
+   * opens is a cap that may have been superseded by the time the purchase
+   * commits, which is a supersession dated table's characteristic failure.
+   * `CATALOG_TABLE_KEYS` is untouched at five members and this key is still not
+   * one of them: ADR-265 refused that admission rather than taking it, because a
+   * catalogue read hands out ROWS and a caller holding rows does the effective
+   * dating and the override fold itself.
+   *
+   * SO WHAT IS LEFT IS THE EMPTY TABLE, AND NO DOOR FIXES IT. Nothing in this
+   * repository writes a `firm_parameters` row, and nothing writes the
+   * `operators` row its `approved_by` references either, so the read finds
+   * NOTHING on every deployment this tree can produce. AN ABSENT ROW IS NO CAP
+   * AND IT IS NOT AN UNLIMITED ONE: folding an absent row into `Infinity`, or
+   * skipping the comparison when the read returns nothing, is a control that
+   * answers yes to everybody on the endpoint that sells accounts. THE REFUSAL
+   * ADR-252 SAID THIS SLICE OWED IS WRITTEN, in the door: it THROWS, before it
+   * reads the identity, and its return type is `number` so there is no absent
+   * value here for anybody to fold.
    */
   readonly maxAccounts: number;
   /** `identities.status`. INV-M3-15 refuses `restricted`. */

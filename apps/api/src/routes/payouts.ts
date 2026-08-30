@@ -66,7 +66,7 @@
 // (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`:
 // `ledgerTransactions` (`packages/db/src/scope.ts:903`) and `ledgerEntries`
 // (`packages/db/src/scope.ts:894`); `ScopedTx.insert` takes
-// `OwnedTableKey` (`scoped-db.ts:3014`) and `insertUnder` takes
+// `OwnedTableKey` (`scoped-db.ts:3232`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
 // (`scoped-db.ts:2135`), a closed list of ONE. So the ONLY handle that
 // satisfies `LedgerTx` is `SystemTx.insert<K extends TableKey>`
@@ -328,6 +328,31 @@ export type IdentityStatus = 'active' | 'restricted' | 'closed';
  */
 export interface PayoutSubject {
   readonly accountId: string;
+  /**
+   * THE STORED `rule_states` ROW FOR THE LAST CLOSED TRADING DAY, REBUILT.
+   *
+   * **A BACKEND IMPLEMENTING `subject()` CALLS `ruleStateOn`
+   * (`../rule-state-reader.ts`) AND DOES NOT FOLD ONE HERE.** `INV-M5-02` is
+   * that both payout endpoints call `evaluatePayout` with the same inputs
+   * because "a second evaluator would be a second rule", and `ADR-239` rules
+   * that the API READS the state the WORKER wrote: a request-path fold is the
+   * divergence `ADR-026` C-07's `state_hash` exists to make detectable,
+   * computed on the one path no replay audit reads. `ruleStates` is registered
+   * `derived` via `accounts` (`packages/db/src/scope.ts`), so the rows are one
+   * hop out on this same transaction.
+   *
+   * **AN ABSENT ROW IS A REFUSAL AND IT IS NEVER A DEFAULT STATE.** The reader
+   * raises `RuleStateAbsent` when the nightly fold has not closed the day for
+   * the account, and there is no arm that returns a state it did not read. A
+   * zeroed or carried-forward state here is a confident payout verdict computed
+   * off inputs nobody folded, which is worse on this door than any refusal.
+   *
+   * **AND THE DAY IS THE PART THIS DEPLOYMENT CANNOT YET SUPPLY.** `R-06`
+   * permits only the LAST CLOSED trading day, `tradingCalendar` is scope class
+   * `firm`, and `CATALOG_TABLE_KEYS` is a closed list of five that does not
+   * include it, so the transaction that reads the state cannot read the day
+   * that decides which state it may read. `ADR-264` section 5.
+   */
   readonly state: RuleState;
   readonly plan: ResolvedPlan;
   /**
@@ -355,10 +380,13 @@ export interface PayoutSubject {
    * on `identity_id` (`packages/db/src/scope.ts`), so no second door and no
    * second transaction is implied by this field.
    *
-   * **AND `usePayoutBackend` IS STILL NOT WIRED, ON THE OTHER TWO FIELDS.**
-   * `state` is a `RuleState`, which means reading a `rule_states` row, and no
-   * scheduled run has written one against this database. That is `ADR-239`
-   * link 4 and it is not this field's.
+   * **AND `usePayoutBackend` IS STILL NOT WIRED, AND THIS PARAGRAPH USED TO SAY
+   * WHY IN A WAY `ADR-264` MADE INCOMPLETE.** It read that `state` means reading
+   * a `rule_states` row and that no scheduled run had written one; the reader
+   * exists now (`../rule-state-reader.ts`) and the fold was measured writing a
+   * row on a seeded database, so what stands is a DEPLOYMENT that has run the
+   * job and the calendar read the field above names. That is `ADR-239` link 4
+   * and `ADR-264` link 6, and neither is this field's.
    */
   readonly gates: ExternalGates;
 }
