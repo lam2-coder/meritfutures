@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->281<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->282<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11039,6 +11039,32 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **Next.** **One money-path row whose fence must name [`apps/api/src/routes/payouts.ts`](../apps/api/src/routes/payouts.ts)**, taking [ADR-293](decisions/ADR-293.md) section 4 A to D in one commit set: [ADR-289](decisions/ADR-289.md)'s seven owed lines, this ruling's four lock lines, slice 6's body (which section 2.2 already compiled), and three prose corrections. **It is one row and not four**, because the body cannot compile until the declaration moves and the lock cannot be added without touching the same file.
 
 **THE COUNTS DO NOT MOVE: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED**, confirmed at the assertion in [`wiring.test.ts`](../apps/api/test/wiring.test.ts) before and after. Counts derived at reporting time, each command run separately: **<!--gen:gate_count-->33<!--/gen--> of <!--gen:gate_count-->33<!--/gen-->** gates after `generate`, **30 of 30** invariants off the runner's own last line, **298 files / 7,242 passed / 6 skipped**, unmoved from the dispatch baseline because no test file was added or edited. `typecheck` 0, `lint` 0, `format:check` clean, `falsify.mjs` clean and FOREGROUND. **`pnpm run verify` was NOT run**, forbidden by the row. **The container started with no `node_modules` and `pnpm install --frozen-lockfile` was run before anything was measured**, which is row `294`'s reported defect met in the wild. **MONEY PATH. The `E2` line-by-line read on [ADR-293](decisions/ADR-293.md) is OWED and has not happened.**
+
+## 2026-08-30 - Session 487: a column that cannot be null, and the null is not the defect ([ADR-297](decisions/ADR-297.md), proposed)
+
+**All three dispatched premises were re-derived at source and all three hold, byte for byte.** [`0010:89`](../packages/db/migrations/0010_payouts.sql) is `approved_at timestamptz NOT NULL DEFAULT now()`, [`payouts.ts:267`](../apps/api/src/routes/payouts.ts) is `readonly approved_at: string | null`, and [`:256`](../apps/api/src/routes/payouts.ts) says the nullability *"IS THE HOLD'S WHOLE SHAPE IN ONE FIELD."*
+
+**The ruling is the third shape, the superseding migration, and `0077` is RESERVED in [ALLOCATION](decisions/ALLOCATION.md) and NOT WRITTEN.** `0010` is merged and sacred (constitution `E2`) and no line of it is edited; the supersession is an addition from outside it, on [`0070:151`](../packages/db/migrations/0070_withdrawal_approval_and_dual_control.sql)'s own idiom.
+
+**The defect is one layer deeper than the nullability, and that is what decides between the three shapes.** `DEFAULT now()` plus **no writer anywhere in the repository** means the column holds the **insert instant on every row**, and [`0010:123`](../packages/db/migrations/0010_payouts.sql)'s `created_at` carries the same definition with the same absent writer. **So `approved_at` is a second copy of `created_at` under a name that claims a decision the row has not necessarily made.**
+
+**And it is the only one of four state timestamps on its own table that is neither nullable nor bound to its state.** `settled_at`, `frozen_at` and `held_at` are each `NULL` under a CHECK; `approved_at` is `NOT NULL` under none. [`0070:200-203`](../packages/db/migrations/0070_withdrawal_approval_and_dual_control.sql) and [`0016:255-257`](../packages/db/migrations/0016_treasury_controls.sql) give two other tables the same shape, **so `0010:89` is the only approval timestamp in this schema without it.** **The column was correct when written and [ADR-040](decisions/ADR-040.md) falsified it without touching it**: `[*] --> approved` was once the only entry edge and approval was the request's own transaction, so the two instants were one.
+
+**The lie was walked over the whole machine rather than taken at the one state the dispatch named, and it is four of eight paths.** A held row; a **released hold sitting in `approved` wrong by up to 48 hours**; a `settled` row reached through one; and a `failed` row reached by `G-HOLD-ENFORCED` that was **never approved at all**. **`status` discriminates exactly one of the four**, because `payout_requests_hold_is_complete` NULLs all five hold columns on exit, making a released hold and a direct approval byte-identical rows.
+
+**So shape 2 is refused and [ADR-290](decisions/ADR-290.md) `F6` is overturned rather than inherited.** Its suppression on `held_pending_review` repairs one path of four and reads as though it repaired the field, **which is the partial-repair shape ADR-290 section 3.2 itself refused one field over.** **Shape 1 is refused** because a non-null wire field must be filled on a held row and the only value available is the false one, so it removes the ability to express the truth rather than the lie.
+
+**`API_CONTRACT` was NOT edited and the fence's conditional permission resolves to no.** The ruling is that the schema moves; [`:516`](architecture/API_CONTRACT.md) and [`:530`](architecture/API_CONTRACT.md) are correct as written and are **vindicated rather than amended**.
+
+**The defect is its own fourth sighting and this is the first row with the standing to decide.** [ADR-158](decisions/ADR-158.md) finding 15 named it and named these same two shapes; [ADR-290](decisions/ADR-290.md) `F6` recorded it. Both are dispositioned here. **Two merged deployables say in their own words that *"the repair is a superseding migration's"***, and **their refusal to write the column is evidence for this ruling rather than against it**: its premise, that the write would destroy the request instant irrecoverably, evaporates the day `0077` lands.
+
+**[ADR-287](decisions/ADR-287.md) slice 7 is unblocked** and reads the column straight with no status guard, correct after `0077` by constraint and before it by unreachability. **The one residual risk is an ordering constraint and it is stated: `0077` must land before slice 8**, which gains it as a precondition. **Nothing is wired and the counts do not move: ten wired of twenty-four declared, fourteen blocked.**
+
+**`RI-37`, reserved to this row by name, is left free**, with three candidates enumerated and each refused, one of them **red on landing** because [`payouts.ts:1175`](../apps/api/src/routes/payouts.ts) already composes the held status.
+
+**The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped** with a delta of **ZERO**, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row. **No GitHub access: no PR was opened and nothing was merged.**
 
 ## 2026-08-30 - Session 488: the decoder's home is the DOOR, and the door has no caller ([ADR-299](decisions/ADR-299.md), proposed)
 
