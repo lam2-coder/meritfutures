@@ -267,6 +267,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-251](ADR-251.md) | an instant is not a trading day, the gap was narrower than the sentence, and the port that named it asked a three-armed question with one arm (2026-08-29, status: proposed) |
 | [ADR-252](ADR-252.md) | the base account cap gets the firm's row ADR-238 named, its vocabulary is closed at the database, and both ports stay refused for reasons that have stopped being the same reason  (2026-08-29, status: proposed) |
 | [ADR-253](ADR-253.md) | a table the registry cannot name, and the ruling ADR-106 said was owed turns out to be a REFUSAL (2026-08-29, status: proposed) |
+| [ADR-254](ADR-254.md) | `R-38` is ACCOUNT grained, the index that already enforces it is right and is M01's own delta, and the identity rule it was confused with is a different rule on a different table that is already served  (2026-08-29, status: proposed) |
 | [ADR-255](ADR-255.md) | `0038`'s reversal pointer is not the linkage the reason wanted, the absent column is absent by ruling, and the entry named the one of four that was discharged (2026-08-29, status: proposed) |
 <!--/gen-->
 
