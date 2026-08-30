@@ -205,6 +205,31 @@ export { validatePlan } from './plan/validate.ts';
 // would be a second statement of the shape with no caller to keep it honest.
 export { decodePlanRules, PlanRulesCodecError } from './plan/rules-codec.ts';
 
+// `plan/cap-schedule-codec.ts` IS ADR-302, AND IT IS ADR-078's TEST APPLIED A
+// SEVENTH TIME. Section 1.3's rationale is the only thing that decides an export
+// here: "every additional export is a way for a caller to reimplement a rule
+// slightly differently". WITHHOLDING DEFEATED IT AND THE PROOF IS MEASURED
+// RATHER THAN HYPOTHETICAL: `toCapScheduleCents` (`apps/worker`), `decodeCapSteps`
+// (`apps/site`) and `readCapSchedule` (`apps/api`) ALL existed, all read the same
+// two stored keys out of the same `jsonb` column, and were compared by nothing --
+// and `apps/api`'s copy HAD ALREADY DIVERGED ON THE MONEY, admitting a
+// `cap_cents` past `Number.MAX_SAFE_INTEGER` and handing back the rounded double
+// while refusing the base-10 string ADR-283 ruling 5 blessed. That is `FM-16`
+// collecting on the value that fixes a payout ceiling.
+//
+// **ALL THREE ARE RETIRED IN THE DIFF THAT ADDS THIS LINE**, which is what
+// separates this export from a fourth statement of the same predicate; ADR-286
+// refused a fourth and ADR-269 refused one before it for this same value.
+//
+// `CapScheduleCodecError` rides with it on `EngineGatesCodecError`'s and
+// `PlanRulesCodecError`'s reasoning unchanged: a refusal a caller must be able to
+// catch is a refusal a caller must be able to name. THE ENCODE DIRECTION IS NOT
+// EXPORTED AND DOES NOT EXIST: nothing in this repository writes the column from
+// a `SizeCapScheduleStep[]`, the publish path is `validatePlan` over a document
+// somebody authored, and an encoder nobody calls would be a second statement of
+// the shape with no caller to keep it honest.
+export { CapScheduleCodecError, decodeCapScheduleCents } from './plan/cap-schedule-codec.ts';
+
 // `hash.ts` IS ADR-081, AND IT IS ADR-078's TEST APPLIED A SECOND TIME. Section
 // 1.3's layout lists `hash.ts` exactly as it lists `payout/clamp.ts` and
 // `replay.ts`, so the site count decides nothing here either; what decides it is
