@@ -88,18 +88,37 @@
 //
 // `0004_catalog.sql` states the rule they fall under: "THERE IS NO PLAN
 // PARAMETER ANYWHERE IN APPLICATION CODE." The sanctioned reader of
-// `plan_versions.rules` is `resolvePlan` in `@merit/rules-engine`, and
-// `apps/api/package.json` does not declare that package; `.npmrc` sets
-// `node-linker=isolated`, so an undeclared import fails at run time and, since
-// ADR-120, under `tsc` as well.
+// `plan_versions.rules` is `resolvePlan` in `@merit/rules-engine`.
 //
-// So the contract permits no null there, the corpus permits no literal here,
-// and the dependency line is outside this session's fence. A SIXTH MEMBER,
-// `cadence.next_eligible_trading_day`, IS UNREACHABLE THROUGH EVERY DOOR:
-// `trading_calendar` is refused registration in `packages/db/src/schema.ts`
-// because `0032` carries an `ALTER TABLE ... DROP NOT NULL` that ADR-094's
-// one-member vocabulary refuses, so the table is in neither `TABLES` nor
-// `SCOPE_RULES` and no scope class reaches it.
+// **BOTH CLAUSES THAT USED TO CARRY THIS REFUSAL WERE STALE AND ADR-283
+// REPAIRS THEM AT THE SOURCE. THE REFUSAL ITSELF IS UNCHANGED**, which is the
+// most dangerous form this defect takes: a refusal that is right for reasons
+// that stopped being true reads as re-derived to every session that checks it.
+// The retired wording is paraphrased and never reproduced, because a sentence a
+// grep can still find reads as live.
+//
+//   IT SAID THIS DEPLOYABLE DOES NOT DECLARE `@merit/rules-engine`. It has
+//   since session 252 (`apps/api/package.json`, `workspace:*`), ADR-171 finding
+//   10 recorded it, and ADR-281 section 7 found the sentence still standing
+//   here. `decodePlanRules` (ADR-283) now turns the blob into the engine's own
+//   `PlanRulesJson`, so the decoding half is discharged too.
+//
+//   IT SAID `trading_calendar` IS REFUSED REGISTRATION AND IS IN NEITHER
+//   `TABLES` NOR `SCOPE_RULES`. It is in both: `schema.ts:4652` declares the
+//   table and `scope.ts:1559` registers it at class `firm`, because ADR-103
+//   clause 2 superseded the one-member fold ADR-094 refused it under.
+//
+// **SO THE REFUSAL IS RE-DERIVED RATHER THAN INHERITED, AND IT STANDS ON TWO
+// FACTS THAT ARE TRUE TODAY.** The five plan parameters need a `ResolvedPlan`,
+// `resolvePlan` takes a decoded `PlanVersionSizeRow` as well as a decoded
+// `PlanRulesJson`, and `ScopedTx.catalogRowAt` returns `Promise<unknown>`, so
+// the size row is a blob this deployable cannot yet decode (ADR-283 section 5).
+// AND THE SIXTH MEMBER, `cadence.next_eligible_trading_day`, IS UNREACHABLE FOR
+// A DIFFERENT AND NARROWER REASON THAN THE ONE THAT STOOD HERE: the table is
+// class `firm` and is NOT among `CATALOG_TABLE_KEYS`' five members
+// (`scoped-db.ts:3392`), which ADR-268 refused to widen in writing, and the one
+// named door ADR-268 did build answers the LAST CLOSED day rather than a
+// forward one.
 //
 // `readProgress` therefore raises `AccountsBackendUnwired` from the database
 // adapter, carrying both blockers, and the route answers `503
@@ -942,11 +961,19 @@ export function databaseAccountsBackend(db: ApiDb): AccountsBackend {
             '`cadence.need` and `ladder.payouts_to_graduate` as NON-NULLABLE, and every one is a ' +
             'plan parameter. `0004_catalog.sql`: there is no plan parameter anywhere in ' +
             'application code, and the sanctioned reader of `plan_versions.rules` is ' +
-            '`resolvePlan` in `@merit/rules-engine`, which `apps/api` does not declare. ' +
-            '`cadence.next_eligible_trading_day` is worse than undeclared: `trading_calendar` is ' +
-            'refused registration in `packages/db/src/schema.ts` because `0032` carries an ' +
-            '`ALTER TABLE ... DROP NOT NULL` that ADR-094 refuses, so it is in neither `TABLES` ' +
-            'nor `SCOPE_RULES` and no scope class reaches it. See ADR-139',
+            '`resolvePlan` in `@merit/rules-engine`. THIS MESSAGE CARRIED TWO REASONS THAT HAD ' +
+            'STOPPED BEING TRUE AND ADR-283 REPLACED BOTH WITHOUT CHANGING THE REFUSAL: this ' +
+            'deployable HAS declared that package since session 252 and `decodePlanRules` now ' +
+            'decodes the blob, and `trading_calendar` IS registered (`schema.ts:4652`, ' +
+            '`scope.ts:1559`, class `firm`). WHAT REFUSES TODAY IS THE SIZE ROW: `resolvePlan` ' +
+            'takes a decoded `PlanVersionSizeRow` too, `ScopedTx.catalogRowAt` returns ' +
+            '`Promise<unknown>`, and `plan_version_sizes.payout_cap_schedule_cents` is itself ' +
+            '`jsonb` holding cents, so no `ResolvedPlan` is producible here. AND ' +
+            '`cadence.next_eligible_trading_day` is refused on a narrower ground than the one ' +
+            'that stood here: `trading_calendar` is class `firm` and is not among ' +
+            "`CATALOG_TABLE_KEYS`' five members (`scoped-db.ts:3392`), which ADR-268 refused to " +
+            'widen in writing, and the door it built answers the LAST CLOSED day and not a ' +
+            'forward one. See ADR-139, ADR-281 section 7 item 1, ADR-283',
         ),
       );
     },

@@ -1794,10 +1794,27 @@ function snakeCase(property: string): string {
 /**
  * The three fields ADR-010 and API_CONTRACT call sensitive, pulled out of `rules`.
  *
- * READ POSITIONALLY AND NOT TYPED, because `PlanRulesJson` lives in
- * `@merit/rules-engine` and this deployable does not declare it. The keys are
- * the document's, transcribed, and `validatePlan` is what actually reads the
- * shape; this function only has to decide whether two versions differ.
+ * READ POSITIONALLY AND NOT TYPED. **THE REASON THAT STOOD HERE WAS THAT
+ * `PlanRulesJson` LIVES IN `@merit/rules-engine` AND THIS DEPLOYABLE DOES NOT
+ * DECLARE IT, AND THAT WAS FALSE FROM SESSION 252** (`apps/api/package.json`,
+ * `workspace:*`; ADR-171 finding 10, ADR-281 section 7 item 1). The retired
+ * wording is paraphrased rather than reproduced, because a sentence a grep can
+ * still find reads as live. `ADR-283` repairs it and the positional read STAYS,
+ * on a reason that is about this function rather than about a manifest.
+ *
+ * **A DECODER HERE WOULD BE A REFUSAL WHERE A DIFF IS OWED.** `decodePlanRules`
+ * (`packages/rules-engine/src/plan/rules-codec.ts`) is now reachable from this
+ * deployable and it THROWS on a document that is not the shape. This function
+ * runs on an admin write path over a `rules` value nobody has published yet, so
+ * decoding it would turn "these two versions differ in a sensitive field" into a
+ * 500 on the exact document an operator is trying to inspect. The three keys are
+ * the document's, transcribed, and `validatePlan` is what reads the shape at
+ * publish; this function only has to decide whether two versions differ.
+ *
+ * **AND POSITIONAL IS NOT A CAST.** Nothing here is asserted into
+ * `PlanRulesJson`: the return type is `Record<string, unknown>` and every value
+ * stays `unknown`, so no caller receives a plan parameter this function claimed
+ * to have checked.
  */
 export function sensitiveFields(rules: unknown): Record<string, unknown> {
   const funded = asRecord(asRecord(rules)?.['phase_funded']);
