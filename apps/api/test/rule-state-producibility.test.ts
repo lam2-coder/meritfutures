@@ -1200,8 +1200,9 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     // THE RETIRED ASSERTION IS DESCRIBED RATHER THAN LEFT IN PLACE. This case
     // required the list to be EMPTY, on `wiring.test.ts` clause FIVE, which had
     // said since `ADR-239` that there was no value to install. `ADR-291` built
-    // one: `postgresPayoutBackend` implements `transact` and `identityStatus()`
-    // and its other five members reject with `PayoutBackendUnwired`.
+    // one: `postgresPayoutBackend` implements `transact` and `identityStatus()`,
+    // and `ADR-295` added `insertPayoutRequest`'s approval branch, so THREE
+    // members answer and the other four reject with `PayoutBackendUnwired`.
     //
     // **THE COUNT IS EXACT AND THAT IS THE POINT OF KEEPING IT A CENSUS.** A
     // SECOND implementation appearing under a deployable's `src/` is either a
@@ -1226,9 +1227,20 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     // refuses in its own closing sentence. Asserted at the module rather than
     // only in its own suite, because this is the file the entry cites.
     const backend = codeOf(join(REPO_ROOT, 'apps/api/src/payout-backend.ts'));
-    for (const member of ['subject', 'holdFlag', 'insertPayoutRequest', 'listPayouts'])
+    for (const member of ['subject', 'holdFlag', 'listPayouts'])
       expect(backend).toContain(`new PayoutBackendUnwired('${member}')`);
     expect(backend).not.toContain('databaseIdempotencyStore');
+
+    // **AND THE FOURTH MEMBER LEFT THIS LIST WITHOUT LEAVING THE REFUSAL SET,
+    // WHICH IS ADR-295 IN ONE ASSERTION.** `insertPayoutRequest` answers on the
+    // APPROVAL branch and refuses on the HOLD branch, so the plain refusal is
+    // gone and a NARROWER one stands beside it. The needle is the hold arm,
+    // asserted rather than dropped: slice 8 cannot be scheduled because
+    // `HoldFlag.tosClause` has no value space and `DEP-M7-05` owes the clauses
+    // to counsel, and a session that "completed" this member by inventing a
+    // clause id would delete exactly this line.
+    expect(backend).not.toContain("new PayoutBackendUnwired('insertPayoutRequest')");
+    expect(backend).toContain("new PayoutBackendUnwired('insertPayoutRequest.hold')");
   });
 
   test('and the entry names what the SIZE ROW waits on as a HOME rather than as a rename', () => {

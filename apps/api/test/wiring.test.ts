@@ -611,7 +611,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:575`) returns a ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:574`) returns a ' +
     '`PayoutSubject` whose `state` (`routes/payouts.ts:400`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
@@ -676,17 +676,32 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'RATHER THAN CLOSED. It read that this tree held no implementation of `PayoutTx` at all, and ' +
     'ADR-291 made that false. The retired wording is paraphrased rather than quoted, because a ' +
     'reason that reproduces its own retired sentence reads as live to every grep, and this entry ' +
-    'has retired a question that way four times already. **THE VALUE EXISTS AND IT IS TWO ' +
+    'has retired a question that way four times already. **THE VALUE EXISTS AND IT IS THREE ' +
     'MEMBERS OF SEVEN**: `postgresPayoutBackend` (`apps/api/src/payout-backend.ts`) implements ' +
     '`transact`, which opens the scoped door on the session identity and is the ONE transaction ' +
-    'every later slice reads on, and `identityStatus()`, which reads `identities` as scope class ' +
-    '`root` and decodes `identity_status` to one of three or RAISES. **ITS OTHER FIVE MEMBERS ' +
-    'REJECT WITH `PayoutBackendUnwired` AND THAT IS THE WHOLE SHAPE RATHER THAN A STAGE OF IT**: ' +
-    '`subject`, `holdFlag` and `insertPayoutRequest` are ADR-287 slices 4 to 6 and 8, ' +
+    'every later slice reads on, `identityStatus()`, which reads `identities` as scope class ' +
+    '`root` and decodes `identity_status` to one of three or RAISES, and, since ADR-295, ' +
+    '`insertPayoutRequest()` ON ITS APPROVAL BRANCH: it derives the `NOT NULL` ' +
+    '`plan_version_id` off `accounts` on the SAME transaction, names ELEVEN of the insert ' +
+    'shape`s FOURTEEN fields, names `splitBp` and `clampReason` NOWHERE because neither has a ' +
+    'column and both are already inside the snapshot, and leaves `identity_id` to the handle ' +
+    'to stamp. **ITS OTHER FOUR MEMBERS REJECT WITH `PayoutBackendUnwired`, AND SO DOES THE ' +
+    'HOLD BRANCH OF THE MEMBER THAT ANSWERS**: `subject` is ADR-287 slices 4 and 5, `holdFlag` ' +
+    'and `insertPayoutRequest`s hold arm are slice 8, WHICH CANNOT BE SCHEDULED BECAUSE ' +
+    '`HoldFlag.tosClause` HAS NO VALUE SPACE AND `DEP-M7-05` OWES THE CLAUSES TO COUNSEL, ' +
     '`listPayouts` is slice 7, and `idempotency` IS THE ONE THAT COULD ANSWER TODAY AND ' +
-    'DELIBERATELY DOES NOT, on this entry`s own closing sentence below. SO WHAT THIS CLAUSE ' +
-    'NAMES NOW IS FIVE MEMBERS AND NOT A PORT: `apps/api/test/payout-backend.test.ts` drives ' +
-    'the adapter over `db-recorder.ts` and asserts each of the five refusing BEFORE it reads ' +
+    'DELIBERATELY DOES NOT, on this entry`s own closing sentence below. AND ONE RULED LINE OF ' +
+    'THE PORT ITSELF IS STILL OWED, WHICH IS THE NEWEST HALF OF THIS CLAUSE AND IS A ' +
+    'PRECONDITION OF SLICE 9 RATHER THAN OF SLICE 6: ADR-293 section 3.5 ruled that THE PAYOUT ' +
+    'PATH LOCKS, as `PayoutTx.lockScope()` delegated to `handle.lockScope()` and called by ' +
+    '`decidePayout` FIRST, on `decideWithdrawal`s and `checkout.ts`s unanimous precedent; the ' +
+    'declaration and the call are two lines of `routes/payouts.ts` that ADR-295`s fence does ' +
+    'not reach, so slice 6`s read-then-write is backstopped only by ' +
+    '`payout_requests_no_in_flight_uq`, WHICH TURNS A CONTRACT-SPECIFIED 409 INTO A 500 AND IS ' +
+    'KEYED PER ACCOUNT WHERE THE EXPOSURE QUESTION IS PER IDENTITY. SO WHAT THIS CLAUSE ' +
+    'NAMES NOW IS FOUR MEMBERS, ONE BRANCH AND ONE OWED LINE, AND NOT A PORT: ' +
+    '`apps/api/test/payout-backend.test.ts` drives ' +
+    'the adapter over `db-recorder.ts` and asserts each refusal BEFORE it reads ' +
     'anything, and `rule-state-producibility.test.ts` holds the census at EXACTLY ONE ' +
     'implementing file so a second cannot arrive unnoticed. AND THE FOLD RULING IS UNCHANGED ' +
     'AND STILL BINDS EVERY SLICE AFTER THIS ONE: THE API DOES NOT GET TO ' +
