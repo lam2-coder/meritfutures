@@ -56,12 +56,14 @@
 // =============================================================================
 
 import { databaseAuthBackend } from './auth-backend.ts';
+import { databaseCertificateImageSource } from './certificate-image-source.ts';
 import { LIVE_DB } from './db.ts';
 import { main } from './index.ts';
 import { databaseAccountReads, useAccountReadsBackend } from './routes/account-reads.ts';
 import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.ts';
 import { useAuthBackend } from './routes/auth.ts';
 import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
+import { useCertificateImageSource } from './routes/certificates.ts';
 import { databaseEconomicCalendar, setEconomicCalendarSource } from './routes/economic-calendar.ts';
 import { databaseMethodDefinitions, setMethodDefinitionSource } from './routes/public-methods.ts';
 import { databaseVerifySource, useVerifySource } from './routes/verify.ts';
@@ -168,5 +170,41 @@ setEconomicCalendarSource(databaseEconomicCalendar(LIVE_DB));
 // is the only writer in the tree and `RI-22` leg 3 keeps it that way. A bound in
 // DDL is a migration and ADR-235 section 6.1 leaves it owed.
 useVerifySource(databaseVerifySource(LIVE_DB));
+
+// `GET /certificates/:code/image.png`, over the SAME two doors as the row above
+// and one renderer. ADR-261.
+//
+// THE PORT WAITED ON A COMPOSITION AND NOT ON A DOOR OR A PRODUCER, which is
+// the distinction this line is worth reading for and the one ADR-256 refused to
+// blur. ADR-231 built the read, `db.firm` always held the append and ADR-256
+// landed the renderer (`src/certificate-card.ts`); what did not exist was
+// anything putting the three together, and ADR-226 and ADR-229 permit wiring
+// only
+// when the remaining gap is A THING THE DEPLOYMENT SETS. A composition is not
+// such a gap. `src/certificate-image-source.ts` is it, and what is left is
+// `MERIT_CERTIFICATE_CARD_MAX_AGE_SECONDS`, which is.
+//
+// THE COPY AND THE LIFETIME ARE READ BEFORE THE LOOKUP AND REFUSED IN FULL, for
+// the reason the line above states about `readPresentation` and one that is
+// sharper here: a DEFERRED code never renders (ADR-168 foreclosure 4), so a
+// configuration check left inside the render would answer 404 for a deferred
+// code and 500 for an issued one. That is a response decided by the state of
+// the row the caller named, which is exactly what ADR-246 clause 8 refuses one
+// port over. A deployment that has not set the seven verify variables or the
+// lifetime answers 503 for every code identically.
+//
+// AND THE COST THAT IS A FOUNDER'S RATHER THAN THIS LINE'S, NAMED WHERE IT IS
+// PAID. ADR-249 section 2.2 accepted in writing that render-on-fetch is compute
+// an attacker can drive, and ADR-256's approval block says the acceptance "was
+// cheap while the render did not exist". THIS LINE IS WHERE IT STOPS BEING
+// CHEAP: a PNG encode now sits on an unauthenticated public path, `FM-M11-05`'s
+// cache is owed and unbuilt, and the rate limit per IP and per ASN that
+// `INV-M11-05` requires in its own words EXISTS NOWHERE IN THIS TREE. ADR-261
+// ships UNSIGNED and this is the sentence a founder is asked to read.
+//
+// THE LIST ROW IS NOT WIRED BY THIS LINE AND MUST NOT BE READ AS RELEASED BY
+// IT. `useCertificateBackend` waits on an origin AND on a guard that makes
+// `links`' refusal state-independent, and the second is code (ADR-261 section 5).
+useCertificateImageSource(databaseCertificateImageSource(LIVE_DB));
 
 await main();
