@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->278<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->279<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -10995,3 +10995,21 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **Next.** The after-state observation is owed and is one command, stated in [ADR-292](decisions/ADR-292.md) section 5. `F2`'s follow-up needs a fence reaching `packages/tooling/test/repo-invariants.test.ts`.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,243 passed / 6 skipped**, a delta of **exactly one test in the same 298 files** against `main`'s 7,242, **measured** by removing `ri33` from `CHECKS` and re-running the one file (247 against 246) rather than inferred: it is the derived `test.each(CHECKS)` clean-tree case and nothing else, with no test deleted and the skip count unmoved. Lint 0, `format:check` clean, `falsify.mjs` clean and FOREGROUND (33 gates clean-and-dirty, 80 scope and 10 loader cases). **`pnpm run verify` was NOT run**, forbidden by the row. **No gate weakened, no fence widened, no test skipped or disabled, no migration number taken or reserved, `apps/**` and `packages/db/**` untouched, no pull request opened and nothing merged.**
+
+---
+
+## 2026-08-30 - Session 485: a crashed check is not a lower count ([ADR-294](decisions/ADR-294.md), proposed)
+
+**THE RUNNER COUNTED A CHECK THAT NEVER RAN AS TWENTY-NINE OF THIRTY.** Row `294`, [ADR-294](decisions/ADR-294.md), ten sections, `proposed` and UNSIGNED. Non-money, tooling only. With `node_modules` absent, `RI-18` crashes on a missing `typescript` module and [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs) printed **`29 of 30 invariants hold.`** over twenty-nine passes, zero fails and one crash. **THE FIX IS IN THE RUNNER AND NOT IN `RI-18`.** A check whose body throws is an **ERROR**: counted in its own tally, **never subtracted from the denominator**, exiting **3** rather than sharing `1` with a violation, and **suppressing the `N of N invariants hold.` sentence entirely** in favour of a three-way tally that says in words that the run did not measure the tree.
+
+**THE EXIT CODE WAS ALREADY NON-ZERO, WHICH IS WHY THIS SURVIVED THREE SESSIONS.** CI went red while the transcript said `29 of 30`, and only a reader holding both at once could see them disagree. **The number is the part a session quotes**, so the sentence is the part that had to go. A run with no crash prints and exits exactly as it always did, and one of the six new cases exists to assert that unchanged half.
+
+**FOUR EXACT TRANSCRIPTS, TWO PAIRS, IN [ADR-294](decisions/ADR-294.md) SECTION 3.** The real crash with `node_modules` moved aside, and a seeded `RI-99` whose body does nothing but throw and which, having no register row, makes `RI-29` FAIL in the same run: one transcript therefore carries a PASS block, a real FAIL and a crash at once, and the old runner reports `29 of 31 invariants hold.` over all three. **THE RED WAS WATCHED RATHER THAN ASSERTED**: a report cannot be falsified by seeding the tree, so the arithmetic it refuses was restored inside `runChecks` and the block re-run, and five of the six cases went RED with the sixth staying green by design.
+
+**NO INVARIANT WAS WEAKENED, DELETED, RENUMBERED OR MADE CONDITIONAL. NO `RI-nn` WAS MINTED AND `RI-35`, RESERVED TO THIS ROW BY NAME, IS LEFT FREE**, with three candidates enumerated and refused, the first because it would be RED ON LANDING over a file outside this fence. **THE HEADER EDIT IS TWO LINES REPLACING TWO LINES**, because live documents cite this file by line as high as `:7060` and `RI-15` and `RI-16` read every one of those citations.
+
+**ONE DEFECT IS REPORTED AND NOT FIXED.** [`gates.mjs`](../scripts/corpus/gates.mjs) carries the identical shape in its own `main`, folding a thrown gate into `failed` and printing `N of N gates pass.`, in the runner that guards the corpus. **It is out of this row's fence**, so it is written down rather than repaired, and the fix is this one transposed.
+
+**Next.** The `gates.mjs` row is owed and needs a fence reaching `scripts/`. `RI-35` is free for whoever needs it.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **30 of 30** invariants off the runner's own last line, **298 files / 7,248 passed / 6 skipped** against a baseline of **298 / 7,242 / 6** measured on this same tree by stashing both files and re-running, a delta of **exactly six cases in one existing file**, no file added, no test deleted, skip count unmoved. Typecheck 0, lint 0, `format:check` clean, `falsify.mjs` clean and FOREGROUND with the tree verified unmutated after it. **`pnpm run verify` was NOT run**, forbidden by the row. **`node_modules` was restored by `pnpm install --frozen-lockfile` and its absence was never committed.**
