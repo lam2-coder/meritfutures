@@ -180,7 +180,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //   go stale the way the claim it replaces did.
   //
   // `SystemReason` is `'nightly-batch' | 'operator-console'`
-  // (`packages/db/src/scoped-db.ts:269`) and ADR-165 ruled it gains no member, so
+  // (`packages/db/src/scoped-db.ts:271`) and ADR-165 ruled it gains no member, so
   // the vocabulary was never the obstacle either. ADR-171 section 9 states the
   // condition under which the door becomes takeable: the slice that lands an
   // `AdminSessionSource` a deployment can install, because that is the first
@@ -589,15 +589,34 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`CRON_INVENTORY`, and a reader that answered an absent row with anything at all would be ' +
     'the wrong answer this clause has refused five times. AN ABSENT ROW IS A REFUSAL AND ' +
     'NEVER A DEFAULT VERDICT: `RuleStateAbsent` is a class and not an arm. ' +
-    'SEVENTH IS WHAT WAS UNDER IT AND NO REASON ON THIS PORT HAD EVER NAMED IT: `R-06` ' +
-    'permits ONE day, the LAST CLOSED one, so `subject()` must select the stored row BY DAY; ' +
-    'the calendar that says which day that is is `tradingCalendar`, whose scope class is ' +
-    '`firm` and which is NOT one of the five members of `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:2905`), so the payout transaction cannot read it. ' +
-    '`databaseEconomicCalendar` reads the same table in this deployable on `ApiDb.firm`, so ' +
-    'this is ADR-211 clause 2`s TWO-TRANSACTION REMEDY needed again on the CALENDAR half ' +
-    'after ADR-233 removed the need for it on the catalogue half, or a sixth catalogued key. ' +
-    'BOTH ARE SOMEBODY`s RULING AND ADR-264 TOOK NEITHER. ' +
+    'SEVENTH WAS THE DAY, AND IT IS THE FIRST CLAUSE OF THIS ENTRY TO CLOSE ON THE STRENGTH ' +
+    'OF A RULING RATHER THAN A BUILD. `R-06` permits ONE day, the LAST CLOSED one, so ' +
+    '`subject()` must select the stored row BY DAY, and ADR-264 found that day unreadable ' +
+    'exactly where the state is read: `tradingCalendar` is scope class `firm` and is NOT one ' +
+    'of the five members of `CATALOG_TABLE_KEYS`. THIS CLAUSE READ THAT THE REMEDY WAS EITHER ' +
+    'ADR-211 CLAUSE 2`s TWO-TRANSACTION CROSSING OR A SIXTH CATALOGUED KEY, THAT BOTH WERE ' +
+    'SOMEBODY`s RULING AND THAT ADR-264 TOOK NEITHER. ADR-268 IS THAT SOMEBODY AND IT REFUSES ' +
+    'BOTH. The retired wording is paraphrased rather than quoted, because a reason that ' +
+    'reproduces its own retired sentence reads as live to every grep. THE SIXTH KEY IS ' +
+    'REFUSED ON ADR-265`s SHAPE ARGUMENT, LANDING HARDER HERE: a catalogue read hands out ROWS ' +
+    'and the fold the caller would then hold is `R-06` ITSELF, which this tree already states ' +
+    'TWICE in two ways that disagree -- `readLastClosedTradingDay` ' +
+    '(`apps/worker/src/batch/adapter.ts`) consults no coverage at all and `lastClosedDay` ' +
+    '(`apps/api/src/admin-source/liability.ts`) has a caller that does -- so a third statement ' +
+    'would be the first on the money path; and the answer needs TWO tables, because coverage ' +
+    'is `trading_calendar_loads` and `scope.ts` says of this table that a reader must consult ' +
+    'both. THE TWO-TRANSACTION CROSSING IS REFUSED ON ADR-211`s OWN PRECONDITION rather than ' +
+    'on a preference: its clause 4 made the crossing safe with a migration after which ' +
+    '"nothing readable can move", and `trading_calendar` has the OPPOSITE property BY DESIGN ' +
+    '-- `0026` grants `merit_app` all four verbs on it, `0032` revoked them only on the two ' +
+    'satellites, and CALENDAR-C1 to C3 REQUIRE a correction to leave a prior image rather ' +
+    'than PREVENTING one. A verdict across two snapshots would persist a ' +
+    '`payout_requests.basis_trading_day` the transaction that recorded it never read. ' +
+    'SO THE DAY IS A NAMED DOOR: `ScopedTx.lastClosedTradingDay()`, one day out, ' +
+    'three reads on the ONE transaction, refusing an empty calendar, an EXHAUSTED one and a ' +
+    'coverage gap. `CATALOG_TABLE_KEYS` did not move and ADR-211 foreclosure 2 is honoured: ' +
+    '`PayoutTx` gains no firm method, exactly as ADR-233`s catalogue verbs discharged the ' +
+    '`plan` half without adding a port member. ' +
     'FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
     'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
@@ -651,7 +670,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'that stands now names something nobody has RUN plus one read on the wrong door. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:3123`), a closed list of five `firm` keys that includes ' +
+    '(`packages/db/src/scoped-db.ts:3379`), a closed list of five `firm` keys that includes ' +
     "`planVersions` and `planVersionSizes`, so `PayoutTx.subject`'s `ResolvedPlan` inputs are " +
     'readable ON THE PAYOUT TRANSACTION and the two-transaction remedy ADR-211 clause 2 ruled ' +
     'is not needed. AN OLDER CLAUSE IS KEPT AS HISTORY BECAUSE IT WAS FALSE: this entry once ' +
@@ -735,7 +754,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(ADR-252, then ADR-265, both on ADR-238 ruling 1) AND THE CROSS-IDENTITY READ IS DELETED ' +
     '(ADR-262). THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
     '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
-    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3123`), whose five members are exactly ' +
+    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3379`), whose five members are exactly ' +
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
     '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
@@ -753,8 +772,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'UNTOUCHED AND 0002 IS NOT EDITED: `grep -rn max_accounts_override ' +
     'packages/db/migrations/0002_identity.sql` returns 1 line. AND ADR-265 BUILT THE DOOR, SO ' +
     'THE CLAUSE THAT SAID "NO DOOR" IS SPENT: `grep -rn effectiveAccountCap ' +
-    'packages/db/src/scoped-db.ts` returns 4 lines, which are the declaration on `ScopedTx`, ' +
-    'the implementation, the statement function and its call. IT IS A NAMED DOOR AND NOT A ' +
+    'packages/db/src/scoped-db.ts` returns 6 lines. FOUR ARE THE DOOR -- the declaration on ' +
+    '`ScopedTx`, the implementation, the statement function and its call -- and the OTHER TWO ' +
+    'ARE ADR-268 CITING IT AS PRECEDENT, once for taking no argument and once for reading its ' +
+    'registry rule rather than assuming it. THE COUNT READ 4 UNTIL A SECOND NAMED DOOR WAS ' +
+    'BUILT BESIDE THE FIRST, which is the shape this invariant exists to surface. IT IS A ' +
+    'NAMED DOOR AND NOT A ' +
     'CATALOGUE ADMISSION, WHICH IS THE PART WORTH READING: ADR-252 section 10 sized the ' +
     'remainder of this clause as one member added to `CATALOG_TABLE_KEYS`, and ADR-265 REFUSED ' +
     'that sizing rather than deferring it. A catalogue read hands out ROWS, so the caller would ' +
@@ -792,7 +815,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:1030`) is a ' +
     '`LedgerTx`, which only `SystemTx` satisfies because `ledger_transactions` and ' +
     '`ledger_entries` are both `derived` rather than `firm`, `SystemReason` is still exactly two ' +
-    'members (`packages/db/src/scoped-db.ts:269`) and `ApiDb` still declares no door that yields ' +
+    'members (`packages/db/src/scoped-db.ts:271`) and `ApiDb` still declares no door that yields ' +
     'a `SystemTx`. ADR-238 RULING 7 ADDS THE HALF ADR-165 DID NOT REACH: ADR-176 cleared the ' +
     'same obstruction for `LT-01` by DELETING `PayoutTx.ledger` and posting later at a system ' +
     'authority, and that remedy does NOT transfer, because M20 pins `LT-08` to the purchase ' +
@@ -907,7 +930,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
     '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
-    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3445`) at the one reason ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3468`) at the one reason ' +
     '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
     'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
     'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +

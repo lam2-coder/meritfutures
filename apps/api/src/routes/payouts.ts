@@ -66,9 +66,9 @@
 // (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`:
 // `ledgerTransactions` (`packages/db/src/scope.ts:903`) and `ledgerEntries`
 // (`packages/db/src/scope.ts:894`); `ScopedTx.insert` takes
-// `OwnedTableKey` (`scoped-db.ts:3232`) and `insertUnder` takes
+// `OwnedTableKey` (`scoped-db.ts:3488`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
-// (`scoped-db.ts:2135`), a closed list of ONE. So the ONLY handle that
+// (`scoped-db.ts:2138`), a closed list of ONE. So the ONLY handle that
 // satisfies `LedgerTx` is `SystemTx.insert<K extends TableKey>`
 // (`scoped-db.ts:3138`), which is generic over EVERY TABLE IN THE ESTATE.
 //
@@ -347,11 +347,26 @@ export interface PayoutSubject {
    * zeroed or carried-forward state here is a confident payout verdict computed
    * off inputs nobody folded, which is worse on this door than any refusal.
    *
-   * **AND THE DAY IS THE PART THIS DEPLOYMENT CANNOT YET SUPPLY.** `R-06`
-   * permits only the LAST CLOSED trading day, `tradingCalendar` is scope class
-   * `firm`, and `CATALOG_TABLE_KEYS` is a closed list of five that does not
-   * include it, so the transaction that reads the state cannot read the day
-   * that decides which state it may read. `ADR-264` section 5.
+   * **AND THE DAY IS `ScopedTx.lastClosedTradingDay()`, WHICH IS A NAMED DOOR
+   * RATHER THAN A CATALOGUE KEY OR A SECOND TRANSACTION.** `R-06` permits only
+   * the LAST CLOSED trading day, and `ADR-264` section 5 found that day
+   * unreadable here: `tradingCalendar` is scope class `firm` and
+   * `CATALOG_TABLE_KEYS` is a closed list of five that does not carry it. It
+   * named two remedies and took neither; `ADR-268` refuses both and builds a
+   * door. **A BACKEND IMPLEMENTING `subject()` CALLS THAT METHOD AND DOES NOT
+   * FOLD A CALENDAR HERE.** The fold is stated twice in this repository
+   * already, in two ways that disagree about coverage, and a third statement of
+   * it in a route would be the first on the money path.
+   *
+   * **THE DOOR REFUSES AN EXHAUSTED CALENDAR AND THAT IS NOT A DEFECT.** An
+   * uncovered day is UNKNOWN rather than a holiday (`ADR-042` F-4), so the
+   * latest closed row of a calendar nobody has loaded forward is the last day
+   * Merit knows about and not the last closed one. The refusal reaches this
+   * route as a throw inside the payout transaction, which rolls back.
+   *
+   * **AND IT DOES NOT WIRE THIS PORT.** Nothing in this tree implements
+   * `PayoutTx` at all, and no deployment has run the nightly fold. `ADR-268`
+   * section 8.
    */
   readonly state: RuleState;
   readonly plan: ResolvedPlan;
