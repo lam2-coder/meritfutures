@@ -5161,11 +5161,23 @@ export const operatorSessions = pgTable('operator_sessions', {
 // the home that ruling named. `identities.maxAccountsOverride` above is the
 // per-entity EXCEPTION and this is the base it is an exception to.
 //
-// THE SHAPE IS `priceFloors`' AND THE GRAIN IS THE WHOLE PRIMARY KEY. There is
-// no uuid of its own: a change is a NEW ROW dated `effectiveFrom` rather than an
-// UPDATE, so the number in force on the day a purchase was refused stays
-// readable after the number has moved. `walletSpendLimits` is the same idiom one
-// class over.
+// THE SHAPE IS `priceFloors`' AND THE GRAIN IS THE WHOLE PRIMARY KEY: a change
+// is a NEW ROW dated `effectiveFrom` rather than an UPDATE, so the number in
+// force on the day a purchase was refused stays readable after the number has
+// moved. `walletSpendLimits` is the same idiom one class over. THAT PROMISE IS
+// NOW ENFORCED RATHER THAN WRITTEN: `0076` refuses an UPDATE and a DELETE on
+// this table, and a DELETE was the quiet half, because removing the current row
+// silently restores the superseded one.
+//
+// THE CLAUSE THAT SAID THERE IS NO UUID OF ITS OWN IS OVERTURNED RATHER THAN
+// DELETED (ADR-284). It read that this table has no uuid, on `priceFloors`'
+// shape, and the reason it gave was about the GRAIN. The grain is unchanged and
+// the primary key is still `(parameter, effectiveFrom)`. What that clause missed
+// is that `adminActions.subjectId` and `dualControlApprovals.subjectId` are both
+// `uuid NOT NULL`, so with no uuid here the audit row API_CONTRACT section 8
+// requires of every admin mutation COULD NOT NAME A CAP ROW, and neither could
+// an approval of one. `id` is a surrogate handle for those two tables and is
+// deliberately not the key.
 //
 // TWO CLOSURES, AND NEITHER IS TRANSCRIBED HERE.
 // `firm_parameters_vocabulary_is_closed` admits exactly one member and
@@ -5207,6 +5219,22 @@ export const firmParameters = pgTable(
       .notNull()
       .references(() => operators.actor),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // 0076. THE HANDLE THE AUDIT SPINE ADDRESSES ROWS BY, and not the grain.
+    // The writer SUPPLIES it, because the approval names the row before the row
+    // exists; the DDL default is a convenience for a scratch database and never
+    // the path.
+    id: uuid('id').notNull().defaultRandom(),
+    // 0076, SD-M6-05, on `walletWithdrawals`' column (0070). NOT NULL and not
+    // conditional on a threshold: 0070 made it conditional because a withdrawal
+    // has a machine arm that names no human, and a config edit has none. UNIQUE
+    // at the database, so one approval authorises one row.
+    dualControlApprovalId: uuid('dual_control_approval_id')
+      .notNull()
+      .references(() => dualControlApprovals.id),
   },
-  (table) => [primaryKey({ columns: [table.parameter, table.effectiveFrom] })],
+  (table) => [
+    primaryKey({ columns: [table.parameter, table.effectiveFrom] }),
+    unique('firm_parameters_id_uq').on(table.id),
+    unique('firm_parameters_approval_is_spent_once').on(table.dualControlApprovalId),
+  ],
 );
