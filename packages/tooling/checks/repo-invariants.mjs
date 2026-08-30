@@ -7588,6 +7588,363 @@ const ri31 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-33  One concurrency group for both events of one commit
+// -----------------------------------------------------------------------------
+// THE DEFECT THIS EXISTS FOR RAN FOR THE WHOLE LIFE OF THE REPOSITORY WITH EVERY
+// GATE GREEN, and it was invisible precisely because nothing it broke was ever
+// red. `ci.yml`, `corpus.yml` and `golden.yml` each declared `push` and
+// `pull_request` and each keyed `concurrency.group` on `github.ref`. That
+// context is `refs/heads/<branch>` on a push and `refs/pull/<n>/merge` on a
+// pull request, so the two runs of ONE COMMIT landed in two groups and neither
+// cancelled the other. Measured on the merged tree at `c81a1a01`: runs
+// `33310507086` (push) and `33311908640` (pull_request), same SHA, BOTH RUN TO
+// COMPLETION, six jobs each. ADR-292 carries the run ids and the timings.
+//
+// THE CHECK RENDERS THE GROUP RATHER THAN PATTERN-MATCHING IT, and that is the
+// whole design. A denylist of context paths would have to know that
+// `github.ref` is divergent, that `github.head_ref` alone is divergent, that
+// `github.head_ref || github.ref` is STILL divergent (`<branch>` against
+// `refs/heads/<branch>`), and that `github.head_ref || github.ref_name` is not.
+// Four rulings, three of them counter-intuitive, in a list somebody maintains.
+// Instead the group is EVALUATED under a push context and under a pull-request
+// context for the same branch, and the two strings must be equal. The check
+// then reports the two group names it computed, which is the defect stating
+// itself.
+//
+// IT ALSO REFUSES THE IDIOM THE DISPATCHING ROW SUPPLIED. `${{
+// github.event.pull_request.number || github.ref }}` is the snippet ALLOCATION
+// row 292 named, and it renders `7` on the pull request and
+// `refs/heads/<branch>` on the push. It is the most-copied answer to this
+// question on the internet and it does not answer it. A check that only knew
+// the shape of the RIGHT answer would have accepted it.
+//
+// THREE LEGS. A dual-triggered workflow with NO `concurrency` block at all is
+// the same defect in its worst form and is leg 1. Divergent renderings are leg
+// 2. `cancel-in-progress` that is not `true` is leg 3, because a shared group
+// that only QUEUES still runs both halves; collapsing the groups is necessary
+// and not sufficient.
+//
+// WHAT IT DOES NOT COVER, stated rather than left to be found. It reads the
+// `on:` and `concurrency:` blocks with a line reader and not a YAML parser, so
+// an anchor, a merge key or a flow mapping spanning lines is beyond it; the
+// third sentinel is what stops that from being silent. It says NOTHING about
+// whether a workflow SHOULD carry both triggers, which is STRATEGY's call and
+// not a check's. It cannot see a duplicate arising from two different
+// workflows, or from `workflow_run`. And it models a same-repository pull
+// request: a pull request from a FORK whose head branch shares a name with a
+// branch of this repository renders the same group as a push to that branch,
+// which ADR-292 section 6 records as accepted and bounded rather than fixed.
+
+/** The directory every workflow lives in, relative to the repository root. */
+const WORKFLOW_HOME = '.github/workflows';
+
+/** The two triggers whose runs this check requires to collide. */
+const DUAL = ['push', 'pull_request'];
+
+/**
+ * The `github` context as the two events render it FOR ONE COMMIT ON ONE
+ * BRANCH, which is the only situation this check is about.
+ *
+ * The branch name and pull request number are arbitrary; what is load-bearing
+ * is which entries DIFFER between the two columns, and every one of those is a
+ * documented property of the event rather than a choice made here. `head_ref`
+ * is set only on `pull_request`; on `push` it is the empty string, which is
+ * falsy to `||`.
+ *
+ * @type {Record<string, Record<string, string>>}
+ */
+const EVENT_CONTEXT = {
+  push: {
+    'github.event_name': 'push',
+    'github.ref': 'refs/heads/merit-branch',
+    'github.ref_name': 'merit-branch',
+    'github.ref_type': 'branch',
+    'github.head_ref': '',
+    'github.base_ref': '',
+    'github.sha': '1'.repeat(40),
+    'github.event.pull_request.number': '',
+    'github.event.pull_request.head.ref': '',
+    'github.event.number': '',
+  },
+  pull_request: {
+    'github.event_name': 'pull_request',
+    'github.ref': 'refs/pull/7/merge',
+    'github.ref_name': '7/merge',
+    'github.ref_type': 'branch',
+    'github.head_ref': 'merit-branch',
+    'github.base_ref': 'main',
+    'github.sha': '2'.repeat(40),
+    'github.event.pull_request.number': '7',
+    'github.event.pull_request.head.ref': 'merit-branch',
+    'github.event.number': '7',
+  },
+};
+
+/**
+ * Context paths that hold the SAME value on both events, so a group naming one
+ * of them is neither a defect nor a fix. Kept separate from `EVENT_CONTEXT` so
+ * that the two columns above can be read as the difference they encode.
+ *
+ * @type {Record<string, string>}
+ */
+const EVENT_INVARIANT = {
+  'github.workflow': 'the-workflow',
+  'github.repository': 'owner/repo',
+  'github.repository_owner': 'owner',
+  'github.workflow_ref': 'owner/repo/.github/workflows/w.yml@refs/heads/main',
+};
+
+/**
+ * The lines of a workflow with full-line comments and blank lines dropped,
+ * paired with their 1-based numbers.
+ *
+ * A `#` line is dropped rather than blanked because this reader is
+ * INDENTATION-SENSITIVE and a comment sits at whatever column its author liked.
+ * `ci.yml`'s own `concurrency` block quotes a `${{ ... }}` expression inside a
+ * comment, so a reader that kept them would evaluate prose.
+ *
+ * @param {string} body
+ * @returns {{ text: string, line: number }[]}
+ */
+function significantLines(body) {
+  return body
+    .split('\n')
+    .map((text, index) => ({ text, line: index + 1 }))
+    .filter(({ text }) => text.trim() !== '' && !text.trimStart().startsWith('#'));
+}
+
+/**
+ * The keys of a top-level block, whatever shape it is written in.
+ *
+ * `on: push`, `on: [push, pull_request]` and an indented mapping are all live
+ * GitHub spellings and this repository uses the third.
+ *
+ * @param {{ text: string, line: number }[]} lines
+ * @param {string} key
+ * @returns {{ keys: string[], values: Map<string, string>, line: number } | null}
+ */
+function topLevelBlock(lines, key) {
+  const opener = lines.findIndex(({ text }) => text.startsWith(`${key}:`));
+  if (opener === -1) return null;
+
+  const openerLine = /** @type {{ text: string, line: number }} */ (lines[opener]);
+  const inline = openerLine.text.slice(key.length + 1).trim();
+  if (inline !== '') {
+    const flow = /^\[(.*)\]$/.exec(inline);
+    const keys = (flow === null ? [inline] : (flow[1] ?? '').split(','))
+      .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
+      .filter((entry) => entry !== '');
+    return { keys, values: new Map(), line: openerLine.line };
+  }
+
+  /** @type {string[]} */
+  const keys = [];
+  /** @type {Map<string, string>} */
+  const values = new Map();
+  let depth = Number.POSITIVE_INFINITY;
+
+  for (const { text } of lines.slice(opener + 1)) {
+    const indent = text.length - text.trimStart().length;
+    if (indent === 0) break;
+    const entry = /^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:(.*)$/.exec(text);
+    if (entry === null) continue;
+    if (indent > depth) continue;
+    depth = indent;
+    const name = /** @type {string} */ (entry[1]);
+    keys.push(name);
+    values.set(name, (entry[2] ?? '').trim());
+  }
+
+  return { keys, values, line: openerLine.line };
+}
+
+/**
+ * One `${{ ... }}` expression rendered under one event context.
+ *
+ * The grammar is the one a concurrency group is written in: operands joined by
+ * `||`, each a single-quoted literal or a context path, and the value is the
+ * first truthy operand or else the last one, which is GitHub's own rule. An
+ * operand this does not model THROWS rather than rendering as empty, because an
+ * unmodelled path silently renders equal on both sides and turns leg 2 into a
+ * check that always passes.
+ *
+ * @param {string} expression
+ * @param {string} event
+ * @param {string} where
+ * @returns {string}
+ */
+function renderExpression(expression, event, where) {
+  const context = { ...EVENT_INVARIANT, ...EVENT_CONTEXT[event] };
+  const operands = expression.split('||').map((operand) => operand.trim());
+
+  /** @type {string[]} */
+  const rendered = [];
+  for (const operand of operands) {
+    const literal = /^'(.*)'$/.exec(operand);
+    if (literal !== null) {
+      rendered.push(literal[1] ?? '');
+      continue;
+    }
+    const value = context[operand];
+    if (value === undefined) {
+      throw new Error(
+        `RI-33 cannot render ${where}: the operand \`${operand}\` is not a context path this ` +
+          'check models. An operand it renders as empty is one that compares EQUAL on both ' +
+          'events, which would turn the divergence leg into a check that always passes. Add ' +
+          'the path to `EVENT_CONTEXT` if it differs between a push and a pull request, or ' +
+          'to `EVENT_INVARIANT` if it does not',
+      );
+    }
+    rendered.push(value);
+  }
+
+  return rendered.find((value) => value !== '') ?? rendered[rendered.length - 1] ?? '';
+}
+
+/**
+ * A whole `group:` value rendered under one event context.
+ *
+ * @param {string} group
+ * @param {string} event
+ * @param {string} where
+ * @returns {string}
+ */
+const renderGroup = (group, event, where) =>
+  group
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/\$\{\{([^}]*)\}\}/g, (_whole, expression) =>
+      renderExpression(String(expression), event, where),
+    );
+
+/** @type {Invariant} */
+const ri33 = {
+  id: 'RI-33',
+  title: 'A workflow on both push and pull_request renders one concurrency group for both',
+  covers:
+    'EVERY WORKFLOW IN `.github/workflows` THAT DECLARES BOTH `push` AND ' +
+    '`pull_request`, which is the exact set whose every commit starts TWO ' +
+    'runs. Its `concurrency.group` is RENDERED under a push context and under ' +
+    'a pull-request context for one branch and the two strings must be EQUAL, ' +
+    'rather than matched against a list of blessed spellings. That is the ' +
+    'design and not an implementation detail: `github.ref` diverges, ' +
+    '`github.head_ref` alone diverges, `github.head_ref || github.ref` STILL ' +
+    'diverges (`<branch>` against `refs/heads/<branch>`), and ' +
+    '`github.event.pull_request.number || github.ref` -- the idiom ALLOCATION ' +
+    'row 292 supplied and the most-copied answer to this question -- renders ' +
+    '`7` against `refs/heads/<branch>` and DOES NOT FIX IT. THREE LEGS: no ' +
+    '`concurrency` block at all, divergent renderings, and ' +
+    '`cancel-in-progress` that is not `true`, because a shared group that only ' +
+    'QUEUES still runs both halves. THREE SENTINELS THROW: no workflow file ' +
+    'walked, a tree whose workflows name `pull_request` while the reader ' +
+    'classified NONE as dual-triggered, and an operand inside a group that ' +
+    'this check does not model, which would render empty on both sides and ' +
+    'make the divergence leg always pass. IT IS A LINE READER AND NOT A YAML ' +
+    'PARSER, so an anchor or a multi-line flow mapping is beyond it and the ' +
+    'second sentinel is what keeps that loud. IT SAYS NOTHING ABOUT WHETHER A ' +
+    'WORKFLOW SHOULD CARRY BOTH TRIGGERS, which is STRATEGY`s call: removing ' +
+    'a trigger to stop a duplicate is weakening a gate to pass it. It cannot ' +
+    'see a duplicate across two workflows or via `workflow_run`, and it models ' +
+    'a SAME-REPOSITORY pull request. No database. ADR-292.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const home = join(root, WORKFLOW_HOME);
+    const files = existsSync(home)
+      ? readdirSync(home)
+          .filter((file) => /\.ya?ml$/.test(file))
+          .sort()
+      : [];
+
+    // SENTINEL ONE. No workflow file means the directory moved or the extension
+    // test stopped matching, at which point every leg below asserts about an
+    // empty list and this check reports PASS over a repository whose CI it
+    // never opened. ADR-274's rule.
+    if (files.length === 0) {
+      throw new Error(
+        `RI-33 walked no workflow file in ${WORKFLOW_HOME}. Zero means the directory moved ` +
+          'or the extension test stopped matching, at which point every leg asserts about ' +
+          'an empty list and this check reports PASS over CI it never opened',
+      );
+    }
+
+    /** @type {string[]} */
+    const dual = [];
+    let mentionsPullRequest = 0;
+
+    for (const file of files) {
+      const rel = `${WORKFLOW_HOME}/${file}`;
+      const lines = significantLines(read(root, rel));
+      if (lines.some(({ text }) => text.includes('pull_request'))) mentionsPullRequest++;
+
+      const triggers = topLevelBlock(lines, 'on');
+      if (triggers === null) continue;
+      if (!DUAL.every((trigger) => triggers.keys.includes(trigger))) continue;
+      dual.push(rel);
+
+      const concurrency = topLevelBlock(lines, 'concurrency');
+      const group = concurrency?.values.get('group');
+
+      // LEG 1. The worst form of the same defect: two runs per commit and
+      // nothing that could ever cancel either.
+      if (concurrency === null || group === undefined || group === '') {
+        findings.push(
+          `${rel} declares both \`push\` and \`pull_request\` (${WORKFLOW_HOME}/${file}:` +
+            `${String(triggers.line)}) and names no \`concurrency.group\`. Every commit on a ` +
+            'branch with an open pull request therefore starts two runs of this workflow and ' +
+            'nothing can cancel either',
+        );
+        continue;
+      }
+
+      const where = `${rel}:${String(concurrency.line)}`;
+      const [onPush, onPull] = DUAL.map((event) => renderGroup(group, event, where));
+
+      // LEG 2, and it is the one the check is named for.
+      if (onPush !== onPull) {
+        findings.push(
+          `${where} keys \`concurrency.group\` on \`${group}\`, which renders "${String(onPush)}" ` +
+            `on \`push\` and "${String(onPull)}" on \`pull_request\` for one commit on one ` +
+            'branch. Two groups is two runs, and `cancel-in-progress` never sees them as ' +
+            'siblings. `github.head_ref || github.ref_name` renders one string on both ' +
+            'events; do NOT reach for a trigger removal, which is weakening a gate to pass it',
+        );
+      }
+
+      // LEG 3. Necessary and not sufficient: one group that only queues is
+      // still two runs, one of them behind the other.
+      const cancel = concurrency.values.get('cancel-in-progress');
+      if (cancel !== 'true') {
+        findings.push(
+          `${where} shares one \`concurrency.group\` across \`push\` and \`pull_request\` with ` +
+            `\`cancel-in-progress: ${String(cancel ?? '(absent)')}\`. A shared group that does ` +
+            'not cancel merely QUEUES the second run, so the commit is still built twice',
+        );
+      }
+    }
+
+    // SENTINEL TWO, AND IT IS THE ONE THAT MATTERS. This check's scope is
+    // computed by a line reader over YAML. Reindent a trigger block, write `on`
+    // as a flow mapping, or break the key expression, and the dual-triggered
+    // set empties while every leg above still runs and still finds nothing.
+    // A tree whose workflows say `pull_request` and whose reader found no
+    // dual-triggered workflow is a broken reader, not a fixed repository.
+    if (mentionsPullRequest > 0 && dual.length === 0) {
+      throw new Error(
+        `RI-33 found \`pull_request\` in ${String(mentionsPullRequest)} workflow file(s) and ` +
+          'classified NONE of them as declaring both triggers. Zero means the `on:` reader ' +
+          'stopped matching the shape these workflows are written in, at which point this ' +
+          'check reports PASS over every duplicated run in the tree',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -7619,6 +7976,7 @@ export const CHECKS = [
   ri29,
   ri30,
   ri31,
+  ri33,
 ];
 
 function main() {

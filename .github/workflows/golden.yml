@@ -58,7 +58,13 @@ on:
   pull_request:
 
 concurrency:
-  group: golden-${{ github.ref }}
+  # ADR-292, and `ci.yml` carries the argument. `github.ref` differs between the
+  # `push` and `pull_request` events above, so a group keyed on it put the two
+  # runs of one commit in different groups and neither cancelled the other.
+  # `github.head_ref` is set only on `pull_request`; on `push` it is empty and
+  # `github.ref_name` is the same branch name, so both events render one string.
+  # `RI-33` holds this line. NEITHER TRIGGER IS REMOVED.
+  group: golden-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
