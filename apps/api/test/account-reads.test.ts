@@ -905,13 +905,26 @@ describe('the eligibility blocker states causes that are LIVE, and each is deriv
       'apps/worker/src/job.ts',
     ]);
 
-    // AND THE ADAPTER REFUSES THE LOAD, which is the clause that now stands
-    // under this endpoint's 503. `apps/worker/test/entrypoint.test.ts` watches a
-    // real process meet that refusal and exit non-zero.
-    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
-      "new BatchPortUnwired('loadAccountDay'",
-    );
-    expect(await eligibilityBlocker()).toContain('rejects `loadAccountDay` by name');
+    // **AND THE ADAPTER NO LONGER REFUSES THE LOAD, WHICH IS THE CLAUSE ADR-260
+    // TOOK OFF THIS REASON.** This case asserted the opposite and went red on the
+    // resolver landing, without being seeded, which is what it was built to do:
+    // the sentence under this endpoint's 503 sent an operator to build a port
+    // that is now built. It is asserted in the other direction rather than
+    // deleted, so the day anything restores an unwired arm to that method this
+    // reason and this case move together.
+    const adapter = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'));
+    expect(adapter).not.toContain("new BatchPortUnwired('loadAccountDay'");
+    expect(adapter).toContain('resolveExternalGates');
+
+    // THE PORTS THAT DO STILL REFUSE ARE NAMED, so "the fold completes" is not
+    // read as "the adapter is whole". Neither is on `runNightlyBatch`'s path.
+    expect(adapter).toContain("new BatchPortUnwired('accountDaysFrom'");
+    expect(adapter).toContain("new BatchPortUnwired('storedRuleStates'");
+
+    const blocker = await eligibilityBlocker();
+    expect(blocker).not.toContain('rejects `loadAccountDay` by name');
+    expect(blocker).toContain('the fold completes');
+    expect(blocker).toContain('the table is still empty');
   });
 
   test('clause 2: no `engine_gates` encoding ships under any `src/`, so the writer would refuse', async () => {
