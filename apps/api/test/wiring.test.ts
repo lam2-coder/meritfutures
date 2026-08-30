@@ -816,12 +816,23 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`LedgerTx`, which only `SystemTx` satisfies because `ledger_transactions` and ' +
     '`ledger_entries` are both `derived` rather than `firm`, `SystemReason` is still exactly two ' +
     'members (`packages/db/src/scoped-db.ts:271`) and `ApiDb` still declares no door that yields ' +
-    'a `SystemTx`. ADR-238 RULING 3 ADDS THE HALF ADR-165 DID NOT REACH: ADR-176 cleared the ' +
+    'a `SystemTx`. ADR-238 RULING 7 ADDS THE HALF ADR-165 DID NOT REACH: ADR-176 cleared the ' +
     'same obstruction for `LT-01` by DELETING `PayoutTx.ledger` and posting later at a system ' +
     'authority, and that remedy does NOT transfer, because M20 pins `LT-08` to the purchase ' +
     'transaction by name and `DEP-M20-02` states the consequence of moving it. The card arm ' +
     'alone would be a partial backend whose port promises the whole transaction, which is the ' +
-    'shape `usePayoutBackend` refuses above. EVERY CLAUSE HERE IS ASSERTED BY ' +
+    'shape `usePayoutBackend` refuses above. AND ADR-270 NARROWS THIS ARM BY RULING IT ' +
+    'OUTSIDE ITS OWN ANSWER RATHER THAN INSIDE IT. That entry rules what posts a ledger ' +
+    'entry when the request path may not: a job a clock started, at `nightly-batch`, on the ' +
+    'door `apps/worker` holds. LT-08 IS NOT REACHED BY THAT ANSWER AND THE REASON IS THE PIN ' +
+    'RATHER THAN A FENCE: a posting may move to a clock exactly where the check it is bound ' +
+    'to resolves no caller, INV-M20-01 binds LT-06 to a live POSITION which is read off ' +
+    'rows, and INV-M20-02 binds LT-08 to the PAYING IDENTITY, which IS the caller (M20 ' +
+    'section 7, AS-M20-06: ownership is resolved server side and "compared to the paying ' +
+    'identity, in the same transaction as the debit"). This transaction is a request ' +
+    'transaction by construction, so NO SUCCESSOR MAY REACH FOR THE WORKER HERE and the arm ' +
+    'still waits on the ruling ADR-238 ruling 7 named, in `packages/ledger` and ' +
+    '`packages/db`. EVERY CLAUSE HERE IS ASSERTED BY ' +
     '`test/checkout-backend-blockers.test.ts` RATHER THAN ONLY WRITTEN. MONEY PATH.',
   useCheckoutAdapters:
     'a configured PSP adapter per MID plus the `returnUrl` and `cancelUrl` configuration. ' +
@@ -1044,20 +1055,26 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'handle. AND ADR-267 NARROWS THAT CLAUSE FROM AN ABSENCE TO A RULING, WHICH IS THE ' +
     'SEVENTH CORRECTION TO THIS ENTRY AND THE FIRST THAT MAKES IT SMALLER RATHER THAN ' +
     'LONGER. The question a successor would otherwise ask here is whether ADR-176 clears it ' +
-    'the way it cleared LT-01, by deleting the handle and posting later at a system ' +
-    'authority. IT DOES NOT, AND THE ANSWER IS MEASURED RATHER THAN ASSUMED: LT-01 CREDITS ' +
-    'the wallet and LT-06 DEBITS it, M20 section 3.3a separates the payout hold from the ' +
-    'wallet halt by exactly that fact and calls it the whole of the difference between the ' +
-    'two legs, and INV-M20-01 binds every wallet debit to the transaction that checks it ' +
-    'against the live position. The key half of ADR-176 is ALREADY PAID on this leg -- ' +
-    '`decideWithdrawal` stores the key the trader supplied on the row -- and the remedy ' +
-    'still fails, ' +
-    'so what refuses is WHEN the posting happens and not a missing key or a missing handle. ' +
+    'the way it cleared LT-01. IT DOES NOT, AND THE FOUR PINS ARE RUN RATHER THAN RESTATED ' +
+    'HERE: `lt06-posting-timing.test.ts` holds M05 section 2.1 (LT-01 CREDITS the wallet and ' +
+    'LT-06 DEBITS it), INV-M20-01, M20 section 3.3a, and the key `decideWithdrawal` already ' +
+    'stores. What refuses is WHEN the posting happens and not a missing key or a handle. ' +
     'THE CONSEQUENCE FOR THIS PORT IS THAT NO `apps/api` DOOR CAN DISCHARGE THIS CLAUSE AT ' +
     'ALL: the driver that lands it performs the TRANSITION AND THE POSTING TOGETHER at a ' +
     'system authority, which is a move OUT of this deployable rather than a wiring inside ' +
     'it, so this entry is no longer waiting on a slice that could arrive here. ' +
-    '`lt06-posting-timing.test.ts` RUNS the ruling, watched red under five seeded defects. ' +
+    'AND ADR-270 CLOSES THE AUTHORITY HALF, WHICH IS THE EIGHTH CORRECTION AND THE SECOND ' +
+    'THAT MAKES THIS ENTRY SMALLER. This clause used to end on a door nobody had ruled. ' +
+    'BOTH REFUSALS STAND, RE-DERIVED AT SOURCE AND NOT SOFTENED: `SystemReason` is still two ' +
+    'members and `ApiDb` still declares no system door. WHAT POSTS IS DECIDED BY WHO THE ' +
+    "TRANSACTION'S OPENER SERVES, which `packages/ledger/src/tx.ts` states in its own words, " +
+    'and a job a clock started is `nightly-batch` on the door `apps/worker` has held since ' +
+    'ADR-165 clause 2. SO WHAT IS LEFT IS NOT AN AUTHORITY AND NONE OF IT IS IN THIS ' +
+    'DEPLOYABLE: the worker declares no `@merit/ledger`, `ExpiryLedgerPort.postLt01` has no ' +
+    'adapter, and there is no job store. THE WORKER RUNNING IS NOT WHAT ANSWERED IT EITHER ' +
+    '(ADR-241, ADR-260): the handle predates the run, and what those entries changed is ' +
+    'delivery rather than authority. `ledger-posting-authority.test.ts` RUNS the ruling and ' +
+    '`lt06-posting-timing.test.ts` RUNS the leg, each watched red under five seeded defects. ' +
     'Past it `settled` and `failed` are drawn only out of `transferring`, reached by ' +
     'enqueueing on a rail with no live adapter and no importer. A 503 says Merit cannot do ' +
     'this today. A wired deployment would say yes and then never pay, and a trader can now ' +
