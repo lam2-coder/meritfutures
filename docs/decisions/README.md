@@ -302,6 +302,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-286](ADR-286.md) | the two spellings are the dependency graph rather than a preference, so no caller renames and what the size row waits on is a HOME; and the one FM-16 in this area is the cap schedule, which has three statements and has already diverged on the money  (2026-08-30, status: proposed) |
 | [ADR-287](ADR-287.md) | the whole purchase, enumerated. `PayoutTx` declares four methods, one is buildable today, two wait on rulings nobody has made, and one of those waits on counsel  (2026-08-30, status: proposed) |
 | [ADR-288](ADR-288.md) | a red security gate on `main`, and the ruling is that an unrewritable commit is PINNED while the tree it left behind is REPAIRED  (2026-08-30, status: proposed) |
+| [ADR-289](ADR-289.md) | `eligibility_snapshot_id` names a resource the schema deliberately refuses to create, so it comes OUT of the frozen contract and OUT of the port shape  (2026-08-30, status: proposed) |
 | [ADR-290](ADR-290.md) | two fields with no column. `failure_note` is a RULED ABSENCE with its column and its writer both specified and neither written, and `timeline`'s source is NAMED as `events` and is EMPTY because that table has no producer  (2026-08-30, status: proposed) |
 <!--/gen-->
 
