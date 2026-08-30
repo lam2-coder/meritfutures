@@ -860,11 +860,16 @@ const ELIGIBILITY_BLOCKER =
   'is `runNightlyBatch`. THE TWO HALVES THIS CLAUSE USED TO NAME ARE SPENT AND ADR-241 SPENT ' +
   'THEM: the deployable is scheduled, `apps/worker/src/start.ts` calls `main` and exits ' +
   'non-zero when the batch throws, and `postgresBatchPorts` in ' +
-  '`apps/worker/src/batch/adapter.ts` is a `BatchPorts` value over Postgres. What refuses now ' +
-  'is NARROWER AND IS NOT WEAKER: that adapter serves four of ten methods and rejects ' +
-  '`loadAccountDay` by name, so a fold never starts, because an `AccountDay` carries a ' +
-  'resolved plan, a prior state, a mark, settlements, an opened-on anchor and R-40s five ' +
-  'context facts and this deployment resolves none of them. (2) EVEN GIVEN AN ' +
+  '`apps/worker/src/batch/adapter.ts` is a `BatchPorts` value over Postgres. WHAT REFUSES HERE ' +
+  'HAS NARROWED TWICE MORE AND IS NOW ABOUT A RUN RATHER THAN ABOUT A PORT. THE RETIRED ' +
+  'CLAUSE IS PARAPHRASED RATHER THAN QUOTED, because a reason that reproduces its own retired ' +
+  'sentence reads as live to every grep: it said the adapter refused the account-day load by ' +
+  'name and that this deployment resolved none of its six fields. ADR-258 resolved five of ' +
+  'them and ADR-260 resolved the sixth, so `postgresBatchPorts` now serves EVERY method ' +
+  '`runNightlyBatch` calls and the fold completes; `accountDaysFrom` and `storedRuleStates` ' +
+  'still refuse and neither is on that path. So the honest clause is smaller: no scheduled run ' +
+  'has written against this database, the table is still empty, and a confident verdict ' +
+  'computed off an empty table is a wrong answer where a 503 is an honest one. (2) EVEN GIVEN AN ' +
   'ADAPTER THE WRITER WOULD REFUSE: `RuleStateWriterIo.encodeEngineGates` has no ' +
   'implementation under any `src/`, and `UNWIRED_RULE_STATE_WRITER_IO` throws ' +
   '`RuleStateWriterUnwired` by name, because the stored encoding of `engine_gates` is `B5` ' +

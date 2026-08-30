@@ -330,6 +330,36 @@ export interface PayoutSubject {
   readonly accountId: string;
   readonly state: RuleState;
   readonly plan: ResolvedPlan;
+  /**
+   * `R-40` AND `R-38`'s FIVE CONTEXT FACTS, AND THEY ARE CONSTRUCTIBLE NOW.
+   *
+   * **THIS FIELD WAS THE THIRD OF THREE AND NO REASON ON THIS PORT NAMED IT FOR
+   * ELEVEN REVISIONS.** `ADR-248` ruled it NOT constructible in this deployable,
+   * because `hasPayoutInFlight` was a predicate `M01` stated at two grains and a
+   * route picking a side would be settling an open corpus question in a file
+   * nobody reads twice. `ADR-254` ruled the grain ACCOUNT and amended `M01`.
+   * `ADR-260` wrote the resolver.
+   *
+   * **A BACKEND IMPLEMENTING `subject()` CALLS `resolveExternalGates`
+   * (`@merit/rules-engine`) AND DOES NOT WRITE THIS RECORD OUT.** It takes the
+   * RAW column values -- `accounts.status`, both `payouts_frozen` flags,
+   * `accounts.recon_blocked`, the whole `kyc_verifications` chain of the owning
+   * identity, and the `status` of every `payout_requests` row of the subject
+   * account -- and either returns the record or throws an `ExternalGatesRefusal`
+   * naming the leg. `apps/worker` builds `AccountDay.external` through the same
+   * function, which is the point: a literal here would be a second answer to the
+   * seven-versus-six `accounts.status` question with nothing comparing the two.
+   *
+   * **EVERY TABLE IT NEEDS IS ON THE PAYOUT TRANSACTION.** `identities` is
+   * `root`, and `accounts`, `kycVerifications` and `payoutRequests` are `owned`
+   * on `identity_id` (`packages/db/src/scope.ts`), so no second door and no
+   * second transaction is implied by this field.
+   *
+   * **AND `usePayoutBackend` IS STILL NOT WIRED, ON THE OTHER TWO FIELDS.**
+   * `state` is a `RuleState`, which means reading a `rule_states` row, and no
+   * scheduled run has written one against this database. That is `ADR-239`
+   * link 4 and it is not this field's.
+   */
   readonly gates: ExternalGates;
 }
 

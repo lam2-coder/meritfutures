@@ -254,7 +254,7 @@ test('`certificates` carries no image location column, and no migration adds one
 // 4. The set splits two and one, read off the list rather than restated
 // -----------------------------------------------------------------------------
 
-test('two of the three certificate ports wait on the card and the third waits on the door', () => {
+test('one of the three certificate ports is wired, one waits on the origin and the guard, one on the door', () => {
   const source = readFileSync(WIRING, 'utf8');
   const start = source.indexOf('const BLOCKED');
   const listing = source.slice(start, source.indexOf('\n};', start));
@@ -269,15 +269,23 @@ test('two of the three certificate ports wait on the card and the third waits on
     ]),
   );
 
-  const card = ['useCertificateBackend', 'useCertificateImageSource'];
+  // THE SET SPLIT TWO-AND-ONE AND IT NOW SPLITS ONE-ONE-ONE, which is ADR-256
+  // ruling 13 arriving: the two card ports "no longer expire together, they
+  // expire in ORDER", and ADR-261 wired the first of the two. This case is
+  // rewritten rather than deleted, on the rule that a case measuring a shape
+  // the tree has left behind is a case that stops measuring anything.
+  const startSource = readFileSync(join(HERE, '..', 'src', 'start.ts'), 'utf8');
+  expect(startSource).toContain('useCertificateImageSource(databaseCertificateImageSource(');
+  expect(entries.has('useCertificateImageSource')).toBe(false);
+
+  const list = 'useCertificateBackend';
   const door = 'useCertificateRevokeBackend';
-  for (const port of [...card, door])
+  for (const port of [list, door])
     expect(entries.has(port), `\`${port}\` is not in the BLOCKED list`).toBe(true);
 
-  // THE TWO CARD PORTS EACH NAME THE RENDERER AND THE REVOKE PORT DOES NOT, and
-  // the revoke port names the resolver the other two do not. Neither half of
-  // that is a count: both are named ports, so a fourth certificate port joining
-  // the list fails here rather than passing quietly.
+  // THE LIST PORT NAMES THE TWO THINGS IT WAITS ON AND THE REVOKE PORT NAMES
+  // NEITHER. Neither half is a count: both are named ports, so a fourth
+  // certificate port joining the list fails here rather than passing quietly.
   //
   // CASE-INSENSITIVE, AND THAT IS NOT A DETAIL. These entries shout their
   // findings in capitals and quote their own sources in lower case, so the same
@@ -285,12 +293,21 @@ test('two of the three certificate ports wait on the card and the third waits on
   // case failed on `useCertificateBackend` while the word was in the entry
   // twice. `RI-14`'s first draft made the identical mistake and its header
   // records it.
-  const RENDERER = /renderer/i;
+  const ORIGIN = /an origin/i;
+  const GUARD = /guard/i;
   const RESOLVER = /principal\(request\)/i;
-  for (const port of card) {
-    expect(entries.get(port), `\`${port}\` stopped naming the renderer`).toMatch(RENDERER);
-    expect(entries.get(port), `\`${port}\` started naming the resolver`).not.toMatch(RESOLVER);
-  }
+
+  expect(entries.get(list), `\`${list}\` stopped naming the origin`).toMatch(ORIGIN);
+  // THE GUARD IS THE HALF THAT MATTERS, because the origin alone is a thing a
+  // deployment sets and ADR-226 and ADR-229 permit wiring on that. What keeps
+  // this port shut is that `links`' refusal is decided by the state of the
+  // caller's own rows until something reads the origin BEFORE the rows, and
+  // ADR-261 section 5 rules that check is code rather than configuration. An
+  // entry that stopped naming it would be an entry a reader could close with
+  // one variable.
+  expect(entries.get(list), `\`${list}\` stopped naming the guard`).toMatch(GUARD);
+  expect(entries.get(list), `\`${list}\` started naming the resolver`).not.toMatch(RESOLVER);
+
   expect(entries.get(door), `\`${door}\` stopped naming the resolver`).toMatch(RESOLVER);
-  expect(entries.get(door), `\`${door}\` started naming the renderer`).not.toMatch(RENDERER);
+  expect(entries.get(door), `\`${door}\` started naming the origin`).not.toMatch(ORIGIN);
 });

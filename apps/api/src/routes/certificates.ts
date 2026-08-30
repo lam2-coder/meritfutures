@@ -202,29 +202,29 @@
 //   `class: 'owned'` on `identity_id` in `packages/db/src/scope.ts`, so
 //   `tx.rows('certificates')` is the caller's own rows with `scopePredicate`
 //   already ANDed in, and `databaseCertificateBackend` below is that adapter.
-//   WHAT KEEPS THAT ROW AT 503 IS THE LINK SIGNER AND NOT THE READ, and
-//   {@link CertificateLinks} carries the ruling (ADR-240).
+//   WHAT KEEPS THAT ROW AT 503 IS AN ORIGIN AND A GUARD, NOT THE READ, and
+//   {@link CertificateLinks} carries both (ADR-249, ADR-261).
 //
-//   GET /certificates/:code/image.png HAS A DOOR NOW AND STILL HAS NO ANSWER.
-//   This paragraph read that it "CANNOT USE EITHER DOOR", because it is
-//   unauthenticated and `certificates` is `owned`; ADR-231 built a fifth door,
-//   `publicLookup(fn)`, which reads `certificates` by `code` for a caller who
-//   will never be anybody, and `databaseVerifySource` in `routes/verify.ts`
-//   already reads that row and writes `certificate_verifications` through
-//   `db.firm`, which is both of this port's database arms. WHAT REFUSED WAS
-//   THAT THE ANSWER IS BYTES, AND ADR-256 LANDED THE PRODUCER:
-//   `renderCertificateCard` draws one from the row and the deployment's copy,
-//   and `test/certificate-links.test.ts` counts TWO files naming
-//   `CertificateCard` where it counted ONE. WHAT REFUSES NOW IS AN ADAPTER
-//   COMPOSING THE TWO DATABASE ARMS WITH THE RENDER, AND ONE UNNAMED NUMBER.
+//   GET /certificates/:code/image.png HAS A DOOR, A PRODUCER, AND SINCE
+//   ADR-261 THE COMPOSITION OF THE TWO. This paragraph read that the row
+//   "CANNOT USE EITHER DOOR", because it is unauthenticated and `certificates`
+//   is `owned`; ADR-231 built a fifth door, `publicLookup(fn)`, which reads
+//   `certificates` by `code` for a caller who will never be anybody. It then
+//   read that WHAT REFUSED WAS THAT THE ANSWER IS BYTES, and ADR-256 landed
+//   `renderCertificateCard`. It then read that what refused was AN ADAPTER
+//   AND ONE UNNAMED NUMBER, and `src/certificate-image-source.ts` composes
+//   both database arms with the render and names the number. NOTHING IN THIS
+//   FILE REFUSES THIS ROW ANY MORE.
 //
-// So the image row is served through a PORT and the port is UNWIRED, which is
-// `routes/public-methods.ts`' shape and its stated reason: an unset source is a
-// deployment that has not been finished, and it is answered loudly rather than
-// guessed at. `routes/economic-calendar.ts` STOOD BESIDE IT HERE AND NO LONGER
-// DOES: ADR-240 wired it, because its remaining gap was a configured threshold
-// and a threshold is a thing a deployment supplies. THIS ONE'S WAS A RENDERER,
-// which ADR-256 supplied; what is left is the adapter named above.
+// So the image row is served through a PORT and `start.ts` INSTALLS one, which
+// is `routes/economic-calendar.ts`' shape rather than `routes/public-methods.ts`'
+// any longer. ADR-240 wired that one because its remaining gap was a configured
+// threshold and a threshold is a thing a deployment supplies; this one's gap was
+// a RENDERER, which ADR-256 supplied, and then a COMPOSITION, which ADR-261
+// supplied. A process that never ran `start.ts` still answers 503 here and says
+// so. THE LIST ROW BESIDE IT IS STILL UNWIRED and {@link CertificateLinks}
+// carries what it waits on: an origin, and a guard that makes its refusal
+// state-independent (ADR-261 section 5).
 // =============================================================================
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -352,12 +352,12 @@ export interface CertificateListResponse {
  *
  * `image_url` IS "signed, time-limited" AND IS NOT WAITING ON A SECRET, WHICH
  * IS THE RULING WORTH READING SLOWLY. `routes/account-reads.ts`'
- * `CERTIFICATE_BLOCKER` counted THREE absent things independently on the
- * `/certificate` row, "the card renderer, the CDN origin and the URL signer",
- * and TWO have since moved: ADR-249 ruled there is no URL signer to place and
- * ADR-256 landed the renderer, so what is left is the ORIGIN. `certificates`
- * (`0020_public_surface.sql`) carries `signature` and `signing_key_id` and NO
- * image location column, "so there is not even a stored value to sign".
+ * `CERTIFICATE_BLOCKER` counted THREE absent things on the `/certificate` row,
+ * "the card renderer, the CDN origin and the URL signer", and TWO have moved:
+ * ADR-249 ruled there is no signer to place, ADR-256 landed the renderer and
+ * ADR-261 wired the row this field addresses, SO WHAT IS LEFT IS THE ORIGIN.
+ * `certificates` (`0020_public_surface.sql`) carries `signature` and
+ * `signing_key_id` and NO image location column, "not even a value to sign".
  *
  * AND THE SIGNATURE COULD NOT ADDRESS THIS FILE'S OWN IMAGE ROW EVEN IF A KEY
  * EXISTED. API_CONTRACT section 6.3 states of `GET /certificates/:code/image.png`:
@@ -1044,6 +1044,31 @@ export function currentCertificateImageSource(): CertificateImageSource {
   return imageSource;
 }
 
+/**
+ * Raised when the installed source cannot be configured. Answered 503, never 500.
+ *
+ * A DEPLOYMENT NOBODY FINISHED IS NOT A DEFECT, which is ADR-240 section 4's
+ * standing ruling and the reason this sits beside {@link CertificateImageUnwired}
+ * rather than beside {@link CertificateImageError}. An unset variable sends an
+ * operator to `start.ts`; a 500 sends them hunting for a bug.
+ *
+ * AND IT IS RAISED BEFORE THE LOOKUP OR IT IS THE ORACLE ADR-246 CLAUSE 8
+ * REFUSED. A deferred code never renders (ADR-168 foreclosure 4), so a
+ * configuration refusal raised inside the render is a refusal only the codes
+ * whose rows issued can reach, and the difference between a 404 and a 500 would
+ * be a fact about Merit's book. `src/certificate-image-source.ts` reads the
+ * whole configuration first and this class is what it raises.
+ */
+export class CertificateImageUnconfigured extends Error {
+  constructor(reason: string, what: string) {
+    super(
+      `\`GET /certificates/:code/image.png\` is installed and ${what} is not usable, so it ` +
+        `answers 503 for EVERY code alike rather than for the codes that render: ${reason}`,
+    );
+    this.name = 'CertificateImageUnconfigured';
+  }
+}
+
 /** One day in seconds. The bound M11 section 4 states, as a number. */
 const ONE_DAY_SECONDS = 86_400;
 
@@ -1192,8 +1217,14 @@ export const imageHandler: RouteHandler = async (request, reply) => {
 
 /** An unwired port is a 503 and never a 500. Anything else is the transport's. */
 function unwiredOrThrow(err: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply {
-  if (!(err instanceof CertificateImageUnwired)) throw err;
-  request.log.error({ err }, 'certificate image source is not wired');
+  // TWO CLASSES, ONE ANSWER, WHICH IS `routes/verify.ts`' SHAPE: it answers the
+  // same 503 for `VerifySourceUnwired` and `VerifyPresentationError`, because a
+  // port nobody installed and a port nobody configured are the same deployment
+  // fact seen twice. `CertificateImageError` is deliberately NOT here: those are
+  // defects and a defect is a 500.
+  if (!(err instanceof CertificateImageUnwired) && !(err instanceof CertificateImageUnconfigured))
+    throw err;
+  request.log.error({ err }, 'certificate image source is not wired or not configured');
   return reply
     .code(503)
     .type(PROBLEM_MEDIA_TYPE)
