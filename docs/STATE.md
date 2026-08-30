@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->281<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->282<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11065,3 +11065,29 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped** with a delta of **ZERO**, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row. **No GitHub access: no PR was opened and nothing was merged.**
+
+---
+
+## 2026-08-30 - Session 494: the worker has no ledger, and the three absences are five ([ADR-305](decisions/ADR-305.md), proposed)
+
+**Row `305`, a PLANNING row on the money path. [ADR-305](decisions/ADR-305.md), ten sections, `proposed` and UNSIGNED. No `src/` line moved, no test changed, no migration was written, no `package.json` was edited and no `RI-nn` was minted.**
+
+**All three absences [ADR-270](decisions/ADR-270.md) clause 6 named were re-derived at source and all three hold.** `apps/worker` declares exactly `@merit/db` and `@merit/rules-engine`; `ExpiryLedgerPort.postLt01` occurs at two lines in [`sweeps/ports.ts`](../apps/worker/src/sweeps/ports.ts), its declaration and its rejector; and no migration names `pgboss`.
+
+**The sizing is nine slices, and the three absences are five.** `@merit/ledger` exports no `LT-06` builder: `walletWithdrawalApprovalPosting` is module-scoped and occurs zero times in the package's public surface, so the manifest line grants a deployable an exported surface `LT-06` is not in. `lt01()` has one definition and it is in `apps/api`, which `apps/worker` cannot import, and the copy-the-arithmetic route is refused by the port itself by name. And the adapter that port specifies in its own docblock is `postTransaction(tx.ledger, ...)` while `ExpiryTx` declares three members, none of them `ledger`.
+
+**The authority question is answered in writing rather than inherited, and both refusals stand.** `SystemReason` is still two members and `ApiDb` still declares no system door. The driver is `systemDb('nightly-batch')`, on [`packages/ledger/src/tx.ts`](../packages/ledger/src/tx.ts)'s own sentence that the reason is chosen by whoever opens the transaction. **[ADR-165](decisions/ADR-165.md) and [ADR-176](decisions/ADR-176.md) are not reopened** and the four `LT-06` pins are run rather than restated.
+
+**The driver is not `driveApprovals` moved.** `WithdrawalTx` says every method is scoped to the caller's identity and that no method takes an identity, and a clock has no identity, so the sweep needs its own port across identities. `decideApproval` is pure and homeless, which is the same question [ADR-286](decisions/ADR-286.md) refused every candidate home for.
+
+**And the installation is not Merit's to schedule.** `0072`'s `WD-C2` refuses `approved --> cancelled`, `approved --> transferring` is the only other arrow out of `approved`, and `transferring` is unreachable. **So the day `LT-06` posts, an approved withdrawal has no exit at all**, and `0072` wrote that consequence down one migration in advance. **A 503 says Merit cannot do this today. A wired deployment would say yes and then never pay.**
+
+**Eight of the nine slices are dispatchable and five may run at once.** Slices 1 to 5 have no blocker and no dependency on each other; 6 joins 2 and 3 and closes `postLt01`; 7 joins 1 and 5 and is the driver; 8 joins 4 and 7; **slice 9 joins 7, 8 and the rail, which is vendor work and is FOUNDER-OWED and is not sized here.**
+
+**No migration number was taken or reserved**: `0077` is [ADR-297](decisions/ADR-297.md)'s and `0078` is the first free number, which slice 4's own row spends. **Nothing is wired and the counts do not move: ten wired of twenty-four declared, fourteen blocked.**
+
+**`useWithdrawalBackend`'s entry was not rewritten**, `apps/api/test/**` being out of fence, so **`F1`, `F2` and `F3` are owed to it** by a row whose fence reaches that file.
+
+**The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed. **And the repository itself was absent**: the container held no clone at all, and it was attached and verified against this row before a byte was written.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped** with a delta of **ZERO**, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**, and the fence is measured rather than intended: `git status --porcelain` names **six files and all six are under `docs/`**, two of them the generated registry READMEs. **`pnpm run verify` was NOT run**, forbidden by the row.
