@@ -737,18 +737,54 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`ScopedTx.catalogRowAt` returns `Promise<unknown>` (`packages/db/src/scoped-db.ts:3620`) ' +
     'and `plan_version_sizes.payout_cap_schedule_cents` is itself `jsonb` holding cents ' +
     '(`packages/db/migrations/0004_catalog.sql:168`), so the second argument is a blob too. ' +
-    'ADR-283 DID NOT TAKE IT AND SAYS WHY: the two readers that exist read two DIFFERENT ' +
-    'sources under two different key spellings, `apps/worker` a driver row whose properties ' +
-    'are `packages/db`s camelCase and `apps/site` a wire object under the stored snake_case ' +
-    'column names, so it is NOT one predicate stated twice and a canonical decoder has to make ' +
-    'one caller rename, which is a ruling somebody owns. A FOURTH STATEMENT OF THE BLOB ' +
-    'WRITTEN HERE WOULD STILL BE `FM-16` ON THE MONEY PATH, and ADR-269 REFUSED EXACTLY THAT ' +
-    'ONE PORT OVER FOR THE SAME VALUE: `EligibleFoldUnwired` states it in its own message and ' +
-    '`setAdminReadSource`s entry above carries it. AND THE TREE STATES THE BLOB`s DECODING ' +
+    'ADR-283 DID NOT TAKE IT AND ADR-286 IS THE RULING IT SAID SOMEBODY OWNS. THAT ROW LEFT ' +
+    'THIS CLAUSE FRAMED AS A CHOICE OF KEY SPELLING IN WHICH ONE CALLER GIVES UP ITS OWN, AND ' +
+    'THE FRAMING IS RETIRED RATHER THAN ANSWERED. The retired wording is paraphrased and not ' +
+    'quoted, because a reason that reproduces its own retired sentence reads as live to every ' +
+    'grep. THE SPELLINGS ARE REAL AND ADR-286 RE-DERIVED BOTH AT SOURCE BEFORE RULING: ' +
+    '`apps/worker` reads a driver row whose properties are `packages/db`s camelCase ' +
+    "(`size_cents: bigintOf(row, 'sizeCents', at)`, `apps/worker/src/batch/adapter.ts:1304`) " +
+    'and `apps/site` reads a wire object under the stored snake_case column names ' +
+    '(`apps/site/src/catalog/adapter.ts:498`). **BUT NEITHER SPELLING IS A PREFERENCE AND SO ' +
+    'NEITHER IS TRADEABLE, AND THE MANIFESTS ARE WHERE THAT IS VISIBLE RATHER THAN THE ' +
+    'READERS**: `apps/site` DECLARES NO `@merit/db` AT ALL, so it reads snake_case because it ' +
+    'reads Merit`s own HTTP response and has no database to read instead, while `apps/worker` ' +
+    'and `apps/api` both declare it and both get Drizzle`s property names. Asking the site to ' +
+    'read camelCase is asking the wire contract to change and asking the worker to read ' +
+    'snake_case is asking `packages/db` to stop mapping. **AND THE PAYOUT PATH IS ON THE ' +
+    'DRIVER SIDE OF THAT SPLIT, SO IT NEEDS NO RENAME FROM ANYBODY**: this deployable already ' +
+    'reads `plan_version_sizes` off this door under the driver spelling, at ' +
+    '`readSize` (`apps/api/src/routes/catalog.ts:1242`), which is a THIRD size-row reader ' +
+    'ADR-283`s count did not reach because it returns a LOCAL row type rather than the ' +
+    'engine`s. **SO THE RESIDUE IS A HOME AND NOT A RULING, AND THAT IS THE FIRST TIME THIS ' +
+    'CLAUSE HAS NAMED IT**: a driver-side decoder has to know `packages/db`s property names, ' +
+    '`RI-01` forbids the engine from knowing them and that package`s own manifest says it ' +
+    'never may, and `apps/api` and `apps/worker` cannot import each other, so `toSizeRow` ' +
+    '(`apps/worker/src/batch/adapter.ts:1295`) fits this port exactly and is unreachable from ' +
+    'it. ADR-239 slice A`s argument PUT `gates-codec.ts` in the engine and the same argument ' +
+    'read in the other direction KEEPS this one out. **AND THE ONE `FM-16` IN THIS AREA IS THE ' +
+    'CAP SCHEDULE RATHER THAN THE ROW, WHICH IS THE FINDING ADR-283 COULD NOT SEE FROM WHERE ' +
+    'IT STOOD**: the spelling ruling does not reach INSIDE the `jsonb`, where every reader asks ' +
+    'for the same two stored keys, so `payout_cap_schedule_cents` is one predicate stated ' +
+    'THREE times, by `toCapScheduleCents` (`apps/worker/src/batch/adapter.ts:1320`), ' +
+    '`decodeCapSteps` (`apps/site/src/catalog/adapter.ts:520`) and `readCapSchedule` ' +
+    '(`apps/api/src/routes/catalog.ts:1219`), with nothing comparing them. **AND THEY HAVE ' +
+    'ALREADY DIVERGED, ON THIS DEPLOYABLE`s SIDE, ON THE MONEY.** The first two admit a ' +
+    'cents value as a safe-integer number or a base-10 string of digits and REFUSE a number ' +
+    'past `Number.MAX_SAFE_INTEGER`; the third tests `Number.isInteger`, which is true of ' +
+    '`2 ** 53 + 1`, and converts with `BigInt`, so a cap arrives ROUNDED and a payout ceiling ' +
+    'nobody published is what a trader is paid against. It is REPORTED AND NOT REPAIRED ' +
+    'because `apps/api/src/**` is outside row 286`s fence, and ADR-286 section 7 item 1 owns ' +
+    'it. A FOURTH STATEMENT OF EITHER BLOB WRITTEN HERE WOULD STILL BE `FM-16` ON THE MONEY ' +
+    'PATH, and ADR-269 REFUSED EXACTLY THAT ONE PORT OVER FOR THE SAME VALUE: ' +
+    '`EligibleFoldUnwired` states it in its own message and `setAdminReadSource`s entry above ' +
+    'carries it. AND THE TREE STATES THE RULES BLOB`s DECODING ' +
     'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1108`) and ' +
     '`decodeRules` (`apps/site/src/catalog/adapter.ts:552`) COLLAPSE ONTO THE ENGINE`s, which ' +
-    'row 283`s fence put out of bounds; link 7 holds that census at exactly three so a FOURTH ' +
-    'cannot arrive unnoticed and the retirement is visible the day it lands. ' +
+    'row 283`s fence put out of bounds; link 7 holds that census at exactly three, holds the ' +
+    'cap-schedule census at three beside it, and asserts the divergence above as a live ' +
+    'property so a FOURTH cannot arrive unnoticed and each retirement is visible the day it ' +
+    'lands. ' +
     '`gates` STILL WAITS ON NOTHING (ADR-260) AND THAT IS RE-DERIVED RATHER THAN CARRIED: ' +
     '`ExternalGateFacts` takes raw scalars and two row lists, `identities` is `root` and ' +
     '`accounts`, `kycVerifications` and `payoutRequests` are `owned`, so every input is on this ' +
