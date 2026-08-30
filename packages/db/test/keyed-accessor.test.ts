@@ -286,8 +286,20 @@ function ddlUniqueKeys(): Map<string, Set<string>> {
     }
   }
 
+  // `[^;]*?` AND NOT `[\s\S]*?`, WHICH IS A ONE-TOKEN REPAIR OF A LEAK THAT
+  // PREDATES THE DIFF THAT EXPOSED IT (ADR-284 section 9). `sql` is every
+  // migration concatenated, so a dot-all gap lets ONE match span statements and
+  // FILES: an `ALTER TABLE <a>` with no `ADD ... UNIQUE` after it inside its own
+  // statement kept expanding until it found one in a LATER FILE, and recorded
+  // that key against `<a>`. Measured on the tree that found it, the sweep
+  // yielded exactly two ALTER-derived keys and the first was `purchases: id`,
+  // which is `firm_parameters_id_uq` attributed to a table eleven migrations
+  // away. The consequence is both directions at once: a key the database
+  // enforces reads as invented, and a key it does not enforce reads as real.
+  // A statement cannot contain a `;`, so bounding the gap to one statement is
+  // the whole fix.
   for (const altered of sql.matchAll(
-    /ALTER TABLE\s+(?:ONLY\s+)?(\w+)[\s\S]*?ADD\s+(?:CONSTRAINT\s+\w+\s+)?(?:PRIMARY KEY|UNIQUE)\s*\(([^)]+)\)/gi,
+    /ALTER TABLE\s+(?:ONLY\s+)?(\w+)[^;]*?ADD\s+(?:CONSTRAINT\s+\w+\s+)?(?:PRIMARY KEY|UNIQUE)\s*\(([^)]+)\)/gi,
   )) {
     record(altered[1] as string, (altered[2] as string).split(','));
   }

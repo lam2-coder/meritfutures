@@ -103,6 +103,61 @@ function ddlColumns(table: string): readonly string[] {
   return names;
 }
 
+/**
+ * One migration's DECLARING lines: `--` comments removed and `COMMENT ON`
+ * statements skipped whole.
+ *
+ * TRANSCRIBED FROM `apps/api/test/checkout-backend-blockers.test.ts`, WHICH
+ * WROTE IT FOR THE IDENTICAL DEFECT ON `max_accounts`, and it is a scanner
+ * rather than a `.replace()` over a comment regex, so `RI-30`'s second leg is
+ * untouched: that invariant is about the JavaScript stripper in
+ * `packages/tooling`, and SQL comments are `--`.
+ */
+function declaringLines(body: string): readonly string[] {
+  const out: string[] = [];
+  let inComment = false;
+  for (const line of body.split('\n')) {
+    const code = line.split('--')[0] ?? '';
+    const ends = code.trimEnd().endsWith(';');
+    if (inComment) {
+      if (ends) inComment = false;
+      continue;
+    }
+    if (/^\s*COMMENT\s+ON\s/i.test(code)) {
+      inComment = !ends;
+      continue;
+    }
+    if (code.trim() !== '') out.push(code.trim());
+  }
+  return out;
+}
+
+/**
+ * Every column any migration ADDS to `firm_parameters`, over the whole set.
+ *
+ * `[^;]*?` AND NEVER `[\s\S]*?`. `keyed-accessor.test.ts` carried the dot-all
+ * form over a concatenation of every migration and one match spanned FILES,
+ * which ADR-284 section 9 measured; a statement cannot contain a `;`, so the
+ * bound is the fix and it is applied here at birth rather than repaired later.
+ */
+function addedColumns(): readonly { file: string; name: string; type: string }[] {
+  const found: { file: string; name: string; type: string }[] = [];
+  for (const [file, body] of migrationFiles()) {
+    const code = declaringLines(body).join('\n');
+    for (const alter of code.matchAll(
+      /ALTER\s+TABLE\s+(?:ONLY\s+)?firm_parameters\b[^;]*?ADD\s+COLUMN\s+([a-z][a-z0-9_]*)\s+([a-z]+)/gi,
+    )) {
+      found.push({ file, name: alter[1] as string, type: (alter[2] as string).toLowerCase() });
+    }
+  }
+  return found;
+}
+
+/** `snake_case` to the property name Drizzle gives it in `schema.ts`. */
+function camel(column: string): string {
+  return column.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
 /** Every `.sql` in the migration set, keyed by file name. */
 function migrationFiles(): ReadonlyMap<string, string> {
   const out = new Map<string, string>();
@@ -126,29 +181,75 @@ describe('the firm parameter vocabulary is closed in the DDL', () => {
     expect(migrationParameters()).toEqual(['base_account_cap']);
   });
 
-  test('no other migration widens the vocabulary, asserted BY CONSTRAINT NAME', () => {
+  test('no other migration widens the vocabulary, asserted over DECLARING lines and name-blind', () => {
     // Migrations are sacred and are superseded rather than edited, so the way a
     // member arrives is a LATER file dropping this constraint and adding its
     // own. That is a legitimate move and it is not a silent one: this case names
     // the constraint, so the file that supersedes it appears in the diff beside
     // its own name.
+    //
+    // TWO REPAIRS, ADR-284, AND THE SECOND IS THE ONE THAT MATTERS.
+    //
+    // FIRST, IT READ MENTIONS AND THE CLAIM WAS NEVER ABOUT MENTIONS. `body`
+    // was the whole file, so a later migration EXPLAINING the closure in its own
+    // header turned this red while widening nothing. That is exactly the defect
+    // `checkout-backend-blockers.test.ts` repaired on `max_accounts`, in this
+    // repository, for this reason: "A count of MENTIONS was never the claim."
+    // So it reads DECLARING lines, and a `COMMENT ON` statement is skipped
+    // whole, which is the same instrument that file uses.
+    //
+    // SECOND, AND THIS IS A STRENGTHENING RATHER THAN A NARROWING: it was BLIND
+    // to a widening that never types the old constraint's name. A later file
+    // that adds a SECOND membership list over `parameter` widens the vocabulary
+    // the moment the first closure stops binding, and the old form would not
+    // have seen it. Both moves are swept for now, and neither can be written in
+    // a comment.
     const offenders: string[] = [];
     for (const [file, body] of migrationFiles()) {
       if (file === '0074_firm_parameters.sql') continue;
-      if (body.includes('firm_parameters_vocabulary_is_closed')) offenders.push(file);
+      for (const line of declaringLines(body)) {
+        if (line.includes('firm_parameters_vocabulary_is_closed')) {
+          offenders.push(`${file}: ${line}`);
+        } else if (/parameter\s+IN\s*\(/i.test(line)) {
+          offenders.push(`${file}: a second membership list over \`parameter\`: ${line}`);
+        }
+      }
     }
     expect(offenders).toEqual([]);
   });
 
-  test('no migration alters `firm_parameters` at all, asserted BY TABLE NAME', () => {
-    // The whole-set sweep beside the constraint sweep, because a column added by
-    // an `ALTER` would widen what may be STORED without touching the CHECK that
-    // says what may be NAMED.
-    const offenders: string[] = [];
-    for (const [file, body] of migrationFiles()) {
-      if (/ALTER\s+TABLE\s+(?:ONLY\s+)?firm_parameters\b/i.test(body)) offenders.push(file);
-    }
-    expect(offenders).toEqual([]);
+  test('no migration adds a column to `firm_parameters` that could hold a VALUE', () => {
+    // THE FORM OF THIS CASE MOVED AND ITS PROPERTY DID NOT (ADR-284 section 9).
+    // It read that NO migration may `ALTER TABLE firm_parameters` at all, and
+    // its own stated reason was narrower than that form: "a column added by an
+    // `ALTER` would widen what may be STORED without touching the CHECK that
+    // says what may be NAMED." This file's header states the same property twice
+    // and both times as a VALUE surface: the second closure is the column type,
+    // and "a `text_value` column landing beside `integer_value` would be the
+    // settings bag arriving under a constraint that still passes."
+    //
+    // SO THE PROPERTY IS THE VALUE SURFACE AND THE OLD FORM WAS A PROXY FOR IT.
+    // `0076` adds a `uuid` handle and a `uuid` approval citation, because
+    // `admin_actions.subject_id` is `uuid NOT NULL` and a composite primary key
+    // has nowhere to go in it; neither column can hold a parameter's value, and
+    // `integer_value` is still the only column that can.
+    //
+    // AND THE NEW FORM IS STRICTLY STRONGER ON THE AXIS IT GUARDS, which is the
+    // only thing that makes the move legitimate rather than a gate weakened to
+    // pass. The old form BANNED the statement and CLASSIFIED nothing, so on the
+    // first legitimate `ALTER` the only available move was to delete the case.
+    // This one reads every column any migration adds, in the whole set, and
+    // REFUSES ANY TYPE THAT COULD CARRY A VALUE. `0074` rules that the value
+    // type is itself part of the vocabulary -- "a parameter that is not an
+    // integer belongs in a table of its own" -- so a `uuid` is a referent and a
+    // `text`, `integer`, `bigint`, `numeric` or `jsonb` addition is the settings
+    // bag arriving by `ALTER`, whatever it is named. `text_value`, `cents_value`
+    // and `jsonb_value` are all red here and were all green under the old form
+    // the moment anybody deleted it.
+    const widening = addedColumns()
+      .filter((added) => added.type !== 'uuid')
+      .map((added) => `${added.file}: ADD COLUMN ${added.name} ${added.type}`);
+    expect(widening).toEqual([]);
   });
 
   test("the cap's domain is carried per parameter rather than on the column", () => {
@@ -180,12 +281,25 @@ describe('one value column, and its type is part of the vocabulary', () => {
     ]);
   });
 
-  test('the Drizzle declaration transcribes the same six and no more', () => {
+  test('the Drizzle declaration transcribes the INSTALLED column set and no more', () => {
     // The two hand-written statements of one table, compared. `schema.ts` is a
     // transcription and the DDL is the authority, which is why this compares
-    // against the migration rather than against a list held here.
+    // against the migrations rather than against a list held here.
+    //
+    // THE AUTHORITY IS NOW THE WHOLE SET AND NOT ONE FILE, WHICH IS THE
+    // STRENGTHENING (ADR-284). It compared against a six-name literal, which was
+    // `0074`'s `CREATE TABLE` written out a second time, and that stopped being
+    // the installed table the moment a second migration declared a column. A
+    // literal cannot notice that; this derives.
+    //
+    // IT IS ALSO THE SENTINEL FOR THE `ADD COLUMN` SWEEP ABOVE, and they guard
+    // each other on purpose. If that parser ever stops matching it yields an
+    // empty set and reports no widening, which is the silent direction; this
+    // case then goes RED, because the transcription carries columns the
+    // derivation lost.
+    const installed = [...ddlColumns('firm_parameters'), ...addedColumns().map((a) => a.name)];
     expect(Object.keys(getTableColumns(firmParameters)).sort()).toEqual(
-      ['parameter', 'integerValue', 'reason', 'effectiveFrom', 'approvedBy', 'createdAt'].sort(),
+      installed.map(camel).sort(),
     );
   });
 
