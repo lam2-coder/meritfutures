@@ -463,6 +463,38 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // celebrating; an entry down to ONE blocker is worth stating twice, because
   // this file's own repeated finding is that a reason naming the second-cheapest
   // blocker retires the question for every reader after it.
+  //
+  // AND ADR-264 IS THE FIRST ENTRY ON THIS PORT TO SETTLE A CLAUSE BY RUNNING
+  // SOMETHING, WHICH IS WHY IT GETS ITS OWN PARAGRAPH AFTER SIXTEEN REVISIONS OF
+  // READING. Clause four said `rule_states` holds no rows and that the fold
+  // "completes"; completing and PERSISTING are different claims and this entry
+  // had never held the second. It does now: `0001` to `0074` applied to an empty
+  // PostgreSQL 16, one account seeded with one live mark, `apps/worker`'s own
+  // entrypoint run, and the table went from zero rows to one. The read half is
+  // built in the same entry and `apps/api/src/rule-state-reader.ts` is the
+  // module.
+  //
+  // **THE PORT STILL DOES NOT BECOME WIREABLE AND THE REASON IS A DIFFERENT KIND
+  // OF THING FROM EVERY REASON BEFORE IT.** Sixteen revisions have named
+  // something nobody had BUILT: a job, an adapter, a codec, a resolver, a
+  // reader. What stands now is that no DEPLOYMENT has run the job, which
+  // ADR-241 ruled external and this repository cannot assert, and one read on
+  // the wrong door: `R-06` permits only the last closed trading day, and
+  // `tradingCalendar` is `firm` and outside `CATALOG_TABLE_KEYS`, so the
+  // transaction that reads the state cannot read the day that decides which
+  // state it may read. `apps/api/test/rule-state-producibility.test.ts` runs
+  // that as link 6 on every CI-01 pass, because it is a clause this entry
+  // discovered rather than inherited and a comment cannot fail.
+  //
+  // AND A SECOND TRANSCRIPTION OF A `rule_states` ROW NOW SHIPS, WHICH IS
+  // REGISTERED HERE RATHER THAN LEFT FOR A SWEEP TO FIND. `toRuleState` in
+  // `apps/worker/src/batch/adapter.ts` and `readRuleState` in `apps/api` read
+  // the same twenty-two values and neither deployable can import the other,
+  // which is `FM-16` by name; its home is `packages/rules-engine` beside
+  // `gates-codec.ts` and ADR-264's row does not fence that package. What FM-16
+  // costs is "with nothing comparing them", and that half is paid: SD-08's
+  // digest is computed by the writer, stored in `bytea`, and re-derived from
+  // the state the reader rebuilds.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
     'A `RuleState` THIS DEPLOYMENT CANNOT PRODUCE, AND THE LEAD CLAUSE MOVED AGAIN BECAUSE THE ' +
@@ -517,18 +549,38 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:458`) returns a ' +
-    '`PayoutSubject` whose `state` (`routes/payouts.ts:331`) is a `RuleState`, ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:486`) returns a ' +
+    '`PayoutSubject` whose `state` (`routes/payouts.ts:356`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
     '`decodeEngineGates` is what rebuilds one from the other. ' +
-    'FOURTH, `rule_states` HOLDS NO ROWS, so a backend installed today would compute a ' +
-    'confident payout verdict off an empty table, which is a wrong answer where a 503 is an ' +
-    'honest one. **THIS CLAUSE IS THE LAST ONE STANDING AND IT CHANGED CHARACTER WITHOUT ' +
-    'CHANGING WORDS**: it used to be one of five absences and it is now the only one, because ' +
-    'the fold that writes the row completes as of ADR-260 and what is missing is a RUN rather ' +
-    'than a capability. A reader who wants this port moving should send the next row at a ' +
-    'scheduled run and a `RuleStateRow` reader, and at nothing else on this list. ' +
+    'FOURTH, THIS CLAUSE READ THAT `rule_states` HOLDS NO ROWS AND THAT A BACKEND INSTALLED ' +
+    'TODAY WOULD COMPUTE A CONFIDENT PAYOUT VERDICT OFF AN EMPTY TABLE, AND ADR-264 SETTLED ' +
+    'BOTH HALVES OF IT BY RUNNING RATHER THAN BY READING. The retired wording is paraphrased ' +
+    'rather than quoted, because a reason that reproduces its own retired sentence reads as ' +
+    'live to every grep. **THE FOLD WRITES A ROW AND THAT IS MEASURED**: migrations `0001` to ' +
+    '`0074` applied forward-only to an empty PostgreSQL 16, one identity, one plan version, ' +
+    'one account and one live `daily_marks` row seeded, `apps/worker`s own entrypoint invoked ' +
+    'at `node --experimental-strip-types src/start.ts`, and the table went from zero rows to ' +
+    'one, reported `written: 1` and exited 0. **AND THE READ HALF IS BUILT**: ' +
+    '`readRuleState` and `ruleStateOn` (`apps/api/src/rule-state-reader.ts`) rebuild the ' +
+    'engine`s `RuleState` from that row, `apps/api/test/rule-state-reader.test.ts` re-derives ' +
+    'SD-08`s digest over the rebuilt state and compares it with the `state_hash` PostgreSQL ' +
+    'holds, and the thirty-two bytes agree. SO WHAT IS ABSENT IS NEITHER A CAPABILITY NOR A ' +
+    'ROW THIS REPOSITORY COULD PRODUCE: it is that NO SCHEDULED RUN HAS HAPPENED IN A ' +
+    'DEPLOYMENT, which is an operator fact ADR-241 ruled EXTERNAL and registered in ' +
+    '`CRON_INVENTORY`, and a reader that answered an absent row with anything at all would be ' +
+    'the wrong answer this clause has refused five times. AN ABSENT ROW IS A REFUSAL AND ' +
+    'NEVER A DEFAULT VERDICT: `RuleStateAbsent` is a class and not an arm. ' +
+    'SEVENTH IS WHAT WAS UNDER IT AND NO REASON ON THIS PORT HAD EVER NAMED IT: `R-06` ' +
+    'permits ONE day, the LAST CLOSED one, so `subject()` must select the stored row BY DAY; ' +
+    'the calendar that says which day that is is `tradingCalendar`, whose scope class is ' +
+    '`firm` and which is NOT one of the five members of `CATALOG_TABLE_KEYS` ' +
+    '(`packages/db/src/scoped-db.ts:2905`), so the payout transaction cannot read it. ' +
+    '`databaseEconomicCalendar` reads the same table in this deployable on `ApiDb.firm`, so ' +
+    'this is ADR-211 clause 2`s TWO-TRANSACTION REMEDY needed again on the CALENDAR half ' +
+    'after ADR-233 removed the need for it on the catalogue half, or a sixth catalogued key. ' +
+    'BOTH ARE SOMEBODY`s RULING AND ADR-264 TOOK NEITHER. ' +
     'FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
     'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
@@ -573,10 +625,13 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'SERVED: `gateNoInFlight` (`routes/wallet-withdrawals.ts`) refuses a second open ' +
     '`wallet_withdrawals` row for one identity IN THE HANDLER, because that legs open index is ' +
     'plain rather than unique (ADR-158 finding 8), and it does not read this field. ' +
-    'SO THE THREE FIELDS NOW WAIT ON ONE THING BETWEEN THEM AND THE FIFTEENTH REVISION OF ' +
-    'THIS REASON SAYS SO: `plan` waits on NOTHING (ADR-233), `gates` waits on NOTHING ' +
-    '(ADR-260), and `state` waits on a `rule_states` ROW, which is a scheduled run and a ' +
-    'reader. THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED. THE FIRM-READ CLAUSE IS ' +
+    'SO THE THREE FIELDS WAIT ON ONE THING BETWEEN THEM AND THE SIXTEENTH REVISION OF THIS ' +
+    'REASON SAYS WHAT IT IS: `plan` waits on NOTHING (ADR-233), `gates` waits on NOTHING ' +
+    '(ADR-260), and `state` waits on NO CAPABILITY EITHER. It waits on a DEPLOYMENT that has ' +
+    'run the job, and on a way to read the calendar on the transaction that reads the state. ' +
+    'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED, AND THE REASON FOR THAT IS NEW: ' +
+    'every clause on this entry until ADR-264 named something nobody had built, and the one ' +
+    'that stands now names something nobody has RUN plus one read on the wrong door. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
     '(`packages/db/src/scoped-db.ts:3123`), a closed list of five `firm` keys that includes ' +
@@ -587,7 +642,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`breached` and `breach_kind` are all three columns of `rule_states` as of ' +
     '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
     'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
-    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:468-469` states "no member of ' +
+    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:496-497` states "no member of ' +
     'this interface that a scoped door cannot serve", which ADR-233 makes TRUE of the ' +
     'catalogue half and leaves false of `state`. EVERY CLAUSE ABOVE IS A PREDICATE SOMEWHERE ' +
     'AND NOT ONLY A SENTENCE HERE: `apps/api/test/rule-state-producibility.test.ts` runs the ' +
