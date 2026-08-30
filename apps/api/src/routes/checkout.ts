@@ -128,7 +128,7 @@
 //      now the SAME remaining half again, having been a different one between
 //      ADR-252 and ADR-265.
 //
-//   2. THE LEDGER ARM, UNCHANGED. See `ledger` below, and ADR-238 ruling 3 for
+//   2. THE LEDGER ARM, UNCHANGED. See `ledger` below, and ADR-238 ruling 7 for
 //      why ADR-176's remedy for `LT-01` does not transfer to `LT-08`.
 //
 // AND THE ONE THAT WAS SECOND IS GONE RATHER THAN NARROWED (ADR-262). It read
@@ -1018,7 +1018,7 @@ export interface CheckoutTx {
    * `SystemReason`.
    *
    * AND ADR-176's REMEDY FOR THE SAME OBSTRUCTION DOES NOT TRANSFER HERE, which
-   * ADR-238 ruling 3 re-derived rather than assumed. That entry cleared
+   * ADR-238 ruling 7 re-derived rather than assumed. That entry cleared
    * `PayoutTx.ledger` by DELETING it: the `LT-01` posting moved out of the
    * request path to a system authority and the handler stored the client's key
    * for the door that posts it. `LT-08` cannot follow, because M20 pins it to
