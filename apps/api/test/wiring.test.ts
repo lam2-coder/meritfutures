@@ -243,12 +243,27 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'clause 6, which needs a join and an aggregate. Installing a backend would not resolve any ' +
     'of these findings and must not paper over them. MONEY PATH.',
   useAdminWriteBackend:
-    'TWO SUPPLIERS AND NEITHER OF THEM IS A DOOR. THIS ENTRY NAMED THREE AND THE THIRD IS ' +
-    'DISCHARGED (ADR-251). `principal(request)` (`routes/admin-writes.ts:276`), blocked on ' +
-    '`setAdminSessionSource` above. And a projection of `ValidationResult` onto ' +
-    '`PlanValidation` (`routes/admin-writes.ts:342`), whose `errors` is `{ code, message }` ' +
-    'where `CvViolation` is `{ id, path, detail, sizeCents }` and whose `ok` is false when ' +
-    '`materialization` is non-empty as well. Nothing in this tree performs that projection. ' +
+    'ONE SUPPLIER AND IT IS NOT A DOOR. THIS ENTRY NAMED THREE, THE THIRD WENT AT ADR-251 AND ' +
+    'THE SECOND GOES HERE (ADR-257). `principal(request)` ' +
+    '(`routes/admin-writes.ts:277`), blocked on `setAdminSessionSource` above, is what is ' +
+    'left, and it is behind the SSO purchase. ' +
+    'THE SECOND CLAUSE READ "nothing in this tree performs that projection" AND IT IS NOW ' +
+    'FALSE RATHER THAN NARROWED: `projectPlanValidation` ' +
+    '(`routes/admin-writes.ts:405`) maps `ValidationResult` ' +
+    '(`packages/rules-engine/src/types.ts:701`) onto `PlanValidation` ' +
+    '(`routes/admin-writes.ts:350`), carrying `ok` from the engine unchanged and folding the ' +
+    'materialization findings into `errors` so that an `ok: false` is never handed over with ' +
+    'an empty reason list. ' +
+    'WHAT REPLACES IT IS NOT A BLOCKER ON THIS PORT AND IS A FINDING ABOUT THE ENVELOPE. A ' +
+    '`CvViolation` (`packages/rules-engine/src/types.ts:667`) declares FOUR fields and one ' +
+    'entry of `errors` declares TWO, so `path` and `sizeCents` are LOST, and `sizeCents` is ' +
+    'the only field that tells one `plan_version_sizes` row apart from another: two rows with ' +
+    'the same defect project to two IDENTICAL entries. Widening `PlanValidation` would move ' +
+    "that loss one line later rather than remove it, because API_CONTRACT section 2's " +
+    '`errors?: Array<{ path: string; message: string }>` is where this refusal travels and it ' +
+    'has no third field. The loss FAILS CLOSED, so it is reported at ADR-257 section 5 and ' +
+    'the contract is not moved here. `test/admin-write-plan-validation.test.ts` derives every ' +
+    'clause of this paragraph from the engine and from source on every run. ' +
     'THE THIRD CLAUSE READ "nothing in this workspace maps an instant to an exchange trading ' +
     'day" AND IT IS NOW FALSE RATHER THAN NARROWED: `@merit/rules-engine` exports ' +
     '`buildSessionCalendar` (`packages/rules-engine/src/calendar.ts:443`) and `tradingDayAt` ' +
@@ -256,8 +271,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "`trading_calendar`'s stored session bounds and `trading_calendar_loads`' coverage, " +
     'comparing an instant only with an instant. Both tables are `firm` and `apps/api` holds ' +
     '`db.firm`, so the supplier and the read are both in this deployable. ' +
-    'WHAT REPLACES IT IS SMALLER AND IS NOT A MISSING FUNCTION. `tradingDay(): string` ' +
-    '(`routes/admin-writes.ts:338`) has ONE arm and the resolver answers THREE, because ' +
+    'WHAT REPLACED THAT ONE IS SMALLER AND IS NOT A MISSING FUNCTION. `tradingDay(): string` ' +
+    '(`routes/admin-writes.ts:346`) has ONE arm and the resolver answers THREE, because ' +
     'ADR-042 F-4 requires `outside_coverage` to be distinguishable from `not_a_session`; and no ' +
     'ruling says which day an operator close takes when the instant is in no session, while ' +
     '`accounts_terminal_has_close_date` requires `closed_on` on every `closed_admin` row. A ' +
