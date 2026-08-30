@@ -18,6 +18,8 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import type { AdminEventItem, EventFeedQuery, EventFeedResponse } from '../src/api/types.ts';
@@ -98,12 +100,11 @@ function text(html: string): string {
 }
 
 /** Source with comments removed, so a needle named in prose is not a finding. */
+// Stripped by the shared home (ADR-279) rather than by a comment regex: a
+// block-comment OPENER written inside a LINE comment opened a phantom block that
+// ran to the next real closer and took every line between them with it.
 function code(path: string): string {
-  return readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .filter((line) => !line.trimStart().startsWith('//'))
-    .join('\n');
+  return stripComments(readFileSync(path, 'utf8'));
 }
 
 // =============================================================================

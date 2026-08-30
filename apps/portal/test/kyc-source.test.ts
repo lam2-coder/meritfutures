@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import KycStatusPage from '../src/app/kyc/page.ts';
 import { KYC_CONTENT_COPY, KYC_STATE_COPY } from '../src/app/kyc/copy.ts';
 import {
@@ -428,9 +430,10 @@ test('POST /kyc/session is registered by apps/api and is still not called from h
   // SO NO FILE IN THIS SEGMENT SPELLS THE PATH, in code. A constant declared
   // here for an endpoint nothing calls is an invitation to the next session.
   for (const entry of readdirSync(SEGMENT, { withFileTypes: true })) {
-    const body = readFileSync(join(SEGMENT, entry.name), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/\/\/[^\n]*/g, ' ');
+    // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+    // block-comment OPENER written inside a LINE comment opened a phantom block that
+    // ran to the next real closer and took every line between them with it.
+    const body = stripComments(readFileSync(join(SEGMENT, entry.name), 'utf8'));
     expect(body, `${entry.name} does not name the session endpoint`).not.toContain('/kyc/session');
   }
 });

@@ -62,6 +62,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { CANARY_SHAPES, canaryMint, canaryNonce, isCanaryId } from '../src/detectors/canary.ts';
 import type {
   Detector,
@@ -92,13 +94,12 @@ import {
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const read = (path: string): string => readFileSync(`${ROOT}${path}`, 'utf8');
 
-/** A source file with its comments removed, on session 292's finding. */
-const code = (path: string): string =>
-  read(path)
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .split('\n')
-    .map((line) => line.replace(/^\s*\/\/.*$/, ''))
-    .join('\n');
+// THE STRIPPING IS THE SHARED HOME'S (ADR-279), and this file changes no
+// finding: `src/detectors/fills.ts` strips identically either way today. It is
+// migrated because the idiom is the defect and not the file it happens to be
+// pointed at, and because `detector-runner.test.ts`, whose idiom this was
+// copied from, does change.
+const code = (path: string): string => stripComments(read(path));
 
 const FILLS_TS = code('apps/worker/src/detectors/fills.ts');
 const RISK_SQL = read('packages/db/migrations/0008_risk.sql');

@@ -16,7 +16,7 @@ depends_on:
     ../decisions/ADR-095.md,
     ../decisions/ADR-171.md,
   ]
-last_updated: 2026-08-28
+last_updated: 2026-08-30
 ---
 
 # WAVE-06: `apps/admin` acquires a transport, and the central question is answered by an approved document rather than by this plan
@@ -171,7 +171,7 @@ the console is missing is the half `api-admin` does not serve and must not: a re
 
 | Mechanism                                                                                                                                                                 | What it refuses                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`RI-04`** ([`repo-invariants.mjs:389`](../../packages/tooling/checks/repo-invariants.mjs), over [`DEPLOYABLES:385`](../../packages/tooling/checks/repo-invariants.mjs)) | `apps/admin` importing `apps/api`. So the console cannot reach the operator handlers in-process and must be a network client of them, which is the property that makes them one API rather than two |
+| **`RI-04`** ([`repo-invariants.mjs:398`](../../packages/tooling/checks/repo-invariants.mjs), over [`DEPLOYABLES:395`](../../packages/tooling/checks/repo-invariants.mjs)) | `apps/admin` importing `apps/api`. So the console cannot reach the operator handlers in-process and must be a network client of them, which is the property that makes them one API rather than two |
 | **`RI-09`** ([`repo-invariants.mjs:1318`](../../packages/tooling/checks/repo-invariants.mjs))                                                                             | A file under any deployable but `apps/api` whose PATH spells a route on the API surface. So `apps/admin/src/app/api/v1/...` fails a merge blocker rather than a review                              |
 | **`RI-11`** ([`ui-server-endpoints.mjs:168`](../../packages/tooling/checks/ui-server-endpoints.mjs))                                                                      | A Server Action anywhere, with no exemption, and a framework routing config spelling the API base path or an operator prefix                                                                        |
 

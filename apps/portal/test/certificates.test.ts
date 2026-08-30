@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import type { CertificateResponse } from '../src/api/types.ts';
 import { UnverifiableCertificateError, toCertificateView } from '../src/view/certificates.ts';
 import { MissingDisclosureError, disclosureBlock } from '../src/view/disclosure.ts';
@@ -114,9 +116,10 @@ test('no claim is recomputed, cross-checked, or arithmetic-ed', () => {
   // A client-side consistency check would be the portal asserting something
   // about a signed artifact it cannot verify, and its failure would look like a
   // defect in a valid certificate.
-  const code = readFileSync(join(SRC, 'view', 'certificates.ts'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const code = stripComments(readFileSync(join(SRC, 'view', 'certificates.ts'), 'utf8'));
 
   for (const operator of [' - ', ' * ', ' / ', ' % ', '+=', '-=']) {
     expect(code.includes(operator), `${operator} appears in certificates.ts`).toBe(false);

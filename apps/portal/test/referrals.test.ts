@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import type { AffiliateStats } from '../src/api/types.ts';
 import { disclosureBlock } from '../src/view/disclosure.ts';
 import { toReferralPanel } from '../src/view/referrals.ts';
@@ -119,9 +121,10 @@ test('zeroes are rendered and never hidden', () => {
 });
 
 test('the panel performs no arithmetic on any figure it renders', () => {
-  const code = readFileSync(join(SRC, 'view', 'referrals.ts'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const code = stripComments(readFileSync(join(SRC, 'view', 'referrals.ts'), 'utf8'));
 
   for (const operator of [' - ', ' * ', ' / ', ' % ', '+=', '-=']) {
     expect(code.includes(operator), `${operator} appears in referrals.ts`).toBe(false);

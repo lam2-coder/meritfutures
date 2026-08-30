@@ -67,6 +67,8 @@ import { pathToFileURL } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import {
   readCalendarSlice,
   readTradingHorizon,
@@ -81,15 +83,16 @@ const LIABILITY_REL = 'apps/api/src/admin-source/liability.ts';
 const WORKER_ADAPTER_REL = 'apps/worker/src/batch/adapter.ts';
 const WORKER_JOB_REL = 'apps/worker/src/job.ts';
 
-/**
- * `repo-invariants.mjs`'s own comment stripper, RE-DECLARED rather than
- * imported, because that helper is private to the check module and exporting it
- * to satisfy a suite would widen the module's surface for a test's convenience.
- * It is three lines and the cases that use it say what they read.
- */
-function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-}
+// THE STRIPPER IS IMPORTED, AND THE PARAGRAPH THAT USED TO STAND HERE WAS WRONG
+// (ADR-279). It read: "`repo-invariants.mjs`'s own comment stripper, RE-DECLARED
+// rather than imported, because that helper is private to the check module and
+// exporting it to satisfy a suite would widen the module's surface for a test's
+// convenience. It is three lines and the cases that use it say what they read."
+//
+// Three lines was the argument and three lines was the defect. A block-comment
+// OPENER written inside a LINE comment opened a phantom block that ran to the
+// next real closer. The shared home is
+// `packages/tooling/checks/strip-comments.mjs` and `RI-30` keeps it the only one.
 
 function sourceOf(rel: string): string {
   return readFileSync(join(ROOT, rel), 'utf8');

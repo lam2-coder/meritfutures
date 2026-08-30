@@ -43,6 +43,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { TABLE_KEYS } from '@merit/db';
 import type { TableKey } from '@merit/db';
 
@@ -392,7 +394,10 @@ const SOURCE = readFileSync(join(HERE, '..', 'src', 'routes', 'admin-wallet.ts')
  * The module with every comment removed, which is what a claim about what the
  * CODE does has to be made against.
  */
-const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+// Stripped by the shared home (ADR-279) rather than by a comment regex: a
+// block-comment OPENER written inside a LINE comment opened a phantom block that
+// ran to the next real closer and took every line between them with it.
+const CODE = stripComments(SOURCE);
 
 // -----------------------------------------------------------------------------
 // 2a. THE DUAL-CONTROL THRESHOLD, ADR-228

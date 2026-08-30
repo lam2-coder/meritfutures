@@ -572,6 +572,32 @@ function cleanTree(): string {
   // a work tree, and on a machine where `TMPDIR` sits inside a repository every
   // RI-21 case would silently be reading that repository's rules instead of the
   // fixture's.
+  // RI-30's ESTATE, WHICH THE FIXTURE MUST CARRY BECAUSE THAT CHECK'S SENTINELS
+  // ARE UNCONDITIONAL THROWS RATHER THAN A SILENCE ON A FOREIGN TREE. ADR-279
+  // chose that on the row's own instruction: an absence check over an empty
+  // scope reports PASS in silence, and this check's whole subject is that
+  // defect. So the fixture holds the three things it refuses to run without --
+  // the home, the witness that is admitted to carry the naive idiom, and one
+  // importer OUTSIDE `packages/tooling`, which is the leg that detects a revert.
+  write(
+    root,
+    'packages/tooling/checks/strip-comments.mjs',
+    'export function stripComments(source) {\n  return source;\n}\n',
+  );
+  write(
+    root,
+    'packages/tooling/test/strip-comments.test.ts',
+    '// The idiom this file is admitted to carry, as the thing every case compares against.\n' +
+      "const naive = (s) => s.replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ').replace(/\\/\\/[^\\n]*/g, ' ');\n" +
+      'export const seen = naive;\n',
+  );
+  write(
+    root,
+    'packages/harness/test/parses-source.test.ts',
+    "import { stripComments } from '../../tooling/checks/strip-comments.mjs';\n" +
+      'export const read = stripComments;\n',
+  );
+
   execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
   write(root, '.gitignore', '.env\n.env.*\n!.env.example\n');
   return root;

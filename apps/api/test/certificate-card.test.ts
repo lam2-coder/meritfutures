@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { CERTIFICATE_CODE_ALPHABET } from '@merit/db';
 import { afterEach, expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import {
   CARD_CHARSET,
   CARD_HEIGHT_PX,
@@ -364,11 +366,10 @@ test('the renderer reads no clock, no environment, no file, no network and no ra
   // one of these words while explaining why it does not use them, and a sweep
   // that read the prose would either fail on the explanation or be written to
   // ignore exactly the thing it checks.
-  const code = source
-    .split('\n')
-    .filter((line) => !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'))
-    .join('\n')
-    .replace(/\/\*\*[\s\S]*?\*\//g, '');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const code = stripComments(source);
 
   for (const forbidden of [
     'Date',

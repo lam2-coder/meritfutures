@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import * as portal from '../src/index.ts';
 
 // =============================================================================
@@ -171,11 +173,18 @@ function sourceFiles(): string[] {
   return files;
 }
 
-/** Source with comments removed, so a needle named in prose is not a finding. */
+/**
+ * Source with comments removed, so a needle named in prose is not a finding.
+ *
+ * THE STRIPPING IS THE SHARED HOME'S (ADR-279) AND WAS TWO REPLACEMENTS HERE.
+ * That idiom read a block-comment OPENER written inside a LINE comment as a real
+ * one and ran a phantom block to the next real closer: seven of the 66 files
+ * this walk parses stripped shorter under it, `app/sign-in/page.ts` to 180
+ * characters of 5,221. Every case below is an ABSENCE assertion, which is the
+ * direction that goes vacuously GREEN over an emptied file rather than red.
+ */
 function code(file: string): string {
-  return readFileSync(file, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
+  return stripComments(readFileSync(file, 'utf8'));
 }
 
 test('transport exists in one named file and nowhere else', () => {

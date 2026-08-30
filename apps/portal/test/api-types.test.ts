@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 // =============================================================================
 // M4-R: the transcription is a transcription
 // =============================================================================
@@ -169,7 +171,7 @@ function reExportedFromApiTypes(barrel: string): readonly string[] {
 
   for (const block of barrel.matchAll(/export (?:type )?\{([^}]*)\} from '\.\/api\/types\.ts';/g)) {
     for (const raw of block[1]!.split(',')) {
-      const name = raw.replace(/\/\/.*$/gm, '').trim();
+      const name = stripComments(raw).trim();
       if (name !== '') names.push(name);
     }
   }

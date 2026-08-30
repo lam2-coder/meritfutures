@@ -77,6 +77,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import {
   CANARY_NONCE_MIN_LENGTH,
   CANARY_PREFIX,
@@ -137,12 +139,13 @@ const read = (path: string): string => readFileSync(`${ROOT}${path}`, 'utf8');
  * `SqlExecutorReason` in prose, for exactly that reason, so the assertions in
  * section 6 read the CODE and the headers stay honest.
  */
-const code = (path: string): string =>
-  read(path)
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .split('\n')
-    .map((line) => line.replace(/^\s*\/\/.*$/, ''))
-    .join('\n');
+// THE STRIPPING IS THE SHARED HOME'S (ADR-279). The idiom that stood here
+// replaced block comments first and then whole-line `//` comments, so a
+// block-comment OPENER written inside a LINE comment opened a phantom block
+// that ran to the next real closer: `src/detectors/ports.ts`, one of the five
+// files this suite parses, stripped to 5,302 characters under it and strips to
+// 5,721 under the scanner.
+const code = (path: string): string => stripComments(read(path));
 
 const RISK_SQL = read('packages/db/migrations/0008_risk.sql');
 const SCHEMA_TS = read('packages/db/src/schema.ts');

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import type { AffiliateStats } from '../src/api/types.ts';
 import {
   AFFILIATE_STATS_PATH,
@@ -316,10 +318,10 @@ test('the refused read names the ruling, and the two absences are different type
   // record along with the request. What may not exist is a REQUEST, and the one
   // path this segment ever hands the client is the stats path.
   const dir = join(HERE, '..', 'src', 'app', 'referrals');
-  const stripped = (file: string): string =>
-    readFileSync(join(dir, file), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/\/\/[^\n]*/g, ' ');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const stripped = (file: string): string => stripComments(readFileSync(join(dir, file), 'utf8'));
 
   const data = stripped('data.ts');
   expect(data.split('/affiliate/creatives').length - 1, 'named once in code').toBe(1);

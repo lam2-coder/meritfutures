@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import type { AffiliateStats } from '../src/api/types.ts';
 import { ReferralScreen } from '../src/app/referrals/screen.ts';
 import type { ReferralScreenView } from '../src/app/referrals/screen.ts';
@@ -188,10 +190,10 @@ test('no field on the view could hold an attached disclosure', () => {
   // is NULL at `pending`, which is the explanation and not a field. A check that
   // fires on its own reasoning gets disabled within a week (inv-m4-01.test.ts's
   // own recorded finding, one directory over).
-  const declared = block
-    .slice(0, block.indexOf('};'))
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const declared = stripComments(block.slice(0, block.indexOf('};')));
   expect(declared).toContain('readonly disclosure_required_at_approval: RequiredDisclosureView;');
   for (const field of ['disclosure:', 'disclosure_version_id', 'attached', 'approved_with']) {
     expect(declared.includes(field), `CreativeSubmissionView declares ${field}`).toBe(false);
@@ -335,9 +337,7 @@ test('the segment holds no route handler, no server action and no transport', ()
   // than promised in a comment.
   const dir = join(SRC, 'app', 'referrals');
   for (const file of ['page.ts', 'screen.ts', 'data.ts', 'states.ts']) {
-    const code = readFileSync(join(dir, file), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/\/\/[^\n]*/g, ' ');
+    const code = stripComments(readFileSync(join(dir, file), 'utf8'));
     for (const banned of ['use server', 'fetch(', 'NextRequest', 'NextResponse', '/api/v1']) {
       expect(code.includes(banned), `${file} contains ${banned}`).toBe(false);
     }

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import KycStatusPage, { dynamic, metadata } from '../src/app/kyc/page.ts';
 import {
   KYC_NEXT_STEP_COPY,
@@ -505,9 +507,10 @@ test('this segment serves no API path and declares no server action', () => {
     expect(entry.isFile(), `${entry.name} is a file`).toBe(true);
     expect(entry.name, 'no route handler in this segment').not.toMatch(/^route\./);
 
-    const code = readFileSync(join(SEGMENT, entry.name), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/\/\/[^\n]*/g, ' ');
+    // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+    // block-comment OPENER written inside a LINE comment opened a phantom block that
+    // ran to the next real closer and took every line between them with it.
+    const code = stripComments(readFileSync(join(SEGMENT, entry.name), 'utf8'));
     expect(code, `${entry.name} declares no server action`).not.toContain('use server');
     expect(code, `${entry.name} spells no API base path`).not.toContain('/api/v1');
   }

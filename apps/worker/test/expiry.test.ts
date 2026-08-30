@@ -60,6 +60,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import {
   EXPIRY_CLOCKS,
   FREEZE_EXPIRING_LEAD_HOURS,
@@ -350,7 +352,7 @@ describe('the constants are BOUND to their sources and not merely retyped', () =
     const payouts = source(PAYOUTS_TS);
     expect(payouts).toContain('export const PAYOUT_ENDPOINT = `POST ${PAYOUT_PATH}`;');
     expect(payouts).toContain('    idempotencyKey,\n');
-    expect(payouts.replace(/^\s*\/\/.*$/gm, '')).not.toMatch(/\bpostTransaction\b/);
+    expect(stripComments(payouts)).not.toMatch(/\bpostTransaction\b/);
     expect(releaseLedgerKey('k')).toBe('POST /accounts/:accountId/payout k');
   });
 

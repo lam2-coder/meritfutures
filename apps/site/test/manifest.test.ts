@@ -43,6 +43,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..');
 const ROOT = join(APP, '..', '..');
@@ -173,9 +175,10 @@ test('no source file in this app imports the database accessor', () => {
     // accessor by name in the sentences that explain why it is not imported,
     // and a check that fired on its own rationale would be deleted within a
     // week.
-    const code = readFileSync(file, 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/\/\/[^\n]*/g, ' ');
+    // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+    // block-comment OPENER written inside a LINE comment opened a phantom block that
+    // ran to the next real closer and took every line between them with it.
+    const code = stripComments(readFileSync(file, 'utf8'));
     if (code.includes(accessor)) offences.push(file.slice(ROOT.length + 1));
   }
 

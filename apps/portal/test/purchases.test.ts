@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import type { PlanRules, PlanVersionResponse, PurchaseListItem } from '../src/api/types.ts';
 import { toPurchaseHistory, toRuleDiff } from '../src/view/purchases.ts';
 
@@ -200,9 +202,10 @@ test('the rule diff performs no arithmetic on any value it renders', () => {
   // A source-level assertion, because the design rule is about an operator that
   // does not appear rather than about an output. The failure it prevents is a
   // later session adding a `delta` field because the number "was right there".
-  const code = readFileSync(join(SRC, 'view', 'purchases.ts'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const code = stripComments(readFileSync(join(SRC, 'view', 'purchases.ts'), 'utf8'));
 
   for (const operator of [' - ', ' * ', ' / ', ' % ', '+=', '-=']) {
     expect(code.includes(operator), `${operator} appears in purchases.ts`).toBe(false);
