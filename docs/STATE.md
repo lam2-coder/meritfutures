@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->240<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->241<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10157,3 +10157,31 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **WHERE THIS IS MOST LIKELY WRONG.** The round trip is through `JSON.parse` and not through Postgres: no database was reachable, and what is NOT executed is that `jsonb` accepts this bag and that the table's `CHECK` constraints admit the row it sits in. `ADR-206` section 6 measured both on a real row and this session relies on that rather than repeating it. **And the decoder is stricter than any approved document requires**, which is a judgement flagged for the `E2` read: a strict decoder is a control on a money path and it is also a way to answer 503 on a row that is merely untidy.
 
 **A FINDING REGISTERED RATHER THAN REPAIRED.** Session 436 recorded that `STATE.md` carried the `gen:adr_count` paragraph TWICE, verbatim. **It now carries it FOUR times**, and the generator updated all four. `RI-12`'s ceiling is eight identical lines in one file, so every count is green and what the duplication costs is headroom. Not touched here: it is a keep-both merge artefact rather than a claim, and it is outside this row's fence.
+
+---
+
+## 2026-08-29 - Session 448: four fields at two slots, and the field with nowhere to go is the one that names the row ([ADR-257](decisions/ADR-257.md), proposed)
+
+**[ADR-257](decisions/ADR-257.md), `status: proposed`, UNSIGNED. MONEY PATH, `E2` READ OWED.** Row `257` sent one session at the last supplier on `useAdminWriteBackend` that is not behind the SSO purchase: the projection of `ValidationResult` onto `PlanValidation`. **No migration number and no `RI-` number were taken.**
+
+**THE PROJECTION IS BUILT AND WHAT IT CANNOT CARRY IS THE RULING.** [`projectPlanValidation`](../apps/api/src/routes/admin-writes.ts) is total and pure and sits beside the type it targets. A `CvViolation` declares FOUR fields and one entry of `PlanValidation.errors` declares TWO, so **every possible projection loses two of them** and the only question was which. `path` and `sizeCents` are the two.
+
+**`sizeCents` IS NOT DECORATION, IT IS THE ONLY ROW ADDRESS THERE IS**, and that is measured rather than argued. No violation carries an ordinal, an index or a `plan_version_sizes` key, so two rows with the same defect produce two values equal in `id`, in `path` and in `detail`. **The projected pair is `toEqual`**: not degraded, not approximated, equal.
+
+**THE FIRST TRAP WAS NOT SPRUNG.** `sizeCents` is refused a home in `message` and refused a structured `code` such as `sizes[5000000].drawdown_cents`, on `INV-02` and on the contract's own *"`*_cents` are JSON integers"*: a cents value recoverable only by parsing prose is not integer cents at a boundary, it is prose that happens to contain digits. The assertion searches the projected document for both size values and finds neither.
+
+**THE SECOND TRAP HAS A PRIMARY SOURCE AND IT IS A MIGRATION.** `ok` is the ENGINE's, carried through with no boolean arithmetic at all. [`0004_catalog.sql:188`](../packages/db/migrations/0004_catalog.sql), inside the block declaring the materialized column, puts the check at publish; `FM-07` names the cost; and [API_CONTRACT](architecture/API_CONTRACT.md)'s own publish row says the endpoint materializes in the same transaction, so nothing in the corpus makes a materialization disagreement publishable.
+
+**AND THE `ok` RULING HAS A CONSEQUENCE NO ENTRY HAD NAMED.** The publish handler maps `validation.errors` straight into the problem document, so a projection carrying the engine's `ok` and only the nineteen `CV-nn` rules answers `validation_failed` with an **EMPTY `errors[]`** on a plan refused for materialization alone. **The MZ findings are therefore folded into `errors`**, and `diffs` are deliberately NOT folded, because `PW-` values fire on plans that publish and an advisory inside a refusal list is an advisory nobody can tell from a reason.
+
+**THE LOSS FAILS CLOSED AND THAT IS WHY THE PROJECTION SHIPS RATHER THAN BEING REFUSED.** `ok` survives intact, so no plan publishes that should not. What is lost is an operator's ability to tell WHICH size row to repair. **A refusal that under-explains costs a session; a permission that under-checks costs a plan in front of buyers**, and the loss is on the first side of that line.
+
+**THREE FINDINGS ABOUT [API_CONTRACT](architecture/API_CONTRACT.md) ARE REPORTED AND NONE IS APPLIED.** The problem envelope is `errors?: Array<{ path: string; message: string }>` and **cannot carry money at all**, so widening `PlanValidation` would move the loss one line later rather than remove it. The `path` slot on this endpoint carries a rule id, because the wire has ONE addressing slot and the engine produces TWO addressing facts. And the publish row names `precondition_failed` and `conflict` and not the `validation_failed` its own handler raises, which may be the wrong code entirely: section 2 defines that code as *"Body or query failed schema validation"* and on a `CV-nn` violation the body is well formed and the STORED DRAFT is what cannot publish. **That document is byte for byte unchanged.**
+
+**ELEVEN CASES AND ALL ELEVEN WATCHED RED**, ten on eight seeded defects and one on the committed entry before it was narrowed. Every seeded file was restored and checked with `sha256sum`. **`admin-writes.ts` was restored twice**: one seed revert reached for `git checkout` and took the session's own uncommitted edits with it, and the rebuild from this branch's own edit scripts came back byte identical to the hash recorded before seeding.
+
+**THE ENTRY IS NARROWED FROM TWO SUPPLIERS TO ONE** and the refuted sentence is repaired at the source, in the port's own docstring, rather than contradicted from `wiring.test.ts`. **THE PORT IS NOT WIRED, THE WIRED COUNT DOES NOT MOVE, AND NO ROUTE BEHAVIOUR CHANGES**: the publish handler and its `path: error.code` mapping are untouched and a deployment still observes 503.
+
+**A LANDMINE THAT HAS NOT MOVED.** `docs/STATE.md` carries the `gen:adr_count` paragraph EXACTLY EIGHT times and `RI-12`'s ceiling is eight. Session 445 recorded it; this session's permission is `append` and it added no copy. **A ninth turns `RI-12` RED.**
+
+**A LANDMINE THAT IS NEW.** `git checkout -- <file>` is not a seed restoration on a branch whose own edits to that file are uncommitted. It restores the committed version and discards the session's work without saying so. A seed is reverted by the inverse edit, and the hash is checked either way.

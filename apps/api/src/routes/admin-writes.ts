@@ -102,6 +102,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 
+import type { ValidationResult } from '@merit/rules-engine';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { defineRoutes } from '../registry.ts';
@@ -292,14 +293,21 @@ export interface AdminWriteBackend {
    * outside that entry's fence. It is inside this one, so it is repaired at
    * the source rather than contradicted from another file.
    *
-   * WHAT IS STILL TRUE IS THE PORT, AND IT IS TRUE FOR A DIFFERENT REASON. The
-   * remaining gap is a PROJECTION rather than a dependency: `validatePlan`
-   * answers a `ValidationResult`, whose `errors` are `CvViolation` values
+   * WHAT IS STILL TRUE IS THE PORT, AND WHAT WAS MISSING FROM IT IS NOT. The
+   * gap was a PROJECTION rather than a dependency: `validatePlan` answers a
+   * `ValidationResult`, whose `errors` are `CvViolation` values
    * (`{ id, path, detail, sizeCents }`) and whose failure includes a non-empty
    * `materialization`, and {@link PlanValidation} is `{ code, message }` with a
-   * boolean. Nothing in this tree performs that projection, so the validator
-   * still arrives the way the database does: injected, unwired by default, and
-   * 503 until somebody writes it.
+   * boolean. "NOTHING IN THIS TREE PERFORMS THAT PROJECTION" STOOD HERE AND IS
+   * NOW FALSE (ADR-257): {@link projectPlanValidation} performs it, below the
+   * type it targets, and its own block states which two of the four fields it
+   * loses and why neither is folded into a string.
+   *
+   * THE PORT IS UNCHANGED BY THAT AND IS STILL UNWIRED, because the projection
+   * was never the whole supply: this object is installed or it is not, and
+   * `principal(request)` above is still owed. So the validator arrives the way
+   * the database does: injected, unwired by default, and 503 until a deployment
+   * hands over every member at once.
    */
   validatePlan(rules: unknown, sizes: readonly unknown[]): PlanValidation;
 
@@ -342,6 +350,65 @@ export interface AdminWriteBackend {
 export interface PlanValidation {
   readonly ok: boolean;
   readonly errors: readonly { readonly code: string; readonly message: string }[];
+}
+
+/**
+ * `ValidationResult` onto {@link PlanValidation}, which is the LAST SUPPLIER ON
+ * THIS PORT A SESSION CAN WRITE (ADR-257).
+ *
+ * THE NARROWING IS LOSSY BY ARITHMETIC AND NOT BY OVERSIGHT, AND SAYING SO HERE
+ * IS THE POINT OF THIS BLOCK. A `CvViolation` declares FOUR fields, `id`,
+ * `path`, `detail` and `sizeCents`; one entry of `errors` above declares TWO.
+ * Two slots do not hold four facts, so any projection at all loses two of them
+ * and the only question is WHICH, decided here rather than by whoever wires the
+ * deployment.
+ *
+ * `ok` IS THE ENGINE'S, CARRIED WITHOUT ARITHMETIC, AND THAT IS THE RULING
+ * RATHER THAN THE OBVIOUS CHOICE. `ValidationResult.ok` is `errors.length === 0
+ * && materialization.length === 0`, so it is FALSE on a plan whose nineteen
+ * `CV-nn` rules all pass and whose `plan_version_sizes` rows disagree with the
+ * parent `rules` jsonb. `0004_catalog.sql` puts that check at publish in the
+ * migration that declares the materialized column: "The publish path writes
+ * both, and CV-publish validation asserts the materialized flag matches the
+ * parent's jsonb." A projection that recomputed `ok` from its own `errors`
+ * would publish exactly the rows that sentence refuses, which is `FM-07`.
+ *
+ * SO THE MATERIALIZATION FINDINGS ARE CARRIED INTO `errors` AND ARE NOT DROPPED
+ * BESIDE A FALSE `ok`. `MaterializationFinding` and `CvViolation` are the same
+ * four fields and both BLOCK, and an `ok: false` whose `errors` is empty is a
+ * refusal an operator cannot act on: the publish handler turns `errors` into
+ * the problem document's `errors[]`, so dropping them answers `validation_failed`
+ * with an empty list. Their `id` keeps them distinguishable, since `MZ-` and
+ * `CV-` are disjoint prefixes over two closed vocabularies.
+ *
+ * `diffs` ARE DROPPED AND MUST NOT BE FOLDED IN. `PublishDiff` never blocks
+ * (M01 section 2.4), so a `PW-` value inside `errors` would make an `info`
+ * indistinguishable from a refusal to a caller that reads the list rather than
+ * the flag, and `ok` is true on a plan that produced three of them.
+ *
+ * `path` AND `sizeCents` ARE LOST AND NOTHING HERE HIDES THAT. `sizeCents` is
+ * INTEGER CENTS naming the `plan_version_sizes` row a violation was found on,
+ * and it is the ONLY field that distinguishes one size row's violation from
+ * another's: two rows with the same defect produce two values equal in `id`, in
+ * `path` and in `detail`, differing in `sizeCents` alone, and this function maps
+ * them to two identical entries. FOLDING EITHER INTO `message` WAS AVAILABLE AND
+ * IS REFUSED: a cents value recoverable only by parsing prose is not integer
+ * cents at a boundary (INV-02), and `message` is carried through as `detail`
+ * exactly so that a reader can tell the engine's sentence from a handler's.
+ * WHAT THAT COSTS AND WHAT IT DOES NOT: the loss FAILS CLOSED, because `ok`
+ * survives and every refusal is still a refusal; what it costs is an operator
+ * who cannot tell WHICH size row to repair. That is a finding about
+ * API_CONTRACT's `Problem.errors`, which is `{ path, message }` and has no
+ * third field to widen into from here, and it is reported in ADR-257 section 5
+ * rather than repaired by this file.
+ */
+export function projectPlanValidation(result: ValidationResult): PlanValidation {
+  const errors: { readonly code: string; readonly message: string }[] = [];
+  for (const violation of result.errors)
+    errors.push({ code: violation.id, message: violation.detail });
+  for (const finding of result.materialization)
+    errors.push({ code: finding.id, message: finding.detail });
+  return { ok: result.ok, errors };
 }
 
 /** Raised by a backend that is not installed. Answered as 503, never 500. */
