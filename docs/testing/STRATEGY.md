@@ -269,7 +269,6 @@ The batch 2 gate ruled that the docs link-check joins the inventory. It arrives 
 #### These gates are now a script, and it runs
 
 **[`scripts/corpus/gates.mjs`](../../scripts/corpus/gates.mjs), no dependencies, `node scripts/corpus/gates.mjs check`.** Every gate above, plus [ADR-026](../decisions/ADR-026.md)'s manifest completeness gate: **<!--gen:gate_count-->33<!--/gen--> checks in one runner**. A gate with an install step is a gate that stops running on the day the install breaks, so the runner reads the tree and nothing else.
-**[`scripts/corpus/gates.mjs`](../../scripts/corpus/gates.mjs), no dependencies, `node scripts/corpus/gates.mjs check`.** Every gate above, plus [ADR-026](../decisions/ADR-026.md)'s manifest completeness gate: **<!--gen:gate_count-->33<!--/gen--> checks in one runner**. A gate with an install step is a gate that stops running on the day the install breaks, so the runner reads the tree and nothing else.
 
 **That number is a generated span, and it is one because this sentence was found wrong.** It read "All ten of the gates above ... **eleven checks in one runner**" against eleven gate rows plus `ADR-026`, and had been wrong since `CI-06n` was added. **Sixteenth hand-maintained count found wrong in this corpus**, and it was sitting in the section that documents the gate against hand-maintained counts. The query is `GATES.length`, written beside `GATES`, which is the one place that cannot drift from the runner.
 
