@@ -36,12 +36,15 @@ import { buildServer, discoverRouteModules, BASE_PATH } from '../src/index.ts';
 //      somebody adds verification here, this case goes red and ADR-240's ruling
 //      about where the signer belongs has to be re-read before it is changed.
 //
-//   2. THERE IS NO CARD RENDERER IN THIS REPOSITORY. `CertificateCard` is the
-//      type whose `bytes` the image endpoint serves, and the count of files
-//      naming it is the count of producers plus one. The day a renderer lands,
-//      this case goes red and `useCertificateImageSource`'s entry expires
-//      rather than waiting to be noticed. That is `RI-22` leg 3's shape at test
-//      scale: assert over the DRAWS rather than over the prose.
+//   2. THERE IS ONE CARD RENDERER IN THIS REPOSITORY, AND THIS PAIR OF CASES
+//      READ "THERE IS NONE" UNTIL ADR-256. `CertificateCard` is the type whose
+//      `bytes` the image endpoint serves, and the count of files naming it is
+//      the count of producers plus one. The case was written so that the day a
+//      renderer landed it would go red and `useCertificateImageSource`'s entry
+//      would expire rather than waiting to be noticed, which is `RI-22` leg 3's
+//      shape at test scale: assert over the DRAWS rather than over the prose.
+//      IT WENT RED ON ADR-256's DIFF, WHICH IS THE CONTROL WORKING, and both
+//      cases now assert the shape rather than the absence.
 // =============================================================================
 
 const HERE = import.meta.dirname;
@@ -172,20 +175,33 @@ test('the sweep reaches the source it claims to, so an empty answer is not an em
   expect(namingIn('CertificateBackendUnwired')).toContain('apps/api/src/routes/certificates.ts');
 });
 
-test('CertificateCard is named in one shipped file, and that file is the port', () => {
-  // A CARD RENDERER IS A PRODUCER OF THIS TYPE and there is none. The port
-  // declares it, `CertificateLookup` carries it, and nothing anywhere builds
-  // one. `useCertificateImageSource`'s entry in `wiring.test.ts` rests on this,
-  // and ADR-235's landmine is why it is executed: an absent producer reads as a
-  // satisfied specification, because nothing has ever contradicted it.
-  expect(namingIn('CertificateCard')).toEqual(['apps/api/src/routes/certificates.ts']);
+test('CertificateCard is named in two shipped files, the port and the renderer', () => {
+  // THIS CASE WAS WRITTEN TO GO RED ON EXACTLY THIS DIFF AND IT DID. ADR-240
+  // clause 11: "THE DAY A RENDERER LANDS, THAT CASE GOES RED AND THE ENTRY
+  // EXPIRES", which is `RI-22` leg 3's shape at test scale. It read
+  // `['apps/api/src/routes/certificates.ts']`, ADR-256 landed the renderer, and
+  // the case is REWRITTEN rather than deleted: what it measured was an absence
+  // and what it measures now is the SHAPE the ruling put in the absence's place.
+  //
+  // TWO FILES AND NO THIRD. The port declares the type and `CertificateLookup`
+  // carries it; the renderer is the one producer. A third file naming it is a
+  // second producer, and ADR-249 clause 1 rules that where the bytes come from
+  // is a deployment shape rather than something a source tree grows twice.
+  expect(namingIn('CertificateCard')).toEqual([
+    'apps/api/src/certificate-card.ts',
+    'apps/api/src/routes/certificates.ts',
+  ]);
 });
 
-test('image/png appears in one shipped file, and that file serves rather than renders', () => {
-  // THE SAME ABSENCE FROM THE OTHER END, because a renderer could land under a
-  // type of its own and satisfy the case above. The one file that names the
-  // media type is the route that LABELS bytes it was handed; `assertPng` there
-  // refuses bytes carrying no PNG signature, which is a validator and is the
-  // opposite of a producer.
-  expect(namingIn('image/png')).toEqual(['apps/api/src/routes/certificates.ts']);
+test('image/png appears in two shipped files, and one labels while the other draws', () => {
+  // THE SAME MEASUREMENT FROM THE OTHER END, because a renderer could have
+  // landed under a type of its own and satisfied the case above. The route
+  // LABELS bytes it was handed and `assertPng` there refuses bytes carrying no
+  // PNG signature, which is a validator; `certificate-card.ts` is the producer
+  // those bytes come from, and `CERTIFICATE_CARD_MEDIA_TYPE` is the one place
+  // the producer and the label agree on what they are.
+  expect(namingIn('image/png')).toEqual([
+    'apps/api/src/certificate-card.ts',
+    'apps/api/src/routes/certificates.ts',
+  ]);
 });

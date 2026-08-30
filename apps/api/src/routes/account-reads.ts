@@ -880,9 +880,15 @@ const CERTIFICATE_BLOCKER =
   'tree can produce one. `certificates` (0020_public_surface.sql) carries `code`, `claims`, ' +
   '`signature` and `signing_key_id` and NO image location column, so there is not even a stored ' +
   'value to sign; M11 section 5 rows this endpoint as shared with M4 and states that "M11 owns ' +
-  'what is behind both", and the card renderer, the CDN origin and the URL signer are all M11 ' +
-  "and none exists. Inventing an origin here would also break `apps/admin/src/origin.ts`'s rule " +
-  'that a real hostname is a deployment fact and never a value this repository writes down. ' +
+  'what is behind both". THIS SENTENCE COUNTED THREE ABSENT THINGS, "the card renderer, the CDN ' +
+  'origin and the URL signer are all M11 and none exists", AND TWO OF THE THREE HAVE MOVED. It ' +
+  "is REPOINTED rather than deleted, on RI-14's rule that a false sentence removed leaves " +
+  'nothing for the next reader to check. ADR-249 ruled that there is NO URL SIGNER TO PLACE AT ' +
+  'ALL, and ADR-256 landed the renderer (`src/certificate-card.ts`). WHAT IS LEFT IS THE ORIGIN, ' +
+  'and the row that origin would address, which is `GET /certificates/:code/image.png` and is ' +
+  'still an unwired port. Inventing an origin here would also break ' +
+  "`apps/admin/src/origin.ts`'s rule that a real hostname is a deployment fact and never a value " +
+  'this repository writes down. ' +
   'EVERY OTHER FIELD OF THE RESPONSE IS READABLE FROM `certificates` TODAY, so the blocker is ' +
   'one named field rather than the endpoint';
 
