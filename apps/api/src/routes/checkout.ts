@@ -110,7 +110,8 @@
 //
 // THE ONE UNDERNEATH IT WAS NEVER IN THIS LIST, AND IT IS THE FIRST LINE OF BOTH
 // HANDLERS, which is the second time this file has named its second-cheapest
-// blocker and missed its cheapest (ADR-238 ruling 1). Three remain:
+// blocker and missed its cheapest (ADR-238 ruling 1). TWO REMAIN, AND THE
+// SECOND OF THE THREE IS DISCHARGED BY ADR-262:
 //
 //   1. A CAP WITH NO SOURCE. `accountCap()` runs before anything else on the
 //      purchase path and on the reset path alike, and its `maxAccounts` has no
@@ -119,22 +120,25 @@
 //      `databaseAuthBackend` refuses `readMe` for the identical finding about
 //      the same number on `GET /me`. ADR-238 ruling 1 rules the BASE cap the
 //      firm's number rather than a plan's, and rules that it is not read from
-//      `plan_versions.rules` in any of the three forms available. Nothing in
-//      this tree holds it yet.
+//      `plan_versions.rules` in any of the three forms available. ADR-252 built
+//      the home and wired nothing to it, so what remains is a DOOR.
 //
-//   2. A ROW OF SOMEBODY ELSE'S THAT THE BUYER MUST SEE. `clickByToken` returns
-//      a `ClickRef` carrying an `AffiliateRef`, and `couponByCode` returns one
-//      too, so both reach `affiliates.identity_id` -- a row `owned` by the
-//      AFFILIATE. A buyer-scoped read of it returns nothing, silently, and
-//      `resolveAttribution` would then fold an organic sale over every referral.
-//      That is a wrong answer that returns rows, which is what this whole
-//      registry exists to make unavailable. ADR-233 section 5 refused the grant
-//      and ADR-238 ruling 2 refuses it again and names what the port must do
-//      instead, which is a door that resolves the affiliate INSIDE
-//      `packages/db` and hands this file a bit rather than a uuid.
-//
-//   3. THE LEDGER ARM, UNCHANGED. See `ledger` below, and ADR-238 ruling 3 for
+//   2. THE LEDGER ARM, UNCHANGED. See `ledger` below, and ADR-238 ruling 3 for
 //      why ADR-176's remedy for `LT-01` does not transfer to `LT-08`.
+//
+// AND THE ONE THAT WAS SECOND IS GONE RATHER THAN NARROWED (ADR-262). It read
+// that `clickByToken` and `couponByCode` both reach `affiliates.identity_id`, a
+// row `owned` by the AFFILIATE, so a buyer-scoped read of either returns nothing
+// silently and `resolveAttribution` folds an organic sale over every referral.
+// THE REMEDY ADR-238 RULING 2 NAMED IS BUILT AND IT IS NOT A READ GRANT: an
+// `AffiliateRef` carries `isBuyer` instead of `identityId`, `ScopedTx` gained
+// `attributionAffiliate` and `attributionClick`, which resolve the affiliate
+// inside the transaction and project the answer to a bit, and
+// `insertAsParty` STAMPS `attributions.affiliate_identity_id` by following
+// `affiliate_id` through the registry. So this file never holds the uuid, and
+// the property is structural rather than careful: there is no field on either
+// shape to put one in. THIS DID NOT WIRE THE PORT, and clauses 1 and 2 above are
+// why.
 //
 // -----------------------------------------------------------------------------
 // A THIRD PARTY IS CALLED INSIDE AN OPEN TRANSACTION AND THE COST IS STATED
@@ -474,7 +478,14 @@ export interface CouponRow {
   readonly maxRedemptions: number | null;
   readonly redemptionCount: number;
   readonly perIdentityLimit: number;
-  /** `affiliates` through `coupons.affiliate_id`, or `null`. */
+  /**
+   * The affiliate `coupons.affiliate_id` names, or `null`.
+   *
+   * AN `AffiliateRef` IS AN ID AND A BIT AND NOT AN IDENTITY (ADR-262).
+   * `coupons` is a `firm` catalogue row and `affiliate_id` comes back with it,
+   * so an implementation already holds that value; `ScopedTx.attributionAffiliate`
+   * turns it into this shape without the uuid crossing into this file.
+   */
   readonly affiliate: AffiliateRef | null;
 }
 
@@ -818,15 +829,28 @@ export interface CheckoutTx {
   /**
    * The click this token names, or `null`. `affiliate_clicks_token_uq`.
    *
-   * REFUSED TWICE AND NOT MERELY UNBUILT. The `ClickRef` carries an
-   * `AffiliateRef` and an `AffiliateRef` carries `affiliates.identity_id`, so
-   * this method reads ACROSS a tenancy boundary for a caller who proved a
-   * different identity. ADR-233 section 5 refused the grant and ADR-238
-   * ruling 2 refuses it again on ground ADR-233's does not supply: a `firm`
-   * row belongs to nobody and these rows belong to somebody, so the disclosure
-   * objection that is ABSENT there is fully PRESENT here. A buyer-scoped read
-   * returns the empty set silently and folds every referral as organic, which
-   * is a wrong answer that returns rows.
+   * REFUSED TWICE AND BUILT ON THE THIRD ASKING, AS SOMETHING OTHER THAN A READ
+   * GRANT (ADR-262). What ADR-233 section 5 and ADR-238 ruling 2 refused was a
+   * buyer reaching `affiliates.identity_id`, a row `owned` by the affiliate: a
+   * buyer-scoped read of it returns the empty set silently and folds every
+   * referral as organic, which is a wrong answer that returns rows, and an
+   * unscoped one hands a stranger's uuid to a caller who proved a different
+   * identity.
+   *
+   * NEITHER HAPPENS NOW, BECAUSE THE `ClickRef` CARRIES NO IDENTITY. Its
+   * `AffiliateRef` is `affiliates.id` and one boolean. An implementation is
+   * `ScopedTx.attributionClick`, which resolves the affiliate INSIDE this
+   * transaction and projects the answer to three fields; the uuid is compared
+   * against the handle and discarded in the same expression, and there is no
+   * field on this shape to put one in. `attributions.affiliate_identity_id` is
+   * stamped by the accessor for the same reason `buyer_identity_id` is.
+   *
+   * WHAT THE THREE PROJECTED FIELDS ARE IS WORTH STATING, because the row does
+   * belong to the affiliate: `clickId` is a surrogate `bigint`, `clickedAt` is
+   * when THIS BUYER followed the link, and `isBuyer` is the self-deal bit, which
+   * discloses nothing either way. `ip`, `user_agent`, `click_fingerprint`,
+   * `referrer_host` and `suspicious_reason` -- the five the registry's own rule
+   * calls the trap -- are not projected.
    */
   clickByToken(token: string): Promise<ClickRef | null>;
 
@@ -1010,6 +1034,14 @@ export interface CheckoutTx {
    * The door refuses that key in both spellings, deliberately: the handle
    * supplies the buyer and a value the fold computed is a second statement of
    * the same fact. Assert the two agree if you like, then drop it.
+   *
+   * AND THERE IS NO AFFILIATE IDENTITY ON THE ROW TO PASS THROUGH AT ALL
+   * (ADR-262). `attributions.affiliate_identity_id` is `NOT NULL` in the DDL and
+   * `AttributionRow` does not carry it: the registry records that this row's
+   * counterparty is RESOLVED from `affiliate_id`, and `insertAsParty` follows
+   * that edge to `affiliates` inside the same transaction and stamps what it
+   * finds. So an `attributions` insert now takes NEITHER identity from the
+   * caller, and the door refuses the affiliate column in both spellings too.
    */
   insertAttribution(purchaseId: string, row: AttributionRow): Promise<void>;
 

@@ -622,13 +622,25 @@ export interface DerivedRule {
  * write a row for another -- not because it is checked, but because there is no
  * parameter through which the writer's own column could be supplied.
  *
- * THE COUNTERPARTY IS THE CALLER'S AND THE DOOR VALIDATES NOTHING ABOUT IT,
- * which is stated here rather than left to be assumed: this construction proves
- * WHO IS WRITING and never who is being written about. `attributions` is where
- * that matters twice, because its two columns MAY name one person on a voided
- * row under `attributions_literal_self_deal_is_void` -- so a door that refused a
+ * WHERE THE COUNTERPARTY COMES FROM IS NOW A FIELD AND NO LONGER AN ASSUMPTION.
+ * ADR-262. ADR-230 wrote one answer into prose -- the counterparty is the
+ * caller's, because "the identity it names is one the caller already held" --
+ * and that sentence is TRUE of `identity_links` and FALSE of `attributions`,
+ * where what the buyer holds is a coupon code or a click token and neither is an
+ * identity. So `PairCounterparty` carries the answer per table: `by: 'caller'`
+ * is ADR-230's construction unchanged, and `by: 'resolved'` names a NON-IDENTITY
+ * column on this row that `pairInsertStatement` follows inside the caller's own
+ * transaction, stamping what it finds and returning nothing.
+ *
+ * WHAT NEITHER ARM DOES IS VALIDATE WHO IS BEING WRITTEN ABOUT, and that is
+ * stated here rather than left to be assumed: this construction proves WHO IS
+ * WRITING. `attributions` is where that matters twice, because its two columns
+ * MAY name one person on a voided row under
+ * `attributions_literal_self_deal_is_void` -- so a door that refused a
  * counterparty equal to the writer would make the literal self-deal row
- * UNWRITABLE and destroy the evidence SD-M8-05 exists to keep.
+ * UNWRITABLE and destroy the evidence SD-M8-05 exists to keep. A resolution
+ * cannot make that mistake either: it stamps whatever `affiliates.identity_id`
+ * holds, including the caller's own.
  */
 export interface PairRule {
   readonly class: 'pair';
@@ -670,7 +682,60 @@ export type PairWriter =
       readonly by: 'party';
       /** Which of the two identity columns the WRITER is. Stamped, never supplied. */
       readonly column: string;
+      /**
+       * WHERE THE OTHER COLUMN'S VALUE COMES FROM. ADR-262, and it is required.
+       *
+       * The question exists only on this arm, which is why it sits inside it
+       * rather than beside `writer` on the rule: a table no party may author has
+       * no counterparty to fill, and a field every member had to answer `null`
+       * to would be a field a later author answers without reading.
+       */
+      readonly counterparty: PairCounterparty;
       /** Why that party, and why writing it discloses nothing. */
+      readonly why: string;
+    };
+
+/**
+ * HOW THE COUNTERPARTY'S IDENTITY REACHES THE ROW. ADR-262.
+ *
+ * ADR-230 HAD ONE ANSWER AND WROTE IT AS AN ASSUMPTION RATHER THAN AS A FIELD:
+ * the counterparty is the caller's, on the ground that "the identity it names is
+ * one the caller already held". THAT GROUND IS TRUE OF `identity_links` AND
+ * FALSE OF `attributions`, and ADR-238 ruling 2 is where it broke. The buyer
+ * holds a coupon code or a click token; neither IS the affiliate's identity, and
+ * the read that would turn one into the other crosses a tenancy boundary into a
+ * row `affiliates` owns. A door that handed that uuid back so the caller could
+ * hand it forward would be disclosing an identity in order to write it.
+ *
+ * SO THE ANSWER BECOMES PER TABLE AND IT IS DECLARED, like every other ruling in
+ * this file. `by: 'caller'` is ADR-230's construction unchanged. `by: 'resolved'`
+ * names a NON-IDENTITY column on this same row that addresses the counterparty's
+ * row on another table, and `pairInsertStatement` follows it INSIDE the caller's
+ * transaction and stamps what it finds. The uuid is read and never returned, so
+ * the disclosure ADR-106 refuses does not happen: the door builds no `RETURNING`
+ * and the value never leaves `packages/db`.
+ *
+ * THE IDENTITY COLUMN IS NOT RESTATED HERE AND THAT IS DELIBERATE. `via` names a
+ * table this registry already classifies, and a resolution is admitted only
+ * where that table's rule is `owned` on a NOT NULL column -- so the column the
+ * stamp reads is `SCOPE_RULES[via].column` and there is exactly one statement of
+ * it. A second copy here is the drift `packages/db` exists to keep to one.
+ */
+export type PairCounterparty =
+  | {
+      readonly by: 'caller';
+      /** Why the value the caller supplies is one it already held. */
+      readonly why: string;
+    }
+  | {
+      readonly by: 'resolved';
+      /** The column ON THIS ROW that addresses the counterparty. Never an identity. */
+      readonly from: string;
+      /** The table that row lives on. Its rule must be `owned` and NOT NULL. */
+      readonly via: TableKey;
+      /** The column of `via` that `from` references. */
+      readonly foreignColumn: string;
+      /** Why the caller cannot be asked for the identity, and what it holds instead. */
       readonly why: string;
     };
 
@@ -1451,6 +1516,13 @@ export const SCOPE_RULES = {
     writer: {
       by: 'party',
       column: 'buyer_identity_id',
+      counterparty: {
+        by: 'resolved',
+        from: 'affiliate_id',
+        via: 'affiliates',
+        foreignColumn: 'id',
+        why: "THE BUYER DOES NOT HOLD THE AFFILIATE'S IDENTITY AND MUST NOT BE HANDED IT, WHICH IS ADR-238 RULING 2 ARRIVING IN THE REGISTRY. What the buyer holds is a coupon code they typed or a click token they followed, and neither IS an identity: `coupons.affiliate_id` and `affiliate_clicks.affiliate_id` both address `affiliates`, whose rule one hundred lines up is `owned` on `identity_id`, so the read that turns either into a uuid is a read of somebody else's row. ADR-230 declined to validate this column on the ground that `the identity it names is one the caller already held`, and that ground is TRUE of `identity_links` and FALSE HERE, which is the finding this field exists to record. So `affiliate_id` is what the caller names -- a row of the affiliate PROGRAM rather than a person -- and `pairInsertStatement` follows it to `affiliates.id` inside the caller's own transaction and stamps the identity it finds. THE VALUE IS READ AND NEVER RETURNED: the door builds no `RETURNING` clause, so the uuid does not leave this package and the caller cannot leak what it never receives. WHAT THE HANDLER GETS INSTEAD IS ONE BIT, `attributionAffiliate`'s `isBuyer`, which is what `attributions_literal_self_deal_is_void` needs and is the whole of what it needs: a buyer using their own code already knows the code is theirs, and a buyer using somebody else's learns only that it is not theirs, which names nobody. RESOLVING RATHER THAN JOINING IS NOT A CONTRADICTION OF 0012'S OWN COMMENT: that comment says both identities are STORED rather than joined AT READ TIME, because an affiliate can be reassigned or an identity merged afterwards, and this resolution happens at the moment of purchase, which is the moment the row is a statement about.",
+      },
       why: "THE BUYER, BECAUSE THE BUYER IS THE ONE WHOSE ACT CREATES THE ROW. M08 section 3.1 rules that `RESOLUTION HAPPENS AT CHECKOUT START, in the same step that pins the plan version` and that `IT HAPPENS ONCE`, so this row is written inside one identity's checkout transaction and by nothing else in the estate: the affiliate is asleep, and a row written when they were not is not theirs to author. THE AFFILIATE HALF IS NOT A SECOND AUTHOR AND MUST NOT BECOME ONE -- an affiliate who could write this row could mint a referral over somebody else's purchase, which is the fraud `purchase_id uuid NOT NULL UNIQUE` (`0012_disputes_and_affiliate_settlement.sql:77`) and `INV-M8-01` bound from the other direction, one sale at a time. WHAT THE BUYER LEARNS BY WRITING IS NOTHING THEY DID NOT BRING: the affiliate identity in the row comes out of `resolveAttribution`, whose inputs are the coupon the buyer typed and the click token the buyer presented, and the door builds no `RETURNING`, so the transaction hands back no column at all. THE SELF-DEAL ROW IS WRITABLE AND THAT IS DELIBERATE: `attributions_literal_self_deal_is_void` permits the two columns to name one person on a voided row, so the door must not refuse a counterparty equal to the writer, and it does not.",
     },
     why: "WHO REFERRED WHOM, AT THE MOMENT OF PURCHASE (0012_disputes_and_affiliate_settlement.sql, SD-M8-05). Both columns are `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT`, and 0012's own comment says why both are STORED rather than joined: the row is a statement about the two of them at that moment, and an affiliate can be reassigned or an identity merged afterwards. Naming the buyer hides the referral from the affiliate who earned it; naming the affiliate returns a buyer's own purchase attribution to somebody else, which returns rows, raises nothing, and is ADR-008's BOLA failure. THE PAIR MAY COLLAPSE HERE AND IT DOES NOT ON THE OTHER TWO, WHICH IS THE ONE PER-TABLE DIFFERENCE THIS CLASS HAS: `attributions_literal_self_deal_is_void` is `buyer_identity_id <> affiliate_identity_id OR voided = true`, so the two columns MAY name one person on a voided row -- and that row is the self-deal the constraint exists to record rather than an exception to the class. THE CONTRACT ALREADY REFUSES THE ROW-LEVEL READ THIS CLASS REFUSES: `GET /affiliate/stats` returns counts and cents -- `clicks_30d`, `conversions_30d`, `earned_cents_lifetime`, `payable_cents` -- and no referral row and no buyer, so nothing in API_CONTRACT wants the disjunction. `affiliate_id` IS THE AVAILABLE MISTAKE AND ADR-101 CLAUSE 1 REFUSES IT MECHANICALLY: it is `uuid NOT NULL REFERENCES affiliates(id)` and `affiliates` carries the identity, so a `derived` hop through it resolves and terminates -- and it stands on a row that declares its own identity columns, which is the shape that clause was written for.",

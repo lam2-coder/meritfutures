@@ -229,11 +229,21 @@ function cleanTree(): string {
   // repair, and only the SECOND of each was repointed in the real document. So
   // `firm` and `derived` stay where they are here and the blank line alone
   // moves, which is the shape the register actually holds.
+  //
+  // AND IT MOVED A THIRD TIME UNDER ADR-262, BY SIXTY-FIVE, WHICH IS THE FIRST
+  // MOVE LARGE ENOUGH TO NEED THE FIXTURE TO GROW. That entry added
+  // `PairCounterparty` beside `PairWriter` and a `counterparty` block inside the
+  // `attributions` rule, both ABOVE the `},` this models, so it went from `911`
+  // to `976` and a 960-line fixture no longer reaches it. The length follows the
+  // pointer for the reason the paragraph above gives: the register names literal
+  // numbers, so a fixture that did not move with them would report every
+  // registered finding as vacant. `firm` and `derived` are unmoved again, on the
+  // same reasoning as last time.
   write(
     root,
     'packages/db/src/scope.ts',
-    Array.from({ length: 960 }, (_, i) => {
-      if (i + 1 === 911) return '';
+    Array.from({ length: 1025 }, (_, i) => {
+      if (i + 1 === 976) return '';
       const name = { 511: 'firm', 545: 'derived' }[i + 1];
       return name === undefined ? '//' : `// class: '${name}',`;
     })
@@ -256,7 +266,7 @@ function cleanTree(): string {
   write(
     root,
     'apps/worker/src/provisioning/payload.ts',
-    '// The payload is flat, and `scope.ts:911` repeats it at length.\n',
+    '// The payload is flat, and `scope.ts:976` repeats it at length.\n',
   );
   write(
     root,

@@ -124,19 +124,42 @@ export type AttributionModel = 'last_touch' | 'code_override';
 /**
  * An affiliate, as this fold needs to see one.
  *
- * BOTH IDENTIFIERS ARE CARRIED AND NEITHER IS DERIVED FROM THE OTHER.
- * `attributions` stores `affiliate_id` AND `affiliate_identity_id`, and `0012`
- * states why both are stored rather than joined: the row is "a statement about
- * the two of them AT THE MOMENT OF PURCHASE, and an affiliate can be
- * reassigned or an identity merged afterwards". A fold that took only the
- * affiliate id would have to join to write the row, and the join would be
- * answering the question at a later moment than the one being recorded.
+ * ONE IDENTIFIER AND ONE BIT, AND THE MISSING FIELD IS THE RULING. ADR-238
+ * ruling 2 refused the read that would have supplied `affiliates.identity_id` to
+ * a buyer's handler: `affiliates` is scope class `owned` on that column, so the
+ * row belongs to somebody else and a buyer-scoped read of it returns the EMPTY
+ * SET, which folds every referral as organic -- a wrong answer that returns
+ * rows. ADR-262 built the remedy that entry named: `packages/db` resolves the
+ * affiliate INSIDE the checkout transaction and hands the handler this shape.
+ *
+ * `affiliateId` IS NOT AN IDENTITY. It is `affiliates.id`, a row of the
+ * affiliate PROGRAM, and it is already the buyer's to hold -- `coupons` is a
+ * `firm` catalogue row and its `affiliate_id` comes back with it.
+ *
+ * `isBuyer` IS THE WHOLE OF WHAT THE UUID WAS FOR HERE. This fold used one
+ * comparison, the buyer's identity against the affiliate's own, and wrote one
+ * column.
+ * The comparison is now made where the value lives and arrives as its result;
+ * the column is STAMPED by the same accessor that resolved it. So the identity
+ * is read, written, and never returned to anybody, and this package holds no
+ * uuid a caller could leak.
+ *
+ * WHAT IS GIVEN UP IS THAT THIS FOLD CAN NO LONGER CHECK THE BIT, and that is
+ * stated rather than left to be discovered: `isBuyer` is computed against the
+ * same handle whose identity `buyerIdentityId` carries, so the two agree by
+ * construction at the door and by nothing at all in here.
  */
 export interface AffiliateRef {
-  /** `affiliates.id`. */
+  /** `affiliates.id`. The program row, never the person. */
   readonly affiliateId: string;
-  /** `affiliates.identity_id`, read at this moment. */
-  readonly identityId: string;
+  /**
+   * Is this affiliate the buyer? `attributions_literal_self_deal_is_void`.
+   *
+   * THE BIT AND NEVER THE UUID (ADR-262). It discloses nothing either way: a
+   * buyer using their own code knows the code is theirs, and a buyer using
+   * somebody else's learns only that it is not theirs, which names nobody.
+   */
+  readonly isBuyer: boolean;
 }
 
 /**
@@ -223,7 +246,19 @@ export type NoAttributionReason =
  * produce.
  */
 export interface AttributionRow {
-  /** `attributions.affiliate_id`. */
+  /**
+   * `attributions.affiliate_id`, and IT IS THE COLUMN THE COUNTERPARTY IS
+   * RESOLVED FROM (ADR-262).
+   *
+   * `attributions.affiliate_identity_id` IS `NOT NULL` IN THE DDL AND IS ABSENT
+   * FROM THIS SHAPE, which is the one place this interface's opening rule is
+   * deliberately not met, so it is stated rather than left to be noticed. That
+   * column is STAMPED by `ScopedTx.insertAsParty`, which follows this value to
+   * `affiliates.id` inside the same transaction: the registry carries the
+   * resolution and the door refuses a caller who names the column. A fold that
+   * produced the uuid would first have to be handed it, which is the read
+   * ADR-238 ruling 2 refuses.
+   */
   readonly affiliateId: string;
   /** `attributions.model`. */
   readonly model: AttributionModel;
@@ -231,8 +266,6 @@ export interface AttributionRow {
   readonly clickId: bigint | null;
   /** `attributions.buyer_identity_id`. SD-M8-05. */
   readonly buyerIdentityId: string;
-  /** `attributions.affiliate_identity_id`. SD-M8-05. */
-  readonly affiliateIdentityId: string;
   /** `attributions.voided`. */
   readonly voided: boolean;
   /**
@@ -356,17 +389,26 @@ function attribute(
   buyerIdentityId: string,
   linkConfidence: LinkConfidence | null,
 ): AttributionDecision {
+  if (affiliate.affiliateId === '') {
+    throw new AttributionError(
+      'an affiliate id is required; `attributions.affiliate_id` is NOT NULL and it is the ' +
+        "column the accessor resolves this row's affiliate identity from",
+    );
+  }
+
   const base = {
     affiliateId: affiliate.affiliateId,
     model,
     clickId,
     buyerIdentityId,
-    affiliateIdentityId: affiliate.identityId,
   } as const;
 
-  // `attributions_literal_self_deal_is_void`. Arithmetic, not a judgment, and
-  // the confidence stays null because that case needs no score.
-  if (buyerIdentityId === affiliate.identityId) {
+  // `attributions_literal_self_deal_is_void`. THE COMPARISON IS NOT MADE HERE
+  // AND ITS RESULT IS READ INSTEAD (ADR-262): `packages/db` compares the
+  // affiliate's `identity_id` against the handle it is bound to and hands this
+  // fold the bit. It is still arithmetic rather than a judgment, and the
+  // confidence stays null because that case needs no score.
+  if (affiliate.isBuyer) {
     return {
       kind: 'attributed',
       row: {

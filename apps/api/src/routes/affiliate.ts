@@ -371,6 +371,19 @@ export const PAGE_LIMIT_MAX = 100;
  * THAT PRODUCES A 403 HERE. `affiliates.identity_id` is `NOT NULL REFERENCES
  * identities(id)`, so "is this caller an affiliate" is a scoped read of one
  * table and never an inference from a claim on the request.
+ *
+ * THE NAME IS SHARED WITH `@merit/affiliate` AND THE SHAPE IS NOT, WHICH IS
+ * ESTABLISHED HERE RATHER THAN LEFT TO BE DISCOVERED (ADR-262 section 3). That
+ * one is `{ affiliateId, isBuyer }`, the counterparty of somebody else's
+ * purchase reduced to a bit; this one is `{ affiliateId, code, status }`, THE
+ * CALLER'S OWN ROW, read under `scopePredicate` on the identity the request
+ * proved. They were never the same shape and they answer different questions, so
+ * the collision is a naming accident and not a duplication: unifying them would
+ * put a self-read and a counterparty projection behind one name, and the day
+ * somebody added a field for one surface it would arrive on the other. NEITHER
+ * CARRIES AN IDENTITY, for reasons that are not each other's -- this one because
+ * the caller's identity is the handle's, and that one because ADR-238 ruling 2
+ * refuses the buyer the affiliate's.
  */
 export interface AffiliateRef {
   readonly affiliateId: string;
