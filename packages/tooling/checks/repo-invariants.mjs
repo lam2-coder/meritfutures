@@ -43,6 +43,15 @@ import { builtinModules } from 'node:module';
 import { join, dirname, resolve, relative, extname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+// THE ONE COMMENT STRIPPER, IMPORTED RATHER THAN DECLARED. ADR-279. This file
+// carried its own two-replacement copy until then, and that copy could not tell
+// a block-comment OPENER written inside a LINE comment from a real one: on
+// `apps/worker/src/index.ts` it stripped 55,728 characters to 2,753 and a
+// `new Date().getHours()` seeded inside the phantom span was INVISIBLE to
+// `RI-28`, which reported PASS. See `strip-comments.mjs`'s header for the
+// measurement and for what the scanner does not model.
+import { stripComments } from './strip-comments.mjs';
+
 // RI-11 LIVES IN ITS OWN FILE AND IS IMPORTED HERE, WHICH IS THE FIRST TIME A
 // CHECK IN THIS ARRAY HAS. ADR-138: three sessions were live in this file's
 // neighbours when it was written, and a ruling that needs 250 lines of argument
@@ -630,23 +639,6 @@ const ri06 = {
 const NODE_BUILTINS = new Set(
   builtinModules.flatMap((m) => [m, `node:${m}`]).concat(builtinModules.map((m) => `node:${m}`)),
 );
-
-/**
- * Source with comments removed, so a specifier quoted inside a header block is
- * not read as an import.
- *
- * These files carry more prose than code and several headers quote real import
- * lines while explaining them, so scanning the raw text would report findings
- * against sentences. The `[^:]` guard keeps `https://` out of the line-comment
- * pattern.
- */
-/**
- * @param {string} source
- * @returns {string}
- */
-function stripComments(source) {
-  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-}
 
 /**
  * Every statically written module specifier in one file, in source order.
@@ -6835,6 +6827,12 @@ const ri28 = {
     'SIXTH: an `Intl.DateTimeFormat` construction that names no `timeZone`, ' +
     'which formats in the process`s zone. Both constructions in this tree name ' +
     'one. ' +
+    'COMMENTS AND STRING LITERALS ARE BOTH REMOVED FIRST (ADR-279), through the ' +
+    'one scanner in `packages/tooling/checks/strip-comments.mjs`: a spelling ' +
+    'written in prose or inside a quoted string is not a call, and ' +
+    '`scripts/ci/falsify-ci.mjs` holds the text of seeded violations as its ' +
+    'whole subject. A TEMPLATE SUBSTITUTION IS CODE and survives blanking, so ' +
+    '`${at.getHours()}` is still a finding. ' +
     'IT READS `src/` AND `scripts/` AND NOT TESTS, because a test legitimately ' +
     'builds these on purpose: `packages/db/test/date-column-timezone.test.ts` ' +
     'constructs a local `Date` at five zones and ' +
@@ -6880,7 +6878,15 @@ const ri28 = {
     }
 
     for (const file of sources) {
-      const code = stripComments(readFileSync(join(root, file), 'utf8'));
+      // STRING LITERALS ARE BLANKED AS WELL AS COMMENTS, AND ADR-279 IS WHY.
+      // Every spelling below is a CALL or a member access, and none of them can
+      // occur inside a literal and mean anything. `scripts/ci/falsify-ci.mjs`
+      // is the file that proves it: its whole job is to hold the TEXT of seeded
+      // violations, and it carries `value.toLocaleString()` in a template
+      // literal as the CI-02/RE-D-02 seed. This check reported PASS on it for
+      // as long as it did only because its own stripper was deleting 40,000
+      // characters of that file by accident.
+      const code = stripComments(readFileSync(join(root, file), 'utf8'), { literals: 'blank' });
       /** @param {number} index */
       const lineAt = (index) => code.slice(0, index).split('\n').length;
 
