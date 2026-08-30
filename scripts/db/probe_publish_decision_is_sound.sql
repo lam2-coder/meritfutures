@@ -87,49 +87,49 @@ BEGIN
 
   -- The runs. Every status the vocabulary admits, plus every anchor shape.
   INSERT INTO simulation_runs (plan_version_id, rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by, completed_at)
   VALUES (pv1, d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-ok1',
           10000, 'complete', 'probe', now())
   RETURNING id INTO r_ok1;
 
   INSERT INTO simulation_runs (rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by, completed_at)
   VALUES (d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-loose',
           10000, 'complete', 'probe', now())
   RETURNING id INTO r_loose;
 
   INSERT INTO simulation_runs (rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by, completed_at)
   VALUES (d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-fail',
           10000, 'failed', 'probe', now())
   RETURNING id INTO r_fail;
 
   INSERT INTO simulation_runs (rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by)
   VALUES (d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-queued',
           10000, 'queued', 'probe')
   RETURNING id INTO r_queue;
 
   INSERT INTO simulation_runs (rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by)
   VALUES (d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-running',
           10000, 'running', 'probe')
   RETURNING id INTO r_run;
 
   INSERT INTO simulation_runs (plan_version_id, rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by, completed_at)
   VALUES (pv_b, d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-planb',
           10000, 'complete', 'probe', now())
   RETURNING id INTO r_plan_b;
 
   INSERT INTO simulation_runs (plan_version_id, rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by, completed_at)
   VALUES (pv_a9, d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-a9',
           10000, 'complete', 'probe', now())
@@ -144,7 +144,7 @@ BEGIN
   -- being published. This is the shape the whole control exists to permit, and
   -- a guard that refused it would be a module nobody can use.
   INSERT INTO simulation_runs (plan_version_id, rules_digest, sizes_digest, calibration_id,
-    calibration_digest, calibration_observed_at, harness_version, engine_version, seed,
+    calibration_digest, calibration_observed_on, harness_version, engine_version, seed,
     sample_size, status, requested_by, completed_at)
   VALUES (NULL, d1, d2, 'probe-cal', dc, DATE '2026-08-01', '1.0.0', '1.0.0', 'seed-ok2',
           10000, 'complete', 'probe', now())

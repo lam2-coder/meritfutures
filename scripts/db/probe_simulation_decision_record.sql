@@ -67,7 +67,7 @@ BEGIN
   -- became text, this assertion is what would notice.
   INSERT INTO simulation_runs (
     rules_digest, sizes_digest, calibration_id, calibration_digest,
-    calibration_observed_at, harness_version, engine_version, seed, sample_size,
+    calibration_observed_on, harness_version, engine_version, seed, sample_size,
     status, requested_by, completed_at)
   VALUES (d1, d2, 'probe-calibration', decode(cal_hex, 'hex'), DATE '2026-08-01',
           '1.0.0', '1.0.0', 'seed-alpha', 10000, 'complete', 'probe', now())
@@ -84,7 +84,7 @@ BEGIN
   -- STORABLE, which is the `>= 0` decision watched rather than argued.
   INSERT INTO simulation_runs (
     rules_digest, sizes_digest, calibration_id, calibration_digest,
-    calibration_observed_at, harness_version, engine_version, seed, sample_size,
+    calibration_observed_on, harness_version, engine_version, seed, sample_size,
     status, requested_by)
   VALUES (d1, d2, 'probe-calibration', decode(cal_hex, 'hex'), DATE '2026-08-01',
           '1.0.0', '1.0.0', 'seed-beta', 0, 'queued', 'probe');
@@ -126,7 +126,7 @@ BEGIN
   -- SUCCESS 6. A whole sweep arm.
   INSERT INTO simulation_runs (
     rules_digest, sizes_digest, calibration_id, calibration_digest,
-    calibration_observed_at, harness_version, engine_version, seed, sample_size,
+    calibration_observed_on, harness_version, engine_version, seed, sample_size,
     status, requested_by, sweep_id, swept_parameter, swept_value_bp, completed_at)
   VALUES (d1, d2, 'probe-calibration', decode(cal_hex, 'hex'), DATE '2026-08-01',
           '1.0.0', '1.0.0', 'seed-arm', 5000, 'complete', 'probe',
@@ -196,7 +196,7 @@ BEGIN
   BEGIN
     INSERT INTO simulation_runs (
       rules_digest, sizes_digest, calibration_id, calibration_digest,
-      calibration_observed_at, harness_version, engine_version, seed, sample_size,
+      calibration_observed_on, harness_version, engine_version, seed, sample_size,
       status, requested_by, completed_at)
     VALUES (d1, d2, 'c', decode(cal_hex, 'hex'), DATE '2026-08-01',
             '1.0.0', '1.0.0', 's', 1, 'running', 'probe', now());
@@ -212,7 +212,7 @@ BEGIN
   BEGIN
     INSERT INTO simulation_runs (
       rules_digest, sizes_digest, calibration_id, calibration_digest,
-      calibration_observed_at, harness_version, engine_version, seed, sample_size,
+      calibration_observed_on, harness_version, engine_version, seed, sample_size,
       status, requested_by)
     VALUES (d1, d2, 'c', decode(cal_hex, 'hex'), DATE '2026-08-01',
             '1.0.0', '1.0.0', 's', 1, 'complete', 'probe');
@@ -227,7 +227,7 @@ BEGIN
   BEGIN
     INSERT INTO simulation_runs (
       rules_digest, sizes_digest, calibration_id, calibration_digest,
-      calibration_observed_at, harness_version, engine_version, seed, sample_size,
+      calibration_observed_on, harness_version, engine_version, seed, sample_size,
       status, requested_by, swept_parameter, swept_value_bp)
     VALUES (d1, d2, 'c', decode(cal_hex, 'hex'), DATE '2026-08-01',
             '1.0.0', '1.0.0', 's', 1, 'queued', 'probe', 'some.param', 5);
@@ -243,7 +243,7 @@ BEGIN
   BEGIN
     INSERT INTO simulation_runs (
       rules_digest, sizes_digest, calibration_id, calibration_digest,
-      calibration_observed_at, harness_version, engine_version, seed, sample_size,
+      calibration_observed_on, harness_version, engine_version, seed, sample_size,
       status, requested_by)
     VALUES (d1, d2, 'c', cal_hex::bytea, DATE '2026-08-01',
             '1.0.0', '1.0.0', 's', 1, 'queued', 'probe');
@@ -259,7 +259,7 @@ BEGIN
   BEGIN
     INSERT INTO simulation_runs (
       rules_digest, sizes_digest, calibration_id, calibration_digest,
-      calibration_observed_at, harness_version, engine_version, seed, sample_size,
+      calibration_observed_on, harness_version, engine_version, seed, sample_size,
       status, requested_by)
     VALUES (d1, d2, 'c', decode(cal_hex, 'hex'), DATE '2026-08-01',
             '1.0.0', '1.0.0', 's', -1, 'queued', 'probe');

@@ -5899,9 +5899,10 @@ const ri25 = {
 // exception set: "an unlisted column fails, and so does a stale entry naming a
 // column that no longer exists."
 //
-//   LEG 1  NO `*_at` COLUMN IS DECLARED WITH A NON-INSTANT TYPE. One ruled
-//          exception, `simulation_runs.calibration_observed_at`, whose repair
-//          ADR-272 section 5 specifies and does not take.
+//   LEG 1  NO `*_at` COLUMN IS DECLARED WITH A NON-INSTANT TYPE. NO RULED
+//          EXCEPTIONS REMAIN. `simulation_runs.calibration_observed_at` was the
+//          one, and `0075` renamed it to `calibration_observed_on` (ADR-278),
+//          so the entry came out in the commit that landed the repair.
 //   LEG 2  NO COLUMN NAME IS DECLARED WITH A DAY TYPE IN ONE TABLE AND AN
 //          INSTANT TYPE IN ANOTHER. One ruled exception, `effective_from`, a
 //          `date` in six tables and a `timestamptz` in three. THIS LEG IS WHY
@@ -5909,6 +5910,30 @@ const ri25 = {
 //          ambiguity arrived through a name carrying no suffix at all, so a
 //          check reading only suffixes would have reported a clean tree over
 //          nine tables that disagree about what one word means.
+//
+// THE POPULATION IS THE SCHEMA THE SET INSTALLS, NOT THE UNION OF ITS `CREATE
+// TABLE` BODIES, AND ADR-278 IS WHY THOSE ARE NOW TWO DIFFERENT ANSWERS. Until
+// `0075` this directory held zero `RENAME COLUMN` and zero `DROP COLUMN`
+// statements, so a reader that summed declarations got the installed schema for
+// free. `0075` renames a column `0045` declares, and constitution E2 makes
+// `0045` uneditable, so the declaration stands forever and the column is gone.
+//
+// A READER THAT DID NOT FOLD THE RENAME WOULD HAVE FAILED THIS TREE FOR DOING
+// THE REPAIR. Watched, before the fold was written: with the exception removed
+// and the declarations summed, leg 1 reported `calibration_observed_at is
+// declared \`date\` in 0045_simulation_runs.sql` and told a repaired estate to
+// "rename it by a superseding migration". So renames are folded in file order,
+// after each file's own declarations, and a `DROP COLUMN` THROWS rather than
+// being ignored: this reader has no model for a column that stops existing, and
+// silently asserting about one is the suppression list the exception sets were
+// shaped to avoid.
+//
+// LEG 1 KEEPS A SENTINEL NOW THAT IT KEEPS NO EXCEPTION. The stale-entry half
+// was leg 1's reverse assertion, and removing the last entry would have left the
+// leg with nothing proving its reader still matches anything: a filter that
+// stopped seeing `_at` columns would report a clean estate. ADR-272 measured 321
+// `*_at` column declarations, so zero of them on a tree carrying migrations is a
+// broken reader and throws.
 //
 // AN EXCEPTION IS ASSERTED ONLY WHERE ITS WITNESS MIGRATIONS ARE PRESENT, and
 // that is a scoping rule rather than an escape hatch. An entry claims that a
@@ -5946,19 +5971,13 @@ const INSTANT_TYPES = new Set(['timestamptz', 'timestamp with time zone', 'times
 // ground it was ruled on. They are objects and not bare names because an entry
 // with no stated ground is how an exception set becomes a suppression list, and
 // an entry with no witness is one that can never be shown to be stale.
-const AT_SUFFIX_EXCEPTIONS = new Map([
-  [
-    'calibration_observed_at',
-    {
-      witnesses: ['0045_simulation_runs.sql'],
-      ground:
-        'ADR-272 clause 3. `0045:103` declares it `date NOT NULL`. The rename ADR-272 ' +
-        'section 5 specifies needs `scripts/db/probe_publish_decision_is_sound.sql` and ' +
-        '`scripts/db/probe_simulation_decision_record.sql`, both run by `corpus.yml` and ' +
-        "pinned in CI-06h's list, and ALLOCATION row 272 fences neither",
-    },
-  ],
-]);
+// EMPTY, AND THE EMPTINESS IS THE RECORD OF A REPAIR RATHER THAN AN OVERSIGHT.
+// `calibration_observed_at` was the single entry. `0075` renamed it and ADR-278
+// took the entry out in the same commit, because an exception outliving its
+// defect is a control that has quietly stopped being one. The shape is kept for
+// the next entry: witnesses and a stated ground, never a bare name.
+/** @type {Map<string, { witnesses: string[], ground: string }>} */
+const AT_SUFFIX_EXCEPTIONS = new Map();
 const NAME_TYPE_COLLISION_EXCEPTIONS = new Map([
   [
     'effective_from',
@@ -6057,6 +6076,59 @@ function temporalColumnFrom(segment) {
 }
 
 /**
+ * Every column rename ONE migration performs, oldest first within the file.
+ *
+ * ADR-278. `0075` is the first statement in this estate to change an existing
+ * column, and without this the declaration sum stops being the installed schema.
+ *
+ * The optional `COLUMN` keyword is matched because PostgreSQL accepts the form
+ * without it. `ALTER TABLE t RENAME TO u` does not match, which is correct: this
+ * check keys on column NAME and never on table, so a table rename moves nothing
+ * it can see. `RENAME CONSTRAINT a TO b` does match and is a harmless no-op,
+ * because no temporal column is named by a constraint name.
+ *
+ * @param {string} sql
+ * @returns {{ from: string, to: string }[]}
+ */
+function columnRenamesIn(sql) {
+  /** @type {{ from: string, to: string }[]} */
+  const out = [];
+  const code = stripSqlComments(sql);
+  const rename = /\bRENAME\s+(?:COLUMN\s+)?([a-z_][a-z0-9_]*)\s+TO\s+([a-z_][a-z0-9_]*)/gi;
+  for (let m = rename.exec(code); m !== null; m = rename.exec(code)) {
+    const from = m[1];
+    const to = m[2];
+    if (from === undefined || to === undefined) continue;
+    out.push({ from: from.toLowerCase(), to: to.toLowerCase() });
+  }
+  return out;
+}
+
+/**
+ * Every column ONE migration DROPS.
+ *
+ * There are none in this estate and this reader exists so that the first one
+ * announces itself. A dropped column leaves its `CREATE TABLE` declaration
+ * standing in a migration E2 forbids editing, so an unfolded drop would have
+ * this check asserting about a column the database does not have -- which is
+ * the exception set's own failure mode arriving through the reader instead.
+ *
+ * @param {string} sql
+ * @returns {string[]}
+ */
+function droppedColumnsIn(sql) {
+  /** @type {string[]} */
+  const out = [];
+  const code = stripSqlComments(sql);
+  const drop = /\bDROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/gi;
+  for (let m = drop.exec(code); m !== null; m = drop.exec(code)) {
+    const name = m[1];
+    if (name !== undefined) out.push(name.toLowerCase());
+  }
+  return out;
+}
+
+/**
  * Every temporal column DECLARED by one migration.
  *
  * `CREATE TABLE` bodies are found by paren depth rather than by line shape,
@@ -6107,8 +6179,12 @@ const ri26 = {
   covers:
     'A NAME THAT LIES INSIDE THE TEMPORAL VOCABULARY IS UNDETECTABLE AND A NAME ' +
     'THAT LIES ACROSS TYPE FAMILIES IS NOT, so only the first is checked. ' +
-    `Population: every column declared by a \`CREATE TABLE\` body or an \`ADD COLUMN\` ` +
-    `clause under \`${MIGRATIONS_DIR}\`, comments stripped first. ` +
+    `Population: THE SCHEMA THE SET INSTALLS. Every column declared by a ` +
+    `\`CREATE TABLE\` body or an \`ADD COLUMN\` clause under \`${MIGRATIONS_DIR}\`, ` +
+    'comments stripped first, with `RENAME COLUMN` folded in file order and ' +
+    '`DROP COLUMN` a throw. Before `0075` the estate held neither statement and ' +
+    'the sum of declarations WAS the installed schema; E2 makes a superseded ' +
+    'declaration permanent, so those are two answers now (ADR-278). ' +
     'LEG 1: NO `*_at` COLUMN IS DECLARED WITH A NON-INSTANT TYPE. ADR-146 ' +
     'clause 2 makes `*_at` an assertion that the value is an RFC 3339 UTC ' +
     'instant, and ADR-271 section 3 bounded a live type parser from the ' +
@@ -6120,7 +6196,10 @@ const ri26 = {
     'fails and so does a ruled exception that has stopped being one, so the day ' +
     'either is repaired this check names the entry to retire. An exception is ' +
     'asserted only where the migrations it names are present, because an entry ' +
-    'about `0045` is not a claim about a tree without `0045`. ' +
+    'about `0004` is not a claim about a tree without `0004`. LEG 1 NOW CARRIES ' +
+    'NO EXCEPTIONS AT ALL: ADR-278 retired the last one in the commit that ' +
+    'landed its repair, and the reverse assertion that half provided is replaced ' +
+    'by a throw on a tree that carries migrations and no `*_at` column. ' +
     'NOT CHECKED, AND RULED RATHER THAN MISSED (ADR-272 section 3): `*_day` and ' +
     '`*_on` on a NON-temporal type. `daily_marks.traded_day`, ' +
     '`daily_marks.win_day` and `trading_calendar.is_half_day` are `boolean`, ' +
@@ -6150,10 +6229,40 @@ const ri26 = {
     /** @type {Map<string, Map<string, string[]>>} column name -> type -> migrations */
     const declared = new Map();
     for (const file of files) {
-      for (const { name, type } of temporalColumnsIn(readFileSync(join(dir, file), 'utf8'))) {
+      const sql = readFileSync(join(dir, file), 'utf8');
+      for (const { name, type } of temporalColumnsIn(sql)) {
         const byType = declared.get(name) ?? new Map();
         byType.set(type, [...(byType.get(type) ?? []), file]);
         declared.set(name, byType);
+      }
+
+      // A DROP HAS NO FOLD, SO IT THROWS. There are none in this estate; the
+      // day one lands, this reader's model of the schema is wrong and it says
+      // so instead of asserting about a column the database does not have.
+      const dropped = droppedColumnsIn(sql);
+      if (dropped.length > 0) {
+        throw new Error(
+          `RI-26 found \`DROP COLUMN\` in ${file} (${dropped.join(', ')}) and has no fold for ` +
+            'one. A dropped column keeps its `CREATE TABLE` declaration in a migration E2 ' +
+            'forbids editing, so this reader would go on asserting about a column that no ' +
+            'longer exists. Teach the fold, or rule the drop into this check with its ground',
+        );
+      }
+
+      // RENAMES ARE FOLDED AFTER THIS FILE'S OWN DECLARATIONS, in file order, so
+      // that the answer is the schema the set INSTALLS rather than the sum of
+      // what it declared along the way (ADR-278). The declaring migration stays
+      // in the site list under the new name: it is still where the type came
+      // from, and it is what a reader chasing the finding needs to open.
+      for (const { from, to } of columnRenamesIn(sql)) {
+        const moving = declared.get(from);
+        if (moving === undefined) continue;
+        declared.delete(from);
+        const target = declared.get(to) ?? new Map();
+        for (const [type, sites] of moving) {
+          target.set(type, [...(target.get(type) ?? []), ...sites]);
+        }
+        declared.set(to, target);
       }
     }
 
@@ -6232,6 +6341,26 @@ const ri26 = {
           `tree that carries ${witnesses.join(', ')}. Those migrations declare both, so zero ` +
           'means the `CREATE TABLE` reader or the comment stripper has moved and every ' +
           'column in the schema now reports as untyped',
+      );
+    }
+
+    // LEG 1'S SENTINEL, AND IT REPLACES ONE THAT WAS DELETED RATHER THAN ADDING
+    // A NEW IDEA. Until ADR-278 the stale-entry half asserted leg 1's reader in
+    // reverse; with the last `_at` exception retired that half asserts nothing,
+    // and a suffix filter that stopped matching would report a clean estate over
+    // every `*_at` column there is. ADR-272 measured 321 of them, so zero on a
+    // tree that carries migrations is a broken reader and not a repaired schema.
+    // The guard is `declared.size` and not `files.length`, because a tree whose
+    // migrations declare NO temporal column is the fixture case this check is
+    // deliberately silent on, and the throw above already covers a tree that
+    // parses nothing while carrying the witnesses.
+    if (declared.size > 0 && ![...declared.keys()].some((name) => name.endsWith('_at'))) {
+      throw new Error(
+        `RI-26 found no \`*_at\` temporal column among the ${declared.size} it read under ` +
+          `${MIGRATIONS_DIR}. Leg 1 holds no exceptions since ADR-278, so ` +
+          'this is the only thing left asserting its reader still matches: zero means the ' +
+          'suffix test, the rename fold or the `CREATE TABLE` reader has moved and every ' +
+          'violator in the estate now reports as absent',
       );
     }
 
