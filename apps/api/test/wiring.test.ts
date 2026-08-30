@@ -502,7 +502,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'already works out and states; `reconBlocked` is `accounts.recon_blocked` ' +
     '(`0007_accounts.sql:87`) and has no identity half; and `kycState` is the head of the ' +
     'supersession chain over `kyc_verifications.state` (`0003_kyc.sql:51`), which ' +
-    '`currentKycState` (`apps/api/src/routes/wallet-withdrawals.ts:471`) ALREADY RESOLVES AND ' +
+    '`currentKycState` (`apps/api/src/routes/wallet-withdrawals.ts:510`) ALREADY RESOLVES AND ' +
     'FAILS CLOSED ON, on another money door. TWO DO NOT. THE ACCOUNT-STATUS LEG CANNOT BE A ' +
     'TOTAL MAP: `account_status` ' +
     'declares SEVEN members (`0001_extensions_and_enums.sql:47`) and `AccountStatus` ' +
@@ -985,28 +985,36 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'used to state it: session 422 built `requested --> approved` and `cooling --> approved`, ' +
     'guarded and dual controlled above 500000 integer cents, and the port did not become ' +
     'wireable, because `approved` IS ITSELF ONE OF THE FOUR MEMBERS OF ' +
-    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:288-293`) and `gateNoInFlight` ' +
+    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:327-332`) and `gateNoInFlight` ' +
     'refuses on the whole list. AND THE SENTENCE AFTER THAT ONE IS NOW WRONG TOO, WHICH MAKES ' +
     'FIVE CORRECTIONS TO THIS ENTRY AND IS ADR-234. It read that NOTHING IN THIS TREE reaches ' +
     '`settled`, `failed` or `cancelled`. Session 424 built `requested --> cancelled` and ' +
     '`cooling --> cancelled` under `G-TRADER-CANCELS`, guarded, with `0072` binding the arrow ' +
     "set at the database, and `withdrawalReleasesIdentity('cancelled')` is true, so ONE OF " +
-    'THE THREE IS DRIVEN. What refuses NOW is that the edge that exists has NO DOOR and the ' +
-    'two that would need one are unreachable. API_CONTRACT states in terms that "there is no ' +
-    'endpoint that cancels a withdrawal" and names `G-TRADER-CANCELS` "as owed rather than ' +
-    'invented", so a wired backend gives a trader a withdrawal they can open and no way to ' +
-    'close; and `settled` and `failed` are drawn only out of `transferring`, which is reached ' +
-    'by enqueueing on a rail that has no live adapter and no importer -- ' +
-    '`TERMINAL_EDGE_FINDINGS` in `routes/wallet-withdrawals.ts` carries all three per status ' +
-    'with the sources, and `wallet-withdrawals.test.ts` RUNS them rather than reading them. ' +
-    'THE OBSTRUCTION IS THEREFORE ONE EDGE NARROWER THAN IT WAS AND IS STILL AN OBSTRUCTION. ' +
+    'THE THREE IS DRIVEN. AND THE SENTENCE AFTER THAT ONE IS NOW WRONG AS WELL, WHICH MAKES ' +
+    'SIX CORRECTIONS TO THIS ENTRY AND IS ADR-263. It read that the edge which exists has NO ' +
+    'DOOR, resting on API_CONTRACT stating in terms that "there is no endpoint that cancels a ' +
+    'withdrawal" and naming `G-TRADER-CANCELS` "as owed rather than invented". ADR-263 MOVED ' +
+    'THAT ONE PARAGRAPH AND `POST /wallet/withdrawals/:withdrawalId/cancel` SERVES IT, ' +
+    'elevated, so THE LOCKOUT HALF OF THIS REASON IS DISCHARGED: a trader closes the ' +
+    'withdrawal they opened and `gateNoInFlight` takes their next one. WHAT REFUSES NOW IS ' +
+    'ONE EDGE FURTHER ON, AND IT IS THE OBSTRUCTION ADR-232 SECTION 6 ALREADY NAMED RATHER ' +
+    'THAN A NEW ONE: NO DOOR DRIVES `requested --> approved` EITHER, so a wired backend would ' +
+    'take a withdrawal request that nothing in this estate can pay. The approval posts LT-06 ' +
+    'and needs the ledger authority ADR-165 declined and ADR-172 clause 2 ruled is not a ' +
+    'handle; past it `settled` and `failed` are drawn only out of `transferring`, reached by ' +
+    'enqueueing on a rail with no live adapter and no importer. A 503 says Merit cannot do ' +
+    'this today. A wired deployment would say yes and then never pay, and a trader can now ' +
+    'take that request back but cannot make it settle. `TERMINAL_EDGE_FINDINGS` in ' +
+    '`routes/wallet-withdrawals.ts` carries one finding per terminal status with its sources, ' +
+    '`wallet-withdrawals.test.ts` RUNS them rather than reading them, and finding C is marked ' +
+    'CLOSED by the door rather than deleted. ' +
     'THE ENTRY SUPPLIES ITS OWN DECISION PROCEDURE AND RI-20 RUNS IT: ' +
     '`grep -rn driveApprovals apps/api/src` returns 3 lines, which are the transition and two ' +
-    'references to it in docblocks, and no fourth line is a caller; ' +
-    '`grep -rn driveCancellation apps/api/src` returns 3 lines, which are ADR-234 transition ' +
-    'and two references to it in docblocks, and no fourth line is a caller either. Wiring it ' +
-    'trades an honest ' +
-    '503 for a permanent per-trader lockout, and only the 503 is reversible. TWO LINE NUMBERS ' +
+    'references to it in docblocks, and NO FOURTH LINE IS A CALLER, which is what refuses; ' +
+    '`grep -rn driveCancellation apps/api/src` returns 7 lines, and that number moved because ' +
+    'ONE of them IS a caller now. A count that changes when a door lands is what this entry ' +
+    'is for. TWO LINE NUMBERS ' +
     'IN THIS ENTRY WERE FALSE BY EIGHTEEN LINES WHEN ADR-176 CHECKED THEM, in the reason ' +
     'ADR-172 wrote one session earlier to replace a false one: line 1233 was the KYC term and ' +
     'line 1506 was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, ' +
