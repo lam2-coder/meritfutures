@@ -664,7 +664,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'A ROW THE BUYER MUST SEE THAT BELONGS TO THE AFFILIATE, REFUSED A SECOND ' +
     'TIME: `clickByToken` (`routes/checkout.ts:831`) returns a `ClickRef` whose `affiliate` ' +
     'carries `affiliates.identity_id`, and `couponByCode` returns the same shape ' +
-    '(`routes/checkout.ts:478`); `affiliates` is scope class `owned` on `identity_id` ' +
+    '(`routes/checkout.ts:805`); `affiliates` is scope class `owned` on `identity_id` ' +
     '(`packages/db/src/scope.ts:1119`) and `affiliate_clicks` is `derived` through it ' +
     '(`packages/db/src/scope.ts:1135`), so the row belongs to somebody else and the disclosure ' +
     'ground that is ABSENT for a `firm` row is fully present here. A buyer-scoped read of either ' +
