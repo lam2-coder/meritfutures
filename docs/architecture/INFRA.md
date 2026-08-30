@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, OVERVIEW.md, SECURITY.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/CLAUDE_CODE_PLAYBOOK.md]
-last_updated: 2026-08-29
+last_updated: 2026-08-30
 ---
 
 # Infrastructure (Constitution §2, D3, Appendix E doctrine)
@@ -69,6 +69,40 @@ Rejected for v1: Kubernetes, a self-managed database, a service mesh, multi-regi
 1. Production credentials exist in exactly one place: the platform vault. They are never in `.env`, never in a preview environment, never in an agent's session.
 2. Preview and dev databases contain **synthetic data only**, produced by the seed script and the [synthetic Rithmic simulator](../GLOSSARY.md#platform-adapter). No production dump ever lands in a lower environment.
 3. **Two services run on `ADMIN_ORIGIN`, a separate apex domain** ([ADR-012](../decisions/ADR-012.md)): the admin console (`admin`) and the operator API (`api-admin`), per section 2.1. The origin has its own Cloudflare rules and its own IP allowlist (C-08), and **those are scoped to the origin rather than to a service**, so they covered `api-admin` from the day [ADR-083](../decisions/ADR-083.md) ruled it into existence; this sentence named one service where two run, which was an inventory error and never a gap in the control ([ADR-089](../decisions/ADR-089.md)). Cookie scope, CORS, and the CSP never span the two origins, so an XSS on the portal cannot reach the admin surface even in principle.
+
+## 3.1 The clocks, and what a deployment's `TZ` decides ([ADR-274](../decisions/ADR-274.md))
+
+**Merit runs on five clocks and until now nothing told an operator that.** They were each correct in their own document and no document held them together, which is how [ADR-268](../decisions/ADR-268.md) came to end on the sentence *"the correctness of every trading day in the estate currently rests on an environment variable nobody has written down."*
+
+| # | The clock | Where it is set | What reads it |
+|---|---|---|---|
+| 1 | **Storage: UTC** | Nothing sets it. `timestamptz` columns and `toISOString()` | Every stored instant ([CLAUDE.md](../../CLAUDE.md)) |
+| 2 | **The trading day: the exchange session calendar, CT** | `trading_calendar`, maintained **as data** and never derived from a timestamp ([ADR-146](../decisions/ADR-146.md) clause 4) | Every `*_day` and `*_on` column, every rule, every payout basis |
+| 3 | **The process clock: `TZ` on a Railway service** | The platform, per service. **Unset today on all six** | **Nothing. That is the finding, and section 3.1.1 is the proof** |
+| 4 | **The database session clock: PostgreSQL's `TimeZone`** | The server's own default, per database or per role. **`pg` sends no `TimeZone` and no `DateStyle` in its startup packet**, verified at source in `getStartupConf`, so **clock 3 does not set clock 4** and the two move independently | Any SQL that renders an instant, and `DateStyle` decides the wire text every `date` column arrives as |
+| 5 | **The scheduler's clock** | The platform scheduler. **External by [ADR-241](../decisions/ADR-241.md), a deployment fact this repository does not hold** | Every expected-by time in [CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md), **every one of which is stated in CT** |
+
+### 3.1.1 `TZ` is not a requirement here, and the reason is stronger than a requirement
+
+**A `TZ=UTC` line in this section would be a control nobody checks.** Nothing in this repository can read a deployment's environment, so the line would be a reassurance rather than a gate, which is the exact class of absent control this estate keeps finding. It is also aimed at the wrong thing: **`TZ` matters only because code asks what it is, and code that never asks is correct at every offset.** That property is stronger than a setting and, unlike a setting, it is checkable from here.
+
+**So it is checked.** [`RI-28`](../../packages/tooling/checks/repo-invariants.mjs) reads every `*.ts`, `*.tsx`, `*.mts`, `*.mjs` and `*.js` under an `apps/*/src`, `packages/*/src` or `scripts/` directory with comments stripped, and refuses six spellings: a local component getter, a local setter, a local rendering, a `process.env.TZ` read, the multi-argument `new Date(y, m, d)` constructor, and an `Intl.DateTimeFormat` naming no `timeZone`. **Measured across 356 source files at the commit that wrote this section: zero, in all six.** It runs in `CI-01`'s repository-invariants step.
+
+**That is one of two halves and the other already landed.** [ADR-271](../decisions/ADR-271.md) installed the `date` type parser that stops `pg` and Drizzle rendering a calendar day through the process's local midnight, and `RI-25` pins it. Together they are why row 3 of the table above reads *nothing*.
+
+**Setting `TZ=UTC` anyway is fine and it is not a control.** It makes a platform log line and a shell `date` read the same as the stored instant beside it, which is worth something to a human at 3am. It is recorded here as a convenience so that a later reader does not mistake its absence for a gap, or its presence for the thing that makes the estate correct.
+
+### 3.1.2 What a deployment still has to get right
+
+**Three things, and none of them is `TZ`.**
+
+1. **THE SCHEDULER'S ZONE, WHICH IS THE LIVE ONE.** [CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md) states every expected-by time in **CT** and the schedule is external, so the cron expressions live in a platform this repository does not read. **A `0 6 * * *` written against a scheduler running UTC fires at midnight CT, six hours before the ingest it is supposed to follow**, and the dead-man switch on the row above it would page for a job that was scheduled exactly as typed. It also moves twice a year: CT is UTC-6 and UTC-5 on either side of a DST boundary and UTC has none, so a schedule that is right in January is an hour wrong in July. **Set the scheduler's zone to the exchange's, or convert every expression and accept that the table and the schedule now disagree by arithmetic nobody has written down.** The inventory carries this in its own words beside the table.
+2. **THE DATABASE'S `DateStyle`.** [ADR-271](../decisions/ADR-271.md) section 10 named it and did not take it. The `date` parser hands back the wire text verbatim, so a server sending a non-ISO `DateStyle` sends `08/28/2026` and a door refuses it **by name** rather than the pre-repair behaviour of `null` and a crash one layer on. **That is fail-closed and it is not correct.** The remedy is pinning `DateStyle` on the connection or in the server's configuration, and it is unowned.
+3. **THAT CLOCK 4 IS NOT CLOCK 3.** A reader who sets `TZ` on a service and expects the database session to follow will be wrong: `pg` sends neither parameter. If a session timezone matters for something, it is set on the database or passed through the connection's `options`, and nothing in Merit does either today.
+
+**One thing in Merit's own code still moves with clock 3, and it is reported rather than repaired here.** `POST /admin/wallet/:identityId/spend-limit` takes `effective_from` from the request body and parses it with a bare `new Date(value)`, which reads a date-time string carrying no offset as the **process's local wall clock**. It is the only caller-supplied instant on the whole API surface. [ADR-274](../decisions/ADR-274.md) section 5 measured it at five zones, spanning nineteen hours and two calendar days, and the repair is an offset requirement in `apps/api/src/routes/admin-wallet.ts` rather than anything in this document.
+
+**No hostname, bucket, key or secret appears above** ([ADR-012](../decisions/ADR-012.md)). A timezone is not a secret, and this is the section where that line would get crossed by helpfulness rather than by intent.
 
 ## 4. Deploy pipeline and the VG gates
 

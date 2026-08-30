@@ -6534,6 +6534,263 @@ const ri27 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-28  No shipped source file reads the process's local clock
+// -----------------------------------------------------------------------------
+// ADR-274's PROPERTY, AND IT IS THE REASON A DEPLOYMENT'S `TZ` DOES NOT DECIDE
+// ANYTHING. ADR-268 section 7 ended on the sentence this check exists to make
+// mechanical: "the correctness of every trading day in the estate currently
+// rests on an environment variable nobody has written down." ADR-271 removed
+// the driver's half of that. THIS IS THE OTHER HALF, and it is the larger one:
+// the driver was one library doing one coercion, and this is every line anybody
+// writes from here on.
+//
+// THE ALTERNATIVE WAS A `TZ=UTC` LINE IN A RUNBOOK AND IT IS REFUSED. Nothing
+// in this repository can read a deployment's environment, so a stated `TZ`
+// requirement would be a control nobody checks -- and it would be checking the
+// wrong thing anyway. `TZ` matters only because code asks what it is. Code that
+// never asks is correct at every offset, which is a stronger property than a
+// setting, and unlike a setting it is checkable from here.
+//
+// FOUR GROUPS, AND EACH IS A DIFFERENT WAY TO ASK.
+//
+//   1. READING a local clock field: `getHours`, `getDate`, `getTimezoneOffset`
+//      and their siblings. The `getUTC*` spellings are the admitted ones and
+//      are different names, so they do not match.
+//   2. WRITING one: `setHours`, `setDate` and their siblings. Same rule.
+//   3. RENDERING through one: `toLocaleString`, `toDateString`, `toTimeString`
+//      and the two `toLocale*` date forms. `toISOString()` is UTC and is what
+//      this tree uses everywhere.
+//   4. CONSTRUCTING one: the multi-argument `new Date(y, m, d, ...)`, which is
+//      LOCAL midnight. `new Date(Date.UTC(...))` is the admitted spelling and
+//      is one argument, so the arguments are counted rather than the commas.
+//
+// PLUS TWO NAMED ASKS. `Intl.DateTimeFormat` without a `timeZone` formats in
+// the process's zone, so every construction must name one -- both of the two in
+// this tree do, `apps/portal/src/view/economic-calendar.ts` and
+// `packages/db/src/seed/calendars/generate.mjs`. And `process.env.TZ` is the
+// question asked in words.
+//
+// WHAT IT CANNOT SEE, AND BOTH ARE REAL:
+//
+//   1. `Date.prototype.toString`, reached by `String(at)`, `${at}` or `at + ''`.
+//      That is local, it is invisible to any text scan, and no spelling of it
+//      is distinguishable from the same operation on a number.
+//   2. A LENIENT PARSE. `new Date(s)` and `Date.parse(s)` read a date-time
+//      string carrying NO offset as LOCAL, per the ECMAScript grammar. Whether
+//      that is reachable depends on where `s` comes from, which is a type
+//      question rather than a text one. ADR-274 section 5 measured the one site
+//      in this estate where a caller supplies that string, and it is reported
+//      there rather than caught here.
+//
+// COMMENTS ARE STRIPPED FIRST, ON RI-25's SEED. That check's first version
+// reported PASS on a restored defect because the file's own header explained
+// the repair at length and the matcher found the explanation. This file's
+// subject has the same shape: the places that talk most about a local clock are
+// the headers of the files that refuse to use one.
+//
+// TESTS ARE OUT OF SCOPE, and deliberately. `packages/db/test/date-column-
+// timezone.test.ts` builds `new Date(2026, 7, 28)` on purpose at five process
+// timezones, and `scripts/demo/test/replay-determinism.property.test.ts` calls
+// `toDateString()` as its declared impure control. Both are asserting ABOUT the
+// construct. Using one is an act and lives under a `src/`.
+
+/**
+ * The local-clock spellings, by group, with the admitted alternative named.
+ *
+ * @type {ReadonlyArray<readonly [string, RegExp, string]>}
+ */
+const LOCAL_CLOCK_READS = [
+  [
+    'reads',
+    /\.get(FullYear|Month|Date|Day|Hours|Minutes|Seconds|Milliseconds|TimezoneOffset)\s*\(/g,
+    'the `getUTC*` form',
+  ],
+  [
+    'writes',
+    /\.set(FullYear|Month|Date|Hours|Minutes|Seconds|Milliseconds)\s*\(/g,
+    'the `setUTC*` form',
+  ],
+  [
+    'renders through',
+    /\.to(LocaleString|LocaleDateString|LocaleTimeString|DateString|TimeString)\s*\(/g,
+    '`toISOString()`, which is UTC',
+  ],
+  [
+    'asks for',
+    /process\.env\s*(?:\[\s*['"]TZ['"]\s*\]|\.TZ\b)/g,
+    'nothing: no Merit line needs it',
+  ],
+];
+
+/**
+ * The text between a call's parentheses, plus its non-empty top-level arguments.
+ *
+ * `open` is the index of the `(`. Nesting, quotes and template literals are all
+ * respected, because `new Date(Date.UTC(y, m, d))` carries two commas that
+ * belong to the inner call and `new Date(`${day}T00:00:00Z`)` carries none that
+ * belong to anything. A TRAILING COMMA IS NOT AN ARGUMENT: prettier writes one
+ * whenever a single argument spans lines, and counting commas rather than
+ * arguments reported `packages/kyc/src/fakes/provider.ts` as a local
+ * construction while this was being written.
+ *
+ * @param {string} code
+ * @param {number} open
+ * @returns {{ text: string, args: string[] } | null} null when unbalanced
+ */
+function callArguments(code, open) {
+  let depth = 0;
+  let close = -1;
+  /** @type {number[]} */
+  const commas = [];
+  /** @type {string | null} */
+  let quote = null;
+  for (let i = open; i < code.length; i++) {
+    const c = code[i];
+    if (quote !== null) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') {
+      quote = c;
+      continue;
+    }
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') {
+      depth--;
+      if (depth === 0) {
+        close = i;
+        break;
+      }
+    } else if (c === ',' && depth === 1) commas.push(i);
+  }
+  if (close === -1) return null;
+  const cuts = [open, ...commas, close];
+  /** @type {string[]} */
+  const args = [];
+  for (let k = 0; k < cuts.length - 1; k++) {
+    const from = cuts[k];
+    const to = cuts[k + 1];
+    if (from === undefined || to === undefined) continue;
+    const piece = code.slice(from + 1, to);
+    if (piece.trim() !== '') args.push(piece);
+  }
+  return { text: code.slice(open + 1, close), args };
+}
+
+const ri28 = {
+  id: 'RI-28',
+  title: 'No shipped source file reads the process timezone',
+  covers:
+    'A DEPLOYMENT`S `TZ` DECIDES NOTHING BECAUSE NO SHIPPED LINE ASKS WHAT IT IS ' +
+    '(ADR-274). Every `*.ts`, `*.tsx`, `*.mts`, `*.mjs` and `*.js` under an ' +
+    '`apps/*/src`, `packages/*/src` or `scripts/` directory is read with ' +
+    'comments stripped, and six spellings are findings. FOUR ARE THE LOCAL ' +
+    'CLOCK ITSELF: a local component getter (`getHours`, `getDate`, ' +
+    '`getTimezoneOffset` and siblings), a local setter, a local rendering ' +
+    '(`toLocaleString`, `toDateString`, `toTimeString`, `toLocaleDateString`, ' +
+    '`toLocaleTimeString`), and a `process.env.TZ` read. The `getUTC*` and ' +
+    '`setUTC*` forms are different names and do not match; `toISOString()` is ' +
+    'UTC and is what this tree uses. ' +
+    'FIFTH: the MULTI-ARGUMENT `new Date(y, m, d, ...)`, which is LOCAL ' +
+    'midnight and is the exact call ADR-268 section 7 found `pg` making. ' +
+    'Arguments are counted with nesting, quotes and template literals ' +
+    'respected, so `new Date(Date.UTC(...))` is ONE argument and is admitted, ' +
+    'and a trailing comma is not an argument. ' +
+    'SIXTH: an `Intl.DateTimeFormat` construction that names no `timeZone`, ' +
+    'which formats in the process`s zone. Both constructions in this tree name ' +
+    'one. ' +
+    'IT READS `src/` AND `scripts/` AND NOT TESTS, because a test legitimately ' +
+    'builds these on purpose: `packages/db/test/date-column-timezone.test.ts` ' +
+    'constructs a local `Date` at five zones and ' +
+    '`scripts/demo/test/replay-determinism.property.test.ts` calls ' +
+    '`toDateString()` as its declared impure control. ' +
+    'WHAT IT CANNOT SEE, both stated in ADR-274 rather than implied: ' +
+    '`Date.prototype.toString` reached through `String(at)` or `${at}`, which ' +
+    'no text scan can distinguish from the same operation on a number; and a ' +
+    'LENIENT PARSE, `new Date(s)` or `Date.parse(s)` on a date-time string ' +
+    'carrying no offset, which ECMAScript reads as LOCAL and whose ' +
+    'reachability is a type question. ADR-274 section 5 measured the one ' +
+    'caller-supplied site in this estate and reports it there. ' +
+    'THIS CHECK IS NOT A `TZ` REQUIREMENT AND DELIBERATELY NOT: nothing here ' +
+    'can read a deployment`s environment, so a stated setting would be a ' +
+    'control nobody checks. This is the property that makes the setting ' +
+    'irrelevant, which is checkable from here. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const sources = walk(root).filter((f) => {
+      if (!/\.(ts|tsx|mts|mjs|js)$/.test(f)) return false;
+      if (/(^|\/)(test|tests|__tests__|e2e|fixtures)\//.test(f)) return false;
+      if (/\.(test|spec)\.[a-z]+$/.test(f)) return false;
+      return (
+        /^apps\/[^/]+\/src\//.test(f) || /^packages\/[^/]+\/src\//.test(f) || /^scripts\//.test(f)
+      );
+    });
+
+    // A SENTINEL, on RI-24's and RI-25's precedent. Zero source files means the
+    // walk or the path filter has moved, at which point every leg below passes
+    // by having read nothing and the whole property is unguarded while the
+    // check reads PASS. The synthetic fixture writes several `apps/*/src`
+    // files, so this fires on a broken filter rather than on a small tree.
+    if (sources.length === 0) {
+      throw new Error(
+        'RI-28 found no source file under any `apps/*/src`, `packages/*/src` or `scripts/`. ' +
+          'Zero means the walk or the path filter has moved, at which point every leg is ' +
+          'asserting about an empty list and a local clock read anywhere in the tree would ' +
+          'report as absent',
+      );
+    }
+
+    for (const file of sources) {
+      const code = stripComments(readFileSync(join(root, file), 'utf8'));
+      /** @param {number} index */
+      const lineAt = (index) => code.slice(0, index).split('\n').length;
+
+      for (const [verb, pattern, instead] of LOCAL_CLOCK_READS) {
+        for (const m of code.matchAll(pattern)) {
+          findings.push(
+            `${file}:${lineAt(m.index ?? 0)} ${verb} the process's local clock, as ` +
+              `\`${(m[0] ?? '').trim()}\`. A calendar day has no timezone and an instant is ` +
+              'stored in UTC (CLAUDE.md), so a local clock field is a third answer that ' +
+              `moves with a deployment's \`TZ\` and appears in no diff. Use ${instead}`,
+          );
+        }
+      }
+
+      // THE LOCAL CONSTRUCTOR. Counted rather than pattern-matched, because the
+      // admitted spelling `new Date(Date.UTC(y, m, d))` carries the same commas.
+      for (const m of code.matchAll(/\bnew\s+Date\s*\(/g)) {
+        const call = callArguments(code, (m.index ?? 0) + m[0].length - 1);
+        if (call === null || call.args.length < 2) continue;
+        findings.push(
+          `${file}:${lineAt(m.index ?? 0)} constructs a \`Date\` from ${call.args.length} ` +
+            "components, which is the PROCESS'S LOCAL midnight. That is the exact call " +
+            'ADR-268 section 7 found `pg` making on every `date` column, and it read ' +
+            '`2026-08-28` as `2026-08-27` east of UTC. Use `new Date(Date.UTC(...))`',
+        );
+      }
+
+      // A FORMATTER THAT NAMES NO ZONE FORMATS IN THE PROCESS'S.
+      for (const m of code.matchAll(/\bIntl\.DateTimeFormat\s*\(/g)) {
+        const call = callArguments(code, (m.index ?? 0) + m[0].length - 1);
+        if (call === null || /\btimeZone\b/.test(call.text)) continue;
+        findings.push(
+          `${file}:${lineAt(m.index ?? 0)} constructs an \`Intl.DateTimeFormat\` naming no ` +
+            "`timeZone`, so it formats in the PROCESS'S zone. Name the zone the render is " +
+            'for: `packages/db/src/seed/calendars/generate.mjs` names the exchange`s and ' +
+            '`apps/portal/src/view/economic-calendar.ts` names the viewer`s',
+        );
+      }
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -6561,6 +6818,7 @@ export const CHECKS = [
   ri25,
   ri26,
   ri27,
+  ri28,
 ];
 
 function main() {

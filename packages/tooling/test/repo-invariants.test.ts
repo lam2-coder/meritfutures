@@ -3354,3 +3354,132 @@ describe('RI-26 keeps a temporal column name honest about its own type', () => {
     expect(() => findings('RI-26', root)).toThrow(/has stopped|reader or the comment stripper/);
   });
 });
+
+// -----------------------------------------------------------------------------
+// RI-28, the other half of the same subject
+// -----------------------------------------------------------------------------
+// RI-25 keeps the DRIVER from giving a calendar day a timezone. RI-28 keeps
+// MERIT'S OWN LINES from asking what the process's timezone is, which is the
+// larger half: the driver was one library doing one coercion, and this is every
+// line anybody writes from here on (ADR-274).
+//
+// THE FIXTURE IS ALREADY IN SCOPE, unlike RI-25's, because `cleanTree()` writes
+// several `apps/*/src` files. So the clean-tree cases above are a real pass over
+// a non-empty file list rather than a silence, and the seeds here write into
+// that same scope.
+describe('RI-28 refuses a process-local clock in shipped source', () => {
+  /** A tree in RI-28's scope: the fixture plus one source file carrying the seed. */
+  const treeWithSource = (body: string): string => {
+    const root = cleanTree();
+    write(root, 'apps/api/src/clock-seed.ts', body);
+    return root;
+  };
+
+  test('the clean fixture holds, and the scope it holds over is not empty', () => {
+    const root = cleanTree();
+    expect(findings('RI-28', root)).toEqual([]);
+    // THE PASS IS ASSERTED TO BE A REAL ONE. A filter that stopped matching
+    // would make every case in this block pass by reading nothing, so the
+    // admitted spellings are exercised here and the sentinel is exercised in
+    // the throwing direction in the last case of this block.
+    expect(
+      findings(
+        'RI-28',
+        treeWithSource(
+          'const a = new Date(Date.UTC(2026, 7, 28)).getUTCDate();\n' +
+            'const b = new Date(`2026-08-28T00:00:00Z`).toISOString();\n' +
+            "const c = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago' });\n" +
+            'const d = new Date(1);\n',
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  test.each([
+    [
+      'a local component getter',
+      'export const h = new Date().getHours();\n',
+      "reads the process's",
+    ],
+    [
+      'a local component setter',
+      'export const d = new Date();\nd.setHours(0);\n',
+      "writes the process's",
+    ],
+    [
+      'a local rendering',
+      'export const s = new Date().toDateString();\n',
+      "renders through the process's",
+    ],
+    ['a `process.env.TZ` read', "export const z = process.env['TZ'];\n", "asks for the process's"],
+    [
+      'the multi-argument constructor',
+      'export const m = new Date(2026, 7, 28);\n',
+      'constructs a `Date` from 3 components',
+    ],
+    [
+      'a formatter naming no zone',
+      "export const f = new Intl.DateTimeFormat('en-US', { hour: '2-digit' });\n",
+      'naming no `timeZone`',
+    ],
+  ])('RI-28 catches %s', (_what, body, needle) => {
+    expect(findings('RI-28', treeWithSource(body)).join('\n')).toContain(needle);
+  });
+
+  test('a `getUTC*` read is the admitted spelling and is not the getter it contains', () => {
+    // `getUTCDate` CONTAINS `getDate` AS A SUBSTRING IN NEITHER DIRECTION, and
+    // this case is what keeps a future widening of the pattern from banning the
+    // one spelling the check exists to send people to.
+    expect(
+      findings('RI-28', treeWithSource('export const u = new Date(1).getUTCDate();\n')),
+    ).toEqual([]);
+  });
+
+  test('COMMENTS ARE STRIPPED, AND THAT IS LOAD-BEARING RATHER THAN DEFENSIVE', () => {
+    // RI-25's seed found the same mechanism mattering in the OPPOSITE
+    // direction: there a comment made a presence check pass falsely. Here a
+    // comment would make an ABSENCE check fail falsely, and it is not
+    // hypothetical -- measured on the real tree while ADR-274 was written, the
+    // unstripped scan reports three findings, all of them prose in
+    // `scripts/ci/`. The files that talk most about a local clock are the
+    // headers of the files that refuse to use one.
+    const prose =
+      '// never call new Date().getHours() or toLocaleString(), and do not read\n' +
+      '// process.env.TZ. See ADR-274.\n' +
+      '/* nor new Date(2026, 7, 28), nor Intl.DateTimeFormat("en-US", {}) */\n' +
+      'export const ok = new Date(Date.UTC(2026, 7, 28)).toISOString();\n';
+    expect(findings('RI-28', treeWithSource(prose))).toEqual([]);
+  });
+
+  test('a trailing comma is not a second argument', () => {
+    // PRETTIER WRITES ONE whenever a single argument spans lines, and counting
+    // commas rather than arguments reported `packages/kyc/src/fakes/provider.ts`
+    // as a local construction while this check was being written.
+    const wrapped =
+      'export const e = new Date(\n  Date.UTC(2026, 7, 28) + 1000,\n).toISOString();\n';
+    expect(findings('RI-28', treeWithSource(wrapped))).toEqual([]);
+  });
+
+  test('a test file is out of scope, because building one on purpose is not using one', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'packages/db/test/date-column-timezone.test.ts',
+      'const x = new Date(2026, 7, 28);\n',
+    );
+    write(root, 'apps/api/src/e2e/pass.ts', 'const y = new Date().getHours();\n');
+    expect(findings('RI-28', root)).toEqual([]);
+  });
+
+  test('a scope that matches nothing THROWS rather than reporting a clean tree', () => {
+    // THE DIRECTION THAT MATTERS, and it is the one every case above depends
+    // on. RI-28 is an ABSENCE check, so a path filter that stopped matching
+    // reports PASS about an empty list while a local clock read anywhere in the
+    // tree goes unseen. That failure is silent in a way a presence check's is
+    // not, which is why the sentinel is a throw and not a finding.
+    const root = mkdtempSync(join(tmpdir(), 'merit-invariants-empty-'));
+    seeded.push(root);
+    write(root, 'docs/STATE.md', '# not source\n');
+    expect(() => findings('RI-28', root)).toThrow(/found no source file/);
+  });
+});
