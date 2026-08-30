@@ -29,9 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->261<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-
-**<!--gen:adr_count-->261<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->262<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10571,3 +10569,21 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **The document went to [INFRA section 3.1](architecture/INFRA.md), directly after `Environments`**, because an operator standing up a service reads section 3 and section 8 is read after the mistake; the scheduler's half went beside [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md)'s own table. **Where nothing can check, both documents say so plainly**, which is the row's second branch exercised twice.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **25 of 25** invariants off the runner's own last line, **293 files / 7,063 passed / 6 skipped** against a baseline of **293 / 7,050 / 6** measured on this tree by stashing the diff and restoring it byte-identical, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, per the row.
+
+## 2026-08-30 - Session 466: the register that names every invariant here was read by nothing ([ADR-275](decisions/ADR-275.md), proposed)
+
+**Row `275` asked for the leg that reads the live `CHECKS` array against the `RI-nn` register in [ALLOCATION](decisions/ALLOCATION.md), both directions, plus a title-drift leg. The row's claim held and the re-derivation sharpened it**: that document holds FOUR allocation tables and [`gates.mjs`](../scripts/corpus/gates.mjs) gates three of them, ADR numbers, migration numbers and `CI-06` letters through `CI-06p`. **The invariant register was the one registry in that file with nothing over it.** `RI-15` and `RI-16` read the document for `file:line` citations and neither parses a table.
+
+**`RI-29` IS MINTED, RESERVED TO THE ROW RATHER THAN READ OUT OF THE NEXT-FREE NOTE, AND ITS ROW IS WRITTEN IN THE SAME COMMIT AS THE CHECK** with its title copied out of the live array. Three legs, both completeness directions plus title drift, and a sentinel that THROWS on a register that parses to nothing.
+
+**IT LANDED RED ON FIVE DEFECTS AND EVERY OTHER GATE IN THE TREE WAS GREEN ACROSS ALL OF THEM.** `RI-11` had **no register row at all and never had one in any wave**, described only in a prose paragraph below the table. `RI-08`, `RI-18`, `RI-27` and `RI-28` each carried a third cell that was not the title the live array holds. **The row predicted where the value would be and the margin is large**: the completeness legs found one and the title leg found four. **Two of the four asserted in their own text that the title had been copied out of the array while carrying no title at all**, which is the failure careful reading cannot catch, and **two of the four drifted titles are COMPUTED**, so a typed copy could never have survived them.
+
+**NO EXEMPTION LIST LIVES INSIDE THE CHECK.** `RI-17` is in the register and not in `CHECKS` by a boundary ruling, and it is admitted by reading its OWN row for a link to a source file that exists and carries the id. A list of exceptions kept in the check would be the second copy this register exists to end.
+
+**THE SECOND PROPERTY THE ROW NAMED IS RULED UNBUILDABLE FROM HERE RATHER THAN FAKED**, which is [ADR-274](decisions/ADR-274.md)'s move on `TZ` one wave earlier. Nothing here can read a DISPATCH. **The repair is that a wave reserves each row's invariant number at dispatch, as row `275` did**, and the next-free note now says it is a record of what was taken rather than the reservation mechanism.
+
+**ONE FINDING OUTSIDE THE SUBJECT AND INSIDE THE FENCE, REPORTED AND REPAIRED**: this document carried its `The gate that closed` sentence TWICE, landed by session 465's merge. That is `RI-12`'s exact subject at a count below its threshold, so nothing could see it.
+
+**NOTHING EXECUTABLE IN `src/` CHANGED.** No migration, no port, no route, no door.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **28 of 28** invariants off the runner's own last line, **294 files / 7,100 passed / 6 skipped** against a baseline of **294 / 7,089 / 6** measured on this tree by stashing the diff and restoring it byte-identical by `sha256sum -c`, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, per the row, and `falsify.mjs` was not run.
