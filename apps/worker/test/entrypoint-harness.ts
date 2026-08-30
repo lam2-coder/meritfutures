@@ -20,6 +20,14 @@
 
 import { main, type WorkerJobIo } from '../src/index.ts';
 import type { WorkerDb } from '../src/db.ts';
+import {
+  ACCOUNT_A,
+  PLAN_VERSION_ID,
+  accountRow,
+  markRow,
+  planVersionRow,
+  sizeRow,
+} from './fixtures.ts';
 
 const MODE = process.argv[2] ?? '';
 
@@ -35,22 +43,44 @@ const SESSION = {
   sessionCloseAt: CLOSED_AT,
 };
 
-const MARK = { accountId: '11111111-1111-4111-8111-111111111111', supersededBy: null };
+// THE `refusing-port` MODE NOW CARRIES A WHOLE ACCOUNT DAY AND THAT IS THE
+// POINT RATHER THAN SETUP. `ADR-258` made `loadAccountDay` resolve five of an
+// `AccountDay`'s six fields, so a stub mark with two keys on it no longer
+// reaches the refusal: it reaches a `BatchRowError` about a column, which is a
+// different fact and would let case 2.3 pass while proving nothing about a
+// PORT. The rows below are `fixtures.ts`'s, which are `DATA_MODEL` section 11's
+// plan and the materialized grid, so this harness refuses where the deployment
+// refuses: after the plan resolved, the prior read and the mark was live, on
+// `external` and on nothing else.
+const DAY = SESSION.tradingDay;
 
 function rowsFor(key: string): unknown[] {
+  const refusing = MODE === 'refusing-port';
   if (key === 'tradingCalendar') return MODE === 'empty-calendar' ? [] : [SESSION];
   if (key === 'tradingCalendarRevisions') return [];
-  if (key === 'dailyMarks') return MODE === 'refusing-port' ? [MARK] : [];
+  if (key === 'dailyMarks') return refusing ? [markRow({ tradingDay: DAY })] : [];
   if (key === 'ruleStates') return [];
+  if (key === 'accounts') return refusing ? [accountRow({ openedOn: DAY })] : [];
+  if (key === 'planVersions') return refusing ? [planVersionRow()] : [];
+  if (key === 'planVersionSizes') return refusing ? [sizeRow()] : [];
+  if (key === 'payoutRequests') return [];
   throw new Error(`the harness has no rows for ${key}`);
 }
 
+/** The two addresses this path takes, answered by key rather than by predicate. */
+function rowAt(key: string, at: Record<string, unknown>): unknown {
+  if (key === 'accounts') return at['id'] === ACCOUNT_A ? accountRow({ openedOn: DAY }) : undefined;
+  if (key === 'planVersions') return at['id'] === PLAN_VERSION_ID ? planVersionRow() : undefined;
+  throw new Error(`the harness has no address for ${key}`);
+}
+
 // THE STUB IS CAST RATHER THAN IMPLEMENTED. `SystemTx` publishes seven methods
-// and this harness exercises two of them; implementing the other five would be
+// and this harness exercises three of them; implementing the other four would be
 // writing a second accessor to prove a fact about a process exit code.
 const tx = {
   rows: (key: string) => Promise.resolve(rowsFor(key)),
   rowsWhere: (key: string) => Promise.resolve(rowsFor(key)),
+  rowAt: (key: string, at: Record<string, unknown>) => Promise.resolve(rowAt(key, at)),
 } as unknown as Parameters<Parameters<WorkerDb['batch']>[0]>[0];
 
 const db: WorkerDb = { batch: (fn) => fn(tx) };
