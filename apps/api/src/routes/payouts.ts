@@ -246,7 +246,6 @@ export interface PayoutResponse {
     readonly min_business_days: number;
     readonly max_business_days: number;
   };
-  readonly eligibility_snapshot_id: string;
   readonly hold: PayoutHold | null;
 }
 
@@ -578,16 +577,23 @@ export interface PayoutTx {
   holdFlag(accountId: string): Promise<HoldFlag | null>;
 
   /**
-   * Write the request. Returns the stored snapshot id.
+   * Write the request.
+   *
+   * IT RETURNS NOTHING AND ADR-289 IS WHY. This member used to promise
+   * `{ eligibilitySnapshotId }` and nothing in this repository could supply
+   * one: the stored proof is `eligibility_snapshot jsonb NOT NULL`
+   * (`0010_payouts.sql:74`) and that migration refuses a separate identity for
+   * it in its own words, because a join here "would add a way for THE PROOF AND
+   * THE DECISION to disagree". The proof is addressed by `payout_request_id`,
+   * which the response already carries. A return value nothing can produce is
+   * an invitation to an adapter to invent one, on the money path.
    *
    * THE LAST WRITE ON THIS PATH, AND THAT IS ADR-176 IN THE INTERFACE. What
    * this transaction commits is the APPROVAL; the `LT-01` posting is performed
    * at a system authority, so there is no ledger handle on this port and no
    * member of this interface that a scoped door cannot serve.
    */
-  insertPayoutRequest(
-    row: PayoutRequestInsert,
-  ): Promise<{ readonly eligibilitySnapshotId: string }>;
+  insertPayoutRequest(row: PayoutRequestInsert): Promise<void>;
 }
 
 /** What opens a transaction, plus the store the idempotency layer needs. */
@@ -1198,7 +1204,7 @@ async function decidePayout(args: {
           },
   };
 
-  const { eligibilitySnapshotId } = await tx.insertPayoutRequest(row);
+  await tx.insertPayoutRequest(row);
 
   // THE POSTING USED TO BE HERE, GUARDED BY `flag === null`, AND ADR-176 MOVED
   // IT OFF THIS PATH RATHER THAN DELETING IT. `PayoutTx` no longer carries a
@@ -1247,7 +1253,6 @@ async function decidePayout(args: {
     basis_trading_day: evaluation.asOfTradingDay,
     payout_ordinal: evaluation.ordinal,
     estimated_settlement: ESTIMATED_SETTLEMENT,
-    eligibility_snapshot_id: eligibilitySnapshotId,
     hold: holdBlockOf(row),
   };
 }
