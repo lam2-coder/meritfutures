@@ -612,7 +612,7 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
   });
 });
 
-describe('link 6: the READER exists now, and the DAY it must select by does not reach it', () => {
+describe('link 6: the READER exists, and the DAY it selects by now has a door', () => {
   // **THE FIRST LINK ON THIS LIST TO CLOSE ON THIS DEPLOYABLE'S OWN SIDE.**
   // Links 1 to 3 were all `apps/worker`'s: a job nothing called, an adapter that
   // refused, a codec nobody had written. Link 4 is the empty table. What was
@@ -620,12 +620,15 @@ describe('link 6: the READER exists now, and the DAY it must select by does not 
   // turns a stored row into the `RuleState` `PayoutSubject.state` declares, and
   // `ADR-264` writes it.
   //
-  // AND THE LINK UNDER IT IS NEW, WHICH IS THIS ENTRY'S FIFTH TIME. `R-06` is
-  // that no endpoint may evaluate eligibility against anything other than the
-  // LAST CLOSED DAY. The reader therefore takes the day as an argument and has
-  // no `latest` arm; the caller is the only thing that could know which day the
-  // calendar says is closed, and a scoped payout transaction cannot read the
-  // calendar at all.
+  // AND THE LINK UNDER IT WAS NEW WHEN `ADR-264` FOUND IT, AND `ADR-268` CLOSES
+  // IT. `R-06` is that no endpoint may evaluate eligibility against anything
+  // other than the LAST CLOSED DAY. The reader therefore takes the day as an
+  // argument and has no `latest` arm; the caller is the only thing that could
+  // know which day the calendar says is closed, and until `ADR-268` a scoped
+  // payout transaction could not read the calendar at all. What closes it is a
+  // NAMED DOOR and not a sixth catalogued key, so the assertions below that the
+  // list did not move are unchanged and are now load bearing in the other
+  // direction: they are what would catch the shorter diff being taken later.
 
   test('one `rule_states` row reader ships under a `src/` in THIS deployable, and it refuses absence', () => {
     // THE NEEDLE IS THE CODEC CALL AND NOT THE TYPE NAME, on link 5's own
@@ -674,13 +677,14 @@ describe('link 6: the READER exists now, and the DAY it must select by does not 
     expect(reader).toContain('throw new RuleStateAbsent');
   });
 
-  test('and `tradingCalendar` is `firm` and OUTSIDE the five keys ADR-233 catalogued', () => {
-    // **THE BLOCKER UNDER THE READER, DERIVED ON THIS TREE RATHER THAN
-    // ASSERTED.** `subject()` runs on the payout transaction, which is a
-    // `ScopedTx`. `ADR-233` gave that handle a `firm`-class read over
-    // `CATALOG_TABLE_KEYS`, a CLOSED list, and the calendar is not on it. So the
-    // one fact that decides WHICH stored row `R-06` permits is unreadable
-    // exactly where the state is read.
+  test('and `tradingCalendar` is `firm` and STILL OUTSIDE the five keys ADR-233 catalogued', () => {
+    // **THE BLOCKER `ADR-264` DERIVED, AND THE HALF OF IT THAT DID NOT MOVE.**
+    // `subject()` runs on the payout transaction, which is a `ScopedTx`.
+    // `ADR-233` gave that handle a `firm`-class read over `CATALOG_TABLE_KEYS`,
+    // a CLOSED list, and the calendar is not on it. `ADR-268` reads the calendar
+    // through a NAMED DOOR instead, so this list is asserted here for the
+    // opposite reason it used to be: not because the day is unreachable, but
+    // because the shorter diff was available and was refused.
     const scoped = readFileSync(join(REPO_ROOT, 'packages/db/src/scoped-db.ts'), 'utf8');
     const list = scoped.slice(scoped.indexOf('export const CATALOG_TABLE_KEYS = ['));
     const catalogued = [...list.slice(0, list.indexOf(']')).matchAll(/'(\w+)'/g)].map(
@@ -705,18 +709,72 @@ describe('link 6: the READER exists now, and the DAY it must select by does not 
     const entry = registry.slice(registry.indexOf('\n  tradingCalendar: {'));
     expect(entry.slice(0, entry.indexOf('\n  },'))).toContain("class: 'firm'");
 
-    // **AND THE READ EXISTS IN THIS DEPLOYABLE, ON A DIFFERENT DOOR, WHICH IS
-    // WHY THIS IS A SECOND TRANSACTION RATHER THAN A MISSING CAPABILITY.**
-    // `databaseEconomicCalendar` reads the same table through `ApiDb.firm`. So
-    // what `subject()` needs is `ADR-211` clause 2's two-transaction remedy,
-    // which `ADR-233` removed the need for on the CATALOGUE half and which
-    // nothing has ruled on the CALENDAR half, or a sixth catalogued key. Both
-    // are somebody's ruling and `ADR-264` takes neither.
+    // **AND THE READ EXISTS IN THIS DEPLOYABLE ON A DIFFERENT DOOR, WHICH IS
+    // WHAT MADE THE SECOND TRANSACTION LOOK LIKE THE CHEAP ANSWER.**
+    // `databaseEconomicCalendar` reads the same table through `ApiDb.firm`. That
+    // read is a PANEL and this one is a verdict, and `ADR-268` refuses the
+    // crossing here on `ADR-211` clause 4's own precondition: that crossing was
+    // made safe by a migration after which nothing readable can move, and this
+    // table is the one the corpus built a correction mechanism FOR.
     const api = codeOf(join(REPO_ROOT, 'apps/api/src/routes/economic-calendar.ts'));
     expect(api).toContain("tx.rowsWhere('tradingCalendar'");
     expect(api).toContain('db.firm(');
     expect(codeOf(join(REPO_ROOT, 'apps/api/src/db.ts'))).toContain(
       'firm<T>(fn: (tx: FirmTx) => Promise<T>): Promise<T>;',
     );
+  });
+
+  test('the day reaches the payout transaction through ONE named door and no other way', () => {
+    // **THE DOOR, AND THE THREE THINGS IT IS NOT.** It is a method of `ScopedTx`
+    // returning ONE day, so it is not a catalogue admission, not a second
+    // transaction and not a `PayoutTx` member: `ADR-211` foreclosure 2 said a
+    // `PayoutTx` will not gain a firm method, and it does not.
+    const scoped = readFileSync(join(REPO_ROOT, 'packages/db/src/scoped-db.ts'), 'utf8');
+    expect(scoped).toContain('lastClosedTradingDay(): Promise<string>;');
+    expect(scoped).toContain('export async function lastClosedTradingDayStatement');
+
+    const route = codeOf(join(REPO_ROOT, 'apps/api/src/routes/payouts.ts'));
+    expect(route).not.toContain('lastClosedTradingDay(): Promise<');
+    expect(route).not.toContain('session_close_at');
+    expect(route).not.toContain('sessionCloseAt');
+  });
+
+  test('THE FOLD IS NOT RESTATED, and the two statements of it that exist are named', () => {
+    // **`R-06`'s SELECTION IS ONE PREDICATE AND THIS TREE ALREADY STATES IT
+    // TWICE**, which is the whole argument against handing a caller rows. The
+    // census is over the tree rather than over a list, so a third statement
+    // appearing anywhere turns this red rather than being noticed in review.
+    const folds = deployableSources()
+      .filter((path) => /session_?[cC]lose_?[aA]t/.test(codeOf(path)))
+      .map(rel)
+      .sort();
+
+    // **THE WHOLE LIST IS ASSERTED AND EACH MEMBER IS SAID TO BE WHAT IT IS**,
+    // on link 5's own idiom about the engine's file: a census that named only
+    // the interesting members would be a filter somebody tuned. Two of these
+    // SELECT A DAY, three DECLARE the column, and one is the door.
+    //
+    //   `apps/worker/src/batch/adapter.ts`      SELECTS. `readLastClosedTradingDay`,
+    //                                           consults no coverage at all.
+    //   `apps/api/src/admin-source/liability.ts` SELECTS. `lastClosedDay`, whose
+    //                                           caller `anchorCalendar` does.
+    //   `packages/db/src/scoped-db.ts`          THE DOOR. ADR-268.
+    //   `packages/db/src/schema.ts`             declares the column.
+    //   `packages/db/src/scope.ts`              the registry rule's prose.
+    //   `packages/rules-engine/src/calendar.ts` the engine's own calendar type.
+    //
+    // `apps/api/src/routes/economic-calendar.ts` is NOT here and that is right:
+    // it counts sessions still AHEAD off `session_open_at` for a freshness panel
+    // and selects no day at all. A SEVENTH member is a third selection of `R-06`
+    // and turns this red, which is the control the catalogue admission would
+    // have had no way to provide.
+    expect(folds).toEqual([
+      'apps/api/src/admin-source/liability.ts',
+      'apps/worker/src/batch/adapter.ts',
+      'packages/db/src/schema.ts',
+      'packages/db/src/scope.ts',
+      'packages/db/src/scoped-db.ts',
+      'packages/rules-engine/src/calendar.ts',
+    ]);
   });
 });

@@ -281,7 +281,9 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-265](ADR-265.md) | the cap gets a door that hands out one number, the catalogue admission its own sizing called for is refused because it would have built the trap, and the two ports become one finding again  (2026-08-30, status: proposed) |
 | [ADR-266](ADR-266.md) | the guard ADR-261 named is written, the list port's refusal is moved into the read arm so a deferral cannot decide it, and the second of the two card ports is wired (2026-08-30, status: proposed) |
 | [ADR-267](ADR-267.md) | the remedy does not transfer, because LT-01 credits the wallet and LT-06 debits it, and the corpus separates the two legs by exactly that fact  (2026-08-30, status: proposed) |
+| [ADR-268](ADR-268.md) | the day is a named door, because a catalogue read would hand the payout route R-06 itself and a second transaction would compute a verdict from a calendar the recording transaction never read  (2026-08-30, status: proposed) |
 | [ADR-269](ADR-269.md) | a blocker whose every term is spent while its figure stays absent was stated one layer too high, the fold that names the layer underneath, and a liability figure that says which of its terms are measured  (2026-08-30, status: proposed) |
+| [ADR-270](ADR-270.md) | what posts a ledger entry is decided by who the transaction's opener serves, a posting may move to a clock exactly where its pinned check resolves no caller, and both refusals stand  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
