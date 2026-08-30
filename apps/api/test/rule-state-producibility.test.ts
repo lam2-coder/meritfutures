@@ -919,13 +919,11 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     );
     expect(migration).toMatch(/payout_cap_schedule_cents\s+jsonb NOT NULL/);
 
-    // **AND IT IS NOT ONE PREDICATE STATED TWICE, WHICH IS WHY `ADR-283` DID NOT
-    // TAKE IT WITH THE BLOB.** The two size-row readers read two DIFFERENT
-    // sources under two different key spellings: `apps/worker` reads a driver row
-    // whose properties are `packages/db`'s camelCase, and `apps/site` reads a
-    // wire object under the stored snake_case column names. A single canonical
-    // decoder has to pick one spelling and make the other caller rename, which is
-    // a ruling somebody owns rather than a transcription.
+    // **THE SPELLING DIFFERENCE IS REAL AND `ADR-286` RE-DERIVED IT RATHER THAN
+    // TAKING `ADR-283`'s WORD FOR IT**, because the whole case for treating the
+    // size row differently from the blob rested on it. `apps/worker` reads a
+    // driver row whose properties are `packages/db`'s camelCase; `apps/site`
+    // reads a wire object under the stored snake_case column names.
     expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
       "size_cents: bigintOf(row, 'sizeCents', at),",
     );
@@ -935,6 +933,189 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     expect(readFileSync(join(REPO_ROOT, 'packages/db/src/schema.ts'), 'utf8')).toContain(
       "sizeCents: bigint('size_cents', { mode: 'bigint' }).notNull(),",
     );
+  });
+
+  test('the spelling is the DEPENDENCY GRAPH and not a preference either reader could trade', () => {
+    // **`ADR-286` RULING 2. THIS IS THE CASE THAT RETIRES "ONE CALLER HAS TO
+    // RENAME".** `ADR-283` section 5 read the two spellings and concluded that a
+    // canonical decoder must pick one and make the other caller rename, which it
+    // correctly declined to decide. What it did not measure is WHY each reader
+    // spells its source the way it does, and the answer is in the manifests
+    // rather than in the readers: **`apps/site` DECLARES NO `@merit/db` AT ALL.**
+    //
+    // So `apps/site` reads snake_case because it reads Merit's own HTTP response
+    // and has no database to read instead, and `apps/worker` reads camelCase
+    // because Drizzle hands back property names. **NEITHER SPELLING IS A CHOICE,
+    // SO NEITHER IS TRADEABLE**: asking the site to read camelCase is asking the
+    // wire contract to change, and asking the worker to read snake_case is asking
+    // `packages/db` to stop mapping. There is no rename to negotiate.
+    const manifest = (unit: string): { dependencies?: Record<string, string> } =>
+      JSON.parse(readFileSync(join(REPO_ROOT, 'apps', unit, 'package.json'), 'utf8')) as {
+        dependencies?: Record<string, string>;
+      };
+
+    expect(manifest('worker').dependencies?.['@merit/db']).toBe('workspace:*');
+    expect(manifest('api').dependencies?.['@merit/db']).toBe('workspace:*');
+    expect(
+      manifest('site').dependencies?.['@merit/db'],
+      'the site gained a database dependency, so ADR-286 ruling 2 has lost its ground',
+    ).toBeUndefined();
+
+    // **AND THE PAYOUT PATH IS ON THE DRIVER SIDE OF THAT SPLIT, WHICH IS WHY IT
+    // NEEDS NO RENAME FROM ANYBODY.** `apps/api` already reads `plan_version_sizes`
+    // off this door under the driver spelling, in its own catalogue route. What it
+    // lacks is not a spelling ruling; it is a decoder for the spelling it already
+    // reads, in a home both driver-side deployables can reach.
+    expect(codeOf(join(REPO_ROOT, 'apps/api/src/routes/catalog.ts'))).toContain(
+      "size_cents: cents(row, 'sizeCents', PLAN_VERSION_SIZES),",
+    );
+  });
+
+  test('and the engine may not be that home, which is `RI-01` and not a preference', () => {
+    // **`ADR-286` RULING 3.** A decoder for the DRIVER spelling has to know
+    // `packages/db`'s property names. `packages/rules-engine` declares no
+    // workspace dependency in any field and its own manifest says it never may,
+    // so the engine is foreclosed as the home for the driver-side decoder by the
+    // invariant rather than by taste. That is the same argument `ADR-239` slice A
+    // used to PUT `gates-codec.ts` in the engine, read in the other direction:
+    // the gates predicate needs no database naming and this one does.
+    const engine = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'packages/rules-engine/package.json'), 'utf8'),
+    ) as Record<string, unknown>;
+
+    for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies'])
+      expect(engine[field], `the engine declares ${field}, so RI-01 has moved`).toBeUndefined();
+
+    const dev = (engine['devDependencies'] ?? {}) as Record<string, string>;
+    expect(Object.values(dev).filter((range) => range.startsWith('workspace:'))).toEqual([]);
+
+    // AND THE TWO DRIVER-SIDE DEPLOYABLES CANNOT REACH EACH OTHER EITHER, so
+    // `apps/worker`'s existing `toSizeRow` is not a home for `apps/api` however
+    // exactly it already fits.
+    const apiDeps = (
+      JSON.parse(readFileSync(join(REPO_ROOT, 'apps/api/package.json'), 'utf8')) as {
+        dependencies?: Record<string, string>;
+      }
+    ).dependencies;
+    expect(apiDeps?.['@merit/worker']).toBeUndefined();
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
+      'function toSizeRow(value: unknown, at: string): PublishedSizeRow {',
+    );
+  });
+
+  test('the ONE `FM-16` here is the CAP SCHEDULE, and its census is THREE and not two', () => {
+    // **`ADR-286` RULING 5, AND IT IS THE FINDING `ADR-283` COULD NOT SEE FROM
+    // WHERE IT STOOD.** That entry counted the readers of the size ROW and found
+    // two. The `jsonb` COLUMN inside the row has a THIRD reader, and it is
+    // invisible to a count of size-row readers because it returns a LOCAL step
+    // type rather than the engine's.
+    //
+    // **AND ALL THREE SPELL THE BLOB'S OWN KEYS IDENTICALLY.** `from_ordinal` and
+    // `cap_cents` are what Postgres stores and what every reader asks for, so the
+    // spelling ruling above does not reach inside the column: this half IS one
+    // predicate stated three times, which is `FM-16` by name on the value that
+    // fixes a payout ceiling.
+    // **THE NEEDLE IS THE QUOTED KEY AND NOT THE NAME**, and the difference is
+    // the whole census. A file that reads `'cap_cents'` as a STRING is pulling it
+    // out of an untyped bag, which is a decode; a file that writes `.cap_cents` is
+    // reading a field off a value somebody already decoded, which is a use. The
+    // broad question returns eleven files and five of them are consumers,
+    // `apps/portal/src/view/eligibility.ts` and `packages/rules-engine/src/plan/
+    // resolve.ts` among them. Measured before this list was written.
+    const readers = deployableSources()
+      .filter((path) => /'cap_cents'/.test(codeOf(path)))
+      .map(rel)
+      .sort();
+
+    expect(readers).toEqual([
+      'apps/api/src/routes/catalog.ts',
+      'apps/site/src/catalog/adapter.ts',
+      'apps/worker/src/batch/adapter.ts',
+    ]);
+
+    // THE THREE DECODERS, NAMED, because a census satisfied by a count would be
+    // satisfied by three files that had drifted into the pattern. The engine's
+    // three entries above DECLARE and CONSUME the step; they decode nothing.
+    expect(codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'))).toContain(
+      "from_ordinal: jsonInteger(jsonField(source, 'from_ordinal', where), `${where}.from_ordinal`),",
+    );
+    expect(codeOf(join(REPO_ROOT, 'apps/site/src/catalog/adapter.ts'))).toContain(
+      "from_ordinal: integer(field(source, 'from_ordinal', at), `${at}.from_ordinal`),",
+    );
+    expect(codeOf(join(REPO_ROOT, 'apps/api/src/routes/catalog.ts'))).toContain(
+      'function readCapSchedule(raw: unknown, planVersionId: string): readonly CapScheduleStep[] {',
+    );
+
+    // AND NO DECODER FOR IT LIVES IN THE ENGINE YET, which is what `ADR-286`
+    // ruling 6 declines to change in this fence. A fourth statement written here
+    // instead of a collapse is the trap row `286` named; this list going to four
+    // is that trap arriving, and it is right for this case to go red. The day the
+    // collapse lands the list drops to `packages/rules-engine` plus whatever has
+    // not been retired, which is what makes the follow-up checkable.
+    expect(readers.filter((path) => path.startsWith('packages/'))).toEqual([]);
+  });
+
+  test('and the THIRD statement of it DIVERGES, on the money, in `apps/api`', () => {
+    // **`ADR-286` RULING 7. THIS IS THE "WITH NOTHING COMPARING THEM" HALF OF
+    // `FM-16` COLLECTING, AND IT IS REPORTED RATHER THAN REPAIRED BECAUSE
+    // `apps/api/src/**` IS OUTSIDE ROW `286`'s FENCE.**
+    //
+    // `apps/worker` and `apps/site` both admit a cents value as a safe-integer
+    // JSON number OR as a base-10 string of digits, and both REFUSE a number past
+    // `Number.MAX_SAFE_INTEGER` rather than rounding it. `apps/api`'s copy does
+    // neither: it tests `Number.isInteger`, which is TRUE of `2 ** 53 + 1` and of
+    // `1e20`, and then converts with `BigInt`, which takes the rounded double.
+    // A cap silently reduced is a payout ceiling nobody published, and a base-10
+    // string -- the rendering `ADR-283` ruling 5 blessed as the only one that
+    // survives above the ceiling -- is refused outright by the same two lines.
+    const worker = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'));
+    const site = codeOf(join(REPO_ROOT, 'apps/site/src/catalog/adapter.ts'));
+    const api = codeOf(join(REPO_ROOT, 'apps/api/src/routes/catalog.ts'));
+
+    for (const [where, source] of [
+      ['apps/worker', worker],
+      ['apps/site', site],
+    ] as const) {
+      expect(source, `${where} stopped refusing an unsafe cents number`).toContain(
+        'Number.isSafeInteger(value)',
+      );
+      expect(source, `${where} stopped admitting a base-10 cents string`).toMatch(
+        /typeof value === 'string' && \/\^-\?\\d\+\$\/\.test\(value\)/,
+      );
+    }
+
+    // THE DIVERGENCE, ASSERTED AS THE LIVE PROPERTY IT IS. When this case goes
+    // red because `apps/api` now reads `Number.isSafeInteger`, the finding has
+    // been repaired and `ADR-286` section 7 item 1 is closed.
+    //
+    // **THE QUESTION IS ASKED OF THE FUNCTION AND NOT OF THE FILE**, because
+    // `routes/catalog.ts` reads the `bigint` COLUMNS through a helper that does
+    // check `Number.isSafeInteger`, and a file-wide question would report the
+    // file safe on the strength of the reader that is not the one in question.
+    const capReader = api.slice(api.indexOf('function readCapSchedule('));
+    const readCapSchedule = capReader.slice(0, capReader.indexOf('\nfunction '));
+    expect(readCapSchedule, 'the cap-schedule reader was renamed or removed').toContain(
+      'CatalogRowError',
+    );
+
+    expect(
+      readCapSchedule,
+      'apps/api`s cap-schedule reader now refuses an unsafe cents number, so ADR-286 item 1 is closed',
+    ).toContain("if (typeof cap !== 'number' || !Number.isInteger(cap))");
+    expect(readCapSchedule).not.toContain('Number.isSafeInteger');
+
+    // AND IT ADMITS NO BASE-10 STRING, which is the second half of the same two
+    // lines and the rendering `ADR-283` ruling 5 ruled the only one that survives
+    // above the ceiling. So the divergence runs in BOTH directions: this reader
+    // takes a number the others refuse and refuses a string the others take.
+    expect(readCapSchedule).not.toContain("typeof cap === 'string'");
+
+    // AND THE ROUNDING IS EXECUTED RATHER THAN REASONED ABOUT, because a claim
+    // about a double is the kind this file has been wrong about before.
+    const stored = JSON.parse('{"cap_cents":9007199254740993}') as { cap_cents: number };
+    expect(Number.isInteger(stored.cap_cents)).toBe(true);
+    expect(Number.isSafeInteger(stored.cap_cents)).toBe(false);
+    expect(BigInt(stored.cap_cents)).toBe(9_007_199_254_740_992n);
   });
 
   test('and an ABSENT `rule_states` row now has an HONEST refusal rather than a 500', () => {
@@ -998,6 +1179,30 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     expect(backends).toEqual([]);
 
     expect(codeOf(join(REPO_ROOT, 'apps/api/src/start.ts'))).not.toContain('usePayoutBackend(');
+  });
+
+  test('and the entry names what the SIZE ROW waits on as a HOME rather than as a rename', () => {
+    // **`ADR-286` RULING 8, AND THIS IS THE CASE THAT KEEPS THE ENTRY FROM
+    // SENDING THE NEXT SESSION AT THE WRONG TARGET.** The entry carried
+    // `ADR-283`'s framing, which said a canonical decoder has to make one caller
+    // rename. `ADR-286` measured the manifests and found the spelling is the
+    // dependency graph rather than a preference, so there is no rename to
+    // negotiate and the residue is a HOME: a driver-side decoder is needed by
+    // `apps/api` and `apps/worker`, `RI-01` forecloses the engine, and the two
+    // deployables cannot import each other.
+    const reason = payoutReason();
+
+    expect(reason).toContain('ADR-286');
+    expect(reason).toContain('@merit/db');
+    expect(reason).toContain('RI-01');
+    expect(reason).toContain('payout_cap_schedule_cents');
+    expect(reason).toContain('readCapSchedule');
+
+    // THE RETIRED FRAMING, ASSERTED ABSENT AND ASSEMBLED RATHER THAN WRITTEN
+    // OUT, on this file's own standing rule: a reason that reproduces its own
+    // retired sentence reads as live to every grep, and to the predicate that
+    // checks it is gone.
+    expect(reason).not.toContain('has to make one caller ' + 'rename');
   });
 
   test('and the entry names the decoding that LANDED rather than the one that was missing', () => {
