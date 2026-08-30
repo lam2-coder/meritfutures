@@ -179,6 +179,7 @@
 // lines against a vendor adapter on the pricing page is not a close call.
 // =============================================================================
 
+import { decodeCapScheduleCents } from '@merit/rules-engine';
 import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
 import type { ApiDb } from '../db.ts';
@@ -1207,38 +1208,6 @@ function readPlanVersion(raw: unknown): PlanVersionRow {
   };
 }
 
-/**
- * The materialized cap schedule, read step by step.
- *
- * `cap_cents` ARRIVES AS A JSON NUMBER AND NOT AS A `bigint`, because it lives
- * inside `jsonb` rather than in a `bigint` column, and JSON has one number type.
- * That is a real narrowing of INV-02 and it is the schema's rather than this
- * file's: it is checked for integrality here and converted once, which is the
- * most a reader can do about a value the database stored as a double.
- */
-function readCapSchedule(raw: unknown, planVersionId: string): readonly CapScheduleStep[] {
-  if (!Array.isArray(raw))
-    throw new CatalogRowError(
-      `plan version ${planVersionId} has a \`payout_cap_schedule_cents\` that is not an array. ` +
-        '`0004` declares it "ordered steps keyed by payout ordinal", an array from day one',
-    );
-  return raw.map((entry): CapScheduleStep => {
-    const step = asRow(entry, 'plan_version_sizes.payout_cap_schedule_cents');
-    const ordinal = step['from_ordinal'];
-    const cap = step['cap_cents'];
-    if (typeof ordinal !== 'number' || !Number.isInteger(ordinal))
-      throw new CatalogRowError(
-        `plan version ${planVersionId} has a cap schedule step with no integer \`from_ordinal\``,
-      );
-    if (typeof cap !== 'number' || !Number.isInteger(cap))
-      throw new CatalogRowError(
-        `plan version ${planVersionId} has a cap schedule step whose \`cap_cents\` is not an ` +
-          'integer. Money is integer cents even inside jsonb',
-      );
-    return { from_ordinal: ordinal, cap_cents: BigInt(cap) };
-  });
-}
-
 function readSize(raw: unknown): PlanVersionSizeRow {
   const row = asRow(raw, PLAN_VERSION_SIZES);
   const planVersionId = str(row, 'planVersionId', PLAN_VERSION_SIZES);
@@ -1251,7 +1220,20 @@ function readSize(raw: unknown): PlanVersionSizeRow {
     profit_target_cents: maybeCents(row, 'profitTargetCents', PLAN_VERSION_SIZES),
     buffer_cents: cents(row, 'bufferCents', PLAN_VERSION_SIZES),
     win_day_floor_cents: cents(row, 'winDayFloorCents', PLAN_VERSION_SIZES),
-    payout_cap_schedule_cents: readCapSchedule(row['payoutCapScheduleCents'], planVersionId),
+    // **ADR-302's COLLAPSE, AND THIS SIDE OF IT IS NOT BEHAVIOUR-PRESERVING.**
+    // `readCapSchedule` stood here and DIVERGED FROM ITS TWO PEERS ON THE MONEY,
+    // in both directions: it tested `Number.isInteger`, which is TRUE of
+    // `2 ** 53 + 1`, and then converted with `BigInt`, so a `cap_cents` past
+    // `Number.MAX_SAFE_INTEGER` was ADMITTED AND HANDED BACK ROUNDED; and it
+    // refused a base-10 string of digits outright, which is the rendering
+    // ADR-283 ruling 5 ruled the only one that survives above that ceiling.
+    // `apps/worker` and `apps/site` did neither. The engine's codec is now the
+    // single statement and this reader gains a refusal it did not have and loses
+    // one it should never have had. ADR-302 and ADR-299 section 7.
+    payout_cap_schedule_cents: decodeCapScheduleCents(
+      row['payoutCapScheduleCents'],
+      `plan_version_sizes[${planVersionId}].payoutCapScheduleCents`,
+    ),
   };
 }
 

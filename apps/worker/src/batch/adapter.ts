@@ -116,6 +116,7 @@ import type {
 } from '@merit/rules-engine';
 import {
   buildCalendarSlice,
+  decodeCapScheduleCents,
   decodeEngineGates,
   encodeEngineGates,
   resolveExternalGates,
@@ -1306,7 +1307,16 @@ function toSizeRow(value: unknown, at: string): PublishedSizeRow {
     profit_target_cents: bigintOrNull(row, 'profitTargetCents', at),
     buffer_cents: bigintOf(row, 'bufferCents', at),
     win_day_floor_cents: bigintOf(row, 'winDayFloorCents', at),
-    payout_cap_schedule_cents: toCapScheduleCents(
+    // **ADR-302's COLLAPSE, AND THIS SIDE OF IT IS BEHAVIOUR-PRESERVING.**
+    // `toCapScheduleCents` stood here and stated, in this deployable's own
+    // helpers, exactly what the engine's codec now states once for all three
+    // readers of the column: a safe-integer JSON number or a base-10 string of
+    // digits, and a number past `Number.MAX_SAFE_INTEGER` REFUSED rather than
+    // rounded. What changes is the class of the refusal, which is
+    // `CapScheduleCodecError` and no longer `BatchRowError`; `decodeEngineGates`
+    // one field down has thrown `EngineGatesCodecError` through this same adapter
+    // since ADR-250 and nothing here branches on either.
+    payout_cap_schedule_cents: decodeCapScheduleCents(
       row['payoutCapScheduleCents'],
       `${at}.payoutCapScheduleCents`,
     ),
@@ -1315,20 +1325,6 @@ function toSizeRow(value: unknown, at: string): PublishedSizeRow {
     floor_lock_at_profit_cents: bigintOrNull(row, 'floorLockAtProfitCents', at),
     floor_lock_floor_at_cents: bigintOrNull(row, 'floorLockFloorAtCents', at),
   };
-}
-
-function toCapScheduleCents(
-  value: unknown,
-  at: string,
-): PublishedSizeRow['payout_cap_schedule_cents'] {
-  return jsonList(value, at).map((step, index) => {
-    const where = `${at}[${String(index)}]`;
-    const source = jsonRecord(step, where);
-    return {
-      from_ordinal: jsonInteger(jsonField(source, 'from_ordinal', where), `${where}.from_ordinal`),
-      cap_cents: jsonCents(jsonField(source, 'cap_cents', where), `${where}.cap_cents`),
-    };
-  });
 }
 
 // -----------------------------------------------------------------------------
