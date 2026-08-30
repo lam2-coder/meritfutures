@@ -288,6 +288,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-272](ADR-272.md) | a suffix that lies inside the temporal vocabulary is the defect, and a name that says nothing is not  (2026-08-30, status: proposed) |
 | [ADR-273](ADR-273.md) | the coverage check lives in the caller and that is safe exactly where a TYPE makes forgetting a compile error, so the split is ruled rather than moved and the census is closed by `RI-27`  (2026-08-30, status: proposed) |
 | [ADR-274](ADR-274.md) | five clocks and an operator was told about none of them, so `TZ` is written down as the one that decides nothing and a check keeps it that way  (2026-08-30, status: proposed) |
+| [ADR-275](ADR-275.md) | the register that names every invariant in this tree was read by nothing, so a check could land without its row with every gate green  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
