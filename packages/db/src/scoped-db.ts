@@ -50,10 +50,12 @@
 
 import {
   and,
+  asc,
   desc,
   eq,
   exists,
   getTableColumns,
+  gt,
   gte,
   isNull as isNullColumn,
   lte,
@@ -3019,6 +3021,260 @@ export async function effectiveAccountCapStatement(
 }
 
 // =============================================================================
+// THE FOURTH NAMED DOOR: THE LAST CLOSED TRADING DAY (ADR-268)
+// =============================================================================
+// `R-06` is that no endpoint may evaluate eligibility against anything other
+// than the LAST CLOSED DAY, whatever the batch is doing at the time. So
+// `PayoutTx.subject()` has to select the stored `rule_states` row BY DAY, and
+// ADR-264 section 5 found that the day was unreadable exactly where the state is
+// read: `trading_calendar` is scope class `firm` and `CATALOG_TABLE_KEYS` does
+// not carry it, so a `ScopedTx` could not reach the calendar at all.
+//
+// ADR-264 named two remedies -- ADR-211 clause 2's two-transaction crossing, or
+// a sixth catalogued key -- and took neither. BOTH ARE REFUSED HERE AND THIS IS
+// THE THIRD ANSWER.
+//
+// -----------------------------------------------------------------------------
+// WHY NOT A SIXTH CATALOGUED KEY
+// -----------------------------------------------------------------------------
+// ADR-265's shape argument, and it lands harder on this table than on the one it
+// was written for. A CATALOGUE READ HANDS OUT ROWS AND THE CALLER FOLDS THEM,
+// and the fold this caller would then be holding is not a lookup: it is
+// "which day is the last closed one", which is `R-06` itself.
+//
+// THAT FOLD IS ALREADY STATED TWICE IN THIS TREE AND THE TWO STATEMENTS
+// DISAGREE. `readLastClosedTradingDay` (`apps/worker/src/batch/adapter.ts`)
+// takes the maximum `trading_day` over rows whose session has closed and
+// consults no coverage at all. `lastClosedDay` (`apps/api/src/admin-source/
+// liability.ts`) folds on the maximum CLOSE INSTANT with a day tiebreak, and its
+// caller `anchorCalendar` then checks `trading_calendar_loads` and can answer
+// `uncovered`. A catalogue admission would put a THIRD statement of one
+// predicate on the money path, which is `FM-16` written where money leaves.
+//
+// AND THE ADMISSION IS PER TABLE WHILE THE ANSWER NEEDS TWO. Coverage lives in
+// `trading_calendar_loads`, so a catalogue door would admit that table too and
+// the caller would still be the thing joining them. `scope.ts` says so about
+// this table in its own registration: "A READER MUST THEREFORE CONSULT BOTH
+// TABLES". A key admitted to unblock one port is a permission granted to every
+// future one, and this would be two.
+//
+// -----------------------------------------------------------------------------
+// WHY NOT ADR-211 CLAUSE 2's TWO TRANSACTIONS, AND THE REASON IS THAT ENTRY'S
+// OWN PRECONDITION RATHER THAN A PREFERENCE FOR ONE TRANSACTION
+// -----------------------------------------------------------------------------
+// Clause 2 crossed two transactions for the plan catalogue and clause 4 said
+// what made that safe: a migration pinning the readable rows, after which
+// "nothing readable can move, and the transaction count stops mattering
+// entirely". `0028` and `0066` are that pin.
+//
+// `trading_calendar` HAS THE OPPOSITE PROPERTY AND HAS IT BY DESIGN. `0026`
+// grants `merit_app` all four verbs on it and `0032` revoked them only on the
+// two satellites; what stands between a row and a rewrite is CALENDAR-C1, C2 and
+// C3, which REQUIRE a correction to leave a prior image, an incident reference
+// and a revision row. They record a correction; they do not prevent one. The
+// table carries an `updated_at` for that reason and its satellites do not.
+//
+// So a payout verdict computed across two snapshots is a verdict whose basis day
+// was chosen from a calendar the transaction that recorded it never read.
+// `payout_requests.basis_trading_day` and the append-only `eligibility_snapshot`
+// (`INV-22`) then persist a basis nothing in that transaction agrees with. THE
+// CROSSING IS NOT UNSAFE IN THE ABSTRACT; IT IS UNSAFE ON THE ONE TABLE THE
+// CORPUS BUILT A CORRECTION MECHANISM FOR.
+//
+// -----------------------------------------------------------------------------
+// AND ADR-211 FORECLOSURE 2 IS HONOURED RATHER THAN OVERTURNED
+// -----------------------------------------------------------------------------
+// "A `PayoutTx` will not gain a firm method." It does not. This is a method of
+// `ScopedTx`, which is the handle a backend implementing `PayoutTx.subject()`
+// already holds, exactly as ADR-233's catalogue verbs discharged that port's
+// `plan` half without adding a member to the port interface.
+//
+// -----------------------------------------------------------------------------
+// WHAT THE DOOR REFUSES, AND F-4 IS WHY THERE ARE THREE READS AND NOT ONE
+// -----------------------------------------------------------------------------
+// The maximum row whose session has closed is not by itself the LAST closed day.
+// It is the last one MERIT KNOWS ABOUT, and `ADR-042` F-4 is that those are
+// different answers: a day outside `trading_calendar_loads` coverage is UNKNOWN
+// and unknown is not a holiday. `0032`'s header states the failure this creates
+// -- "an exhausted calendar is INDISTINGUISHABLE FROM AN UNBROKEN HOLIDAY ...
+// the single most silent failure available to this table".
+//
+// SO THE DOOR PROVES THE CALENDAR CAN STILL SEE PAST THE DAY IT IS ABOUT TO
+// RETURN, and it proves it with two facts rather than with a date calculation:
+//
+//   1. A NEXT SESSION EXISTS whose `session_close_at` is still ahead of `now()`.
+//      That is an instant against an instant, and it establishes that `now()`
+//      falls inside a window the calendar carries.
+//   2. ONE `trading_calendar_loads` INTERVAL SPANS BOTH DAYS. That table's own
+//      DDL is that "a day inside these bounds with no trading_calendar row is a
+//      bug in the load", so an interval spanning the two means every day between
+//      them is carried -- and none of them closed, or the first read would have
+//      returned a later day.
+//
+// WHAT THAT COSTS, STATED RATHER THAN HIDDEN. Two ADJACENT loads are not one
+// interval and are deliberately not merged (merging them on a date successor is
+// the date arithmetic `R-02` forbids), so a closed day at the very end of one
+// load whose successor is in the next load REFUSES. The remedy is already this
+// tree's stated convention: a load that means to extend coverage overlaps by a
+// day, which is a fact its own row states. The refusal fails CLOSED on the door
+// where money leaves the firm, and the alternative fails open and silently.
+
+/** A `trading_day` is a day, and a day is `YYYY-MM-DD` and never an instant. */
+const TRADING_DAY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * One `date` column, as a day.
+ *
+ * A `Date` HERE IS REFUSED RATHER THAN RENDERED, and that is `ADR-146` clause 4
+ * arriving through a driver instead of through a line of code. The clause
+ * forbids a UTC calendar date derived from an instant meeting an exchange CT
+ * trading day; a `Date` reaching this function has already crossed a timezone
+ * conversion this package did not make, and `toISOString().slice(0, 10)` is
+ * exactly the forbidden crossing spelled out in one expression.
+ */
+function tradingDay(where: string, value: unknown): string {
+  if (typeof value !== 'string' || !TRADING_DAY_SHAPE.test(value)) {
+    throw new Error(
+      `${where} is ${JSON.stringify(value)}, which is not a YYYY-MM-DD trading day. ` +
+        '`trading_day` is `date` and this driver hands a date back as text; a value arriving ' +
+        'here as anything else has crossed a conversion this package did not make, and ' +
+        'rendering it would produce a UTC calendar date meeting an exchange CT trading day ' +
+        '(ADR-146 clause 4).',
+    );
+  }
+  return value;
+}
+
+/**
+ * The `trading_calendar` row on one side of `now()`, nearest to it.
+ *
+ * `now()` IS THE DATABASE'S AND NOT THE CALLER'S, which inside a transaction is
+ * that transaction's start instant. A clock passed in would be a clock the
+ * caller could move, on the read that decides which day a payout verdict is
+ * computed against, and it would also let the two reads below name two moments.
+ *
+ * A HOLIDAY NEEDS NO BRANCH. `0032` made a holiday's `session_close_at` NULL and
+ * neither `NULL <= now()` nor `NULL > now()` is true, so a holiday is excluded
+ * by the comparison rather than by a branch somebody has to remember to write.
+ * That is `databaseEconomicCalendar`'s construction one deployable over.
+ */
+function calendarSessionStatement(source: StatementSource, side: 'closed' | 'ahead'): unknown {
+  const table = TABLES.tradingCalendar as PgTable;
+  const close = columnByName(table, 'session_close_at');
+  const day = columnByName(table, 'trading_day');
+  return source
+    .select()
+    .from(table)
+    .where(side === 'closed' ? lte(close, sql`now()`) : gt(close, sql`now()`))
+    .orderBy(side === 'closed' ? desc(day) : asc(day))
+    .limit(1);
+}
+
+/** One `trading_calendar_loads` interval spanning both days, or no row at all. */
+function coverageSpanningStatement(source: StatementSource, from: string, to: string): unknown {
+  const table = TABLES.tradingCalendarLoads as PgTable;
+  return source
+    .select()
+    .from(table)
+    .where(
+      bothOf(
+        lte(columnByName(table, 'coverage_start_day'), from),
+        gte(columnByName(table, 'coverage_end_day'), to),
+      ),
+    )
+    .limit(1);
+}
+
+/**
+ * THE LAST CLOSED TRADING DAY, OR A REFUSAL. ADR-268.
+ *
+ * ONE DAY OUT, AND THE CALLER NEVER HOLDS A CALENDAR ROW. The selection is
+ * `R-06`'s and it is made HERE, because a door that returned rows would be
+ * handing every caller the fold that decides which stored `rule_states` row a
+ * payout may be evaluated against -- a fold this tree already states twice, in
+ * two ways that disagree about coverage.
+ *
+ * IT TAKES NO ARGUMENT AT ALL, on `effectiveAccountCap`'s reason: there is no
+ * day a caller could name, because naming one is the question.
+ *
+ * THE RETURN TYPE IS `string` AND THAT IS THE CONTROL RATHER THAN THE SIGNATURE.
+ * A `string | null` is a value a caller can write a UTC date against in one
+ * expression, and that expression is the crossing `ADR-146` clause 4 forbids.
+ * There is no absent value here for anybody to fold.
+ *
+ * THREE REFUSALS AND NO FOURTH OUTCOME. A calendar nobody has loaded, a calendar
+ * that has run out, and a calendar with a hole between the two days are each a
+ * throw; the transaction rolls back and the payout endpoint answers honestly.
+ * `ADR-042` F-4 is that "we do not know about this day" is an ANSWER, and on
+ * this door the answer is no.
+ */
+export async function lastClosedTradingDayStatement(source: StatementSource): Promise<string> {
+  // THE CLASS IS READ OUT OF THE REGISTRY RATHER THAN ASSUMED, on
+  // `effectiveAccountCapStatement`'s idiom. Both tables are read UNFILTERED as
+  // rows belonging to nobody, and if either registration moves, the reads below
+  // are the wrong reads rather than failing ones.
+  for (const key of ['tradingCalendar', 'tradingCalendarLoads'] as const) {
+    const rule = registeredRule(key);
+    if (rule.class !== 'firm') {
+      throw new Error(
+        `${key} is registered "${rule.class}" and this door reads it UNFILTERED as a row ` +
+          'belonging to nobody. The registry moved and this door did not follow it.',
+      );
+    }
+  }
+
+  const table = TABLES.tradingCalendar as PgTable;
+  const dayProperty = propertyForColumn(table, 'trading_day');
+  if (dayProperty === undefined) {
+    throw new Error('trading_calendar declares no `trading_day` column. The schema has drifted.');
+  }
+
+  // 1. THE LATEST SESSION THAT HAS ALREADY CLOSED.
+  const closedRows = (await calendarSessionStatement(source, 'closed')) as unknown[];
+  const closed = closedRows[0] as Record<string, unknown> | undefined;
+  if (closed === undefined) {
+    throw new Error(
+      'no `trading_calendar` row carries a session that has already closed, so there is no day ' +
+        'for R-06 to permit. On a database nobody has loaded the exchange calendar into this is ' +
+        'every day. AN EMPTY CALENDAR IS NOT AN UNBROKEN HOLIDAY (ADR-042 F-4): it is a ' +
+        'deployment that cannot say what a trading day is, and a payout evaluated against a day ' +
+        'it named anyway would be a confident verdict on a calendar nobody wrote.',
+    );
+  }
+  const day = tradingDay('trading_calendar.trading_day', closed[dayProperty]);
+
+  // 2. THE NEXT SESSION, WHICH IS WHAT MAKES THE FIRST ONE THE *LAST* CLOSED
+  //    ONE RATHER THAN THE LAST ONE MERIT KNOWS ABOUT.
+  const aheadRows = (await calendarSessionStatement(source, 'ahead')) as unknown[];
+  const ahead = aheadRows[0] as Record<string, unknown> | undefined;
+  if (ahead === undefined) {
+    throw new Error(
+      `the latest closed session is ${day} and \`trading_calendar\` carries no session that has ` +
+        'NOT yet closed, so the calendar is EXHAUSTED and every day after that one is outside ' +
+        'coverage. An uncovered day is UNKNOWN and unknown is not a holiday (ADR-042 F-4), so ' +
+        'that day is the last one Merit knows about rather than the last closed one R-06 ' +
+        'permits. `0032`: an exhausted calendar is indistinguishable from an unbroken holiday ' +
+        'and is the most silent failure this table has. Load the exchange calendar forward.',
+    );
+  }
+  const next = tradingDay('the next `trading_calendar` session-s trading_day', ahead[dayProperty]);
+
+  // 3. AND ONE LOAD SPANNING BOTH, SO NOTHING BETWEEN THEM IS UNKNOWN.
+  const covering = (await coverageSpanningStatement(source, day, next)) as unknown[];
+  if (covering[0] === undefined) {
+    throw new Error(
+      `no \`trading_calendar_loads\` row covers ${day} through ${next} in ONE interval, so the ` +
+        'days between them are not known to be loaded and a session may have closed inside the ' +
+        'gap. Adjacent loads are deliberately not merged, because merging them on a date ' +
+        'successor is the date arithmetic R-02 forbids; a load that means to extend coverage ' +
+        'overlaps its predecessor by a day. Until one does, R-06 has no last closed day here.',
+    );
+  }
+
+  return day;
+}
+
+// =============================================================================
 // READING A ROW THAT BELONGS TO NOBODY, INSIDE THE TRANSACTION THAT WRITES
 // (ADR-233)
 // =============================================================================
@@ -3294,6 +3550,30 @@ export interface ScopedTx extends TxCommon {
    * absent value for a caller to fold into `Infinity`.
    */
   effectiveAccountCap(): Promise<number>;
+  /**
+   * THE LAST CLOSED TRADING DAY, ON THIS TRANSACTION (ADR-268).
+   *
+   * `PayoutTx.subject()` IS THE READ THIS EXISTS FOR. `R-06` permits an
+   * eligibility evaluation against ONE day and the stored `rule_states` row has
+   * to be selected by it, so the transaction that reads the state has to be the
+   * transaction that reads the day: a calendar read on a second connection is a
+   * verdict computed across two snapshots, and `trading_calendar` is the one
+   * table this corpus built a correction mechanism FOR (CALENDAR-C1 to C3).
+   *
+   * THE SELECTION IS HERE AND THE CALLER NEVER HOLDS A CALENDAR ROW, because
+   * "which day is the last closed one" IS `R-06`, and a door that returned rows
+   * would hand every caller a fold this tree already states twice in two ways
+   * that disagree.
+   *
+   * IT TAKES NO ARGUMENT AT ALL: there is no day a caller could name, because
+   * naming one is the question.
+   *
+   * IT THROWS WHERE THE CALENDAR CANNOT SEE PAST THE DAY. An empty calendar, an
+   * EXHAUSTED one and a coverage gap are each a refusal, on `ADR-042` F-4: an
+   * uncovered day is UNKNOWN and unknown is not a holiday. The return type is
+   * `string` so that no caller has an absent value to fold a UTC date into.
+   */
+  lastClosedTradingDay(): Promise<string>;
   /** Rows matching a filter, ANDed with this identity's scope. Many rows. */
   rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
     key: K,
@@ -3485,6 +3765,19 @@ export function scopedTx(
       // read on a second connection is a cap that may have moved before the
       // purchase commits.
       return await effectiveAccountCapStatement(source, identityId);
+    },
+    async lastClosedTradingDay(): Promise<string> {
+      // ON `source`, WHICH IS THIS TRANSACTION, AND `R-06` IS WHY RATHER THAN
+      // CONVENTION: the day SELECTS the `rule_states` row the same transaction
+      // reads, and `trading_calendar` is UPDATE-able by `merit_app` under
+      // triggers that RECORD a correction rather than refuse one. A day read on
+      // a second connection is a basis day the transaction recording the payout
+      // never saw.
+      //
+      // NO IDENTITY IS PASSED AND NONE COULD BE. Both tables are `firm` and
+      // `scopePredicate` throws on either key, so this is the class being read
+      // correctly rather than a filter omitted.
+      return await lastClosedTradingDayStatement(source);
     },
     async rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
       key: K,
