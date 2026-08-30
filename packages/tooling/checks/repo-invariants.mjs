@@ -6331,12 +6331,17 @@ const CLOSE_INSTANT_REGISTER = [
   },
   {
     rel: 'apps/worker/src/batch/adapter.ts',
-    coverage: 'absent',
+    coverage: 'consulted',
     what:
-      'FOLDS, AND CONSULTS NO COVERAGE AT ALL. `readLastClosedTradingDay`, exported, ' +
-      'returning `TradingDay | null` where `null` means "no session has closed" and never ' +
-      '"outside coverage". THE REGISTERED GAP: ADR-268 finding 2 reported it, ADR-273 ' +
-      'finding 1 re-derived it, and `apps/worker` was outside both fences',
+      'FOLDS, AND THE GAP IS CLOSED (ADR-277). `anchorLastClosedDay` and `anchorNamedDay` read ' +
+      'BOTH tables in ONE transaction and return a `TradingDayAnchor` carrying the day on its ' +
+      '`anchored` arm ALONE, so the caller cannot skip the verdict and compile. The fold itself ' +
+      'is module-private now: `readLastClosedTradingDay` was exported and handed out a bare ' +
+      '`TradingDay | null`, and `calendarCarriesDay` asked a coverage-shaped question of ' +
+      '`trading_calendar`. THIS ROW READ `absent` FOR ONE WAVE AND THIS CHECK IS WHAT DEMANDED ' +
+      'THE EDIT: ADR-268 finding 2 reported the fold, ADR-273 finding 1 enlarged it to the ' +
+      'caller and registered it here precisely so that the session repairing it could not ' +
+      'leave the register saying a gap exists that somebody had closed',
   },
   {
     rel: 'packages/db/src/scoped-db.ts',

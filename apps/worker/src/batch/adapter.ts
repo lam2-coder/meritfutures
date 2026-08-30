@@ -371,22 +371,117 @@ export function toCalendarSlice(rows: readonly CalendarRow[]): CalendarSlice {
   });
 }
 
+// -----------------------------------------------------------------------------
+// Coverage, which is a SECOND table and is the thing that makes UNKNOWN an answer
+// -----------------------------------------------------------------------------
+// `ADR-042` F-4: a day outside every `trading_calendar_loads` interval is
+// UNKNOWN, and unknown is not a holiday. `0032`'s own header calls confusing the
+// two "the single most silent failure available to this table", and
+// `packages/db/src/scope.ts`'s registration of `tradingCalendar` states the
+// consequence for every reader in one sentence: "A READER MUST THEREFORE CONSULT
+// BOTH TABLES".
+//
+// THIS ADAPTER DID NOT, AND NEITHER DID ITS CALLER. That is `ADR-268` finding 2,
+// `ADR-273` finding 1, and `ADR-277` is the repair.
+//
+// NO DOOR IS WIDENED TO READ IT. `SystemTx.rows` is declared over `TableKey`,
+// which is every registered table, and `tradingCalendarLoads` is registered
+// `firm` like its neighbour. So the read below is the accessor answering a
+// question it already published; `CATALOG_TABLE_KEYS` is still five,
+// `packages/db/src/scoped-db.ts` is read and not written, and nothing in this
+// diff names a key set.
+
+/** One `trading_calendar_loads` row, as the INCLUSIVE bounds it declares. */
+interface CoverageInterval {
+  readonly from: string;
+  readonly to: string;
+}
+
+function toCoverageInterval(value: unknown): CoverageInterval {
+  const row = asRow(value, 'tradingCalendarLoads');
+  return {
+    from: text(row, 'coverageStartDay', 'tradingCalendarLoads'),
+    to: text(row, 'coverageEndDay', 'tradingCalendarLoads'),
+  };
+}
+
+async function readCoverageIntervals(tx: BatchTx): Promise<readonly CoverageInterval[]> {
+  return (await tx.rows('tradingCalendarLoads')).map(toCoverageInterval);
+}
+
 /**
- * The latest trading day whose session has already closed at `at`.
+ * Whether ONE interval spans `from` through `to`, both inclusive.
  *
- * **THE DAY THE JOB CLOSES IS READ FROM THE CALENDAR AND IS NEVER DERIVED FROM A
- * CLOCK.** `ADR-146` clause 4 forbids a UTC calendar date derived from an instant
- * meeting an exchange CT trading day, and this function never crosses the two: an
- * instant is compared only with an instant (`session_close_at <= at`), and the
- * trading day is READ off the row that comparison selected. That is
- * `databaseEconomicCalendar`'s idiom in `apps/api`, which counts sessions that
- * have not yet opened and compares a count with a horizon.
+ * **ONE, AND THE UNION OF SEVERAL IS DELIBERATELY NOT ACCEPTED.** Two adjacent
+ * loads are not one interval and merging them would require deciding that one
+ * day is the successor of another, which is the date arithmetic `R-02` forbids.
+ * `packages/db/src/scoped-db.ts` states the same refusal on the door where money
+ * leaves the firm and states its remedy: "a load that means to extend coverage
+ * overlaps its predecessor by a day, which is a fact its own row states". This
+ * fold is that door's rule transcribed, so the batch and the payout endpoint
+ * agree about which estates they will answer on.
  *
- * `null` when no session has closed, which on a fresh database is every day.
- * `ADR-241` section 5 is what the job does with that answer.
+ * THE COMPARISON IS STRING ORDERING ON `YYYY-MM-DD`, WHICH IS CHRONOLOGICAL
+ * BECAUSE THE SHAPE IS FIXED-WIDTH AND ZERO-PADDED. That is this file's existing
+ * idiom for the same domain (`latestClosedSession`'s own maximum), and it
+ * is the reason no `Date` is constructed here: a day parsed into an instant and
+ * compared is the crossing `ADR-146` clause 4 forbids.
  */
-export async function readLastClosedTradingDay(db: WorkerDb, at: Date): Promise<TradingDay | null> {
-  const rows = await db.batch(async (tx) => readCalendarRows(tx));
+function spannedByOneLoad(
+  intervals: readonly CoverageInterval[],
+  from: string,
+  to: string,
+): boolean {
+  return intervals.some((interval) => interval.from <= from && interval.to >= to);
+}
+
+// -----------------------------------------------------------------------------
+// The day this run closes, as a value from which the day is UNREACHABLE without
+// looking at the verdict
+// -----------------------------------------------------------------------------
+
+/**
+ * Which day the batch may fold, or why it may not fold one.
+ *
+ * **`tradingDay` IS ON THE `anchored` ARM ALONE AND THAT IS THE WHOLE CONTROL.**
+ * `ADR-273` ruling 1: a fold may leave the coverage read to its caller only when
+ * the caller is handed a value from which the day is unreachable without
+ * discriminating on a coverage verdict. This deployable had no such value, which
+ * is why its caller could forget and did. A consumer that reads `.tradingDay`
+ * without narrowing on `kind` now does not compile, and that is a fence rather
+ * than a memory.
+ *
+ * **THE REFUSED ARM CARRIES NO DAY, NOT EVEN AS DIAGNOSTICS.** `apps/api`'s
+ * `CalendarAnchor` puts the coverage-blind answer inside its `uncovered` arm as
+ * `anchor_day`, which is correct THERE because that value crosses an HTTP
+ * boundary as an operator's diagnostic and never re-enters a fold. Here the one
+ * consumer is the job that writes `rule_states`, and a field holding exactly the
+ * wrong answer beside a refusal is a field somebody reaches for when the refusal
+ * is inconvenient. The sentence in `why` names the day; nothing hands it back as
+ * a `TradingDay`.
+ */
+export type TradingDayAnchor =
+  | { readonly kind: 'anchored'; readonly tradingDay: TradingDay }
+  | { readonly kind: 'refused'; readonly why: string };
+
+/**
+ * The latest trading day whose session has already closed at `at`, or `null`.
+ *
+ * **PRIVATE, AND ITS PRIVACY IS THE OTHER HALF OF THE REPAIR.** It was
+ * `readLastClosedTradingDay`, exported from this file and re-exported from the
+ * barrel, so its callers were unbounded by construction and every one of them
+ * received a bare `TradingDay | null` in which `null` means "no session has
+ * closed" and never "outside coverage". `ADR-273` section 10 named that exact
+ * shape as the one a census cannot see. There is now no way to reach it from
+ * outside this module, so there is no second caller to remember anything.
+ *
+ * **THE DAY IS READ FROM THE CALENDAR AND IS NEVER DERIVED FROM A CLOCK.**
+ * `ADR-146` clause 4 forbids a UTC calendar date derived from an instant meeting
+ * an exchange CT trading day, and this fold never crosses the two: an instant is
+ * compared only with an instant (`session_close_at <= at`), and the trading day
+ * is READ off the row that comparison selected.
+ */
+function latestClosedSession(rows: readonly CalendarRow[], at: Date): string | null {
   let latest: string | null = null;
   for (const row of rows) {
     if (row.isHoliday) continue;
@@ -395,13 +490,161 @@ export async function readLastClosedTradingDay(db: WorkerDb, at: Date): Promise<
     if (close.getTime() > at.getTime()) continue;
     if (latest === null || row.tradingDay > latest) latest = row.tradingDay;
   }
-  return latest === null ? null : (latest as TradingDay);
+  return latest;
 }
 
-/** Whether the calendar carries this day at all, holiday or session. */
-export async function calendarCarriesDay(db: WorkerDb, day: TradingDay): Promise<boolean> {
-  const rows = await db.batch(async (tx) => tx.rowsWhere('tradingCalendar', { tradingDay: day }));
-  return rows.length > 0;
+/**
+ * The earliest trading day whose session has NOT yet closed at `at`, or `null`.
+ *
+ * **THIS IS THE FACT THAT MAKES THE FIRST ONE THE *LAST CLOSED* DAY RATHER THAN
+ * THE LAST DAY MERIT KNOWS ABOUT**, and it is an instant against an instant, so
+ * it establishes that `at` falls inside a window the calendar carries without
+ * any deployment ever computing a date.
+ */
+function earliestSessionAhead(rows: readonly CalendarRow[], at: Date): string | null {
+  let earliest: string | null = null;
+  for (const row of rows) {
+    if (row.isHoliday) continue;
+    const close = row.sessionCloseAt;
+    if (close === null) continue;
+    if (close.getTime() <= at.getTime()) continue;
+    if (earliest === null || row.tradingDay < earliest) earliest = row.tradingDay;
+  }
+  return earliest;
+}
+
+/**
+ * Both tables, read inside ONE transaction.
+ *
+ * **ONE, AND THE CROSSING IS REFUSED FOR `scoped-db.ts`'s OWN REASON RATHER THAN
+ * FOR TIDINESS.** `WorkerDb.batch` opens a transaction per call, so two calls are
+ * two snapshots; and `trading_calendar` is the one table in this estate the
+ * corpus built a CORRECTION mechanism for, so a row can legitimately move between
+ * them. A basis day chosen from a calendar the transaction that checked coverage
+ * never read is exactly the verdict that door refuses to produce, and this job
+ * writes its answer into `rule_states` where it is the payout basis.
+ */
+async function readCalendarAndCoverage(
+  db: WorkerDb,
+): Promise<{ calendar: readonly CalendarRow[]; coverage: readonly CoverageInterval[] }> {
+  return db.batch(async (tx) => {
+    const calendar = await readCalendarRows(tx);
+    const coverage = await readCoverageIntervals(tx);
+    return { calendar, coverage };
+  });
+}
+
+/**
+ * The last closed trading day at `at`, PROVED COVERED, or a refusal.
+ *
+ * **THREE FACTS AND NO FOURTH OUTCOME, WHICH IS `lastClosedTradingDayStatement`'s
+ * RULE TRANSCRIBED RATHER THAN INVENTED.** `ADR-268` built that door on the
+ * payout path and this fold is the same predicate in another deployable; before
+ * this entry the two disagreed, and a batch that folded an estate the payout
+ * endpoint refuses to answer on is the disagreement written into money rows.
+ *
+ *   1. **A SESSION HAS CLOSED.** On a database nobody has loaded the exchange
+ *      calendar into this is every day, and it is a refusal rather than a guess
+ *      (`ADR-241` section 5).
+ *   2. **A SESSION AHEAD OF `at` EXISTS.** Without it the calendar is EXHAUSTED
+ *      and the day fact 1 found is the last day Merit knows about rather than
+ *      the last closed one. This is `ADR-273` finding 1's stated harm: a calendar
+ *      loaded through June and a job run in August folds June's day and stamps
+ *      `rule_states` with it, exiting 0.
+ *   3. **ONE LOAD SPANS BOTH DAYS**, so nothing between them is unknown and no
+ *      session can have closed inside a gap.
+ */
+export async function anchorLastClosedDay(db: WorkerDb, at: Date): Promise<TradingDayAnchor> {
+  const { calendar, coverage } = await readCalendarAndCoverage(db);
+
+  const closed = latestClosedSession(calendar, at);
+  if (closed === null) {
+    return {
+      kind: 'refused',
+      why:
+        '`trading_calendar` carries no session that has already closed, so there is no day to ' +
+        'close. On a database nobody has loaded the exchange calendar into this is every day, ' +
+        'and an empty calendar is not an unbroken holiday (ADR-042 F-4)',
+    };
+  }
+
+  const ahead = earliestSessionAhead(calendar, at);
+  if (ahead === null) {
+    return {
+      kind: 'refused',
+      why:
+        `the latest closed session is ${closed} and \`trading_calendar\` carries no session that ` +
+        'has NOT yet closed, so the calendar is EXHAUSTED and every day after that one is ' +
+        'outside coverage. That makes it the last day Merit knows about rather than the last ' +
+        'closed day R-06 permits, and folding it would stamp `rule_states` with a confident ' +
+        'basis for a night nobody loaded. Load the exchange calendar forward',
+    };
+  }
+
+  if (!spannedByOneLoad(coverage, closed, ahead)) {
+    return {
+      kind: 'refused',
+      why:
+        `no \`trading_calendar_loads\` row covers ${closed} through ${ahead} in ONE interval, so ` +
+        'the days between them are not known to be loaded and a session may have closed inside ' +
+        'the gap. Adjacent loads are deliberately not merged, because merging them on a date ' +
+        'successor is the date arithmetic R-02 forbids; a load that means to extend coverage ' +
+        'overlaps its predecessor by a day',
+    };
+  }
+
+  return { kind: 'anchored', tradingDay: closed as TradingDay };
+}
+
+/**
+ * A day an operator named, PROVED CARRIED AND PROVED COVERED, or a refusal.
+ *
+ * **THIS REPLACES `calendarCarriesDay`, WHOSE REFUSAL SAID "outside coverage"
+ * AND WHOSE QUERY ASKED `trading_calendar` FOR A ROW.** A `trading_calendar` row
+ * states that Merit knows what this day IS, a session or a holiday. It states
+ * nothing about whether anybody LOADED it, and the two are separate facts in
+ * separate tables with no constraint tying them: `0032` declares no foreign key
+ * between them, and `0048` header item 7 rules explicitly that CALENDAR-C3's
+ * retroactivity test is the FOLD EXTENT and not the coverage window, so a
+ * calendar row may be inserted for a day no load ever declared. A check that
+ * asks the wrong table and reports the right-sounding reason is worse than no
+ * check, because it makes a reader stop looking.
+ *
+ * **BOTH FACTS ARE REQUIRED AND NEITHER IMPLIES THE OTHER.** A covered day with
+ * no row is a bug in the load, which `0032` says in its own DDL comment, and it
+ * refuses here. A carried day outside every load is the wrong-answer path this
+ * entry exists to close.
+ *
+ * **THE "CAN THE CALENDAR SEE PAST IT" FACT IS DELIBERATELY NOT ASKED HERE.**
+ * `RB-01` re-runs a night that failed, so the day is named precisely because it
+ * is behind; demanding a session ahead of `now()` would refuse the one thing the
+ * override exists for. What `R-06` needs of a NAMED day is that it is real and
+ * that it was loaded, and that is what this asks.
+ */
+export async function anchorNamedDay(db: WorkerDb, day: TradingDay): Promise<TradingDayAnchor> {
+  const { calendar, coverage } = await readCalendarAndCoverage(db);
+
+  if (!calendar.some((row) => row.tradingDay === day)) {
+    return {
+      kind: 'refused',
+      why:
+        `\`trading_calendar\` has no row for ${day}, so this deployment cannot say whether that ` +
+        'day is a session, a holiday, or a date the exchange never had',
+    };
+  }
+
+  if (!spannedByOneLoad(coverage, day, day)) {
+    return {
+      kind: 'refused',
+      why:
+        `\`trading_calendar\` carries ${day} and no \`trading_calendar_loads\` interval covers ` +
+        'it. A calendar row says what a day IS and a load row says that somebody loaded it, and ' +
+        'a day outside every load is UNKNOWN rather than a holiday (ADR-042 F-4). Folding it ' +
+        'would write a confident basis for a day the estate never loaded',
+    };
+  }
+
+  return { kind: 'anchored', tradingDay: day };
 }
 
 // -----------------------------------------------------------------------------
