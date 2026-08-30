@@ -308,7 +308,9 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-292](ADR-292.md) | every CI run happens twice, the fix is one line per workflow, and the one line the row supplied does not work  (2026-08-30, status: proposed) |
 | [ADR-293](ADR-293.md) | slice 6's approval branch is buildable in one body and is BLOCKED BY ONE DECLARED RETURN TYPE the fence does not reach, and the lock handed over by ADR-291 is RULED: the payout path locks, as a port member and not inside `transact`  (2026-08-30, status: proposed) |
 | [ADR-294](ADR-294.md) | a crashed check is not a lower count. The runner reports PASS, FAIL and ERROR as three outcomes, keeps the denominator, and refuses to print the sentence that reads as a measurement (2026-08-30, status: proposed) |
+| [ADR-295](ADR-295.md) | slice 6's approval branch LANDED, and the lock ADR-293 ruled is STILL OWED because the fence that granted this file granted it for seven named lines  (2026-08-30, status: proposed) |
 | [ADR-297](ADR-297.md) | a column that cannot be null, and the null is not the defect. `payout_requests.approved_at` holds the REQUEST instant on every row, it is the only one of four state timestamps not bound to its state, and the repair is a SUPERSESSION whose number is RESERVED AND NOT WRITTEN  (2026-08-30, status: proposed) |
+| [ADR-299](ADR-299.md) | the home is the DOOR, because its `unknown` was never ruled and it has NO CALLER; the decoder splits at the line that actually exists rather than at the one ADR-286 drew; and the cap schedule is dispatched FIRST  (2026-08-30, status: proposed) |
 | [ADR-305](ADR-305.md) | the withdrawal driver, sized. Nine slices, five absences and not three, and the installation is blocked on a vendor because the day `LT-06` posts an approved withdrawal has no exit at all  (2026-08-30, status: proposed) |
 <!--/gen-->
 

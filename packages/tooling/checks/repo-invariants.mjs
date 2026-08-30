@@ -7945,6 +7945,347 @@ const ri33 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-34  Every writer of payout_requests names the derived column and no other
+// -----------------------------------------------------------------------------
+// ADR-295 (ADR-287 slice 6). THE DEFECT THIS EXISTS FOR IS ONE AN IMPLEMENTER
+// WALKS INTO BY BEING CAREFUL, which is why a static check is worth more here
+// than a bigger model. `PayoutRequestInsert` declares FOURTEEN fields. TWO of
+// them, `splitBp` and `clampReason`, HAVE NO COLUMN: `grep -rn split_bp
+// packages/db/migrations` and the same for `clamp_reason` each return ZERO
+// lines, and both values are already stored inside `eligibility_snapshot`. A
+// THIRD, `plan_version_id`, is `NOT NULL` on the table and is ABSENT from the
+// shape, so it has to be derived from `accounts` on the same transaction.
+//
+// AN IMPLEMENTER MAPPING THE SHAPE FIELD BY FIELD GETS ALL THREE WRONG IN THE
+// SAME DIRECTION, and only one of the three fails loudly. Writing `splitBp`
+// somewhere would state one money fact twice on the money path and nothing
+// would ever go red; omitting `planVersionId` is a `NOT NULL` violation at run
+// time, on the request that approves a payout; naming `identityId` is refused
+// by `packages/db` at run time, for the same reason and at the same moment.
+// ADR-287 finding F3 recorded all three as a LANDMINE for exactly this reason.
+//
+// SO THIS IS THE MECHANICAL ASSERTION THAT REPLACES REMEMBERING, which is
+// `MERIT_BUILD_MASTER_PROMPT`'s own stated remedy for the error class the
+// reconciliation session's three worst errors belong to.
+// -----------------------------------------------------------------------------
+
+/**
+ * Where the writers live, and where the facts this check asserts are declared.
+ *
+ * `MIGRATIONS_DIR` IS `RI-26`'S AND IS REUSED RATHER THAN RESTATED, on this
+ * file's own standing rule: two names for one directory is the second copy the
+ * checks in it exist to end.
+ */
+const PAYOUT_TABLE_KEY = 'payoutRequests';
+const PAYOUT_MIGRATION = 'packages/db/migrations/0010_payouts.sql';
+const SCOPE_REGISTRY = 'packages/db/src/scope.ts';
+
+/**
+ * The two SQL spellings `payout_requests` HAS NO COLUMN FOR, with the property
+ * spelling each would be written under. Re-derived by a sentinel below rather
+ * than trusted: if a migration ever adds one, this check must stop asserting
+ * its absence instead of quietly asserting a fact that stopped being true.
+ */
+const PAYOUT_COLUMNLESS = [
+  { sql: 'split_bp', property: 'splitBp' },
+  { sql: 'clamp_reason', property: 'clampReason' },
+];
+
+/** The tenancy column. The handle stamps it and naming it in an insert is refused. */
+const PAYOUT_TENANCY = [{ sql: 'identity_id', property: 'identityId' }];
+
+/** The `NOT NULL` column the insert shape does not carry, so every writer derives it. */
+const PAYOUT_DERIVED = { sql: 'plan_version_id', property: 'planVersionId' };
+
+/** `payoutRequests` is `owned` on `identity_id`, as the registry itself writes it. */
+const OWNED_ON_IDENTITY = /payoutRequests:\s*\{\s*class:\s*'owned',\s*column:\s*'identity_id'/;
+
+/** `plan_version_id` is `NOT NULL` on the table, as the migration itself writes it. */
+const PLAN_VERSION_NOT_NULL = /plan_version_id\s+uuid NOT NULL/;
+
+/** A scoped or firm write naming this table. The values object is the second argument. */
+const WRITES_PAYOUT_REQUESTS = new RegExp(
+  String.raw`\binsert(?:Under)?\s*\(\s*(['"\`])` + PAYOUT_TABLE_KEY + String.raw`\1\s*,`,
+  'g',
+);
+
+/**
+ * The TOP-LEVEL keys of one object literal, and whether it spreads.
+ *
+ * A SPREAD IS REPORTED RATHER THAN WALKED, and that is the leg that keeps this
+ * check from being defeated by one character: `{ ...row }` writes every field
+ * of `PayoutRequestInsert`, `splitBp` and `clampReason` included, and no key
+ * scan can see it. Nesting, quotes and template substitutions are respected, so
+ * a key of a nested object is not a key of this one.
+ *
+ * @param {string} text an object literal, braces included
+ * @returns {{ keys: string[], spreads: boolean } | null}
+ */
+function objectLiteralKeys(text) {
+  const open = text.indexOf('{');
+  if (open === -1) return null;
+  /** @type {string[]} */
+  const keys = [];
+  let spreads = false;
+  let depth = 0;
+  /** @type {string | null} */
+  let quote = null;
+  let pending = '';
+  for (let i = open; i < text.length; i++) {
+    const c = text[i] ?? '';
+    if (quote !== null) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') {
+      quote = c;
+      pending = '';
+      continue;
+    }
+    if (c === '{' || c === '[' || c === '(') {
+      depth++;
+      pending = '';
+      continue;
+    }
+    if (c === '}' || c === ']' || c === ')') {
+      depth--;
+      pending = '';
+      if (depth === 0) break;
+      continue;
+    }
+    if (depth !== 1) continue;
+    if (c === ':' && pending.trim() !== '') {
+      keys.push(pending.trim());
+      pending = '';
+      continue;
+    }
+    if (c === ',') {
+      pending = '';
+      continue;
+    }
+    if (text.startsWith('...', i)) spreads = true;
+    pending += c;
+  }
+  return { keys, spreads };
+}
+
+/** @type {Invariant} */
+const ri34 = {
+  id: 'RI-34',
+  title: 'Every writer of payout_requests derives plan_version_id and names no column-less field',
+  covers:
+    'EVERY INSERT INTO `payout_requests` UNDER AN `apps/*/src` OR ' +
+    '`packages/*/src` DIRECTORY (ADR-295), read with comments stripped ' +
+    'through the one scanner and with the values object parsed as a BALANCED ' +
+    'OBJECT LITERAL rather than matched. THREE LEGS, and each is a field of ' +
+    '`PayoutRequestInsert` that fails in a DIFFERENT direction. FIRST: no ' +
+    'writer names `splitBp` or `clampReason` in either spelling, because ' +
+    '`payout_requests` HAS NO SUCH COLUMN and both values are already stored ' +
+    'inside `eligibility_snapshot`; writing one elsewhere would state a money ' +
+    'fact TWICE on the money path and nothing would ever go red. SECOND: no ' +
+    'writer names `identityId` or `identity_id`, because the table is scope ' +
+    'class `owned` on it and a scoped write STAMPS its tenancy from the ' +
+    'handle. THIRD: every writer names `planVersionId`, which is `NOT NULL` ' +
+    'on the table and ABSENT from the insert shape, so an omission is a ' +
+    'constraint violation on the request that approves a payout. A SPREAD IS ' +
+    'A FINDING ON ITS OWN: `{ ...row }` writes all fourteen fields and no key ' +
+    'scan can see it, so the one character that would defeat legs one and two ' +
+    'is reported rather than walked. ' +
+    'IT READS INSERTS AND NOT UPDATES, and that is a limit rather than an ' +
+    'oversight: `planVersionId` is REQUIRED on an insert and FORBIDDEN on an ' +
+    'update, where `0027_triggers_invariants.sql` raises on any attempt to ' +
+    'move it, so one id covering both would be two rules wearing one number. ' +
+    'No writer of either kind exists outside `apps/api/src/payout-backend.ts` ' +
+    'on this tree. ' +
+    'FIVE SENTINELS THAT THROW, because every leg here is an ABSENCE except ' +
+    'the third and an absence over an empty scope reports PASS (ADR-274): no ' +
+    'source file walked; A TREE WHOSE SCHEMA DECLARES `payout_requests` AND ' +
+    'WHOSE SOURCE WRITES IT NOWHERE, which is what this check becomes the day ' +
+    'the module is renamed or the write stops being an `insert` call; ' +
+    '`split_bp` or `clamp_reason` APPEARING in `packages/db/migrations`, at ' +
+    'which point leg one is asserting a schema fact that stopped being true; ' +
+    'and either `plan_version_id uuid NOT NULL` leaving `0010_payouts.sql` or ' +
+    '`payoutRequests` ceasing to be registered `owned` on `identity_id` in ' +
+    '`packages/db/src/scope.ts`. ' +
+    'THE SCHEMA FACTS ARE READ ONLY WHERE THERE IS A WRITER, AND A TREE THAT ' +
+    'DECLARES NO `payout_requests` AT ALL RETURNS EMPTY WITHOUT MEASURING. ' +
+    'That is the ONE arm here that passes over nothing, it is stated rather ' +
+    'than implied, and it cannot arise on this repository: a merged migration ' +
+    'is never edited and only superseded (constitution `E2`), so ' +
+    '`CREATE TABLE payout_requests` cannot leave this tree without an ADR that ' +
+    'is exactly the occasion to re-derive this check. It exists for a ' +
+    'SYNTHETIC tree that never had the table, which is what ' +
+    '`packages/tooling/test/repo-invariants.test.ts` builds. No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const sources = walk(root).filter((f) => {
+      if (!/\.(ts|tsx|mts|mjs|js)$/.test(f)) return false;
+      if (/(^|\/)(test|tests|__tests__|e2e|fixtures)\//.test(f)) return false;
+      if (/\.(test|spec)\.[a-z]+$/.test(f)) return false;
+      return /^apps\/[^/]+\/src\//.test(f) || /^packages\/[^/]+\/src\//.test(f);
+    });
+
+    // SENTINEL ONE. Zero source files means the walk or the path filter has
+    // moved, at which point every leg below is asserting about an empty list
+    // and a writer anywhere in the tree would report as absent.
+    if (sources.length === 0) {
+      throw new Error(
+        'RI-34 found no source file under any `apps/*/src` or `packages/*/src`. Zero means ' +
+          'the walk or the path filter has moved, at which point every leg is asserting ' +
+          'about an empty list and a writer anywhere in the tree would report as absent',
+      );
+    }
+
+    /** @type {{ rel: string, line: number, values: string | undefined }[]} */
+    const writers = [];
+
+    for (const rel of sources) {
+      const code = stripComments(readFileSync(join(root, rel), 'utf8'));
+      WRITES_PAYOUT_REQUESTS.lastIndex = 0;
+      let matched = WRITES_PAYOUT_REQUESTS.exec(code);
+      while (matched !== null) {
+        const open = code.indexOf('(', matched.index);
+        const call = open === -1 ? null : callArguments(code, open);
+        writers.push({
+          rel,
+          line: code.slice(0, matched.index).split('\n').length,
+          values: call?.args[1],
+        });
+        matched = WRITES_PAYOUT_REQUESTS.exec(code);
+      }
+    }
+
+    const migrationsDir = join(root, MIGRATIONS_DIR);
+    const migrations = existsSync(migrationsDir)
+      ? readdirSync(migrationsDir)
+          .filter((name) => name.endsWith('.sql'))
+          .map((name) => readFileSync(join(migrationsDir, name), 'utf8'))
+          .join('\n')
+      : '';
+    const declaresTheTable = /CREATE TABLE payout_requests\b/.test(migrations);
+
+    // THE ONE ARM THAT PASSES OVER NOTHING, AND IT IS THE SCHEMA THAT DECIDES
+    // IT RATHER THAN THE ABSENCE OF WRITERS. A tree whose migrations never
+    // create `payout_requests` has nothing for this check to be about: leg one
+    // asserts the absence of two columns of a table that does not exist and leg
+    // three requires a `NOT NULL` column of the same. ON THIS REPOSITORY IT
+    // CANNOT ARISE: a merged migration is never edited and only superseded
+    // (constitution `E2`), so the `CREATE TABLE` cannot leave the tree without
+    // an ADR, which is exactly the occasion to re-derive this check. It exists
+    // for the SYNTHETIC tree `packages/tooling/test/repo-invariants.test.ts`
+    // builds, which every invariant must hold on and which has no payout schema.
+    if (!declaresTheTable) return findings;
+
+    // SENTINEL TWO. The schema declares the table and NOTHING under a
+    // deployable's `src/` writes it through the accessor this check reads. Two
+    // of the three legs are absences, so this would otherwise be a PASS over an
+    // empty scope, which is ADR-274's warned shape.
+    if (writers.length === 0) {
+      throw new Error(
+        `RI-34 found no writer of \`${PAYOUT_TABLE_KEY}\` under any \`apps/*/src\` or ` +
+          '`packages/*/src`, on a tree whose migrations DO create `payout_requests`. Zero ' +
+          'means the module was renamed, the table key spelling moved, or the write is no ' +
+          'longer an `insert` call, at which point two of this check`s three legs are ' +
+          'absences asserted over an empty scope and report PASS',
+      );
+    }
+
+    // SENTINEL THREE. The absence of these two columns is what makes naming
+    // them a defect. If a migration adds one, this check must say so rather
+    // than keeping an assertion the schema has overtaken.
+    for (const { sql } of PAYOUT_COLUMNLESS) {
+      if (!migrations.includes(sql)) continue;
+      throw new Error(
+        `RI-34 found \`${sql}\` in ${MIGRATIONS_DIR}, and this check asserts that no writer ` +
+          'names it BECAUSE THE TABLE HAS NO SUCH COLUMN. If a migration added one, leg one ' +
+          'is now asserting a schema fact that stopped being true and the check must be ' +
+          're-derived rather than left green. ADR-287 finding F3 and ADR-295 are the reasoning',
+      );
+    }
+
+    // SENTINEL FOUR. Both halves are facts leg two and leg three rest on, and
+    // both live in files this check does not otherwise open.
+    const migrationPath = join(root, PAYOUT_MIGRATION);
+    if (
+      !existsSync(migrationPath) ||
+      !PLAN_VERSION_NOT_NULL.test(readFileSync(migrationPath, 'utf8'))
+    ) {
+      throw new Error(
+        `RI-34 cannot find \`plan_version_id uuid NOT NULL\` in ${PAYOUT_MIGRATION}. Leg three ` +
+          'requires every writer to derive that column BECAUSE it is `NOT NULL` and absent ' +
+          'from the insert shape. If the column moved, the requirement moved with it',
+      );
+    }
+    const scopePath = join(root, SCOPE_REGISTRY);
+    if (!existsSync(scopePath) || !OWNED_ON_IDENTITY.test(readFileSync(scopePath, 'utf8'))) {
+      throw new Error(
+        'RI-34 cannot find `payoutRequests` registered `owned` on `identity_id` in ' +
+          `${SCOPE_REGISTRY}. Leg two forbids a writer naming the tenancy column BECAUSE the ` +
+          'handle stamps it. If the scope class changed, that is a money-path ruling and this ' +
+          'check is asserting against a registry it no longer matches',
+      );
+    }
+
+    for (const writer of writers) {
+      const { rel, line, values } = writer;
+      if (values === undefined) {
+        findings.push(
+          `${rel}:${line} writes \`${PAYOUT_TABLE_KEY}\` and this check could not read the ` +
+            'values it writes. A writer on the money path that a check cannot parse is a ' +
+            'writer nothing holds, so it is reported rather than skipped',
+        );
+        continue;
+      }
+      const parsed = objectLiteralKeys(values);
+      if (parsed === null) {
+        findings.push(
+          `${rel}:${line} writes \`${PAYOUT_TABLE_KEY}\` from a value that is not an object ` +
+            'literal, so the fields it writes are decided somewhere this check cannot read. ' +
+            'ADR-287 finding F3 is why the fields have to be visible at the call site',
+        );
+        continue;
+      }
+      if (parsed.spreads) {
+        findings.push(
+          `${rel}:${line} SPREADS into the \`${PAYOUT_TABLE_KEY}\` insert. A spread writes ` +
+            'every field of `PayoutRequestInsert`, including `splitBp` and `clampReason`, ' +
+            'which have NO COLUMN and are already stored inside `eligibility_snapshot`. ' +
+            'Name the fields',
+        );
+      }
+      for (const { sql, property } of [...PAYOUT_COLUMNLESS, ...PAYOUT_TENANCY]) {
+        const named = parsed.keys.filter((key) => key === sql || key === property);
+        if (named.length === 0) continue;
+        findings.push(
+          `${rel}:${line} names \`${named[0] ?? property}\` in a \`${PAYOUT_TABLE_KEY}\` ` +
+            (sql === 'identity_id'
+              ? 'insert. That is the tenancy column, `packages/db` stamps it from the handle, ' +
+                'and naming it in an insert`s values is REFUSED at run time'
+              : 'insert. `payout_requests` has NO SUCH COLUMN and the value is already ' +
+                'stored inside `eligibility_snapshot`, so a second home for it would state ' +
+                'one money fact twice on the money path'),
+        );
+      }
+      if (parsed.keys.some((key) => key === PAYOUT_DERIVED.sql || key === PAYOUT_DERIVED.property))
+        continue;
+      findings.push(
+        `${rel}:${line} writes \`${PAYOUT_TABLE_KEY}\` without naming ` +
+          `\`${PAYOUT_DERIVED.property}\`. The column is \`NOT NULL\` and ` +
+          '`PayoutRequestInsert` does not carry it, so it is DERIVED from ' +
+          '`accounts.plan_version_id` on the same transaction. An omission is a constraint ' +
+          'violation on the request that approves a payout',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -7977,6 +8318,7 @@ export const CHECKS = [
   ri30,
   ri31,
   ri33,
+  ri34,
 ];
 
 // =============================================================================
