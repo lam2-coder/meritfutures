@@ -311,6 +311,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-295](ADR-295.md) | slice 6's approval branch LANDED, and the lock ADR-293 ruled is STILL OWED because the fence that granted this file granted it for seven named lines  (2026-08-30, status: proposed) |
 | [ADR-297](ADR-297.md) | a column that cannot be null, and the null is not the defect. `payout_requests.approved_at` holds the REQUEST instant on every row, it is the only one of four state timestamps not bound to its state, and the repair is a SUPERSESSION whose number is RESERVED AND NOT WRITTEN  (2026-08-30, status: proposed) |
 | [ADR-299](ADR-299.md) | the home is the DOOR, because its `unknown` was never ruled and it has NO CALLER; the decoder splits at the line that actually exists rather than at the one ADR-286 drew; and the cap schedule is dispatched FIRST  (2026-08-30, status: proposed) |
+| [ADR-301](ADR-301.md) | the lock is a PORT MEMBER and it LANDED, `transact` still takes none, and the race that was a 500 is the 409 the contract names  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
