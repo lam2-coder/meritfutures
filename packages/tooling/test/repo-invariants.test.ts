@@ -3,9 +3,11 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -76,6 +78,24 @@ const appendTo = (root: string, rel: string, body: string): void => {
 const write = (root: string, rel: string, body: string): void => {
   mkdirSync(join(root, rel, '..'), { recursive: true });
   writeFileSync(join(root, rel), body);
+};
+
+/**
+ * Every `.md` in a fixture tree, repo-relative.
+ *
+ * RI-31's two sentinels are the only cases that need this, and they need it for
+ * opposite reasons: one empties the markdown and the other leaves every file in
+ * place while taking the SPANS out of it. Enumerating rather than naming the
+ * files keeps both cases true when the fixture grows another document.
+ */
+const walkMarkdown = (root: string, dir = '.', out: string[] = []): string[] => {
+  for (const entry of readdirSync(join(root, dir))) {
+    if (entry === '.git') continue;
+    const rel = dir === '.' ? entry : `${dir}/${entry}`;
+    if (statSync(join(root, rel)).isDirectory()) walkMarkdown(root, rel, out);
+    else if (rel.endsWith('.md')) out.push(rel);
+  }
+  return out;
 };
 
 /**
@@ -338,6 +358,22 @@ function cleanTree(): string {
   // would drift the day a check was added and every case below would then report
   // the fixture's staleness instead of its own seed.
   write(root, 'docs/decisions/ALLOCATION.md', allocationDoc(register()));
+  // RI-31's SCOPE IS A COMMENT SYNTAX RATHER THAN A DIRECTORY, AND ITS SECOND
+  // SENTINEL IS AN UNCONDITIONAL THROW when nothing in the tree carries one. So
+  // the fixture must hold at least one generated span or every clean-tree case
+  // fails on a fixture defect rather than on a check. TWO FILES, because the
+  // check's own claim is that a span crossing a file boundary is fine: these two
+  // lines are byte-identical, in different documents, and are NOT a finding.
+  write(
+    root,
+    'docs/testing/SPANS.md',
+    '# Spans\n\nThe corpus holds <!--gen:gate_count-->33<!--/gen--> gates.\n',
+  );
+  write(
+    root,
+    'packages/db/DELTA_MANIFEST.md',
+    '# Manifest\n\nThe corpus holds <!--gen:gate_count-->33<!--/gen--> gates.\n',
+  );
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
     root,
@@ -2240,6 +2276,28 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     expect(() => findings('RI-16', root)).toThrow(/NO citation in scope/);
   });
 
+  test('RI-31 throws when the walk reaches no markdown at all', () => {
+    const root = cleanTree();
+    for (const rel of walkMarkdown(root)) rmSync(join(root, rel));
+    expect(() => findings('RI-31', root)).toThrow(/walked no `\.md` file at all/);
+  });
+
+  test('RI-31 throws when nothing in the tree carries a generated span', () => {
+    // THE DIRECTION THAT FAILS SILENTLY, and it is why this sentinel exists at
+    // all. This check's scope is a COMMENT SYNTAX rather than a directory:
+    // rename the span form, or widen the fence mask until it swallows whole
+    // documents, and every line of the check still runs, finds nothing, and
+    // reports PASS over every doubled generated line in the tree. The markdown
+    // is left in place here, so the throw is about the SPANS being gone rather
+    // than about the files being gone.
+    const root = cleanTree();
+    for (const rel of walkMarkdown(root)) {
+      const body = readFileSync(join(root, rel), 'utf8');
+      if (body.includes('<!--gen:')) write(root, rel, body.replaceAll('<!--gen:', '<!--span:'));
+    }
+    expect(() => findings('RI-31', root)).toThrow(/no line carrying a `<!--gen:` span/);
+  });
+
   test('RI-07 throws when the graph walk reaches only the entry point', () => {
     // THE FAILURE MODE THIS GUARDS IS THE CHECK ITSELF BREAKING SILENTLY. If the
     // specifier scan stopped matching -- a regex edit, a syntax this file does
@@ -3729,5 +3787,87 @@ describe('RI-29 binds the invariant register to the live CHECKS array', () => {
       join(root, 'docs/decisions/ALLOCATION.md.moved'),
     );
     expect(() => findings('RI-29', root)).toThrow(/cannot run/);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// RI-31, whose subject is a line the generator wrote rather than a line's length
+// -----------------------------------------------------------------------------
+// THE TWO DIRECTIONS ARE NOT SYMMETRIC AND BOTH ARE HERE. A check that fires on
+// a doubled generated line is easy; a check that stays quiet about the four
+// shapes below is the whole reason it can have no ceiling and no length floor.
+// ADR-282 ruled each of them on measurement rather than on taste, so each is a
+// case here where it cannot quietly stop being true.
+describe('RI-31 refuses a generated line written twice, and only that', () => {
+  const SPAN = '<!--gen:gate_count-->33<!--/gen-->';
+
+  test('a generated line doubled inside one file is a finding', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'docs/testing/SPANS.md',
+      `# Spans\n\nThe corpus holds ${SPAN} gates.\nThe corpus holds ${SPAN} gates.\n`,
+    );
+    expect(findings('RI-31', root).join('\n')).toContain('docs/testing/SPANS.md:3,4');
+  });
+
+  // THE SCOPE LEG, AND IT IS THE ONE THE ROW'S FENCE GOT WRONG. RI-12 reads
+  // `docs/`; the generator writes every `.md` in the tree, and the file that
+  // held seven of the fifteen live instances was `packages/db/DELTA_MANIFEST.md`.
+  // A check that only walked `docs/` would report PASS here.
+  test('a generated line doubled OUTSIDE docs/ is a finding', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'packages/db/DELTA_MANIFEST.md',
+      `# Manifest\n\nThe corpus holds ${SPAN} gates.\nThe corpus holds ${SPAN} gates.\n`,
+    );
+    expect(findings('RI-31', root).join('\n')).toContain('packages/db/DELTA_MANIFEST.md:3,4');
+  });
+
+  test('one span NAME twice on a single line is not a finding', () => {
+    // `gate_count` occurs 192 times under docs/ and twice on one line wherever a
+    // document writes "N of N". A check keyed on the name would be unusable.
+    const root = cleanTree();
+    write(root, 'docs/testing/SPANS.md', `# Spans\n\n${SPAN} of ${SPAN} gates pass.\n`);
+    expect(findings('RI-31', root)).toEqual([]);
+  });
+
+  test('one identical generated line in two different files is not a finding', () => {
+    // Zero such pairs existed in the corpus when this check was written, and a
+    // cross-file rule would fire on two documents that legitimately share a
+    // sentence. The fixture already carries this pair; this asserts it.
+    const root = cleanTree();
+    const line = `The corpus holds ${SPAN} gates.`;
+    write(root, 'docs/testing/SPANS.md', `# Spans\n\n${line}\n`);
+    write(root, 'packages/db/DELTA_MANIFEST.md', `# Manifest\n\n${line}\n`);
+    expect(findings('RI-31', root)).toEqual([]);
+  });
+
+  test('a doubled line carrying no span is not a finding, which is RI-12 half', () => {
+    // The partition ADR-282 measured: of 37 long lines repeating inside one
+    // file, 29 carried no span and included every legitimate one. This check
+    // does not replace RI-12 and must not start reporting its subject.
+    const root = cleanTree();
+    const long =
+      'A sentence long enough to sit inside RI-12 own scope, repeated once, carrying no generated span at all.';
+    write(
+      root,
+      'docs/testing/SPANS.md',
+      `# Spans\n\nThe corpus holds ${SPAN} gates.\n\n${long}\n${long}\n`,
+    );
+    expect(findings('RI-31', root)).toEqual([]);
+  });
+
+  test('a generated line doubled inside a fenced block is not a finding', () => {
+    // A span shown in a fence is documentation of the FORM. STRATEGY carries the
+    // worked example and the generator masks it, so this check masks it too.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/testing/SPANS.md',
+      `# Spans\n\nThe corpus holds ${SPAN} gates.\n\n\`\`\`\n${SPAN}\n${SPAN}\n\`\`\`\n`,
+    );
+    expect(findings('RI-31', root)).toEqual([]);
   });
 });
