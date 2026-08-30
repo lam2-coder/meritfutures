@@ -913,11 +913,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
   //
   // THE PORT IS STILL BLOCKED AND THE TRUE REASON IS WORSE THAN THE FALSE ONE.
   // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
-  // drives `requested --> approved` or `cooling --> approved`, and `:287-292`
-  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES` (the
-  // array is `wallet-withdrawals.ts:288-293` since ADR-232 added an import
-  // above it; it was :287-292, and :283-288 was the docblock above that), on
-  // which `gateNoInFlight` refuses. So a wired endpoint writes a row nothing
+  // drives `requested --> approved` or `cooling --> approved`, and `:350-355`
+  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES`, on
+  // which `gateNoInFlight` refuses. THE ARRAY HAS MOVED FOUR TIMES AND THE
+  // EARLIER PLACES ARE WRITTEN OUT OF CITATION GRAMMAR ON PURPOSE (ADR-212, the
+  // rule this entry states about its own two dead numbers): it stood at lines
+  // two hundred eighty three, two hundred eighty seven and three hundred
+  // twenty seven before ADR-267 added a docblock above it, and a pointer quoted
+  // as HISTORY must not wear the shape that says follow me. So a wired endpoint writes a row nothing
   // will ever advance and then refuses that identity's every later withdrawal,
   // permanently, behind a screen saying a withdrawal is in flight.
   //
@@ -958,7 +961,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'used to state it: session 422 built `requested --> approved` and `cooling --> approved`, ' +
     'guarded and dual controlled above 500000 integer cents, and the port did not become ' +
     'wireable, because `approved` IS ITSELF ONE OF THE FOUR MEMBERS OF ' +
-    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:327-332`) and `gateNoInFlight` ' +
+    '`OPEN_WITHDRAWAL_STATUSES` (`routes/wallet-withdrawals.ts:350-355`) and `gateNoInFlight` ' +
     'refuses on the whole list. AND THE SENTENCE AFTER THAT ONE IS NOW WRONG TOO, WHICH MAKES ' +
     'FIVE CORRECTIONS TO THIS ENTRY AND IS ADR-234. It read that NOTHING IN THIS TREE reaches ' +
     '`settled`, `failed` or `cancelled`. Session 424 built `requested --> cancelled` and ' +
@@ -975,7 +978,24 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'THAN A NEW ONE: NO DOOR DRIVES `requested --> approved` EITHER, so a wired backend would ' +
     'take a withdrawal request that nothing in this estate can pay. The approval posts LT-06 ' +
     'and needs the ledger authority ADR-165 declined and ADR-172 clause 2 ruled is not a ' +
-    'handle; past it `settled` and `failed` are drawn only out of `transferring`, reached by ' +
+    'handle. AND ADR-267 NARROWS THAT CLAUSE FROM AN ABSENCE TO A RULING, WHICH IS THE ' +
+    'SEVENTH CORRECTION TO THIS ENTRY AND THE FIRST THAT MAKES IT SMALLER RATHER THAN ' +
+    'LONGER. The question a successor would otherwise ask here is whether ADR-176 clears it ' +
+    'the way it cleared LT-01, by deleting the handle and posting later at a system ' +
+    'authority. IT DOES NOT, AND THE ANSWER IS MEASURED RATHER THAN ASSUMED: LT-01 CREDITS ' +
+    'the wallet and LT-06 DEBITS it, M20 section 3.3a separates the payout hold from the ' +
+    'wallet halt by exactly that fact and calls it the whole of the difference between the ' +
+    'two legs, and INV-M20-01 binds every wallet debit to the transaction that checks it ' +
+    'against the live position. The key half of ADR-176 is ALREADY PAID on this leg -- ' +
+    '`decideWithdrawal` stores the key the trader supplied on the row -- and the remedy ' +
+    'still fails, ' +
+    'so what refuses is WHEN the posting happens and not a missing key or a missing handle. ' +
+    'THE CONSEQUENCE FOR THIS PORT IS THAT NO `apps/api` DOOR CAN DISCHARGE THIS CLAUSE AT ' +
+    'ALL: the driver that lands it performs the TRANSITION AND THE POSTING TOGETHER at a ' +
+    'system authority, which is a move OUT of this deployable rather than a wiring inside ' +
+    'it, so this entry is no longer waiting on a slice that could arrive here. ' +
+    '`lt06-posting-timing.test.ts` RUNS the ruling, watched red under five seeded defects. ' +
+    'Past it `settled` and `failed` are drawn only out of `transferring`, reached by ' +
     'enqueueing on a rail with no live adapter and no importer. A 503 says Merit cannot do ' +
     'this today. A wired deployment would say yes and then never pay, and a trader can now ' +
     'take that request back but cannot make it settle. `TERMINAL_EDGE_FINDINGS` in ' +
