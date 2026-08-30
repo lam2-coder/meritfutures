@@ -268,6 +268,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-252](ADR-252.md) | the base account cap gets the firm's row ADR-238 named, its vocabulary is closed at the database, and both ports stay refused for reasons that have stopped being the same reason  (2026-08-29, status: proposed) |
 | [ADR-253](ADR-253.md) | a table the registry cannot name, and the ruling ADR-106 said was owed turns out to be a REFUSAL (2026-08-29, status: proposed) |
 | [ADR-255](ADR-255.md) | `0038`'s reversal pointer is not the linkage the reason wanted, the absent column is absent by ruling, and the entry named the one of four that was discharged (2026-08-29, status: proposed) |
+| [ADR-258](ADR-258.md) | the fold's blocker was one field and not six, `prior` is a smaller read than the port ADR-250 left refusing, and the plan decoder this slice needed already exists one deployable over (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
