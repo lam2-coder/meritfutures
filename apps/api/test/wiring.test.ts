@@ -591,8 +591,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:486`) returns a ' +
-    '`PayoutSubject` whose `state` (`routes/payouts.ts:356`) is a `RuleState`, ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:537`) returns a ' +
+    '`PayoutSubject` whose `state` (`routes/payouts.ts:384`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
     '`decodeEngineGates` is what rebuilds one from the other. ' +
@@ -642,13 +642,23 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'coverage gap. `CATALOG_TABLE_KEYS` did not move and ADR-211 foreclosure 2 is honoured: ' +
     '`PayoutTx` gains no firm method, exactly as ADR-233`s catalogue verbs discharged the ' +
     '`plan` half without adding a port member. ' +
+    'AND ADR-281 RE-DERIVED THAT DOOR AT SOURCE RATHER THAN TAKING THIS ENTRY`s WORD FOR IT, ' +
+    'BECAUSE A DOOR THAT EXISTS AND IS NOT REACHED FROM THE REFUSING PATH IS NOT A DISCHARGE: ' +
+    '`ScopedTx.lastClosedTradingDay(): Promise<string>` is DECLARED at ' +
+    '`packages/db/src/scoped-db.ts:3589` and IMPLEMENTED at `:3782` on `source`, which is the ' +
+    'payout transaction itself; `lastClosedTradingDayStatement` (`:3224`) reads both calendar ' +
+    'tables and throws on an empty calendar, an EXHAUSTED one and a coverage gap alike; the ' +
+    'return type is `string` so no caller holds an absent value to fold a UTC date into ' +
+    '(ADR-146 clause 4); and `routes/payouts.ts:354` instructs a backend to call it. SO THE ' +
+    'READ CLAUSE IS DISCHARGED AND IS DELETED FROM THE SUMMARY BELOW RATHER THAN KEPT BESIDE A ' +
+    'DOOR THAT LANDED, which is assertion 2 of this file`s own three working a third time. ' +
     'FIFTH: NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`. THE API DOES NOT GET TO ' +
     'FOLD ONE ITSELF AND ADR-239 RULES IT: `INV-M5-02` (`M05:81`) is that both endpoints call ' +
     '`evaluatePayout` with the same inputs because "a second evaluator would be a second rule", ' +
     "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
     'detectable, computed on the one path no replay audit reads. ' +
     'SIXTH, AND THE CLAUSE THAT HAS MOVED MOST IS NOW CLOSED. ' +
-    '`PayoutSubject` (`routes/payouts.ts:329`) CARRIES THREE FIELDS AND THIS ENTRY NAMED ONLY ' +
+    '`PayoutSubject` (`routes/payouts.ts:333`) CARRIES THREE FIELDS AND THIS ENTRY NAMED ONLY ' +
     'TWO FOR ELEVEN REVISIONS. `state` is clauses one to four, `plan` was discharged by ' +
     'ADR-233, and `gates` is an `ExternalGates` WHICH IS NOW CONSTRUCTIBLE. THE CLAUSE MOVED ' +
     'THREE TIMES AND IS RECORDED THAT WAY BECAUSE EACH MOVE WAS A DIFFERENT KIND OF THING. ' +
@@ -686,16 +696,56 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'SERVED: `gateNoInFlight` (`routes/wallet-withdrawals.ts`) refuses a second open ' +
     '`wallet_withdrawals` row for one identity IN THE HANDLER, because that legs open index is ' +
     'plain rather than unique (ADR-158 finding 8), and it does not read this field. ' +
-    'SO THE THREE FIELDS WAIT ON ONE THING BETWEEN THEM AND THE SIXTEENTH REVISION OF THIS ' +
-    'REASON SAYS WHAT IT IS: `plan` waits on NOTHING (ADR-233), `gates` waits on NOTHING ' +
-    '(ADR-260), and `state` waits on NO CAPABILITY EITHER. It waits on a DEPLOYMENT that has ' +
-    'run the job, and on a way to read the calendar on the transaction that reads the state. ' +
-    'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED, AND THE REASON FOR THAT IS NEW: ' +
-    'every clause on this entry until ADR-264 named something nobody had built, and the one ' +
-    'that stands now names something nobody has RUN plus one read on the wrong door. THE FIRM-READ CLAUSE IS ' +
+    'SO THE THREE FIELDS WAIT ON TWO THINGS BETWEEN THEM, AND THE SEVENTEENTH REVISION OF THIS ' +
+    'REASON IS THE FIRST TO NAME THE ONE THAT WAS NEVER ON IT (ADR-281). THE RETIRED SUMMARY ' +
+    'IS PARAPHRASED RATHER THAN QUOTED, because a reason that reproduces its own retired ' +
+    'sentence reads as live to every grep, and this entry has retired the same question that ' +
+    'way twice already. IT SAID THE `plan` FIELD WAITED ON NOTHING, ON ADR-233`s AUTHORITY, ' +
+    'AND ADR-233 GAVE THIS TRANSACTION THE READ AND NOT THE DECODE. `PayoutSubject.plan` is a ' +
+    '`ResolvedPlan` (`routes/payouts.ts:405`); `resolvePlan` takes a DECODED `PlanRulesJson` ' +
+    'and a decoded `PlanVersionSizeRow` (`packages/rules-engine/src/plan/resolve.ts:184`); and ' +
+    '`plan_versions.rules` is `jsonb`, so a catalogue row is a blob and not a plan. THE ' +
+    'DECODING EXISTS TWICE IN THIS REPOSITORY AND NEITHER COPY IS REACHABLE FROM HERE: ' +
+    '`toPublishedRules` (`apps/worker/src/batch/adapter.ts:1108`) and `decodeRules` ' +
+    '(`apps/site/src/catalog/adapter.ts:552`), and this deployable can import neither ' +
+    'deployable. THE ENGINE DECLARES NONE and `PlanRulesJson` leaves that package as a TYPE, ' +
+    'so the workspace declaration is not what refuses: `apps/api` has declared ' +
+    '`@merit/rules-engine` since session 252 and `resolvePlan` is exported ' +
+    '(`packages/rules-engine/src/index.ts:184`). A THIRD DECODER WRITTEN HERE WOULD BE `FM-16` ' +
+    'BY NAME ON THE MONEY PATH, over the blob that fixes every cents value a payout is decided ' +
+    'against, and ADR-269 REFUSED EXACTLY THAT ONE PORT OVER FOR THE SAME VALUE: ' +
+    '`EligibleFoldUnwired` states it in its own message and `setAdminReadSource`s entry above ' +
+    'carries it. ADR-239 slice A rules the shared home is `packages/rules-engine` beside ' +
+    '`gates-codec.ts`, which is where ADR-250 put this port`s other codec. THAT IS THE THIRD ' +
+    'TIME THIS ENTRY HAS NAMED THE SECOND-CHEAPEST BLOCKER, and it is the failure this file ' +
+    'diagnoses in itself rather than a new kind of miss: a session dispatched to remove what ' +
+    'this entry named would have removed a scheduled run and a calendar door that landed two ' +
+    'waves ago, found the route still answering 503, and had no written account of why. ' +
+    '`gates` STILL WAITS ON NOTHING (ADR-260) AND THAT IS RE-DERIVED RATHER THAN CARRIED: ' +
+    '`ExternalGateFacts` takes raw scalars and two row lists, `identities` is `root` and ' +
+    '`accounts`, `kycVerifications` and `payoutRequests` are `owned`, so every input is on this ' +
+    'transaction. AND `state` NO LONGER WAITS ON A READ AT ALL. WHAT IS LEFT OF IT IS THE ' +
+    'EMPTY TABLE, AND ROW 281 ASKED WHETHER A PORT REFUSES ON ONE OR WIRES AND ANSWERS HONESTLY ' +
+    'THAT THERE IS NO STATE FOR THE DAY. IT IS ANSWERED, AND THE ANSWER IS THAT THE SECOND ARM ' +
+    'DOES NOT EXIST: `ruleStateOn` throws `RuleStateAbsent`, `unwiredOrThrow` ' +
+    '(`routes/payouts.ts:1372`) RETHROWS anything that is not a `PayoutBackendUnwired`, and a ' +
+    'wired backend meeting an unfolded day therefore answers 500 on the door where money leaves ' +
+    'the firm. A 500 is not an honest answer that there is no state for the day; it is an ' +
+    'internal error from a live-looking route, which is the shape this port has refused. ' +
+    'ADR-256 ruling 12 is the standing rule and it decides this arm: wiring is permitted when ' +
+    'the last gap is a thing THE DEPLOYMENT SETS, and a composition that does not exist is not ' +
+    'such a gap. A SYNTHESISED DEFAULT IS NOT A THIRD OPTION: `RuleStateAbsent` is a class and ' +
+    'not an arm, and a fabricated `RuleState` is a payout basis nobody computed. ' +
+    'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED AT TEN OF TWENTY-FOUR DECLARED ' +
+    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A SECOND TIME: every clause on this ' +
+    'entry until ADR-264 named something nobody had BUILT, ADR-268 closed the one that named a ' +
+    'READ, and what stands now is a decoding whose home is RULED and untaken plus a refusal arm ' +
+    'this deployable has never had. BOTH ARE CODE SOMEBODY WRITES IN THIS REPOSITORY, which is ' +
+    'what keeps this entry a liability that can expire: an entry whose last obstruction is an ' +
+    'operator fact ADR-241 ruled EXTERNAL is one nothing here could ever discharge. THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:3379`), a closed list of five `firm` keys that includes ' +
+    '(`packages/db/src/scoped-db.ts:3392`), a closed list of five `firm` keys that includes ' +
     "`planVersions` and `planVersionSizes`, so `PayoutTx.subject`'s `ResolvedPlan` inputs are " +
     'readable ON THE PAYOUT TRANSACTION and the two-transaction remedy ADR-211 clause 2 ruled ' +
     'is not needed. AN OLDER CLAUSE IS KEPT AS HISTORY BECAUSE IT WAS FALSE: this entry once ' +
@@ -703,12 +753,22 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`breached` and `breach_kind` are all three columns of `rule_states` as of ' +
     '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
     'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
-    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:496-497` states "no member of ' +
+    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:547-548` states "no member of ' +
     'this interface that a scoped door cannot serve", which ADR-233 makes TRUE of the ' +
     'catalogue half and leaves false of `state`. EVERY CLAUSE ABOVE IS A PREDICATE SOMEWHERE ' +
     'AND NOT ONLY A SENTENCE HERE: `apps/api/test/rule-state-producibility.test.ts` runs the ' +
-    'four links on every CI-01 pass, because a reason naming the second-cheapest blocker ' +
-    'retires the question for every reader after it and this entry has done that twice. A ' +
+    'SEVEN links on every CI-01 pass, because a reason naming the second-cheapest blocker ' +
+    'retires the question for every reader after it and this entry has done that three times. ' +
+    'AND THREE CITATIONS IN THIS ENTRY WERE FOUND STALE BY EXACTLY FIFTEEN LINES BEFORE A ' +
+    'CHARACTER OF ADR-281 WAS WRITTEN, WHICH IS ADR-212 ON THIS ENTRY A THIRD TIME: `state`, ' +
+    '`PayoutTx.subject` and the no-member sentence each pointed fifteen lines above themselves, ' +
+    'because a docblock was inserted above them and nothing checks a line number. All three are ' +
+    'repointed here at the post-diff file rather than left, and the durable repair is still the ' +
+    'one ADR-212 names, which is to cite a NAME where a name will do. ' +
+    'LINK 7 IS ADR-281`s AND IT IS A CENSUS RATHER THAN A SENTENCE: exactly two files in this ' +
+    'tree call `resolvePlan(` and neither is under `apps/api/src`, exactly two declare a ' +
+    '`rules` decoder and neither is importable here, and the day either count moves this entry ' +
+    'goes red rather than stale. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
     'both constructible today (`payoutRequests` is `owned`, `scope.ts:1217`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
@@ -779,7 +839,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(ADR-252, then ADR-265, both on ADR-238 ruling 1) AND THE CROSS-IDENTITY READ IS DELETED ' +
     '(ADR-262). THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
     '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
-    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3379`), whose five members are exactly ' +
+    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3392`), whose five members are exactly ' +
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
     '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
@@ -958,7 +1018,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
     '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
-    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3468`) at the one reason ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3481`) at the one reason ' +
     '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
     'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
     'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +

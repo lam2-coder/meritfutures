@@ -3042,14 +3042,27 @@ export async function effectiveAccountCapStatement(
 // and the fold this caller would then be holding is not a lookup: it is
 // "which day is the last closed one", which is `R-06` itself.
 //
-// THAT FOLD IS ALREADY STATED TWICE IN THIS TREE AND THE TWO STATEMENTS
-// DISAGREE. `readLastClosedTradingDay` (`apps/worker/src/batch/adapter.ts`)
-// takes the maximum `trading_day` over rows whose session has closed and
-// consults no coverage at all. `lastClosedDay` (`apps/api/src/admin-source/
-// liability.ts`) folds on the maximum CLOSE INSTANT with a day tiebreak, and its
-// caller `anchorCalendar` then checks `trading_calendar_loads` and can answer
-// `uncovered`. A catalogue admission would put a THIRD statement of one
-// predicate on the money path, which is `FM-16` written where money leaves.
+// THAT FOLD IS ALREADY STATED TWICE IN THIS TREE. `anchorLastClosedDay`
+// (`apps/worker/src/batch/adapter.ts`) reads `trading_calendar` and
+// `trading_calendar_loads` in ONE transaction and returns a `TradingDayAnchor`
+// carrying the day on its `anchored` arm alone. `lastClosedDay`
+// (`apps/api/src/admin-source/liability.ts`) folds on the maximum CLOSE INSTANT
+// with a day tiebreak, and its caller `anchorCalendar` then checks
+// `trading_calendar_loads` and can answer `uncovered`. A catalogue admission
+// would put a THIRD statement of one predicate on the money path, which is
+// `FM-16` written where money leaves.
+//
+// **AND THE TWO USED TO DISAGREE, WHICH IS WHERE THIS COMMENT WAS STALE FOR ONE
+// WAVE.** It read that the worker's fold "consults no coverage at all", which
+// was true of `readLastClosedTradingDay` and was `ADR-268` finding 2. `ADR-277`
+// repaired it and took that function off the exported surface entirely, so the
+// sentence named a function this tree no longer has. `ADR-281` repaired the
+// comment; `ADR-277` section 7 item 2 registered it and could not reach it,
+// because `packages/db/**` was outside that row's fence and `RI-27` strips
+// comments before it reads a file. THE ARGUMENT ABOVE IS UNAFFECTED AND IS WHY
+// THE CORRECTION IS A CORRECTION RATHER THAN A DELETION: what refuses a sixth
+// catalogued key is that the fold would be stated a THIRD time on the money
+// path, and two statements that now agree are still two.
 //
 // AND THE ADMISSION IS PER TABLE WHILE THE ANSWER NEEDS TWO. Coverage lives in
 // `trading_calendar_loads`, so a catalogue door would admit that table too and
