@@ -58,6 +58,8 @@ import { join } from 'node:path';
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import type {
   BasisPoints,
   Cents,
@@ -1102,7 +1104,10 @@ describe('ADR-176: the request path holds no ledger handle', () => {
   );
 
   /** The file with every line and block comment removed. Prose may name what code may not. */
-  const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const CODE = stripComments(SOURCE);
 
   it('imports no WRITE-side symbol from @merit/ledger, so nothing here can post', () => {
     // `posting`, `transfer`, `identityAccount`, `firmAccount` and `Posting` BUILD

@@ -35,6 +35,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { TABLE_KEYS } from '@merit/db';
 
 import {
@@ -281,10 +283,10 @@ describe('the policy carries every number and the module spells none of them', (
     // is `B2` again. Comments and refusal messages quote all three and must, so
     // the scan is over the CODE with both stripped, and the policy object itself
     // is removed because it is the one site the ruling appoints.
-    const code = MODULE.replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .split('\n')
-      .map((line) => line.replace(/^\s*\/\/.*$/, ''))
-      .join('\n')
+    // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+    // block-comment OPENER written inside a LINE comment opened a phantom block that
+    // ran to the next real closer and took every line between them with it.
+    const code = stripComments(MODULE)
       // AND THE STRINGS TOO, IN ONE PASS OVER ALL THREE QUOTE CHARACTERS.
       // Every refusal message cites `ADR-201 section 7` and quotes `7/30`, so a
       // scan that read message text would report the citations as second sites

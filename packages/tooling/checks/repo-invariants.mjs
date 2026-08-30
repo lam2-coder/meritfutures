@@ -7143,6 +7143,279 @@ const ri29 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-30  One comment stripper, in packages/tooling, and every parser imports it
+// -----------------------------------------------------------------------------
+// ADR-279's PROPERTY, AND IT IS `FM-16` IN THE TOOLING. Seven files declared a
+// comment stripper, an eighth was found while writing this, and six of the eight
+// were the same three-line idiom:
+//
+//     source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ')
+//
+// The block pass runs FIRST and cannot tell that a block-comment OPENER sits
+// inside a LINE comment, so a header quoting a glob opens a phantom block that
+// runs to the next real closer. On `apps/worker/src/index.ts` that idiom strips
+// 55,728 characters to 2,753, and a `new Date().getHours()` seeded inside the
+// phantom span was INVISIBLE to `RI-28`, which reported PASS.
+//
+// **THE DIRECTION IS WHAT MAKES THIS WORTH A CHECK.** A PRESENCE assertion over
+// an emptied file goes red and somebody looks. An ABSENCE check over an emptied
+// file goes GREEN, and four of the six naive sites were absence checks. That is
+// ADR-274's own warned defect class landing inside the check ADR-274 shipped,
+// and ADR-277 section 8 said in as many words that a defect deferred to a row
+// nobody has written was becoming the pattern rather than the exception.
+//
+// TWO LEGS, AND THE SECOND IS THE DURABLE ONE.
+//
+//   1. THE NAME. No file but the home declares a binding named `stripComments`
+//      or any `strip*Comment*` spelling. That is the name all eight used and it
+//      is what a ninth will be called.
+//   2. THE IDIOM, WHICH IS NAME-BLIND. No file but the home carries a
+//      `.replace()` over a block-comment or line-comment regex. This catches a
+//      copy under a different name, and it catches one written inline with no
+//      function at all, which is the form a hurried session actually writes.
+//
+// ONE FILE IS ADMITTED AND THE ADMISSION IS ASSERTED RATHER THAN TRUSTED.
+// `packages/tooling/test/strip-comments.test.ts` reproduces the naive idiom
+// VERBATIM, because every case in it is a comparison against the thing being
+// repaired and a repair with no record of what it repaired is a repair the next
+// session undoes. So the admission is one named path, and the check THROWS if
+// that file stops existing or stops carrying the idiom, which is what stops the
+// exception quietly becoming a hole.
+//
+// IT READS WITH LITERALS BLANKED, on RI-28's reasoning: a stripper QUOTED inside
+// a string is prose about a stripper. A regex literal is code to this scanner
+// and survives blanking, which is what leg 2 needs.
+//
+// FOUR SENTINELS THAT THROW, AND THE ROW THAT COMMISSIONED THIS CHECK NAMED THE
+// REASON: an absence check over an empty scope reports PASS in silence, and this
+// whole subject is that defect. Zero files walked, a missing home, a home that
+// exports nothing, and an importer set that does not reach outside
+// `packages/tooling` are each an ERROR rather than a quiet green. The last is
+// the one that matters most: if nothing outside this package imports the home,
+// the migration has been reverted and both legs are then trivially satisfied by
+// a tree that has gone back to eight copies under other names.
+//
+// WHAT IT CANNOT SEE, stated rather than implied. A hand-written scanner under a
+// name leg 1 does not match, carrying no `.replace()` at all: leg 2 is blind to
+// it and so is leg 1. That is a SECOND CORRECT stripper rather than a naive one,
+// and it is the copy this check is least worried about, because the defect
+// ADR-279 repairs is not duplication for its own sake but the specific idiom
+// that empties a file. Duplication of a correct scanner costs a reader; the
+// idiom costs a green check that is not checking anything.
+
+/** The one comment stripper, relative to the repo root. */
+const STRIPPER_HOME = 'packages/tooling/checks/strip-comments.mjs';
+
+/**
+ * The home's type face, which is the same module and not a second copy.
+ *
+ * It restates the SIGNATURE and holds no algorithm, and it exists because
+ * `repo-invariants.mjs` is run as `node ...repo-invariants.mjs` with nothing
+ * compiled, so the home cannot be TypeScript, while the suites that import it
+ * are type-checked by packages whose `tsconfig.json` sets no `allowJs`.
+ */
+const STRIPPER_TYPES = 'packages/tooling/checks/strip-comments.d.mts';
+
+/**
+ * The one file admitted to carry the naive idiom, and what it must still say.
+ *
+ * It is the suite that proves the repair, and every case in it compares the
+ * scanner against the idiom. The check throws rather than passes if this file
+ * stops holding the idiom, because at that point the admission is exempting
+ * nothing and the next reader has no way to know that.
+ */
+const STRIPPER_WITNESS = 'packages/tooling/test/strip-comments.test.ts';
+
+/**
+ * A DECLARATION of `stripComments`, which is the name every JavaScript copy used.
+ *
+ * The trailing `[(=<:]` is what makes it a declaration rather than a mention:
+ * this check's own source carries `function stripComments\s*\(` inside a REGEX
+ * LITERAL, which the scanner correctly treats as code, and a name leg that read
+ * it would report the check as its own violator. The exact name is deliberate
+ * too. `stripSqlComments`, `stripJsComments` and `stripComment` do not match,
+ * and none of them should: the first two are out of subject below and the third
+ * parses YAML.
+ */
+const STRIPPER_NAME = /\b(?:function|const|let|var|class)\s+(stripComments)\s*[(=<:]/g;
+
+/** A `.replace()` over a JavaScript LINE-comment regex. No SQL or YAML strip can match. */
+const STRIPPER_LINE = /\.replace\s*\(\s*\/[^\n]{0,24}?\\\/\\\//g;
+
+/** A `.replace()` over a BLOCK-comment regex, which SQL shares and JavaScript does not own. */
+const STRIPPER_BLOCK = /\.replace\s*\(\s*\/[^\n]{0,8}?\\\/\\\*/g;
+
+/**
+ * A `--` line-comment strip, which is what makes a block strip SQL and not this.
+ *
+ * THIS IS A LANGUAGE TEST AND IT IS NOT A FENCE. `RI-30`'s subject is the
+ * JavaScript comment stripper. SQL's comment grammar is different (`--`, and
+ * `''` doubling inside a literal), the shared home could not strip it correctly,
+ * and the five SQL strippers standing in this tree are reported by ADR-279 and
+ * repaired by nobody. A block strip in the same expression as a `--` strip is
+ * one of those.
+ */
+const SQL_LINE = /--\[\^\\[nr]\]/;
+
+/** How far from a block strip a `--` strip may sit and still be the same act. */
+const SQL_WINDOW = 300;
+
+/** Files a stripper could be written in. */
+const STRIPPABLE = /\.(ts|tsx|mts|mjs|js|jsx)$/;
+
+/** @type {Invariant} */
+const ri30 = {
+  id: 'RI-30',
+  title: 'One comment stripper, in packages/tooling, and every parser imports it',
+  covers:
+    'THE COMMENT STRIPPER IS DECLARED ONCE, IN ' +
+    '`packages/tooling/checks/strip-comments.mjs`, AND EVERY FILE THAT PARSES ' +
+    'SOURCE IMPORTS IT (ADR-279). Seven files declared their own and six were ' +
+    'the two-replacement idiom, whose block pass runs first and cannot tell a ' +
+    'block-comment OPENER written inside a LINE comment from a real one: on ' +
+    '`apps/worker/src/index.ts` it strips 55,728 characters to 2,753 and a ' +
+    '`new Date().getHours()` seeded inside the phantom span was invisible to ' +
+    '`RI-28`, which reported PASS. LEG 1 IS THE NAME: no file but the home ' +
+    'declares a `strip*Comment*` binding. LEG 2 IS THE IDIOM AND IS ' +
+    'NAME-BLIND: no file but the home carries a `.replace()` over a ' +
+    'block-comment or line-comment regex, which catches a copy under another ' +
+    'name and one written inline with no function at all. ' +
+    'ONE FILE IS ADMITTED, `packages/tooling/test/strip-comments.test.ts`, ' +
+    'which reproduces the idiom VERBATIM as the thing every case compares ' +
+    'against, and THE ADMISSION IS ASSERTED: the check THROWS if that file ' +
+    'stops existing or stops carrying the idiom, so an exception cannot ' +
+    'quietly become a hole. ' +
+    'IT READS EVERY `.ts`, `.tsx`, `.mts`, `.mjs`, `.js` and `.jsx` file in ' +
+    'the workspace with comments removed and string literals BLANKED, so a ' +
+    'stripper quoted inside a string is prose and a regex literal, which is ' +
+    'code, is not. ' +
+    'FOUR SENTINELS THROW RATHER THAN PASS, because an absence check over an ' +
+    'empty scope reports PASS in silence and this check`s whole subject is ' +
+    'that defect: zero files walked, a missing home, a home exporting no ' +
+    '`stripComments`, and an importer set that does not reach outside ' +
+    '`packages/tooling`. The last is the revert detector. ' +
+    'WHAT IT CANNOT SEE: a hand-written scanner under a name leg 1 does not ' +
+    'match and carrying no `.replace()`, which is a second CORRECT stripper ' +
+    'rather than a naive one. Duplication of a correct scanner costs a ' +
+    'reader; the idiom costs a green check that is checking nothing. ' +
+    'No database.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    if (!existsSync(join(root, STRIPPER_HOME))) {
+      throw new Error(
+        `RI-30 cannot run: ${STRIPPER_HOME} does not exist, and it is the home this check ` +
+          'exists to keep single. A missing home is not an empty finding list: with it gone ' +
+          'both legs would report every remaining copy as the defect and name the wrong one',
+      );
+    }
+
+    const home = readFileSync(join(root, STRIPPER_HOME), 'utf8');
+    if (!/export function stripComments\s*\(/.test(home)) {
+      throw new Error(
+        `RI-30 cannot run: ${STRIPPER_HOME} exports no \`stripComments\`, so there is nothing ` +
+          'for the tree to import and the absence legs below would be asserting that nobody ' +
+          'declares what nobody can obtain',
+      );
+    }
+
+    if (!existsSync(join(root, STRIPPER_WITNESS))) {
+      throw new Error(
+        `RI-30 cannot run: ${STRIPPER_WITNESS} does not exist. It is the ONE file admitted ` +
+          'to carry the naive idiom, it is admitted because it is the suite that proves the ' +
+          'repair, and an admission whose subject is gone is a hole rather than an exception',
+      );
+    }
+
+    const witness = stripComments(readFileSync(join(root, STRIPPER_WITNESS), 'utf8'), {
+      literals: 'blank',
+    });
+    if ([...witness.matchAll(STRIPPER_LINE)].length === 0) {
+      throw new Error(
+        `RI-30 cannot run: ${STRIPPER_WITNESS} no longer carries the two-replacement idiom, ` +
+          'and it is admitted by name for carrying it. Either the suite stopped comparing the ' +
+          'scanner against the thing it repairs, in which case the comparison is what to ' +
+          'restore, or the admission is now exempting a file that needs no exemption and ' +
+          'should be removed from this check',
+      );
+    }
+
+    const files = walk(root).filter(
+      (f) => STRIPPABLE.test(f) && f !== STRIPPER_HOME && f !== STRIPPER_TYPES,
+    );
+    if (files.length === 0) {
+      throw new Error(
+        'RI-30 found no JavaScript-family source file in the workspace. Zero means the walk ' +
+          'or the extension filter has moved, at which point both legs are asserting about an ' +
+          'empty list and eight comment strippers would report as none',
+      );
+    }
+
+    /** @type {string[]} */
+    const importers = [];
+    for (const file of files) {
+      const source = readFileSync(join(root, file), 'utf8');
+
+      // THE IMPORTER LEG READS THE TEXT THAT STILL HOLDS LITERALS, because a
+      // module specifier IS a string literal and blanking it deletes the thing
+      // being looked for. The two legs below read the blanked text for the
+      // opposite reason: a stripper quoted inside a string is prose about one.
+      if (/from\s+'[^']*strip-comments\.mjs'/.test(stripComments(source))) importers.push(file);
+
+      if (file === STRIPPER_WITNESS) continue;
+      const code = stripComments(source, { literals: 'blank' });
+
+      for (const m of code.matchAll(STRIPPER_NAME)) {
+        findings.push(
+          `${file}:${code.slice(0, m.index ?? 0).split('\n').length} declares \`${m[1]}\`, and ` +
+            `the comment stripper is declared once, in ${STRIPPER_HOME}. Seven files declared ` +
+            'their own and six were the idiom that reads a block-comment opener inside a line ' +
+            'comment as a real one, which empties the rest of the file and turns every ' +
+            'absence assertion over it vacuously GREEN (ADR-279). Import it instead',
+        );
+      }
+
+      const idiom = [
+        ...code.matchAll(STRIPPER_LINE),
+        // A BLOCK STRIP IS THIS CHECK'S ONLY IF IT IS NOT SQL'S. The window is
+        // the expression around it: `stripSqlComments` and its four siblings
+        // each strip `--` in the same chain, and they are a different language.
+        ...[...code.matchAll(STRIPPER_BLOCK)].filter((m) => {
+          const at = m.index ?? 0;
+          return !SQL_LINE.test(code.slice(Math.max(0, at - SQL_WINDOW), at + SQL_WINDOW));
+        }),
+      ].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      for (const m of idiom) {
+        findings.push(
+          `${file}:${code.slice(0, m.index ?? 0).split('\n').length} strips comments with a ` +
+            '`.replace()` over a comment regex. TWO REPLACEMENTS CANNOT DO THIS: the block ' +
+            'pass runs first and a block-comment OPENER written inside a LINE comment opens a ' +
+            'phantom block that runs to the next real closer. On `apps/worker/src/index.ts` ' +
+            'that deletes 53,000 of 55,728 characters and `RI-28` reported PASS over a live ' +
+            `\`new Date().getHours()\` (ADR-279). Import \`stripComments\` from ${STRIPPER_HOME}`,
+        );
+      }
+    }
+
+    const outside = importers.filter((f) => !f.startsWith('packages/tooling/'));
+    if (outside.length === 0) {
+      throw new Error(
+        `RI-30 found no file outside \`packages/tooling/\` importing ${STRIPPER_HOME}. The ` +
+          'home is imported by thirty files across seven packages, so zero outside importers ' +
+          'means the migration has been reverted or the module moved. Both legs below are ' +
+          'then satisfied by a tree that has gone back to eight copies under other names, ' +
+          'which is the silent PASS this check exists to refuse',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -7172,6 +7445,7 @@ export const CHECKS = [
   ri27,
   ri28,
   ri29,
+  ri30,
 ];
 
 function main() {

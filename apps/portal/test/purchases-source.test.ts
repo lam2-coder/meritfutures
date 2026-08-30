@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { PAGE_LIMIT_MAX } from '../src/api/types.ts';
 import type {
   CertificateResponse,
@@ -268,9 +270,10 @@ test('one page is read, at the maximum the contract states, and no cursor is eve
 
   // Section 1 calls the token `<opaque>`, which binds the client: nothing in
   // this application constructs one, parses one, or reads a meaning out of one.
-  const source = readFileSync(join(SEGMENT, 'source.ts'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
+  // Stripped by the shared home (ADR-279) rather than by a comment regex: a
+  // block-comment OPENER written inside a LINE comment opened a phantom block that
+  // ran to the next real closer and took every line between them with it.
+  const source = stripComments(readFileSync(join(SEGMENT, 'source.ts'), 'utf8'));
   expect(source, 'no cursor is composed into a path').not.toMatch(/cursor=/);
 });
 
@@ -569,9 +572,7 @@ test('the image endpoint is not requested by this segment, and could not be read
   // NO REQUEST. Recording a row requires naming it, so the assertion is scoped
   // to what may not exist, which is a call.
   const stripped = (file: string): string =>
-    readFileSync(join(SEGMENT, file), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/\/\/[^\n]*/g, ' ');
+    stripComments(readFileSync(join(SEGMENT, file), 'utf8'));
 
   const source = stripped('source.ts');
   expect(source.split('image.png').length - 1, 'named once in code').toBe(1);

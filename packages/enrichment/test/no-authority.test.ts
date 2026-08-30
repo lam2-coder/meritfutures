@@ -29,6 +29,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
+import { stripComments } from '../../tooling/checks/strip-comments.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, '..', 'src');
 
@@ -53,9 +55,7 @@ function sourceFiles(dir: string = SRC): string[] {
  * first and every assertion below reads the code.
  */
 function code(path: string): string {
-  return readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
+  return stripComments(readFileSync(path, 'utf8'));
 }
 
 const FILES = sourceFiles();

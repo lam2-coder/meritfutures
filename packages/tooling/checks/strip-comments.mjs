@@ -41,11 +41,21 @@
 //      that collapsed a block comment to one space would report a line number
 //      that is not the line. `RI-28` did exactly that until ADR-279.
 //
-// WHAT IT DOES NOT MODEL, stated rather than implied: a REGULAR EXPRESSION
-// literal. `/[/*]/` reads as a comment opener to this scanner and to every
-// other stripper this tree has ever had. No Merit source file carries one
-// today, an unterminated state simply consumes to end of file, and the honest
-// repair is a parser rather than a longer scanner.
+// A REGULAR EXPRESSION LITERAL IS CODE AND IS MODELLED, AND IT HAD TO BE. Every
+// stripper this tree has ever had, this one included until ADR-279 measured it,
+// read `/\/\*[\s\S]*?\*\//g` and saw the `//` in its own tail as a line comment,
+// then deleted the rest of the line. THAT IS THE WORST POSSIBLE PLACE FOR THAT
+// BLIND SPOT: the files carrying such a regex are the files that strip comments,
+// which is exactly what `RI-30` reads, so the check that hunts the idiom was
+// blind to the idiom. Eleven files in this tree hit it.
+//
+// WHETHER A `/` OPENS A REGEX OR DIVIDES IS NOT DECIDABLE FROM CHARACTERS ALONE,
+// so this is a heuristic and is named one. A `/` divides when the previous
+// non-space character could end a value: an identifier character, `)`, `]`, `}`,
+// a closing quote, or `<` and `>`, which is what keeps `</div>` in a `.tsx` file
+// from opening one. It opens a regex otherwise, and after the keywords that can
+// be followed by one. A regex is CODE: it is never blanked under `literals`,
+// because a caller hunting a pattern needs to see the pattern.
 // -----------------------------------------------------------------------------
 
 /**
@@ -71,7 +81,7 @@
 export function stripComments(source, options = {}) {
   const blank = options.literals === 'blank';
 
-  /** @typedef {'code' | 'line' | 'block' | 'single' | 'double' | 'template'} State */
+  /** @typedef {'code' | 'line' | 'block' | 'single' | 'double' | 'template' | 'regex'} State */
 
   /**
    * The enclosing states, innermost last. A template substitution pushes
@@ -80,6 +90,29 @@ export function stripComments(source, options = {}) {
    * @type {State[]}
    */
   const stack = ['code'];
+  /** Characters that can END a value, after which a `/` is division. */
+  const DIVIDES_AFTER = /[A-Za-z0-9_$)\]}'"`<>]/;
+  /** Keywords a regex may directly follow, where the character rule says division. */
+  const REGEX_KEYWORDS =
+    /(?:^|[^A-Za-z0-9_$])(?:return|typeof|instanceof|case|in|of|new|delete|void|do|else|yield|await)$/;
+
+  /**
+   * Does the `/` at `index` open a regular expression literal?
+   *
+   * @param {number} index
+   * @returns {boolean}
+   */
+  const opensRegex = (index) => {
+    let j = index - 1;
+    while (j >= 0 && /\s/.test(/** @type {string} */ (source[j]))) j -= 1;
+    if (j < 0) return true;
+    const prev = /** @type {string} */ (source[j]);
+    if (!DIVIDES_AFTER.test(prev)) return true;
+    return REGEX_KEYWORDS.test(source.slice(Math.max(0, j - 12), j + 1));
+  };
+
+  /** Inside a character class of the regex currently being read. */
+  let inClass = false;
   /** Open braces inside the current substitution, so a nested object literal does not close it. */
   const depth = [0];
   let out = '';
@@ -128,6 +161,10 @@ export function stripComments(source, options = {}) {
       if (char === "'") stack.push('single');
       else if (char === '"') stack.push('double');
       else if (char === '`') stack.push('template');
+      else if (char === '/' && opensRegex(i)) {
+        stack.push('regex');
+        inClass = false;
+      }
       out += char;
       i += 1;
       continue;
@@ -150,6 +187,24 @@ export function stripComments(source, options = {}) {
         continue;
       }
       if (char === '\n') out += '\n';
+      i += 1;
+      continue;
+    }
+
+    if (state === 'regex') {
+      // A REGEX IS CODE: copied out verbatim in both modes. An escape carries
+      // its next character, and a `/` inside a character class does not end it.
+      out += char;
+      if (char === '\\') {
+        const next = source[i + 1];
+        if (next !== undefined) out += next;
+        i += 2;
+        continue;
+      }
+      if (char === '[') inClass = true;
+      else if (char === ']') inClass = false;
+      else if (char === '/' && !inClass) stack.pop();
+      else if (char === '\n') stack.pop();
       i += 1;
       continue;
     }

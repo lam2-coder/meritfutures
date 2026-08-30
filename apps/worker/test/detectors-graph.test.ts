@@ -42,6 +42,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import { canaryNonce, isCanaryId } from '../src/detectors/canary.ts';
 import {
   CALENDAR_DAYS_PER_TRADING_DAY,
@@ -95,13 +97,10 @@ import type { DetectorRunOutcome, DetectorRunReport } from '../src/detectors/run
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const read = (path: string): string => readFileSync(`${ROOT}${path}`, 'utf8');
 
-/** A source file with its comments removed. `detector-runner.test.ts`'s idiom. */
-const code = (path: string): string =>
-  read(path)
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .split('\n')
-    .map((line) => line.replace(/^\s*\/\/.*$/, ''))
-    .join('\n');
+// THE STRIPPING IS THE SHARED HOME'S (ADR-279), and this file changes no
+// finding: `src/detectors/graph.ts` strips identically either way today. The
+// copy is what is being removed, not a defect in this suite's answers.
+const code = (path: string): string => stripComments(read(path));
 
 const M07 = read('docs/plans/M07-risk-abuse.md');
 const RISK_SQL = read('packages/db/migrations/0008_risk.sql');

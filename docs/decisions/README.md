@@ -292,6 +292,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-276](ADR-276.md) | one word, two temporal types, and the estate already tells them apart in six of nine places, so the finding is the three that say nothing rather than the collision  (2026-08-30, status: proposed) |
 | [ADR-277](ADR-277.md) | the worker's guard asked the right question of the wrong table, and the repair is a refusal plus a type, because the sharper half of the defect was on the branch that looked safe  (2026-08-30, status: proposed) |
 | [ADR-278](ADR-278.md) | the rename ADR-272 specified, and the reader that could not have seen it land (2026-08-30, status: proposed) |
+| [ADR-279](ADR-279.md) | a stripper that eats the file, and the count in the row was seven where the tree holds twenty-nine (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
