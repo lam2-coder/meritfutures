@@ -124,6 +124,33 @@ const FIXTURE_MINT =
 const writeMint = (root: string, body: string): void =>
   write(root, 'packages/db/src/certificate-code.ts', body);
 
+/**
+ * The register rows RI-29 reads, one per live check, DERIVED and never typed.
+ *
+ * The third cell is the title read out of the array, which is the register's own
+ * rule. `overrides` replaces or drops the row for one id, which is how a case
+ * seeds exactly one of RI-29's legs.
+ */
+const register = (overrides: Readonly<Record<string, string | null>> = {}): string[] =>
+  CHECKS.flatMap((c) => {
+    const override = overrides[c.id];
+    if (override === null) return [];
+    return [override ?? `| \`${c.id}\` | the fixture's register | ${c.title} |`];
+  });
+
+/** The fixture's ALLOCATION document: RI-16's citations, then RI-29's register. */
+const allocationDoc = (rows: readonly string[]): string =>
+  '# Number allocation\n\n## Reservations\n\n' +
+  '| 164 | `PayoutTx.ledger` (`routes/payouts.ts:395`) is required, and the worker at ' +
+  "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts; both are scope " +
+  'class `derived` (`scope.ts:536,545`) |\n' +
+  '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395`, and ' +
+  'both plan tables are scope class `firm` (`scope.ts:506,511`) |\n' +
+  '\n## The invariant register\n\n' +
+  '| Number | Claimed by | What it asserts |\n| --- | --- | --- |\n' +
+  rows.join('\n') +
+  '\n';
+
 /** A tree that satisfies every invariant, which each case then breaks in one way. */
 function cleanTree(): string {
   const root = mkdtempSync(join(tmpdir(), 'merit-invariants-'));
@@ -305,16 +332,12 @@ function cleanTree(): string {
       '[`assertNamesNoSubject:219`](../../apps/admin/src/page.ts) and ' +
       '[`assertFloatIsNotReserve:263`](../../apps/admin/src/page.ts) |\n',
   );
-  write(
-    root,
-    'docs/decisions/ALLOCATION.md',
-    '# Number allocation\n\n## Reservations\n\n' +
-      '| 164 | `PayoutTx.ledger` (`routes/payouts.ts:395`) is required, and the worker at ' +
-      "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts; both are scope " +
-      'class `derived` (`scope.ts:536,545`) |\n' +
-      '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395`, and ' +
-      'both plan tables are scope class `firm` (`scope.ts:506,511`) |\n',
-  );
+  // RI-29 READS THE `RI-nn` REGISTER OUT OF THIS DOCUMENT, so the fixture
+  // carries one and it is DERIVED FROM `CHECKS` rather than typed. A typed copy
+  // here would be the exact defect RI-29 exists to catch, one directory over: it
+  // would drift the day a check was added and every case below would then report
+  // the fixture's staleness instead of its own seed.
+  write(root, 'docs/decisions/ALLOCATION.md', allocationDoc(register()));
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
     root,
@@ -3481,5 +3504,138 @@ describe('RI-28 refuses a process-local clock in shipped source', () => {
     seeded.push(root);
     write(root, 'docs/STATE.md', '# not source\n');
     expect(() => findings('RI-28', root)).toThrow(/found no source file/);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// RI-29, the register nothing read
+// -----------------------------------------------------------------------------
+// EVERY CASE BELOW SEEDS THE REGISTER RATHER THAN THE CHECKS ARRAY, because the
+// array is this file's own import and a case that mutated it would be testing
+// the fixture. The register is a document, which is the half that drifts.
+//
+// THE CLEAN DIRECTION IS COVERED TWICE ALREADY and it is worth naming: the real
+// tree runs at the top of this file, and the fixture's own register is derived
+// from `CHECKS`, so a case that seeds nothing must report nothing on both.
+describe('RI-29 binds the invariant register to the live CHECKS array', () => {
+  /** A tree whose register is the fixture's, with one id replaced or dropped. */
+  const treeWithRegister = (overrides: Readonly<Record<string, string | null>>): string => {
+    const root = cleanTree();
+    write(root, 'docs/decisions/ALLOCATION.md', allocationDoc(register(overrides)));
+    return root;
+  };
+
+  test('a check with no register row is a finding', () => {
+    // THE DEFECT ADR-275 EXISTS FOR, and the one that was live on the real tree:
+    // `RI-11` had been a member of `CHECKS` since it was written and this table
+    // had never carried a row for it, invisible to every gate.
+    expect(findings('RI-29', treeWithRegister({ 'RI-11': null })).join('\n')).toContain(
+      'carries no register row for `RI-11`',
+    );
+  });
+
+  test('a register row naming no check that exists is a finding', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ALLOCATION.md',
+      allocationDoc([
+        ...register(),
+        '| `RI-90` | a number nobody minted | Something nothing checks |',
+      ]),
+    );
+    expect(findings('RI-29', root).join('\n')).toContain('registers `RI-90`, which is not in');
+  });
+
+  test('a row whose check lives outside CHECKS passes when it names its home', () => {
+    // `RI-17` IS THIS ROW ON THE REAL TREE and it is why leg 2 is not simply
+    // membership of `CHECKS`. Its check landed in `apps/api/test/` because
+    // `packages/tooling` resolves neither `@merit/api` nor `fastify`, and the
+    // row's own cell names the file. NO EXEMPTION LIST IS KEPT IN THE CHECK:
+    // the admission is derived from the row, so a row that stops naming a real
+    // home goes red without anything here being edited.
+    const root = cleanTree();
+    write(root, 'apps/api/test/elsewhere.test.ts', "describe('RI-90', () => {});\n");
+    write(
+      root,
+      'docs/decisions/ALLOCATION.md',
+      allocationDoc([
+        ...register(),
+        '| `RI-90` | a check outside the array | **LANDED as ' +
+          '[`apps/api/test/elsewhere.test.ts`](../../apps/api/test/elsewhere.test.ts)** |',
+      ]),
+    );
+    expect(findings('RI-29', root)).toEqual([]);
+  });
+
+  test('a home link that names a file which does not exist is still a finding', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ALLOCATION.md',
+      allocationDoc([
+        ...register(),
+        '| `RI-90` | a check outside the array | **LANDED as ' +
+          '[`apps/api/test/gone.test.ts`](../../apps/api/test/gone.test.ts)** |',
+      ]),
+    );
+    expect(findings('RI-29', root).join('\n')).toContain('registers `RI-90`, which is not in');
+  });
+
+  test('a title that has drifted from the live array is a finding', () => {
+    // THE LEG WHERE THE VALUE IS. Four rows on the real tree failed this and
+    // two of them asserted in their own text that the title had been copied out
+    // of the array while carrying no title at all.
+    const drifted = '| `RI-05` | the fixture`s register | The Node version is written once |';
+    expect(findings('RI-29', treeWithRegister({ 'RI-05': drifted })).join('\n')).toContain(
+      'states what `RI-05` asserts without carrying the title',
+    );
+  });
+
+  test('a title the row merely paraphrases is a finding, and containment is what passes', () => {
+    // CONTAINMENT RATHER THAN EQUALITY IS THE RULE, and it is stated rather than
+    // implied: rows RI-17 and later wrap the title in prose about where the
+    // check landed and what it was watched doing, which is worth keeping.
+    const c = CHECKS.find((check) => check.id === 'RI-05');
+    const wrapped = `| \`RI-05\` | the fixture\`s register | **LANDED**, title read live: *"${c?.title ?? ''}"*, and watched RED |`;
+    expect(findings('RI-29', treeWithRegister({ 'RI-05': wrapped }))).toEqual([]);
+  });
+
+  test('two rows for one number is a finding', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ALLOCATION.md',
+      allocationDoc([...register(), '| `RI-05` | a renumber recorded twice | .nvmrc |']),
+    );
+    expect(findings('RI-29', root).join('\n')).toContain('holds 2 register rows for `RI-05`');
+  });
+
+  test('a two-cell orphan fragment is a finding, which is the shape no table gate reads', () => {
+    // `RI-23`'s ROW SAT THIS WAY FOR A WAVE. `CI-06/table-row-width` parses rows
+    // of tables and a fragment after a blank line is not part of one, so the
+    // only gate that could have seen it was the one that did not exist.
+    const orphan = '| `RI-05` | .nvmrc is the only place the Node version is written |';
+    expect(findings('RI-29', treeWithRegister({ 'RI-05': orphan })).join('\n')).toContain(
+      'register row carrying 2 cell(s) where the register declares 3',
+    );
+  });
+
+  test('a register with no rows THROWS rather than reporting a clean tree', () => {
+    // THE DIRECTION THAT FAILS SILENTLY. With no rows parsed, leg 2 and leg 3
+    // assert about an empty list, and leg 1 is worse than silent: it would
+    // report every check as unregistered and name the wrong defect entirely.
+    const root = cleanTree();
+    write(root, 'docs/decisions/ALLOCATION.md', allocationDoc([]));
+    expect(() => findings('RI-29', root)).toThrow(/found no `RI-nn` row/);
+  });
+
+  test('a register document that is gone THROWS, because a missing one is not an empty one', () => {
+    const root = cleanTree();
+    renameSync(
+      join(root, 'docs/decisions/ALLOCATION.md'),
+      join(root, 'docs/decisions/ALLOCATION.md.moved'),
+    );
+    expect(() => findings('RI-29', root)).toThrow(/cannot run/);
   });
 });
