@@ -267,7 +267,9 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-251](ADR-251.md) | an instant is not a trading day, the gap was narrower than the sentence, and the port that named it asked a three-armed question with one arm (2026-08-29, status: proposed) |
 | [ADR-252](ADR-252.md) | the base account cap gets the firm's row ADR-238 named, its vocabulary is closed at the database, and both ports stay refused for reasons that have stopped being the same reason  (2026-08-29, status: proposed) |
 | [ADR-253](ADR-253.md) | a table the registry cannot name, and the ruling ADR-106 said was owed turns out to be a REFUSAL (2026-08-29, status: proposed) |
+| [ADR-254](ADR-254.md) | `R-38` is ACCOUNT grained, the index that already enforces it is right and is M01's own delta, and the identity rule it was confused with is a different rule on a different table that is already served  (2026-08-29, status: proposed) |
 | [ADR-255](ADR-255.md) | `0038`'s reversal pointer is not the linkage the reason wanted, the absent column is absent by ruling, and the entry named the one of four that was discharged (2026-08-29, status: proposed) |
+| [ADR-257](ADR-257.md) | four fields arrive at two slots, `ok` is the engine's and is not recomputed, and the field with nowhere to go is integer cents (2026-08-29, status: proposed) |
 | [ADR-258](ADR-258.md) | the fold's blocker was one field and not six, `prior` is a smaller read than the port ADR-250 left refusing, and the plan decoder this slice needed already exists one deployable over (2026-08-30, status: proposed) |
 <!--/gen-->
 

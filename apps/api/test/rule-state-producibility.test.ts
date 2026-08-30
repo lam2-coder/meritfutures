@@ -410,19 +410,21 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
     // worth to the rules.
   });
 
-  test("and `hasPayoutInFlight` has NO single ruled predicate, because M01 states R-38's grain both ways", () => {
-    // **THE THIRD FIELD'S SECOND LEG IS NOT A MISSING FUNCTION. IT IS A
-    // CONTRADICTED ONE.** ADR-245 sized this leg as four column reads and one
-    // refusal, and ADR-248 re-derived it and found that the in-flight leg has no
-    // predicate to read: `M01` says R-38 counts an outstanding leg FOR THIS
-    // ACCOUNT where it declares the field, and FOR THIS IDENTITY where it states
-    // the rule. The two readings differ by exactly the population of identities
-    // holding more than one account, which is every copy trader on the plan
-    // maximum, and they differ ON THE DOOR WHERE MERIT PAYS.
+  test('and `hasPayoutInFlight` has ONE ruled predicate since ADR-254, and it is the ACCOUNT', () => {
+    // **THE THIRD FIELD'S SECOND LEG WAS A CONTRADICTED FUNCTION RATHER THAN A
+    // MISSING ONE, AND ADR-254 RULED IT.** ADR-245 sized this leg as four column
+    // reads and one refusal; ADR-248 found that the in-flight leg had no
+    // predicate to read, because `M01` said FOR THIS ACCOUNT where it declared
+    // the field and FOR THIS IDENTITY where it stated the rule, and refused to
+    // rule between them. ADR-254 rules the ACCOUNT and amends M01's two R-38
+    // rows.
     //
-    // BOTH SIDES ARE SLICED OUT OF THE DOCUMENT RATHER THAN TYPED HERE, so the
-    // day an ADR rules the grain one of these slices stops matching and this
-    // case names it instead of going quietly stale.
+    // THE DAY THAT RULING MOVED, THIS CASE WAS RED, WHICH IS WHAT IT WAS FOR.
+    // Both sides were sliced out of the document rather than typed here so that
+    // an amendment would land as a failure rather than as silence, and it did.
+    // The slices now read the RULED side, and the retired side is asserted to be
+    // STILL PRESENT AND STILL MARKED: a corrected document that deletes what it
+    // corrected leaves the next reader nothing to check.
     const m01 = readFileSync(join(REPO_ROOT, 'docs/plans/M01-rules-engine.md'), 'utf8');
 
     // Section 2.1's `ExternalGates` block, where the field is DECLARED.
@@ -432,7 +434,7 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
     expect(field, 'section 2.1 no longer declares `hasPayoutInFlight` exactly once').toHaveLength(
       1,
     );
-    expect(field[0]).toContain('exists for this account');
+    expect(field[0]).toContain('for this account');
 
     // Group F's R-38 row, where the rule is STATED. It appears twice, because
     // M01 carries the rule table and its context-gate restatement, and both
@@ -443,14 +445,23 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
       .split('\n')
       .filter((line) => line.startsWith('| R-38 ') && line.includes('wallet-to-rail withdrawal'));
     expect(stated).toHaveLength(2);
-    for (const row of stated) expect(row).toContain('withdrawal for this identity in');
+    for (const row of stated) {
+      // The LIVE half is everything before the retirement marker. The retired
+      // sentence survives after it, quoted, which is why the filter above still
+      // finds the phrase `wallet-to-rail withdrawal` on both rows.
+      const live = row.split('**THIS ROW READ')[0] ?? '';
+      expect(live).toContain('for this account');
+      expect(live).not.toContain('for this identity');
+      expect(row).toContain('withdrawal for this identity in');
+      expect(row).toContain('ADR-254');
+    }
 
-    // AND THE ENGINE'S OWN CONTRACT MAY NOT PICK ONE EITHER. `types.ts` claimed
+    // AND THE ENGINE'S OWN CONTRACT NOW CARRIES THE RULING. `types.ts` claimed
     // to reproduce section 2.1 verbatim and then wrote the identity reading
-    // twice, which is the claim ADR-248 repaired: a caller reading the interface
-    // to learn what to supply was being told a settled answer to an open
-    // question. The repaired comment names both and rules neither, and this
-    // assertion is what stops the next edit from quietly resolving it.
+    // twice; ADR-248 repaired the claim without ruling it, and ADR-254 rules it.
+    // The comment names the winner, cites the ruling, and keeps the loser
+    // visible, so a caller reading the interface to learn what to supply is told
+    // a settled answer that is actually settled.
     const engine = readFileSync(join(REPO_ROOT, 'packages/rules-engine/src/types.ts'), 'utf8');
     const contract = engine.slice(
       engine.lastIndexOf('/**', engine.indexOf('export interface ExternalGates {')),
@@ -458,22 +469,27 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
     );
     expect(contract).toContain('for this account');
     expect(contract).toContain('for this identity');
-    expect(contract).toContain('rules NEITHER');
+    expect(contract).toContain('ADR-254');
+    expect(contract).not.toContain('rules NEITHER');
   });
 
   test('and SD-09, the second line of defence for the same rule, is ACCOUNT grained', () => {
-    // **THE INDEX IS THE ONE PLACE R-38 IS ENFORCED TODAY AND IT AGREES WITH THE
-    // DECLARATION RATHER THAN WITH THE RULE ROW.** M01's AS-01 residual says the
-    // same thing in prose ("None at account level. At identity level, ten
-    // accounts can each hold one in-flight payout, which is AS-09") and AS-09 is
-    // RULED at the gate as visibility rather than a rule, so a resolver taking
-    // the identity reading would refuse nine of a copy trader's ten accounts
-    // under a ceiling the corpus declined to impose.
+    // **THE INDEX IS THE ONE PLACE R-38 IS ENFORCED TODAY, IT AGREED WITH THE
+    // DECLARATION RATHER THAN WITH THE RULE ROW, AND ADR-254 RULED WITH IT.**
+    // M01's AS-01 residual says the same thing in prose ("None at account level.
+    // At identity level, ten accounts can each hold one in-flight payout, which
+    // is AS-09"), AS-09's own attack says it in five words ("AS-01's in-flight
+    // rule does not help because each account has its own"), and AS-09 is RULED
+    // at the gate as visibility rather than a rule, so the identity reading
+    // would have refused nine of a copy trader's ten accounts under a ceiling
+    // the corpus declined to impose.
     //
-    // THAT IS WHY THIS LEG IS NOT A DEFAULT ANYBODY MAY PICK. One reading
-    // refuses payouts the corpus permits; the other permits a stack the rule row
-    // forbids. A resolver written today would be a route or a worker ruling a
-    // contradiction inside a FROZEN plan, in a line nobody would read again.
+    // THE INDEX IS NOT THE ARGUMENT, WHICH IS WORTH KEEPING STRAIGHT HERE. A
+    // shipped index is a commitment the database is already enforcing, and it
+    // could still have been the wrong one. It is not: `SD-09` is M01's OWN
+    // delta, declared at `(account_id)` in the same document that stated the
+    // rule at the identity, so the index is the plan built faithfully and the
+    // contradiction was always M01 against itself. ADR-254 section 1.
     const migrations = join(REPO_ROOT, 'packages/db/migrations');
     const files = readdirSync(migrations)
       .filter((name) => name.endsWith('.sql'))
@@ -502,11 +518,12 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
     expect(live).toContain('ON payout_requests (account_id)');
     expect(outstanding).toEqual(['approved', 'frozen', 'held_pending_review']);
 
-    // AND THE STATUS SET HAS MOVED TWICE SINCE M01 WAS FROZEN, WHICH IS THE
-    // SECOND HALF OF WHY THE LEG HAS NO PREDICATE. `evaluate.ts` records it:
-    // ADR-028 retired `transferring` from this table and ADR-040 added
-    // `held_pending_review`. The engine reads a resolved boolean so the drift
-    // cannot reach the arithmetic, and the resolver is exactly where it lands.
+    // AND THE STATUS SET MOVED TWICE AFTER M01 WAS FROZEN, WHICH THIS CASE USED
+    // TO MEASURE AS A GAP AND NOW MEASURES AS CLOSED. ADR-028 retired
+    // `transferring` from this table and ADR-040 added `held_pending_review`,
+    // and ADR-040 named M01's declaration and its `SD-09` delta as two sites its
+    // own sweep did not reach. ADR-254 folded them, so section 2.1's note is now
+    // the index's own predicate rather than the pre-ADR-028 one.
     const m01 = readFileSync(join(REPO_ROOT, 'docs/plans/M01-rules-engine.md'), 'utf8');
     const block = m01.slice(m01.indexOf('interface ExternalGates {'));
     const line = block
@@ -514,15 +531,23 @@ describe('link 5: `PayoutSubject` has a THIRD field and no reason on this port h
       .split('\n')
       .find((row) => row.includes('hasPayoutInFlight:'));
     const note = (line ?? '').slice((line ?? '').indexOf('//') + 2);
-    const frozen = note
-      .slice(0, note.indexOf('exists for'))
+    const declaredSet = note
+      .slice(0, note.indexOf('for this account'))
       .split('|')
       .map((word) => word.trim());
-    expect(frozen).toEqual(['approved', 'transferring', 'frozen']);
-    expect(frozen.filter((member) => !outstanding.includes(member))).toEqual(['transferring']);
-    expect(outstanding.filter((member) => !frozen.includes(member))).toEqual([
-      'held_pending_review',
-    ]);
+    expect(declaredSet).toEqual(outstanding);
+
+    // AND THE RETIRED SET IS STILL QUOTABLE, IN THE ROWS THAT WERE AMENDED.
+    // Deleting it would leave a reader who finds `transferring` in ADR-204 or in
+    // a session log with nothing in the plan to resolve it against.
+    const retiredRows = m01
+      .split('\n')
+      .filter((row) => row.startsWith('| R-38 ') || row.startsWith('| SD-09 '));
+    expect(retiredRows).toHaveLength(3);
+    for (const row of retiredRows) {
+      expect(row).toContain('transferring');
+      expect(row).toContain('ADR-254');
+    }
 
     // NON-VACUITY, on this file's own standard: the identical parser is shown
     // reading the SUPERSEDED predicate, which carries two members rather than
