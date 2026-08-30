@@ -13,9 +13,17 @@
 // **THAT DISAGREEMENT IS OVER, AND SECTION 3 IS WHERE THIS FILE RECORDS IT.**
 // `ADR-277` repaired the worker half: both of its branches read
 // `trading_calendar_loads` and hand back a discriminated union. The sentence
-// above is quoted as the comment that STANDS in `scoped-db.ts` and is now stale
-// on its worker clause; repairing it is a `packages/db` edit that ADR-277 was
-// fenced out of and that `RI-27` cannot see, and ADR-277 section 6 reports it.
+// above is quoted as the comment that STOOD in `scoped-db.ts` for one wave
+// after it became false, which is why it is quoted here at all.
+//
+// **IT NO LONGER STANDS. `ADR-281` REPAIRED IT.** That comment now names
+// `anchorLastClosedDay`, states that the two folds AGREE, and records the wave
+// it was stale for. Repairing it was a `packages/db` edit `ADR-277` was fenced
+// out of and that `RI-27` cannot see, because the census strips comments before
+// it reads a file; `ADR-277` section 7 item 2 registered it and `ADR-281`'s
+// fence reached it. **THE QUOTATION ABOVE IS HISTORY NOW AND IS KEPT AS
+// HISTORY**, because a reader meeting section 3 needs the sentence the section
+// was written against.
 //
 // `ADR-042` F-4 is what makes the difference matter: a day outside
 // `trading_calendar_loads` is UNKNOWN and unknown is not a holiday. So a fold

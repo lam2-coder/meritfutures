@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, STATE_MACHINES.md, SECURITY.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md, ../../research/SECURITY_LANDSCAPE.md]
-last_updated: 2026-08-28
+last_updated: 2026-08-30
 ---
 
 # API Contract (Constitution B2)
@@ -33,6 +33,8 @@ Schemas are written as TypeScript types because they map one to one onto the zod
 **Money and ratios.** `*_cents` are JSON integers. `*_bp` are JSON integers. No floats, no formatted strings; formatting happens in the client.
 
 **Time.** `*_at` are RFC 3339 UTC strings. `*_day` and `*_on` are `YYYY-MM-DD` **exchange trading days**, never UTC dates.
+
+**THE RULE ABOVE IS STATED BY SUFFIX, SO IT REACHES NO FIELD THAT CARRIES NEITHER, AND `effective_from` IS WHERE THAT HAS BEEN MEASURED TO BITE.** [ADR-146](../decisions/ADR-146.md) clause 2 turns the suffix into a refusal at the point of projection; a name that carries no suffix is asserted by nothing. `effective_from` appears on this surface **twice and as two different temporal types**: a bare `YYYY-MM-DD` on `GET /public/methods/:statCode` and an RFC 3339 instant on `POST /admin/wallet/:identityId/spend-limit`. **Neither is renamed**, because each renders faithfully the column behind it and [ADR-276](../decisions/ADR-276.md) clause 2 rules that pair of columns a correct distinction rather than a collision. **What was wrong is that only one of the two sites said which type it held.** [ADR-280](../decisions/ADR-280.md) rules the obligation, and it is [ADR-276](../decisions/ADR-276.md) clause 4 lifted from the schema to the wire: **a request or response field whose name carries neither suffix states its temporal type in its own comment, at every site where the field appears, or is renamed.** **It binds every field added from that entry forward and the fields already here are brought to it one entry at a time rather than by assertion**: `effective_from` is done at both of its sites, and `period_start` and `period_end` are named as owed there because reading them is a survey this entry did not run.
 
 **OpenAPI.** Generated from the same zod schemas. In production `/docs`, `/openapi.json`, and `/swagger` return `404` (test D0-10 asserts it against the production build).
 
@@ -312,7 +314,10 @@ type MethodPageResponse = {
     measures: Array<"rate" | "total" | "mean" | "median" | "p50" | "p95" | "count">;
     method_body_mdx: string;
     adr_ref: string | null;
-    effective_from: string;          // YYYY-MM-DD, always future at write time (INV-M12-07)
+    effective_from: string;          // A DAY. `YYYY-MM-DD`, always future at write time (INV-M12-07).
+                                     // `statistic_definitions.effective_from` is a `date`. The SAME
+                                     // FIELD NAME is an INSTANT on `POST /admin/wallet/:identityId/
+                                     // spend-limit`; ADR-280 and ADR-276 clause 2 are why both are right
     superseded_by_version: number | null;
   }>;
 };
@@ -1397,19 +1402,25 @@ Auth: `admin_sso`, role `owner`. `reason` required and audited. Errors: `validat
 type SpendLimitRequest = {
   daily_cents: number;                // integer cents, >= 0
   rolling_7d_cents: number;           // integer cents, >= daily_cents
-  effective_from: string;             // NOT NULL with no default in the row: the caller states it
+  effective_from: string;             // AN INSTANT. RFC 3339 `date-time`: a day, a `T`, a time, and an
+                                      // EXPLICIT offset (`Z` or `+hh:mm`). NOT NULL with no default in
+                                      // the row, so the caller states it. A bare `YYYY-MM-DD` is REFUSED
+                                      // and is not read as UTC midnight; so is a date-time with no
+                                      // offset, and so is a day that does not exist. ADR-280
   reason: string;                     // NOT NULL in the row
 };
 type SpendLimitResponse = {
   identity_id: string;
   daily_cents: number;
   rolling_7d_cents: number;
-  effective_from: string;
+  effective_from: string;            // AN INSTANT, echoed as `toISOString()` renders it, so always `Z`
   set_by: string;                     // the admin actor, from the session. NEVER from the body
   created_at: string;
 };
 ```
-Auth: `admin_sso`, roles `owner` and `ops`. `reason` required and audited. Errors: `validation_failed` (non-integer or negative figures, or `rolling_7d_cents` below `daily_cents`), `conflict` (a row already exists for this identity at this `effective_from`), `forbidden` (`readonly` role), `not_found`.
+Auth: `admin_sso`, roles `owner` and `ops`. `reason` required and audited. Errors: `validation_failed` (non-integer or negative figures, `rolling_7d_cents` below `daily_cents`, or an `effective_from` that is not an RFC 3339 `date-time` naming a day that exists), `conflict` (a row already exists for this identity at this `effective_from`), `forbidden` (`readonly` role), `not_found`.
+
+**`effective_from` IS AN INSTANT HERE AND A DAY ON `GET /public/methods/:statCode`, AND THAT IS THE REASON ITS SHAPE IS A REFUSAL RATHER THAN A CONVENTION.** [ADR-280](../decisions/ADR-280.md). This is **the only caller-supplied instant on the whole surface** ([ADR-274](../decisions/ADR-274.md) section 5's census), it writes `C-23`'s append-only record of what spend limit was in force when, and until that entry its whole validation was whether a date parser returned a number. **Three shapes RFC 3339 does not admit as a `date-time` were accepted, stored and echoed with a precision the caller never sent.** A bare `YYYY-MM-DD` is UTC midnight at every process timezone, so a caller who learned the field name from the public method page got **a day silently promoted to an instant**. A date-time carrying no offset is read against the SERVER's timezone, which [ADR-274](../decisions/ADR-274.md) section 5 measured across five zones as nineteen hours and two calendar days. And a day that does not exist is **not refused by a date parser, it is rolled over**: an operator who names February 30 was writing a limit dated March 2. **A non-zero offset is admitted** and is normalised to `Z` on the way out, because the defect is an ABSENT offset rather than a non-zero one and [ADR-146](../decisions/ADR-146.md) clause 3's `Z`-only rule is about how an instant is SPELLED IN A RESPONSE.
 
 **`rolling_7d_cents >= daily_cents` is a CHECK and not a nicety.** `wallet_spend_limits_weekly_exceeds_daily`: a rolling weekly limit below the daily limit is a daily limit with a confusing name.
 

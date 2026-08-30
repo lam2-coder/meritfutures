@@ -1261,6 +1261,81 @@ describe('POST /admin/wallet/:identityId/spend-limit', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ errors: [{ path: 'reason' }] });
   });
+
+  // ---------------------------------------------------------------------------
+  // ADR-280. THE SHAPE OF `effective_from` ON THE WAY IN
+  // ---------------------------------------------------------------------------
+  // `wallet_spend_limits.effective_from` is a `timestamptz` and this is the only
+  // caller-supplied instant on the whole API surface (ADR-274 section 5). The
+  // handler's own refusal message has always said "must be an RFC 3339
+  // timestamp" and the parse has always been `new Date(value)`, which accepts
+  // two shapes RFC 3339 does not admit as a `date-time`: a bare day, and a
+  // date-time carrying no offset. Both were stored, echoed, and reported by
+  // nothing.
+
+  it('refuses a DAY where the contract requires an instant, which the public page spells', async () => {
+    // The same field name renders a bare `YYYY-MM-DD` on `GET
+    // /public/methods/:statCode`, so a day is exactly the shape a caller who
+    // learned the name elsewhere sends. `new Date('2026-09-01')` is UTC
+    // midnight at every process timezone, so this was never a wrong INSTANT: it
+    // was a day promoted to one on the append-only record of what limit was in
+    // force when.
+    const written: Written[] = [];
+    const response = await callAs('owner', SPEND_LIMIT, written, {
+      ...SPEND_LIMIT_BODY,
+      effective_from: '2026-09-01',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      code: 'validation_failed',
+      errors: [{ path: 'effective_from' }],
+    });
+    // AND NOTHING WAS WRITTEN. The refusal is a body validation, so it precedes
+    // the audit row as well as the append.
+    expect(written.filter((w) => w.kind === 'insert')).toEqual([]);
+  });
+
+  it('refuses a date-time carrying NO OFFSET, which ECMAScript reads as LOCAL', async () => {
+    // ADR-274 section 5 measured this one at five zones: nineteen hours and two
+    // calendar days. It is the half a `Z` requirement was always claimed to
+    // cover and never did.
+    const response = await callAs('owner', SPEND_LIMIT, [], {
+      ...SPEND_LIMIT_BODY,
+      effective_from: '2026-09-01T00:00:00',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ errors: [{ path: 'effective_from' }] });
+  });
+
+  it('ADMITS an explicit non-zero offset, because that names one instant unambiguously', async () => {
+    // A `Z`-only rule is API_CONTRACT clause 3's rule for what an `*_at` is
+    // SPELLED as on the way OUT (ADR-146). This is an input, the defect is the
+    // ABSENT offset rather than a non-zero one, and `2026-09-01T05:00:00+05:00`
+    // stores the same instant at every process timezone. Refusing it would be
+    // refusing a correct value to tidy a spelling.
+    const written: Written[] = [];
+    const response = await callAs('owner', SPEND_LIMIT, written, {
+      ...SPEND_LIMIT_BODY,
+      effective_from: '2026-09-01T05:00:00+05:00',
+    });
+    expect(response.statusCode).toBe(200);
+    // AND IT IS NORMALISED ON THE WAY OUT. The response and the row both carry
+    // the instant as `toISOString()` renders it, which is `Z`.
+    expect((response.json() as SpendLimitResponse).effective_from).toBe(EFFECTIVE_FROM);
+    const append = written.find((w) => w.kind === 'insert' && w.table === 'walletSpendLimits');
+    expect(append?.values['effectiveFrom']).toEqual(new Date(EFFECTIVE_FROM));
+  });
+
+  it('refuses a string that matches the shape and names no day, `2026-02-30`', async () => {
+    // The regex is a shape check and `Date` is what knows the calendar. Both are
+    // kept: neither alone refuses this.
+    const response = await callAs('owner', SPEND_LIMIT, [], {
+      ...SPEND_LIMIT_BODY,
+      effective_from: '2026-02-30T00:00:00Z',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ errors: [{ path: 'effective_from' }] });
+  });
 });
 
 // -----------------------------------------------------------------------------

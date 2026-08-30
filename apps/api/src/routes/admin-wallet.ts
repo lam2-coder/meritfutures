@@ -1056,6 +1056,43 @@ function centsField(
 }
 
 /**
+ * An RFC 3339 `date-time`: a day, a `T`, a time, and an EXPLICIT offset.
+ *
+ * THE OFFSET IS REQUIRED AND `+00:00` IS ADMITTED BESIDE `Z`, WHICH IS THE
+ * OPPOSITE OF ADR-146 CLAUSE 3 AND IS NOT A CONTRADICTION OF IT. That clause
+ * rules how an `*_at` is SPELLED ON THE WAY OUT, where two spellings of one
+ * instant hand every consumer a normalisation step. This is an INPUT, and the
+ * failure ADR-274 section 5 measured is the ABSENT offset rather than a non-zero
+ * one: ECMAScript reads a date-time with no offset as LOCAL, so
+ * `2026-09-01T00:00:00` stored five different instants at five process
+ * timezones, spanning nineteen hours and two calendar days. An explicit
+ * `+05:00` names one instant at every offset and is normalised to `Z` by the
+ * `toISOString()` this handler already renders with. Refusing it would be
+ * refusing a correct value to tidy a spelling.
+ *
+ * THE RANGES ARE IN THE PATTERN BECAUSE `Date` DOES NOT REFUSE ALL OF THEM.
+ * `new Date('2026-09-01T25:00:00Z')` is `Invalid Date` and so is `13` for a
+ * month, but `24:00:00` rolls into the next day and RFC 3339's `time-hour` is
+ * `00-23`, so the hour is bounded here. A leap second (`:60`) is refused with
+ * it: `Date` rejects one in any case, so admitting the spelling would promise a
+ * parse this server cannot perform.
+ *
+ * WHAT THIS PATTERN CANNOT SEE IS THE CALENDAR, and {@link instantField} is
+ * where that is caught. `3[01]` admits `2026-02-30`, and `new Date` does NOT
+ * refuse it: it ROLLS OVER, silently, to `2026-03-02`. See there.
+ *
+ * IT IS A THIRD COPY OF A PATTERN `routes/economic-calendar.ts` AND
+ * `routes/internal.ts` ALSO HOLD, and it is a copy rather than an import for
+ * their own stated reason: each states the vocabulary its own surface promises,
+ * and this one promises something neither of those does (an offset that need
+ * not be zero, and a bounded hour). A shared time-vocabulary module is named as
+ * owed in ADR-280 rather than lifted here, on ADR-146 section 4's rule that the
+ * lift happens once the consumers agree about what they are asking for.
+ */
+const INSTANT =
+  /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+
+/**
  * An instant off the body, as a `Date`.
  *
  * `wallet_spend_limits.effective_from` is `timestamptz NOT NULL` with NO DEFAULT,
@@ -1063,6 +1100,30 @@ function centsField(
  * A bound goes through the column's own mapper and is never assembled by hand
  * (ADR-157 section 3), so this hands a `Date` to the accessor rather than a
  * string.
+ *
+ * THIS IS THE ONLY CALLER-SUPPLIED INSTANT ON THE WHOLE API SURFACE (ADR-274
+ * section 5's census), AND UNTIL ADR-280 THE WHOLE OF ITS VALIDATION WAS
+ * `Number.isNaN`. The message has always said "must be an RFC 3339 timestamp"
+ * and the parse admitted three things RFC 3339 does not:
+ *
+ * 1. **A BARE DAY.** `new Date('2026-09-01')` is `2026-09-01T00:00:00.000Z` at
+ *    EVERY process timezone, because a date-only ISO string is UTC by
+ *    specification. So this was never a wrong instant; it was a DAY PROMOTED TO
+ *    ONE, with a time of day it never carried, on the append-only record of what
+ *    spend limit was in force when. **And a day is exactly the shape a caller
+ *    who learned this field name elsewhere would send**: `effective_from` is a
+ *    bare `YYYY-MM-DD` on `GET /public/methods/:statCode`.
+ * 2. **A DATE-TIME WITH NO OFFSET**, read as LOCAL. ADR-274 section 5.
+ * 3. **A DAY THAT DOES NOT EXIST.** `new Date('2026-02-30T00:00:00Z')` is not
+ *    `Invalid Date`. It is `2026-03-02T00:00:00.000Z`. **`Date` rolls a
+ *    day-of-month over rather than refusing it**, so an operator who typed a
+ *    February 30 got a limit dated March 2 and nothing said so. A pattern cannot
+ *    see this and the round trip below is what does.
+ *
+ * BOTH CHECKS ARE KEPT AND NEITHER IS REDUNDANT. The pattern refuses shapes
+ * `Date` accepts (1, 2, and a `24:00:00` that rolls); the round trip refuses a
+ * day `Date` accepts and moves (3). `C-23`'s control is the row's `effective_from`
+ * and every one of these wrote a different one from the one the operator named.
  */
 function instantField(
   row: Record<string, unknown>,
@@ -1074,9 +1135,31 @@ function instantField(
     errors.push({ path: key, message: 'is required and must be an RFC 3339 timestamp' });
     return undefined;
   }
+  if (!INSTANT.test(value)) {
+    errors.push({
+      path: key,
+      message:
+        'must be an RFC 3339 timestamp: a day, a `T`, a time, and an explicit offset ' +
+        '(`Z` or `+hh:mm`). A bare `YYYY-MM-DD` is a DAY and this column is an INSTANT; ' +
+        'a date-time with no offset is read against the server`s own timezone',
+    });
+    return undefined;
+  }
   const at = new Date(value);
   if (Number.isNaN(at.getTime())) {
     errors.push({ path: key, message: 'is not a timestamp this server can parse' });
+    return undefined;
+  }
+  // THE CALENDAR, WHICH THE PATTERN CANNOT CHECK AND `Date` DOES NOT REFUSE.
+  // `2026-02-30T00:00:00Z` parses to `2026-03-02T00:00:00.000Z`. The round trip
+  // is on the DATE PART ALONE, at UTC midnight, because the value's offset may
+  // legitimately put the instant on a different UTC day from the one written.
+  const day = value.slice(0, 10);
+  if (new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day) {
+    errors.push({
+      path: key,
+      message: `names \`${day}\`, which is not a day that exists. A day-of-month past the end of its month is not refused by this server's date parser, it is ROLLED OVER, so it would have been stored as a different day from the one named`,
+    });
     return undefined;
   }
   return at;
