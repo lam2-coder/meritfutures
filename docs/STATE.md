@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->282<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->283<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11065,6 +11065,26 @@ Counts derived at reporting time, each command run separately: **33 of 33** gate
 **The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped** with a delta of **ZERO**, typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row. **No GitHub access: no PR was opened and nothing was merged.**
+
+## 2026-08-30 - Session 488: the decoder's home is the DOOR, and the door has no caller ([ADR-299](decisions/ADR-299.md), proposed)
+
+**THE QUESTION [ADR-286](decisions/ADR-286.md) CLOSED ON IS ANSWERED: THE HOME IS `packages/db`.** Row `299`, [ADR-299](decisions/ADR-299.md), fourteen sections, `proposed` and UNSIGNED, `E2` read OWED and not performed. **MONEY PATH, RULING ONLY: no `src/` line moved, no export moved, no `scoped-db.ts` edit, no decoder written**, measured rather than intended (`git diff origin/main --stat -- packages apps` is EMPTY). The three catalogue read verbs should return the row type [`schema.ts`](../packages/db/src/schema.ts) already declares instead of `unknown`, and the ruling is that this is the form the port waits on.
+
+**THE CANDIDATE SET IS TWO AND IT IS DERIVED RATHER THAN INHERITED.** The intersection of `apps/api`'s and `apps/worker`'s declared workspace dependencies is exactly `@merit/db` and `@merit/rules-engine`, and the engine is foreclosed for this value, so `packages/db` is the only place in this tree both deployables can already reach. **A NEW PACKAGE IS REFUSED ON WHAT IT WOULD CONTAIN RATHER THAN ON COST**: a driver-side decoder needs NO import from `@merit/db` to read a driver row, so the new package's whole content would be a copy of another package's property names, held where that package cannot break it loudly.
+
+**AND TWO OF THE THREE GROUNDS FOR CALLING THIS A DELIBERATE DOOR DO NOT SURVIVE THE SOURCE.** [ADR-233](decisions/ADR-233.md) contains ZERO occurrences of the word `unknown`, and [ADR-112](decisions/ADR-112.md) foreclosure 3, the citation the premise rests on, reads *"`ON CONFLICT`, `ORDER BY`, `LIMIT` and `FOR UPDATE` have no shape in this accessor"*. **The `unknown` is inherited from `ScopedDb.rows` and was never ruled by anybody**, and it is uniform across every read verb on all four handles. **THE DOOR ALSO HAS NO CALLER**: five occurrences under `apps/*/src`, four comments and one refusal string, none a call, and the only calls in the tree are `packages/db`'s own suite asserting the refusals. Slice 5 is the first caller it will ever have, which is [ADR-078](decisions/ADR-078.md)'s objection MET rather than dodged.
+
+**THE DECODER SPLITS AT THE LINE THAT ACTUALLY EXISTS.** The engine already knows the DATABASE's own names, deliberately, in `PlanVersionSizeRow`'s *"transcribed column for column"* header and in `decodePlanRules`; what it may not know is `packages/db`'s PROPERTY spellings. **So the homeless part is a KEY MAPPING and nothing else**, `RI-01` is the manifest half by its own `covers` string, and `merit/engine-purity` would not see a string literal either. **What remains stated per caller is the rename, and it is accepted rather than hidden**: it is `FM-16` by the letter and a transposition of two `bigint` columns still compiles.
+
+**THE CAP-SCHEDULE ROW IS RULED THE NEXT DISPATCH, AHEAD OF THE DOOR ROW, AND IT IS SPECIFIED** with its fence, its stop condition and its named trap: the codec, the collapse of all three readers, and a fence reaching [`apps/api/src/routes/catalog.ts`](../apps/api/src/routes/catalog.ts), so the payout ceiling stops being three statements and the one that ROUNDS is repaired in the same commit set. [ADR-078](decisions/ADR-078.md) section 2 is read FOR the export, which [ADR-286](decisions/ADR-286.md) cited and did not reach.
+
+**`catalog.ts`'s LOCAL `PlanVersionSizeRow` DOES NOT COLLAPSE AND IS RENAMED INSTEAD**, because the engine's type refuses the price BY NAME while the catalogue endpoint's whole subject IS the price, and its `plan_version_id` is a plain `string` against a branded `PlanVersionId`. **A THIRD DECLARATION OF THAT NAME IS FOUND AND REGISTERED**, at [`checkout.ts:466`](../apps/api/src/routes/checkout.ts), three fields, in the DRIVER spelling, on the `CheckoutTx.planVersionSize` port, which no entry had counted.
+
+**SEVEN THINGS ARE REPORTED RATHER THAN REPAIRED**, among them that `readSize` is fed by `firmDb()` and NOT by the door the payout path must use, that the home governs TWO unwired ports rather than one, and that [ADR-286](decisions/ADR-286.md)'s "eleven files" broad census does not reproduce while its executable one reproduces exactly. **NO `RI-nn` WAS MINTED AND `RI-38`, RESERVED TO THIS ROW BY NAME, IS LEFT FREE**, first on the fence fact that `packages/tooling/**` is not in this fence, with three candidates enumerated and each refused. **No gate weakened, no fence widened, no migration number taken or reserved, nothing signed.**
+
+**Next.** The cap-schedule row specified in [ADR-299](decisions/ADR-299.md) section 7, then the door row taking ruling 1 with a fence over [`scoped-db.ts`](../packages/db/src/scoped-db.ts) and its suite, then [ADR-287](decisions/ADR-287.md) slice 5. `RI-38` is free for whoever needs it.
+
+Counts derived at reporting time, each command run separately and every exit code read without a pipe: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped**, with no test added, deleted or skipped by this row and no file under any `src/` or `test/` touched. Lint 0 and `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row. **NO GITHUB ACCESS: no pull request was opened and nothing was merged**, per the dispatch.
 
 ---
 
