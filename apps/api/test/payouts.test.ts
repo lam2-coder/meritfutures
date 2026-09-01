@@ -361,6 +361,12 @@ const backend: PayoutBackend = {
     // "this route posts nothing" is a compile-time property here rather than a
     // count this file has to remember to check.
     const tx: PayoutTx = {
+      // ADR-293 section 3.5's per-identity lock. THIS FIXTURE HAS ONE
+      // TRANSACTION AND THEREFORE NOTHING TO SERIALISE, so it records nothing
+      // and answers: what the lock is FOR is measured against two concurrent
+      // requests in `ADR-293 section 3.3` below, over a store that models the
+      // index and the queue.
+      lockScope: () => Promise.resolve(),
       identityStatus: () => Promise.resolve(fixture.identityStatus),
       subject: (accountId) => Promise.resolve(fixture.subjects.get(accountId) ?? null),
       holdFlag: () => Promise.resolve(fixture.holdFlag),
@@ -726,6 +732,215 @@ describe('one payout in flight per account', () => {
     fixture.gates = clearGates();
     reseedSubject();
     expect((await requestPayout()).statusCode).toBe(200);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// ADR-293 SECTION 3.3. THE RACE IS A 409 AND IT IS NOT A 500.
+// -----------------------------------------------------------------------------
+// The block above drives ONE request against an in-flight fact the fixture was
+// handed. This one drives TWO REQUESTS AT ONCE and hands the fixture nothing:
+// the in-flight fact is whatever the two transactions leave behind, and the
+// question is which status the loser gets.
+//
+// WHY IT IS NOT THE BLOCK ABOVE AGAIN. `G-NO-IN-FLIGHT` is READ through
+// `subject()`, DECIDED in memory, and the row is WRITTEN against that decision.
+// A gate decided outside the lock is decided against a state another
+// transaction can still change, so the refusal the contract names is reachable
+// only if the two transactions are serialised. Unserialised, the loser reaches
+// the insert, meets `payout_requests_no_in_flight_uq`, and raises something
+// `unwiredOrThrow` rethrows: a 500 on the door where money leaves the firm,
+// where API_CONTRACT section 6 specifies a named 409.
+// -----------------------------------------------------------------------------
+
+describe('ADR-293 section 3.3: two concurrent requests are one 200 and one 409, never a 500', () => {
+  /**
+   * `payout_requests_no_in_flight_uq` refusing the second row.
+   *
+   * IT IS DELIBERATELY NOT A `PayoutBackendUnwired`. That class is the ONE
+   * thing `unwiredOrThrow` catches, so an error inheriting from it would let
+   * this case pass against a 503 and prove nothing about the 500 the contract
+   * does not permit here.
+   */
+  class NoInFlightViolation extends Error {
+    constructor() {
+      super('duplicate key value violates unique constraint "payout_requests_no_in_flight_uq"');
+      this.name = 'NoInFlightViolation';
+    }
+  }
+
+  interface Race {
+    readonly backend: PayoutBackend;
+    /** Every port call both transactions made, in the order they made them. */
+    readonly trace: string[];
+  }
+
+  /** A promise and its resolver. The barrier and the lock both need this shape. */
+  function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+    let resolve!: () => void;
+    const promise = new Promise<void>((settle) => {
+      resolve = (): void => {
+        settle();
+      };
+    });
+    return { promise, resolve };
+  }
+
+  /**
+   * TWO TRANSACTIONS OF ONE IDENTITY, over a store that models the two database
+   * facts this case turns on and nothing else.
+   *
+   * FACT ONE, THE INDEX SPANS TRANSACTIONS. `payout_requests_no_in_flight_uq`
+   * is a partial unique index, so the second inserter conflicts with a row the
+   * first has written and NOT YET COMMITTED. `inFlight` is therefore stamped at
+   * the INSERT rather than at the commit. A fixture that stamped at commit
+   * would let both inserts through and would be agreeing with its own fake.
+   *
+   * FACT TWO, `ScopedTx.lockScope()` IS A ROW LOCK HELD UNTIL THE TRANSACTION
+   * ENDS. It is a FIFO queue here, joined in `lockScope()` and left when
+   * `transact` returns by either path. IT IS TAKEN ONLY IF THE PORT CALLS IT,
+   * which is the whole of what this case measures: a `decidePayout` that does
+   * not call it serialises nothing and the queue never runs.
+   *
+   * THE BARRIER IS "BOTH REQUESTS ARE INSIDE `transact`" AND NOT "BOTH HAVE
+   * READ", and that is the one choice here that could have made the case a lie.
+   * A barrier on the READ is unreachable under the lock, because the second
+   * transaction is parked in `lockScope()` and will never read; the case would
+   * hang rather than go green, which is a fixture deciding the answer. A
+   * barrier on ENTRY is reached in both worlds and leaves everything after it
+   * to the code under test.
+   *
+   * NOTHING ELSE IS SIMULATED. Whether the composed predicate reaches one row,
+   * and whether postgres really blocks the second `FOR UPDATE`, are
+   * `packages/db`'s and are asserted in its own suite against a real database.
+   * What is asserted here is an `apps/api` property: the ORDER `decidePayout`
+   * puts its own calls in.
+   */
+  function racingBackend(): Race {
+    const trace: string[] = [];
+    /** Accounts carrying a row the partial index refuses a second of. */
+    const inFlight = new Set<string>();
+    const both = deferred();
+    let entered = 0;
+    /** The identity row lock, as the queue it is. */
+    let tail: Promise<void> = Promise.resolve();
+
+    const port: PayoutBackend = {
+      ...backend,
+      transact: async <T>(_session: AuthSession, fn: (tx: PayoutTx) => Promise<T>): Promise<T> => {
+        entered += 1;
+        if (entered === 2) both.resolve();
+        const held = deferred();
+        const tx: PayoutTx = {
+          lockScope: async () => {
+            trace.push('lockScope');
+            const ahead = tail;
+            tail = held.promise;
+            await ahead;
+          },
+          identityStatus: () => {
+            trace.push('identityStatus');
+            return Promise.resolve(fixture.identityStatus);
+          },
+          subject: async (accountId) => {
+            // NEITHER TRANSACTION READS UNTIL BOTH ARE OPEN. Unserialised, this
+            // is what makes both of them read the same empty in-flight set;
+            // serialised, the second is still parked in `lockScope()` here and
+            // reads only after the first has committed.
+            await both.promise;
+            trace.push('subject');
+            const seen = fixture.subjects.get(accountId);
+            if (seen === undefined) return null;
+            return {
+              ...seen,
+              gates: { ...seen.gates, hasPayoutInFlight: inFlight.has(accountId) },
+            };
+          },
+          holdFlag: () => Promise.resolve(fixture.holdFlag),
+          insertPayoutRequest: (row) => {
+            trace.push('insert');
+            if (inFlight.has(row.accountId)) return Promise.reject(new NoInFlightViolation());
+            inFlight.add(row.accountId);
+            fixture.requests.push(row);
+            return Promise.resolve();
+          },
+        };
+        try {
+          return await fn(tx);
+        } finally {
+          // THE LOCK OUTLIVES EVERY GATE AND IS RELEASED ON BOTH EXITS. A
+          // release on the return path only would leave a refused transaction
+          // holding the identity forever, which no database does. `held` is
+          // resolved even when `lockScope()` was never called, where it was
+          // never published to `tail` and resolving it reaches nobody.
+          held.resolve();
+        }
+      },
+    };
+    return { backend: port, trace };
+  }
+
+  it('serialises on `lockScope()`, so the loser is refused and never violates the index', async () => {
+    const race = racingBackend();
+    usePayoutBackend(race.backend);
+
+    const [first, second] = await Promise.all([requestPayout(), requestPayout()]);
+
+    const statuses = [first.statusCode, second.statusCode].sort((a, b) => a - b);
+    // THE DISCRIMINATOR IS THE 500 AND IT IS NAMED ON ITS OWN LINE. The pair
+    // below would also be satisfied by a route that refused for some other
+    // reason; a 500 is the unique violation arriving unhandled, and it is what
+    // this tree answered here before the lock landed.
+    expect(statuses).not.toContain(500);
+    expect(statuses).toEqual([200, 409]);
+
+    const loser = first.statusCode === 409 ? first : second;
+    expect(loser.json().code).toBe('conflict');
+    expect(loser.json().detail).toBe('A payout is already in flight for this account.');
+    // R-38 has no cell in `gates` and a breakdown here would be invented.
+    expect(loser.json().gates).toBeUndefined();
+
+    // EXACTLY ONE ROW COMMITTED, which is what the refusal is FOR.
+    expect(fixture.requests).toHaveLength(1);
+
+    // AND THE LOSER NEVER REACHED THE INSERT. Two inserts against one committed
+    // row would mean the INDEX refused the second, which is the backstop doing
+    // the work ADR-293 section 3.3 ruled it cannot do.
+    expect(race.trace.filter((call) => call === 'insert')).toHaveLength(1);
+  });
+
+  it('takes the lock FIRST in both transactions, above the identity gate', async () => {
+    const race = racingBackend();
+    usePayoutBackend(race.backend);
+
+    await Promise.all([requestPayout(), requestPayout()]);
+
+    // A case that did not read the trace would pass with `lockScope()` deleted
+    // on any tree whose scheduler happened to serialise the two requests
+    // anyway. `checkout.test.ts` reads its own trace for the same reason.
+    expect(race.trace[0]).toBe('lockScope');
+    expect(race.trace.filter((call) => call === 'lockScope')).toHaveLength(2);
+    expect(race.trace.indexOf('lockScope')).toBeLessThan(race.trace.indexOf('identityStatus'));
+  });
+
+  it('declares the member on `PayoutTx` and calls it as the first statement of `decidePayout`', () => {
+    const CODE = stripComments(
+      readFileSync(join(import.meta.dirname, '..', 'src', 'routes', 'payouts.ts'), 'utf8'),
+    );
+
+    const port = /export interface PayoutTx \{([\s\S]*?)\n\}/.exec(CODE)?.[1] ?? '';
+    expect(port).toMatch(/lockScope\(\): Promise<void>;/);
+
+    // THE PLACEMENT, ASSERTED ON THE TEXT BECAUSE NO TYPE CARRIES IT.
+    // `decideWithdrawal` and `checkout.ts` both take it as their first
+    // statement, and ADR-293 section 3.4 is why it is first here too: it reads
+    // nothing about the account and takes no address, so ADR-140's ordering is
+    // undisturbed and `identityStatus()`'s own read lands under the lock.
+    const body = CODE.slice(CODE.indexOf('const { tx, accountId, requestedCents'));
+    expect(body.indexOf('await tx.lockScope();')).toBeGreaterThan(0);
+    expect(body.indexOf('await tx.lockScope();')).toBeLessThan(
+      body.indexOf('await tx.identityStatus()'),
+    );
   });
 });
 
@@ -1120,6 +1335,7 @@ describe('ADR-285: an absent `rule_states` row is an honest 503 and never a 500'
       ...backend,
       transact: <T>(_session: AuthSession, fn: (tx: PayoutTx) => Promise<T>): Promise<T> =>
         fn({
+          lockScope: () => Promise.resolve(),
           identityStatus: () => Promise.resolve(fixture.identityStatus),
           subject: () => Promise.reject(err),
           holdFlag: () => Promise.resolve(fixture.holdFlag),

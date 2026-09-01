@@ -34,6 +34,7 @@ export interface DbCall {
   /** The identity the SCOPED door was opened with. Absent on every other door. */
   readonly identityId?: string;
   readonly verb:
+    | 'lockScope'
     | 'rows'
     | 'rowsWhere'
     | 'rowAt'
@@ -45,6 +46,9 @@ export interface DbCall {
   /**
    * The table named. `establish` names none: the door's whole point is that a
    * caller cannot choose, so the recorder writes the ACT rather than a key.
+   * `lockScope` names none either, for the opposite reason: it TAKES NO
+   * ARGUMENT, so the only fact there is to record is that it was called, and
+   * the row it locks is the handle's own identity.
    */
   readonly key: string;
   readonly address?: unknown;
@@ -61,6 +65,15 @@ export interface Replies {
   readonly insert?: unknown[];
   readonly insertThrows?: unknown;
   readonly insertUnder?: unknown[];
+  /**
+   * What `lockScope` answers.
+   *
+   * IT ANSWERS A ROW BECAUSE THE ACCESSOR DOES. `ScopedTx.lockScope` is a
+   * locking select over `identities` and hands back the row it locked
+   * (`packages/db/src/scoped-db.ts`), so a recorder that answered `undefined`
+   * unconditionally would make "the adapter discards it" unfalsifiable.
+   */
+  readonly locks?: unknown;
   /** What the RESOLUTION door answers. `undefined` is "nobody holds this address". */
   readonly resolvesTo?: unknown;
   /** What the PUBLIC LOOKUP door answers. `undefined` is "no row carries this code". */
@@ -130,6 +143,15 @@ export function recordingDb(replies: Replies = {}): Recorder {
       identityId,
       sqlExecutor: () => {
         throw new Error('the recorder offers no sqlExecutor: no adapter here may reach for one');
+      },
+      // ADR-157's per-identity row lock. IT TAKES NO ARGUMENT AND RECORDS NO
+      // KEY, which is the honest shape: what an `apps/api` suite can assert
+      // here is THAT the adapter took the lock and IN WHAT ORDER, and whether
+      // the `FOR UPDATE` really blocks a second transaction is `packages/db`'s
+      // and is asserted there against a real database.
+      lockScope: () => {
+        note({ door, verb: 'lockScope', key: '' });
+        return Promise.resolve(replies.locks);
       },
       rows: (key: string) => {
         note({ door, verb: 'rows', key });
