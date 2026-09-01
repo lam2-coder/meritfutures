@@ -51,7 +51,14 @@ import { defineConfig } from 'vitest/config';
 // same bytes twice -- so it belongs in CI-02 beside the others, and adding the
 // root here is what puts it there. A test matched by no project does not run,
 // and a determinism claim nothing runs is a claim, not a control.
-const SOURCES = ['apps/*', 'packages/*', 'scripts/demo'];
+//
+// `scripts/corpus` JOINED ON THE SAME ARGUMENT (ADR-296). It holds `gates.mjs`,
+// the runner every corpus gate is spelled in, and its `test/` directory holds a
+// unit suite over that runner's REPORT. Same reasoning, same stage, and the same
+// reason it is a source root rather than a project: CI-06 is the stage that runs
+// the gates, and CI-02 is the stage that runs the suite about how they are
+// counted.
+const SOURCES = ['apps/*', 'packages/*', 'scripts/corpus', 'scripts/demo'];
 
 /** Test files that belong to no stage-specific suffix. CI-02, with `property`. */
 const UNIT = SOURCES.map((s) => `${s}/test/**/*.test.ts`);
