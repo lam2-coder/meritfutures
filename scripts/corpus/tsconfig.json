@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+
+  "//": "ADR-296. `scripts/corpus` is not a workspace package, so `pnpm -r run typecheck` never reaches it and a TypeScript directory no `tsc` invocation reaches is a directory that rots: the root `typecheck` script names this project explicitly, exactly as it already names `scripts/demo` and `e2e`. `allowJs` is ON so the suite can import the runner it reads and get its JSDoc types; `checkJs` is OFF, and that is a statement about what this project is FOR rather than an exemption. `gates.mjs` is nine thousand lines of JavaScript that no `tsc` has ever read, it is cited by line number from a shelf of live documents that RI-15 and RI-16 police, and type-checking it would be a rewrite that moves every one of those lines. The suite here is TypeScript and IS checked, under the same strict base as every other project in this tree.",
+
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["test/**/*.ts"]
+}
