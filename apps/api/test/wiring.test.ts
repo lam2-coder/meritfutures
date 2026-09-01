@@ -611,7 +611,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:574`) returns a ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:606`) returns a ' +
     '`PayoutSubject` whose `state` (`routes/payouts.ts:400`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
@@ -676,10 +676,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'RATHER THAN CLOSED. It read that this tree held no implementation of `PayoutTx` at all, and ' +
     'ADR-291 made that false. The retired wording is paraphrased rather than quoted, because a ' +
     'reason that reproduces its own retired sentence reads as live to every grep, and this entry ' +
-    'has retired a question that way four times already. **THE VALUE EXISTS AND IT IS THREE ' +
-    'MEMBERS OF SEVEN**: `postgresPayoutBackend` (`apps/api/src/payout-backend.ts`) implements ' +
+    'has retired a question that way four times already. **THE VALUE EXISTS AND IT IS FOUR ' +
+    'MEMBERS OF EIGHT**: `postgresPayoutBackend` (`apps/api/src/payout-backend.ts`) implements ' +
     '`transact`, which opens the scoped door on the session identity and is the ONE transaction ' +
-    'every later slice reads on, `identityStatus()`, which reads `identities` as scope class ' +
+    'every later slice reads on, `lockScope()`, which delegates to `ScopedTx.lockScope` in one ' +
+    'line and is ADR-301 building what ADR-293 section 3.5 ruled, `identityStatus()`, which ' +
+    'reads `identities` as scope class ' +
     '`root` and decodes `identity_status` to one of three or RAISES, and, since ADR-295, ' +
     '`insertPayoutRequest()` ON ITS APPROVAL BRANCH: it derives the `NOT NULL` ' +
     '`plan_version_id` off `accounts` on the SAME transaction, names ELEVEN of the insert ' +
@@ -690,16 +692,18 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'and `insertPayoutRequest`s hold arm are slice 8, WHICH CANNOT BE SCHEDULED BECAUSE ' +
     '`HoldFlag.tosClause` HAS NO VALUE SPACE AND `DEP-M7-05` OWES THE CLAUSES TO COUNSEL, ' +
     '`listPayouts` is slice 7, and `idempotency` IS THE ONE THAT COULD ANSWER TODAY AND ' +
-    'DELIBERATELY DOES NOT, on this entry`s own closing sentence below. AND ONE RULED LINE OF ' +
-    'THE PORT ITSELF IS STILL OWED, WHICH IS THE NEWEST HALF OF THIS CLAUSE AND IS A ' +
-    'PRECONDITION OF SLICE 9 RATHER THAN OF SLICE 6: ADR-293 section 3.5 ruled that THE PAYOUT ' +
+    'DELIBERATELY DOES NOT, on this entry`s own closing sentence below. AND THE RULED LINE ' +
+    'THAT WAS STILL OWED HERE IS BUILT, WHICH IS THE FIRST TIME THIS CLAUSE HAS CLOSED A HALF ' +
+    'RATHER THAN NARROWED ONE: ADR-293 section 3.5 ruled that THE PAYOUT ' +
     'PATH LOCKS, as `PayoutTx.lockScope()` delegated to `handle.lockScope()` and called by ' +
-    '`decidePayout` FIRST, on `decideWithdrawal`s and `checkout.ts`s unanimous precedent; the ' +
-    'declaration and the call are two lines of `routes/payouts.ts` that ADR-295`s fence does ' +
-    'not reach, so slice 6`s read-then-write is backstopped only by ' +
+    '`decidePayout` FIRST, on `decideWithdrawal`s and `checkout.ts`s unanimous precedent, and ' +
+    'ADR-301 landed all four lines. So slice 6`s read-then-write is SERIALISED rather than ' +
+    'backstopped only by ' +
     '`payout_requests_no_in_flight_uq`, WHICH TURNS A CONTRACT-SPECIFIED 409 INTO A 500 AND IS ' +
-    'KEYED PER ACCOUNT WHERE THE EXPOSURE QUESTION IS PER IDENTITY. SO WHAT THIS CLAUSE ' +
-    'NAMES NOW IS FOUR MEMBERS, ONE BRANCH AND ONE OWED LINE, AND NOT A PORT: ' +
+    'KEYED PER ACCOUNT WHERE THE EXPOSURE QUESTION IS PER IDENTITY, and `payouts.test.ts` ' +
+    'watches the 409 under two concurrent requests. `transact` STILL TAKES NO LOCK and ' +
+    'ADR-293 section 3.4 is why. SO WHAT THIS CLAUSE ' +
+    'NAMES NOW IS FOUR MEMBERS AND ONE BRANCH, AND NOT A PORT: ' +
     '`apps/api/test/payout-backend.test.ts` drives ' +
     'the adapter over `db-recorder.ts` and asserts each refusal BEFORE it reads ' +
     'anything, and `rule-state-producibility.test.ts` holds the census at EXACTLY ONE ' +
@@ -892,7 +896,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`breached` and `breach_kind` are all three columns of `rule_states` as of ' +
     '`packages/db/migrations/0065_rule_state_lifetime_and_breach.sql`. THE GREP IT QUOTED IS ' +
     'LIVE AND RI-20 RUNS IT: `grep -rn lifetime_settled packages/db/migrations` returns 7 ' +
-    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:585-586` states "no member of ' +
+    'lines. REGISTERED RATHER THAN REPAIRED: `routes/payouts.ts:625-626` states "no member of ' +
     'this interface that a scoped door cannot serve", which ADR-233 makes TRUE of the ' +
     'catalogue half and leaves false of `state`. EVERY CLAUSE ABOVE IS A PREDICATE SOMEWHERE ' +
     'AND NOT ONLY A SENTENCE HERE: `apps/api/test/rule-state-producibility.test.ts` runs the ' +
