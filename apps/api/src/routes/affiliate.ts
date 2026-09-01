@@ -66,13 +66,15 @@
 // THREE FINDINGS THIS MODULE REPORTS, AND ONE HALF OF ONE THAT IS NOW REPAIRED
 // -----------------------------------------------------------------------------
 // ADR-253 SECTION 5 REPAIRED THE `affiliate_statements` HALF OF FINDING 1 AND
-// RULED ON FINDINGS 2 AND 3. The findings are kept in place rather than deleted,
+// RULED ON FINDINGS 2 AND 3; ADR-304 RULES THE REST OF FINDING 1 AND WIDENS IT.
+// The findings are kept in place rather than deleted,
 // on RI-14's rule that a false sentence removed leaves nothing for the next
 // reader to check: each now says what is true of this tree and what was ruled.
 // -----------------------------------------------------------------------------
 // 1. `affiliate_commissions` IS UNREACHABLE THROUGH THE SCOPED ACCESSOR, WHICH
-//    IS WHAT `GET /affiliate/stats` IS A READ OF. THIS FINDING NAMED TWO TABLES
-//    AND NOW NAMES ONE.
+//    IS WHAT `GET /affiliate/stats` IS A READ OF. THIS FINDING NAMED TWO TABLES,
+//    THEN ONE, AND ADR-304 MEASURES THAT THE ENDPOINT HAS TWO OBSTRUCTIONS
+//    RATHER THAN ONE. They are not the same two.
 //
 //    `affiliate_commissions` is unregistered in `packages/db/src/scope.ts`, and
 //    that file states why in its own words: its only path to an identity is
@@ -93,11 +95,31 @@
 //    `affiliate_commissions`, and `conversions_30d` is a count over
 //    `attributions`. So ONE OF THE FOUR ENDPOINTS BELOW CANNOT BE SERVED BY THE
 //    ACCESSOR AS IT STANDS. Nothing here registers a table to make a route
-//    possible, and ADR-253 has now ruled that NOTHING CAN: no member of the
-//    closed six honestly fits the row, and `firm` -- which is available, and
-//    which every mechanical check in this repository accepts -- would put a
-//    wrong tenancy answer behind a door that RETURNS ROWS. The port fails closed
-//    and its message names the obstruction, which is the honest shape available.
+//    possible, and ADR-253 ruled that no member of the closed six honestly fits
+//    the row: `firm` -- which is available, and which every mechanical check in
+//    this repository accepts -- would put a wrong tenancy answer behind a door
+//    that RETURNS ROWS.
+//
+//    ADR-253 LEFT A SEVENTH CLASS OPEN AND ADR-304 CLOSES IT: NO SEVENTH CLASS,
+//    AND THE TABLE IS ONE COLUMN AWAY. `affiliate_creatives`, `affiliate_clicks`
+//    and `affiliate_statements` each declare `affiliate_id uuid NOT NULL
+//    REFERENCES affiliates(id)` and each is registered `derived` via
+//    `affiliates` on it with no ruling at all; this is the only table on the
+//    rail that declares none. Migration `0078` is RESERVED for that column in
+//    docs/decisions/ALLOCATION.md and is NOT WRITTEN. The sentence this comment
+//    carried, that ADR-253 `has now ruled that NOTHING CAN`, was true of the
+//    vocabulary and false of the schema, and it is corrected here rather than
+//    removed.
+//
+//    AND THE SECOND OBSTRUCTION IS NOT A SCOPE QUESTION AT ALL. `attributions`
+//    is `pair`, so it is excluded from `ScopedTableKey` AND from `FirmTableKey`
+//    and `scopePredicate` throws on it: `conversions_30d` therefore has no
+//    scoped door and would still have none after `0078`. No class reaches it,
+//    because ADR-106's exclusion is a ruling about what a ROW read returns and a
+//    count returns no row. What serves it is a NAMED DOOR returning one integer
+//    (ADR-262, ADR-265), which needs no registry change and no DDL. The port
+//    fails closed and its message names BOTH obstructions, which is the honest
+//    shape available.
 //
 // 2. `POST /affiliate/links` HAS NO TABLE, `affiliate_clicks` IS NOT IT, AND
 //    ADR-253 RULES THAT NO TABLE IS OWED.
@@ -480,17 +502,42 @@ const AFFILIATES_READABLE =
   '`affiliates` is scope class `owned` on `identity_id`, so this read has a door and no ' +
   'adapter has been written for it yet.';
 
-/** The header's finding 1, in the place a caller will actually meet it. */
+/**
+ * THE HEADER'S FINDING 1, IN THE PLACE A CALLER WILL ACTUALLY MEET IT, AND IT
+ * WAS WRONG IN TWO PLACES UNTIL ADR-304.
+ *
+ * IT SAID THE TABLE IS `a seventh class away, and ADR-253 declines to write one
+ * to make a registration compile`. ADR-253 was right that no member of the
+ * closed six fits and right to leave the class to a row of its own; that row is
+ * `304` and its ruling is that no seventh class should exist. The table is a
+ * COLUMN away. A refusal is the one place a later session reads to find out
+ * what to build, so a refusal sending that session to write a scope class is
+ * worse than one saying nothing at all.
+ *
+ * AND IT NAMED ONE OBSTRUCTION WHERE THIS METHOD HAS TWO. `conversions_30d` is
+ * counted over `attributions`, which is `pair` and is refused by BOTH narrow
+ * doors under ADR-106, and no scope class reaches it: that exclusion is a
+ * ruling about what a ROW read returns and a count returns no row. The sentence
+ * quoting what was corrected is kept above rather than deleted, per RI-14.
+ */
 const COMMISSIONS_UNREACHABLE =
-  'Its figures are sums over `affiliate_commissions`, which is UNREGISTERED in ' +
-  '`packages/db/src/scope.ts` and undeclared in `packages/db/src/schema.ts`. ADR-106 said a ' +
-  'ruling was owed about what a row derived from a two-party row belongs to; ADR-253 makes that ' +
-  'ruling and it is a REFUSAL. No member of the closed six fits: the row declares no column ' +
-  'against `identities(id)`, which leaves `owned`, `pair` and `either` nothing to name; all ' +
-  'three of its edges refuse `derived`; and `firm` is available, passes every mechanical check ' +
-  'in this repository, and is FALSE, because a commission is what Merit owes a named affiliate. ' +
-  'So this is not one registration away. It is a seventh class away, and ADR-253 declines to ' +
-  'write one to make a registration compile.';
+  'It has TWO obstructions and neither is an adapter. FIRST, its three money figures are sums ' +
+  'over `affiliate_commissions`, which is UNREGISTERED in `packages/db/src/scope.ts` and ' +
+  'undeclared in `packages/db/src/schema.ts`. No member of the closed six fits (ADR-253): the ' +
+  'row declares no column against `identities(id)`, which leaves `owned`, `pair` and `either` ' +
+  'nothing to name; all three of its edges refuse `derived`; and `firm` is available, passes ' +
+  'every mechanical check in this repository, and is FALSE, because a commission is what Merit ' +
+  'owes a named affiliate. ADR-304 rules that this is NOT a seventh scope class away either: it ' +
+  'is one COLUMN away, `affiliate_id uuid NOT NULL REFERENCES affiliates(id)`, which ' +
+  '`affiliate_creatives`, `affiliate_clicks` and `affiliate_statements` each carry and are each ' +
+  'registered `derived` via `affiliates` on. Migration `0078` is RESERVED for it in ' +
+  'docs/decisions/ALLOCATION.md and is NOT WRITTEN. SECOND, `conversions_30d` is a count over ' +
+  '`attributions`, which is scope class `pair`: excluded from `ScopedTableKey` AND from ' +
+  '`FirmTableKey`, so `scopePredicate` throws on it, and NO scope class fixes that. What serves ' +
+  'that count is a NAMED DOOR returning one integer, which is the construction ADR-262 and ' +
+  'ADR-265 already use, on an `owned` row and on a `firm` row respectively, and which ' +
+  'needs no registry change at all. So this method waits on a migration, a registration, a ' +
+  'counting door and then an adapter, in that order, and on no further ruling.';
 
 /**
  * THE SENTENCE THIS CONSTANT CARRIED WAS RETIRED AND WAS STILL BEING SERVED.
