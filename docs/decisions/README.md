@@ -317,6 +317,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-301](ADR-301.md) | the lock is a PORT MEMBER and it LANDED, `transact` still takes none, and the race that was a 500 is the 409 the contract names  (2026-08-30, status: proposed) |
 | [ADR-302](ADR-302.md) | three readers of one payout ceiling, one of them wrong on the money in both directions, collapsed onto a single codec in the diff that wrote it  (2026-08-30, status: proposed) |
 | [ADR-304](ADR-304.md) | a commission is not the firm's, and it is not a seventh scope class away either. `affiliate_commissions` is ONE COLUMN away, the column is the one the other three tables on this rail already carry, and `0078` is RESERVED AND NOT WRITTEN (2026-08-30, status: proposed) |
+| [ADR-305](ADR-305.md) | the withdrawal driver, sized. Nine slices, five absences and not three, and the installation is blocked on a vendor because the day `LT-06` posts an approved withdrawal has no exit at all  (2026-08-30, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
