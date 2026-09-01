@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->285<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->285<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11139,6 +11139,26 @@ Counts derived at reporting time, each command run separately and every exit cod
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **299 files / 7,290 passed / 6 skipped** against session 487's 298 / 7,249 / 6, a delta of **+1 file and +41 cases, all of them this row's codec suite**; typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row.
 
 **NO GITHUB ACCESS: NO PULL REQUEST WAS OPENED AND NOTHING WAS MERGED**, as in session 487. The branch is pushed and left mergeable, and `origin/main` moved mid-session and was **fetched and merged in rather than rebased**, with every gate re-run on the merged tree.
+
+## 2026-08-30 - Session 489: a crashed gate is an unknown ([ADR-296](decisions/ADR-296.md), proposed)
+
+**The premise was measured at source before it was ruled on, and it held exactly as [ALLOCATION](decisions/ALLOCATION.md) row `296` stated it.** [`gates.mjs`](../scripts/corpus/gates.mjs) already printed `ERROR  <id>  <title>` plus the message, already left the denominator alone, and already exited non-zero. **A crashed gate has never read `33 of 33`.** Three of the four things [ADR-294](decisions/ADR-294.md) repaired one runner over were already right here, and the entry says so rather than restating that argument as though this runner were as broken.
+
+**What was actually wrong is two things and neither is the count.** `failed++` in the `catch` tallied a crash as a FAILURE, so a run of thirty-three gates producing thirty-two passes, zero fails and one crash printed `32 of 33 gates pass.` beside *"A gate that fails is a corpus that is wrong, not a gate to relax"*: thirty-two measurements asserted where the truth is thirty-two measurements and **one unknown**, with the diagnosis aimed at the one place the defect is not. And the exit code was `1`, the same code a genuinely violated corpus returns.
+
+**The ruling is a three-way tally.** ERROR counted apart from PASS and FAIL, denominator held, exit `3` dominating a violation in the same run, and the `N of N gates pass.` sentence suppressed entirely on a crashed run. **The exit-code vocabulary now matches `repo-invariants.mjs`**, which closes the ordering question ADR-294's own approval note raised: two runners guarding one tree should not disagree about what `3` means.
+
+**A run with no crash is byte for byte unchanged**, wording and exit code, verified by diffing the two clean transcripts with the gate `note:` lines filtered out. One line differs and it is not the runner's: `CI-06/conflict-markers` counts a hundred and eight more lines in a tree whose runner grew.
+
+**Four exact transcripts, two pairs**, from a crash seeded as one `throw` inside `CI-06r`'s body and then removed. **The seed went inside an existing gate rather than being appended as a thirty-fourth**, because a new gate moves `GATES.length`, which is the `gate_count` span, which turns `CI-06g` red with 182 findings, and the claim under test is what a crash reads on a thirty-three-gate run. **Every exit code was read without a pipe.**
+
+**The RED was watched.** A report cannot be falsified by seeding the corpus, so the single-counter arithmetic was restored inside `runGates` and the block re-run: four of seven cases RED and three green by design, the three being the unchanged half.
+
+**No gate was weakened, deleted, renumbered, skipped or made conditional**, the array holds the same thirty-three members in the same order, and **`RI-36`, reserved to this row by name, is left free**, with three candidates refused. One of them is the candidate ADR-294 refused as red on landing; **it would be green today** and is refused now on its own merits.
+
+**One fence judgement was taken and it is stated rather than buried.** The row put *"tests over it"* in the fence and `packages/**` out of it, and those clauses meet on this tree: `packages/tooling/tsconfig.json` sets `checkJs: true`, so a suite there importing nine thousand lines of never-typechecked JavaScript fails by the screen, and the two ways past are to type-check the whole runner (moving every cited line in it) or to disable checking for that file (weakening a control to land a test). **`packages/**` is untouched.** The suite went beside the runner and **`scripts/corpus` is now a Vitest source root and a `tsc` project**, which is what `scripts/demo` already is. [ADR-296](decisions/ADR-296.md) section 8 and its approval note both raise it.
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **299 files / 7,256 passed / 6 skipped** against a baseline of **298 / 7,249 / 6** measured on this same tree, a delta of exactly seven cases in one new file. Typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row. **NO GITHUB ACCESS: the API returns *"GitHub access is not enabled for this session"* and `gh` is not installed, so NO PULL REQUEST WAS OPENED AND NOTHING WAS MERGED.** The branch is pushed and mergeable: `origin/main` moved twice during the session and was **merged in, never rebased**, and `generate`, `check` and `repo-invariants.mjs` were all re-run after the merge.
 
 ## 2026-08-30 - Session 491: the resolver duplicates a generated line, and the check that catches it is the control ([ADR-300](decisions/ADR-300.md), proposed)
 

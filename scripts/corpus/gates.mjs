@@ -9,7 +9,7 @@
 //   node scripts/corpus/gates.mjs list             list the gates
 //   node scripts/corpus/gates.mjs anchors <f.md>   the anchors a file offers
 //
-// Exit code is 0 only when every gate that ran reported PASS.
+// Exit codes: 0 every gate PASSed, 1 a gate FAILed, 2 usage, 3 a gate ERRORed.
 //
 // TWO RULES THIS FILE IS WRITTEN UNDER, both from the corpus that asked for it:
 //
@@ -8997,7 +8997,7 @@ const ci06DerivableCounts = {
   },
 };
 
-const GATES = [
+export const GATES = [
   ci06a,
   ci06b,
   ci06c,
@@ -9033,12 +9033,141 @@ const GATES = [
   ci06DerivableCounts,
 ];
 
+// =============================================================================
+// THE REPORT, AND WHY A CRASH IS ITS OWN OUTCOME
+// =============================================================================
+// ADR-296, which is ADR-294 transposed one runner over. THE DEFECT HERE WAS
+// NARROWER THAN THE ONE THAT FILE FIXED AND SAYING SO IS PART OF THE FIX. This
+// runner already printed the word ERROR, already left the denominator alone and
+// already exited non-zero, so a crashed gate has never read `33 of 33`. What it
+// did was fold the crash into `failed`, and then print
+//
+//     32 of 33 gates pass. A gate that fails is a corpus that is wrong, not a
+//     gate to relax.
+//
+// over a run of 33 gates that produced 32 passes, ZERO fails and ONE crash.
+// Two things are wrong with that and neither is the count. The tally says
+// thirty-two gates were MEASURED and one did not hold, when the truth is
+// thirty-two measurements and ONE UNKNOWN; and the sentence beside it tells the
+// reader to go and repair the corpus, which is the one place the defect is not.
+// The exit code says `1`, which is the same thing it says when the corpus really
+// is wrong, so a shell cannot tell a broken runner from a broken corpus either.
+//
+// So the tally is THREE-WAY and the denominator never moves. A crashed gate is
+// reported ERROR, is counted apart from both PASS and FAIL, stays in the `of N`,
+// and takes the exit code to `EXIT.CRASHED` rather than sharing `EXIT.VIOLATED`
+// with a real finding. The `N of N gates pass` sentence is printed ONLY on a run
+// where nothing crashed, because that sentence is a claim about a completed
+// measurement and a run holding an ERROR did not complete one.
+//
+// A RUN WITH NO CRASH IS BYTE FOR BYTE WHAT IT ALWAYS WAS, wording and exit code
+// both, and a case in the suite asserts that half so it cannot drift as a side
+// effect of a later change to the crashed half.
+//
+// The one crash this cannot see is a module that throws while it is being
+// IMPORTED, which kills the process before a gate runs at all. It is survivable
+// for the same reason it is in `repo-invariants.mjs`: node exits non-zero with a
+// stack trace and NO summary line, so it can never be mistaken for a count.
+
+/**
+ * The exit codes, named because the shell is where the distinction is spent.
+ *
+ * `CRASHED` is 3 rather than 2 because 2 already means a usage error, and it is
+ * separate from `VIOLATED` because "this corpus is wrong" and "this run did not
+ * measure the corpus" are different facts that want different responses. It
+ * DOMINATES `VIOLATED` on a run that produced both: the findings you can read
+ * are the smaller news when a gate went unread.
+ *
+ * These are the same four codes `repo-invariants.mjs` speaks, on purpose. Two
+ * runners guarding one tree should not disagree about what `3` means.
+ */
+export const EXIT = { OK: 0, VIOLATED: 1, USAGE: 2, CRASHED: 3 };
+
+/**
+ * The findings printed under one FAIL before the tail is summarised.
+ *
+ * Unchanged by ADR-296 and named rather than left as a literal, because the
+ * suite asserts the uncrashed half of this report byte for byte and a magic
+ * number it cannot see is a number that drifts.
+ */
+const FINDINGS_SHOWN = 40;
+
+/**
+ * Run `gates`, emitting one transcript line at a time, and return the tally.
+ *
+ * `emit` is a parameter rather than a bare `console.log` so the suite reads the
+ * transcript this file actually prints instead of a second copy of the wording.
+ * THE GATE BODIES STILL WRITE THEIR `note:` LINES TO `console.log` DIRECTLY, so
+ * a caller passing its own `emit` collects the runner's lines and not the notes;
+ * that is stated rather than repaired, because rerouting thirty-three gate
+ * bodies is a change to thirty-three gates and this row is a change to a report.
+ *
+ * @param {readonly {id: string, title: string, run: () => string[]}[]} gates
+ * @param {{ emit?: (line: string) => void }} [options]
+ * @returns {{ passed: number, failed: number, errored: number, total: number, exitCode: number }}
+ */
+export function runGates(gates, options = {}) {
+  const { emit = console.log } = options;
+  const total = gates.length;
+  let passed = 0;
+  let failed = 0;
+  let errored = 0;
+
+  for (const gate of gates) {
+    /** @type {string[]} */
+    let findings;
+    try {
+      findings = gate.run();
+    } catch (err) {
+      errored++;
+      emit(`ERROR  ${gate.id}  ${gate.title}  (THIS GATE DID NOT RUN)`);
+      emit(`       ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    if (findings.length === 0) {
+      passed++;
+      emit(`PASS   ${gate.id}  ${gate.title}`);
+    } else {
+      failed++;
+      emit(`FAIL   ${gate.id}  ${gate.title}  (${findings.length})`);
+      for (const f of findings.slice(0, FINDINGS_SHOWN)) emit(`       ${f}`);
+      if (findings.length > FINDINGS_SHOWN)
+        emit(`       ... and ${findings.length - FINDINGS_SHOWN} more`);
+    }
+  }
+
+  emit('');
+  if (errored === 0) {
+    emit(
+      `${passed} of ${total} gates pass.` +
+        (failed ? ' A gate that fails is a corpus that is wrong, not a gate to relax.' : ''),
+    );
+  } else {
+    emit(`${errored} of ${total} gate(s) COULD NOT RUN, so this run did not measure the corpus.`);
+    emit(`${passed} passed, ${failed} failed, ${errored} errored, of ${total} gate(s).`);
+    emit(
+      'A GATE THAT CRASHED IS NOT A GATE THAT HELD, so this run does not get to say ' +
+        `"${passed} of ${total} gates pass": it is ${passed} measurement(s) and ` +
+        `${errored} unknown(s), and the unknown is where a violation hides. Fix the ` +
+        'ERROR above and run it again.',
+    );
+  }
+
+  return {
+    passed,
+    failed,
+    errored,
+    total,
+    exitCode: errored > 0 ? EXIT.CRASHED : failed > 0 ? EXIT.VIOLATED : EXIT.OK,
+  };
+}
+
 function main() {
   const [cmd, only] = process.argv.slice(2);
 
   if (cmd === 'list') {
     for (const g of GATES) console.log(`${g.id}  ${g.title}\n      covers: ${g.covers}\n`);
-    return 0;
+    return EXIT.OK;
   }
   if (cmd === 'generate') return generate();
   if (cmd === 'allocation') return allocationReport();
@@ -9048,12 +9177,12 @@ function main() {
   if (cmd === 'anchors') {
     if (!only) {
       console.error('usage: node scripts/corpus/gates.mjs anchors <file.md> [filter]');
-      return 2;
+      return EXIT.USAGE;
     }
     const filter = (process.argv[4] ?? '').toLowerCase();
     for (const a of [...headingSlugs(read(only))].sort())
       if (!filter || a.includes(filter)) console.log(a);
-    return 0;
+    return EXIT.OK;
   }
 
   if (cmd !== 'check') {
@@ -9061,41 +9190,20 @@ function main() {
       'usage: node scripts/corpus/gates.mjs check [GATE-ID] | generate | allocation | list | ' +
         'anchors <file.md>',
     );
-    return 2;
+    return EXIT.USAGE;
   }
 
   const selected = only ? GATES.filter((g) => g.id === only) : GATES;
   if (selected.length === 0) {
     console.error(`no such gate: ${only}`);
-    return 2;
+    return EXIT.USAGE;
   }
 
-  let failed = 0;
-  for (const gate of selected) {
-    let findings;
-    try {
-      findings = gate.run();
-    } catch (err) {
-      console.log(`ERROR  ${gate.id}  ${gate.title}`);
-      console.log(`       ${err.message}`);
-      failed++;
-      continue;
-    }
-    if (findings.length === 0) {
-      console.log(`PASS   ${gate.id}  ${gate.title}`);
-    } else {
-      failed++;
-      console.log(`FAIL   ${gate.id}  ${gate.title}  (${findings.length})`);
-      for (const f of findings.slice(0, 40)) console.log(`       ${f}`);
-      if (findings.length > 40) console.log(`       ... and ${findings.length - 40} more`);
-    }
-  }
-
-  console.log(
-    `\n${selected.length - failed} of ${selected.length} gates pass.` +
-      (failed ? ' A gate that fails is a corpus that is wrong, not a gate to relax.' : ''),
-  );
-  return failed ? 1 : 0;
+  return runGates(selected).exitCode;
 }
 
-process.exit(main());
+// Importable by the suite that reads this report, runnable by CI-06.
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (invokedDirectly) process.exit(main());
