@@ -3409,6 +3409,52 @@ export const CATALOG_TABLE_KEYS = [
 export type CatalogTableKey = (typeof CATALOG_TABLE_KEYS)[number];
 
 /**
+ * ONE ROW OF ONE CATALOGUE TABLE, as `schema.ts` declares it (ADR-303).
+ *
+ * DERIVED FROM `TABLES` AND NEVER LISTED, on `AddressableColumn`'s precedent in
+ * this file: the shape is Drizzle's own select model for the table the key
+ * names, so there is no second transcription to go stale and no list for anybody
+ * to maintain. `schema.ts` states both spellings of every column on one line,
+ * `sizeCents: bigint('size_cents', { mode: 'bigint' })`, and it is the only file
+ * in this repository that does. That is ADR-299 section 6's reason for the key
+ * mapping living HERE rather than in a package that would hold a copy of these
+ * property names checked by nothing.
+ *
+ * THE `unknown` THIS REPLACES WAS INHERITED RATHER THAN RULED. ADR-233 built
+ * this door and does not mention a return type anywhere; ADR-112 foreclosure 3
+ * is about `ON CONFLICT`, `ORDER BY`, `LIMIT` and `FOR UPDATE` having no shape
+ * in this accessor and says nothing about what a caller is handed. The `unknown`
+ * came down from `ScopedDb.rows`, which predates the catalogue door entirely.
+ *
+ * FOUR LIMITS, STATED HERE RATHER THAN DISCOVERED LATER (ADR-299 section 5.1):
+ *
+ *   1. THE RUNTIME GUARDS DO NOT COME OFF ON THE STRENGTH OF THIS TYPE, and
+ *      that is the limit this file exists to carry rather than the ADR. A type
+ *      derived from `schema.ts` is a type derived from a TRANSCRIPTION, and
+ *      ADR-112 foreclosure 4 records that nothing yet makes that transcription
+ *      complete: no check in this tree compares a `schema.ts` column TYPE
+ *      against the DDL. A caller that reads money off one of these rows still
+ *      checks the value it read.
+ *   2. IT IS NOT A DECODER. It SHRINKS one. A driver-side caller still writes a
+ *      field mapping onto the engine's own row type, once per caller, which is
+ *      an accepted `FM-16`. What changes is that both ends are declared: a key
+ *      that does not exist is `TS2339` rather than a runtime throw on a money
+ *      read. A key that exists and is the WRONG one still compiles, because
+ *      `drawdownCents` and `bufferCents` are both `bigint`.
+ *   3. IT DOES NOT REACH INSIDE A `jsonb`. `payoutCapScheduleCents` carries no
+ *      `.$type<>()`, so the blob stays untyped and stays decoded by hand. That
+ *      is correct rather than an omission: a JSON document is not a column value
+ *      and the type system has nothing to read. The one divergence this value
+ *      has actually produced is inside that blob.
+ *   4. IT MOVES THREE VERBS AND NOT THE ACCESSOR. `rows`, `rowsWhere`, `rowAt`,
+ *      `lockAt` and every `FirmTx` and `SystemTx` read still return `unknown`.
+ *      Whether the same treatment is owed to them is NAMED here and NOT RULED:
+ *      that is a much larger surface, it has real callers, and it is a separate
+ *      row.
+ */
+export type CatalogRow<K extends CatalogTableKey> = (typeof TABLES)[K]['$inferSelect'];
+
+/**
  * The runtime half of the narrowness, and it exists because the compile half is
  * castable.
  *
@@ -3610,17 +3656,17 @@ export interface ScopedTx extends TxCommon {
    * below; the read is unfiltered because there is no tenancy to filter by, and
    * that is the CLASS being read correctly rather than a filter omitted.
    */
-  catalogRows<K extends CatalogTableKey>(key: K): Promise<unknown[]>;
+  catalogRows<K extends CatalogTableKey>(key: K): Promise<CatalogRow<K>[]>;
   /** Catalogue rows matching a filter. `RowFilter` is equality, ANDed, and nothing else. */
   catalogRowsWhere<K extends CatalogTableKey, F extends RowFilter<K>>(
     key: K,
     where: NamesAColumn<K, F>,
-  ): Promise<unknown[]>;
+  ): Promise<CatalogRow<K>[]>;
   /** ONE catalogue row, or `undefined`. The address must name a unique key. */
   catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(
     key: K,
     at: NamesAColumn<K, A>,
-  ): Promise<unknown>;
+  ): Promise<CatalogRow<K> | undefined>;
   /**
    * ONE row of this identity's, LOCKED until this transaction ends (ADR-157).
    *
@@ -3814,33 +3860,38 @@ export function scopedTx(
       )) as unknown[];
       return oneOrNone(key, found);
     },
-    async catalogRows<K extends CatalogTableKey>(key: K): Promise<unknown[]> {
+    async catalogRows<K extends CatalogTableKey>(key: K): Promise<CatalogRow<K>[]> {
       // THE GUARD IS FIRST AND IT IS RUN ON ALL THREE, because the type is the
       // only other thing standing here and a type is castable. `undefined` for
       // the predicate is `firmTx.rows`' own argument: there is no tenancy column
-      // on any key this guard admits.
+      // on any key this guard admits. ADR-303 narrowed the RETURN and moved no
+      // guard: the assertion below is the same assertion, over a declared shape.
       refuseUncatalogued(key);
-      return (await selectStatement(source, key, undefined)) as unknown[];
+      return (await selectStatement(source, key, undefined)) as CatalogRow<K>[];
     },
     async catalogRowsWhere<K extends CatalogTableKey, F extends RowFilter<K>>(
       key: K,
       where: NamesAColumn<K, F>,
-    ): Promise<unknown[]> {
+    ): Promise<CatalogRow<K>[]> {
       refuseUncatalogued(key);
-      return (await selectStatement(source, key, unscopedFilterPredicate(key, where))) as unknown[];
+      return (await selectStatement(
+        source,
+        key,
+        unscopedFilterPredicate(key, where),
+      )) as CatalogRow<K>[];
     },
     async catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(
       key: K,
       at: NamesAColumn<K, A>,
-    ): Promise<unknown> {
+    ): Promise<CatalogRow<K> | undefined> {
       refuseUncatalogued(key);
       refuseUnaddressed(key, at);
       const found = (await selectStatement(
         source,
         key,
         unscopedAddressPredicate(key, at),
-      )) as unknown[];
-      return oneOrNone(key, found);
+      )) as CatalogRow<K>[];
+      return oneOrNone(key, found) as CatalogRow<K> | undefined;
     },
     async lockAt<K extends ScopedTableKey, A extends RowAddress<K>>(
       key: K,

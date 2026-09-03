@@ -55,7 +55,13 @@ import {
   type IdentityId,
   type TableKey,
 } from '../src/index.ts';
-import { scopedTx, uniqueKeys, type StatementSource } from '../src/scoped-db.ts';
+import {
+  scopedTx,
+  uniqueKeys,
+  type CatalogRow,
+  type ScopedTx,
+  type StatementSource,
+} from '../src/scoped-db.ts';
 
 const IDENTITY = 'i-buyer' as IdentityId;
 const OTHER = 'i-somebody-else' as IdentityId;
@@ -349,5 +355,180 @@ describe('nothing here is a write, and nothing here is a scope', () => {
       await expect(tx.rows(key as never), key).rejects.toThrow();
     }
     expect(sent).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// THE FIFTH DIRECTION: THE RETURN IS A DECLARED ROW (ADR-303)
+// =============================================================================
+// ADR-233 built this door and never ruled its return type. ADR-299 ruling 1
+// rules it, and ADR-303 lands it: the three verbs hand back the row type
+// `schema.ts` declares instead of `unknown`.
+//
+// EVERY REFUSAL ABOVE IS UNMOVED AND THAT IS THE OTHER HALF OF THE STOP
+// CONDITION. Nothing in this section replaces a case above it; the guard order
+// in `catalogRows`, `catalogRowsWhere` and `catalogRowAt` is what the four
+// directions above assert and a narrower return cannot reach it.
+//
+// THE TYPE CASES ARE CHECKED BY `tsc` AND NOT BY VITEST, which this file's own
+// header already says about the compile half of any refusal: vitest runs
+// transpiled code and a type error is gone by then. `packages/db/tsconfig.json`
+// includes `test/**/*.ts`, so `pnpm typecheck` compiles this file and a RED here
+// is a compile failure in this package rather than a failing test.
+
+/** `true` only where the argument is `true`. A false case does not compile. */
+type Assert<T extends true> = T;
+
+/**
+ * `A` and `B` are the SAME type, invariantly.
+ *
+ * THE CONDITIONAL-IDENTITY FORM AND NOT MUTUAL ASSIGNABILITY, because `any` is
+ * assignable in both directions and would pass a two-sided `extends` check
+ * silently. That matters here: the failure this section exists to catch is a
+ * return type that has stopped being a row, and `any` is one of the two ways it
+ * could stop.
+ */
+type Same<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+
+type PlanVersionSizeCatalogRow = CatalogRow<'planVersionSizes'>;
+
+/** The row is `schema.ts`'s row, column for column, and it is neither `unknown` nor `any`. */
+type TheRowIsTheDeclaredRow = [
+  // THE MONEY COLUMN ARRIVES AS `bigint`, which is `{ mode: 'bigint' }` in
+  // `schema.ts` reaching a caller as a type rather than as a hope.
+  Assert<Same<PlanVersionSizeCatalogRow['sizeCents'], bigint>>,
+  // THE PRICE IS ON THE ROW. ADR-299 section 5.1 item 4: the row type carries
+  // more than the engine's does, and the engine's refusal of the price by name
+  // is preserved because the DECODER's output is still the engine's type.
+  Assert<Same<PlanVersionSizeCatalogRow['priceCents'], bigint>>,
+  // A NULLABLE COLUMN KEEPS ITS NULL. `profit_target_cents` is NULL on Direct,
+  // and a type that flattened that would be false about the one plan with no
+  // evaluation.
+  Assert<Same<PlanVersionSizeCatalogRow['profitTargetCents'], bigint | null>>,
+  // A KEY THE TABLE DOES NOT DECLARE IS NOT ON THE ROW, which is the `TS2339`
+  // ADR-299 section 5.1 item 1 says this buys.
+  Assert<Same<'notAColumn' extends keyof PlanVersionSizeCatalogRow ? true : false, false>>,
+  // AND IT IS NOT `unknown`, NOR `any`. Both would satisfy every assignment in
+  // this file and neither is a row.
+  Assert<Same<Same<PlanVersionSizeCatalogRow, unknown>, false>>,
+  Assert<Same<Same<PlanVersionSizeCatalogRow, any>, false>>,
+];
+
+/**
+ * THE `jsonb` STAYS UNTYPED, AND IT IS ASSERTED RATHER THAN LEFT AS AN ABSENCE.
+ *
+ * ADR-299 section 5.1 item 2: `payout_cap_schedule_cents` carries no `.$type<>()`
+ * in `schema.ts`, so the blob is `unknown` on the typed row and every reader
+ * still decodes it by hand. The one divergence this value has actually produced
+ * is inside that blob, and a session reading the typed door must not conclude
+ * the cap schedule came with it.
+ */
+type TheBlobIsStillUnknown = Assert<
+  Same<PlanVersionSizeCatalogRow['payoutCapScheduleCents'], unknown>
+>;
+
+/**
+ * THE OTHER READ VERBS ARE UNMOVED, which ADR-299 section 5.1 item 3 NAMES and
+ * does NOT rule. `rows`, `rowsWhere`, `rowAt` and `lockAt` still return
+ * `unknown`, so a session that widens one of them is changing something this
+ * case records as deliberate rather than tidying an inconsistency.
+ */
+type TheScopedVerbsStillReturnUnknown = [
+  Assert<Same<Awaited<ReturnType<ScopedTx['rows']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<ScopedTx['rowsWhere']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<ScopedTx['rowAt']>>, unknown>>,
+  Assert<Same<Awaited<ReturnType<ScopedTx['lockAt']>>, unknown>>,
+];
+
+/** `undefined` IS IN `catalogRowAt`'S RETURN, so an absent row is a case a caller must hold. */
+type TheAddressedReadCanBeAbsent = Assert<
+  undefined extends Awaited<ReturnType<ScopedTx['catalogRowAt']>> ? true : false
+>;
+
+/**
+ * THE TYPE CASES, BOUND TO A VALUE SO THE SUITE CAN NAME THEM.
+ *
+ * A TYPE ALIAS NOTHING REFERENCES IS AN ESLINT ERROR IN THIS REPOSITORY, and
+ * writing `_` in front of each name to buy silence would leave the cases
+ * invisible to a reader running the suite. Binding them to a tuple of `true`
+ * spends one value and makes the RED legible from either half: a case that stops
+ * holding is `TS2344` at the alias, and this tuple stops compiling with it.
+ */
+const ADR_303_TYPE_CASES: readonly [
+  TheRowIsTheDeclaredRow,
+  TheBlobIsStillUnknown,
+  TheScopedVerbsStillReturnUnknown,
+  TheAddressedReadCanBeAbsent,
+] = [[true, true, true, true, true, true], true, [true, true, true, true], true];
+
+/**
+ * The three verbs hand back declared rows AT A CALL SITE, which is the property
+ * a caller will actually meet.
+ *
+ * THIS FUNCTION IS NEVER CALLED AND THAT IS THE POINT: it is compiled and not
+ * run, and every line in it is an assignment `unknown` would refuse.
+ */
+async function theVerbsHandBackDeclaredRows(tx: ScopedTx): Promise<void> {
+  const many: readonly PlanVersionSizeCatalogRow[] = await tx.catalogRows('planVersionSizes');
+  const filtered: readonly CatalogRow<'coupons'>[] = await tx.catalogRowsWhere('coupons', {
+    code: 'LAUNCH50',
+  });
+  const one: PlanVersionSizeCatalogRow | undefined = await tx.catalogRowAt('planVersionSizes', {
+    planVersionId: 'pv-1',
+    sizeCents: 5_000_000n,
+  });
+  // THE MONEY COLUMN IS READ WITHOUT A CAST AND WITHOUT A GUARD FOR ITS
+  // EXISTENCE, which is the whole of what the narrowing buys. What it does NOT
+  // buy is the guard on the VALUE: ADR-299 section 5.1 item 5 rules that a type
+  // derived from a transcription does not retire a runtime check.
+  const cents: bigint | undefined = one?.sizeCents;
+  const codes: readonly string[] = filtered.map((row) => row.code);
+  void many;
+  void cents;
+  void codes;
+}
+
+describe('the return is the declared row and no refusal moved (ADR-303)', () => {
+  test('the type cases above are compiled, and this test says so out loud', () => {
+    // A TYPE IS NOT A TEST AND THIS FILE SHOULD NOT PRETEND OTHERWISE. The
+    // aliases above are checked by `tsc` and are invisible to vitest, so what
+    // this case asserts is only that the tuple binding them is whole. A case
+    // that stops holding fails `pnpm typecheck` and this line never runs.
+    expect(ADR_303_TYPE_CASES.flat(2)).not.toContain(false);
+    expect(ADR_303_TYPE_CASES.flat(2).length).toBeGreaterThan(0);
+    expect(typeof theVerbsHandBackDeclaredRows).toBe('function');
+  });
+
+  test('`catalogRowAt` hands back `undefined` where nothing matched', async () => {
+    // THE `| undefined` ARM IS REACHED AT RUN TIME AND NOT ONLY DECLARED. The
+    // recording handle answers every statement with no rows, so this is the
+    // absent case the type now forces a caller to hold.
+    const { source, sent } = recording();
+    const found = await scopedTx(source, stubConn(), IDENTITY).catalogRowAt('coupons', {
+      code: 'NOT-A-COUPON',
+    });
+    expect(found).toBeUndefined();
+    expect(sent).toHaveLength(1);
+  });
+
+  test('the guard still runs BEFORE the narrowed return, on all three verbs', async () => {
+    // THE SECOND HALF OF THE STOP CONDITION, ASSERTED AS ITSELF. A typed return
+    // that cost one refusal would be a regression wearing a type, so each verb
+    // is driven once more with a key outside the list and each must still throw
+    // having built nothing. The four directions at the top of this file assert
+    // this over EVERY outside key; this case asserts it beside the change.
+    for (const verb of ['catalogRows', 'catalogRowsWhere', 'catalogRowAt'] as const) {
+      const { source, sent } = recording();
+      const tx = scopedTx(source, stubConn(), IDENTITY);
+      const run =
+        verb === 'catalogRows'
+          ? tx.catalogRows('treasuryBalances' as CatalogTableKey)
+          : verb === 'catalogRowsWhere'
+            ? tx.catalogRowsWhere('treasuryBalances' as CatalogTableKey, { id: 'x' } as never)
+            : tx.catalogRowAt('treasuryBalances' as CatalogTableKey, { id: 'x' } as never);
+      await expect(run, verb).rejects.toThrow(/is not a table a scoped transaction may read/);
+      expect(sent, `${verb} built a statement`).toHaveLength(0);
+    }
   });
 });
