@@ -319,6 +319,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-303](ADR-303.md) | the catalogue door returns the row `schema.ts` declares, and every refusal it had it still has  (2026-09-03, status: proposed) |
 | [ADR-304](ADR-304.md) | a commission is not the firm's, and it is not a seventh scope class away either. `affiliate_commissions` is ONE COLUMN away, the column is the one the other three tables on this rail already carry, and `0078` is RESERVED AND NOT WRITTEN (2026-08-30, status: proposed) |
 | [ADR-305](ADR-305.md) | the withdrawal driver, sized. Nine slices, five absences and not three, and the installation is blocked on a vendor because the day `LT-06` posts an approved withdrawal has no exit at all  (2026-08-30, status: proposed) |
+| [ADR-306](ADR-306.md) | `subject()` has three legs, and the two that cannot answer refuse by name instead of the member refusing wholesale (2026-09-03, status: proposed) |
 | [ADR-307](ADR-307.md) | the pin that fixed one `qs` advisory is the vehicle of the next two, and `CI-05` has been red on every branch since (2026-09-03, status: proposed) |
 <!--/gen-->
 
