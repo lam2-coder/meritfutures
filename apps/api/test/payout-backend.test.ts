@@ -1,13 +1,20 @@
 // =============================================================================
 // apps/api/test/payout-backend.test.ts
 // =============================================================================
-// THE FIRST `PayoutTx` IN THIS TREE, ASSERTED AS THE FOUR-OF-EIGHT SHAPE IT IS.
+// THE FIRST `PayoutTx` IN THIS TREE, ASSERTED AS THE FIVE-OF-EIGHT SHAPE IT IS.
 //
-// ADR-291 (ADR-287 slice 3), then ADR-295's approval branch and ADR-301's lock.
-// What this file watches is not only that the live members answer, but that the
-// FOUR THAT DO NOT REFUSE VISIBLY: a member that quietly returned a plausible
-// value would be a fixture approving payouts, and every one of the four is
-// unbuilt for a reason ADR-287 names at a primary source.
+// ADR-291 (ADR-287 slice 3), then ADR-295's approval branch, ADR-301's lock,
+// ADR-306's three legs of `subject()` and ADR-308's last two. What this file
+// watches is not only that the live members answer, but that the THREE THAT DO
+// NOT REFUSE VISIBLY: a member that quietly returned a plausible value would be
+// a fixture approving payouts, and every one of the three is unbuilt for a
+// reason ADR-287 names at a primary source.
+//
+// AND FROM ADR-308 IT WATCHES ONE MORE THING, WHICH IS THE ONLY PROPERTY ON THIS
+// PORT THAT A GREEN SUITE CANNOT OTHERWISE HOLD: that `subject().state` READS a
+// stored `rule_states` row and does not FOLD one. A request-path fold would
+// answer every case here correctly and would be the divergence ADR-026 `C-07`'s
+// `state_hash` exists to detect.
 //
 // IT DRIVES THE ADAPTER AGAINST `db-recorder.ts` AND NOT AGAINST A DATABASE, on
 // that file's own stated boundary: what a recorder proves is WHICH DOOR was
@@ -19,16 +26,32 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { ExternalGatesRefusal, PlanRulesCodecError } from '@merit/rules-engine';
+import {
+  CapScheduleCodecError,
+  ExternalGatesRefusal,
+  PlanRulesCodecError,
+} from '@merit/rules-engine';
 import { describe, expect, it } from 'vitest';
 
 import { recordingDb, NO_PRE_IDENTITY_DOORS } from './db-recorder.ts';
 import type { ApiDb } from '../src/db.ts';
 import { PayoutRowError, postgresPayoutBackend } from '../src/payout-backend.ts';
 import { identityScope } from '../src/idempotency.ts';
+import { RuleStateAbsent, RuleStateUnreadable } from '../src/rule-state-reader.ts';
 import { PayoutBackendUnwired } from '../src/routes/payouts.ts';
 import type { AuthSession } from '../src/routes/auth.ts';
-import type { PayoutRequestInsert } from '../src/routes/payouts.ts';
+import type { PayoutRequestInsert, PayoutSubject } from '../src/routes/payouts.ts';
+
+/**
+ * THE ADAPTER'S OWN SOURCE, read once for the cases that assert an ABSENCE.
+ *
+ * A RETIRED REFUSAL IS ASSERTED GONE RATHER THAN DROPPED, which is this file's
+ * standing idiom and `insertPayoutRequest`'s precedent: an arm nothing asserts
+ * is an arm the next refactor puts back.
+ */
+function backendSource(): string {
+  return readFileSync(join(import.meta.dirname, '..', 'src', 'payout-backend.ts'), 'utf8');
+}
 
 const IDENTITY = '0199c7a1-1111-7000-8000-000000000501';
 
@@ -534,20 +557,155 @@ const STORED_RULES: Record<string, unknown> = {
   },
 };
 
-/** What each of the four tables `subject()` reads answers with. */
+/**
+ * The day `ScopedTx.lastClosedTradingDay()` answers with, on ADR-268.
+ *
+ * IT IS A VALUE THIS FIXTURE SUPPLIES AND NEVER ONE THE ADAPTER FOLDS. `R-06`
+ * permits only the last closed trading day, and the whole of ADR-268 is that the
+ * selection belongs to a named door on the transaction rather than to a calendar
+ * read and folded on the request path.
+ */
+const STATE_DAY = '2026-08-28';
+
+/**
+ * One `rule_states` row AS THE DRIVER HANDS IT BACK, in `schema.ts`'s spelling.
+ *
+ * IT CARRIES THE COLUMNS `readRuleState` READS AND NO OTHERS, which is a claim
+ * about that reader rather than about the table: `context_gates`, `state_hash`
+ * and `calendar_revision_id` are all three columns of a real row and a
+ * `RuleState` has no field for any of them, which `rule-state-reader.ts` states
+ * in its own header and its own suite asserts. `id`, `computed_at` and
+ * `created_at` are the database's.
+ *
+ * `engineGates` IS THE STORED DOCUMENT AND NOT A DECODED ONE: `decodeEngineGates`
+ * reads the money legs as strings of digits, because `jsonb` cannot hold a
+ * `bigint`, and a fixture typed as the decoded shape would be handing the codec
+ * its own answer.
+ */
+function foldedStateRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    accountId: ACCOUNT,
+    tradingDay: STATE_DAY,
+    phase: 'funded',
+    balanceCents: 5_010_000n,
+    floorOpenCents: 4_750_000n,
+    floorCents: 4_760_000n,
+    floorLocked: false,
+    highWaterBalanceCents: 5_010_000n,
+    withdrawableCents: 10_000n,
+    tradedDaysCount: 4,
+    winDaysCount: 2,
+    consistencyBestDayCents: 10_000n,
+    consistencyPeriodProfitCents: 10_000n,
+    consistencyPeriodStartDay: null,
+    payoutsSettledCount: 0,
+    payoutAnchorDay: null,
+    cadenceAnchorDay: null,
+    lifetimeSettledCents: 0n,
+    engineGates: {
+      tradedDays: { pass: true, skipped: false, have: 4, need: 1 },
+      winDays: { pass: true, have: 2, need: 1, floorCents: '5000' },
+      buffer: { pass: false, haveCents: '10000', needCents: '50000' },
+      // `profitNeededToDiluteCents` IS A BASE-10 STRING AND NOT A NULL, on
+      // ADR-206 ruling 3: a JSON number cannot round-trip a `Cents` through the
+      // read port, so the codec refuses one. Derived by watching that refusal
+      // rather than by reading the codec.
+      consistency: {
+        pass: true,
+        skipped: false,
+        bestDayShareBp: 1000,
+        maxDayShareBp: 3000,
+        profitNeededToDiluteCents: '0',
+      },
+      cadenceGap: {
+        pass: true,
+        skipped: true,
+        tradingDaysSinceLastPayout: null,
+        need: 0,
+        nextEligibleTradingDay: null,
+      },
+      minimumAmount: {
+        pass: false,
+        withdrawableCents: '10000',
+        minPayoutCents: '10000',
+        capCents: '150000',
+      },
+    },
+    engineEligible: false,
+    breached: false,
+    breachKind: null,
+    engineVersion: 'session-511-probe',
+    ...over,
+  };
+}
+
+/**
+ * One `plan_version_sizes` row AS THE TYPED CATALOGUE DOOR HANDS IT BACK.
+ *
+ * **EVERY MONEY COLUMN IS A `bigint` AND `payout_cap_schedule_cents` IS NOT.**
+ * `schema.ts` reads the `bigint` columns `{ mode: 'bigint' }`, so that is what
+ * arrives; the cap schedule is `jsonb NOT NULL` (`0004_catalog.sql`) and `jsonb`
+ * cannot hold a `bigint` at all, so its cents are a JSON number here and a
+ * `bigint` only after `decodeCapScheduleCents`. A fixture that seeded `bigint`
+ * inside the blob would be seeding a document Postgres cannot store.
+ *
+ * IT AGREES WITH `STORED_RULES` RATHER THAN MERELY TYPECHECKING AGAINST IT.
+ * `phase_eval.enabled` is true, so `profit_target_cents` is NOT NULL (`CV-03`);
+ * both phases declare `daily_loss_limit.type: 'none'`, so the materialized limit
+ * is null (`CV-16`); and `lock.enabled` is false on both, so the floor-lock trio
+ * is absent (`SD-10`). A row that disagreed with the blob would be refused by
+ * `resolvePlan` for a reason no case here is about.
+ */
+function storedSizeRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: '0199c7a1-bbbb-7000-8000-000000000501',
+    planVersionId: PLAN_VERSION,
+    sizeCents: 5_000_000n,
+    priceCents: 29_900n,
+    resetPriceCents: 19_900n,
+    drawdownCents: 250_000n,
+    profitTargetCents: 400_000n,
+    bufferCents: 50_000n,
+    winDayFloorCents: 5_000n,
+    payoutCapScheduleCents: [{ from_ordinal: 1, cap_cents: 150_000 }],
+    dailyLossLimitCents: null,
+    floorLockEnabled: false,
+    floorLockAtProfitCents: null,
+    floorLockFloorAtCents: null,
+    createdAt: new Date('2026-08-01T00:00:00.000Z'),
+    ...over,
+  };
+}
+
+/** What each of the six tables `subject()` reads answers with. */
 interface SubjectSeed {
   /** `rowAt('accounts', { id })`. `undefined` is the `null` arm. */
   readonly account?: unknown;
   readonly identities?: readonly unknown[];
   readonly kycVerifications?: readonly unknown[];
   readonly payoutRequests?: readonly unknown[];
+  /** `rowsWhere('ruleStates', { accountId })`. An empty list is `RuleStateAbsent`. */
+  readonly ruleStates?: readonly unknown[];
   /** `catalogRowAt('planVersions', { id })`. `undefined` is an empty catalogue. */
   readonly planVersion?: unknown;
+  /**
+   * `catalogRowAt('planVersionSizes', { planVersionId, sizeCents })`.
+   * `undefined` is an account pinned to a size its own version does not publish.
+   */
+  readonly planVersionSize?: unknown;
+  /**
+   * `ScopedTx.lastClosedTradingDay()`, ADR-268's NAMED DOOR.
+   *
+   * A `string` is the day; an `Error` is what the door raises on an empty, an
+   * EXHAUSTED or a holed calendar, seeded as a value so a case can watch that
+   * refusal escape rather than describing it.
+   */
+  readonly lastClosedTradingDay?: string | Error;
 }
 
-/** One read, as this fixture records it. The catalogue verb is the fifth. */
+/** One read, as this fixture records it. The catalogue verb is the fourth. */
 interface SeededRead {
-  readonly verb: 'rows' | 'rowsWhere' | 'rowAt' | 'catalogRowAt';
+  readonly verb: 'rows' | 'rowsWhere' | 'rowAt' | 'catalogRowAt' | 'lastClosedTradingDay';
   readonly key: string;
   readonly address?: unknown;
 }
@@ -575,6 +733,7 @@ function seededDb(seed: SubjectSeed): SeededDb {
     if (key === 'identities') return [...(seed.identities ?? [])];
     if (key === 'kycVerifications') return [...(seed.kycVerifications ?? [])];
     if (key === 'payoutRequests') return [...(seed.payoutRequests ?? [])];
+    if (key === 'ruleStates') return [...(seed.ruleStates ?? [])];
     throw new Error(`this fixture seeds no \`${key}\` rows, so nothing here may read it`);
   };
 
@@ -600,8 +759,22 @@ function seededDb(seed: SubjectSeed): SeededDb {
     },
     catalogRowAt: (key: string, address: unknown) => {
       reads.push({ verb: 'catalogRowAt', key, address });
-      if (key !== 'planVersions') throw new Error(`this fixture catalogues no \`${key}\` row`);
-      return Promise.resolve(seed.planVersion);
+      if (key === 'planVersions') return Promise.resolve(seed.planVersion);
+      if (key === 'planVersionSizes') return Promise.resolve(seed.planVersionSize);
+      throw new Error(`this fixture catalogues no \`${key}\` row`);
+    },
+    // ADR-268's NAMED DOOR, RECORDED LIKE A READ BECAUSE IT IS ONE. It takes no
+    // argument at all -- there is no day a caller could name, because naming one
+    // is the question -- so the record carries the door's name and no address.
+    lastClosedTradingDay: () => {
+      reads.push({ verb: 'lastClosedTradingDay', key: 'tradingCalendar' });
+      const day = seed.lastClosedTradingDay;
+      if (day === undefined)
+        throw new Error(
+          'this fixture seeds no closed trading day, so nothing here may ask for one',
+        );
+      if (day instanceof Error) return Promise.reject(day);
+      return Promise.resolve(day);
     },
   };
 
@@ -631,7 +804,7 @@ function subjectAccountRow(over: Record<string, unknown> = {}): Record<string, u
   };
 }
 
-/** A seed on which all three built legs resolve and only the unbuilt two refuse. */
+/** A seed on which ALL FOUR legs resolve and the member answers whole. */
 function wholeSeed(over: SubjectSeed = {}): SubjectSeed {
   return {
     account: subjectAccountRow(),
@@ -639,6 +812,9 @@ function wholeSeed(over: SubjectSeed = {}): SubjectSeed {
     kycVerifications: [{ id: KYC, state: 'verified', supersedes: null }],
     payoutRequests: [],
     planVersion: { id: PLAN_VERSION, rules: STORED_RULES },
+    planVersionSize: storedSizeRow(),
+    ruleStates: [foldedStateRow()],
+    lastClosedTradingDay: STATE_DAY,
     ...over,
   };
 }
@@ -678,36 +854,54 @@ describe('subject() answers `null` for an account this handle cannot see', () =>
   });
 });
 
-describe('subject() refuses BY NAME and the name is the remainder of ADR-287', () => {
-  it('names `subject.state` AND `subject.plan.size`, never the member wholesale', async () => {
-    // THE LINE THIS REPLACED REFUSED `subject` ON ONE LINE, and a blanket
-    // rejection cost a session: neither ALLOCATION nor STATE could tell a member
-    // nobody had started from a member three quarters built, and both recorded
-    // slice 5 as next while slice 4 had never been built. What the refusal names
-    // now is exactly ADR-287 section 7's slice 5.
+describe('subject() ANSWERS WHOLE, which is the stop condition of ADR-287 slice 5', () => {
+  it('returns all four legs and refuses NOTHING by name', async () => {
+    // **THE MEMBER THAT REFUSED FOR FOUR REVISIONS ANSWERS.** ADR-306 built the
+    // `null` arm, `gates` and `plan` up to the size decode and threw
+    // `subject.state and subject.plan.size` by name; ADR-308 built both. What a
+    // caller gets back now is a `PayoutSubject` and not an error at all.
     const { answer } = await subjectOn(wholeSeed());
-    expect(answer).toBeInstanceOf(PayoutBackendUnwired);
-    const message = (answer as Error).message;
-    expect(message).toContain('PayoutBackend.subject.state and subject.plan.size is not wired');
+    expect(answer).not.toBeInstanceOf(Error);
+
+    const subject = answer as PayoutSubject;
+    expect(subject.accountId).toBe(ACCOUNT);
+    expect(subject.state.tradingDay).toBe(STATE_DAY);
+    expect(subject.plan.planVersionId).toBe(PLAN_VERSION);
+    expect(subject.gates.accountStatus).toBe('active');
+    expect(subject.gates.kycState).toBe('verified');
   });
 
-  it('is a `PayoutBackendUnwired`, so the route answers 503 and not 500', async () => {
-    // `unwiredOrThrow` catches this class and rethrows every other, and the
-    // header's ruling is that an UNBUILT member is the contract's "dependency
-    // down, safe to retry". A payout the deployment cannot compute a basis for is
-    // exactly that, and it is not the 500 a malformed row earns.
-    const { answer } = await subjectOn(wholeSeed());
-    expect(answer).toBeInstanceOf(PayoutBackendUnwired);
-    expect(answer).not.toBeInstanceOf(PayoutRowError);
+  it('the member no longer refuses by name, and NOTHING here is a `PayoutBackendUnwired`', () => {
+    // **THE TWO NEEDLES ARE RETIRED AND ARE ASSERTED ABSENT RATHER THAN
+    // DROPPED**, on `insertPayoutRequest`'s own precedent in this file: an arm
+    // nothing asserts is an arm the next refactor puts back. A session that
+    // "simplified" `subject()` back into a blanket rejection, or that restored
+    // the `SubjectLeg` scaffolding to park a leg in, goes red here.
+    const source = backendSource();
+    expect(source).not.toContain("new PayoutBackendUnwired('subject')");
+    expect(source).not.toContain("member: 'subject.state'");
+    expect(source).not.toContain("member: 'subject.plan.size'");
+
+    // THE DECLARATION IS THE NEEDLE AND NOT THE NAME, because the member's own
+    // docblock says in prose why the scaffolding went and a sweep for the bare
+    // name would be a case that could only be satisfied by deleting the reason.
+    // ADR-286's own repair of two assertions is this move: ask a narrower
+    // question rather than relax a broader one.
+    expect(source).not.toContain('type SubjectLeg<T> =');
+    expect(source).not.toContain('{ ok: false, member:');
   });
 
-  it('REACHED THAT REFUSAL THROUGH ALL THREE BUILT LEGS, in the ruled order', async () => {
-    // THIS CASE IS THE STOP CONDITION AND THE READ ORDER IS THE PROOF. The
-    // catalogue read is the LAST of the five and is reachable only if
-    // `resolveExternalGates` RETURNED a record rather than refusing, and the
-    // refusal above is reachable only if `decodePlanRules` returned too. So a
-    // leg that quietly stopped resolving would move this list rather than leave
-    // it green.
+  it('READS SIX THINGS, IN THE RULED ORDER, and the order is the proof', async () => {
+    // **THIS CASE IS THE STOP CONDITION AND THE SEQUENCE CARRIES IT.** The
+    // ownership answer is FIRST (ADR-285 ruling 4) and every read after it
+    // happens only for an account this handle can already see. The size row is
+    // reachable only if `decodePlanRules` returned, and the state reads are
+    // reachable only if `resolvePlan` returned, so a leg that quietly stopped
+    // resolving moves this list rather than leaving it green.
+    //
+    // **AND THE DAY IS READ BEFORE THE ROWS IT SELECTS**, which is `R-06`: there
+    // is no arm here that picks a `rule_states` row and then names the day it
+    // came from.
     const { seeded } = await subjectOn(wholeSeed());
     expect(seeded.reads).toStrictEqual([
       { verb: 'rowAt', key: 'accounts', address: { id: ACCOUNT } },
@@ -715,32 +909,124 @@ describe('subject() refuses BY NAME and the name is the remainder of ADR-287', (
       { verb: 'rows', key: 'kycVerifications' },
       { verb: 'rowsWhere', key: 'payoutRequests', address: { accountId: ACCOUNT } },
       { verb: 'catalogRowAt', key: 'planVersions', address: { id: PLAN_VERSION } },
+      {
+        verb: 'catalogRowAt',
+        key: 'planVersionSizes',
+        address: { planVersionId: PLAN_VERSION, sizeCents: 5_000_000n },
+      },
+      { verb: 'lastClosedTradingDay', key: 'tradingCalendar' },
+      { verb: 'rowsWhere', key: 'ruleStates', address: { accountId: ACCOUNT } },
     ]);
+    expect(seeded.identityIds).toStrictEqual([IDENTITY]);
   });
 
-  it('READS NO `rule_states` ROW AND NO CALENDAR, which is INV-M5-02 and ADR-268', async () => {
-    // `PayoutSubject.state` requires a backend to CALL `ruleStateOn` and NOT to
-    // fold a state in the request path: the API reads what the WORKER wrote, and
-    // a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to
-    // detect, computed on the one path no replay audit reads. The day is
-    // `ScopedTx.lastClosedTradingDay()` on ADR-268 and never a calendar folded
-    // here. A session that built `state` by folding either would go red HERE and
-    // not only on review.
+  it('OPENS ONE DOOR for all eight reads, so no leg is decided on a second snapshot', async () => {
+    // A payout evaluated across two snapshots can read a state written after the
+    // account row it is being folded against. `rule-state-reader.ts` states that
+    // as the reason it is PURE and the CALLER reads the rows, and ADR-268 states
+    // it for the calendar: "a day read on a second connection is a basis day the
+    // transaction recording the payout never saw."
     const { seeded } = await subjectOn(wholeSeed());
-    const keys = seeded.reads.map((read) => read.key);
-    expect(keys).not.toContain('ruleStates');
-    expect(keys).not.toContain('tradingCalendar');
-    expect(keys).not.toContain('accountDays');
+    expect(seeded.identityIds).toHaveLength(1);
+  });
+});
+
+describe('subject() `state` READS the stored row and NEVER folds one here', () => {
+  it('hands `ruleStateOn` the rows and the DAY THE DOOR GAVE, and folds nothing', async () => {
+    // **`INV-M5-02` AND ADR-239.** The API reads the state the WORKER wrote, and
+    // a request-path fold is the divergence ADR-026 `C-07`'s `state_hash` exists
+    // to make detectable, computed on the one path no replay audit reads. The
+    // day comes from `ScopedTx.lastClosedTradingDay()` (ADR-268) and never from
+    // a calendar folded here.
+    //
+    // THE SEED CARRIES TWO DAYS AND ONLY ONE OF THEM IS THE DOOR'S, so a body
+    // that picked the latest row rather than the day it was handed reads the
+    // WRONG one and this case sees it. `ruleStateOn` has no `latest` function
+    // and its own header says there must never be one.
+    const { answer } = await subjectOn(
+      wholeSeed({
+        ruleStates: [
+          foldedStateRow({ tradingDay: '2026-08-31', withdrawableCents: 999_999n }),
+          foldedStateRow(),
+        ],
+      }),
+    );
+    expect((answer as PayoutSubject).state.tradingDay).toBe(STATE_DAY);
+    expect((answer as PayoutSubject).state.withdrawableCents).toBe(10_000n);
   });
 
-  it('READS NO `plan_version_sizes` ROW, which is the cut ADR-306 chose', async () => {
-    // The size row's READ and its DECODE are one act: `catalogRowAt` answers a
-    // row or `undefined`, and what an absent one MEANS -- an account pinned to a
-    // size its own plan version does not publish -- is a refusal rule nobody has
-    // written. Reading it here would settle half of slice 5's question in an
-    // adapter, which is this port's whole history.
+  it('READS NO CALENDAR TABLE AND NO `account_days`, which is ADR-268 and INV-M5-02', async () => {
+    // A session that built this leg by folding a calendar or by replaying the
+    // account's days would go red HERE and not only on review. `tradingCalendar`
+    // reaches this member through a NAMED DOOR that hands out ONE STRING, and
+    // the fold this tree already states twice stays where it is.
     const { seeded } = await subjectOn(wholeSeed());
-    expect(seeded.reads.map((read) => read.key)).not.toContain('planVersionSizes');
+    const keys = seeded.reads.filter((read) => read.verb !== 'lastClosedTradingDay');
+    expect(keys.map((read) => read.key)).not.toContain('tradingCalendar');
+    expect(keys.map((read) => read.key)).not.toContain('tradingCalendarLoads');
+    expect(keys.map((read) => read.key)).not.toContain('accountDays');
+  });
+
+  it('lets `RuleStateAbsent` ESCAPE on an unfolded day, and NEVER answers a zeroed state', async () => {
+    // **THE TRAP THIS PORT HAS REFUSED SIX TIMES.** `rule_states` holds no row
+    // for an account-day until a nightly fold has closed it. A leg that answered
+    // such a day with a zeroed state, or with the latest row it could find, would
+    // put a CONFIDENT payout verdict in front of a trader on inputs nobody
+    // computed. The class escapes and `decidePayout`'s caller answers 503
+    // `stateNotFolded` (ADR-285).
+    const { answer } = await subjectOn(wholeSeed({ ruleStates: [] }));
+    expect(answer).toBeInstanceOf(RuleStateAbsent);
+    expect(answer).not.toBeInstanceOf(PayoutBackendUnwired);
+    expect((answer as RuleStateAbsent).tradingDay).toBe(STATE_DAY);
+  });
+
+  it('lets that refusal escape ONLY AFTER the ownership answer, which is ADR-285 ruling 4', async () => {
+    // **404 AND 503 ARE DISTINGUISHABLE AND SECTION 1 REQUIRES THAT THEY STAY
+    // SO.** A scoped read of a foreign account's rows is EMPTY and an empty list
+    // IS `RuleStateAbsent`, so a state-first implementation would hand a prober
+    // 503 for every account of another identity where the contract requires 404.
+    // The `null` arm is reached with NOTHING else read.
+    const { answer, seeded } = await subjectOn({ account: undefined });
+    expect(answer).toBeNull();
+    expect(seeded.reads.map((read) => read.verb)).not.toContain('lastClosedTradingDay');
+    expect(seeded.reads.map((read) => read.key)).not.toContain('ruleStates');
+  });
+
+  it('lets `RuleStateUnreadable` escape too, so a malformed row is a 500 and not a 503', async () => {
+    // AN ABSENCE IS A FOLD THAT HAS NOT RUN AND THIS IS A ROW WHOSE COLUMNS
+    // DISAGREE WITH THE SCHEMA THAT WROTE THEM. They are different operational
+    // days, which is why the reader has two classes, and only the first is
+    // retryable. `routes/payouts.ts` catches `RuleStateAbsent` alone and says so.
+    const { answer } = await subjectOn(
+      wholeSeed({ ruleStates: [foldedStateRow(), foldedStateRow()] }),
+    );
+    expect(answer).toBeInstanceOf(RuleStateUnreadable);
+    expect(answer).not.toBeInstanceOf(PayoutBackendUnwired);
+  });
+
+  it('lets the CALENDAR door refuse, and reads no `rule_states` row after it', async () => {
+    // `ADR-042` F-4: an uncovered day is UNKNOWN rather than a holiday, so an
+    // empty, an exhausted and a holed calendar are each a throw. It is not a
+    // `PayoutBackendUnwired`, so the transaction rolls back and the route answers
+    // 500 rather than telling a trader to retry a calendar nobody loaded.
+    const refusal = new Error('no `trading_calendar` row carries a session that has closed');
+    const { answer, seeded } = await subjectOn(wholeSeed({ lastClosedTradingDay: refusal }));
+    expect(answer).toBe(refusal);
+    expect(answer).not.toBeInstanceOf(PayoutBackendUnwired);
+    expect(seeded.reads.map((read) => read.key)).not.toContain('ruleStates');
+  });
+
+  it('NEVER writes a second transcription of the row: `ruleStateOn` is IMPORTED', () => {
+    // `toRuleState` (`apps/worker/src/batch/adapter.ts`) reads the same twenty-two
+    // values and `apps/api` cannot import `apps/worker`, which is why
+    // `rule-state-reader.ts` exists and registers itself as `FM-16`'s shape in its
+    // own header. A THIRD statement of it, written into this adapter because the
+    // second was not noticed, is the failure ADR-269 already refused one port over.
+    const source = backendSource();
+    expect(source).toContain("import { ruleStateOn } from './rule-state-reader.ts';");
+    expect(source).not.toContain('highWaterBalanceCents');
+    expect(source).not.toContain('payoutsSettledCount');
+    expect(source).not.toContain('breachKind');
   });
 });
 
@@ -842,27 +1128,98 @@ describe('subject() resolves `gates` through the engine and writes no record out
   });
 });
 
-describe('subject() builds `plan` up to the size decode and no further', () => {
+describe('subject() resolves `plan` at the account s OWN size, through the engine', () => {
   it('addresses the catalogue at the account s OWN pinned version', async () => {
     // `accounts.plan_version_id` NEVER CHANGES for the life of the account
     // (`0007_accounts.sql`, with `0027_triggers_invariants.sql`'s trigger raising
     // on an attempt to move it), so the version a payout is decided against is
     // the account's own and never the plan's latest.
     const { seeded } = await subjectOn(wholeSeed());
-    expect(seeded.reads.at(-1)).toStrictEqual({
+    expect(seeded.reads[4]).toStrictEqual({
       verb: 'catalogRowAt',
       key: 'planVersions',
       address: { id: PLAN_VERSION },
     });
   });
 
+  it('addresses the SIZE GRID on its own unique key, at the account s own size', async () => {
+    // **`plan_version_sizes_version_size_uq` IS `(plan_version_id, size_cents)`**
+    // (`0004_catalog.sql:220`, transcribed as a constraint at `schema.ts` so
+    // `refuseUnaddressed` can read it), so this address names AT MOST ONE ROW.
+    // A read filtered on the version alone would be the whole grid with a choice
+    // made here, and the choice is `accounts.size_cents`.
+    const { seeded } = await subjectOn(wholeSeed());
+    expect(seeded.reads[5]).toStrictEqual({
+      verb: 'catalogRowAt',
+      key: 'planVersionSizes',
+      address: { planVersionId: PLAN_VERSION, sizeCents: 5_000_000n },
+    });
+
+    // AND THE SIZE IS A `bigint` IN THE PREDICATE ITSELF. `INV-02` is money as
+    // integer cents at every boundary, and a predicate is a boundary: a `number`
+    // here would address the grid with a value that has already been converted.
+    const address = seeded.reads[5]?.address as { sizeCents: unknown };
+    expect(typeof address.sizeCents).toBe('bigint');
+  });
+
+  it('RESOLVES the pair through the engine, and every cents value is COPIED not computed', async () => {
+    // `resolvePlan` "applies no percentage and that is its whole discipline":
+    // every `_bp` field is read for STRUCTURE and every cents value is copied
+    // from the size row, which is what makes the marketing page and the engine
+    // agree to the cent. The values below are the seeded row's, unchanged.
+    const { answer } = await subjectOn(wholeSeed());
+    const plan = (answer as PayoutSubject).plan;
+
+    expect(plan.planVersionId).toBe(PLAN_VERSION);
+    expect(plan.sizeCents).toBe(5_000_000n);
+    expect(plan.funded.bufferCents).toBe(50_000n);
+    expect(plan.funded.drawdown.drawdownCents).toBe(250_000n);
+    expect(plan.eval?.profitTargetCents).toBe(400_000n);
+    expect(plan.funded.payoutCapSchedule).toStrictEqual([{ fromOrdinal: 1, capCents: 150_000n }]);
+  });
+
+  it('DECODES the cap schedule rather than trusting the blob, and the codec is the engine s', async () => {
+    // **ADR-286 RULING 5 MEASURED THIS BLOB AS THE ONE REAL `FM-16` IN THIS
+    // AREA**, at three statements that had already diverged on the money, and
+    // ADR-302 collapsed them into `decodeCapScheduleCents`. This adapter is a
+    // CALLER of it and not a fourth statement: a `cap_cents` past
+    // `Number.MAX_SAFE_INTEGER` is refused here rather than handed back rounded.
+    // **THE UNSAFE VALUE IS PARSED RATHER THAN WRITTEN, AND THAT IS THE HONEST
+    // CONSTRUCTION AS WELL AS THE LINTABLE ONE.** `jsonb` is what stores it, so
+    // `JSON.parse` is how it actually arrives; a numeric literal here is refused
+    // by `no-loss-of-precision` for exactly the reason the codec refuses the
+    // value, which is that the double cannot carry it.
+    const stored = JSON.parse('{"cap_cents":9007199254740993}') as { cap_cents: number };
+    const { answer } = await subjectOn(
+      wholeSeed({
+        planVersionSize: storedSizeRow({
+          payoutCapScheduleCents: [{ from_ordinal: 1, cap_cents: stored.cap_cents }],
+        }),
+      }),
+    );
+    expect(answer).toBeInstanceOf(CapScheduleCodecError);
+    expect(answer).not.toBeInstanceOf(PayoutBackendUnwired);
+
+    // AND THE OTHER DIRECTION: the base-10 string ADR-283 ruling 5 ruled the only
+    // rendering that survives above the ceiling is ADMITTED, exactly.
+    const { answer: big } = await subjectOn(
+      wholeSeed({
+        planVersionSize: storedSizeRow({
+          payoutCapScheduleCents: [{ from_ordinal: 1, cap_cents: '9007199254740993' }],
+        }),
+      }),
+    );
+    expect((big as PayoutSubject).plan.funded.payoutCapSchedule).toStrictEqual([
+      { fromOrdinal: 1, capCents: 9_007_199_254_740_993n },
+    ]);
+  });
+
   it('DECODES the rules blob, so a document this build cannot read refuses HERE', async () => {
-    // THE DECODED VALUE IS DISCARDED AND THE DECODE IS STILL THE POINT: nothing
-    // consumes `PlanRulesJson` until `resolvePlan` can be called, so what the
-    // line buys is the refusal. A `plan_versions.rules` this build cannot read
-    // stops on the account's own transaction rather than on the day slice 5
-    // installs a fold over it for the first time. A session that deleted the
-    // call as dead would go red here.
+    // A `plan_versions.rules` this build cannot read stops on the account's own
+    // transaction rather than inside the fold that reads it next. It is not a
+    // `PayoutBackendUnwired`, so the route answers 500: a stored document that
+    // disagrees with the codec that reads it is Merit's records disagreeing with
+    // Merit's engine, and no retry fixes it.
     const { answer } = await subjectOn(
       wholeSeed({ planVersion: { id: PLAN_VERSION, rules: { schema_version: 2 } } }),
     );
@@ -870,21 +1227,50 @@ describe('subject() builds `plan` up to the size decode and no further', () => {
     expect(answer).not.toBeInstanceOf(PayoutBackendUnwired);
   });
 
-  it('NEVER decodes the blob a second time: the decoder is the engine s', async () => {
+  it('NEVER decodes either document a second time: both codecs are the engine s', () => {
     // `PayoutSubject.plan`'s docblock refuses a fourth transcription of the blob
     // that fixes every cents value a payout is decided against: FM-16 on the
     // money path, and ADR-269 refused exactly that for `readLiability` one port
-    // over. `decodePlanRules` is IMPORTED, and the two copies ADR-283 exists to
-    // retire are in `apps/worker` and `apps/site` and are not importable here.
-    const source = readFileSync(
-      join(import.meta.dirname, '..', 'src', 'payout-backend.ts'),
-      'utf8',
-    );
-    expect(source).toContain(
-      "import { decodePlanRules, resolveExternalGates } from '@merit/rules-engine';",
-    );
+    // over. Both codecs are IMPORTED, and the copies ADR-283 and ADR-286 exist to
+    // retire live in `apps/worker` and `apps/site` and are not importable here.
+    const source = backendSource();
+    expect(source).toContain('decodeCapScheduleCents,');
+    expect(source).toContain('decodePlanRules,');
+    expect(source).toContain('resolvePlan,');
     expect(source).not.toContain('schema_version');
     expect(source).not.toContain('profit_target_bp');
+    expect(source).not.toContain("'cap_cents'");
+    expect(source).not.toContain("'from_ordinal'");
+  });
+
+  it('READS THE ROW AND NEVER CASTS IT: every money column is checked at run time', async () => {
+    // **ADR-303 LIMIT 1, WHICH IS THAT DOOR'S OWN SENTENCE AND NOT THIS FILE'S
+    // CAUTION**: `CatalogRow<K>` is derived from `schema.ts`, which is a
+    // TRANSCRIPTION of the DDL, and ADR-112 foreclosure 4 records that nothing in
+    // this tree compares a transcribed column TYPE against the migration. "A
+    // caller that reads money off one of these rows still checks the value it
+    // read." A `number` on a payout basis has already been through a float.
+    const { answer } = await subjectOn(
+      wholeSeed({ planVersionSize: storedSizeRow({ bufferCents: 50000 }) }),
+    );
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect((answer as Error).message).toContain('bufferCents');
+    expect((answer as Error).message).toContain('INV-02');
+  });
+
+  it('KEEPS A NULLABLE MONEY COLUMN NULL, so the engine s own refusal is reachable', async () => {
+    // `profit_target_cents` is "Null on Direct: there is no evaluation, so there
+    // is no profit target. A ZERO HERE WOULD BE A TARGET OF ZERO, which is a
+    // different and reachable thing" (`0004_catalog.sql`). `resolveProfitTarget`
+    // refuses the null where the eval phase is ENABLED, on `CV-03`, and that
+    // refusal is only reachable if this reader hands the null through unchanged.
+    // A reader that defaulted it to `0n` would pass R-26 on an account's first
+    // day, which is the exact failure CV-03 exists to block.
+    const { answer } = await subjectOn(
+      wholeSeed({ planVersionSize: storedSizeRow({ profitTargetCents: null }) }),
+    );
+    expect((answer as Error).name).toBe('EngineInvariantError');
+    expect((answer as Error).message).toContain('CV-03');
   });
 
   it('refuses an empty catalogue read rather than substituting a version', async () => {
@@ -896,12 +1282,57 @@ describe('subject() builds `plan` up to the size decode and no further', () => {
     expect((answer as Error).message).toContain(PLAN_VERSION);
   });
 
+  it('refuses an ABSENT SIZE ROW rather than resolving against a neighbouring rung', async () => {
+    // **THIS IS THE REFUSAL RULE ADR-306 NAMED AS UNWRITTEN, AND IT IS WHY THAT
+    // ROW LEFT THE READ OUT.** There is NO composite foreign key from `accounts`
+    // to this grid: `0007_accounts.sql` declares the version and the size as two
+    // independent columns and `0044` says in its own words that a `size_cents`
+    // "names a plan_version_sizes.size_cents; it is not a foreign key to that
+    // row". So the pair CAN fail to resolve.
+    //
+    // A GRID IS NOT AN INTERPOLATION. An account pinned to a size its own version
+    // does not publish has no drawdown, no buffer and no payout ceiling anywhere
+    // in this database, and picking the nearest rung would hand a trader a floor
+    // rule nobody published. `PayoutRowError`, so 500 and not a retryable 503.
+    const { answer } = await subjectOn(wholeSeed({ planVersionSize: undefined }));
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect(answer).not.toBeInstanceOf(PayoutBackendUnwired);
+    expect((answer as Error).message).toContain(PLAN_VERSION);
+    expect((answer as Error).message).toContain('5000000');
+  });
+
   it('refuses an `accounts.plan_version_id` that did not read back as text', async () => {
     const { answer } = await subjectOn(
       wholeSeed({ account: subjectAccountRow({ planVersionId: null }) }),
     );
     expect(answer).toBeInstanceOf(PayoutRowError);
     expect((answer as Error).message).toContain('accounts.planVersionId');
+  });
+
+  it('refuses an `accounts.size_cents` that did not read back as a `bigint`', async () => {
+    // The account's own size is what ADDRESSES the grid, so a coerced one reads
+    // a different rung of the same plan. `accounts.size_cents` is `bigint NOT
+    // NULL CHECK (size_cents > 0)` (`0007_accounts.sql:52`).
+    const { answer } = await subjectOn(
+      wholeSeed({ account: subjectAccountRow({ sizeCents: 5000000 }) }),
+    );
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect((answer as Error).message).toContain('accounts.size_cents');
+  });
+
+  it('NEVER READS A PRICE, which is the engine s own rule and not this file s taste', async () => {
+    // `price_cents` and `reset_price_cents` are columns and `types.ts` says why
+    // `PlanVersionSizeRow` omits them: no `CV-nn` mentions either, no rule reads
+    // a price, and M01 section 1.2 puts commerce outside the engine. "A validator
+    // that could see the price could grow a rule about it", and so could a payout
+    // adapter. Seeding both as nonsense changes nothing this member answers.
+    const { answer } = await subjectOn(
+      wholeSeed({
+        planVersionSize: storedSizeRow({ priceCents: 'not money', resetPriceCents: null }),
+      }),
+    );
+    expect(answer).not.toBeInstanceOf(Error);
+    expect((answer as PayoutSubject).plan.sizeCents).toBe(5_000_000n);
   });
 });
 
