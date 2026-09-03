@@ -812,7 +812,7 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
   // are what keeps this file from repeating the failure it diagnoses: three
   // clauses NARROW and each is measured rather than described.
 
-  test('`PayoutSubject.plan` is a `ResolvedPlan`, and NO `apps/api` file produces one yet', () => {
+  test('`PayoutSubject.plan` is a `ResolvedPlan`, and `apps/api` PRODUCES ONE NOW', () => {
     // THE NEEDLE IS THE RESOLVER CALL AND NOT THE TYPE NAME, on link 6's own
     // reasoning: a file that NAMES `ResolvedPlan` is usually declaring a
     // parameter, and every consumer of the fold declares one. A file that
@@ -825,17 +825,31 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
       .map(rel)
       .sort();
 
-    // **TWO, AND ONE OF THEM IS THE DECLARATION.** The engine declares the
-    // resolver and `apps/worker` is the only deployable that calls it. A third
-    // entry appearing under `apps/api/src` is this port's `plan` half landing,
-    // and it turns this case red so the entry above cannot stay as it is.
-    // **`ADR-283` DID NOT MOVE THIS NUMBER AND SAYS SO**: it landed the decoding
-    // the resolver needs and wired nothing.
+    // **THE CASE IS INVERTED RATHER THAN DELETED, AND IT WENT RED EXACTLY WHERE
+    // IT SAID IT WOULD.** What stood here required this list to be TWO -- the
+    // engine's declaration and `apps/worker`'s single call -- under a comment
+    // reading "a third entry appearing under `apps/api/src` is this port's `plan`
+    // half landing, and it turns this case red so the entry above cannot stay as
+    // it is". `ADR-308` is that entry, and this is the assertion it was written
+    // to break.
+    //
+    // **THE COUNT IS STILL EXACT AND THAT IS THE POINT OF KEEPING IT A CENSUS.**
+    // A FOURTH producer is either a second payout adapter or a fold escaping into
+    // a deployable that has no business holding one, and the day either arrives
+    // this goes red rather than stale.
     expect(producers).toEqual([
+      'apps/api/src/payout-backend.ts',
       'apps/worker/src/batch/adapter.ts',
       'packages/rules-engine/src/plan/resolve.ts',
     ]);
-    expect(producers.filter((path) => path.startsWith('apps/api/'))).toEqual([]);
+
+    // **AND THE ONE `apps/api` PRODUCER IS THE ADAPTER AND NOT A ROUTE.**
+    // `routes/payouts.ts` declares the field and must never resolve one: a plan
+    // resolved in the request path beside the engine that folds it is the shape
+    // `INV-M5-02` refuses one field over on `state`.
+    expect(producers.filter((path) => path.startsWith('apps/api/'))).toEqual([
+      'apps/api/src/payout-backend.ts',
+    ]);
   });
 
   test('the DECODING is no longer the blocker, and the engine is where it landed', () => {
@@ -1231,25 +1245,30 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
       expect(backend).toContain(`new PayoutBackendUnwired('${member}')`);
     expect(backend).not.toContain('databaseIdempotencyStore');
 
-    // **AND THE FIFTH MEMBER LEFT THAT LIST THE WAY THE FOURTH DID, WHICH IS
-    // ADR-306 IN THREE ASSERTIONS.** `subject` refused WHOLESALE on one line
-    // under a comment naming ADR-287 slices 4 AND 5 together, and that blanket
-    // rejection cost a session: neither record could tell a member nobody had
-    // started from a member three quarters built, and both named slice 5 as next
-    // while slice 4 had never been built. Slice 4 built the `null` arm, `gates`
-    // and `plan` up to the size decode, so the plain refusal is gone and TWO
-    // NARROWER ones stand in its place, exactly as `insertPayoutRequest.hold`
-    // stands below.
+    // **AND THE FIFTH MEMBER LEFT THE REFUSAL SET ALTOGETHER, WHICH IS ADR-308
+    // AND WHICH THIS FILE'S NEEDLES WERE BUILT TO MEASURE.** `subject` refused
+    // WHOLESALE on one line for three revisions; ADR-306 built three legs and
+    // left TWO NARROWER refusals naming `subject.state` and `subject.plan.size`,
+    // which is the remainder ADR-287 section 7 sizes as slice 5; ADR-308 built
+    // both. **THE NEEDLES ARE RETIRED BECAUSE WHAT THEY TRACKED IS GONE**, and
+    // they are asserted ABSENT rather than dropped, on `insertPayoutRequest`'s
+    // own precedent below: an arm nothing asserts is an arm the next refactor
+    // puts back.
     //
-    // THE NEEDLES ARE THE TWO UNBUILT LEGS AND THEY ARE THE REMAINDER ADR-287
-    // SECTION 7 SIZES AS SLICE 5. A session that "completed" this member by
-    // folding a `RuleState` in the request path or by asserting a
-    // `PlanVersionSizeRow` onto an untyped row would delete exactly these lines,
-    // and a session that collapsed the two back into one blanket refusal would
-    // go red on the first.
+    // **WHAT REPLACES THEM IS THE PROPERTY THE NEEDLES EXISTED TO PROTECT.** A
+    // session that "completed" this member by folding a `RuleState` in the
+    // request path, or by asserting a `PlanVersionSizeRow` onto an untyped row,
+    // would have deleted the old lines and satisfied nothing; these three say
+    // the member reads the state the WORKER wrote (`INV-M5-02`, ADR-239), that
+    // the day is ADR-268's named door and not a calendar folded here, and that
+    // the resolver is the engine's.
     expect(backend).not.toContain("new PayoutBackendUnwired('subject')");
-    expect(backend).toContain("member: 'subject.state'");
-    expect(backend).toContain("member: 'subject.plan.size'");
+    expect(backend).not.toContain("member: 'subject.state'");
+    expect(backend).not.toContain("member: 'subject.plan.size'");
+
+    expect(backend).toContain("import { ruleStateOn } from './rule-state-reader.ts';");
+    expect(backend).toContain('await handle.lastClosedTradingDay()');
+    expect(backend).toContain('return resolvePlan(rules, sizeRow);');
 
     // **AND THE FOURTH MEMBER LEFT THIS LIST WITHOUT LEAVING THE REFUSAL SET,
     // WHICH IS ADR-295 IN ONE ASSERTION.** `insertPayoutRequest` answers on the

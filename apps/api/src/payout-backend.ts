@@ -1,21 +1,22 @@
 // =============================================================================
 // apps/api/src/payout-backend.ts
 // =============================================================================
-// THE FIRST LINE OF PAYOUT PERSISTENCE THIS TREE HAS EVER HAD, AND IT IS FOUR
+// THE FIRST LINE OF PAYOUT PERSISTENCE THIS TREE HAS EVER HAD, AND IT IS FIVE
 // MEMBERS OF EIGHT ON PURPOSE.
 //
 // `wiring.test.ts`'s `usePayoutBackend` entry has carried one clause longer than
 // any other: "NOTHING IN THIS TREE IMPLEMENTS `PayoutTx`". ADR-287 enumerated
 // what implementing it would cost and found nine sessions, of which this file is
 // slice 3. ADR-291 is this file's ruling, ADR-295 added slice 6, ADR-301 added
-// the lock ADR-293 ruled and ADR-295's fence could not reach, and ADR-306 built
-// three of `subject()`'s four legs.
+// the lock ADR-293 ruled and ADR-295's fence could not reach, ADR-306 built
+// three of `subject()`'s four legs, and ADR-308 built the fourth and the size
+// decode inside the third. `subject()` ANSWERS WHOLE.
 //
 // -----------------------------------------------------------------------------
 // WHAT ANSWERS, AND WHAT REFUSES
 // -----------------------------------------------------------------------------
-// `PayoutBackend` and `PayoutTx` carry EIGHT members between them. FOUR answer
-// here and FOUR reject with `PayoutBackendUnwired`:
+// `PayoutBackend` and `PayoutTx` carry EIGHT members between them. FIVE answer
+// here and THREE reject with `PayoutBackendUnwired`:
 //
 //   transact            ANSWERS. The scoped door, opened once per request.
 //   lockScope           ANSWERS. `ScopedTx.lockScope`, delegated in one line.
@@ -25,12 +26,13 @@
 //   insertPayoutRequest ANSWERS ON THE APPROVAL BRANCH ONLY. ADR-287 slice 6,
 //                       ruled by ADR-295. ITS HOLD BRANCH REFUSES, and that is
 //                       slice 8, whose supplier is COUNSEL and not a session.
-//   subject             REFUSES, AND IT IS THE ONE THAT IS THREE QUARTERS
-//                       BUILT. ADR-287 slice 4, ruled by ADR-306: the `null`
-//                       arm, `gates` and `plan` up to the size decode all
-//                       answer, and the member still cannot, because `state`
-//                       and the size row's decoding are slice 5's. THE REFUSAL
-//                       NAMES BOTH.
+//   subject             ANSWERS, AND IT IS THE ONE THAT TOOK TWO ROWS. ADR-287
+//                       slices 4 and 5. ADR-306 built the `null` arm, `gates`
+//                       and `plan` up to the size decode; ADR-308 built `state`
+//                       and the size decode, so all four legs read. NOTHING IN
+//                       IT IS SYNTHESISED: every leg answers from a row it read
+//                       or throws, and there is no shape here that holds half
+//                       of either value.
 //   holdFlag            REFUSES. ADR-287 slice 8, whose supplier is COUNSEL.
 //   listPayouts         REFUSES. ADR-287 slice 7, blocked on the slice 2 ruling.
 //   idempotency         REFUSES, AND IT IS THE ONE THAT COULD ANSWER TODAY.
@@ -52,6 +54,11 @@
 // reached changes no deployment, which is exactly what building the port ahead
 // of the ruling that installs it is supposed to cost.
 //
+// AND THAT SENTENCE IS WORTH MORE NOW THAN IT WAS, BECAUSE THE MEMBER ANSWERS.
+// Three members still refuse, so `usePayoutBackend`'s own closing ruling still
+// binds: a partial backend refuses AS A WHOLE or it is a fixture serving real
+// traffic. Installing this file is slice 9 and slice 9 alone.
+//
 // -----------------------------------------------------------------------------
 // TWO REFUSAL VOCABULARIES, AND THE DIFFERENCE IS THE STATUS CODE
 // -----------------------------------------------------------------------------
@@ -66,20 +73,29 @@
 // retry can fix.
 //
 // -----------------------------------------------------------------------------
-// A MEMBER THAT REFUSES BY NAME, AND WHY THE NAME IS WORTH THE LINES
+// THE MEMBER THAT REFUSED BY NAME, AND WHAT ITS NAMES BOUGHT
 // -----------------------------------------------------------------------------
 // `subject()` refused wholesale for three revisions, on one line, under a comment
 // naming ADR-287 slices 4 AND 5 together. That is a blanket rejection and it
 // COSTS A SESSION: a reader cannot tell a member nobody has started from a member
 // whose last leg is missing, and row 306 was dispatched only after re-deriving at
 // source that slice 4 had never been built while both records said slice 5 was
-// next. What the member throws now names `subject.state` and `subject.plan.size`,
-// which is the remainder as ADR-287 section 7 sizes it.
+// next. It then threw `subject.state and subject.plan.size`, which was the
+// remainder as ADR-287 section 7 sizes it, and named BOTH rather than whichever
+// one the body reached first, so the row that followed read the whole remainder
+// instead of half of it. THAT IS WHAT THE NAMES BOUGHT AND THEY ARE SPENT: both
+// legs read now, and the record of what they cost is ADR-306 and ADR-308.
 //
-// IT NAMES BOTH RATHER THAN THE FIRST ONE IT REACHES, on `resolveExternalGates`'s
-// shape: every leg is evaluated before any of them refuses, so the report is the
-// whole set. A member that stopped at the first unbuilt leg would tell the next
-// session the remainder is one item when it is two.
+// -----------------------------------------------------------------------------
+// THE STATE LEG READS AND DOES NOT FOLD, AND THAT IS THE ONE TO GUARD
+// -----------------------------------------------------------------------------
+// `PayoutSubject.state` requires a backend to CALL `ruleStateOn` and NOT to fold
+// a state in the request path, on `INV-M5-02` and ADR-239; the day comes from
+// `ScopedTx.lastClosedTradingDay()` on ADR-268 and never from a calendar folded
+// here. A REQUEST-PATH FOLD IS THE DIVERGENCE ADR-026 `C-07`'s `state_hash`
+// EXISTS TO MAKE DETECTABLE, computed on the one path no replay audit reads. A
+// session that "optimises" `stateLeg` into a fold has not made this file faster;
+// it has made the API and the worker two evaluators of one rule.
 //
 // NO SYNTHESISED DEFAULT ON EITHER PATH. A status outside `identity_status`'s
 // three members raises; it never falls back to `restricted` (which would deny a
@@ -89,11 +105,22 @@
 // =============================================================================
 
 import type { ScopedTx } from '@merit/db';
-import { decodePlanRules, resolveExternalGates } from '@merit/rules-engine';
-import type { ExternalGates, ResolvedPlan, RuleState } from '@merit/rules-engine';
+import {
+  decodeCapScheduleCents,
+  decodePlanRules,
+  resolveExternalGates,
+  resolvePlan,
+} from '@merit/rules-engine';
+import type {
+  ExternalGates,
+  PlanVersionSizeRow,
+  ResolvedPlan,
+  RuleState,
+} from '@merit/rules-engine';
 
 import type { ApiDb } from './db.ts';
 import type { IdempotencyStore } from './idempotency.ts';
+import { ruleStateOn } from './rule-state-reader.ts';
 import { PayoutBackendUnwired } from './routes/payouts.ts';
 import type { IdentityStatus, PayoutBackend, PayoutSubject, PayoutTx } from './routes/payouts.ts';
 
@@ -193,88 +220,183 @@ function flag(row: Record<string, unknown>, column: string, table: string): bool
 }
 
 /**
- * ONE LEG OF `PayoutSubject`, ANSWERED OR REFUSED BY NAME.
+ * One `bigint NOT NULL` money column, AS A VALUE RATHER THAN AS A COLUMN OF A
+ * BAG, because the typed catalogue door hands back a row and not a bag.
  *
- * **THE SHAPE IS `resolveExternalGates`'s `Leg<T>` AND IT IS THE SAME SHAPE FOR
- * THE SAME REASON** (`packages/rules-engine/src/external-gates.ts`): every leg is
- * evaluated before any of them refuses, so what a caller meeting an unbuilt
- * `subject()` gets is the WHOLE SET of members that could not answer rather than
- * whichever one this file happened to reach first. ADR-287 slice 4 builds three
- * of the four legs and slice 5 builds the rest, so today the set has two members
- * in it and a session that read a single refusal would size the remainder wrong.
+ * **IT IS CHECKED AT RUN TIME EVEN WHERE `tsc` ALREADY SAYS `bigint`, AND THAT
+ * IS ADR-303's OWN LIMIT 1 RATHER THAN CAUTION.** `CatalogRow<K>` is derived
+ * from `schema.ts`, which is a TRANSCRIPTION of the DDL, and ADR-112 foreclosure
+ * 4 records that nothing in this tree compares a transcribed column TYPE against
+ * the migration that declares it. That door's own docblock states the rule this
+ * function keeps: "a caller that reads money off one of these rows still checks
+ * the value it read".
  *
- * **THE REFUSAL CARRIES A MEMBER NAME AND NOT A VALUE, WHICH IS THE `NOTHING IS
- * STUBBED` RULE MADE STRUCTURAL.** There is no arm of this type that holds a
- * partial `RuleState` or a half-resolved `ResolvedPlan`, so a later session
- * cannot fill one in without changing the type.
+ * **AND IT DOES NOT COERCE.** `INV-02` is that money is `bigint` integer cents
+ * AT EVERY BOUNDARY, and a `number` arriving on a payout basis has already been
+ * through a float. `routes/catalog.ts`'s `cents` states the same rule one read
+ * over, on the same table.
  */
-type SubjectLeg<T> =
-  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly member: string };
+function centsOf(value: unknown, at: string): bigint {
+  if (typeof value !== 'bigint')
+    throw new PayoutRowError(
+      `\`${at}\` did not read back as a bigint. Money is integer cents at every boundary ` +
+        '(INV-02), and a money column that arrives as anything else has already lost precision ' +
+        'somewhere. It is refused rather than coerced, because a coerced payout basis is a ' +
+        'number nobody published',
+    );
+  return value;
+}
 
 /**
- * `PayoutSubject.state`. ADR-287 SLICE 5, REFUSED BY NAME AND NOT FOLDED HERE.
+ * One NULLABLE `bigint` money column, KEPT NULLABLE.
  *
- * **THE REFUSAL IS RULED RATHER THAN PREFERRED, AND THE RULING IS THE PORT'S
- * OWN.** `PayoutSubject.state`'s docblock (`routes/payouts.ts`) requires a
- * backend implementing `subject()` to CALL `ruleStateOn` (`../rule-state-reader
- * .ts`) and NOT to fold a state in the request path, on `INV-M5-02` and ADR-239:
- * the API reads the state the WORKER wrote, and a request-path fold is the
- * divergence ADR-026 `C-07`'s `state_hash` exists to make detectable, computed
- * on the one path no replay audit reads. The day it is read on is
+ * **THE NULL IS A VALUE AND NEVER A ZERO**, and `0004_catalog.sql` says why on
+ * the column this reads most often: "Null on Direct: there is no evaluation, so
+ * there is no profit target. A ZERO HERE WOULD BE A TARGET OF ZERO, which is a
+ * different and reachable thing." `resolveProfitTarget` in the engine refuses
+ * the null where the eval phase is enabled, on `CV-03`, and that refusal is only
+ * reachable if this reader hands the null through unchanged.
+ */
+function centsOrNullOf(value: unknown, at: string): bigint | null {
+  if (value === null || value === undefined) return null;
+  return centsOf(value, at);
+}
+
+/**
+ * One `boolean NOT NULL` column of the typed catalogue row, uncoerced.
+ *
+ * `floor_lock_enabled` is MATERIALIZED from `plan_versions.rules` because a
+ * CHECK constraint cannot read another table (`schema.ts`), and `SD-10`'s trio
+ * is complete exactly when it is true. A truthy string read as `true` here is a
+ * floor lock this plan never published.
+ */
+function boolOf(value: unknown, at: string): boolean {
+  if (typeof value !== 'boolean')
+    throw new PayoutRowError(
+      `\`${at}\` read back as ${JSON.stringify(value)} and the column is a \`boolean NOT ` +
+        'NULL`. It is `SD-10`s materialized flag and a coerced one is a floor lock nobody ' +
+        'published',
+    );
+  return value;
+}
+
+/** One `text NOT NULL` column of the typed catalogue row. */
+function textOf(value: unknown, at: string): string {
+  if (typeof value !== 'string')
+    throw new PayoutRowError(
+      `\`${at}\` did not read back as text. It is \`NOT NULL\` in the schema that wrote it`,
+    );
+  return value;
+}
+
+/**
+ * `PayoutSubject.state`. ADR-287 SLICE 5, AND IT READS RATHER THAN FOLDS.
+ *
+ * **THE TWO CONSTRAINTS ON THIS BODY ARE RULED AND ARE NOT PREFERENCES.**
+ * `PayoutSubject.state`'s docblock (`routes/payouts.ts`) requires a backend
+ * implementing `subject()` to CALL `ruleStateOn` (`./rule-state-reader.ts`) and
+ * NOT to fold a state in the request path, on `INV-M5-02` and ADR-239: the API
+ * reads the state the WORKER wrote. **A REQUEST-PATH FOLD IS THE DIVERGENCE
+ * ADR-026 `C-07`'s `state_hash` EXISTS TO MAKE DETECTABLE**, computed on the one
+ * path no replay audit reads, so a fold here would be a payout basis that looks
+ * identical to the stored one and agrees with nothing. And the day is
  * `ScopedTx.lastClosedTradingDay()` on ADR-268 and never a calendar folded here.
  *
- * **SO WHY IS IT NOT BUILT, WHEN BOTH DOORS EXIST?** Because `ruleStateOn`
- * raises `RuleStateAbsent` for a day the nightly fold has not closed, and the
- * ORDER in which that refusal may escape is ADR-285 ruling 4: the ownership
- * answer is FIRST, so `RuleStateAbsent` may only leave this member for an
- * account the handle can already see. That ordering plus the reader's own
- * arguments is ADR-287 slice 5, which is a row of its own and not this one's.
+ * **THE DAY IS READ BEFORE THE ROWS, AND `R-06` IS WHY RATHER THAN STYLE.** "No
+ * endpoint may evaluate eligibility against anything other than the last closed
+ * day, whatever the batch is doing at the time." The day SELECTS the row, so it
+ * is asked for first and there is no arm here that picks a row and then names
+ * the day it came from. `ruleStateOn` has no `latest` function for the same
+ * reason and its header says so.
  *
- * **IT IS A CONSTANT AND NOT A FUNCTION BECAUSE IT READS NOTHING.** A function
- * here would suggest there is a read to place in an order, and there is not:
- * what slice 5 adds is the read, and it will be a function on that day.
+ * **BOTH READS ARE ON THIS TRANSACTION AND NEITHER OPENS A SECOND DOOR.**
+ * `ruleStates` is scope class `derived` via `accounts` on `account_id`
+ * (`packages/db/src/scope.ts`), so the rows are one hop out on the handle the
+ * account was already resolved on; `lastClosedTradingDay()` runs on the same
+ * `source` and its own docblock states the reason: a day read on a second
+ * connection is a basis day the transaction recording the payout never saw.
+ *
+ * **THE PREDICATE IS `{ accountId }` AND THE DAY IS `ruleStateOn`'s ARGUMENT,
+ * WHICH IS `eligible-next-7d.ts`'s CALL UNCHANGED.** That reader makes the same
+ * call one door over in this same deployable, and the selection belongs to the
+ * function that owns `R-06` rather than to a predicate stated beside it. The
+ * duplicate-row refusal `rule_states_account_day_uq` backstops is a property of
+ * the SET on that day, and it is that function's to raise.
+ *
+ * @throws RuleStateAbsent from the reader, UNCAUGHT ON PURPOSE, and its escape
+ * is ORDERED rather than merely permitted. ADR-285 ruling 4: the ownership
+ * answer is FIRST, so this leg runs only for an account the handle can already
+ * see and a prober naming another identity's account meets section 1's 404
+ * rather than the 503 an unfolded day earns. `decidePayout`'s caller catches
+ * this class and answers `stateNotFolded`; `RuleStateUnreadable` is deliberately
+ * not caught anywhere and stays a 500.
+ *
+ * @throws Error from `lastClosedTradingDay()` on an empty, exhausted or holed
+ * calendar. `ADR-042` F-4 is that an uncovered day is UNKNOWN rather than a
+ * holiday, and `PayoutSubject.state`'s own docblock already rules where that
+ * lands: "the refusal reaches this route as a throw inside the payout
+ * transaction, which rolls back". Not a `PayoutBackendUnwired`, so it is a 500.
  */
-const STATE_LEG: SubjectLeg<RuleState> = { ok: false, member: 'subject.state' };
+async function stateLeg(handle: ScopedTx, accountId: string): Promise<RuleState> {
+  const tradingDay = await handle.lastClosedTradingDay();
+  const stateRows = await handle.rowsWhere('ruleStates', { accountId });
+  return ruleStateOn(stateRows, accountId, tradingDay);
+}
 
 /**
- * `PayoutSubject.plan`, UP TO BUT NOT INCLUDING THE SIZE DECODE (ADR-287 slice 4).
+ * `PayoutSubject.plan`, WHOLE. ADR-287 SLICES 4 AND 5.
  *
- * **WHAT THIS DOES IS THE HALF ADR-283 LANDED**: the pinned version is read off
- * `accounts.plan_version_id` and its `rules` blob is decoded by the ENGINE's
- * `decodePlanRules`. `PayoutSubject.plan`'s own docblock forbids a fourth
- * transcription of that blob in this deployable (`FM-16` on the money path,
- * ADR-269's refusal one port over), so the decoder is imported and never
- * restated.
+ * **THE BLOB HALF IS ADR-283's AND THE SIZE HALF IS THIS ROW'S.**
+ * `plan_versions.rules` is decoded by the ENGINE's `decodePlanRules`, because
+ * `PayoutSubject.plan`'s own docblock forbids a fourth transcription of that
+ * blob in this deployable (`FM-16` on the money path, ADR-269's refusal one port
+ * over). `plan_version_sizes` is read at the account's OWN size and mapped onto
+ * the engine's `PlanVersionSizeRow` below, and `resolvePlan` is then the one
+ * function that turns the pair into a `ResolvedPlan`.
  *
- * **WHAT IT DOES NOT DO IS THE SIZE ROW, AND THE CUT IS AT THE DECODE.**
- * `resolvePlan` takes a decoded `PlanVersionSizeRow` as its second argument and
- * nothing in this repository decodes one: ADR-287 section 3.3 measured that at
- * source and ADR-283 section 5 declined to take it, because the two readers that
- * exist read two DIFFERENT sources under two different key spellings and merging
- * them is a ruling rather than a transcription. **NO CAST STANDS IN FOR IT.** A
- * `PlanVersionSizeRow` asserted onto an untyped row is a payout basis nobody
- * checked, and it is worse than a refusal because it looks like a decode.
+ * **WHAT MADE THE SIZE HALF BUILDABLE IS A DOOR AND NOT A RULING.** ADR-286
+ * ruling 4 measured that the payout path is on the DRIVER side of the two
+ * spellings and needs no rename from anybody, and its section 5 named the
+ * remedy: "`packages/db` handing out a typed catalogue row instead of
+ * `unknown` ... whoever takes it is amending a door, not writing a decoder".
+ * ADR-303 took it. So `catalogRowAt` returns `CatalogRow<'planVersionSizes'>`,
+ * every property below is checked by `tsc` against `schema.ts`, and a key that
+ * does not exist is `TS2339` rather than a runtime throw on a money read.
  *
- * **AND THE SIZE ROW IS NOT READ EITHER, WHICH IS A DECISION AND NOT AN
- * OVERSIGHT.** `catalogRowAt` answers a row OR `undefined`, and what an absent
- * `plan_version_sizes` row MEANS on this door -- an account pinned to a size its
- * own plan version does not publish -- is a refusal rule nobody has written.
- * Writing it here would settle half of slice 5's question in an adapter, which is
- * this port's whole history. The rules decode is different in kind and that is
- * why it runs: its decoder EXISTS, is ruled, and refusing a malformed blob is a
- * control this member can actually apply today.
+ * **THE RUNTIME CHECKS DO NOT COME OFF ON THE STRENGTH OF THAT TYPE, AND THAT
+ * IS ADR-303's OWN LIMIT 1.** `CatalogRow<K>` is derived from a TRANSCRIPTION of
+ * the DDL and nothing in this tree compares a transcribed column type against
+ * the migration. `centsOf` is the check the door's docblock requires of a caller
+ * that reads money off one of these rows.
  *
- * **THE DECODED VALUE IS DISCARDED AND THE DECODE IS STILL THE POINT.** Nothing
- * consumes `PlanRulesJson` until `resolvePlan` can be called, so what this line
- * buys is the REFUSAL: a `plan_versions.rules` blob this build cannot read
- * refuses here, on the account's own transaction, rather than on the day slice 5
- * installs a fold over it for the first time.
+ * **THE MAPPING IS AN ACCEPTED `FM-16` AND IS REGISTERED RATHER THAN HIDDEN.**
+ * ADR-303 limit 2 states it: the typed row is not a decoder, it SHRINKS one, and
+ * a driver-side caller still writes a field mapping onto the engine's row type
+ * once per caller. `toSizeRow` (`apps/worker/src/batch/adapter.ts`) is the same
+ * mapping and `apps/api` cannot import `apps/worker`, which is exactly the shape
+ * `rule-state-reader.ts` registers in its own header for `toRuleState`. **THE
+ * ONE PART THAT IS NOT DUPLICATED IS THE `jsonb`**: `decodeCapScheduleCents` is
+ * the engine's single statement of it since ADR-302, and this is its fourth
+ * caller rather than a fourth statement.
+ *
+ * **SIX COLUMNS ARE NOT READ AND THEIR ABSENCE IS THE ENGINE'S RULE RATHER THAN
+ * AN OVERSIGHT.** `price_cents` and `reset_price_cents` are columns and
+ * `types.ts` says why they are absent from `PlanVersionSizeRow`: no `CV-nn`
+ * mentions either, no rule reads a price, and M01 section 1.2 puts commerce
+ * outside the engine, so a reader that could see the price could grow a rule
+ * about it. `id`, `created_at` and the account's own `size_cents` echo are the
+ * database's.
+ *
+ * @throws PlanRulesCodecError and CapScheduleCodecError from the engine,
+ * UNCAUGHT ON PURPOSE. Neither is a `PayoutBackendUnwired`, so a stored document
+ * this build cannot read is a 500 rather than a retryable 503: a `rules` blob or
+ * a cap schedule that disagrees with the codec that reads it is Merit's records
+ * disagreeing with Merit's engine, and no retry fixes it.
  */
-async function planLeg(
-  handle: ScopedTx,
-  account: Record<string, unknown>,
-): Promise<SubjectLeg<ResolvedPlan>> {
+async function planLeg(handle: ScopedTx, account: Record<string, unknown>): Promise<ResolvedPlan> {
   const planVersionId = text(account, 'planVersionId', 'accounts');
+  const sizeCents = centsOf(account['sizeCents'], 'accounts.size_cents');
+
   const version = await handle.catalogRowAt('planVersions', { id: planVersionId });
   if (version === undefined)
     throw new PayoutRowError(
@@ -283,8 +405,83 @@ async function planLeg(
         '(`0007_accounts.sql`), so an empty read is the catalogue disagreeing with the account ' +
         'rather than a version to substitute for',
     );
-  decodePlanRules(version.rules, `plan_versions[${planVersionId}].rules`);
-  return { ok: false, member: 'subject.plan.size' };
+  const rules = decodePlanRules(version.rules, `plan_versions[${planVersionId}].rules`);
+
+  // **THE ADDRESS IS THE GRID'S OWN UNIQUE KEY AND NOT A FILTER.**
+  // `plan_version_sizes_version_size_uq` is `(plan_version_id, size_cents)`
+  // (`0004_catalog.sql`, transcribed at `schema.ts`), so this names AT MOST ONE
+  // ROW and `refuseUnaddressed` is what enforces that rather than this comment.
+  const size = await handle.catalogRowAt('planVersionSizes', { planVersionId, sizeCents });
+
+  // **AN ABSENT SIZE ROW IS A REFUSAL, AND THIS IS THE RULE ADR-306 NAMED AS
+  // UNWRITTEN.** There is NO composite foreign key from `accounts` to this grid:
+  // `0007_accounts.sql` declares `plan_version_id uuid NOT NULL REFERENCES
+  // plan_versions(id)` and `size_cents bigint NOT NULL CHECK (size_cents > 0)`
+  // as two independent columns, and `0044` states in its own words that a
+  // `size_cents` "names a plan_version_sizes.size_cents; it is not a foreign key
+  // to that row". So the pair CAN fail to resolve, and when it does it is Merit's
+  // account disagreeing with Merit's catalogue.
+  //
+  // IT IS A `PayoutRowError` AND SO A 500, WHICH IS THE READ ABOVE IT ANSWERED
+  // THE SAME WAY. An account pinned to a size its own plan version does not
+  // publish has no drawdown, no buffer and no payout ceiling anywhere in this
+  // database; there is no neighbouring row to fall back to, because a grid is
+  // not an interpolation, and picking one would hand a trader a floor rule
+  // nobody published. A 503 would tell them to retry what no retry can fix.
+  if (size === undefined)
+    throw new PayoutRowError(
+      `\`plan_version_sizes\` carries no row at version \`${planVersionId}\` and size ` +
+        `${String(sizeCents)} cents on this transaction, and the account is pinned to both. ` +
+        'There is no composite foreign key holding the pair together (`0007_accounts.sql`), so ' +
+        'this is the catalogue disagreeing with the account rather than a size to substitute ' +
+        'for: no neighbouring rung is this rung, and a payout resolved against one would be ' +
+        'decided on a plan nobody published',
+    );
+
+  const at = `plan_version_sizes[${planVersionId}:${String(sizeCents)}]`;
+  const sizeRow: PlanVersionSizeRow = {
+    // **THE IDENTITY IS CARRIED AND NEVER CHOSEN, WHICH IS `INV-16` IN THE
+    // SIGNATURE.** `ResolvedPlan.planVersionId` is `size.plan_version_id` inside
+    // `resolvePlan`, so it is read off THE ROW here rather than handed the local
+    // above it: the address makes the two equal and the engine's rule is that
+    // the value travels with the row it came from. The brand is asserted at this
+    // one boundary, exactly as `toSizeRow` asserts it one deployable over.
+    plan_version_id: textOf(
+      size.planVersionId,
+      `${at}.planVersionId`,
+    ) as PlanVersionSizeRow['plan_version_id'],
+    size_cents: centsOf(size.sizeCents, `${at}.sizeCents`),
+    drawdown_cents: centsOf(size.drawdownCents, `${at}.drawdownCents`),
+    profit_target_cents: centsOrNullOf(size.profitTargetCents, `${at}.profitTargetCents`),
+    buffer_cents: centsOf(size.bufferCents, `${at}.bufferCents`),
+    win_day_floor_cents: centsOf(size.winDayFloorCents, `${at}.winDayFloorCents`),
+    // THE ENGINE'S CODEC AND NOT A FOURTH STATEMENT OF IT. ADR-286 ruling 5
+    // measured this blob as the one real `FM-16` in this area, at three
+    // statements that had already diverged on the money; ADR-302 collapsed them
+    // into `decodeCapScheduleCents`, which admits a safe-integer JSON number or
+    // a base-10 string of digits and REFUSES a number past
+    // `Number.MAX_SAFE_INTEGER` rather than handing back the rounded double.
+    payout_cap_schedule_cents: decodeCapScheduleCents(
+      size.payoutCapScheduleCents,
+      `${at}.payoutCapScheduleCents`,
+    ),
+    daily_loss_limit_cents: centsOrNullOf(size.dailyLossLimitCents, `${at}.dailyLossLimitCents`),
+    floor_lock_enabled: boolOf(size.floorLockEnabled, `${at}.floorLockEnabled`),
+    floor_lock_at_profit_cents: centsOrNullOf(
+      size.floorLockAtProfitCents,
+      `${at}.floorLockAtProfitCents`,
+    ),
+    floor_lock_floor_at_cents: centsOrNullOf(
+      size.floorLockFloorAtCents,
+      `${at}.floorLockFloorAtCents`,
+    ),
+  };
+
+  // THE RESOLVER IS THE ENGINE'S AND APPLIES NO PERCENTAGE, which is its own
+  // stated discipline: every `_bp` field is read for STRUCTURE and every cents
+  // value is COPIED from the size row, so the marketing page and the engine
+  // agree to the cent. Nothing in this file multiplies a money value by a rate.
+  return resolvePlan(rules, sizeRow);
 }
 
 /**
@@ -505,23 +702,21 @@ export function postgresPayoutBackend(db: ApiDb): PayoutBackend {
           },
 
           /**
-           * THREE LEGS OF FOUR (ADR-287 slice 4), AND THE OTHER TWO REFUSE BY
-           * NAME.
+           * FOUR LEGS OF FOUR (ADR-287 slices 4 AND 5). THE MEMBER ANSWERS.
            *
-           * THE MEMBER STILL CANNOT ANSWER AND THE LINE IT REPLACES SAID SO IN
-           * ONE WORD. What changed is WHICH word: `subject` refused wholesale,
-           * so a reader could not tell a member nobody had started from a member
-           * three quarters built, and a session dispatched to finish it would
-           * have been asked to complete legs that did not exist. The refusal now
-           * names `subject.state` and `subject.plan.size`, which are exactly
-           * ADR-287 slice 5's two items.
-           *
-           * NOTHING IS STUBBED AND THE COMMENT THAT STOOD HERE SAID WHY: a
-           * synthesised `RuleState` is a payout basis nobody computed. That rule
-           * is now structural rather than stated. `SubjectLeg<T>` has no arm
-           * carrying a partial value, so the unbuilt legs cannot be filled in
-           * without changing the type, and the `return` below reads every leg's
-           * `value` or none of them.
+           * ADR-306 BUILT THREE AND LEFT TWO REFUSING BY NAME, and ADR-308
+           * retired both: `state` reads the stored row through `ruleStateOn` and
+           * `plan` resolves at the account's own size. **THE `SubjectLeg<T>`
+           * SCAFFOLDING WENT WITH THEM AND ITS RULE DID NOT.** That type existed
+           * so that an unbuilt leg could refuse by name without ever carrying a
+           * partial value; with no unbuilt leg left, its `ok: false` arm had no
+           * producer, and a dead union arm on the money path is an invitation to
+           * fill one in. What holds the rule now is the return types themselves:
+           * `stateLeg` answers `RuleState` or throws and `planLeg` answers
+           * `ResolvedPlan` or throws, so there is no shape here that can hold
+           * half of either. **A SYNTHESISED `RuleState` IS A PAYOUT BASIS NOBODY
+           * COMPUTED**, and that sentence has stood on this member since it was
+           * one line of rejection.
            *
            * -------------------------------------------------------------------
            * THE ORDER IS THE CONTROL AND IT IS ADR-285 RULING 4
@@ -534,11 +729,14 @@ export function postgresPayoutBackend(db: ApiDb): PayoutBackend {
            * which section 1 requires this API not to do. Every read below happens
            * only for an account this handle can already see.
            *
-           * AND EVERY BUILT LEG RUNS BEFORE EITHER REFUSAL, which is
-           * `resolveExternalGates`'s own shape one level up: a 503 thrown before
-           * the gates resolved would MASK an `ExternalGatesRefusal` or a
-           * `PlanRulesCodecError` on this account, and slice 5 would then be
-           * installing two readers that had never run against a real row.
+           * **AND THAT IS NOW LOAD BEARING RATHER THAN TIDY, BECAUSE `state` CAN
+           * REFUSE.** `ruleStateOn` raises `RuleStateAbsent` for a day the
+           * nightly fold has not closed and the route answers it `503`. A
+           * state-first implementation would answer a prober `503` for every
+           * account of another identity, where a scoped read is empty and an
+           * empty list IS `RuleStateAbsent`, and 404 and 503 are
+           * distinguishable. Until this row that hazard was hypothetical; from
+           * this row it is the read order below.
            *
            * -------------------------------------------------------------------
            * THE `null` ARM IS THE READ ANSWERING EMPTY AND IS NEVER A CATCH
@@ -555,17 +753,9 @@ export function postgresPayoutBackend(db: ApiDb): PayoutBackend {
 
             const gates = await externalGatesFor(handle, accountId, account);
             const plan = await planLeg(handle, account);
-            const state = STATE_LEG;
+            const state = await stateLeg(handle, accountId);
 
-            if (!state.ok || !plan.ok) {
-              const unbuilt = [
-                ...(state.ok ? [] : [state.member]),
-                ...(plan.ok ? [] : [plan.member]),
-              ];
-              throw new PayoutBackendUnwired(unbuilt.join(' and '));
-            }
-
-            return { accountId, state: state.value, plan: plan.value, gates };
+            return { accountId, state, plan, gates };
           },
 
           // ADR-287 slice 8, WHICH CANNOT BE SCHEDULED. `HoldFlag.tosClause`
