@@ -1337,10 +1337,16 @@ describe('subject() resolves `plan` at the account s OWN size, through the engin
 });
 
 // -----------------------------------------------------------------------------
-// THE FOUR THAT REFUSE. THE WHOLE SHAPE OF THIS SLICE
+// THE TWO THAT REFUSE. THE WHOLE SHAPE OF THIS SLICE
 // -----------------------------------------------------------------------------
+// `listPayouts` LEFT THIS SECTION WHEN ADR-311 BUILT IT, and its cases are the
+// section below. What is left refuses for two different reasons and only one of
+// them is a session's to discharge: `holdFlag` is UNBUILDABLE, because
+// `HoldFlag.tosClause` has no value space in this repository and `DEP-M7-05`
+// owes the clauses to counsel, and `idempotency` is a CHOICE, because a store
+// that exists today is deliberately not installed while the backend is partial.
 
-describe('the four unbuilt members refuse VISIBLY and by name', () => {
+describe('the two unbuilt members refuse VISIBLY and by name', () => {
   /**
    * The `PayoutTx` members that refuse BEFORE READING ANYTHING.
    *
@@ -1373,14 +1379,6 @@ describe('the four unbuilt members refuse VISIBLY and by name', () => {
     expect(recorder.calls).toStrictEqual([]);
   });
 
-  it('`listPayouts` rejects with `PayoutBackendUnwired` and opens no door', async () => {
-    const recorder = backendOver([]);
-    await expect(postgresPayoutBackend(recorder.db).listPayouts(SESSION)).rejects.toBeInstanceOf(
-      PayoutBackendUnwired,
-    );
-    expect(recorder.calls).toStrictEqual([]);
-  });
-
   it('`idempotency` is the UNWIRED store, in all three of its methods', async () => {
     // **THE MEMBER THAT COULD ANSWER TODAY AND DELIBERATELY DOES NOT.**
     // `databaseIdempotencyStore` exists at `src/idempotency-store.ts:144` and
@@ -1408,5 +1406,302 @@ describe('the four unbuilt members refuse VISIBLY and by name', () => {
     );
 
     expect(recorder.calls).toStrictEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// `listPayouts`. ADR-287 SLICE 7, AND THE TWO FIELDS WITH NO COLUMN
+// -----------------------------------------------------------------------------
+// WHAT THIS SECTION WATCHES THAT A GREEN SUITE WOULD NOT OTHERWISE HOLD is that
+// the two unsourced fields are served AS THE RULED ABSENCES THEY ARE. A session
+// completing this member by folding `payout_requests`'s own state timestamps
+// into a history, or by reaching for `admin_actions.reason` as a trader-facing
+// note, would answer every ordinary case here correctly. The cases that catch it
+// are the ones asserting `[]` and `null` on EVERY status, and the one asserting
+// the module reads one table.
+
+/** The `payout_requests` row shape the driver hands back, in property spelling. */
+function payoutRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: REQUEST,
+    accountId: ACCOUNT,
+    approvedCents: 25000n,
+    traderCents: 20000n,
+    status: 'approved',
+    approvedAt: new Date('2026-08-30T12:00:00.000Z'),
+    settledAt: null,
+    heldAt: null,
+    holdExpiresAt: null,
+    holdTosClause: null,
+    ...over,
+  };
+}
+
+/** One migration, read at source. The DDL is what these cases are derived from. */
+function migrationSource(file: string): string {
+  return readFileSync(
+    join(import.meta.dirname, '..', '..', '..', 'packages', 'db', 'migrations', file),
+    'utf8',
+  );
+}
+
+/**
+ * `payout_status`'s members, DERIVED FROM THE MIGRATIONS rather than restated.
+ *
+ * THIS IS THE MECHANICAL ASSERTION THE CONSTITUTION PREFERS TO A BIGGER MODEL.
+ * `PAYOUT_STATUSES` in the adapter is a transcription of two migration lines,
+ * and nothing else in this tree compares the two. A sixth member arriving in a
+ * later migration makes the loop below drive a row this adapter refuses, so the
+ * suite goes red on the commit that adds it rather than staying quietly narrow.
+ */
+function payoutStatusMembers(): readonly string[] {
+  const created = /CREATE TYPE payout_status AS ENUM \(([^)]*)\);/.exec(
+    migrationSource('0001_extensions_and_enums.sql'),
+  );
+  if (created === null || created[1] === undefined)
+    throw new Error('0001 no longer declares `payout_status` in the shape this case reads');
+
+  const added = [
+    ...migrationSource('0030_payout_hold_enum.sql').matchAll(
+      /ALTER TYPE payout_status ADD VALUE '([a-z_]+)'/g,
+    ),
+  ].map((match) => match[1] as string);
+
+  return [...created[1].split(',').map((part) => part.trim().replaceAll("'", '')), ...added];
+}
+
+/** A row that satisfies the CHECK constraints binding on the status it carries. */
+function rowInStatus(status: string): Record<string, unknown> {
+  if (status === 'held_pending_review')
+    return payoutRow({
+      status,
+      heldAt: new Date('2026-08-30T13:00:00.000Z'),
+      holdExpiresAt: new Date('2026-09-01T13:00:00.000Z'),
+      holdTosClause: 'TOS-4.2',
+    });
+  if (status === 'settled')
+    return payoutRow({ status, settledAt: new Date('2026-09-01T09:00:00.000Z') });
+  return payoutRow({ status });
+}
+
+async function listOver(rows: unknown[]): Promise<{
+  readonly answer: unknown;
+  readonly recorder: ReturnType<typeof recordingDb>;
+}> {
+  const recorder = backendOver(rows);
+  const answer = await postgresPayoutBackend(recorder.db)
+    .listPayouts(SESSION)
+    .then(
+      (value) => value as unknown,
+      (err: unknown) => err,
+    );
+  return { answer, recorder };
+}
+
+describe('listPayouts answers from payout_requests, and the two fields with no column are ruled', () => {
+  it('opens the SCOPED door on the SESSION s identity and reads ONE table', async () => {
+    // WHOSE identity and WHICH table, which is what a recorder can prove and is
+    // the half that fails in the direction ADR-008 was accepted for.
+    // `payoutRequests` is scope class `owned` on `identity_id`, so the handle's
+    // own predicate is the whole of the tenancy and this member names no
+    // identity anywhere a caller could point at somebody else.
+    const { recorder } = await listOver([payoutRow()]);
+
+    expect(recorder.calls.map((c) => c.door)).toStrictEqual(['scoped']);
+    expect(recorder.calls.map((c) => c.identityId)).toStrictEqual([IDENTITY]);
+    expect(recorder.calls.map((c) => c.verb)).toStrictEqual(['rows']);
+    expect(recorder.calls.map((c) => c.key)).toStrictEqual(['payoutRequests']);
+  });
+
+  it('serves the EIGHT column-backed fields as the row s own values', async () => {
+    const { answer } = await listOver([payoutRow()]);
+
+    expect(answer).toStrictEqual([
+      {
+        payout_request_id: REQUEST,
+        account_id: ACCOUNT,
+        approved_cents: 25000,
+        trader_cents: 20000,
+        status: 'approved',
+        approved_at: '2026-08-30T12:00:00.000Z',
+        settled_at: null,
+        hold: null,
+        timeline: [],
+        failure_note: null,
+      },
+    ]);
+  });
+
+  it('serves an EMPTY history as an empty list rather than as a refusal', async () => {
+    // A trader who has never requested a payout is not an error, and a scoped
+    // read of a table with no rows of theirs is the same shape as one for an
+    // identity that does not exist. Neither is this member's to distinguish.
+    const { answer } = await listOver([]);
+    expect(answer).toStrictEqual([]);
+  });
+
+  it('SUPPRESSES approved_at on held_pending_review, which is ADR-290 finding F6', async () => {
+    // **THE COLUMN CAN LIE ON EXACTLY ONE STATUS.** `approved_at` is
+    // `timestamptz NOT NULL DEFAULT now()` (`0010_payouts.sql:89`) and `0031`
+    // relaxed nothing, so a held row carries an INSERT TIME in a column the wire
+    // calls an approval time. API_CONTRACT:515 is explicit: "null while held:
+    // the hold is PRE-approval". The fixture carries a real Date in that column
+    // precisely so a straight read would PASS a weaker assertion.
+    const { answer } = await listOver([rowInStatus('held_pending_review')]);
+    const [item] = answer as { approved_at: string | null; hold: unknown }[];
+
+    expect(item?.approved_at).toBeNull();
+    expect(item?.hold).toStrictEqual({
+      held_at: '2026-08-30T13:00:00.000Z',
+      resolves_by: '2026-09-01T13:00:00.000Z',
+      tos_clause: 'TOS-4.2',
+    });
+  });
+
+  it('serves the hold block ONLY on held_pending_review, on every member of the enum', async () => {
+    // Derived from the DDL rather than from a list written here. API_CONTRACT:517
+    // says "present only when status is held_pending_review", and
+    // `payout_requests_hold_is_complete` is a biconditional on that same status,
+    // so the wire's null arm and the database's constraint agree without
+    // anything here deciding it.
+    for (const status of payoutStatusMembers()) {
+      const { answer } = await listOver([rowInStatus(status)]);
+      const [item] = answer as { status: string; hold: unknown }[];
+
+      expect(answer, `status \`${status}\` was refused`).not.toBeInstanceOf(Error);
+      expect(item?.status).toBe(status);
+      expect(item?.hold === null).toBe(status !== 'held_pending_review');
+    }
+  });
+
+  it('serves failure_note as null and timeline as [] on EVERY status', async () => {
+    // **THE TWO RULED ABSENCES, AND THIS IS THE CASE A SYNTHESISING SESSION
+    // FAILS.** ADR-290 ruled both: `failure_note` is null BY CONSTRUCTION,
+    // because no row on this tree can reach `failed`, and `timeline` is the
+    // projection of `events`, which no deployable writes. Asserted across the
+    // whole enum, so a fold that produced entries "only for settled rows", or a
+    // note reached for on `failed`, is caught rather than passed.
+    for (const status of payoutStatusMembers()) {
+      const { answer } = await listOver([rowInStatus(status)]);
+      const [item] = answer as { timeline: unknown; failure_note: unknown }[];
+
+      expect(item?.timeline, `timeline on \`${status}\``).toStrictEqual([]);
+      expect(item?.failure_note, `failure_note on \`${status}\``).toBeNull();
+    }
+  });
+
+  it('READS ONE TABLE, so no timeline is folded and no note is reached for', async () => {
+    // The property behind the two cases above, asserted where a fold would have
+    // to show itself. `events` is not queried, `admin_actions` is not queried,
+    // and the four state timestamps are not gathered: one `rows` call, on one
+    // table, for a whole page of history.
+    const { recorder } = await listOver([
+      rowInStatus('settled'),
+      rowInStatus('held_pending_review'),
+      rowInStatus('frozen'),
+    ]);
+
+    expect(recorder.calls).toHaveLength(1);
+    expect(recorder.calls.map((c) => c.key)).toStrictEqual(['payoutRequests']);
+
+    const source = backendSource();
+    expect(source).not.toContain("rows('events')");
+    expect(source).not.toContain("rows('adminActions')");
+    expect(source).not.toContain('frozenAt');
+  });
+
+  it('REFUSES a status outside payout_status rather than defaulting one', async () => {
+    const { answer } = await listOver([payoutRow({ status: 'transferring' })]);
+
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    // `transferring` is the one a reader would expect to be here: ADR-028 moved
+    // it to `wallet_withdrawals` and API_CONTRACT typed it on this very union
+    // until ADR-040. A default would put it back.
+    expect((answer as Error).message).toContain('transferring');
+    expect((answer as Error).message).toContain('payout_status');
+  });
+
+  it('REFUSES money that did not arrive as a bigint rather than coercing it', async () => {
+    // INV-02 is that money is integer cents at EVERY boundary. A `number` on a
+    // payout basis has already been through a float, and a coerced one is a
+    // number nobody published.
+    for (const column of ['approvedCents', 'traderCents']) {
+      const { answer } = await listOver([payoutRow({ [column]: 25000 })]);
+      expect(answer, `\`${column}\` was coerced`).toBeInstanceOf(PayoutRowError);
+      expect((answer as Error).message).toContain('bigint');
+    }
+  });
+
+  it('REFUSES a hold column present OFF held_pending_review, which is the biconditional', async () => {
+    // The direction a one-sided reader gets wrong. The constraint NULLs all five
+    // hold columns on the way out of the hold, so a settled row carrying
+    // `held_at` is a row the schema says cannot exist, and serving it would
+    // publish a hold the database has already erased.
+    const { answer } = await listOver([
+      payoutRow({
+        status: 'settled',
+        settledAt: new Date('2026-09-01T09:00:00.000Z'),
+        heldAt: new Date('2026-08-30T13:00:00.000Z'),
+      }),
+    ]);
+
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect((answer as Error).message).toContain('payout_requests_hold_is_complete');
+  });
+
+  it('REFUSES a held_pending_review row with a hold column missing', async () => {
+    // The other direction of the same biconditional. All five together or none,
+    // so a half-set row is refused here rather than served with a gap in the
+    // block API_CONTRACT declares as three required fields.
+    const { answer } = await listOver([
+      payoutRow({
+        status: 'held_pending_review',
+        heldAt: new Date('2026-08-30T13:00:00.000Z'),
+        holdExpiresAt: new Date('2026-09-01T13:00:00.000Z'),
+        holdTosClause: null,
+      }),
+    ]);
+
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect((answer as Error).message).toContain('hold_tos_clause');
+  });
+
+  it('REFUSES a settled row whose settled_at reads back empty', async () => {
+    // `payout_requests_settled_has_days` (`0010_payouts.sql:152-157`) makes it
+    // NOT NULL on that status. Read in the one direction the constraint runs:
+    // the reverse is not asserted, because the constraint is an implication.
+    const { answer } = await listOver([payoutRow({ status: 'settled', settledAt: null })]);
+
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect((answer as Error).message).toContain('payout_requests_settled_has_days');
+  });
+
+  it('REFUSES a timestamp that is not a Date rather than parsing one', async () => {
+    // `schema.ts` declares every one of these columns with `withTimezone: true`
+    // and the driver hands back a `Date`. A string arriving here is the driver
+    // configured differently from the schema this code was written against, and
+    // parsing it would hide that rather than report it.
+    const { answer } = await listOver([payoutRow({ approvedAt: '2026-08-30T12:00:00.000Z' })]);
+
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect((answer as Error).message).toContain('approved_at');
+  });
+
+  it('REFUSES a row that is not a row, and names the table it was reading', async () => {
+    const { answer } = await listOver(['not a row']);
+
+    expect(answer).toBeInstanceOf(PayoutRowError);
+    expect((answer as Error).message).toContain('payout_requests[0]');
+  });
+
+  it('NEVER answers PayoutBackendUnwired, because the member is built', async () => {
+    // The retired refusal, asserted GONE rather than dropped, which is this
+    // file's standing idiom. An arm nothing asserts is an arm the next refactor
+    // puts back, and a session that "simplified" this member back into a
+    // rejection would delete exactly this line.
+    const { answer } = await listOver([payoutRow()]);
+
+    expect(answer).not.toBeInstanceOf(PayoutBackendUnwired);
+    expect(backendSource()).not.toContain("new PayoutBackendUnwired('listPayouts')");
   });
 });
