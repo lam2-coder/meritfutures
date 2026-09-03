@@ -1227,9 +1227,29 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     // refuses in its own closing sentence. Asserted at the module rather than
     // only in its own suite, because this is the file the entry cites.
     const backend = codeOf(join(REPO_ROOT, 'apps/api/src/payout-backend.ts'));
-    for (const member of ['subject', 'holdFlag', 'listPayouts'])
+    for (const member of ['holdFlag', 'listPayouts'])
       expect(backend).toContain(`new PayoutBackendUnwired('${member}')`);
     expect(backend).not.toContain('databaseIdempotencyStore');
+
+    // **AND THE FIFTH MEMBER LEFT THAT LIST THE WAY THE FOURTH DID, WHICH IS
+    // ADR-306 IN THREE ASSERTIONS.** `subject` refused WHOLESALE on one line
+    // under a comment naming ADR-287 slices 4 AND 5 together, and that blanket
+    // rejection cost a session: neither record could tell a member nobody had
+    // started from a member three quarters built, and both named slice 5 as next
+    // while slice 4 had never been built. Slice 4 built the `null` arm, `gates`
+    // and `plan` up to the size decode, so the plain refusal is gone and TWO
+    // NARROWER ones stand in its place, exactly as `insertPayoutRequest.hold`
+    // stands below.
+    //
+    // THE NEEDLES ARE THE TWO UNBUILT LEGS AND THEY ARE THE REMAINDER ADR-287
+    // SECTION 7 SIZES AS SLICE 5. A session that "completed" this member by
+    // folding a `RuleState` in the request path or by asserting a
+    // `PlanVersionSizeRow` onto an untyped row would delete exactly these lines,
+    // and a session that collapsed the two back into one blanket refusal would
+    // go red on the first.
+    expect(backend).not.toContain("new PayoutBackendUnwired('subject')");
+    expect(backend).toContain("member: 'subject.state'");
+    expect(backend).toContain("member: 'subject.plan.size'");
 
     // **AND THE FOURTH MEMBER LEFT THIS LIST WITHOUT LEAVING THE REFUSAL SET,
     // WHICH IS ADR-295 IN ONE ASSERTION.** `insertPayoutRequest` answers on the
