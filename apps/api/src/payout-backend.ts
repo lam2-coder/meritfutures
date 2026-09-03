@@ -15,8 +15,8 @@
 // -----------------------------------------------------------------------------
 // WHAT ANSWERS, AND WHAT REFUSES
 // -----------------------------------------------------------------------------
-// `PayoutBackend` and `PayoutTx` carry EIGHT members between them. FIVE answer
-// here and THREE reject with `PayoutBackendUnwired`:
+// `PayoutBackend` and `PayoutTx` carry EIGHT members between them. SIX answer
+// here and TWO reject with `PayoutBackendUnwired`:
 //
 //   transact            ANSWERS. The scoped door, opened once per request.
 //   lockScope           ANSWERS. `ScopedTx.lockScope`, delegated in one line.
@@ -33,17 +33,29 @@
 //                       IT IS SYNTHESISED: every leg answers from a row it read
 //                       or throws, and there is no shape here that holds half
 //                       of either value.
+//   listPayouts         ANSWERS. ADR-287 slice 7, ruled by ADR-311. TEN wire
+//                       fields, EIGHT off columns of `payout_requests` and TWO
+//                       served as the RULED ABSENCES ADR-290 decided. It is the
+//                       only member outside every write path.
 //   holdFlag            REFUSES. ADR-287 slice 8, whose supplier is COUNSEL.
-//   listPayouts         REFUSES. ADR-287 slice 7, blocked on the slice 2 ruling.
 //   idempotency         REFUSES, AND IT IS THE ONE THAT COULD ANSWER TODAY.
 //
 // THE LAST LINE IS THE ONE WORTH READING TWICE, BECAUSE IT IS A CHOICE RATHER
 // THAN AN ABSENCE. `databaseIdempotencyStore` (`src/idempotency-store.ts:144`)
 // exists, has its own suite, and would satisfy this field on this tree today.
-// It is NOT installed here, on `wiring.test.ts`'s own closing ruling: installing
-// `listPayouts` and `idempotency` "beside a `transact` whose `subject` rejects
-// would put a live-looking route in front of the arm that approves payouts".
-// A partial backend refuses AS A WHOLE or it is a fixture serving real traffic.
+// It is NOT installed here, and the WHOLE-REFUSAL RULING is what keeps it out:
+// a partial backend refuses AS A WHOLE or it is a fixture serving real traffic.
+//
+// AND THAT RULING STILL BINDS WITH `listPayouts` ANSWERING, WHICH IS ADR-311's
+// SECTION 4 AND IS NOT AN EXCEPTION CARVED FOR THIS MEMBER. The sentence
+// `wiring.test.ts` wrote it in names its own condition -- installing these two
+// "beside a `transact` whose `subject` rejects" -- and `subject` STOPPED
+// REJECTING when ADR-308 built it. What keeps the backend partial is `holdFlag`,
+// whose supplier is counsel rather than a session, so the property still has a
+// live witness and nothing was weakened to let this member through. THE ORDER IS
+// THE PLAN'S OWN: ADR-287 section 7 schedules slice 7 as a BUILD blocked only on
+// slice 2, and slice 9 as BLOCKED on slices 1 to 7, so 7 precedes 9 by the
+// governing document rather than by this file's preference.
 //
 // -----------------------------------------------------------------------------
 // THIS FILE IS NOT INSTALLED AND THE COUNT DOES NOT MOVE
@@ -55,7 +67,7 @@
 // of the ruling that installs it is supposed to cost.
 //
 // AND THAT SENTENCE IS WORTH MORE NOW THAN IT WAS, BECAUSE THE MEMBER ANSWERS.
-// Three members still refuse, so `usePayoutBackend`'s own closing ruling still
+// TWO members still refuse, so `usePayoutBackend`'s own closing ruling still
 // binds: a partial backend refuses AS A WHOLE or it is a fixture serving real
 // traffic. Installing this file is slice 9 and slice 9 alone.
 //
@@ -121,8 +133,15 @@ import type {
 import type { ApiDb } from './db.ts';
 import type { IdempotencyStore } from './idempotency.ts';
 import { ruleStateOn } from './rule-state-reader.ts';
-import { PayoutBackendUnwired } from './routes/payouts.ts';
-import type { IdentityStatus, PayoutBackend, PayoutSubject, PayoutTx } from './routes/payouts.ts';
+import { centsToJson, PayoutBackendUnwired } from './routes/payouts.ts';
+import type {
+  IdentityStatus,
+  PayoutBackend,
+  PayoutHold,
+  PayoutListItem,
+  PayoutSubject,
+  PayoutTx,
+} from './routes/payouts.ts';
 
 /**
  * A row this backend read that the schema says cannot exist.
@@ -563,6 +582,240 @@ async function externalGatesFor(
   });
 }
 
+// -----------------------------------------------------------------------------
+// `listPayouts`. ADR-287 SLICE 7, AND THE COUNT IS TEN, EIGHT AND TWO
+// -----------------------------------------------------------------------------
+// `PayoutListItem` (`routes/payouts.ts`) declares TEN fields, one per line.
+// EIGHT resolve off columns of `payout_requests` and TWO have no column at all,
+// and ADR-311 re-derived that from the declaration and the DDL rather than
+// carrying ADR-290's number: `0010_payouts.sql:42-124` declares TWENTY-FOUR
+// columns, `0031_payout_hold_and_identity_restriction.sql:46-52` adds FIVE, and
+// `grep -rn 'ALTER TABLE payout_requests' packages/db/migrations` returns those
+// two lines and no others. TWENTY-NINE, and neither `failure_note` nor any
+// history column is among them.
+//
+// THE TWO WITHOUT COLUMNS ARE SERVED AS RULED ABSENCES AND ARE NOT SYNTHESISED,
+// WHICH IS THE WHOLE REASON THIS MEMBER NEEDED A RULING BEFORE IT NEEDED CODE.
+// `failure_note` is `null` on every row and `timeline` is `[]` on every row, and
+// in both cases API_CONTRACT section 6 states it in its own words, so this file
+// TRANSCRIBES a decision rather than making one. An implementer who reached for
+// the obvious value in either place would have shipped something worse than
+// nothing, and ADR-290 sections 2 and 3 are why:
+//
+//   `failure_note` DESCRIBES `failed` AND NOTHING ELSE, and both edges into that
+//   status are enforcement acts. It is null BY CONSTRUCTION rather than by
+//   omission: no `payout_requests` row on this tree can reach `failed`. The
+//   three candidate suppliers are each refused in writing, and the nearest one,
+//   `admin_actions.reason`, is refused because API_CONTRACT section 6 excludes
+//   admin reasoning from every trader projection IN TERMS and the portal renders
+//   this field VERBATIM. A note composed for an audit trail would reach a trader
+//   unedited, beside a closure for cause.
+//
+//   `timeline`'s SOURCE IS `events` (`0017_events_and_audit.sql:26-62`),
+//   projected on `subject_kind = 'payout_request'` and `subject_id`, AND THAT
+//   PROJECTION IS EMPTY: no deployable in this tree constructs an event writer,
+//   so `[]` is what the named source returns rather than a placeholder standing
+//   in for it. THIS MEMBER DOES NOT QUERY `events`, deliberately: a query
+//   against a relation nothing writes, carrying a name-to-state mapping nobody
+//   ruled, is code that has never once been true and that no seeded test can
+//   exercise honestly.
+//
+// AND THE FOLD OVER THIS TABLE'S OWN TIMESTAMPS IS REFUSED, WHICH IS THE ONE AN
+// IMPLEMENTER WOULD HAVE REACHED FOR FIRST. `payout_requests` carries four state
+// timestamps and looks like a history. TWO OF THE FOUR ARE NULLED BY CONSTRAINT
+// ON EXIT: `payout_requests_hold_is_complete` (`0031:62-72`) and
+// `payout_requests_freeze_is_complete` (`0010:141-149`) are biconditionals on
+// their statuses, so a settled payout that was held for forty hours folds to a
+// two-entry timeline WITH NO HOLD IN IT, rendered as if it were complete. A
+// partial history that reads as a complete one is worse than an empty one, and
+// the trader it hides the hold from is the trader who was held.
+
+/**
+ * `payout_status`, transcribed at the two migrations that declare it.
+ *
+ * FOUR MEMBERS AT `0001_extensions_and_enums.sql:91`, which ADR-028 ruled, AND
+ * A FIFTH AT `0030_payout_hold_enum.sql:57`, which is the `ALTER TYPE` ADR-040
+ * added for `held_pending_review`. FIVE, and `PayoutListItem.status`'s own union
+ * is the same five.
+ *
+ * A VALUE OUTSIDE THEM IS A REFUSAL AND NEVER A DEFAULT, and the direction
+ * matters on this read rather than only in principle: `status` selects whether
+ * `approved_at` is suppressed and whether the `hold` block is served, so a
+ * status this code does not recognise is a row whose two conditional fields
+ * cannot be decided at all. It is not `identity_status`'s reader, because that
+ * one's refusal cites ADR-041 and this enum's history is ADR-028's.
+ */
+const PAYOUT_STATUSES = [
+  'approved',
+  'held_pending_review',
+  'settled',
+  'failed',
+  'frozen',
+] as const satisfies readonly PayoutListItem['status'][];
+
+/** One member of `payout_status`, or a refusal naming what was read. */
+function payoutStatusOf(row: Record<string, unknown>, at: string): PayoutListItem['status'] {
+  const value = row['status'];
+  if (typeof value !== 'string')
+    throw new PayoutRowError(
+      `\`${at}.status\` did not read back as text. The column is \`payout_status NOT NULL\``,
+    );
+  if (!(PAYOUT_STATUSES as readonly string[]).includes(value))
+    throw new PayoutRowError(
+      `\`${at}.status\` is \`${value}\`, which is outside \`payout_status\`'s own members ` +
+        `(${PAYOUT_STATUSES.join(' | ')}). The status decides whether \`approved_at\` is ` +
+        'suppressed and whether the `hold` block is served, so an unrecognised one is a row ' +
+        'whose two conditional fields cannot be decided rather than a case to default',
+    );
+  // The narrowing `includes` does not perform, on `member`'s own idiom above.
+  // It is reached only past the guard, so it asserts nothing the line before it
+  // has not already refused.
+  return value as PayoutListItem['status'];
+}
+
+/**
+ * One `timestamptz` as API_CONTRACT section 1's RFC 3339 UTC string.
+ *
+ * IT DOES NOT PARSE A STRING, which is where this differs from
+ * `admin-source/events.ts`'s reader one door over. That one accepts either
+ * because its port is fed by an admin projection; this one reads the driver
+ * directly, where `schema.ts` declares every one of these columns as
+ * `timestamp(..., { withTimezone: true })` and the driver hands back a `Date`.
+ * A string arriving here is the driver configured differently from the schema
+ * this code was written against, and coercing it would hide that.
+ */
+function instant(value: unknown, at: string): string {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime()))
+    throw new PayoutRowError(
+      `\`${at}\` is not a Date. The column is a \`timestamptz\`, and a value that is not one ` +
+        "cannot be rendered as API_CONTRACT section 1's RFC 3339 UTC string",
+    );
+  return value.toISOString();
+}
+
+/** One NULLABLE `timestamptz`, KEPT NULLABLE. The null is a value. */
+function instantOrNull(value: unknown, at: string): string | null {
+  return value === null || value === undefined ? null : instant(value, at);
+}
+
+/**
+ * Section 6's `hold` block, and THE PREDICATE IS TWO SIDED ON PURPOSE.
+ *
+ * It matches `payout_requests_hold_is_complete` (`0031:62-72`), which is a
+ * BICONDITIONAL on `status = 'held_pending_review'`: all five hold columns are
+ * NOT NULL on that status and NULL on every other. So a row that is half of
+ * either arm is refused here rather than served, in both directions. Serving one
+ * direction only would publish a hold the database has already erased, or drop
+ * one it says must be there.
+ *
+ * API_CONTRACT:517 puts the block on that status alone and the wire's own null
+ * arm agrees with the constraint without anybody deciding anything, which is the
+ * only field of the ten where that is true.
+ *
+ * THREE OF THE FIVE HOLD COLUMNS ARE READ AND TWO ARE NOT. `hold_flag_id` and
+ * `hold_reason` have no slot on `PayoutHold`, and API_CONTRACT section 6 is why
+ * rather than an oversight: the trader is shown the fact, the ToS clause and the
+ * date it resolves, NEVER the evidence and NEVER the detector.
+ */
+function holdOf(
+  row: Record<string, unknown>,
+  status: PayoutListItem['status'],
+  at: string,
+): PayoutHold | null {
+  const heldAt = row['heldAt'];
+  const expiresAt = row['holdExpiresAt'];
+  const tosClause = row['holdTosClause'];
+  const present = (value: unknown): boolean => value !== null && value !== undefined;
+
+  if (status !== 'held_pending_review') {
+    if (present(heldAt) || present(expiresAt) || present(tosClause))
+      throw new PayoutRowError(
+        `\`${at}\` is in status \`${status}\` and carries a hold column. ` +
+          '`payout_requests_hold_is_complete` (`0031:62-72`) is a biconditional, so every hold ' +
+          'column is NULL off `held_pending_review` and a row carrying one is a row the schema ' +
+          'says cannot exist',
+      );
+    return null;
+  }
+
+  if (typeof tosClause !== 'string')
+    throw new PayoutRowError(
+      `\`${at}.hold_tos_clause\` did not read back as text on a \`held_pending_review\` row. ` +
+        'The same biconditional makes all five hold columns NOT NULL on that status, so an ' +
+        'absent one is a row this code does not recognise and never a value to substitute for',
+    );
+
+  return {
+    held_at: instant(heldAt, `${at}.held_at`),
+    resolves_by: instant(expiresAt, `${at}.hold_expires_at`),
+    tos_clause: tosClause,
+  };
+}
+
+/**
+ * One `payout_requests` row as `PayoutListItem`. A spread would be `SELECT *`.
+ *
+ * `approved_at` IS SUPPRESSED ON `held_pending_review` AND THAT IS ADR-290
+ * FINDING `F6` RATHER THAN A PREFERENCE. The column is `timestamptz NOT NULL
+ * DEFAULT now()` (`0010:89`) and `0031` relaxed nothing, by its own stated
+ * design: adding columns keeps every existing NOT NULL and CHECK on the money
+ * table intact. SO A HELD ROW CARRIES A NON-NULL `approved_at` WHOSE VALUE IS
+ * THE INSERT TIME AND NOT AN APPROVAL TIME. API_CONTRACT:515 types it
+ * `string | null` and says "null while held: the hold is PRE-approval", which
+ * the declaration's own docblock repeats. A straight column read publishes a
+ * false approval time on the one state that most needs to render correctly.
+ *
+ * `settled_at` IS CHECKED PRESENT ON `settled` AND NOT ON ANY OTHER STATUS,
+ * which is `payout_requests_settled_has_days` (`0010:152-157`) read in the one
+ * direction it actually runs. The constraint is an implication and not a
+ * biconditional, so the reverse is not asserted here either.
+ *
+ * MONEY GOES THROUGH `centsOf` AND THEN `centsToJson`, AND NEITHER STEP IS
+ * DECORATION. The first refuses a column that did not arrive as a `bigint`,
+ * because `INV-02` is that money is integer cents at every boundary and a
+ * `number` on a payout basis has already been through a float. The second
+ * refuses past `Number.MAX_SAFE_INTEGER` rather than serialising a wrong one.
+ * There is no `Number()` on this path.
+ */
+function toPayoutListItem(value: unknown, index: number): PayoutListItem {
+  const at = `payout_requests[${String(index)}]`;
+  const row = asRow(value, at);
+  const status = payoutStatusOf(row, at);
+
+  const settledAt = instantOrNull(row['settledAt'], `${at}.settled_at`);
+  if (status === 'settled' && settledAt === null)
+    throw new PayoutRowError(
+      `\`${at}\` is in status \`settled\` and \`settled_at\` read back empty. ` +
+        '`payout_requests_settled_has_days` (`0010:152-157`) makes it NOT NULL on that status, ' +
+        'so an absent settlement time is a row the schema says cannot exist',
+    );
+
+  return {
+    payout_request_id: text(row, 'id', at),
+    account_id: text(row, 'accountId', at),
+    approved_cents: centsToJson(centsOf(row['approvedCents'], `${at}.approved_cents`)),
+    trader_cents: centsToJson(centsOf(row['traderCents'], `${at}.trader_cents`)),
+    status,
+    approved_at:
+      status === 'held_pending_review' ? null : instant(row['approvedAt'], `${at}.approved_at`),
+    settled_at: settledAt,
+    hold: holdOf(row, status, at),
+
+    // ADR-290 section 3.6 and API_CONTRACT section 6. THE LITERAL IS THE
+    // PROJECTION OF `events` AND NOT A DEFAULT: that relation has no producer in
+    // this tree, so the empty array is what its named source returns. When a
+    // producer lands, this reads it and the ruling is spent.
+    timeline: [],
+
+    // ADR-290 section 2.5 and API_CONTRACT section 6. NULL BY CONSTRUCTION AND
+    // NOT BY OMISSION: no row this endpoint can return is in `failed`, which is
+    // the only status the field describes. The column it is owed is specified in
+    // ADR-290 section 2.4 and not written, and so is the endpoint field that
+    // would supply it.
+    failure_note: null,
+  };
+}
+
 /**
  * The store this backend does NOT install.
  *
@@ -578,7 +831,7 @@ const UNWIRED_STORE: IdempotencyStore = {
 };
 
 /**
- * The postgres `PayoutBackend`. Three members answer and four refuse.
+ * The postgres `PayoutBackend`. Six members answer and two refuse.
  *
  * THE `db` IS A PARAMETER AND NOT `LIVE_DB` REACHED FOR, on
  * `databaseAuthBackend`'s and `databaseWithdrawalBackend`'s shape: the door is
@@ -857,11 +1110,43 @@ export function postgresPayoutBackend(db: ApiDb): PayoutBackend {
         return fn(tx);
       }),
 
-    // ADR-287 slice 7, blocked on slice 2's ruling. `PayoutListItem` declares
-    // ten fields; `failure_note` has no column and API_CONTRACT says so in its
-    // own words, and `timeline` has no source this handle reads. A projection
-    // invented here would be a trader-visible payout history nobody specified.
-    listPayouts: () => Promise.reject(new PayoutBackendUnwired('listPayouts')),
+    /**
+     * `GET /payouts`. ADR-287 SLICE 7, AND IT IS THE ONE MEMBER OUTSIDE EVERY
+     * WRITE PATH.
+     *
+     * **IT OPENS ITS OWN DOOR AND IS DELIBERATELY NOT ON `PayoutTx`.** The port
+     * declares it on `PayoutBackend` beside `idempotency` rather than inside the
+     * transaction, and `readCertificates` (`routes/certificates.ts`) is the same
+     * shape one deployable member over: a read that decides nothing has no
+     * business inside the transaction that approves payouts, and putting it
+     * there would give a list endpoint the lock ordering a write path owns.
+     *
+     * **THE SCOPE IS THE WHOLE OF THE PREDICATE AND THERE IS NO `WHERE` HERE.**
+     * `payoutRequests` is scope class `owned` on `identity_id`
+     * (`packages/db/src/scope.ts`), which that registry's own entry argues for
+     * on this exact endpoint: `account_id` is present and is NOT the scope,
+     * because a derived rule through it would make the payout table's tenancy
+     * depend on a join rather than on a column the database declares against
+     * `identities(id)`, and a wrong answer here "returns another identity's
+     * payout history and, through `hold_flag_id` and `eligibility_snapshot`, the
+     * reasons Merit paid or held them". So `rows('payoutRequests')` is the
+     * caller's own history across their own accounts and nobody else's, and this
+     * member names no identity anywhere for a caller to point at somebody else.
+     *
+     * **NO ORDER IS APPLIED, AND THAT IS A GAP REPORTED RATHER THAN FILLED.**
+     * API_CONTRACT section 6 states no ordering for this endpoint, the accessor
+     * has none to give (ADR-112 foreclosure 3 forecloses `ORDER BY` and `LIMIT`
+     * on it), and the portal declares that it renders in server order and
+     * deliberately does not sort (`apps/portal/src/app/payouts/view.ts`).
+     * `readCertificates` serves its list the same way on the same accessor.
+     * Choosing a sort key and a tie-break HERE would be this adapter ruling an
+     * ordering the frozen contract does not state, on a list whose wire shape
+     * carries no ordinal to sort on. ADR-311 raises it to the founder instead.
+     */
+    listPayouts: (session) =>
+      db.scoped(session.identityId, async (handle) =>
+        (await handle.rows('payoutRequests')).map(toPayoutListItem),
+      ),
 
     // THE MEMBER THAT COULD ANSWER AND DOES NOT. See the header.
     idempotency: UNWIRED_STORE,

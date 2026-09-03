@@ -1235,15 +1235,44 @@ describe('link 7: `plan`s DECODING landed, and what the port waits on is smaller
     // set is what `start.ts` CALLS.
     expect(codeOf(join(REPO_ROOT, 'apps/api/src/start.ts'))).not.toContain('usePayoutBackend(');
 
-    // **AND IT IS A PARTIAL BACKEND THAT REFUSES AS A WHOLE.** `listPayouts` and
-    // `idempotency` are both constructible today, and installing them beside a
-    // `transact` whose `subject` rejects is what `usePayoutBackend`'s entry
-    // refuses in its own closing sentence. Asserted at the module rather than
-    // only in its own suite, because this is the file the entry cites.
+    // **AND IT IS A PARTIAL BACKEND THAT REFUSES AS A WHOLE.** Asserted at the
+    // module rather than only in its own suite, because this is the file the
+    // entry cites.
+    //
+    // **THE `listPayouts` NEEDLE IS RETIRED AND IS ASSERTED ABSENT RATHER THAN
+    // DROPPED**, on this file's own standing idiom two paragraphs down: an arm
+    // nothing asserts is an arm the next refactor puts back. ADR-311 built the
+    // member, and the retirement is not an exception carved for it. **THE
+    // NEEDLE'S OWN STATED PREMISE HAD DIED**: it justified itself as installing
+    // these members "beside a `transact` whose `subject` rejects", and `subject`
+    // stopped rejecting when ADR-308 built it, which the assertion three lines
+    // below this one already says out loud. **AND ADR-287 SECTION 7 SCHEDULES
+    // SLICE 7 AHEAD OF SLICE 9 BY ITS OWN ORDERING**: slice 7 is a build blocked
+    // only on slice 2, and slice 9 is blocked on slices 1 to 7, so reading this
+    // needle as "listPayouts refuses until slice 9" would have a test silently
+    // reordering the plan it serves.
+    //
+    // **WHAT THE NEEDLE PROTECTED STILL HAS A LIVE WITNESS, WHICH IS WHY THE
+    // RULING IS NOT WEAKENED BY ITS RETIREMENT.** `holdFlag` keeps its refusal
+    // and `idempotency` keeps its absence, so the backend is still partial and
+    // installing it is still slice 9's alone. `holdFlag` is unbuildable rather
+    // than unbuilt: `HoldFlag.tosClause` has no value space in this repository
+    // and `DEP-M7-05` owes the clauses to counsel.
     const backend = codeOf(join(REPO_ROOT, 'apps/api/src/payout-backend.ts'));
-    for (const member of ['holdFlag', 'listPayouts'])
-      expect(backend).toContain(`new PayoutBackendUnwired('${member}')`);
+    expect(backend).toContain("new PayoutBackendUnwired('holdFlag')");
+    expect(backend).not.toContain("new PayoutBackendUnwired('listPayouts')");
     expect(backend).not.toContain('databaseIdempotencyStore');
+
+    // **AND THE MEMBER THAT LEFT THE REFUSAL SET IS ASSERTED TO HAVE LEFT IT BY
+    // READING RATHER THAN BY SYNTHESISING.** A session that "completed"
+    // `listPayouts` by folding this table's own state timestamps into a history,
+    // or by inventing a note, would delete exactly these three lines. The fold
+    // is what ADR-290 section 3.2 refuses: two of the four timestamps are NULLed
+    // by constraint on exit, so it renders a settled payout that was held with
+    // no hold in it.
+    expect(backend).toContain("await handle.rows('payoutRequests')");
+    expect(backend).toContain('failure_note: null');
+    expect(backend).toContain('timeline: [],');
 
     // **AND THE FIFTH MEMBER LEFT THE REFUSAL SET ALTOGETHER, WHICH IS ADR-308
     // AND WHICH THIS FILE'S NEEDLES WERE BUILT TO MEASURE.** `subject` refused
