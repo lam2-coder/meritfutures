@@ -66,11 +66,11 @@
 // (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`:
 // `ledgerTransactions` (`packages/db/src/scope.ts:903`) and `ledgerEntries`
 // (`packages/db/src/scope.ts:894`); `ScopedTx.insert` takes
-// `OwnedTableKey` (`scoped-db.ts:3501`) and `insertUnder` takes
+// `OwnedTableKey` (`scoped-db.ts:3547`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
 // (`scoped-db.ts:2138`), a closed list of ONE. So the ONLY handle that
 // satisfies `LedgerTx` is `SystemTx.insert<K extends TableKey>`
-// (`scoped-db.ts:3667`), which is generic over EVERY TABLE IN THE ESTATE. THAT
+// (`scoped-db.ts:3713`), which is generic over EVERY TABLE IN THE ESTATE. THAT
 // LAST NUMBER READ `3138` AND POINTED AT A REFUSAL STRING INSIDE `tradingDay`,
 // which is ADR-212's hazard on this file too: a citation broken by lines
 // inserted above it. ADR-281 moved this neighbourhood by thirteen lines and

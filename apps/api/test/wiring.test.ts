@@ -665,7 +665,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'AND ADR-281 RE-DERIVED THAT DOOR AT SOURCE RATHER THAN TAKING THIS ENTRY`s WORD FOR IT, ' +
     'BECAUSE A DOOR THAT EXISTS AND IS NOT REACHED FROM THE REFUSING PATH IS NOT A DISCHARGE: ' +
     '`ScopedTx.lastClosedTradingDay(): Promise<string>` is DECLARED at ' +
-    '`packages/db/src/scoped-db.ts:3589` and IMPLEMENTED at `:3782` on `source`, which is the ' +
+    '`packages/db/src/scoped-db.ts:3635` and IMPLEMENTED at `:3782` on `source`, which is the ' +
     'payout transaction itself; `lastClosedTradingDayStatement` (`:3224`) reads both calendar ' +
     'tables and throws on an empty calendar, an EXHAUSTED one and a coverage gap alike; the ' +
     'return type is `string` so no caller holds an absent value to fold a UTC date into ' +
@@ -791,7 +791,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`min_settlement_lag_trading_days`, which M01 section 2.4 requires, and ' +
     '`rule-state-producibility.test.ts` link 8 decodes the document out of the README on every ' +
     'run to prove it. WHAT `plan` WAITS ON NOW IS THE SIZE ROW AND IT IS SMALLER AND NAMED: ' +
-    '`ScopedTx.catalogRowAt` returns `Promise<unknown>` (`packages/db/src/scoped-db.ts:3620`) ' +
+    '`ScopedTx.catalogRowAt` returns `Promise<unknown>` (`packages/db/src/scoped-db.ts:3666`) ' +
     'and `plan_version_sizes.payout_cap_schedule_cents` is itself `jsonb` holding cents ' +
     '(`packages/db/migrations/0004_catalog.sql:168`), so the second argument is a blob too. ' +
     'ADR-283 DID NOT TAKE IT AND ADR-286 IS THE RULING IT SAID SOMEBODY OWNS. THAT ROW LEFT ' +
@@ -1190,7 +1190,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
     '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
-    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3481`) at the one reason ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3527`) at the one reason ' +
     '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
     'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
     'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +

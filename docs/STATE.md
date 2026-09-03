@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-30
+last_updated: 2026-09-03
 ---
 
 # STATE
@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->290<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->291<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11267,3 +11267,25 @@ The position after this row, each command run separately and each exit code read
 **The landmine every session in this container keeps meeting: `node_modules` was absent on arrival again**, restored by `pnpm install --frozen-lockfile` and never committed. **And the repository itself was absent**: the container held no clone at all, and it was attached and verified against this row before a byte was written.
 
 Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **31 of 31** invariants off the runner's own last line, **298 files / 7,249 passed / 6 skipped** with a delta of **ZERO**, typecheck 0, lint 0, `format:check` clean. **`falsify.mjs` was NOT run**, and the fence is measured rather than intended: `git status --porcelain` names **six files and all six are under `docs/`**, two of them the generated registry READMEs. **`pnpm run verify` was NOT run**, forbidden by the row. **NO GITHUB API ACCESS: THE BRANCH IS PUSHED AND MERGEABLE AND NO PR WAS OPENED.** `gh` is not installed in this container and the REST call answers *"GitHub access is not enabled for this session. An org admin must connect the Claude GitHub App for this organization."* The push itself succeeds through the session's git proxy, so the branch is on `origin` and the pull request is one click for the founder. This is the same refusal sessions **485**, **487** and **291** reported.
+
+## 2026-09-03 - Session 496: the door has no caller, so it gets a type ([ADR-303](decisions/ADR-303.md), proposed)
+
+**Row `303`, a BUILD row on the money path. [ADR-303](decisions/ADR-303.md), twelve sections, `proposed` and UNSIGNED, `E2` READ OWED.** [ADR-299](decisions/ADR-299.md) ruling 1 is built: `catalogRows`, `catalogRowsWhere` and `catalogRowAt` on `ScopedTx` return `CatalogRow<K>`, which is `(typeof TABLES)[K]['$inferSelect']` and therefore `schema.ts`'s own row, instead of `unknown`. **The `unknown` was inherited rather than ruled**, [ADR-233](decisions/ADR-233.md) never mentions it, and the door had no production caller, so this was the last moment its shape could be chosen by the row that needs it.
+
+**The stop condition was two-sided and the second side was measured rather than claimed.** The refusal inventory of [`catalog-read.test.ts`](../packages/db/test/catalog-read.test.ts) was derived from the file before the first edit, re-derived after, and compared as sets. **Before minus after is empty.** Twenty cases existed and twenty pass unchanged; three were added; no case was deleted, skipped, relaxed, renamed or retargeted; and no count fell. The guard order inside all three verbs is untouched.
+
+**The type half is checked by `tsc` and not by vitest**, because `packages/db/tsconfig.json` includes `test/**/*.ts`. Four type aliases pin what [ADR-299](decisions/ADR-299.md) section 5.1 states as LIMITS rather than as gains: the cap-schedule `jsonb` stays `unknown`, the four scoped read verbs stay `unknown`, a nullable column keeps its null, and the row is neither `unknown` nor `any`. **Three of them were watched RED.** `Same<A, B>` is the conditional-identity form and not mutual assignability, because `any` is assignable in both directions and would pass a two-sided check silently.
+
+**The runtime guards did not come off and `CatalogRow`'s docblock says so**, which is section 5.1 item 5 carried into the file it governs rather than left in an entry. A type derived from `schema.ts` is a type derived from a transcription, and no check in this tree compares a `schema.ts` column type against the DDL.
+
+**Nine line-numbered citations were repaired under the granted extension, each derived from the content it names.** The diff inserts in two places, so a citation below the first moved 46 lines and one below the second moved 51, and `ALLOCATION.md:203` is the one a uniform offset would have broken. **`RI-16`'s own nomination for that one was also wrong**, pointing at a comment mentioning `BEGIN` rather than at the `await conn.query('BEGIN')` the row names: the runner finds the nearest occurrence of a token and a row names a statement. **Two of the nine were not flagged and were repaired anyway**, in files the runner had already opened, and [ADR-303](decisions/ADR-303.md) section 6 declares that as the one place this row went past the letter of its grant. **Fourteen more drifted citations in eleven ADRs and session logs are left standing**, because `RI-16` excludes a dated or session heading by design.
+
+**Five live sentences now say `catalogRowAt` returns `Promise<unknown>` and all five are false.** They are in [`accounts.ts`](../apps/api/src/routes/accounts.ts), [`payouts.ts`](../apps/api/src/routes/payouts.ts), [`wiring.test.ts`](../apps/api/test/wiring.test.ts) and [`rule-state-producibility.test.ts`](../apps/api/test/rule-state-producibility.test.ts), all out of fence, and two of them are the recorded reason a port is still blocked. **They are the first thing the next row over those files owes.**
+
+**`RI-32`, reserved to this row if needed, is left free.** `packages/tooling/**` is out of fence, and the property worth holding is already held by `tsc` in the file that owns it, which reads the type rather than the spelling of it.
+
+**Next.** [ADR-287](decisions/ADR-287.md) slice 5, which this row was dispatched to unblock and which follows it. `CatalogRow` is not re-exported from `packages/db/src/index.ts`, which is out of fence and is one line belonging to slice 5's own row.
+
+**NO MIGRATION, NO ROUTE BEHAVIOUR, NO ENGINE FILE, NO NEW WORKSPACE PACKAGE, NO KEY ADMITTED TO `CATALOG_TABLE_KEYS`, NO WRITE VERB, NO DOOR WIDENED, NO GATE WEAKENED, NO FENCE WIDENED, NO SYNTHESISED DEFAULT, NO CAST ONTO AN UNVALIDATED ROW, NO FLOAT, NOTHING SIGNED. THE WIRED COUNTS DO NOT MOVE: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED.**
+
+Counts derived at reporting time, each command run separately: **33 of 33** gates after `generate`, **32 of 32** invariants off the runner's own last line, **302 files / 7,340 passed / 6 skipped** against a baseline of **302 / 7,337 / 6** measured on this tree with all five files reverted to `6f0efab`, a delta of exactly the three added cases. `typecheck` clean, `lint` clean, `format:check` clean. **`pnpm run verify` was NOT run**, forbidden by the row, and `falsify.mjs` was never invoked by any path.
