@@ -69,11 +69,21 @@ const TERMINAL_SQL = read(
 // fact here that is not a sentence: it is arithmetic a shipped function performs.
 
 test('ADR-267 clause 1: `LT-06` DEBITS the wallet, measured through the exact negation the library exports', () => {
-  // `walletWithdrawalApprovalPosting` is private, deliberately, because nothing
-  // in this tree rules `LT-06`'s writer. What IS exported is `LT-09`, built from
-  // it by `reversalPosting`, which swaps each transfer's two sides and does
-  // nothing else. So `LT-09`'s signs are `LT-06`'s inverted, and reading them is
-  // reading `LT-06` without exporting a second door to it.
+  // WHEN THIS CASE WAS WRITTEN `walletWithdrawalApprovalPosting` WAS PRIVATE,
+  // deliberately, because nothing in this tree ruled `LT-06`'s writer. That was
+  // ADR-267, dated 2026-08-30. ADR-270 clause 2 ruled the writer on 2026-08-30
+  // as well, three entries later on the same day: a transaction a clock opens,
+  // at `systemDb('nightly-batch')` in `apps/worker`. ADR-314 exported the
+  // builder on that discharge. SO NOBODY OVERRODE A DELIBERATE DECISION HERE.
+  // The decision was conditional on its own face and the condition was met.
+  //
+  // THE CASE IS UNCHANGED ANYWAY, AND DELIBERATELY SO. It still reads `LT-06`'s
+  // signs through `LT-09`, built from it by `reversalPosting`, which swaps each
+  // transfer's two sides and does nothing else. That composition is still the
+  // only construction of `LT-06`'s arithmetic in `packages/ledger`, so an export
+  // that altered the arithmetic turns this red. Which is why the export was
+  // checked here rather than by a second case asserting the same thing another
+  // way.
   const identityId = '11111111-1111-4111-8111-111111111111';
   const entries = entriesOf(
     walletWithdrawalFailurePosting(

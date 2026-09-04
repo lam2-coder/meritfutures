@@ -74,6 +74,7 @@ export {
   WALLET_WITHDRAWAL_FAILURE_KIND,
   WALLET_WITHDRAWAL_REFERENCE_KIND,
   reversalPosting,
+  walletWithdrawalApprovalPosting,
   walletWithdrawalFailureKey,
   walletWithdrawalFailurePosting,
   type ReversalHeader,
