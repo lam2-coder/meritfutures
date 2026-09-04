@@ -196,7 +196,7 @@ test('exactly one file under src imports the accessor, and it is src/db.ts', () 
 // 4. What this deployable can import at all
 // -----------------------------------------------------------------------------
 
-test('src reaches two workspace packages and one Node builtin, and no raw driver', () => {
+test('src reaches three workspace packages and one Node builtin, and no raw driver', () => {
   // `pg` AND `drizzle-orm` ARE THE TWO NAMES ADR-165 FORECLOSES AT THE SOURCE.
   // `merit/no-raw-db-client` bans them by lint over `apps/**`; this asserts the
   // same thing over this deployable from the other direction, so the property
@@ -209,7 +209,21 @@ test('src reaches two workspace packages and one Node builtin, and no raw driver
   // whose whole subject is a builtin reaching a package that must not have one.
   // Writing it here rather than filtering it out is what makes a SECOND builtin
   // arriving a decision somebody sees.
-  expect([...bareSpecifiers()].sort()).toEqual(['@merit/db', '@merit/rules-engine', 'node:crypto']);
+  //
+  // **`@merit/ledger` JOINED ON 2026-09-04 (ADR-305 section 7 slice 6) AND THE
+  // LIST IS WIDENED RATHER THAN THE CASE LOOSENED.** It is the posting library,
+  // it is admitted for exactly one file, and that file is `src/sweeps/ledger.ts`
+  // on the same ONE-DOOR pattern section 3 above runs for the accessor. THE
+  // ONE-DOOR HALF IS ASSERTED IN `apps/api/test/ledger-posting-authority.test.ts`
+  // AND NOT REPEATED HERE, because that file is where the posting authority is
+  // held and two statements of one fact is what drifts. An exact list is what
+  // makes a FOURTH workspace package a decision somebody takes here.
+  expect([...bareSpecifiers()].sort()).toEqual([
+    '@merit/db',
+    '@merit/ledger',
+    '@merit/rules-engine',
+    'node:crypto',
+  ]);
 });
 
 test('every bare specifier src imports is declared in this deployable manifest', () => {

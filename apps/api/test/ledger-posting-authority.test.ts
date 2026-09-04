@@ -167,23 +167,90 @@ test('no migration is taken by this entry: none names ADR-270', () => {
 });
 
 // -----------------------------------------------------------------------------
-// Clause 6: three measured absences stand between the ruled authority and a
-// posting, and not one of them is an authority
+// Clause 6: absence 2 IS CLOSED and the property it was measuring is not, which
+// is why these three cases are rewritten rather than deleted
 // -----------------------------------------------------------------------------
+// THIS CLAUSE READ "three measured absences stand between the ruled authority
+// and a posting". ADR-305 section 7 slice 6 closed the second of them: the
+// worker declares `@merit/ledger`, `apps/worker/src/sweeps/ledger.ts`
+// discharges `ExpiryLedgerPort` and `postTransaction` now has a third caller in
+// this estate. The three cases below went red on that change, in the order they
+// are written, and each was seen red before it was touched.
+//
+// NOT ONE OF THEM IS DELETED AND NOT ONE IS LOOSENED TO A `toContain`, because
+// what each was protecting outlives the absence it happened to measure:
+//
+//   1. WHICH DEPLOYABLES MAY NAME THE POSTING LIBRARY. The old case said
+//      `apps/api` was the only one. That boundary was deliberately crossed, so
+//      the case now pins the WHOLE admitted set from the manifests plus the
+//      one file inside the worker that the grant reaches. A third deployable
+//      taking the dependency, or a second file in the worker naming it, is red.
+//
+//   2. WHAT POSTS INSIDE `apps/worker`. `toEqual([])` becomes `toEqual([the
+//      adapter])`: an EXACT list, so a fourth caller fails exactly as the first
+//      one did. A `length` check or a substring would have retired the case.
+//
+//   3. THAT NO DEPLOYMENT CAN POST. The NAME of case 3 is still true after
+//      slice 6 and that is the whole point: what moved is the LIST, not the
+//      property. `UNWIRED_EXPIRY_SWEEP_IO` is still the default, nothing
+//      constructs an `ExpirySweepIo`, and the adapter recovers its handle by
+//      identity through `recordExpiryTransaction`, which HAS NO CALLER. So the
+//      map is empty in every deployment and the third call site refuses every
+//      handle it could be given. The `API_START` assertions are untouched.
 
-test('`apps/worker` cannot name the posting library, and `apps/api` is the only package that can', () => {
-  expect(WORKER_MANIFEST).not.toContain('@merit/ledger');
+test('exactly two deployables may name the posting library, and the worker grant reaches one file', () => {
+  // ADR-305 SECTION 7 SLICE 6 CROSSED THE BOUNDARY THIS CASE USED TO ASSERT,
+  // so the assertion is the whole admitted SET rather than one absence. It is
+  // derived from the tree rather than listed, on `walk`'s own reasoning: a
+  // sixth deployable added with the dependency already in it would pass a list
+  // that named the five that existed when this was written.
+  const admitted = readdirSync(join(ROOT, 'apps'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => read('apps', name, 'package.json').includes('"@merit/ledger"'))
+    .sort();
+  expect(admitted).toEqual(['api', 'worker']);
+  expect(WORKER_MANIFEST).toContain('"@merit/ledger": "workspace:*"');
   expect(API_MANIFEST).toContain('"@merit/ledger": "workspace:*"');
+
+  // THE MANIFEST LINE GRANTS THE CAPABILITY TO A WHOLE DEPLOYABLE AND THIS IS
+  // THE HALF THAT SAYS WHERE IT LANDED. ADR-165 set the pattern for `@merit/db`
+  // at `src/db.ts` and `apps/worker/test/db.test.ts` runs it; this is the same
+  // measurement for the posting library, and it lives here because this file is
+  // where the authority question is held.
+  const naming = walk('apps', 'worker', 'src')
+    .filter((path) => readFileSync(path, 'utf8').includes("from '@merit/ledger'"))
+    .map((path) => path.slice(ROOT.length + 1))
+    .sort();
+  expect(naming).toEqual(['apps/worker/src/sweeps/ledger.ts']);
+
+  // AND `ports.ts` IS STILL NOT IT, which is what keeps ADR-315's ruling
+  // standing: that file imports nothing, so `ExpiryTx` cannot grow a `ledger`
+  // member without restating `LedgerTx` and dragging both excluded keys back
+  // into the sweep's reach. THE ASSERTION IS ON THE IMPORT AND NOT ON THE NAME,
+  // because that file's docblock QUOTES the package while refusing to import it
+  // and the explanation has to stay writable.
+  expect(read('apps', 'worker', 'src', 'sweeps', 'ports.ts')).not.toMatch(/from '@merit\/ledger'/);
 });
 
-test('the worker posting ADR-172 finding 16 reports is a PORT and a sentence, not an adapter', () => {
-  const callers = walk('apps', 'worker', 'src').filter((path) =>
-    readFileSync(path, 'utf8')
-      .split('\n')
-      .some((line) => line.includes('postTransaction(') && !line.trimStart().startsWith('*')),
-  );
-  expect(callers).toEqual([]);
-  // What does exist is the port and the docstring naming the adapter in prose.
+test('the worker posting ADR-172 finding 16 reported is an ADAPTER now, and it is exactly one file', () => {
+  const callers = walk('apps', 'worker', 'src')
+    .filter((path) =>
+      readFileSync(path, 'utf8')
+        .split('\n')
+        .some((line) => line.includes('postTransaction(') && !line.trimStart().startsWith('*')),
+    )
+    .map((path) => path.slice(ROOT.length + 1))
+    .sort();
+  // AN EXACT LIST AND NOT A LENGTH OR A SUBSTRING. `toEqual([])` was what made
+  // the FIRST adapter fail this case; an exact list is what makes the SECOND
+  // one fail it, and a `length` check would have made this case retire itself
+  // the moment it was first turned.
+  expect(callers).toEqual(['apps/worker/src/sweeps/ledger.ts']);
+  // THE JOB IS NOT A CALLER AND MUST NOT BECOME ONE. `expiry.ts` calls the PORT
+  // and the port is what keeps ledger arithmetic out of the sweep.
+  expect(callers).not.toContain('apps/worker/src/sweeps/expiry.ts');
+  // The port itself is unchanged, which is what the adapter had to satisfy.
   expect(read('apps', 'worker', 'src', 'sweeps', 'ports.ts')).toContain(
     'postLt01(tx: ExpiryTx, values: Lt01Values): Promise<void>;',
   );
@@ -193,7 +260,7 @@ test('the worker runs one job and records that every other one is unscheduled', 
   expect(WORKER_INDEX).toContain('The job store is still not\n * installed');
 });
 
-test('no deployment of Merit can post a ledger entry: two call sites, both unwired', () => {
+test('no deployment of Merit can post a ledger entry: three call sites, all unwired', () => {
   const callers = [...walk('apps', 'api', 'src'), ...walk('apps', 'worker', 'src')]
     .filter((path) =>
       readFileSync(path, 'utf8')
@@ -205,7 +272,32 @@ test('no deployment of Merit can post a ledger entry: two call sites, both unwir
   expect(callers).toEqual([
     'apps/api/src/routes/admin-payouts.ts',
     'apps/api/src/routes/checkout.ts',
+    'apps/worker/src/sweeps/ledger.ts',
   ]);
   expect(API_START).not.toContain('useCheckoutBackend(');
   expect(API_START).not.toContain('useAdminPayoutBackend(');
+
+  // THE THIRD SITE'S UNWIRING, AT THE SAME RESOLUTION AS THE OTHER TWO. The
+  // `apps/api` pair is unreachable because `start.ts` installs no backend; the
+  // worker's is unreachable for a reason one level further in, and it is the
+  // adapter's own mechanism rather than an omission. `postLt01` recovers its
+  // `LedgerTx` by the IDENTITY of the `ExpiryTx` it is given (ADR-315), and the
+  // only thing that records one is `recordExpiryTransaction`. NOTHING CALLS IT,
+  // so the map is empty in every deployment of this code and every handle the
+  // adapter could be given is refused.
+  const recorders = walk('apps', 'worker', 'src')
+    .filter((path) =>
+      readFileSync(path, 'utf8')
+        .split('\n')
+        .some(
+          (line) => line.includes('recordExpiryTransaction(') && !line.trimStart().startsWith('*'),
+        ),
+    )
+    .map((path) => path.slice(ROOT.length + 1))
+    .sort();
+  expect(recorders).toEqual([]);
+  // And the default `ExpirySweepIo` still refuses rather than serving.
+  expect(read('apps', 'worker', 'src', 'sweeps', 'ports.ts')).toContain(
+    "ledger: { postLt01: () => Promise.reject(new ExpirySweepUnwired('ledger.postLt01')) },",
+  );
 });

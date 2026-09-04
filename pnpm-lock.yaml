@@ -246,6 +246,9 @@ importers:
       '@merit/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@merit/ledger':
+        specifier: workspace:*
+        version: link:../../packages/ledger
       '@merit/rules-engine':
         specifier: workspace:*
         version: link:../../packages/rules-engine

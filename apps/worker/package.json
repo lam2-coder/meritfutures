@@ -12,8 +12,10 @@
     "start": "node --experimental-strip-types src/start.ts"
   },
   "//": "IT DEPENDS ON THE ENGINE AND THE ENGINE DEPENDS ON NOTHING. RI-01 asserts packages/rules-engine declares no workspace dependency, so the arrow can never point back. `@merit/rules-engine` resolves through that package's `exports` map, which publishes `.` and nothing else, so `../rules-engine/src/day/advance.js` is not reachable from here at all: the batch folds through the PUBLISHED interface because the module resolver gives it no other option.",
+  "//dependencies.@merit/ledger": "ADDED BY ADR-305 SECTION 7 SLICE 6, AND IT IS THE LINE `ledger-posting-authority.test.ts` ASSERTED THE ABSENCE OF UNTIL THAT SLICE. `ExpiryLedgerPort.postLt01` is the hourly sweep's `LT-01` posting and `lt01` is published from `packages/ledger/src/index.ts` since ADR-317, so the adapter that discharges the port has to be able to name the package. IT GRANTS THE CAPABILITY TO EXACTLY ONE FILE AND THE SUITE SAYS WHICH: `src/sweeps/ledger.ts`, on the ONE-DOOR pattern ADR-165 set for `@merit/db` at `src/db.ts`. `src/sweeps/ports.ts` still imports nothing, so `ExpiryTx` keeps three members and `EXPIRY_TABLES` still excludes both ledger keys (ADR-315).",
   "dependencies": {
     "@merit/db": "workspace:*",
+    "@merit/ledger": "workspace:*",
     "@merit/rules-engine": "workspace:*"
   },
   "devDependencies": {
