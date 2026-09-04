@@ -328,6 +328,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-314](ADR-314.md) | the `LT-06` builder gets a public door, `LT-09` still derives from it so the two cannot part, and the ground the door was shut on had expired three entries later on the same day  (2026-09-04, status: proposed) |
 | [ADR-315](ADR-315.md) | a handle that names nothing. The sweep's adapter sentence named a member `ExpiryTx` does not have, and the member is unreachable rather than merely unwanted  (2026-09-04, status: proposed) |
 | [ADR-316](ADR-316.md) | the withdrawal approval sweep's port, and `decideApproval` does not move. The lock the driver needs is already the one `INV-M20-01` names and both authorities can take it, what the driver shares with the route is seven terms of eight, and the event registry names `apps/api` as the producer of an edge that deployable cannot drive  (2026-09-04, status: proposed) |
+| [ADR-317](ADR-317.md) | `lt01` moves into `packages/ledger`, its refusal class moves with it under its own name, and the ADR-176 ratchet is restated from a location into a count over three files instead of two  (2026-09-04, status: proposed) |
 | [ADR-319](ADR-319.md) | an operator close in no session takes the last day that CLOSED, an operator close outside coverage takes no day at all, and three of the constraint's four statuses are not served by either (2026-09-04, status: proposed) |
 <!--/gen-->
 

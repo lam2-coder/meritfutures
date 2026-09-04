@@ -733,7 +733,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "and a request-path fold is the divergence ADR-026 C-07's `state_hash` exists to make " +
     'detectable, computed on the one path no replay audit reads. ' +
     'SIXTH, AND THE CLAUSE THAT HAS MOVED MOST IS NOW CLOSED. ' +
-    '`PayoutSubject` (`routes/payouts.ts:334`) CARRIES THREE FIELDS AND THIS ENTRY NAMED ONLY ' +
+    '`PayoutSubject` (`routes/payouts.ts:337`) CARRIES THREE FIELDS AND THIS ENTRY NAMED ONLY ' +
     'TWO FOR ELEVEN REVISIONS. `state` is clauses one to four, `plan` was discharged by ' +
     'ADR-233, and `gates` is an `ExternalGates` WHICH IS NOW CONSTRUCTIBLE. THE CLAUSE MOVED ' +
     'THREE TIMES AND IS RECORDED THAT WAY BECAUSE EACH MOVE WAS A DIFFERENT KIND OF THING. ' +
@@ -1392,13 +1392,18 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`reversalPosting`) and not it, and a manifest line grants a deployable the EXPORTED ' +
     'surface, so a session reading the worker`s missing dependency as a one-line fix would ' +
     'land the line, import the package and find no function to call. ' +
-    '`F2`: `lt01` HAS EXACTLY ONE DEFINITION IN THIS REPOSITORY AND IT IS IN THE DEPLOYABLE ' +
-    'THE WORKER CANNOT IMPORT, at `apps/api/src/routes/payouts.ts:971`. The way round is ' +
+    '`F2`: `lt01` HAD EXACTLY ONE DEFINITION IN THIS REPOSITORY AND IT WAS IN THE DEPLOYABLE ' +
+    'THE WORKER CANNOT IMPORT. The way round was ' +
     'refused by the port itself, which says that file "names no ledger account, writes no ' +
     'transfer and contains no ledger arithmetic", a second transcription of the split being ' +
     'ADR-092 section 5`s two-statements-of-one-fact hazard on the money path. So `lt01` moves ' +
-    'or nothing posts. ADR-305 POINTED AT THAT DEFINITION AT A LINE IT NO LONGER HOLDS and ' +
-    'the pointer here is re-derived rather than transcribed. ' +
+    'or nothing posts. ADR-305 POINTED AT THAT DEFINITION AT A LINE IT NO LONGER HELD and the ' +
+    'pointer here was re-derived rather than transcribed. ' +
+    'ADR-317 MOVED IT AND `F2` IS DISCHARGED. It is `packages/ledger/src/payout.ts:101`, both ' +
+    'doors in `apps/api` import it back, and it STILL HAS EXACTLY ONE DEFINITION: the move ' +
+    'was code motion and the property the old arrangement protected is what carried it. ' +
+    'THE MANIFEST LINE IS STILL OWED, so this port is no closer to wired: slice 6 owes ' +
+    '`apps/worker/package.json` its `@merit/ledger` dependency and the adapter itself. ' +
     '`F3` IS THE SMALLEST AND WOULD STOP A SESSION JUST AS HARD, BECAUSE THE ADAPTER SENTENCE ' +
     'AND THE PORT DISAGREE. `ExpiryTx` (`apps/worker/src/sweeps/ports.ts:157`) declares ' +
     '`rowsWhere`, `lockAt` and `updateAt` and no `ledger` member, while `postLt01` ' +
