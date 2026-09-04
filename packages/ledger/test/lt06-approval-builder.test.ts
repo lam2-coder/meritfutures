@@ -139,6 +139,20 @@ describe('`LT-09` still derives from it, and a fork of the arithmetic is what th
     // ADR-092 section 5. A `.filter` over a hardcoded file list watches those
     // files and not the claim, which is the miss `in-flight-obligation.test.ts`
     // records against itself, so the directory is walked.
+    //
+    // THE CENSUS EXPECTED ONE SITE UNTIL ADR-317 AND EXPECTS TWO NOW, AND THE
+    // PREDICATE IS UNTOUCHED. `lt01` moved into this package and `LT-01` CREDITS
+    // the identity's wallet where `LT-06` DEBITS it, so `payout.ts` names the
+    // same account in a different transaction. The tempting repair was to narrow
+    // `matchesWalletLeg` until the new site fell outside it, and that is
+    // weakening a gate to pass it: a narrower predicate stops seeing sites this
+    // one still sees. So the predicate stands, the census is asserted SITE BY
+    // SITE with the reason each is legitimate, and a THIRD occurrence anywhere
+    // in `src/` is still red on arrival.
+    //
+    // AND `LT-06` ITSELF IS PINNED SEPARATELY BELOW, by its credit half. The
+    // broad census proves the population; `withdrawals_in_flight` proves that
+    // exactly one of them is this transaction.
     const walk = (dir: string): readonly string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
         entry.isDirectory()
@@ -156,9 +170,26 @@ describe('`LT-09` still derives from it, and a fork of the arithmetic is what th
       return hits.map((line) => `${file}: ${line.trim()}`);
     });
 
-    // One site: `walletWithdrawalApprovalPosting`'s own debit leg. A second is
-    // a second statement of `LT-06`, wherever it sits and whatever it is called.
-    expect(constructions).toHaveLength(1);
-    expect(constructions[0]).toContain('reversal.ts');
+    // Two sites, each named. `reversal.ts` is `walletWithdrawalApprovalPosting`'s
+    // own DEBIT leg, which is `LT-06`. `payout.ts` is `lt01`'s trader half,
+    // which CREDITS the same account and is `LT-01` (ADR-317). Anything else is
+    // a second statement of a posting, wherever it sits and whatever it is
+    // called.
+    expect(constructions).toHaveLength(2);
+    expect(constructions.filter((site) => site.includes('reversal.ts'))).toHaveLength(1);
+    expect(constructions.filter((site) => site.includes('payout.ts'))).toHaveLength(1);
+
+    // `LT-06` IS THE PAIR AND NOT THE ACCOUNT, so the pair is what pins it: the
+    // obligation account it credits is named exactly once in this package, in
+    // the file that holds the builder. A second `LT-06` under any name goes red
+    // here whether or not it spells its debit leg the way this one does.
+    const inFlight = files.flatMap((file) =>
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .filter((line) => line.includes("firmAccount('withdrawals_in_flight')"))
+        .map((line) => `${file}: ${line.trim()}`),
+    );
+    expect(inFlight).toHaveLength(1);
+    expect(inFlight[0]).toContain('reversal.ts');
   });
 });
