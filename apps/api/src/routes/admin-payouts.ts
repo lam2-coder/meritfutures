@@ -75,12 +75,14 @@
 //
 // Three refusals follow and each is a refusal to invent:
 //
-//   1. THE POSTING IS `payouts.ts`'s OWN `lt01()`, IMPORTED. This file names no
+//   1. THE POSTING IS `@merit/ledger`'s `lt01()`, IMPORTED. This file names no
 //      ledger account, writes no transfer and contains no ledger arithmetic. A
 //      second transcription of `debit trader_withdrawable / credit
 //      trader_wallet / credit fees_revenue` is ADR-092 section 5's
 //      two-statements-of-one-fact hazard arriving on the money path, and `lt01`
-//      already asserts `INV-M5-03` over the split internally.
+//      already asserts `INV-M5-03` over the split internally. It was imported
+//      from `payouts.ts` until ADR-317 moved the declaration into the package
+//      `apps/worker` can also reach; the import moved and the refusal did not.
 //   2. THE MONEY IS READ OFF THE STORED ROW AND IS NEVER RECOMPUTED. `INV-M5-02`
 //      is the number shown is the number sent, and API_CONTRACT's own comment on
 //      `PayoutReleaseResponse` is that a release producing a different number
@@ -189,7 +191,7 @@
 // There is no float in this file or in its suite.
 // =============================================================================
 
-import { postTransaction, readChart } from '@merit/ledger';
+import { lt01, postTransaction, readChart } from '@merit/ledger';
 import type { LedgerTx } from '@merit/ledger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -200,7 +202,7 @@ import type { Problem } from '../server.ts';
 import { ACCOUNT_ACTION_ROLES } from './admin-writes.ts';
 import type { AdminInitiative, AdminPrincipal, AdminRole } from './admin-writes.ts';
 import { centsToJson } from './checkout.ts';
-import { PAYOUT_ENDPOINT, lt01 } from './payouts.ts';
+import { PAYOUT_ENDPOINT } from './payouts.ts';
 
 // -----------------------------------------------------------------------------
 // The two contract paths

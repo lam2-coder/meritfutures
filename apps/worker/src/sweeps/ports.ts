@@ -185,7 +185,7 @@ export interface ExpiryTx {
 // -----------------------------------------------------------------------------
 
 /**
- * `LT-01`'s six values, field for field with `payouts.ts`'s `lt01()`.
+ * `LT-01`'s six values, field for field with `@merit/ledger`'s `lt01()`.
  *
  * MONEY IS `bigint` AND A `number` IS REFUSED RATHER THAN COERCED. Every
  * `*_cents` column on `payout_requests` is `bigint` and the Drizzle declaration

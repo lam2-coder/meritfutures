@@ -69,6 +69,8 @@ export {
 
 export { postTransaction, type PostOptions, type PostedTransaction } from './post.ts';
 
+export { PayoutMoneyError, lt01 } from './payout.ts';
+
 export {
   WALLET_WITHDRAWAL_APPROVAL_KIND,
   WALLET_WITHDRAWAL_FAILURE_KIND,

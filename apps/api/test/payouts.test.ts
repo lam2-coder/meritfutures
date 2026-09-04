@@ -27,7 +27,9 @@
 // signs, the zero sum and the `bigint` check all moved into `LT-01 is built and
 // never computed`, where they are made over `postTransaction(recorder,
 // chart, lt01(...))` directly. Deleting them would have been the weakening;
-// they are facts about `lt01` and about `packages/ledger`, and neither moved.
+// they are facts about `lt01` and about `packages/ledger`. ADR-317 has since
+// moved `lt01` INTO `packages/ledger`, so they are now facts about one place
+// rather than two, and the assertions themselves did not move or change.
 //
 // WHAT REPLACES THEM ON THE ROUTE IS THE PROPERTY THAT NOW MATTERS: the
 // approval commits the CALLER'S OWN IDEMPOTENCY KEY to the row, because that
@@ -52,7 +54,7 @@
 // returned is a suite asserting the engine agrees with itself.
 // =============================================================================
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
@@ -70,7 +72,7 @@ import type {
   RuleState,
   TradingDay,
 } from '@merit/rules-engine';
-import { postTransaction, readChart } from '@merit/ledger';
+import { lt01, postTransaction, readChart } from '@merit/ledger';
 import type { LedgerTx, WriteValues } from '@merit/ledger';
 
 import { BASE_PATH, buildServer, discoverRouteModules } from '../src/index.ts';
@@ -99,7 +101,6 @@ import {
   centsFromJson,
   centsToJson,
   gateIdentityStatus,
-  lt01,
   minimumAmountHolds,
   resetPayoutBackend,
   usePayoutBackend,
@@ -1430,12 +1431,32 @@ describe('ADR-285: an absent `rule_states` row is an honest 503 and never a 500'
 // module NOT take".
 //
 // THE PAIRED HALF IS ASSERTED TOO, AND IT IS WHAT KEEPS THIS FROM BEING A
-// ONE-WAY RATCHET. `lt01` must STAY exported here and `admin-payouts.ts` must
-// keep importing it, because the alternative to one statement of
-// `debit trader_withdrawable / credit trader_wallet / credit fees_revenue` is
-// two of them, which is ADR-092 section 5's hazard on the money path. A session
-// that "finished" ADR-176 by moving `lt01` out and letting each door write its
-// own goes red on the second case.
+// ONE-WAY RATCHET. THE PROPERTY IS ONE STATEMENT OF
+// `debit trader_withdrawable / credit trader_wallet / credit fees_revenue` IN
+// THIS REPOSITORY, because the alternative to one is two, which is ADR-092
+// section 5's hazard on the money path. A session that "finished" ADR-176 by
+// letting each door write its own goes red on the third case below.
+//
+// THAT CASE USED TO SAY THE PROPERTY AS A LOCATION AND NOW SAYS IT AS A COUNT,
+// AND THE CHANGE IS ADR-317's. It read
+//
+//   expect(CODE).toMatch(/export function lt01\(/);
+//   expect(ADMIN).toContain("import { PAYOUT_ENDPOINT, lt01 } from './payouts.ts';");
+//
+// which pinned the declaration to `payouts.ts` and the import to
+// `admin-payouts.ts`. ADR-305's `F2` is that `apps/worker` cannot import
+// `apps/api`, so a declaration pinned inside `apps/api` is a declaration the
+// sweep must either reach illegally or transcribe a second time -- which is the
+// very hazard the pin exists to prevent. The declaration moved to
+// `@merit/ledger` and BOTH DOORS IMPORT IT BACK, so the property survives the
+// move and only the location changed.
+//
+// THE REPLACEMENT IS NOT WEAKER AND IT IS NOT THE SAME STRENGTH EITHER. The old
+// pair covered TWO files and could not see a third: nothing in it would have
+// fired if `packages/ledger` had grown a second `lt01` beside the one in
+// `payouts.ts`. The new case counts the declarations in the package, and
+// asserts NO declaration in either door, so it covers THREE files and fires on
+// a second statement wherever any of the three grows one.
 
 describe('ADR-176: the request path holds no ledger handle', () => {
   const SOURCE = readFileSync(
@@ -1447,17 +1468,36 @@ describe('ADR-176: the request path holds no ledger handle', () => {
     'utf8',
   );
 
+  /** `@merit/ledger`'s whole `src/`, as `[filename, comment-stripped source]`. */
+  const LEDGER_SRC = join(import.meta.dirname, '..', '..', '..', 'packages', 'ledger', 'src');
+  const LEDGER_SOURCES: ReadonlyArray<readonly [string, string]> = readdirSync(LEDGER_SRC)
+    .filter((name) => name.endsWith('.ts'))
+    .map((name) => [name, stripComments(readFileSync(join(LEDGER_SRC, name), 'utf8'))] as const);
+  const LEDGER_INDEX = LEDGER_SOURCES.find(([name]) => name === 'index.ts')?.[1] ?? '';
+
+  /** The specifiers a comment-stripped source imports from `@merit/ledger`. */
+  const ledgerSpecifiers = (code: string): readonly string[] =>
+    [...code.matchAll(/import (?:type )?\{([\s\S]*?)\} from '@merit\/ledger';/g)].flatMap((m) =>
+      (m[1] ?? '')
+        .split(',')
+        .map((specifier) => specifier.trim().replace(/^type /, ''))
+        .filter(Boolean),
+    );
+
   /** The file with every line and block comment removed. Prose may name what code may not. */
   // Stripped by the shared home (ADR-279) rather than by a comment regex: a
   // block-comment OPENER written inside a LINE comment opened a phantom block that
   // ran to the next real closer and took every line between them with it.
   const CODE = stripComments(SOURCE);
+  const ADMIN_CODE = stripComments(ADMIN);
 
   it('imports no WRITE-side symbol from @merit/ledger, so nothing here can post', () => {
-    // `posting`, `transfer`, `identityAccount`, `firmAccount` and `Posting` BUILD
-    // a value and reach no database. `postTransaction`, `readChart` and
-    // `LedgerTx` are the three that need a handle, and a handle is what ADR-172
-    // clause 2 refuses this surface.
+    // `postTransaction`, `readChart` and `LedgerTx` are the three symbols that
+    // need a handle, and a handle is what ADR-172 clause 2 refuses this surface.
+    // The build-side five (`posting`, `transfer`, `identityAccount`,
+    // `firmAccount`, `Posting`) reach no database and were always admitted here;
+    // since ADR-317 this file imports none of them either, because `lt01` was
+    // the only thing that used them and `lt01` is now imported whole.
     expect(CODE).not.toMatch(/\bpostTransaction\b/);
     expect(CODE).not.toMatch(/\breadChart\b/);
     expect(CODE).not.toMatch(/\bLedgerTx\b/);
@@ -1474,9 +1514,28 @@ describe('ADR-176: the request path holds no ledger handle', () => {
     expect(port).toMatch(/insertPayoutRequest\(/);
   });
 
-  it('still states `LT-01` exactly once, and `admin-payouts.ts` still reads it from here', () => {
-    expect(CODE).toMatch(/export function lt01\(/);
-    expect(ADMIN).toContain("import { PAYOUT_ENDPOINT, lt01 } from './payouts.ts';");
+  it('states `LT-01` exactly once, in `@merit/ledger`, and BOTH doors read it from there', () => {
+    // 1. The package declares it once. Counted across the whole of its `src/`
+    //    rather than read out of the file it is expected to be in, because a
+    //    second declaration beside the first is what this case exists to catch
+    //    and a targeted read cannot see one.
+    const declaring = LEDGER_SOURCES.filter(([, code]) => /\bfunction lt01\(/.test(code)).map(
+      ([name]) => name,
+    );
+    expect(declaring).toEqual(['payout.ts']);
+
+    // 2. It is published, so the doors' imports resolve to that one declaration
+    //    rather than to a deep path around the package's surface.
+    expect(LEDGER_INDEX).toMatch(/export \{[^}]*\blt01\b[^}]*\} from '\.\/payout\.ts';/);
+
+    // 3. Neither door declares one of its own.
+    expect(CODE).not.toMatch(/\bfunction lt01\(/);
+    expect(ADMIN_CODE).not.toMatch(/\bfunction lt01\(/);
+
+    // 4. And both read it from the package. Matched over the import BLOCK and
+    //    not over one line: the specifier list is prettier's to wrap.
+    expect(ledgerSpecifiers(CODE)).toContain('lt01');
+    expect(ledgerSpecifiers(ADMIN_CODE)).toContain('lt01');
   });
 
   it('carries the caller key into the row, because no later door can post without it', () => {

@@ -114,11 +114,14 @@
 // `start.ts` does not call it, and this route answers 503 before it reaches a
 // transaction at all.
 //
-// THIS FILE STILL HOLDS NO LEDGER ARITHMETIC AND STILL BUILDS `LT-01`. `lt01`
-// below names three accounts and one amount each and computes nothing, and it
-// stays here because `admin-payouts.ts:203` IMPORTS it: a second transcription
-// of `debit trader_withdrawable / credit trader_wallet / credit fees_revenue`
-// is ADR-092 section 5's two-statements-of-one-fact hazard on the money path.
+// THIS FILE STILL HOLDS NO LEDGER ARITHMETIC AND IT NO LONGER BUILDS `LT-01`
+// EITHER. `lt01` names three accounts and one amount each and computes nothing,
+// and it is DECLARED IN `@merit/ledger` and RE-EXPORTED below, because a second
+// transcription of `debit trader_withdrawable / credit trader_wallet / credit
+// fees_revenue` is ADR-092 section 5's two-statements-of-one-fact hazard on the
+// money path. It was declared here and imported by `admin-payouts.ts` until
+// ADR-317; both doors now read it from the package, which is the same one
+// statement in the one place `apps/worker` can also reach (ADR-305 `F2`).
 //
 // -----------------------------------------------------------------------------
 // `C-27` DOES NOT REACH THIS ROUTE, AND THE ANSWER IS THE CONTRACT'S RATHER
@@ -149,7 +152,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { firmAccount, identityAccount, posting, transfer, type Posting } from '@merit/ledger';
+import { PayoutMoneyError, lt01 } from '@merit/ledger';
 import { evaluatePayout } from '@merit/rules-engine';
 import type {
   Cents,
@@ -702,13 +705,15 @@ export function currentPayoutBackend(): PayoutBackend {
 // Money at the boundary. Two functions, and both refuse rather than round.
 // -----------------------------------------------------------------------------
 
-/** Raised when a value on the money path is not integer cents. */
-export class PayoutMoneyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PayoutMoneyError';
-  }
-}
+/**
+ * Raised when a value on the money path is not integer cents.
+ *
+ * DECLARED IN `@merit/ledger` AND RE-EXPORTED HERE (ADR-317). It went there with
+ * `lt01`, which throws it on the `INV-M5-03` refusal; `centsToJson` below throws
+ * the SAME class, so the two sites cannot drift onto two names. The re-export
+ * keeps this module's surface exactly what it was.
+ */
+export { PayoutMoneyError };
 
 /**
  * A JSON integer to `bigint` cents, or `null`.
@@ -925,89 +930,23 @@ export function minimumAmountHolds(evaluation: PayoutEvaluation): boolean {
 }
 
 // -----------------------------------------------------------------------------
-// `LT-01`, built and never computed
+// `LT-01`, built in `@merit/ledger` and re-exported here
 // -----------------------------------------------------------------------------
+// `lt01` WAS DECLARED HERE UNTIL ADR-317 AND ITS BODY IS UNCHANGED, one file
+// and one package over. ADR-305's `F2` is the reason: `apps/worker` cannot
+// import `apps/api`, the hourly sweep's `ExpiryLedgerPort.postLt01` needs this
+// posting, and `sweeps/ports.ts` refuses a second transcription of the split by
+// name. The re-export is what keeps this module's surface what it was; the
+// property `admin-payouts.ts:203` used to protect by importing FROM here is
+// unchanged and stronger, because `LT-01` is now stated once in a library BOTH
+// deployables can reach rather than once in a deployable only one of them can.
+//
+// AND THIS FILE NO LONGER NAMES A LEDGER ACCOUNT AT ALL. `posting`, `transfer`,
+// `identityAccount`, `firmAccount` and `Posting` were imported for `lt01` and
+// for nothing else, so the header's claim that this file "holds no ledger
+// arithmetic" is now true of its import list as well as of its statements.
 
-/**
- * M05 section 2.1's `LT-01`, `payout_approval`.
- *
- *   debit  `trader_withdrawable` (identity)  `approved_cents`
- *   credit `trader_wallet`       (identity)  `trader_cents`
- *   credit `fees_revenue`        (firm)      `firm_cents`
- *
- * THE TABLE'S THREE ENTRIES ARE WRITTEN AS TWO TRANSFERS AND THEREFORE FOUR
- * ENTRIES, AND THAT IS A PROPERTY OF `ADR-104` RULING 1 RATHER THAN A CHOICE
- * MADE HERE. "An entry is never constructed. A `Transfer` is, and every
- * transfer yields exactly two entries." A one-debit two-credit posting is
- * therefore UNREPRESENTABLE in this library, by the same construction that
- * makes the imbalance unrepresentable. The two debits are both against
- * `trader_withdrawable` and in the SAME direction, which `posting()` admits in
- * terms -- "`LEDGER-C1` refuses OPPOSITE signs and says nothing about two
- * debits ... which is what a fee and a principal against one treasury account
- * are" -- and they sum to `approved_cents` exactly, because `trader_cents +
- * firm_cents = approved_cents` is `INV-M5-03`.
- *
- * SO THE INVARIANT THE SHAPE DEPENDS ON IS ASSERTED HERE RATHER THAN ASSUMED.
- * `INV-M5-03` is enforced by a CHECK constraint on `payout_requests` and by the
- * engine's R-44, and neither of those runs between the engine returning a split
- * and this function turning it into two legs. If the two halves did not sum,
- * the total debit against the withdrawable position would silently stop being
- * `approved_cents` while every posting still balanced. That is the class of
- * error `LEDGER-C1` exists for, one level up, and it is checkable, so it is
- * checked.
- *
- * THE DEBIT IS `trader_withdrawable` AND NOT `firm_treasury`, and M05 says why
- * in terms: `firm_treasury` "books a cash movement at approval, which
- * contradicts the ruled recognition timing that payout liability books at
- * approval and cash derecognizes at settlement". That error has been made in
- * this repository once already.
- *
- * `firm_cents` IS RECOGNIZED AT APPROVAL and not held in suspense until
- * settlement, deliberately: "the firm's share is earned when the payout is
- * approved, and holding it in suspense until settlement would make the revenue
- * line depend on a payment rail's latency" (M05 section 2.1, ruled at the batch
- * 1 gate).
- */
-export function lt01(args: {
-  readonly identityId: string;
-  readonly payoutRequestId: string;
-  readonly idempotencyKey: string;
-  readonly approvedCents: Cents;
-  readonly traderCents: Cents;
-  readonly firmCents: Cents;
-}): Posting {
-  if (args.traderCents + args.firmCents !== args.approvedCents) {
-    throw new PayoutMoneyError(
-      `INV-M5-03: trader_cents + firm_cents must equal approved_cents exactly, and ` +
-        `${args.traderCents.toString()}c + ${args.firmCents.toString()}c is not ` +
-        `${args.approvedCents.toString()}c. LT-01 debits the withdrawable position once per ` +
-        'leg, so a split that does not sum would post a total debit that is not the amount ' +
-        'approved, and every leg would still balance.',
-    );
-  }
-  return posting(
-    {
-      kind: 'payout_approval',
-      referenceKind: 'payout_request',
-      referenceId: args.payoutRequestId,
-      idempotencyKey: args.idempotencyKey,
-    },
-    [
-      transfer(
-        identityAccount('trader_withdrawable', args.identityId),
-        identityAccount('trader_wallet', args.identityId),
-        args.traderCents,
-        'LT-01 payout approval: the trader half',
-      ),
-      transfer(
-        identityAccount('trader_withdrawable', args.identityId),
-        firmAccount('fees_revenue'),
-        args.firmCents,
-        'LT-01 payout approval: the firm share, recognized at approval',
-      ),
-    ],
-  );
-}
+export { lt01 };
 
 // -----------------------------------------------------------------------------
 // Validation. Total over the one shape section 6 declares, and hand written.
