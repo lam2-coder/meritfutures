@@ -42,23 +42,37 @@
 //   `plan`       `resolvePlan(rules, size)`          **INJECTED AND REFUSING**
 //
 // **`plan` IS THE ONE TERM THIS FENCE MAY NOT TAKE, AND THE REASON IS `FM-16`
-// RATHER THAN AN ABSENT ROW.** `plan_versions.rules` is a `jsonb` whose decoding
-// into `PlanRulesJson` exists exactly once in this repository, as
-// `toPublishedRules` in `apps/worker/src/batch/adapter.ts`, roughly two hundred
-// and fifty lines of money structure. `apps/api` cannot import `apps/worker`, so
-// a decoder written in this file would be a SECOND statement of that predicate
-// with nothing comparing the two, on the blob that fixes every cents value and
-// every gate threshold a payout is decided against. `ADR-239` slice A already
-// ruled where the shared home is -- `packages/rules-engine`, beside
-// `gates-codec.ts` -- and `ADR-264` set this file's precedent for meeting that
-// finding: **REGISTER it, do not take it**, because taking it is a money-path
-// refactor of a merged adapter and not a liability read.
+// RATHER THAN AN ABSENT ROW.** `plan_versions.rules` is a `jsonb` and a decoder
+// written in this file would be a SECOND statement of the predicate that fixes
+// every cents value and every gate threshold a payout is decided against, with
+// nothing comparing the two. `ADR-239` slice A ruled where the shared home is,
+// `packages/rules-engine` beside `gates-codec.ts`, and `ADR-264` set this file's
+// precedent for meeting that finding: **REGISTER it, do not take it.**
 //
-// So the decoder is a PORT, in {@link EligibleFoldIo}, and its unwired default
-// throws {@link EligibleFoldUnwired} by name. That is
+// **THE SENTENCE THAT SIZED THAT REGISTRATION IS FALSE AND IS QUOTED RATHER THAN
+// DELETED (`ADR-283`).** It read that the decoding "exists exactly once in this
+// repository, as `toPublishedRules` in `apps/worker/src/batch/adapter.ts`" and
+// that "`apps/api` cannot import `apps/worker`". **THE MOVE `ADR-239` SLICE A
+// RULED HAS LANDED**: `decodePlanRules` is exported from the engine's index, this
+// deployable has declared `@merit/rules-engine` since session 252, and
+// `payout-backend.ts` already decodes the blob and resolves a plan on the payout
+// transaction (`ADR-308`). The count was wrong the other way as well: the tree
+// states the predicate THREE times, by the engine, by `toPublishedRules` and by
+// `decodeRules` in `apps/site`, and `rule-state-producibility.test.ts` link 7
+// holds that census at exactly three.
+//
+// **WHAT DOES NOT FOLLOW IS THAT THIS FILE MAY TAKE THE TERM.** The engine's
+// decoder is the first half of `resolvePinnedPlan` and not the whole of it: the
+// port also owes the account's `plan_version_sizes` row, and composing the pair
+// here is a slice with a fence of its own rather than a liability read. So the
+// decoder stays a PORT, in {@link EligibleFoldIo}, and its unwired default throws
+// {@link EligibleFoldUnwired} by name. That is
 // `RuleStateWriterIo.encodeEngineGates`'s own shape, chosen for its own reason:
 // a term that cannot be taken inside a fence is visible as an injected function
-// and invisible as a paragraph.
+// and invisible as a paragraph. **WHAT MOVED IS THE PRICE AND NOT THE REFUSAL**:
+// this term waited on a money-path refactor nobody had taken and now waits on a
+// composition somebody writes, and a reader who meets the retired sentence would
+// size it as the first.
 //
 // -----------------------------------------------------------------------------
 // AN EMPTY `rule_states` IS A REFUSAL AND IS NEVER A ZERO LIABILITY
@@ -212,9 +226,14 @@ export interface EligibleFoldTx {
  * paragraph.
  *
  * `RuleStateWriterIo`'s shape and its reason (`apps/worker/src/batch/state-writer.ts`):
- * the value is produced by code that lives in another deployable, the port makes
- * the absence typed, and the unwired default refuses BY NAME so a caller that
- * forgot to supply one gets the term's name rather than a stack.
+ * the port makes the absence typed, and the unwired default refuses BY NAME so a
+ * caller that forgot to supply one gets the term's name rather than a stack.
+ *
+ * **THE REASON THIS DOCBLOCK GAVE FOR THAT SHAPE IS SUPERSEDED AND IS KEPT SO
+ * THE CHANGE IS VISIBLE.** It read that "the value is produced by code that lives
+ * in another deployable". Since `ADR-283` and `ADR-308` this deployable produces
+ * one too, in `payout-backend.ts`, on the payout transaction. The port survives
+ * that for a smaller reason: it is not this file's fence to compose one here.
  */
 export interface EligibleFoldIo {
   /**
@@ -223,10 +242,16 @@ export interface EligibleFoldIo {
    * the account's columns and this function chooses neither.
    *
    * **IT IS NOT `resolvePlan` ITSELF.** The engine's resolver takes a decoded
-   * `PlanRulesJson` and a decoded `PlanVersionSizeRow`; what is missing in
-   * `apps/api` is the DECODING, so the port is drawn around the read and the
-   * decode together and a supplier satisfies it with `apps/worker`'s
-   * `resolvePinnedPlan` unchanged.
+   * `PlanRulesJson` and a decoded `PlanVersionSizeRow`, so the port is drawn
+   * around the read and the decode together and a supplier satisfies it with
+   * `apps/worker`'s `resolvePinnedPlan` unchanged.
+   *
+   * **THE CLAUSE NAMING WHAT WAS MISSING IS FALSE AND IS QUOTED RATHER THAN
+   * DELETED (`ADR-283`).** It read that "what is missing in `apps/api` is the
+   * DECODING". `decodePlanRules` is exported from `@merit/rules-engine`, this
+   * deployable declares that package, and `payout-backend.ts` calls it. What is
+   * missing is a COMPOSITION of the decode with the size read on a transaction
+   * this fold holds, which is a slice and not a move.
    */
   resolvePinnedPlan(planVersionId: string, sizeCents: Cents): Promise<ResolvedPlan>;
 }
@@ -244,13 +269,19 @@ export class EligibleFoldUnwired extends Error {
   constructor(member: string) {
     super(
       `\`EligibleFoldIo.${member}\` has no implementation in this deployment. ` +
-        '`plan_versions.rules` decodes into `PlanRulesJson` in exactly one place in this ' +
-        'repository, `toPublishedRules` in `apps/worker/src/batch/adapter.ts`, and `apps/api` ' +
-        'cannot import it. A second decoder written on the read side would be a second ' +
+        'A decoder of `plan_versions.rules` written on the read side would be a second ' +
         'statement of the blob that fixes every cents value a payout is decided against, with ' +
         'nothing comparing the two. ADR-239 slice A rules the shared home is ' +
-        '`packages/rules-engine`; until that move lands this term is supplied by a deployment ' +
-        'or the figure is not produced',
+        '`packages/rules-engine` and ADR-283 landed it there as `decodePlanRules`. ' +
+        'THIS MESSAGE USED TO READ that the blob "decodes into `PlanRulesJson` in exactly one ' +
+        'place in this repository, `toPublishedRules` in `apps/worker/src/batch/adapter.ts`, ' +
+        'and `apps/api` cannot import it", and to end "until that move lands". Both clauses ' +
+        'are false since ADR-283 and the wording is superseded here rather than deleted, ' +
+        'because a reader who meets the retired sentence sizes a money-path refactor that has ' +
+        'already happened. What is ' +
+        'unsupplied is this port, which owes a decoded plan AND the account`s ' +
+        '`plan_version_sizes` row together, so a deployment supplies it or the figure is not ' +
+        'produced',
     );
     this.name = 'EligibleFoldUnwired';
     this.member = member;
