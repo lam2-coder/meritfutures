@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-09-03
+last_updated: 2026-09-04
 ---
 
 # STATE
@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->296<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->297<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11409,3 +11409,29 @@ Counts derived at reporting time, each command run separately: **302** test file
 **NOTHING IS SIZED IN SESSION-COUNT.** The only slice counts here are [ADR-305](decisions/ADR-305.md)'s, cited rather than re-derived. **`start.ts` WAS NOT OPENED AND THE WIRED COUNTS DO NOT MOVE: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED.**
 
 Counts derived at reporting time, each command run separately: gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, `format:check` clean. **A docs-only diff cannot move vitest or typecheck and neither is claimed.** **`pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run**, both forbidden by the row. `node_modules` was absent on arrival and was restored by `pnpm install --frozen-lockfile`.
+
+---
+
+## 2026-09-04 - Session 504: the builder with no door gets one, and the ground it was shut on had expired three entries later on the same day ([ADR-314](decisions/ADR-314.md), proposed)
+
+**Row `314`, a BUILD row on the MONEY PATH. [ADR-314](decisions/ADR-314.md), eight sections, `proposed` and UNSIGNED, `E2` read owed and four inherited** ([ADR-189](decisions/ADR-189.md), [ADR-267](decisions/ADR-267.md), [ADR-270](decisions/ADR-270.md), [ADR-305](decisions/ADR-305.md)). [ADR-305](decisions/ADR-305.md) section 7 slice 1.
+
+**THE ABSENCE WAS RE-DERIVED BEFORE ANYTHING MOVED AND BOTH DISPATCHED LINE NUMBERS WERE RIGHT.** `walletWithdrawalApprovalPosting` was declared at [`reversal.ts:218`](../packages/ledger/src/reversal.ts) with no `export`, and its only caller was `:265`, inside `reversalPosting(...)`, which is `LT-09`'s leg. So `@merit/ledger` could build the reversal of a posting it could not hand anybody.
+
+**THE BUILDER NOW CARRIES `export` AND [`index.ts`](../packages/ledger/src/index.ts) HANDS IT OUT**, under the name the corpus already used, so no citation was invalidated by a rename. **`LT-09` STILL DERIVES FROM IT THROUGH `reversalPosting`, AND THERE IS STILL EXACTLY ONE CONSTRUCTION OF `LT-06`'s ARITHMETIC IN `packages/ledger/src`.** [`lt06-approval-builder.test.ts`](../packages/ledger/test/lt06-approval-builder.test.ts) holds that from both sides in five cases, the entries and the text, because a second construction beside the first is [ADR-092](decisions/ADR-092.md) section 5's two-statements-of-one-fact hazard arriving on the money path.
+
+**THREE DEFECTS WERE SEEDED, RUN AND RESTORED**, `sha256sum -c` clean on both source files: a second wallet leg in a NEW `src` module (found by a directory walk that a file list would have missed), `LT-09` restating the legs inline instead of composing, and the builder's two legs swapped. **The third fired [`lt06-posting-timing.test.ts`](../apps/api/test/lt06-posting-timing.test.ts) PIN 1** at *"expected 25000n to be -25000n"* with that file's other nine cases green, which is the check this slice was measured by. **PIN 1's assertions are byte-identical and only its `:72` comment moved.**
+
+**ONE CASE STAYED GREEN UNDER DEFECT 2 AND THAT IS THE FINDING WORTH CARRYING.** The entry-for-entry negation passed against a byte-identical fork, because **a behavioural case catches two copies only once they have already parted**, which on this path is one commit after a withdrawal was reversed by the wrong amount. The textual case catches the fork itself. Neither is sufficient alone.
+
+**THE DOCBLOCK WAS REWRITTEN AT THE SAME LINE COUNT ON PURPOSE, AND IT IS A CITATION DECISION RATHER THAN A STYLE ONE.** Seventeen lines in and seventeen out, so the builder is still declared at `:218` and *"this library opens no transaction and cannot"* is still at `:259`. **Ten of the eighteen `reversal.ts:nn` citations this corpus carries point below that docblock and all ten still resolve, so the citation-repair right the row granted was NOT SPENT ANYWHERE.**
+
+**THE ROW'S OWN TEXT IS WRONG IN ONE FIGURE AND IT WAS CORRECTED RATHER THAN COPIED.** The ground expired **three** entries later and on the **SAME DAY**: [ADR-267](decisions/ADR-267.md) (2026-08-30) wrote the `:72` comment and [ADR-270](decisions/ADR-270.md) (2026-08-30) clause 2 ruled `LT-06`'s writer. The row and the dispatch prompt both say eight. **The row's finding stands untouched and only its count moved**, and it is surfaced because a count nobody re-checked is the failure this project has named as its own worst.
+
+**ONE STALE CITATION FOUND, REPORTED AND NOT REPAIRED.** [ADR-267](decisions/ADR-267.md) finding 3 cites [`reversal.ts:202-234`](../packages/ledger/src/reversal.ts) for `walletWithdrawalFailurePosting`; that range holds the APPROVAL builder and its docblock and the function is at `:261-270`. It was already wrong, this session did not invalidate it, and it sits in a dated record where `CI-06`'s own ruling forbids the rewrite.
+
+**Next.** **[ADR-305](decisions/ADR-305.md) slice 2 (`lt01` into `packages/ledger`) is the one to dispatch into [`index.ts`](../packages/ledger/src/index.ts) next**, and it should be told this branch already appended one specifier to the `./reversal.ts` block, so its own append is a different block and not a conflict. Slices 3, 4 and 5 were unblocked before this session and still are. **Slice 7, the driver, is the first that can compose `LT-06` at all** and still needs 2, 3 and 5 first.
+
+**NOTHING IS WIRED AND `start.ts` WAS NOT OPENED: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED.** No migration written or number taken or reserved, no `RI-nn` minted, no gate weakened, no fence widened, nothing signed, and **no assertion in any pre-existing test file was changed, added or deleted**. [INDEX](INDEX.md) needed no edit and that was checked rather than assumed: it indexes `decisions/` as one row and says entry files are indexed by that README under `CI-06n`.
+
+Counts derived at reporting time, each command run separately: **303** test files passed with **7,391** tests passed and **6** skipped, gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, typecheck, lint and `format:check` clean. **`pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run**, both forbidden by the row. `node_modules` was absent on arrival and was restored by `pnpm install --frozen-lockfile`.
