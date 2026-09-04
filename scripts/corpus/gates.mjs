@@ -1251,8 +1251,29 @@ function tablesInMigrations() {
   for (const file of readdirSync(join(ROOT, dir)).sort()) {
     if (extname(file) !== '.sql') continue;
     const body = read(join(dir, file));
-    for (const m of body.matchAll(/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_]+)/gim)) {
-      out.push({ table: m[1].toLowerCase(), file });
+    // A SCHEMA-QUALIFIED NAME IS NOT A TABLE CALLED BY ITS SCHEMA, and this
+    // parser read one as the other for seventy-eight migrations because there
+    // was nothing else it could be: every table in this estate was in `public`,
+    // so `([a-z_]+)` and "the table name" were the same string. `0079`
+    // (ADR-318) installs pg-boss's job store into its own `pgboss` schema and
+    // the old form captured `pgboss` NINE TIMES, reporting nine duplicate
+    // definitions of one imaginary table and no design record for it.
+    //
+    // PUBLIC IS THE SCOPE, DERIVED RATHER THAN PREFERRED. This function feeds
+    // CI-06i, whose subject is DATA_MODEL's `### <table>` design records, and
+    // it feeds the `tables` span. Both describe MERIT's schema. CI-06h reads
+    // the installed truth as `pg_tables where schemaname='public'` and has
+    // since it was written, so scoping here makes the two agree instead of
+    // making one of them wrong; a vendor's schema has no Merit design record
+    // and is not owed one. `sql_tables` deliberately does NOT change: it is the
+    // `^CREATE TABLE ` grep the workflow itself runs, kept identical on both
+    // sides on purpose, and pg-boss's emitted DDL is indented so that grep
+    // never saw it.
+    for (const m of body.matchAll(
+      /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:([a-z_]+)\.)?([a-z_]+)/gim,
+    )) {
+      if ((m[1] ?? 'public').toLowerCase() !== 'public') continue;
+      out.push({ table: m[2].toLowerCase(), file });
     }
   }
   return out;
@@ -1753,6 +1774,33 @@ const ci06h = {
         "the library's scope map is no longer compared against the installed " +
           'chart, so a firm-scoped trader_wallet row or an identity-scoped ' +
           'reserve row is legal and unread again (ADR-259)',
+      ],
+      // ADR-318, 0079. THE ONLY TWO READERS OF A MIGRATION THAT IS A TRANSCRIPT.
+      // 0079 quotes getConstructionPlans(QUEUE_SCHEMA) rather than declaring the
+      // job store, and packages/queue sets migrate: false, so Contractor.check()
+      // refuses to start against any pgboss.version other than the one the
+      // installed library was compiled with. Deleting the .mjs step makes a
+      // pg-boss catalog bump a silent schema change that fails at boot in a
+      // deployable instead of in a pull request; deleting the .sql step deletes
+      // the only thing that runs a statement against the installed schema, and
+      // it takes REJECTION 5 with it -- the assertion that 0079 grants merit_app
+      // nothing on a schema sitting inside the ledger's restore boundary.
+      [
+        'assert_pgboss_schema_matches_library.mjs',
+        'the pg-boss transcript is no longer compared against the installed ' +
+          'library, so a catalog bump to pg-boss silently stops matching the ' +
+          'schema 0079 installed and the failure moves to a deployable at boot ' +
+          '(ADR-318)',
+      ],
+      [
+        'probe_pgboss_job_store.sql',
+        "0079's job store is no longer probed, so nothing asserts that " +
+          'pgboss.version still pins the version migrate: false reads, that ' +
+          'create_queue routes a job to the right partition and delete_queue ' +
+          'reclaims it, that an undeclared queue, an invented job state and a ' +
+          'keyless key_strict_fifo job are each refused, or that merit_app ' +
+          'still holds nothing at all on a schema inside the ledger PITR ' +
+          'boundary (ADR-318)',
       ],
     ];
     for (const [needle, why] of required) {
