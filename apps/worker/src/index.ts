@@ -393,6 +393,21 @@ export type {
   Lt01Values,
 } from './sweeps/ports.ts';
 
+// **THE LEDGER HALF OF THAT ADAPTER LANDED (ADR-305 section 7 slice 6) AND THE
+// SCHEDULE DID NOT.** `sweeps/ledger.ts` is the one file in this deployable that
+// names `@merit/ledger`, on the ONE-DOOR pattern `src/db.ts` holds for the
+// accessor, and it discharges `ExpiryLedgerPort` and nothing else: `terms` needs
+// `packages/db`'s constructors and `events` needs the sink `P5-n` has not
+// written, so no `ExpirySweepIo` is constructed here or anywhere. THE LEG IS
+// DECLARED BECAUSE THE MODULE EXISTS AND THE BARREL'S OWN SWEEP IS TOTAL, NOT
+// BECAUSE ANYTHING INSTALLS IT: `recordExpiryTransaction` has no caller under
+// `src/`, so `EXPIRY_LEDGER` refuses every handle it could be given today.
+export {
+  EXPIRY_LEDGER,
+  ExpiryLedgerHandleUnknown,
+  recordExpiryTransaction,
+} from './sweeps/ledger.ts';
+
 // -----------------------------------------------------------------------------
 // THE STREAMING INGEST (session 299, `P6-f`)
 // -----------------------------------------------------------------------------
@@ -1237,6 +1252,7 @@ export const WORKER_BARREL_LEGS = [
   './recon/ports.ts',
   './recon/sweep.ts',
   './sweeps/expiry.ts',
+  './sweeps/ledger.ts',
   './sweeps/ports.ts',
 ] as const;
 

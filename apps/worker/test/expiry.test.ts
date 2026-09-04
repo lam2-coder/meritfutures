@@ -1183,12 +1183,31 @@ describe('ADR-315: this job holds no ledger handle and the exclusion stays true 
   });
 
   // THE OTHER HALF OF WHY THE MEMBER IS UNREACHABLE RATHER THAN MERELY
-  // UNWANTED. `ports.ts` imports nothing, so `LedgerTx` could only be RESTATED
-  // here, and the manifest is what makes NAMING it impossible. ADR-315 does not
-  // move this line; ADR-305 section 7 slice 6 is where it moves.
-  it('this deployable still declares no `@merit/ledger`, so the type cannot be named here', () => {
-    expect(source(WORKER_MANIFEST)).not.toContain('@merit/ledger');
+  // UNWANTED, AND ADR-305 SECTION 7 SLICE 6 MOVED THE FIRST LINE OF IT EXACTLY
+  // AS THIS COMMENT SAID IT WOULD. This case read `expect(source(WORKER_MANIFEST))
+  // .not.toContain('@merit/ledger')` and went red on the manifest line the
+  // adapter needs. IT IS REWRITTEN RATHER THAN DELETED, because the manifest was
+  // never the property: the property is that `ports.ts` CANNOT NAME the type,
+  // and the manifest was only the cheaper of the two things standing in the way.
+  //
+  // THE EXPENSIVE ONE IS STILL STANDING AND IS NOW WHAT THE CASE ASSERTS.
+  // `ports.ts` imports nothing at all, so a `ledger` member could only RESTATE
+  // `LedgerTx` there whether or not the deployable declares the package, and the
+  // restatement is what drags both excluded keys back into the sweep's reach.
+  // THE MANIFEST HALF IS KEPT IN THE OTHER DIRECTION rather than dropped: the
+  // grant is real now, so what is checkable is WHERE it landed, and one file
+  // holding it is the ONE-DOOR pattern ADR-165 set for `@merit/db` at `db.ts`.
+  it('the grant `@merit/ledger` now carries reaches one file, and `ports.ts` is not it', () => {
+    expect(source(WORKER_MANIFEST)).toContain('"@merit/ledger": "workspace:*"');
     expect(ports).not.toMatch(/^\s*(?:import|export)\b[^\n]*from '@merit\/ledger'/m);
+    expect(stripComments(ports)).not.toContain('@merit/ledger');
+    // The one file that does name it, and the import it takes. A second file
+    // naming the package is caught in `ledger-posting-authority.test.ts`, which
+    // walks `src/` for it; this half is here because it is THIS suite's port
+    // that the adapter had to satisfy without touching.
+    expect(source('../src/sweeps/ledger.ts')).toContain(
+      "import { lt01, postTransaction, readChart } from '@merit/ledger';",
+    );
   });
 
   // THE CORRECTED SHAPE, PINNED SO THAT A FILE SAYING TWO THINGS AGAIN IS RED.
