@@ -199,23 +199,23 @@ export interface WalletWithdrawalFacts {
 }
 
 /**
- * `LT-06`, the external leg's approval. NOT EXPORTED, and that is the point.
+ * `LT-06`, the external leg's approval. EXPORTED, and `LT-09` is still built on it.
  *
  * M05 section 2.1 rules it: debit the identity's `trader_wallet` by
  * `amount_cents`, credit `withdrawals_in_flight`. ADR-181 derived the credit
  * slot's class and scope and ADR-187 minted its code; `0056` seeded the row so
  * that `chart.ts`'s `resolve` finds it.
  *
- * IT IS PRIVATE BECAUSE THIS SESSION DOES NOT RULE `LT-06`'s WRITER. Nothing in
- * this tree posts it yet, and exporting a second door to a posting whose call
- * site has not been read is how one event acquires two spellings. What it is
- * here for is that `LT-09` must be the EXACT negation of it, and building the
- * ninth transaction out of the sixth is the only shape in which the two cannot
- * disagree. `ninth-transaction.test.ts` reads M05 section 2.1 AS TEXT and holds
- * these two legs against the row, so this transcription cannot silently stop
- * matching the document it transcribes.
+ * IT WAS PRIVATE BECAUSE THE SESSION THAT WROTE THIS FILE (ADR-189, 2026-08-28)
+ * DID NOT RULE `LT-06`'s WRITER. ADR-270 CLAUSE 2 RULED IT ON 2026-08-30: a
+ * transaction a clock opens, at `systemDb('nightly-batch')` in `apps/worker`.
+ * ADR-314 opens the door on that discharge and on nothing else. THE ARITHMETIC IS
+ * STILL STATED ONCE: `walletWithdrawalFailurePosting` below composes this builder
+ * through `reversalPosting`, so `LT-06` and `LT-09` cannot disagree, and a second
+ * builder beside this one is ADR-092 section 5's two-statements-of-one-fact hazard
+ * arriving on the money path. NOTHING IN THIS TREE POSTS IT YET.
  */
-function walletWithdrawalApprovalPosting(facts: WalletWithdrawalFacts): Posting {
+export function walletWithdrawalApprovalPosting(facts: WalletWithdrawalFacts): Posting {
   return posting(
     {
       kind: WALLET_WITHDRAWAL_APPROVAL_KIND,

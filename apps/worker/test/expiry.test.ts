@@ -1110,3 +1110,94 @@ describe('every event this job emits is already a row in the registry, produced 
     expect(source('../src/sweeps/expiry.ts')).not.toContain("'payout.expiry_overdue'");
   });
 });
+
+// =============================================================================
+// 7. ADR-315: THE LEDGER HANDLE THIS JOB DOES NOT HOLD
+// =============================================================================
+// `ports.ts` USED TO SPECIFY ITS OWN ADAPTER AS `postTransaction(tx.ledger,
+// await readChart(tx.ledger), lt01(values))`, AND `tx.ledger` NAMED NOTHING:
+// `ExpiryTx` declares three members and not one of them is a ledger handle. So
+// the file said two things and neither of them was reachable from the other.
+//
+// ADR-315 RULED THE SENTENCE WRONG RATHER THAN THE PORT. The three members
+// stand, the `LedgerTx` stays in the wiring, and `postLt01` recovers it by the
+// IDENTITY of the handle it is given rather than by reading a member off it.
+//
+// THESE CASES ARE THE MECHANICAL HALF OF THAT RULING, and they exist because
+// the reasoning is not self-enforcing. Prose can be reread and agreed with;
+// what stops the next session adding a `ledger` member and leaving
+// `EXPIRY_TABLES`'s exclusion standing above it, unamended and now false, is a
+// red test.
+
+const LEDGER_TX_TS = '../../../packages/ledger/src/tx.ts';
+const WORKER_MANIFEST = '../package.json';
+
+/**
+ * One interface's member names, COMMENTS STRIPPED so a docblock cannot supply
+ * one. Every member of the interfaces this section reads is declared on a
+ * single line at two spaces of indent, which is what the pattern anchors on.
+ */
+function membersOf(text: string, declaration: string): string[] {
+  const start = text.indexOf(declaration);
+  expect(start, declaration).toBeGreaterThan(-1);
+  const body = text.slice(start + declaration.length);
+  const block = stripComments(body.slice(0, body.indexOf('\n}')));
+  return [...block.matchAll(/^ {2}(?:readonly )?([A-Za-z_$][\w$]*)/gm)].map(
+    (match) => match[1] as string,
+  );
+}
+
+describe('ADR-315: this job holds no ledger handle and the exclusion stays true in its own words', () => {
+  const ports = source('../src/sweeps/ports.ts');
+
+  it('`ExpiryTx` declares exactly three members and `ledger` is not one of them', () => {
+    expect(membersOf(ports, 'export interface ExpiryTx {')).toEqual([
+      'rowsWhere',
+      'lockAt',
+      'updateAt',
+    ]);
+  });
+
+  // THE EXCLUSION'S OWN SENTENCE IS "nothing here can write a ledger row by
+  // naming a key", and a key is named by being written as a string. COMMENTS
+  // ARE STRIPPED FIRST so that the paragraph EXPLAINING the exclusion cannot be
+  // the thing that breaks it, and so that the explanation stays writable.
+  it('no ledger key is named in this port at all, on the read side or the write side', () => {
+    const code = stripComments(ports);
+    for (const key of ['ledgerTransactions', 'ledgerEntries', 'ledgerAccounts', 'ledgerHalts'])
+      expect(code, key).not.toContain(key);
+    expect([...EXPIRY_TABLES]).toEqual(['payoutRequests', 'walletWithdrawals']);
+  });
+
+  // BOUND TO `@merit/ledger` RATHER THAN RETYPED, which is section 1's idiom
+  // applied to the fact the ruling turns on: what a `ledger` member would cost
+  // is exactly the four keys a `LedgerTx` names, so they are read out of the
+  // package that declares them. If that union narrows, this ruling is worth
+  // re-taking and this case is what says so.
+  it('the keys a `ledger` member would bring with it are `LedgerTx`’s, read at source', () => {
+    const tx = source(LEDGER_TX_TS);
+    expect(tx).toContain("export type LedgerReadKey = 'ledgerAccounts' | 'ledgerHalts';");
+    expect(tx).toContain("export type LedgerWriteKey = 'ledgerTransactions' | 'ledgerEntries';");
+    expect(tx).toContain('export interface LedgerTx {');
+    expect(membersOf(tx, 'export interface LedgerTx {')).toEqual(['rows', 'insert']);
+  });
+
+  // THE OTHER HALF OF WHY THE MEMBER IS UNREACHABLE RATHER THAN MERELY
+  // UNWANTED. `ports.ts` imports nothing, so `LedgerTx` could only be RESTATED
+  // here, and the manifest is what makes NAMING it impossible. ADR-315 does not
+  // move this line; ADR-305 section 7 slice 6 is where it moves.
+  it('this deployable still declares no `@merit/ledger`, so the type cannot be named here', () => {
+    expect(source(WORKER_MANIFEST)).not.toContain('@merit/ledger');
+    expect(ports).not.toMatch(/^\s*(?:import|export)\b[^\n]*from '@merit\/ledger'/m);
+  });
+
+  // THE CORRECTED SHAPE, PINNED SO THAT A FILE SAYING TWO THINGS AGAIN IS RED.
+  // The superseded sentence survives only as the thing the correction quotes,
+  // which is why the assertion is on its OWN form and not on `tx.ledger`.
+  it('the port states the shape the wiring will take, and the old sentence is gone', () => {
+    expect(ports).not.toContain('THE ADAPTER IS `postTransaction');
+    expect(ports).toContain('THIS DOCBLOCK USED TO SPECIFY THE ADAPTER AS');
+    expect(ports).toContain('SO THE ADAPTER RECOVERS THE HANDLE BY THE IDENTITY OF THE `ExpiryTx`');
+    expect(ports).toContain('REFUSES a handle it');
+  });
+});
