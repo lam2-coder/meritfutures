@@ -216,12 +216,30 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'through `ruleStateOn` (ADR-264), resolves the five R-41 vetoes through ' +
     '`resolveExternalGates`, and calls the engine`s `projectPayout` over the horizon and slice ' +
     '`liability.ts` already produced. ONE OF `PayoutProjectionInput`s FIVE INPUTS REFUSES AND ' +
-    'IT IS `plan`: `plan_versions.rules` decodes into `PlanRulesJson` in exactly one place in ' +
-    'this repository, `toPublishedRules` in `apps/worker/src/batch/adapter.ts`, `apps/api` ' +
-    'cannot import it, and a second decoder of the blob that fixes every cents value a payout ' +
-    'is decided against is FM-16 on the money path. ADR-239 slice A rules the shared home is ' +
-    '`packages/rules-engine`; until that move lands the term is `EligibleFoldIo.resolvePinnedPlan`, ' +
-    'injected, whose unwired default throws `EligibleFoldUnwired` by name. ' +
+    'IT IS `plan`, AND THE CLAUSE THAT SAID WHY IS FALSE IN EVERY PART OF IT (ADR-283). IT ' +
+    'READ: "`plan_versions.rules` decodes into `PlanRulesJson` in exactly one place in this ' +
+    'repository, `toPublishedRules` in `apps/worker/src/batch/adapter.ts`, `apps/api` cannot ' +
+    'import it", and it ended "until that move lands". THE MOVE LANDED. ADR-239 slice A ruled ' +
+    'the shared home and ADR-283 took it: `decodePlanRules` ' +
+    '(`packages/rules-engine/src/plan/rules-codec.ts:472`) is declared there and re-exported ' +
+    'from the engine`s index, this deployable ' +
+    'has declared `@merit/rules-engine` since session 252, AND IT ALREADY CALLS THE DECODER -- ' +
+    '`planLeg` (`apps/api/src/payout-backend.ts:415`) decodes the blob and resolves the plan ' +
+    'on the payout transaction (ADR-308). The one-place half was wrong in the other direction ' +
+    'too: the predicate is stated THREE times in this tree, by the engine, by ' +
+    '`toPublishedRules` in `apps/worker` and by `decodeRules` in `apps/site`, and ' +
+    '`test/rule-state-producibility.test.ts` link 7 holds that census at exactly three. ' +
+    'THE FM-16 GROUND IS UNCHANGED AND IS WHY THIS FILE MAY STILL NOT WRITE A DECODER HERE: a ' +
+    'second decoder of the blob that fixes every cents value a payout is decided against is ' +
+    'FM-16 on the money path, and the engine`s is the statement the other two are owed to. ' +
+    'WHAT THE FIGURE ACTUALLY WAITS ON IS SMALLER AND IS NOT A MOVE. The term is still ' +
+    '`EligibleFoldIo.resolvePinnedPlan`, injected, whose unwired default throws ' +
+    '`EligibleFoldUnwired` by name, and NOTHING under any `src/` in this deployable supplies ' +
+    'it, so the fold refuses exactly as it did. What changed is the PRICE: a ruling nobody had ' +
+    'taken became a call somebody writes on this port`s own composition, and this entry says so ' +
+    'rather than letting a reader meet the retired sentence and size a money-path refactor. ' +
+    'NO PORT IS WIRED BY ANY OF THAT and `readLiability` is still the one name missing from ' +
+    '`IMPLEMENTED_ADMIN_READS`. ' +
     'SO `readLiability` IS STILL NOT COMPOSED, AND COMPOSING IT WOULD BE A LIVE-LOOKING FIGURE ' +
     'IN FRONT OF AN ARM THAT CANNOT ANSWER (`usePayoutBackend`s rule). ' +
     'AND THE FIGURE IS A FORECAST RATHER THAN A MEASUREMENT, WHICH THE WIRE TYPE CANNOT SAY: ' +
@@ -1140,12 +1158,32 @@ const BLOCKED: Readonly<Record<string, string>> = {
   useAffiliateDeps:
     'ONE obstruction, and this entry has named THREE and then TWO. `affiliate_commissions` is ' +
     'UNREGISTERED in `packages/db/src/scope.ts` and UNDECLARED in `packages/db/src/schema.ts`, ' +
-    'and ADR-253 rules that it is not one registration away but a SEVENTH SCOPE CLASS away. Its ' +
-    'only path to an identity runs through `attributions`, which is `pair`, so a `derived` rule ' +
-    'compiles and throws; the row declares no column against `identities(id)`, so `owned`, ' +
-    '`pair` and `either` have nothing to name; and `firm` is available, is accepted by every ' +
-    'mechanical check in this repository, and is FALSE, because a commission is what Merit owes ' +
-    'a named affiliate. THE SECOND OBSTRUCTION IS DISCHARGED AS A REGISTRY QUESTION AND IS NOT ' +
+    'AND THE SENTENCE THAT SIZED THAT OBSTRUCTION IS FALSE (ADR-304, 2026-08-30). IT READ: ' +
+    '"ADR-253 rules that it is not one registration away but a SEVENTH SCOPE CLASS away". ' +
+    'ADR-304 met ADR-253 section 6`s open question and REFUSED THE SEVENTH CLASS in those ' +
+    'terms: the vocabulary is not what is missing, and what is missing is ' +
+    '`affiliate_id uuid NOT NULL REFERENCES affiliates(id)`, which `affiliate_creatives`, ' +
+    '`affiliate_clicks` and `affiliate_statements` each declare and on which all three are ' +
+    'registered `derived` via `affiliates` WITH NO RULING AT ALL. So the table is ONE COLUMN ' +
+    'away rather than a class away, and it is the only table on that rail declaring none. ' +
+    'THE SENTENCE IS QUOTED RATHER THAN DELETED BECAUSE THE CLAUSES UNDER IT STILL HOLD, and ' +
+    'they are what a seventh class was proposed to route around rather than what it refuted: ' +
+    'this table`s only path to an identity runs through `attributions`, which is `pair`, so a ' +
+    '`derived` rule compiles and throws; the row declares no column against `identities(id)`, ' +
+    'so `owned`, `pair` and `either` have nothing to name; and `firm` is available, is ' +
+    'accepted by every mechanical check in this repository, and is FALSE, because a commission ' +
+    'is what Merit owes a named affiliate. ' +
+    'THE COLUMN IS RESERVED AND NOT WRITTEN AND THAT RESERVATION IS NOT THIS FILE`s TO SPEND: ' +
+    'ALLOCATION`s migration table carries `0078` to ADR-304 as "RESERVED, NOT WRITTEN, AND NO ' +
+    'FILE EXISTS", and `packages/db/test/affiliate-commissions-is-a-column-away.test.ts` ' +
+    'asserts that absence rather than this entry claiming it. ' +
+    'AND WHAT THE MIGRATION WAITS ON IS A FOUNDER ACT RATHER THAN ENGINEERING, WHICH IS THE ' +
+    'PART A DISPATCHER READS THIS ENTRY FOR. ADR-304 section 10 puts its second judgement to ' +
+    'the founder -- whether a denormalized tenancy column on a money table is acceptable at ' +
+    'all -- and rules that a founder who would rather the derivation stayed the single source ' +
+    'of truth "should say so before `0078` is dispatched rather than after". A session ' +
+    'dispatched at this entry today would be taking a number the ruling gates on a read that ' +
+    'has not happened. THE SECOND OBSTRUCTION IS DISCHARGED AS A REGISTRY QUESTION AND IS NOT ' +
     'DELETED: it read that no table records an ISSUED link, and ADR-253 section 3 rules that ' +
     'none is owed, because `affiliate_clicks_token_uq` is UNIQUE and one issued link is clicked ' +
     'many times, so an issued handle and a click token cannot be one column, and every attribute ' +
@@ -1342,6 +1380,42 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`routes/wallet-withdrawals.ts` carries one finding per terminal status with its sources, ' +
     '`wallet-withdrawals.test.ts` RUNS them rather than reading them, and finding C is marked ' +
     'CLOSED by the door rather than deleted. ' +
+    'AND ADR-305 SIZED THE DRIVER AND FOUND THREE ABSENCES THIS ENTRY HAD NEVER NAMED, WHICH ' +
+    'IS THE NINTH CORRECTION AND THE FIRST CARRIED IN FROM A ROW THAT COULD NOT REACH THIS ' +
+    'FILE. ADR-305 section 8 says so in its own words: `F1`, `F2` and `F3` "live here and not ' +
+    'there", owed to this entry by a row whose fence reaches `apps/api/test/**`. THIS IS THAT ' +
+    'ROW AND ALL THREE ARE RE-DERIVED AT SOURCE RATHER THAN CARRIED. ' +
+    '`F1`, AND IT IS WHY THE MANIFEST LINE THE WORKER IS MISSING IS NOT THE FIX IT LOOKS ' +
+    'LIKE: `@merit/ledger` PUBLISHES NO `LT-06` BUILDER. `walletWithdrawalApprovalPosting` ' +
+    '(`packages/ledger/src/reversal.ts:218`) is a module-scoped `function`, that package`s ' +
+    'index publishes `walletWithdrawalFailurePosting` (`LT-09`, built from `LT-06` through ' +
+    '`reversalPosting`) and not it, and a manifest line grants a deployable the EXPORTED ' +
+    'surface, so a session reading the worker`s missing dependency as a one-line fix would ' +
+    'land the line, import the package and find no function to call. ' +
+    '`F2`: `lt01` HAS EXACTLY ONE DEFINITION IN THIS REPOSITORY AND IT IS IN THE DEPLOYABLE ' +
+    'THE WORKER CANNOT IMPORT, at `apps/api/src/routes/payouts.ts:971`. The way round is ' +
+    'refused by the port itself, which says that file "names no ledger account, writes no ' +
+    'transfer and contains no ledger arithmetic", a second transcription of the split being ' +
+    'ADR-092 section 5`s two-statements-of-one-fact hazard on the money path. So `lt01` moves ' +
+    'or nothing posts. ADR-305 POINTED AT THAT DEFINITION AT A LINE IT NO LONGER HOLDS and ' +
+    'the pointer here is re-derived rather than transcribed. ' +
+    '`F3` IS THE SMALLEST AND WOULD STOP A SESSION JUST AS HARD, BECAUSE THE ADAPTER SENTENCE ' +
+    'AND THE PORT DISAGREE. `ExpiryTx` (`apps/worker/src/sweeps/ports.ts:157`) declares ' +
+    '`rowsWhere`, `lockAt` and `updateAt` and no `ledger` member, while `postLt01` ' +
+    '(`apps/worker/src/sweeps/ports.ts:230`) is specified in its own docblock as ' +
+    '`postTransaction(tx.ledger, ...)`, so the sentence describing the one-line adapter ' +
+    'describes a line that does not compile. The omission is deliberate rather than an ' +
+    'oversight: `EXPIRY_TABLES` excludes both ledger keys "so nothing here can write a ledger ' +
+    'row by naming a key", and ADR-006 requires the posting to commit in the SAME transaction ' +
+    'as the state change, so a second handle is not the remedy. THAT IS A DESIGN QUESTION AND ' +
+    'ADR-305 SLICE 3 IS WHERE IT IS ANSWERED. ' +
+    'NONE OF THE THREE MOVES THIS PORT AND NONE IS MEANT TO. ADR-305 section 7 makes the ' +
+    'installation slice 9, blocked on slices 7 and 8 AND on a payment rail that is ' +
+    'FOUNDER-OWED and that no engineering session supplies, and its section 5 measures what a ' +
+    'premature wiring costs: `0072` refuses `approved --> cancelled` at the database and ' +
+    '`transferring` is unreachable, so the day `LT-06` posts an approved withdrawal has no ' +
+    'exit at all. THEY ARE CARRIED HERE SO THAT THE NEXT READER OF THIS ENTRY MEETS THEM ' +
+    'BEFORE STARTING RATHER THAN AFTER. ' +
     'THE ENTRY SUPPLIES ITS OWN DECISION PROCEDURE AND RI-20 RUNS IT: ' +
     '`grep -rn driveApprovals apps/api/src` returns 3 lines, which are the transition and two ' +
     'references to it in docblocks, and NO FOURTH LINE IS A CALLER, which is what refuses; ' +
