@@ -17,16 +17,28 @@
 // once, and a reviewer asking where `apps/worker` posts a ledger entry should
 // get ONE answer with a path in it. `apps/worker/package.json`'s own
 // `//dependencies.@merit/ledger` key names this file, and
-// `test/sweep-ledger.test.ts` walks `src/` and asserts the name occurs here and
-// nowhere else. That is the difference between a convention and a control.
+// `apps/api/test/ledger-posting-authority.test.ts` walks `apps/worker/src` and
+// asserts the import occurs here and nowhere else. That is the difference
+// between a convention and a control.
 //
 // IT REACHES NO DATABASE AND IT COULD NOT. There is no `@merit/db` import here,
-// so the ONE-DOOR clause ADR-165 states in terms is untouched: `grep -rlE
-// "from '@merit/db'" apps/worker/src` still prints `apps/worker/src/db.ts` and
-// nothing else. `packages/ledger` declares no dependency of its own, cannot
-// import a client and cannot open a pool, so what arrives here is always the
-// caller's already-open transaction (ADR-006, and `packages/ledger/src/tx.ts`
-// says why in its own header).
+// so ADR-165's ONE-DOOR rule is untouched and `test/db.test.ts` runs it: that
+// suite parses every BARE SPECIFIER under `src/` and asserts the accessor is
+// imported by `src/db.ts` alone.
+//
+// **THE CLAUSE `ports.ts` STATES IN GREP FORM IS NOT THE CONTROL AND WAS
+// ALREADY FALSE AS SPELLED BEFORE THIS FILE EXISTED.** That header says
+// `grep -rlE "from '@merit/db'" apps/worker/src` must print `src/db.ts` and
+// nothing else; run today it prints SEVEN files, six of them because their
+// COMMENTS quote the clause, and this file is the seventh for the same reason.
+// The property is true and the command is not the way to read it, which is why
+// the specifier scan is named here instead. Reported rather than repaired:
+// `ports.ts` is outside this row's fence and the repair is a rewrite.
+//
+// `packages/ledger` declares no dependency of its own, cannot import a client
+// and cannot open a pool, so what arrives here is always the caller's
+// already-open transaction (ADR-006, and `packages/ledger/src/tx.ts` says why
+// in its own header).
 //
 // -----------------------------------------------------------------------------
 // THE HANDLE STAYS IN THE WIRING, WHICH IS ADR-315's RULING AND NOT A CHOICE
@@ -77,7 +89,8 @@
 // -----------------------------------------------------------------------------
 // `postTransaction` asserts against `ledger_halts` unless the caller passes
 // `despiteHalt`, and this file passes no options at all: `PostOptions` is not
-// named here and `despiteHalt` does not occur in this deployable. A refused
+// named here, and the word occurs in NO CODE anywhere under `apps/worker/src`,
+// which `test/sweep-ledger.test.ts` walks the tree to assert. A refused
 // posting throws, the sweep's `releaseHold` catches it, `io.transact` rolls the
 // release back and the request stays `held_pending_review`, which is the
 // correct direction. `P5-k`'s nightly assertion is what reports the row that

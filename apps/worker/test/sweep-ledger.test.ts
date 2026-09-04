@@ -35,7 +35,8 @@
 // Both are `packages/db`'s and are asserted there.
 // =============================================================================
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -70,6 +71,16 @@ import type {
 
 const source = (relative: string): string =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8');
+
+/** Every `.ts` file under `apps/worker/src`, absolute. */
+function walkSrc(): readonly string[] {
+  const base = fileURLToPath(new URL('../src', import.meta.url));
+  const found: string[] = [];
+  for (const entry of readdirSync(base, { recursive: true, withFileTypes: true }))
+    if (entry.isFile() && entry.name.endsWith('.ts'))
+      found.push(join(entry.parentPath, entry.name));
+  return found;
+}
 
 // -----------------------------------------------------------------------------
 // The fixture, which is one identity's three accounts and one held request
@@ -459,15 +470,21 @@ describe('4. a live halt refuses the posting and no override is taken', () => {
     expect(report.clocks[0]?.released).toBe(1);
   });
 
-  it('`despiteHalt` occurs in no CODE in this deployable, so the override is unreachable', () => {
+  it('`despiteHalt` occurs in no CODE anywhere under `src/`, so the override is unreachable', () => {
     // AN OVERRIDE IS A RULING THIS ROW DOES NOT TAKE, and the assertion is on
     // the word rather than on the adapter's call shape: an option object added
-    // later at any call site in these files fails here. COMMENTS ARE STRIPPED
-    // FIRST so that the paragraphs EXPLAINING why no override is taken cannot
-    // be the thing that breaks the case, which is `expiry.test.ts`'s idiom for
-    // the ledger keys one file over.
-    for (const file of ['ledger.ts', 'expiry.ts', 'ports.ts'])
-      expect(stripComments(source(`../src/sweeps/${file}`)), file).not.toContain('despiteHalt');
+    // later at ANY call site in this deployable fails here. THE WALK IS THE
+    // WHOLE TREE AND NOT THE THREE FILES OF THIS SLICE, because the manifest
+    // line grants the capability to the deployable and a narrower sweep would
+    // be checking the one directory nobody was going to write it in.
+    //
+    // COMMENTS ARE STRIPPED FIRST so that the paragraphs EXPLAINING why no
+    // override is taken cannot be the thing that breaks the case, which is
+    // `expiry.test.ts`'s idiom for the ledger keys one file over.
+    const overriding = walkSrc().filter((path) =>
+      stripComments(readFileSync(path, 'utf8')).includes('despiteHalt'),
+    );
+    expect(overriding).toEqual([]);
   });
 });
 
