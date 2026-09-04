@@ -20,7 +20,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->70<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->71<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -219,7 +219,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 
 **`SD-M6-07`'s load-bearing half is the delivery log and not the schedule**, and the reason is [M05](../../docs/plans/M05-payout-system.md):91 `INV-M5-18` rather than anything new. That invariant is asserted *"on the QUERY, never on the job"*, evaluated independently of whether the sweep reported success, on the stated ground that **a job that reports success is not evidence that the work happened**. A second sweep with the same shape gets the same control rather than a new one: the delivery-failure alarm reads `report_deliveries` and never the job's own report, and `GS-288` pins the case where the job reports success and nothing arrived. **`due_at` is what makes that askable**, because without a stored window "nothing arrived" and "not due yet" return the same empty set, which is [`economic_calendar_loads`](../../docs/architecture/data-model/economic_calendar_loads.md)'s coverage bound one table over and one row up.
 
-**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->70<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
+**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->71<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
 
 | Aimed at | What actually refused it |
 |---|---|
@@ -462,7 +462,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->70<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->118<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->32<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->71<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->118<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->32<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -712,7 +712,7 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->118<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->32<!--/gen--> triggers**, across <!--gen:migration_files-->70<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->118<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->32<!--/gen--> triggers**, across <!--gen:migration_files-->71<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -796,6 +796,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **21** | `ADR-068`'s session | **allocated.** `0042` lands |
 | **25** | session 148, `0047` ([ADR-087](../../docs/decisions/ADR-087.md)) | **allocated.** `0047` lands. **SECTION 24 IS CLAIMED BY A HEADING AND HAS NO ROW HERE**, which is the fourth time (`18`, `20` and `24` were each written as a heading and never as a row), and it is named rather than added because `24` is session 135's to claim. **This is the first section in the file to record a repair that does NOT close the item it was written for**: `OI-29` goes to PARTLY CLOSED and `OI-29b` opens above |
 | **31** | session 403, `0066` ([ADR-213](../../docs/decisions/ADR-213.md)) | **allocated.** `0066` lands. **Sections 26 and 28 to 30 are claimed by headings and have no row here**, and `27` has no section at all, which is the same omission the `18`, `20` and `24` rows above each record. They are NAMED and not filled in on their authors' behalf, on this table's standing rule that a row written for somebody else is a claim nobody made. **30 is the true maximum, so 31 is the next free number rather than the row count.** |
+| **35** | session 509, `0079` ([ADR-318](../../docs/decisions/ADR-318.md)) | **allocated.** `0079` lands. **Sections 32, 33 and 34 are claimed by headings and have no row here**, which is the same omission the `18`, `20`, `24` and `26 to 30` rows above each record. They are NAMED and not filled in on their authors' behalf, on this table's standing rule that a row written for somebody else is a claim nobody made. **34 is the true maximum, so 35 is the next free number rather than the row count.** |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -823,7 +824,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->70<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->71<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -898,7 +899,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->70<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->71<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
 
 | | Before `0034` | After `0034` |
 |---|---|---|
@@ -2245,3 +2246,56 @@ Read out of a PostgreSQL 16.13 instance carrying `0001`..`0075` applied forward-
 **THE DELAY WINDOW IS OWED AND IS DELIBERATELY ABSENT.** `D4` and [ADR-010](../../docs/decisions/ADR-010.md) both require *"dual control plus a delay window"* and **neither states a duration**; [SECURITY](../../docs/architecture/SECURITY.md) `C-10` restates the pair without one. The only duration nearby is the 48 hour cooling on a payout DESTINATION change, a different control on a different act. A number invented here is what `0074` refused to do with the cap itself and `0073` with the operator-session lifetime ceiling. **`FP-DC7` is the half that needs no number** and is not the window: it refuses a row dated before its own approval, so a backdated cap cannot rewrite what was in force while a purchase was being refused.
 
 **AND `price_floors` HAS THE SAME `uuid` GAP THIS FILE JUST CLOSED**, measured the same way: six columns, none of them a `uuid`, so an `admin_actions` row cannot name a price floor either. Carried forward for the slice that owns floors, beside `price_floors.approved_by` as a referent, which [ADR-252](../../docs/decisions/ADR-252.md) and [ADR-265](../../docs/decisions/ADR-265.md) already owe.
+
+
+## 35. `0079` lands, and the migration is a transcript rather than a declaration (2026-09-04)
+
+**Session 509, [ADR-318](../../docs/decisions/ADR-318.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `318` and `0079`.** [ADR-305](../../docs/decisions/ADR-305.md) section 7 slice 4, absence 3. [`pg-boss-queue.ts`](../../packages/queue/src/pg-boss-queue.ts) sets `migrate: false` and says why in its own header: pg-boss defaults that flag to true, which runs DDL against the money database at `start()`, from a library, outside the migration set, and **a queue that installs its own schema at boot puts tables inside the PITR boundary that protects the ledger with no review and no migration number**. That file also says the migration it needs does not exist and that the package cannot write it. This is that migration.
+
+**THE BODY WAS NOT WRITTEN. IT WAS EMITTED.** Everything between the file's two `VERBATIM` markers is the exact string `getConstructionPlans(QUEUE_SCHEMA)` returned from the installed pg-boss, produced by `node scripts/db/assert_pgboss_schema_matches_library.mjs --emit` and pasted unmodified: indentation, blank lines, doubled statement terminators, the vendor's inline comments and one line of trailing whitespace. **The schema name is never spelled a second time**: the emitter reads `QUEUE_SCHEMA` out of `pg-boss-queue.ts` and refuses to run if that file carries anything but exactly one declaration of it.
+
+### The finding that turned a transcription into a ruling
+
+Read out of the installed library rather than out of its documentation:
+
+| Query | Result |
+|---|---|
+| what `migrate: false` does at `start()` | runs `Contractor.check()`, not `Contractor.start()` |
+| what `check()` requires | `<schema>.version` equal to the schema version compiled into the library, else it throws `pg-boss database requires migrations`; `pg-boss is not installed` when the table is absent |
+| the last statement of the emitted body | `INSERT INTO pgboss.version(version) VALUES ('38')` |
+| the installed version | **pg-boss@12.28.0**, manifest key `pgboss.schema` = `38` |
+
+**SO A LINE IN `pnpm-workspace.yaml` CAN INVALIDATE A MERGED MIGRATION, and constitution `E2` makes the remedy a new numbered migration rather than an edit.** What was missing was anything that would make somebody write it: the failure without a check is not loud, it is misplaced, arriving as a throw at boot in a deployable after a green pull request. [`assert_pgboss_schema_matches_library.mjs`](../../scripts/db/assert_pgboss_schema_matches_library.mjs) closes that, pinned in `CI-06h` and run with `--falsify` first.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, counts read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger`:
+
+| Query | Result |
+|---|---|
+| `0001`..`0079` applied forward-only from empty under `ON_ERROR_STOP=1` | **clean**, and re-applying `0079` correctly refused at `type "job_state" already exists` |
+| `public` object counts, before and after | **118 tables, 412 indexes, 516 checks, 32 triggers. ALL FOUR UNCHANGED**; nothing in the body touches `public` |
+| new objects, in the `pgboss` schema | 12 tables, 27 indexes, 2 checks, **0 triggers**, 5 functions, 1 enum type |
+| non-system schemas | exactly two, `pgboss` and `public` |
+| `assert_no_floats.sql` over the whole applied schema | **holds, and fires in both directions.** The emitted body declares no non-integer numeric column |
+| the transcript assertion, and `--falsify` | **PASS**, 416 lines quoted verbatim; a seeded line inside the quoted region is seen |
+| SUCCESS cases | **3 of 3.** The version pin, `create_queue` routing a job to the default partition, and a partitioned queue owning its table with `delete_queue` reclaiming it |
+| REJECTION cases | **5 of 5**, each by its named constraint or SQLSTATE |
+| seeded defect | **1, watched RED.** `GRANT USAGE ON SCHEMA pgboss TO merit_app` turns `REJECTION 5` red by name; the `REVOKE` restores green |
+| the probe against `0001`..`0076` | dies at `SUCCESS 1` with `relation "pgboss.version" does not exist`, exit 3 |
+
+**TWO PROPERTIES OF THE EMITTED BODY THAT A COUNT CANNOT CARRY.** The `DO` block over `pgboss.queue_stats` creates one partition for today and one for tomorrow, named off `now() AT TIME ZONE 'UTC'`, so **applying `0079` on a different day installs differently named tables** and a `pgboss` table count is a fact about the day it was read. And the body opens and closes its own transaction and takes an advisory lock keyed on the database and schema name; nothing wraps it, because wrapping it would be editing the transcript.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-318` | the `pgboss` schema | pg-boss's job store, emitted by `getConstructionPlans('pgboss')` at pg-boss@12.28.0: `queue`, `job` and its default partition, `job_dependency`, `schedule`, `subscription`, `bam`, `warning`, `queue_stats`, `version`, five functions and the `job_state` enum | 0079 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed.** This is not a Merit delta: no approved module document proposes a job store as a schema change, and the tables are a vendor's. `0026` IS NOT EDITED, which is constitution `E2` and the shape of every section above.
+
+### The part a reader should carry forward, and it is not the tables
+
+**`0079` GRANTS NOTHING, SO `merit_app` CANNOT REACH THIS SCHEMA AT ALL**: `has_schema_privilege('merit_app', 'pgboss', 'USAGE')` and the same for `CREATE` are both **false**, measured, because every grant term in [`0026`](migrations/0026_roles_and_grants.sql) is scoped `IN SCHEMA public` and a new schema inherits none of them. **That is refused here rather than overlooked.** pg-boss's `create_queue` runs `CREATE TABLE pgboss.%I`, so a runtime that can declare a queue is a runtime with **CREATE on the schema**, and `0026` explicitly revokes exactly that privilege from exactly that role on `public`. Granting it on a schema inside the ledger's restore boundary is a control and not a detail, it belongs to [ADR-305](../../docs/decisions/ADR-305.md) slice 8 along with the `@merit/queue` manifest line, and `0074` refused an invented value on the identical ground.
+
+**AND THE ABSENCE IS ASSERTED RATHER THAN COMMENTED.** `REJECTION 5` of [`probe_pgboss_job_store.sql`](../../scripts/db/probe_pgboss_job_store.sql) goes RED the day somebody grants it, which turns a silent widening into a diff naming the control being changed and the row that owes the ruling.

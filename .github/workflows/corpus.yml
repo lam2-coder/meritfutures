@@ -193,6 +193,26 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # ADR-318. THE JOB NOW NEEDS node_modules AS WELL AS NODE, and it did not
+      # before. `assert_pgboss_schema_matches_library.mjs` asserts that `0079`
+      # still quotes what the INSTALLED pg-boss emits, so it has to import the
+      # installed pg-boss; the version in the catalog is the whole subject of the
+      # check and a copy of the DDL in this repository would be a second
+      # statement of the thing being compared. The step could not degrade to a
+      # skip on a missing tree, on this repository's own rule that a check which
+      # cannot run is not a check that passed.
+      #
+      # Frozen, on VG-12's first part: an install allowed to move the lockfile is
+      # an install that admits packages nobody approved, and here it would also
+      # be an install that could move pg-boss out from under the assertion.
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
       # 1. Forward-only apply from empty, in order, zero errors.
       #    ON_ERROR_STOP is the whole point: psql's default is to continue past
       #    a failed statement and exit 0, which would report a green install of
@@ -756,3 +776,50 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/db/assert_ledger_scope_agrees.mjs
+
+      # ADR-318, `0079`. THE MIGRATION BODY IS A TRANSCRIPT AND THESE TWO STEPS
+      # ARE ITS READERS.
+      #
+      # `0079_pgboss_job_store.sql` does not declare pg-boss's job store, it
+      # QUOTES it: the region between its two markers is the exact string
+      # `getConstructionPlans(QUEUE_SCHEMA)` returned from the installed library.
+      # That is only worth anything while somebody compares the two, and the
+      # comparison has a real failure mode rather than a theoretical one.
+      # `packages/queue` sets `migrate: false`, so at `start()` pg-boss runs
+      # `Contractor.check()`, which throws `pg-boss database requires migrations`
+      # unless `pgboss.version` equals the schema version compiled into the
+      # library it is running. A CATALOG BUMP OF pg-boss IS THEREFORE A SCHEMA
+      # CHANGE, and without this step it is a silent one that fails in a
+      # deployable at boot rather than in a pull request.
+      #
+      # --falsify runs FIRST and is not decoration: this assertion has no natural
+      # failures to observe, so an unfalsified green here reads identically to a
+      # comparison narrowed until it matches everything.
+      - name: The pg-boss transcript comparison is falsifiable (ADR-318)
+        run: |
+          set -euo pipefail
+          node scripts/db/assert_pgboss_schema_matches_library.mjs --falsify
+
+      - name: 0079 still quotes what the installed pg-boss emits (ADR-318)
+        run: |
+          set -euo pipefail
+          node scripts/db/assert_pgboss_schema_matches_library.mjs
+
+      # THE TEXT COMPARISON ABOVE NEVER RUNS A STATEMENT, so it cannot tell a
+      # body that installs a working job store from one that installs a broken
+      # one. This probe does, against the applied schema.
+      #
+      # THREE SUCCESSES BEFORE THE FIRST REJECTION, on DELTA_MANIFEST section
+      # 13's discipline: the migration exists to make enqueueing POSSIBLE, and a
+      # schema that refused every write would satisfy every rejection in the file
+      # and still be useless. Two of the three execute `pgboss.create_queue`,
+      # which is the function doing the DDL pg-boss would otherwise have run at
+      # boot, inside the PITR boundary that protects the ledger.
+      #
+      # REJECTION 5 ASSERTS A DELIBERATE ABSENCE: `0079` grants nothing, so
+      # `merit_app` cannot reach the schema at all. The day a slice grants it,
+      # this case goes red and the ruling has to be written down.
+      - name: Probe the pg-boss job store (0079)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_pgboss_job_store.sql
