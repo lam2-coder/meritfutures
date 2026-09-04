@@ -11527,6 +11527,8 @@ Counts derived at reporting time, each command run separately: gates **33 of 33*
 
 Counts derived at reporting time, each command run separately: gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, lint **0**, typecheck clean, `format:check` clean, and **303 files / 7,398 passed / 6 skipped** against an `origin/main` baseline at `d963032` reproduced by stashing, of **303 / 7,398 / 6**: **a delta of zero, which is what a comment-only `.ts` diff must produce and is why it was measured rather than assumed.** `pnpm run verify` and `scripts/corpus/falsify.mjs` **NOT run**, both forbidden by the row.
 
+---
+
 ## 2026-09-04 - Session 508: the builder moves house, and the ratchet that pinned it there is restated as a count rather than deleted ([ADR-317](decisions/ADR-317.md), proposed)
 
 **Row `317`, [ADR-305](decisions/ADR-305.md) section 7 slice 2, its `F2`. BUILD, MONEY PATH, `E2` READ OWED. CODE MOTION WITH NO BEHAVIOUR CHANGE.** `lt01` is declared at [`packages/ledger/src/payout.ts:101`](../packages/ledger/src/payout.ts), published from that package's index, and **both doors in `apps/api` import it back**. The arithmetic, the three accounts, the two memos, the `INV-M5-03` guard and its message text are byte for byte what they were. The package `apps/worker` will declare is now a package with `LT-01` in it.
