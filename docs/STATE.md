@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->300<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->301<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11500,3 +11500,29 @@ Counts derived at reporting time, each command run separately: gates **33 of 33*
 **Next.** [ADR-305](decisions/ADR-305.md) slice 7 is unblocked on this side and still joins slice 1. The three findings above want a row whose fence reaches [EVENTS](architecture/EVENTS.md) and one that reaches `packages/db/migrations`. **`start.ts` was not opened and the wired counts do not move: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED.**
 
 Counts derived at reporting time, each command run separately: gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, `format:check` clean. **A docs-only diff cannot move vitest or typecheck and neither is claimed.** **`pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run**, both forbidden by the row. `node_modules` was absent on arrival and was restored by `pnpm install --frozen-lockfile`.
+
+---
+
+## 2026-09-04 - Session 510: a close in no session, and the two arms get different answers ([ADR-319](decisions/ADR-319.md), proposed)
+
+**Row `319`, a RULING row and MONEY-ADJACENT: it decides a customer-visible `date` on a terminal account row. [ADR-319](decisions/ADR-319.md), fourteen sections, `proposed` and UNSIGNED. The only `src/` change is the port's DOCBLOCK, rewritten in EXACTLY the eleven lines it replaced; `tradingDay(): string` is byte-identical.** No migration number, no `RI-nn`, no `SD-nn`.
+
+**BOTH NON-SESSION ARMS ARE RULED AND THEY ARE RULED DIFFERENTLY, WHICH IS HOW [ADR-042](decisions/ADR-042.md) `F-4` SURVIVES THIS CONSUMER.** `not_a_session` takes the trading day of the **LATEST SESSION WHOSE CLOSE IS AT OR BEFORE** the close instant, read off that row by comparing instants; `outside_coverage` takes **NO DAY and the close is REFUSED**. A build that answers both arms the same way has misapplied the ruling rather than shortened it.
+
+**THE DIRECTION IS THE CORPUS'S OWN.** [`M01:470`](plans/M01-rules-engine.md)'s `R-06` is *"Every evaluation is against the last closed day and nothing more recent"*; a terminal date must not be in the future; the backward answer cannot be revised by a later calendar load while a forward one can; and a forward day would sit beyond every `rule_states` row the account will ever have.
+
+**A THIRD CLAUSE THE ROW DID NOT ASK FOR AND THE MEASUREMENT FORCED.** A Saturday close writes Friday's day and so does an in-session Friday close, so **the arm that answered is RECORDED in the audit `after` block** over a closed two-member vocabulary. Without it `F-4`'s substitution returns at the consumer while `tradingDayAt` keeps refusing it one package away, where no engine test can see it.
+
+**THE REFUSAL'S COST IS STATED AND ITS THREE BOUNDS ARE MEASURED, AND NONE MAKES IT ZERO.** Freeze still works and still stops money leaving, taking `now()` and never `tradingDay()`, **but requires an open risk flag**; an estate on that arm has already stopped folding; the remedy is loading the calendar, which `F-4` already alarms on.
+
+**THE ROW'S OWN WORKER PREMISE WAS CHECKED AND IS FALSE.** `apps/worker` reads `trading_calendar_loads` at **11** occurrences over **2** files, the adapter folds coverage and refuses on an unspanned range, and the repair is named in the file itself as `ADR-277`. **So the nightly fold is NOT out of compliance the day this is signed**, which is the opposite of what the row expected, and the two paths reached the same two answers independently.
+
+**THE FOUR-ARM CONSTRAINT IS DISPOSED OF AND THIS SERVES ONE ARM.** `closed_admin` is the only terminal status any `src/` line writes. `breached` and `graduated` are **not instant lookups at all** and take the fold's own `rule_states.trading_day`. **`closed_chargeback` owes a SEPARATE ruling that nobody holds**, because its actor is a PSP webhook with no operator to refuse to: the direction transfers and the refusal does not.
+
+**THREE FINDINGS REPORTED, NONE REPAIRED, ALL IN `apps/worker/**`.** [ADR-251](decisions/ADR-251.md) seed **C**, the UTC-calendar-date paper-over, is **LIVE** in `fills.ts`, stamping canary rows at an instant chosen deliberately to be in no session, which is exactly where that entry predicted it would be writable. **Four one-arm ports ask one three-arm question and `RI-27`'s census is BLIND to all four**, because its needle is the column and a port typed `string` names none. And `toCalendarSlice`'s coverage is still self-declared.
+
+**Next.** The build slice is specified and dispatchable from [ADR-319](decisions/ADR-319.md) section 9 alone, over `admin-writes.ts`, `calendar.ts`, [API_CONTRACT](architecture/API_CONTRACT.md), `apps/api/test/**` and `RI-27`'s register. A `closed_chargeback` ruling is owed and allocated to nobody. The three findings want a row whose fence reaches `apps/worker/**`.
+
+**`useAdminWriteBackend` IS STILL BLOCKED ON `principal(request)` BEHIND THE C-08 PURCHASE and is now also behind that build slice. Nothing is wired, no `BLOCKED` entry moved, and the wired counts do not move.**
+
+Counts derived at reporting time, each command run separately: gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, lint **0**, typecheck clean, `format:check` clean, and **303 files / 7,398 passed / 6 skipped** against an `origin/main` baseline at `d963032` reproduced by stashing, of **303 / 7,398 / 6**: **a delta of zero, which is what a comment-only `.ts` diff must produce and is why it was measured rather than assumed.** `pnpm run verify` and `scripts/corpus/falsify.mjs` **NOT run**, both forbidden by the row.

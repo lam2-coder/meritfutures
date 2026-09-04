@@ -331,17 +331,17 @@ export interface AdminWriteBackend {
    * and both tables are `firm` in the registry, so the supplier and the read are
    * both here.
    *
-   * WHAT THIS SIGNATURE STILL CANNOT BE HANDED IS A TOTAL FUNCTION, AND THAT IS
-   * NOW THE WHOLE OF THE GAP. `tradingDayAt` answers three ways, because
-   * ADR-042 F-4 requires it to: a day, `not_a_session` for an instant inside
-   * coverage that no session contains (a weekend, a holiday, the gap between
-   * one close and the next open), and `outside_coverage` for an instant the
-   * estate has loaded nothing around. `tradingDay(): string` has one arm for
-   * three answers. AND NO RULING SAYS WHICH DAY AN OPERATOR CLOSE TAKES WHEN
-   * THE INSTANT IS IN NO SESSION, while `accounts_terminal_has_close_date`
-   * requires `closed_on` on every `closed_admin` row. So what is owed here is a
-   * DECISION and no longer a function, and this port keeps its shape until one
-   * exists rather than picking a day on a handler's authority.
+   * WHAT THIS SIGNATURE STILL CANNOT BE HANDED IS A TOTAL FUNCTION, AND THE
+   * RULING THAT SIZED IT IS NOW MADE (ADR-319). `tradingDayAt` answers three
+   * ways because ADR-042 F-4 requires it to: a day, `not_a_session` inside
+   * coverage where no session contains the instant, and `outside_coverage`
+   * where the estate loaded nothing around it. THE TWO NON-SESSION ARMS ARE
+   * RULED DIFFERENTLY AND THAT IS HOW F-4 SURVIVES HERE. `not_a_session` takes
+   * the trading day of the LATEST SESSION WHOSE CLOSE IS AT OR BEFORE the
+   * instant, on R-06's direction; `outside_coverage` takes NO DAY and the close
+   * is REFUSED; and the arm that answered is RECORDED beside the day, since a
+   * Saturday close writes Friday's day and so does a Friday one. SO THIS PORT
+   * MUST BECOME TWO-ARMED AND HAS NOT: ADR-319 section 9 names what that owes.
    */
   tradingDay(): string;
 }
