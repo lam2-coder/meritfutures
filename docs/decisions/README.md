@@ -331,6 +331,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-317](ADR-317.md) | `lt01` moves into `packages/ledger`, its refusal class moves with it under its own name, and the ADR-176 ratchet is restated from a location into a count over three files instead of two  (2026-09-04, status: proposed) |
 | [ADR-318](ADR-318.md) | the queue has no schema, so the migration is a transcript. `0079` quotes pg-boss's own `getConstructionPlans('pgboss')` byte for byte at a pinned version, a catalog bump to that library is a schema change and is now asserted as one, and the schema ships with NO GRANT because making it usable by `merit_app` means granting CREATE inside the ledger's restore boundary  (2026-09-04, status: proposed) |
 | [ADR-319](ADR-319.md) | an operator close in no session takes the last day that CLOSED, an operator close outside coverage takes no day at all, and three of the constraint's four statuses are not served by either (2026-09-04, status: proposed) |
+| [ADR-320](ADR-320.md) | the handle it did not open. `LT-01`'s adapter, recovered by identity, and six turned cases where the row named three (2026-09-04, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
