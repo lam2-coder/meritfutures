@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->298<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->299<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11456,3 +11456,25 @@ Counts derived at reporting time, each command run separately: **302** test file
 **NOTHING IS WIRED AND `start.ts` WAS NOT OPENED: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED.** No migration written or number taken or reserved, no `RI-nn` minted, no gate weakened, no fence widened, nothing signed, and **no assertion in any pre-existing test file was changed, added or deleted**. [INDEX](INDEX.md) needed no edit and that was checked rather than assumed: it indexes `decisions/` as one row and says entry files are indexed by that README under `CI-06n`.
 
 Counts derived at reporting time, each command run separately: **303** test files passed with **7,391** tests passed and **6** skipped, gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, typecheck, lint and `format:check` clean. **`pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run**, both forbidden by the row. `node_modules` was absent on arrival and was restored by `pnpm install --frozen-lockfile`.
+
+---
+
+## 2026-09-04 - Session 506: a handle that names nothing, and the member that would have named it is unreachable ([ADR-315](decisions/ADR-315.md), proposed)
+
+**Row `315`, [ADR-305](decisions/ADR-305.md) section 7 slice 3, its `F3`. THE STOP CONDITION WAS ONE OF TWO THINGS AND THE SECOND WAS TAKEN: the docblock is corrected and `ExpiryTx` keeps three members.** The hourly sweep's I/O boundary specified its own ledger adapter as `postTransaction(tx.ledger, await readChart(tx.ledger), lt01(values))` directly above a port that declares `postLt01(tx: ExpiryTx, ...)`, and `tx.ledger` named nothing.
+
+**ALL FIVE PREMISES WERE RE-DERIVED AT THE FILE AND ALL FIVE HOLD.** `ExpiryTx` ([`ports.ts:157`](../apps/worker/src/sweeps/ports.ts)) declares `rowsWhere`, `lockAt` and `updateAt` and no `ledger`; `EXPIRY_TABLES` ([`ports.ts:83`](../apps/worker/src/sweeps/ports.ts)) is `['payoutRequests', 'walletWithdrawals']`; and the exclusion says in its own words *"nothing here can write a ledger row by naming a key"* ([`ports.ts:76-78`](../apps/worker/src/sweeps/ports.ts)).
+
+**THE MEMBER IS UNREACHABLE RATHER THAN MERELY UNWANTED, AND THAT IS THE FINDING THE ROW DID NOT HAVE.** `sweeps/ports.ts` imports nothing and this deployable declares no `@merit/ledger`, asserted at [`ledger-posting-authority.test.ts:175`](../apps/api/test/ledger-posting-authority.test.ts), so `LedgerTx` could only be RESTATED there. A restatement writes `LedgerWriteKey` ([`tx.ts:64`](../packages/ledger/src/tx.ts)), which is **exactly the two keys `EXPIRY_TABLES` excludes**, back into the port as an `insert` key union, one call away from a single-sided entry past `assertBalanced` ([`posting.ts:273`](../packages/ledger/src/posting.ts)) and past the halt check. **So the member branch cannot be taken with the exclusion "restated and still holding", which is what the row required of it.** It would also end the header's `SystemTx` assignability, because `SystemTx` ([`scoped-db.ts:3709`](../packages/db/src/scoped-db.ts)) has no `ledger` property.
+
+**THE CORRECTED SHAPE IS IDENTITY AND NOT A SECOND HANDLE.** The wiring records the `SystemTx` it opened against itself, `postLt01` looks it up and REFUSES a handle the wiring did not open, and the posting runs on that same transaction, which is [ADR-006](decisions/ADR-006.md) met rather than restated. **It is this file's own cited idiom**: `TERMS` ([`scoped-db.ts:723`](../packages/db/src/scoped-db.ts)) recognises a filter term by identity for the same reason, and the refusal is the property that makes it right rather than a cost of it.
+
+**A CITATION IN [ADR-305](decisions/ADR-305.md) IS LOOSE AND IS CORRECTED WHERE THIS ROW FOUND IT.** It cites `0057`'s same-transaction sentence as that file's header item 3; the sentence is at [`:104`](../packages/db/migrations/0057_terminal_withdrawal_obligation.sql), inside the `DEFERRED` note of its line-by-line read list.
+
+**TWO STALE CLAIMS CORRECTED AND ONE REPORTED, ALL THREE ABOUT A MEMBER [ADR-176](decisions/ADR-176.md) DELETED.** The docblock said the handle is supplied *"exactly as `PayoutTx.ledger` and `AdminPayoutTx.ledger` are"* and `PayoutTx` carries no such member ([`payouts.ts:63`](../apps/api/src/routes/payouts.ts)); [ADR-172](decisions/ADR-172.md) finding 16 quoted the superseded adapter sentence from a pointer three lines short of it; and the identical dead sentence at [`admin-payouts.ts:88`](../apps/api/src/routes/admin-payouts.ts) is **outside this fence and is not repaired**.
+
+**Next.** [ADR-305](decisions/ADR-305.md) section 7 slice 6 builds `postLt01`'s adapter and is blocked on this row and on slice 2. **Two cases go red by that succeeding and are to be rewritten rather than deleted**: the manifest case this row added to the sweep suite, and [`ledger-posting-authority.test.ts:175`](../apps/api/test/ledger-posting-authority.test.ts).
+
+**NOTHING IS WIRED AND THE WIRED COUNTS DO NOT MOVE: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED.** No manifest was edited, nothing was scheduled, no migration was written and no number reserved, no `RI-nn` was minted, and [`apps/worker/src/index.ts`](../apps/worker/src/index.ts) was not touched.
+
+Counts derived at reporting time, each command run separately: gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, typecheck, lint and `format:check` clean, and the sweep suite **64 of 64**. **`pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run**, both forbidden by the row. `node_modules` was absent on arrival and was restored by `pnpm install --frozen-lockfile`.

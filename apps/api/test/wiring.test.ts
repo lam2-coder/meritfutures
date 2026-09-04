@@ -1402,13 +1402,15 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`F3` IS THE SMALLEST AND WOULD STOP A SESSION JUST AS HARD, BECAUSE THE ADAPTER SENTENCE ' +
     'AND THE PORT DISAGREE. `ExpiryTx` (`apps/worker/src/sweeps/ports.ts:157`) declares ' +
     '`rowsWhere`, `lockAt` and `updateAt` and no `ledger` member, while `postLt01` ' +
-    '(`apps/worker/src/sweeps/ports.ts:230`) is specified in its own docblock as ' +
+    '(`apps/worker/src/sweeps/ports.ts:259`) WAS specified in its own docblock as ' +
     '`postTransaction(tx.ledger, ...)`, so the sentence describing the one-line adapter ' +
-    'describes a line that does not compile. The omission is deliberate rather than an ' +
+    'described a line that does not compile. The omission is deliberate rather than an ' +
     'oversight: `EXPIRY_TABLES` excludes both ledger keys "so nothing here can write a ledger ' +
     'row by naming a key", and ADR-006 requires the posting to commit in the SAME transaction ' +
-    'as the state change, so a second handle is not the remedy. THAT IS A DESIGN QUESTION AND ' +
-    'ADR-305 SLICE 3 IS WHERE IT IS ANSWERED. ' +
+    'as the state change, so a second handle is not the remedy. THAT WAS A DESIGN QUESTION AND ' +
+    'ADR-315 ANSWERED IT: the docblock is corrected, `ExpiryTx` keeps three members, and the ' +
+    '`LedgerTx` stays in the wiring, recovered by the identity of the handle `postLt01` is ' +
+    'given. `F3` IS DISCHARGED AND SLICE 6 STILL OWES THE ADAPTER ITSELF. ' +
     'NONE OF THE THREE MOVES THIS PORT AND NONE IS MEANT TO. ADR-305 section 7 makes the ' +
     'installation slice 9, blocked on slices 7 and 8 AND on a payment rail that is ' +
     'FOUNDER-OWED and that no engineering session supplies, and its section 5 measures what a ' +

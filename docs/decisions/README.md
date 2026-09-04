@@ -326,6 +326,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-312](ADR-312.md) | the thirteen doors, sorted. Eight of them are behind ONE purchase and the control that counts them says six, two are dispatchable today, and two entries went stale under rulings that landed after them  (2026-09-03, status: proposed) |
 | [ADR-313](ADR-313.md) | the map outlived its facts. Five sentences in the BLOCKED map and its neighbours were falsified by rulings that landed after them, and the control that counts what one purchase blocks was green with the wrong predicate  (2026-09-04, status: proposed) |
 | [ADR-314](ADR-314.md) | the `LT-06` builder gets a public door, `LT-09` still derives from it so the two cannot part, and the ground the door was shut on had expired three entries later on the same day  (2026-09-04, status: proposed) |
+| [ADR-315](ADR-315.md) | a handle that names nothing. The sweep's adapter sentence named a member `ExpiryTx` does not have, and the member is unreachable rather than merely unwanted  (2026-09-04, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

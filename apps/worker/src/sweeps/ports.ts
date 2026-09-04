@@ -212,19 +212,48 @@ export interface Lt01Values {
 /**
  * The `LT-01` posting, on THIS transaction.
  *
- * SUPPLIED BY THE WIRING AND NOT BUILT HERE, exactly as `PayoutTx.ledger` and
- * `AdminPayoutTx.ledger` are. This file names no ledger account, writes no
+ * SUPPLIED BY THE WIRING AND NOT BUILT HERE, as `AdminPayoutTx.ledger` is one
+ * deployable over. This file names no ledger account, writes no
  * transfer and contains no ledger arithmetic: a second transcription of
  * `debit trader_withdrawable / credit trader_wallet / credit fees_revenue` is
  * ADR-092 section 5's two-statements-of-one-fact hazard arriving on the money
  * path, and `lt01` already asserts `INV-M5-03` over the split internally.
  *
- * THE ADAPTER IS `postTransaction(tx.ledger, await readChart(tx.ledger),
- * lt01(values))` AND NOTHING MORE. A live ledger halt refuses the posting and
- * that is left alone: `postTransaction` asserts against `ledger_halts` unless
- * the caller passes `despiteHalt`, and an override is a ruling this job does not
- * take. A refused posting rolls the release back, which is the correct
- * direction: the hold stands and the nightly assertion (`P5-k`) reports it.
+ * THIS DOCBLOCK USED TO SPECIFY THE ADAPTER AS `postTransaction(tx.ledger,
+ * await readChart(tx.ledger), lt01(values))` AND `tx.ledger` NAMED NOTHING.
+ * {@link ExpiryTx} declares three members and not one of them is a ledger
+ * handle, so that sentence did not compile against the port immediately below
+ * it. ADR-315 ruled the SENTENCE wrong rather than the port. The three members
+ * stand and what follows is the shape the wiring will actually take.
+ *
+ * THE HANDLE STAYS IN THE WIRING AND THIS JOB NEVER HOLDS ONE, WHICH IS THE
+ * ONLY SHAPE THAT LEAVES {@link EXPIRY_TABLES}'s EXCLUSION TRUE IN ITS OWN
+ * WORDS. A `ledger` member would have to RESTATE `@merit/ledger`'s `LedgerTx`
+ * here, because this file imports nothing and `apps/worker/package.json`
+ * declares no `@merit/ledger`, and restating it writes both ledger table keys
+ * into this file as an `insert` key union. That is the two keys
+ * {@link EXPIRY_TABLES} excludes arriving back within reach of the sweep, one
+ * call away from a single-sided entry written past `assertBalanced`, past
+ * `LEDGER-C1` and past the halt check below. It would break the header's
+ * `SystemTx` assignability too, because `SystemTx` has no `ledger` property.
+ *
+ * SO THE ADAPTER RECOVERS THE HANDLE BY THE IDENTITY OF THE `ExpiryTx` IT IS
+ * GIVEN, which is the `WeakSet` idiom {@link ExpiryFilterTerm} already relies
+ * on, turned on a handle instead of on a term. The wiring opens ONE
+ * transaction, passes it to `transact` as the `ExpiryTx` it already satisfies,
+ * records it against itself, and `postLt01` looks it up and REFUSES a handle it
+ * did not open, because a handle this wiring did not open is a handle it cannot
+ * know the authority of. The posting is then `postTransaction(ledger, await
+ * readChart(ledger), lt01(values))` and nothing more, on that same transaction,
+ * which is ADR-006's requirement met rather than restated: the `LedgerTx` IS
+ * the handle the release was written through and not a second one opened beside
+ * it.
+ *
+ * A live ledger halt refuses the posting and that is left alone:
+ * `postTransaction` asserts against `ledger_halts` unless the caller passes
+ * `despiteHalt`, and an override is a ruling this job does not take. A refused
+ * posting rolls the release back, which is the correct direction: the hold
+ * stands and the nightly assertion (`P5-k`) reports it.
  */
 export interface ExpiryLedgerPort {
   postLt01(tx: ExpiryTx, values: Lt01Values): Promise<void>;
