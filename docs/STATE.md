@@ -11412,7 +11412,7 @@ Counts derived at reporting time, each command run separately: gates **33 of 33*
 
 ---
 
-## 2026-09-04 - Session 504: the builder with no door gets one, and the ground it was shut on had expired three entries later on the same day ([ADR-314](decisions/ADR-314.md), proposed)
+## 2026-09-04 - Session 505: the builder with no door gets one, and the ground it was shut on had expired three entries later on the same day ([ADR-314](decisions/ADR-314.md), proposed)
 
 **Row `314`, a BUILD row on the MONEY PATH. [ADR-314](decisions/ADR-314.md), eight sections, `proposed` and UNSIGNED, `E2` read owed and four inherited** ([ADR-189](decisions/ADR-189.md), [ADR-267](decisions/ADR-267.md), [ADR-270](decisions/ADR-270.md), [ADR-305](decisions/ADR-305.md)). [ADR-305](decisions/ADR-305.md) section 7 slice 1.
 
