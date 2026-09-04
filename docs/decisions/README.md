@@ -323,6 +323,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-307](ADR-307.md) | the pin that fixed one `qs` advisory is the vehicle of the next two, and `CI-05` has been red on every branch since (2026-09-03, status: proposed) |
 | [ADR-308](ADR-308.md) | `subject()` answers whole, because `state` reads the row the worker wrote and the size row decodes on the typed door  (2026-09-03, status: proposed) |
 | [ADR-311](ADR-311.md) | `listPayouts()` answers, eight fields off columns and two as the absences ADR-290 ruled, and the needle that said it must refuse retires because its own stated premise had died  (2026-09-03, status: proposed) |
+| [ADR-312](ADR-312.md) | the thirteen doors, sorted. Eight of them are behind ONE purchase and the control that counts them says six, two are dispatchable today, and two entries went stale under rulings that landed after them  (2026-09-03, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
