@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-09-03
+last_updated: 2026-09-04
 ---
 
 # STATE
@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->297<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->298<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
@@ -11410,6 +11410,26 @@ Counts derived at reporting time, each command run separately: **302** test file
 
 Counts derived at reporting time, each command run separately: gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, `format:check` clean. **A docs-only diff cannot move vitest or typecheck and neither is claimed.** **`pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run**, both forbidden by the row. `node_modules` was absent on arrival and was restored by `pnpm install --frozen-lockfile`.
 
+
+## The map outlived its facts: five falsified sentences repaired, and the count that said six is eight (2026-09-04)
+
+**[ADR-313](decisions/ADR-313.md), `proposed` and UNSIGNED.** Row `313`, [ADR-312](decisions/ADR-312.md) section 9 items 1 and 2. **`E2` read OWED, and three are inherited** ([ADR-304](decisions/ADR-304.md), [ADR-283](decisions/ADR-283.md), [ADR-305](decisions/ADR-305.md), all `proposed` and UNSIGNED).
+
+**[`wiring.test.ts`](../apps/api/test/wiring.test.ts)'s `BLOCKED` map is what every dispatcher reads to learn what is still owed, and [ADR-312](decisions/ADR-312.md) found it telling readers the opposite of the tree.** Five repairs landed and **every one is a quotation rather than a rewrite**, on `RI-14`'s rule that a false sentence deleted leaves nothing for the next reader to check.
+
+**FOUR SENTENCES DRIFTED AND ONE WAS FALSE ON ARRIVAL, AND THAT DISTINCTION IS THE ENTRY'S POINT.** `useAffiliateDeps` said its obstruction is *"a SEVENTH SCOPE CLASS away"* and [ADR-304](decisions/ADR-304.md) refused the seventh class: the table is **ONE COLUMN** away, `0078` is reserved and **NOT DISPATCHED**, and [ADR-304](decisions/ADR-304.md) section 10 gates it on a founder read that has not happened, so the entry now says the port waits on a **founder act** and not on engineering. `setAdminReadSource` said `plan_versions.rules` decodes *"in exactly one place in this repository"* and that its term waits *"until that move lands"*; **[ADR-283](decisions/ADR-283.md) landed the move, `apps/api` already calls `decodePlanRules`, and the predicate is stated THREE times rather than one.** That sentence had **four** copies rather than the three the dispatch named. `useWithdrawalBackend` gains [ADR-305](decisions/ADR-305.md)'s `F1`, `F2` and `F3`, re-derived at source, discharging the debt that row named. **And [ADR-305](decisions/ADR-305.md)'s three `0078` sentences were false the day they were written**: the migration table reserved `0078` to [ADR-304](decisions/ADR-304.md) the same day, so `0079` is free and slice 4 spends it. Row `311`'s state cell led with `RESERVED, NOT YET DISPATCHED` while [ADR-311](decisions/ADR-311.md) was merged.
+
+**THE COUNT IS THE SECOND HALF AND THE PREDICATE IS THE DELIVERABLE.** [`admin-read-constructibility.test.ts`](../apps/api/test/admin-read-constructibility.test.ts) asserted that **six** entries sit behind the hardware-key SSO purchase, was GREEN, and its conclusion was wider than its predicate: it filtered `use`-prefixed entries naming `principal(request)` and appended two names by hand. **The set is now derived over EVERY entry by the property that defines it, an entry that reduces to `AdminSessionSource`, and it is EIGHT, asserted by NAME**: `setAdminReadSource`, `setAdminSessionSource`, `setInternalOpsSource`, `useAdminPayoutBackend`, `useAdminWalletBackend`, `useAdminWriteBackend`, `useCertificateRevokeBackend`, `useCheckoutBackend`. It agrees with [ADR-312](decisions/ADR-312.md), derived independently. A second case anchors the predicate on the SSO entry's own reason and on [`SECURITY.md`](architecture/SECURITY.md)'s *"a purchase Merit has not made"*, and a guard proves the WORD is not the predicate. **The seed was watched RED** with the offending port's own name in the diff, then reverted.
+
+**FOUR FINDINGS ARE REGISTERED AND NOT REPAIRED, each with what is true instead** ([ADR-313](decisions/ADR-313.md) section 8). **The largest is `usePayoutBackend`'s link-7 census**, which says *"exactly two files in this tree call `resolvePlan(` and neither is under `apps/api/src`"* and promises to go *"red rather than stale"*; **both halves are false since [ADR-283](decisions/ADR-283.md) and [ADR-308](decisions/ADR-308.md), and the promise did not hold** because the assertion under it was inverted and the prose was not. **It needs a row.** [`liability.ts`](../apps/api/src/admin-source/liability.ts) holds a fifth copy of the decoder sentence; [`admin-source-eligible-next-7d.test.ts`](../apps/api/test/admin-source-eligible-next-7d.test.ts) states the same claim in a case NAME with passing assertions under it; and [ADR-305](decisions/ADR-305.md) cites `lt01` at a line it no longer holds.
+
+**ONE CLAIM IN THE DISPATCH DID NOT SURVIVE RE-DERIVATION AND IS REPORTED RATHER THAN COPIED.** It states that `grep -c 0079` over [ALLOCATION](decisions/ALLOCATION.md) returns 0; **it returns 1**, the one line being row `313`'s own reservation cell, written after the derivation was made. **The substance holds**: no row of the migration table claims `0079` and the table ends at `0078`.
+
+**Next.** **`usePayoutBackend`'s entry needs a row of its own**, and it is the entry a payout session reads first. Then [ADR-305](decisions/ADR-305.md)'s five parallel slices, which need dispatching rather than planning; then the `tradingDay` ruling, small and independent of the purchase. **The admin identity provider remains the single founder decision with the largest engineering consequence**, and eight doors are behind it rather than six.
+
+**NOTHING IS WIRED AND NO COUNT MOVES: TEN WIRED OF TWENTY-FOUR DECLARED, FOURTEEN BLOCKED.** No `src/` behaviour changed, no migration was written, no number was reserved and no `RI-nn` was minted.
+
+Counts derived at reporting time, each command run separately: **302** test files passed, **7,388** passed and **6** skipped with the skip count unmoved, gates **33 of 33** after `generate`, invariants **32 of 32** off the runner's own last line, typecheck, lint and `format:check` clean. **`pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run**, both forbidden by the row.
 ---
 
 ## 2026-09-04 - Session 506: a handle that names nothing, and the member that would have named it is unreachable ([ADR-315](decisions/ADR-315.md), proposed)

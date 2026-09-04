@@ -212,7 +212,7 @@ test('ApiDb declares no operator door, so no deployment can construct the backen
 // So both halves are read at their own sources now: the RETIRED term over the
 // scope the blocker named, POSITIVELY, and the LIVE term over the two files that
 // hold it.
-test('readLiability has its parts and now its fold, and the term that holds it is the plan decoder', () => {
+test('readLiability has its parts and its fold, and what holds it is an unsupplied port', () => {
   // THE THREE PARTS EXIST. This is the half of ADR-236 that says the remaining
   // read shape is UNBUILT rather than blocked by anything a founder must buy.
   const liability = read('src', 'admin-source', 'liability.ts');
@@ -245,28 +245,79 @@ test('readLiability has its parts and now its fold, and the term that holds it i
     'writeRuleState: writeRuleStateVia(',
   );
 
-  // THE LIVE TERM. `plan_versions.rules` decodes in exactly one place in this
-  // repository and it is not this deployable, so the fold's `plan` input is an
-  // injected port that refuses by name rather than a second decoder of the blob
-  // that fixes every cents value a payout is decided against.
-  expect(fold).toContain('export class EligibleFoldUnwired');
-  expect(fold).not.toContain('schema_version');
+  // **THE LIVE TERM, AND THE SENTENCE THAT STOOD HERE IS FALSE (`ADR-283`).** It
+  // read: "`plan_versions.rules` decodes in exactly one place in this repository
+  // and it is not this deployable". The engine exports the decoder, this
+  // deployable declares that package and `payout-backend.ts` calls it, so the
+  // move `ADR-239` slice A ruled has landed and the fold's `plan` input is NOT
+  // waiting on it. Both halves are read at source below rather than described,
+  // because the claim this comment replaces went stale exactly by being prose.
+  expect(readFileSync(join(root, 'packages/rules-engine/src/index.ts'), 'utf8')).toContain(
+    'export { decodePlanRules',
+  );
+  expect(read('src', 'payout-backend.ts')).toContain('decodePlanRules(');
+
+  // AND `toPublishedRules` IS STILL THERE, which is now evidence of the OTHER
+  // half rather than of the retired one: the predicate is stated three times in
+  // this tree and `rule-state-producibility.test.ts` link 7 holds that census.
   expect(readFileSync(join(root, 'apps/worker/src/batch/adapter.ts'), 'utf8')).toContain(
     'function toPublishedRules(',
   );
+
+  // **WHAT HOLDS THE FOLD IS THE UNSUPPLIED PORT AND NOT THE DECODER.** Nothing
+  // in this deployable composes the decode with the account's size row on a
+  // transaction this fold holds, so the injected term still refuses by name and
+  // `readLiability` is still the one method with no producer.
+  expect(fold).toContain('export class EligibleFoldUnwired');
+  expect(fold).not.toContain('schema_version');
 });
 
 // -----------------------------------------------------------------------------
-// 5. How many ports the purchase actually blocks, derived from the list itself
+// 5. How many ports the purchase actually blocks, derived over the WHOLE list
 // -----------------------------------------------------------------------------
+//
+// **THIS CASE WAS GREEN AND ITS STATED CONCLUSION WAS WRONG, WHICH IS THE EXACT
+// SHAPE IT WAS WRITTEN TO CATCH ONE LEVEL DOWN.** It read `wiring.test.ts`'s
+// `BLOCKED` list, derived the `use`-prefixed entries naming `principal(request)`,
+// added two names by hand, and concluded "that is the whole of what the purchase
+// blocks, and it is SIX". `ADR-312` sorted the thirteen doors and found EIGHT:
+// `useCheckoutBackend` says in its own words that what is left "IS THE OPERATOR
+// ROUTE AND IT IS BEHIND THE SSO PURCHASE", and `setInternalOpsSource` says
+// `ADR-171` clause 1 refuses its door "until an `AdminSessionSource` a deployment
+// can install exists". **NEITHER IS `use`-PREFIXED-AND-NAMING-`principal`, so
+// neither was counted.**
+//
+// **THE PREDICATE WAS THE DEFECT AND THE NUMERAL WAS ONLY ITS SYMPTOM.** A
+// prefix and a phrase describe how FOUR of the eight happen to be written; they
+// are not what makes an entry behind the purchase. What makes an entry behind the
+// purchase is that it reduces to `AdminSessionSource`, the port whose own reason
+// names the thing `SECURITY.md`'s C-08 row calls "a purchase Merit has not made".
+// So the set is derived over EVERY entry by that property, and the day a
+// fifteenth entry reduces to that port it is in this list without anybody
+// remembering to add it.
+//
+// **THE FIGURE IS NOT ASSERTED AS A NUMERAL AND THAT IS DELIBERATE.** This file's
+// case 1 asserts numerals because they are ADR-236's finding; here a numeral is
+// what went stale, so what is asserted is the MEMBERSHIP, named, on
+// `viaPrincipal`'s own stated rule below: a port entering or leaving the set
+// fails here with its own name in the diff rather than moving a digit somewhere
+// a reader has to trust.
+//
+// **THE ENTRY TEXT IS READ WITH ITS TRAILING COMMENTS STRIPPED, WHICH THE OLD
+// PARSE DID NOT DO.** An entry runs to the next key, and this file's own comment
+// says so; but the block comment introducing the NEXT entry sits inside that
+// span, so a `BLOCKED` entry was being credited with prose about its successor.
+// It moves no result on this tree, measured, and it is the kind of thing that
+// moves one silently later.
 
-test('six BLOCKED entries reduce to the admin session source, four by principal and one by the door', () => {
-  // THE COUNT IN `wiring.test.ts`'s OWN PROSE WENT STALE ONCE ALREADY. Its
-  // session-source entry read "THREE OTHER PORTS WAIT ON THIS ONE through
-  // `principal(request)`", which was ADR-171's figure and was correct until
-  // `useCertificateRevokeBackend` was added to the list by a later slice. Nothing
-  // reported the drift, because a count written into a string is not read by
-  // anything. This case reads it.
+/** One `BLOCKED` entry: its port name and its reason text, comments removed. */
+interface BlockedEntry {
+  readonly port: string;
+  readonly reason: string;
+}
+
+/** `wiring.test.ts`'s `BLOCKED` map, parsed as data. */
+function blockedEntries(): readonly BlockedEntry[] {
   const source = readFileSync(join(APP, 'test', 'wiring.test.ts'), 'utf8');
   const start = source.indexOf('const BLOCKED');
   const list = source.slice(start, source.indexOf('\n};', start));
@@ -280,13 +331,89 @@ test('six BLOCKED entries reduce to the admin session source, four by principal 
   const heads = [...list.matchAll(/^ {2}([a-zA-Z]+):/gm)];
   const entries = heads.map((head, index) => ({
     port: head[1] ?? '',
-    reason: list.slice(
-      (head.index ?? 0) + head[0].length,
-      index + 1 < heads.length ? (heads[index + 1]?.index ?? list.length) : list.length,
-    ),
+    reason: list
+      .slice(
+        (head.index ?? 0) + head[0].length,
+        index + 1 < heads.length ? (heads[index + 1]?.index ?? list.length) : list.length,
+      )
+      .split('\n')
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join('\n'),
   }));
-  expect(entries.length, 'the BLOCKED list did not parse into entries').toBeGreaterThan(10);
 
+  expect(entries.length, 'the BLOCKED list did not parse into entries').toBeGreaterThan(10);
+  return entries;
+}
+
+/**
+ * The port the purchase IS, named once so the two cases below cannot drift apart.
+ *
+ * It is not a hardcoded member of the answer: it is the port whose own reason
+ * carries the purchase, asserted before anything is counted.
+ */
+const SSO_PORT = 'setAdminSessionSource';
+
+test('the entry that names the purchase is the SSO port, so the reduction has an anchor', () => {
+  // `SECURITY.md`'s C-08 row, as amended by ADR-237 section 3, is where the
+  // corpus says this is bought rather than built: "Who is this person is the
+  // identity provider's, is hardware-key SSO, and is a purchase Merit has not
+  // made." THIS CASE IS THAT SENTENCE FOUND IN THE MAP, so the derivation below
+  // is anchored to a reason a reader can open rather than to a name in this file.
+  const sso = blockedEntries().find((entry) => entry.port === SSO_PORT);
+  expect(sso, `\`${SSO_PORT}\` is not in the BLOCKED list`).toBeDefined();
+  expect(sso?.reason).toMatch(/hardware-key SSO/);
+  expect(sso?.reason).toMatch(/that is a purchase/);
+
+  const security = readFileSync(join(APP, '..', '..', 'docs/architecture/SECURITY.md'), 'utf8');
+  expect(security).toContain('a purchase Merit has not made');
+});
+
+test('every BLOCKED entry the purchase blocks, derived over the whole list and named', () => {
+  const entries = blockedEntries();
+
+  // THE PREDICATE IS "THIS ENTRY REDUCES TO THE SSO PORT", read as the entry
+  // naming `AdminSessionSource` at all -- the interface or the setter, since
+  // `setInternalOpsSource` reduces through ADR-171's clause about the interface
+  // and never writes the setter's name. THE PORT ITSELF IS IN BY IDENTITY AND
+  // NOT BY MENTION: its own reason names the purchase and not the port.
+  const behindThePurchase = entries
+    .filter((entry) => entry.port === SSO_PORT || entry.reason.includes('AdminSessionSource'))
+    .map((entry) => entry.port)
+    .sort();
+
+  // EIGHT, NAMED RATHER THAN COUNTED. ADR-312 derived this set by hand over the
+  // thirteen doors it sorted; this is the same set derived by a predicate, and
+  // the two agree.
+  expect(behindThePurchase).toStrictEqual([
+    'setAdminReadSource',
+    'setAdminSessionSource',
+    'setInternalOpsSource',
+    'useAdminPayoutBackend',
+    'useAdminWalletBackend',
+    'useAdminWriteBackend',
+    'useCertificateRevokeBackend',
+    'useCheckoutBackend',
+  ]);
+
+  // **THE WORD IS NOT THE PREDICATE, AND THIS IS THE GUARD THAT KEEPS A
+  // SUCCESSOR FROM MAKING IT ONE.** `usePayoutBackend` calls its own missing
+  // backend "the whole purchase" and is behind no purchase at all, so a check
+  // that matched the noun would count nine and be wrong in a new direction.
+  const namesTheWord = entries
+    .filter((entry) => entry.reason.includes('purchase'))
+    .map((entry) => entry.port);
+  expect(namesTheWord).toContain('usePayoutBackend');
+  expect(behindThePurchase).not.toContain('usePayoutBackend');
+});
+
+test('four of the eight reduce through principal(request), and they are named', () => {
+  // THE COUNT IN `wiring.test.ts`'s OWN PROSE WENT STALE ONCE ALREADY. Its
+  // session-source entry read "THREE OTHER PORTS WAIT ON THIS ONE through
+  // `principal(request)`", which was ADR-171's figure and was correct until
+  // `useCertificateRevokeBackend` was added to the list by a later slice. Nothing
+  // reported the drift, because a count written into a string is not read by
+  // anything. This case reads it.
+  //
   // THE PREDICATE IS "A BACKEND WHOSE OWN BLOCKER IS `principal(request)`", AND
   // THE `use` PREFIX IS WHAT SEPARATES THAT FROM A MENTION. Six entries name the
   // resolver: the four backends it actually blocks, plus `setAdminSessionSource`
@@ -295,7 +422,11 @@ test('six BLOCKED entries reduce to the admin session source, four by principal 
   // word alone returned all six and conflated the two kinds, which is what this
   // case caught on its first run. `use` versus `set` is not cosmetic here: the
   // backends are installed objects and the two `set` ports are sources.
-  const viaPrincipal = entries
+  //
+  // **THIS IS A SUBSET AND NO LONGER THE ANSWER**, which is the whole of what the
+  // case above repairs: four is how many reduce THROUGH THE RESOLVER, and it was
+  // read for eight sessions as how many the purchase blocks.
+  const viaPrincipal = blockedEntries()
     .filter((entry) => entry.port.startsWith('use') && entry.reason.includes('principal(request)'))
     .map((entry) => entry.port)
     .sort();
@@ -308,12 +439,4 @@ test('six BLOCKED entries reduce to the admin session source, four by principal 
     'useAdminWriteBackend',
     'useCertificateRevokeBackend',
   ]);
-
-  // PLUS THE SSO PORT ITSELF, PLUS THE READ SOURCE THROUGH ADR-171 SECTION 9.
-  // That is the whole of what the purchase blocks, and it is SIX rather than the
-  // four ADR-171 measured or the five its ALLOCATION row carried. ADR-236.
-  const behindThePurchase = [...viaPrincipal, 'setAdminSessionSource', 'setAdminReadSource'];
-  expect(behindThePurchase).toHaveLength(6);
-  for (const port of behindThePurchase)
-    expect(list, `\`${port}\` is not in the BLOCKED list`).toContain(`  ${port}:`);
 });
