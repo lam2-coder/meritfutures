@@ -11412,7 +11412,7 @@ Counts derived at reporting time, each command run separately: gates **33 of 33*
 
 ---
 
-## 2026-09-04 - Session 504: a handle that names nothing, and the member that would have named it is unreachable ([ADR-315](decisions/ADR-315.md), proposed)
+## 2026-09-04 - Session 506: a handle that names nothing, and the member that would have named it is unreachable ([ADR-315](decisions/ADR-315.md), proposed)
 
 **Row `315`, [ADR-305](decisions/ADR-305.md) section 7 slice 3, its `F3`. THE STOP CONDITION WAS ONE OF TWO THINGS AND THE SECOND WAS TAKEN: the docblock is corrected and `ExpiryTx` keeps three members.** The hourly sweep's I/O boundary specified its own ledger adapter as `postTransaction(tx.ledger, await readChart(tx.ledger), lt01(values))` directly above a port that declares `postLt01(tx: ExpiryTx, ...)`, and `tx.ledger` named nothing.
 
