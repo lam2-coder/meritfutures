@@ -246,3 +246,85 @@ describe("the header's migration claims are read from packages/db/migrations", (
     ).toEqual([]);
   });
 });
+
+// =============================================================================
+// WHICH SIDE FLATTENS A MULTI-STATEMENT RESULT, read out of the installed vendor
+// =============================================================================
+// ADR-331, and it is here rather than in `packages/db` because this is the only
+// package in the workspace permitted to know the vendor's name at all.
+//
+// THE QUESTION THIS BLOCK ANSWERS IS "WHOSE JOB IS THE FLATTENING". `pg`
+// resolves a MULTI-STATEMENT string to a `Result[]`, and every plan pg-boss
+// wraps in its own `locked()` helper is one. pg-boss's built-in driver hands
+// that array back untouched and unwraps it internally, which it can do because
+// it IS `pg`. Every ADAPTER the library ships instead NORMALISES to `{ rows }`,
+// and each of them flattens on the way: an adapter that normalises is the side
+// that destroyed the array, so it is the only side that still can.
+//
+// `packages/db`'s `sqlExecutorOn` is an adapter of exactly that kind and it did
+// not flatten. It read `.rows` off the array, which is `undefined`, and returned
+// it past a type declaring `unknown[]`; pg-boss's supervisor then died on
+// `undefined.filter` and took the whole supervise pass with it, maintenance
+// included. That is ADR-327 section 9 finding 1 and this block is what makes the
+// repair falsifiable from the side that owns the contract.
+//
+// BOTH FACTS ARE READ OUT OF THE INSTALLED PACKAGE AND NEITHER IS RESTATED. A
+// pg-boss upgrade that changed either one would make `packages/db`'s flattening
+// wrong, and nothing else in this repository would say so.
+describe('the executor contract is the vendor`s, read from the installed pg-boss', () => {
+  /** A file of the installed library, or a failure. An unreadable check is not a check. */
+  function vendorFile(name: string): string {
+    const path = join(ROOT, 'packages/queue/node_modules/pg-boss', name);
+    try {
+      return readFileSync(path, 'utf8');
+    } catch {
+      throw new Error(`pg-boss is not installed at ${path}; this case cannot run`);
+    }
+  }
+
+  test('pg-boss asks its adapters for a NORMALISED answer and not for the driver`s', () => {
+    // `IDatabase` is the type `ConstructorOptions.db` takes, which is what
+    // `pgBossQueue` supplies. Its one required method returns `{ rows }`, a
+    // single object, so an adapter answering with an array of results is
+    // answering off contract however faithfully it copies the driver.
+    const types = vendorFile('dist/types.d.ts');
+    const declared =
+      /export interface IDatabase \{\s*executeSql\([^)]*\): Promise<\{\s*rows: any\[\];\s*\}>;/.test(
+        types,
+      );
+    expect(
+      declared,
+      'pg-boss`s IDatabase.executeSql no longer returns Promise<{ rows: any[] }>. ' +
+        '`packages/db`s sqlExecutorOn is written to that shape and has to follow it',
+    ).toBe(true);
+  });
+
+  test('pg-boss`s own helper flattens the array, which is the semantics packages/db reproduces', () => {
+    // `unwrapSQLResult` is not on this package`s public entry point, so it cannot
+    // be imported without a second module naming the vendor, which the case above
+    // this block forbids. It is read instead, and what is read is the property
+    // rather than the spelling: the array branch concatenates each element`s
+    // `rows`, so a RETURNING in the middle of a plan is not lost behind the
+    // trailing COMMIT.
+    const tools = vendorFile('dist/tools.js');
+    const body = tools.slice(tools.indexOf('function unwrapSQLResult'));
+    expect(body, 'unwrapSQLResult is gone from pg-boss/dist/tools.js').not.toBe('');
+    expect(body.slice(0, body.indexOf('\n}'))).toContain('flatMap(i => i.rows)');
+  });
+
+  test('`packages/db`s executor carries both of `pg`s answers', () => {
+    // THE MERIT HALF, BOUND TO THE TWO ABOVE SO THE THREE FAIL TOGETHER. Read
+    // rather than imported, for the reason `write-accessor.test.ts` states from
+    // the other direction: neither package declares a dependency on the other,
+    // and structural typing is what binds them.
+    const executor = readFileSync(join(ROOT, 'packages/db/src/scoped-db.ts'), 'utf8');
+    const open = executor.indexOf('function sqlExecutorOn(');
+    expect(open, 'packages/db no longer declares sqlExecutorOn').toBeGreaterThan(-1);
+    const declaration = executor.slice(open, executor.indexOf('\n}', open));
+    expect(
+      declaration,
+      'sqlExecutorOn does not branch on the array `pg` returns for a multi-statement plan',
+    ).toContain('Array.isArray(result)');
+    expect(declaration).toContain('flatMap((one) => one.rows)');
+  });
+});

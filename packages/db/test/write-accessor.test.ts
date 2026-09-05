@@ -118,8 +118,16 @@ function recording(): { source: StatementSource; sent: Sent[] } {
   return { source, sent };
 }
 
-/** A `pg` connection that records, for the raw-executor assertions. */
-function recordingConn(): {
+/**
+ * A `pg` connection that records, for the raw-executor assertions.
+ *
+ * `answer` IS WHAT THE DRIVER RESOLVES WITH AND IT IS A PARAMETER SINCE ADR-331,
+ * because `pg` has two answers and only one of them used to be modelled here. A
+ * single statement resolves to one `Result`; a MULTI-STATEMENT string resolves
+ * to a `Result[]`, one element per statement. The default is the single empty
+ * result the three older cases were written against.
+ */
+function recordingConn(answer: unknown = { rows: [] as unknown[] }): {
   conn: PoolClient;
   queries: Array<{ text: string; values: unknown[] | undefined }>;
 } {
@@ -127,7 +135,7 @@ function recordingConn(): {
   const conn = {
     query: async (text: string, values?: unknown[]) => {
       queries.push({ text, values });
-      return { rows: [] as unknown[] };
+      return answer;
     },
   } as unknown as PoolClient;
   return { conn, queries };
@@ -565,6 +573,50 @@ describe('the raw executor is a named door and not a property', () => {
       .executeSql(text, values);
     expect(queries).toEqual([{ text, values }]);
     expect(out).toEqual({ rows: [] });
+  });
+
+  test('a MULTI-STATEMENT answer comes back FLATTENED, in statement order', async () => {
+    // ADR-331. THIS EXECUTOR USED TO READ `.rows` OFF AN ARRAY AND HAND BACK
+    // `undefined` PAST A TYPE THAT SAYS `unknown[]`. `pg` resolves a
+    // multi-statement string to a `Result[]`, and every plan pg-boss wraps in its
+    // own `locked()` helper is one: measured on pg-boss@12.28.0 against
+    // PostgreSQL 16.13, one such plan renders SIX statements, `pg` returns an
+    // array of six, and the rows the caller asked for arrive in element four
+    // with empty arrays either side. A reader of `.rows` on that array gets
+    // `undefined`, and pg-boss's supervisor then dies on `undefined.filter`.
+    //
+    // THE ANSWER MODELLED HERE IS THAT SHAPE and the expectation is the two
+    // non-empty elements CONCATENATED, so an executor that returned only the
+    // last result, or only the first, fails this case rather than passing it.
+    const { source } = recording();
+    const { conn } = recordingConn([
+      { rows: [] },
+      { rows: [] },
+      { rows: [{ pg_advisory_xact_lock: '' }] },
+      { rows: [{ name: 'provisioning' }, { name: 'ledger' }] },
+      { rows: [] },
+    ]);
+    const out = await scopedTx(source, conn, IDENTITY)
+      .sqlExecutor('job-enqueue')
+      .executeSql('BEGIN; SELECT 1; COMMIT;');
+    expect(out.rows).toEqual([
+      { pg_advisory_xact_lock: '' },
+      { name: 'provisioning' },
+      { name: 'ledger' },
+    ]);
+  });
+
+  test('a SINGLE-statement answer is passed through as itself', async () => {
+    // The other of `pg`'s two answers, pinned so the flattening above cannot be
+    // read as the only path. A parameterised call takes the extended protocol,
+    // which cannot carry a second statement at all, so this is the shape every
+    // enqueue takes and it is the one path that worked before ADR-331.
+    const { source } = recording();
+    const { conn } = recordingConn({ rows: [{ id: 'job-1' }] });
+    const out = await scopedTx(source, conn, IDENTITY)
+      .sqlExecutor('job-enqueue')
+      .executeSql('INSERT INTO j (data) VALUES ($1) RETURNING id', ['{}']);
+    expect(out.rows).toEqual([{ id: 'job-1' }]);
   });
 
   test('a reason outside the vocabulary is refused even past a cast', () => {
