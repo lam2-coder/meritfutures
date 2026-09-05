@@ -8916,7 +8916,13 @@ const ri36 = {
 //      because sections 10 to 12 verify the fold as one set.
 //   2. A `## <n>.` SECTION HEADING NAMING THE NUMBER IN BACKTICKS. That is the
 //      shape sections 13 onward use, one per superseding migration, and section
-//      16's own note calls the sequence append-only.
+//      16's own note calls the sequence append-only. A HEADING CLAIMS ONLY THE
+//      NUMBERS BEFORE ITS VERB: every landing heading here reads `0028` lands
+//      or `0030` and `0031` land, and a number named AFTER the verb is a
+//      cross-reference rather than a claim. That narrowing was forced by the
+//      suite rather than designed: section 39's heading MENTIONS `0080` while
+//      recording `0081`, and the first reader written here took every
+//      backticked number and reported a clean tree with `0080` unrecorded.
 //
 // THE SECTION-1 LEG IS SCOPED TO SECTION 1 AND THAT IS LOAD BEARING. Section 14
 // (`0030` and `0031`) carries a table of the identical shape, and a reader that
@@ -8969,6 +8975,12 @@ const MIGRATION_SEQUENCE_HEADING = /^## 1\.\s/;
 
 /** A migration file, by the name the whole estate cites it under. */
 const MIGRATION_FILE = /^(\d{4})_[a-z0-9_]+\.sql$/;
+
+/**
+ * The verb every landing heading in this file uses, and the boundary of a
+ * heading's CLAIM: numbers before it are recorded, numbers after it are prose.
+ */
+const LANDING_VERB = /\bland(?:s)?\b/;
 
 /**
  * THE BACKLOG: migrations that landed with no record, each with the file and
@@ -9036,7 +9048,19 @@ function landingRecords(root) {
     const at = `${MANIFEST_DOC}:${index + 1}`;
     if (text.startsWith('## ')) {
       inSequence = MIGRATION_SEQUENCE_HEADING.test(text);
-      for (const named of text.matchAll(/`(\d{4})`/g)) {
+      // THE CLAIM IS THE PART OF THE HEADING BEFORE THE WORD `land`, AND THAT
+      // IS A NARROWING THE SUITE FORCED RATHER THAN A FLOURISH. Section 39's
+      // heading reads "`0081` lands, and the record that was owed with it is
+      // written in the same commit as `0080`'s"; a reader taking every
+      // backticked number in the heading counted that MENTION as a record for
+      // `0080` and reported the tree clean with `0080` unrecorded, which the
+      // reconstruction case caught. Every landing heading in this file names
+      // its own migration before the verb -- `0028` lands, `0030` and `0031`
+      // land, `0048` and `0049` land -- and a heading with no `land` in it,
+      // like section 15's or section 22's, claims nothing.
+      const verb = LANDING_VERB.exec(text);
+      if (verb === null) return;
+      for (const named of text.slice(0, verb.index).matchAll(/`(\d{4})`/g)) {
         headings += 1;
         note(named[1] ?? '', `${at}, the section headed "${text.slice(3).trim().slice(0, 72)}"`);
       }
@@ -9068,7 +9092,9 @@ const ri37 = {
     'a row of the migration-sequence table in SECTION 1, which is the only ' +
     'record `0001` to `0029` have or will have because the fold verifies them ' +
     'as one set; or a `## <n>.` section heading naming the number in ' +
-    'backticks, which is the shape every section from 13 onward uses. THE ' +
+    'backticks BEFORE ITS VERB, which is the shape every section from 13 ' +
+    'onward uses -- ``0028` lands`, ``0030` and `0031` land` -- so a number ' +
+    'named AFTER the verb is a cross-reference and claims nothing. THE ' +
     'TABLE LEG IS SCOPED TO SECTION 1: section 14 carries a table of the same ' +
     'shape and an unscoped reader would count a delta row or a counts row as ' +
     'a record. ' +
