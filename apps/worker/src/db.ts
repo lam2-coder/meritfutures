@@ -89,8 +89,19 @@
 // WHAT THIS FILE DOES NOT DO, AND MUST NOT GROW
 // -----------------------------------------------------------------------------
 // It does not import `pg` (`merit/no-raw-db-client` is attached to `apps/**`
-// and this path is inside it), it does not import `drizzle-orm`, it reaches for
-// no `sqlExecutor`, and it casts past no key type. P7 section 11 rule 10:
+// and this path is inside it), it does not import `drizzle-orm`, and it casts
+// past no key type.
+//
+// **THAT SENTENCE ALSO READ "it reaches for no `sqlExecutor`", AND ADR-333 MADE
+// IT FALSE.** It is kept beside its correction rather than deleted, per `RI-14`.
+// What it was written against is a MONEY-PATH ADAPTER routing a scoped read or a
+// scoped write around the key vocabulary, and that is still refused: no adapter
+// in this deployable reaches for one, `test/db.test.ts`'s substitute throws on
+// the method, and six suites assert their own module does not contain the word.
+// What this file gained is the pool-shaped executor at the foot of it, which
+// reaches no table at all and exists so that `src/queue.ts` can be the one file
+// that names `@merit/queue`. The section at the bottom is the argument.
+// P7 section 11 rule 10:
 // `packages/db/src/scoped-db.ts` is `P5-a`'s file and no P7 slice moves it. If a
 // detector needs a shape the accessor does not offer -- and ADR-157 section 5
 // REFUSED the aggregate P7 asked for, on the evidence that a detector's blocker
@@ -98,8 +109,14 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
-import { closeClient, systemDb, transaction } from '@merit/db';
-import type { SystemDb, SystemReason, SystemTx } from '@merit/db';
+import { closeClient, poolSqlExecutor, systemDb, transaction } from '@merit/db';
+import type {
+  PoolSqlExecutorReason,
+  SqlExecutor,
+  SystemDb,
+  SystemReason,
+  SystemTx,
+} from '@merit/db';
 
 /**
  * The one reason this deployable ever runs at, spelled once.
@@ -176,4 +193,95 @@ export const LIVE_DB: WorkerDb = {
  */
 export function closeWorkerDb(): Promise<void> {
   return closeClient();
+}
+
+// =============================================================================
+// THE POOL-SHAPED EXECUTOR, WHICH IS NOT A FOURTH DOOR AND HAS TO SAY WHY
+// =============================================================================
+// **IT IS HERE AND NOT IN `src/queue.ts`, AND THAT PLACEMENT IS THE WHOLE OF
+// WHAT MAKES ONE IMPORTER STRUCTURAL IN THIS DEPLOYABLE.** ADR-165's pattern is
+// ONE FILE PER PACKAGE: `@merit/db` names this file, `@merit/ledger` names
+// `src/sweeps/ledger.ts`, and since ADR-333 `@merit/queue` names `src/queue.ts`.
+// A queue door that reached for `poolSqlExecutor` itself would have made
+// `test/db.test.ts`'s "exactly one file under src imports the accessor" a
+// TWO-element list, which is an assertion standing since session 292 loosened to
+// land a later row's subject. The two doors compose STRUCTURALLY instead:
+// `SqlExecutor` here and `JobTransaction` there are the same shape and neither
+// package imports the other, which is the arrangement `packages/db` and
+// `packages/queue` already have between themselves (ADR-102).
+//
+// -----------------------------------------------------------------------------
+// WHY IT IS NOT A SECOND DOOR IN ADR-165 CLAUSE 2's SENSE
+// -----------------------------------------------------------------------------
+// **THE CLAUSE COUNTS DOORS ONTO TABLES AND THIS REACHES NO TABLE.** It says
+// this file "opens `batch(fn)` over `systemDb('nightly-batch')` and declares no
+// `scoped`, no `firm`, and no reason parameter", and every one of those three is
+// a `TableKey`-generic handle: a `scoped` door would need the workspace's second
+// `IdentityId` cast and a `firm` door is a strict subset of the one above. This
+// value has no `rows`, no `insert`, no `updateAt`, no key vocabulary and no
+// scope predicate. It hands out ONE METHOD that takes a string, which is
+// ADR-332 leg 3, and `transaction()` has no overload that takes it, so there is
+// no argument position anywhere in the accessor where it becomes a scope.
+//
+// **AND IT IS A BIGGER AUTHORITY OBJECT ALL THE SAME, WHICH IS SAID HERE RATHER
+// THAN LEFT FOR A REVIEWER TO NOTICE.** ADR-331 section 4 clause 3's words are
+// "a pool-shaped raw-SQL door runs arbitrary statements, unscoped, outside any
+// transaction, on the money database", and that is true of what this returns.
+// What bounds it in THIS deployable is the same thing that bounds the reason
+// above: there is no parameter. `poolSqlExecutor(reason)` takes a word and this
+// function takes NOTHING, so the only statements it can carry are the ones
+// `src/queue.ts` hands to pg-boss, and a second caller wanting raw SQL on the
+// pool is a diff in this file with an argument attached.
+//
+// -----------------------------------------------------------------------------
+// THE TWO WORDS ARE TWO CONNECTION LIFETIMES AND THE TYPE REFUSES THE SWAP
+// -----------------------------------------------------------------------------
+// `'job-supervisor'` is pg-boss's work on its OWN schema -- queue metadata, the
+// polling fetch, maintenance and completion -- on a handle that outlives every
+// transaction. `'job-enqueue'` is ONE statement INSIDE the caller's open
+// transaction, which is ADR-006's whole consequence and is what
+// `enqueueProvisioningOp` already spends through `tx.sqlExecutor('job-enqueue')`.
+// ADR-332 PARTITIONED the vocabulary rather than widening it: each producer's
+// parameter is an `Extract` of one member, so `poolSqlExecutor('job-enqueue')`
+// and `tx.sqlExecutor('job-supervisor')` are COMPILE ERRORS in both directions.
+// `test/queue.test.ts` proves that with two `@ts-expect-error` lines rather than
+// asserting it, because `tsc` reports an unused one as an error of its own.
+//
+// **THE CONFUSION IS NOT THEORETICAL AND ITS PRICE IS MEASURED.** ADR-331
+// section 5 and ADR-332 section 2.3 ran a supervisor on the transaction-bound
+// producer: every plan the vendor wraps in `locked()` renders `BEGIN ... COMMIT`
+// as ONE string, the first one COMMITS the caller's transaction, and an enqueue
+// after it SURVIVED A ROLLBACK that was supposed to take it. That is ADR-006's
+// property inverted, at construction, before any Merit code has run a line.
+// =============================================================================
+
+/**
+ * The one reason this deployable ever runs raw SQL on the POOL at.
+ *
+ * TYPED AS `PoolSqlExecutorReason` RATHER THAN INFERRED AS A LITERAL, for
+ * `WORKER_REASON`'s reason one vocabulary over: a rename of the member leaves
+ * that alias `never` and this line stops compiling, where a copy of the string
+ * would simply stop matching and say nothing.
+ */
+export const WORKER_SUPERVISOR_REASON: PoolSqlExecutorReason = 'job-supervisor' as const;
+
+/**
+ * The handle `src/queue.ts` constructs pg-boss over.
+ *
+ * NO PARAMETER, WHICH IS THIS FILE'S OWN IDIOM FOR A CLOSED VOCABULARY. The
+ * reason is spent at the call site rather than accepted as an argument, exactly
+ * as `workerHandle()` spends `'nightly-batch'`, so there is nothing a caller
+ * could put a second word in.
+ *
+ * IT OPENS NO SOCKET AND IT IS THE POOL `batch(fn)` ALREADY RUNS ON.
+ * `poolSqlExecutor` resolves the pool through `client()` PER STATEMENT, so
+ * constructing a queue over this connects nothing and the FIRST statement is
+ * what needs a `DATABASE_URL` (`test/queue.test.ts` asserts that, and the
+ * rejection it names is `client.ts`'s own, which is the proof of WHICH pool).
+ * **SO THE QUEUE NEEDS NO `close` OF ITS OWN**: `closeWorkerDb()` above already
+ * releases the one pool both doors share, which is what lets a one-shot job that
+ * enqueued something still EXIT.
+ */
+export function queueExecutor(): SqlExecutor {
+  return poolSqlExecutor(WORKER_SUPERVISOR_REASON);
 }

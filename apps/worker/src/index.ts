@@ -45,15 +45,34 @@
 // `JobQueue`'s five methods throws for this deployable today", AND `0082` MADE
 // THE SECOND HALF FALSE.**
 //
-// WHAT IS STILL MISSING IS NAMED RATHER THAN DEFERRED, because a deferral with
-// no named blocker is not a finding (ADR-326 section 3.2). No module under
-// `src/` imports `@merit/queue`, so the capability is declared and unexercised.
-// The next row owes the ONE-DOOR module `@merit/ledger` got at `src/sweeps/
-// ledger.ts` and `@merit/db` got at `src/db.ts` (ADR-165): one file that names
-// the package, one `JobTransaction` from `packages/db`'s `sqlExecutor
-// ('job-enqueue')`, and one queue name. ADR-327 section 5 says why that file is
-// not here: this row's fence held the manifest and the barrel and no other
-// module of this deployable.
+// AND THE IMPORTER IS HERE TOO, SINCE ADR-333. `src/queue.ts` is the ONE-DOOR
+// module `@merit/ledger` got at `src/sweeps/ledger.ts` and `@merit/db` got at
+// `src/db.ts` (ADR-165): the one file under `src/` that names the package. It
+// takes its constructor executor from `src/db.ts` rather than reaching for the
+// accessor itself, so each package still names exactly one file, and the queue
+// name it declares is `PROVISIONING_QUEUE_NAME`, which `src/provisioning/
+// saga.ts` already declares.
+//
+// **THIS PARAGRAPH READ "WHAT IS STILL MISSING IS NAMED RATHER THAN DEFERRED,
+// because a deferral with no named blocker is not a finding (ADR-326 section
+// 3.2). No module under `src/` imports `@merit/queue`, so the capability is
+// declared and unexercised. The next row owes the ONE-DOOR module ... ADR-327
+// section 5 says why that file is not here", AND ADR-333 WROTE THAT FILE.** It
+// is kept beside its correction rather than deleted, per `RI-14`, and `RI-35`
+// holds the correction to the tree: the sentence was a REGISTERED absence claim
+// and the register moved it to `retired` in the same commit that falsified it,
+// so a tree where the door went away turns the check red here instead of leaving
+// a correction to be believed.
+//
+// **THE DOOR TAKES TWO OF `JobQueue`'s FIVE METHODS AND THAT IS THE RULING.**
+// `declareQueue` and `enqueue` are published; `start`, `stop` and `consume` are
+// not. A supervise pass emits its failures on an emitter `pgBossQueue` does not
+// expose, so a process that starts one gets an unhandled rejection naming a
+// vendor's `dist` (ADR-331 section 10 item 3, ADR-332 section 10 item 2); and
+// this deployable is a ONE-SHOT JOB (ADR-241), so a sixty-second supervise
+// interval here either never fires or holds the event loop open. `src/queue.ts`
+// carries the argument and `test/queue.test.ts` asserts the absence over the
+// tree rather than over the type.
 //
 // AND `0082` DOES NOT GRANT `CREATE`, WHICH IS A RULING AND NOT AN OMISSION.
 // `pgboss.create_queue` runs `CREATE TABLE pgboss.%I` only for a PARTITIONED
@@ -101,11 +120,22 @@
 // ADR-327 ADDED THE LINE.**
 //
 // THE SAGA IS STILL WRITTEN AGAINST PORTS, and that has not changed with the
-// manifest: `ProvisioningJobQueue` is a port, `enqueueProvisioningOp` calls it,
-// and no adapter over `pgBossQueue` exists yet because no module here imports
-// the package. `src/provisioning/ports.ts` says what each port's implementation
-// is and what blocks two of them, and `src/schedule.ts` carries the blocker per
-// job rather than as a generality.
+// manifest OR with the door: `ProvisioningJobQueue` is a port,
+// `enqueueProvisioningOp` calls it, and **no adapter over `LIVE_QUEUE` has a
+// caller here**. `src/provisioning/ports.ts` says what each port's
+// implementation is and what blocks two of them, and `src/schedule.ts` carries
+// the blocker per job rather than as a generality.
+//
+// **THAT CLAUSE READ "no adapter over `pgBossQueue` exists yet because no module
+// here imports the package", AND ADR-333 MADE ITS STATED REASON FALSE WHILE
+// LEAVING ITS CONCLUSION STANDING** -- which is exactly the shape ADR-331 met
+// one package over. It is kept beside its correction rather than deleted, per
+// `RI-14`. A module here imports the package now; what is still absent is a
+// CALLER, and `RI-35` binds that absence rather than this prose asserting it:
+// the register carries a `worker-queue-door-caller` artifact, so the day
+// somebody wires the saga to the door this correction goes red at its own line.
+// **The row that writes a door is not the row that wires a job** (ADR-165
+// clause 5, ADR-326 section 4).
 //
 // **WHAT IS REAL IS THE PIPELINE, THE DIGEST, THE MACHINE, THE COMPENSATION AND
 // THE EXIT; WHAT IS NOT IS THE WIRING**, and the difference is visible in the
@@ -1437,6 +1467,13 @@ export const WORKER_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = 
     'THE ONE DOOR. ADR-165 and `test/db.test.ts`: this is the only file under apps/worker/src ' +
     'that may import @merit/db. Re-exporting it would leave every consumer of this package one ' +
     'import short of the accessor.',
+  './queue.ts':
+    'THE OTHER ONE DOOR (ADR-333). This is the only file under apps/worker/src that may import ' +
+    '@merit/queue, and `test/queue.test.ts` and `test/schedule.test.ts` case 5.1 each pin the ' +
+    'importer list at exactly this one file. IT IS NOT A LEG AND `./sweeps/ledger.ts` IS, WHICH ' +
+    'IS THE DISTINCTION WORTH READING: that file exports an ADAPTER over a port, and this one ' +
+    'exports the CAPABILITY, which is `./db.ts`s class. Re-exporting it would leave every ' +
+    'consumer of this package one import short of a constructed queue on the money database.',
   './start.ts':
     'THE PROCESS ENTRY POINT. `apps/api/src/start.ts` states the ruling this transcribes: this ' +
     'package`s `exports` target is `index.ts`, so importing it must have no effect, and a barrel ' +

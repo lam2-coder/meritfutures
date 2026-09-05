@@ -502,6 +502,120 @@ export const ABSENCE_ARTIFACTS = [
     probe: (root) => declaredIn(root, 'apps/worker/package.json', '@merit/queue'),
   },
   {
+    key: 'db-pool-sql-executor',
+    names: '`packages/db` exporting `poolSqlExecutor`, the pool-shaped door ADR-332 published',
+    needles: [],
+    sweptBy:
+      'nothing, for `api-queue-manifest`s reason: its one claim site carries the name on its ' +
+      'own line and `queue-door`s needles do not reach it. **THIS IS THE ENTRY ADR-332 LEFT ' +
+      'OWED AND NAMED IN `packages/queue/test/surface.test.ts`**, in the exact shape that file ' +
+      'writes down: an artifact keyed on the export, with a `retired` claim anchored on the ' +
+      'quotation the correction retires. That row could not take it, because the sentence it ' +
+      'retired had never been registered and no marker in the vocabulary above reaches it, so ' +
+      'the register could not be amended under its grant. ADR-333 is amending the register ' +
+      'anyway (`queue-door` moved) and takes it here',
+    probe: (root) => {
+      // BOTH HALVES, BECAUSE A BARREL LINE ALONE IS NOT AN EXPORT. The name has
+      // to be published by `packages/db`'s own entry point AND declared by the
+      // module behind it; a re-export of something deleted does not compile, but
+      // a probe reading one half would call the artifact present off whichever
+      // half a partial revert happened to leave.
+      const barrel = requireFile(root, 'packages/db/src/index.ts');
+      const declared = requireFile(root, 'packages/db/src/scoped-db.ts');
+      const republished = /^\s*poolSqlExecutor,\s*$/m.test(barrel);
+      const exists = /^export function poolSqlExecutor\(/m.test(declared);
+      return republished && exists ? 'present' : 'absent';
+    },
+  },
+  {
+    key: 'job-queue-failure-channel',
+    names:
+      'a channel on `JobQueue` by which a caller could observe a SUPERVISE FAILURE: a sixth ' +
+      'method, or an emitter. ADR-006s five-method interface, ADR-331 section 10 item 3 and ' +
+      'ADR-332 section 10 item 2',
+    needles: [],
+    sweptBy:
+      'nothing, for `api-queue-manifest`s reason: both claim sites already sit inside ' +
+      '`queue-door`s needle reach, so a second copy would buy nothing. AND A NEEDLE ON ' +
+      '`supervisor` WAS TRIED AND REJECTED IN THE SAME SITTING: over the widened scope it ' +
+      'reaches the `job-supervisor` reason word in `packages/db/src/scoped-db.ts` and in ' +
+      '`apps/worker/src/db.ts`, which are statements about a VOCABULARY and not about this ' +
+      'channel, so it would register noise, which is ADR-328s own rule against a needle that ' +
+      'mostly names other things',
+    probe: (root) => {
+      // READ AT THE INTERFACE'S OWN DATA. `JOB_QUEUE_METHODS` is the list
+      // `surface.test.ts` grades ADR-006's narrowness criterion against, and
+      // `EveryJobQueueMethodIsListed` makes it total in the other direction, so
+      // a sixth METHOD cannot arrive without appearing here.
+      const body = requireFile(root, 'packages/queue/src/job-queue.ts');
+      const start = body.indexOf('export const JOB_QUEUE_METHODS');
+      const end = body.indexOf('] as const', start);
+      if (start === -1 || end === -1) {
+        throw new Error(
+          'RI-35 cannot read `JOB_QUEUE_METHODS` out of packages/queue/src/job-queue.ts, so ' +
+            'the failure-channel probe measured nothing. A probe that reported `absent` off a ' +
+            'list it could not find would hold its claim true forever',
+        );
+      }
+      const listed = [...body.slice(start, end).matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
+      if (listed.length === 0) {
+        throw new Error(
+          'RI-35 found `JOB_QUEUE_METHODS` declaring no method, which cannot be true of a ' +
+            'shipped interface and would make every absence below unfalsifiable',
+        );
+      }
+      const five = new Set(['declareQueue', 'enqueue', 'consume', 'start', 'stop']);
+      const sixth = listed.some((name) => name !== undefined && !five.has(name));
+      // AND AN EMITTER, WHICH WOULD BE A CHANNEL WITHOUT BEING A METHOD. That is
+      // the shape pg-boss itself uses and the shape `pgBossQueue` declines to
+      // forward, so it is the likeliest way this artifact arrives.
+      const emitter = /EventEmitter|addListener|\bonError\b|\bonFailure\b/.test(body);
+      return sixth || emitter ? 'present' : 'absent';
+    },
+  },
+  {
+    key: 'worker-queue-door-caller',
+    names:
+      'a caller of `apps/worker/src/queue.ts`s door under any `src/`, past the module that ' +
+      'declares it. ADR-333 wrote the door and wired nothing',
+    needles: [],
+    sweptBy:
+      'nothing, on `provisioning-saga-caller`s reason: the door`s two exported names reach ' +
+      'three lines in the shipped scope and all three are its own declaration, so a needle on ' +
+      'them would sweep the register that already binds them',
+    probe: (root) => {
+      const files = shippedSources(root);
+      if (files.length === 0) {
+        throw new Error(
+          'RI-35 found no source file under any `apps/*/src` or `packages/*/src`, so the ' +
+            'queue-door caller probe measured nothing',
+        );
+      }
+      // THE DECLARING MODULE IS EXCLUDED AND NOTHING ELSE IS. `LIVE_QUEUE` is
+      // declared there and `workerQueue(` is both declared and called there, so
+      // a probe over the whole tree would report the door calling itself.
+      // A CALL AND NEVER THE MENTION, on `provisioning-saga-caller`s instrument
+      // and for ADR-165 section 9s recorded reason: `apps/worker/src/index.ts`
+      // NAMES `LIVE_QUEUE` in order to say that nothing calls it, and a probe
+      // counting the name would report the door wired off the sentence saying it
+      // is not. So the shapes are a property access and a factory call, and the
+      // declaring module is excluded because it is both.
+      const door = 'apps/worker/src/queue.ts';
+      for (const rel of files) {
+        if (rel === door) continue;
+        const called = readFileSync(join(root, rel), 'utf8')
+          .split('\n')
+          .some(
+            (line) =>
+              /\bLIVE_QUEUE\s*\./.test(line) ||
+              (/\bworkerQueue\s*\(/.test(line) && !/function\s+workerQueue/.test(line)),
+          );
+        if (called) return 'present';
+      }
+      return 'absent';
+    },
+  },
+  {
     key: 'provisioning-saga-caller',
     names: 'a caller of `runProvisioningSaga` under any `src/`, past its own barrel re-exports',
     needles: [],
@@ -681,27 +795,68 @@ const ABSENCE_MARKERS = [
 
 /** @type {Claim[]} */
 export const ABSENCE_CLAIMS = [
-  // --- live: the queue has no door -----------------------------------------
+  // --- the queue's door, WRITTEN BY ADR-333, so all three moved together ----
+  // **THIS IS LEG 2 FIRING ON GOOD NEWS AND IT IS WHAT THE LEG IS FOR.** All
+  // three of these were `live` against `queue-door` for three rows: ADR-327 put
+  // `@merit/queue` in `apps/worker`'s manifest and could not add an importer,
+  // ADR-331 and ADR-332 each measured a blocker and each recorded that the
+  // importer was a different row's. ADR-333 wrote `apps/worker/src/queue.ts`,
+  // the probe flipped to `present`, and RI-35 went red AT ALL THREE SENTENCES
+  // rather than at a count somebody would have had to notice. Each is repaired
+  // beside its correction under `RI-14` and moved here to `retired`, in the same
+  // commit, so a tree that lost the door again turns leg 3 red at the same lines.
   {
     site: 'apps/worker/src/index.ts',
-    claim: 'imports `@merit/queue`, so the capability is declared and unexercised.',
-    disposition: 'live',
+    claim: 'declared and unexercised. The next row owes the ONE-DOOR module ... ADR-327',
+    disposition: 'retired',
     artifact: 'queue-door',
-    why: 'ADR-327 added the manifest line and could not add the importer. The barrel says so',
+    why: 'ADR-327 added the manifest line and could not add the importer; ADR-333 added it',
   },
   {
     site: 'apps/worker/src/index.ts',
-    claim: 'no adapter over `pgBossQueue` exists yet because no module here imports',
-    disposition: 'live',
+    claim: 'THAT CLAUSE READ "no adapter over `pgBossQueue` exists yet because no module',
+    disposition: 'retired',
     artifact: 'queue-door',
-    why: 'the saga`s ports are written against a `JobQueue` nothing supplies',
+    why: 'ADR-333 falsified the clause`s stated REASON and left its conclusion standing',
   },
   {
     site: 'packages/queue/src/index.ts',
     claim: 'NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`',
-    disposition: 'live',
+    disposition: 'retired',
     artifact: 'queue-door',
-    why: 'the package publishes an interface and an adapter that nothing has taken yet',
+    why: 'the package published an interface and an adapter, and `apps/worker` has now taken it',
+  },
+  {
+    site: 'packages/queue/src/index.ts',
+    claim: 'THAT PARAGRAPH ENDED "That door is not published by `packages/db` and the',
+    disposition: 'retired',
+    artifact: 'db-pool-sql-executor',
+    why: 'ADR-332 published `poolSqlExecutor` and left this register entry owed by name',
+  },
+
+  // --- live: the door exists, and what it deliberately does NOT reach -------
+  {
+    site: 'apps/worker/src/queue.ts',
+    claim: '**1. `start()` IS THE SUPERVISOR, AND ITS FAILURES REACH NO CALLER OF',
+    disposition: 'live',
+    artifact: 'job-queue-failure-channel',
+    why:
+      'the door withholds `start` BECAUSE the failures have no channel; if one arrives the ' +
+      'reason for withholding it is gone and this sentence has to be read again',
+  },
+  {
+    site: 'packages/queue/src/index.ts',
+    claim: 'manifest and not a grant this time: it is that a caller of `start()` cannot',
+    disposition: 'live',
+    artifact: 'job-queue-failure-channel',
+    why: 'the package states its own limit, and it is the package that would repair it',
+  },
+  {
+    site: 'apps/worker/src/index.ts',
+    claim: '`enqueueProvisioningOp` calls it, and **no adapter over `LIVE_QUEUE` has a',
+    disposition: 'live',
+    artifact: 'worker-queue-door-caller',
+    why: 'ADR-333 wrote the door and wired nothing; the day the saga is wired this goes red',
   },
   {
     site: 'apps/api/src/routes/internal.ts',

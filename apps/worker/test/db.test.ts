@@ -218,9 +218,22 @@ test('src reaches three workspace packages and one Node builtin, and no raw driv
   // AND NOT REPEATED HERE, because that file is where the posting authority is
   // held and two statements of one fact is what drifts. An exact list is what
   // makes a FOURTH workspace package a decision somebody takes here.
+  //
+  // **`@merit/queue` JOINED ON 2026-09-05 (ADR-333) AND THIS CASE WENT RED BY
+  // THAT ROW SUCCEEDING.** It has been in this deployable's manifest since
+  // ADR-327 and reached no `src/` file for two rows, which is why it was not in
+  // this list; ADR-333 wrote the ONE DOOR and the list is widened by one name
+  // rather than the case being loosened to a `toContain`. Its one-door half is
+  // asserted in `test/queue.test.ts` and in `test/schedule.test.ts` case 5.1,
+  // for section 3's reason above: the property belongs beside the capability.
+  // **THE ACCESSOR'S OWN ONE-DOOR ASSERTION IS UNTOUCHED BY IT**, and that is
+  // the design rather than luck: the queue door takes its executor from
+  // `src/db.ts` and imports `@merit/db` nowhere, so section 3 above is still an
+  // exact one-element list.
   expect([...bareSpecifiers()].sort()).toEqual([
     '@merit/db',
     '@merit/ledger',
+    '@merit/queue',
     '@merit/rules-engine',
     'node:crypto',
   ]);
