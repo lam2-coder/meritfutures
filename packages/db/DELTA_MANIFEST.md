@@ -801,6 +801,12 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **35** | session 509, `0079` ([ADR-318](../../docs/decisions/ADR-318.md)) | **allocated.** `0079` lands. **Sections 32, 33 and 34 are claimed by headings and have no row here**, which is the same omission the `18`, `20`, `24` and `26 to 30` rows above each record. They are NAMED and not filled in on their authors' behalf, on this table's standing rule that a row written for somebody else is a claim nobody made. **34 is the true maximum, so 35 is the next free number rather than the row count.** |
 | **38** | session 525, `0080` ([ADR-322](../../docs/decisions/ADR-322.md)), written by [ADR-334](../../docs/decisions/ADR-334.md) | **allocated.** `0080` lands, **and this is the first section in this file recording a migration that merged WITHOUT one.** `0080` merged on 2026-09-05 and four later rows reported the absence rather than repairing it: [ADR-323](../../docs/decisions/ADR-323.md) landmine 1, [ADR-327](../../docs/decisions/ADR-327.md), [ADR-330](../../docs/decisions/ADR-330.md) and [ADR-329](../../docs/decisions/ADR-329.md) section 9 finding 5. **THE SECTION NUMBER IS LANDING ORDER AND NOT MIGRATION ORDER**, which 35, 36 and 37 already prove by being `0079`, `0078` and `0082`; **37 is the maximum, so 38 is the next free number** rather than a slot between 35 and 37. **A LETTERED SECTION WAS CONSIDERED AND REFUSED**: `4a` is the escape hatch for a section that belongs in the MIDDLE, and a record written today belongs at the end of a sequence ordered by when records were written |
 | **39** | session 525, `0081` ([ADR-323](../../docs/decisions/ADR-323.md)), written by [ADR-334](../../docs/decisions/ADR-334.md) | **allocated.** `0081` lands, on the row above's reasoning and in the same commit. **38 is the maximum this table has ever held and 39 is the next free number.** The two are consecutive because the migrations are consecutive and their rulings are one ruling on two tables, which [ADR-322](../../docs/decisions/ADR-322.md) landmine 1 says in its own words. **NEITHER ROW IS WRITTEN ON SOMEBODY ELSE'S BEHALF**, which is this table's standing rule: the sections beside them are written in the same commit, MEASURED against a live PostgreSQL 16.13 rather than reconstructed from the two ADRs, and `RI-37` is what makes the next such omission a failure instead of a fifth sentence |
+| **40** | session 526, `0052` ([ADR-177](../../docs/decisions/ADR-177.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0052` lands, and it is the first of six consecutive sections closing the chart-of-accounts and ledger-code run that `RI-37`'s backlog register held. **39 is the maximum this table has ever held and 40 is the next free number.** **SECTION NUMBERS ARE LANDING ORDER**, which 35, 36 and 37 prove by being `0079`, `0078` and `0082`, so six records written today take the six numbers after the maximum rather than slots between 27 and 31. **Within the six the order is MIGRATION order**, because the six files are one supersession chain on one constraint and a reader who takes them out of order reads a predicate that no longer existed |
+| **41** | session 526, `0053` ([ADR-180](../../docs/decisions/ADR-180.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0053` lands. **This is the only file in the six that no committed script watches**, executed in both directions and recorded in the section rather than inferred from a grep |
+| **42** | session 526, `0054` ([ADR-183](../../docs/decisions/ADR-183.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0054` lands, and the section records one measured disagreement with [ADR-183](../../docs/decisions/ADR-183.md) and with the migration's own header, with its cause executed and neither record amended |
+| **43** | session 526, `0055` ([ADR-186](../../docs/decisions/ADR-186.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0055` lands, **and it is the only migration in this repository measured to re-apply CLEAN against its own landing schema**, which the section states with the partial-replay hazard that follows from it |
+| **44** | session 526, `0056` ([ADR-187](../../docs/decisions/ADR-187.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0056` lands. The eighth ledger code, and the only count it moves is a row |
+| **45** | session 526, `0057` ([ADR-189](../../docs/decisions/ADR-189.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0057` lands, **and it is the first section in this file that could not quote a probe transcript at its own migration's landing point**: [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) reads a column `0070` adds, so the transcript is quoted at the full applied set and the counterfactual is a removal. **NONE OF THESE SIX ROWS IS WRITTEN ON SOMEBODY ELSE'S BEHALF**, which is this table's standing rule: each is written in the same commit as the section it claims and as the deletion of that migration's row from `RI-37`'s backlog register. **The rows this table still owes are unchanged and are NOT filled in here**: 24, 26 to 30 and 32 to 34 are claimed by headings and have no row, and nothing compares this table to the headings |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -2541,3 +2547,357 @@ NOTICE:  REJECTION 8: the vocabulary is 0006's, the method rule is 0081's, the a
 **THE IDEMPOTENCY ANCHOR IS NOW A UNIQUE INDEX OVER TWO NULLABLE COLUMNS, AND WHAT KEEPS IT CORRECT IS A POSTGRESQL DEFAULT NOBODY WROTE DOWN.** A btree unique index treats `NULL`s as DISTINCT unless it is built `NULLS NOT DISTINCT`, so `(NULL, NULL)` collides with nothing, including with another wallet row. That is right rather than tolerated, because the anchor defeats a duplicate **webhook** and a wallet purchase reached no processor, so there is no delivery to deduplicate. **The failure mode of getting it wrong is silent and total**: a `NULLS NOT DISTINCT` rebuild would permit exactly ONE wallet-funded purchase in the entire table and fail on the second. `ACCEPTANCE 2` writes a second wallet purchase and requires it to commit, `REJECTION 6` writes the same `(psp, psp_reference)` pair twice and requires the anchor **by name**, and `REJECTION 8` reads `indnullsnotdistinct`, `indisunique` and `indpred` out of the catalogue. **`0081` bought an assertion instead of a partial index**, and the `COMMENT ON INDEX` this section measured is where the rule is stated at the object.
 
 **AND THE SECOND `psp_reference` REPAIR IS STILL OWED WHILE THIS MIGRATION LOOKS LIKE IT DELIVERED IT.** [STATE](../../docs/STATE.md) session 220 records that stamping the processor reference **after** the provider call needs a nullable column and a migration. The column is nullable now and the repair is not delivered, because under `'psp'` the `CASE` requires the reference at `INSERT`. **A session that reads only the column type will conclude otherwise**, which is why it is written in the migration, in [ADR-323](../../docs/decisions/ADR-323.md) finding 8, and here.
+
+## 40. `0052` lands, and the record is written for a constraint the schema no longer holds (2026-09-05)
+
+**Session 526, [ADR-177](../../docs/decisions/ADR-177.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `177` and `0052`. THE SECTION IS DATED TODAY AND THE MIGRATION IS NOT.** [ADR-334](../../docs/decisions/ADR-334.md) shipped `RI-37` with a shrink-only register of twenty merged migrations that carry no landing record, sixteen of them money path, and recorded that seven of the twenty appear in this file **zero times in any form**. This is the first of six sections that close the chart-of-accounts and ledger-code run, `0052` through `0057`, and [ADR-335](../../docs/decisions/ADR-335.md) is the row that writes them.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION AND NONE IS COPIED OUT OF [ADR-177](../../docs/decisions/ADR-177.md).** Every figure that entry states is reproduced exactly and the agreement is stated rather than assumed, because a landing record whose numbers were transcribed from its own ADR is a copy and not a record.
+
+`ledger_accounts` is the table every posting names and until this file **nothing had ever populated it**: `count(*)` on the freshly applied `0001`..`0051` schema is **0**, measured. `0052` writes one row and one CHECK, and it binds `kind` to `code` for the four codes whose kind is derivable from a posting the corpus already states, leaving `firm_treasury`, `psp_clearing` and `reserve` falling through `ELSE true` because no file settled them.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0052` applied forward-only into an empty database under `ON_ERROR_STOP=1`, counts read from `pg_tables`, `pg_indexes`, `pg_constraint`, `pg_trigger` and `pg_proc` rather than from a grep:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean.** Re-applying `0052` alone is refused at `constraint "ledger_accounts_kind_matches_code" for relation "ledger_accounts" already exists`, and re-applying `0001` at `type "identity_status" already exists` |
+| `public` object counts, `0051` then `0052` | **114 tables, 397 indexes, 481 to 482 CHECK constraints, 167 foreign keys, 12 unique constraints, 21 non-internal triggers, 107 functions.** ONE object is created and it is a CHECK |
+| `ledger_accounts` rows, `0051` then `0052` | **0 to 1**, and the row is `fees_revenue / revenue / firm` with a null `identity_id` |
+| `ledger_accounts_kind_matches_code`, read at `pg_constraint` | the `CASE` over `code` with **four arms and `ELSE true`**: `fees_revenue` revenue, `trader_wallet`, `trader_withdrawable` and `promotional_credit` liability. The `ELSE` is where the open question is stored |
+| the four figures [ADR-177](../../docs/decisions/ADR-177.md) states | **114 base tables at `0001`..`0052`** and **`ledger_accounts` at 0 rows before it**, both reproduced to the unit off `information_schema.tables` and `count(*)` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+### THE SET DOES NOT APPLY WITHOUT THIS FILE, and that is the counterfactual
+
+Applying every migration on disk **with `0052` removed** does not reach the end. It dies at [`0053:203`](migrations/0053_firm_treasury_kind.sql):
+
+```
+ERROR:  constraint "ledger_accounts_kind_matches_code" of relation "ledger_accounts" does not exist
+```
+
+`0053` opens with a bare `DROP CONSTRAINT` and no `IF EXISTS`, and so do `0055` and `0056`. **So the six files are a chain rather than six independent statements**, and the ordinary way of measuring what a migration contributes, applying the set without it, is unavailable for this one. What replaced it is the row-level counterfactual below.
+
+### The probe that covers it, and the half of it that nothing covers
+
+[`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) **reads** this file's seeded row rather than writing its own, which its own header records as the repair for a defect the seed caused. Executed on the full applied set with the row deleted inside the same database, the probe dies at line 89:
+
+```
+ERROR:  PROBE FAILED: no firm fees_revenue account. 0052 seeds it; this probe reads it and no longer creates one
+```
+
+**AND THE FOUR ARMS ARE COVERED BY NOTHING, WHICH IS A PROPERTY OF THE SUPERSESSION CHAIN RATHER THAN AN OVERSIGHT.** `0053`, `0055` and `0056` each drop and re-add `ledger_accounts_kind_matches_code` under its own name, so **no database this repository can build holds the predicate `0052` installed**. `LEDGER-K1a` and `LEDGER-K1b` perturb `reserve`, whose arm is `0055`'s; `LEDGER-K2a` and `LEDGER-K2b` perturb `withdrawals_in_flight`, whose arm is `0056`'s. Nothing under `scripts/db/` perturbs `fees_revenue`, `trader_wallet`, `trader_withdrawable` or `promotional_credit` against this constraint. The four arms survive inside `0056`'s version of the same name and are enforced today; what is unwatched is the DDL statement this file made, which is the ordinary condition of a superseded constraint and is written here so a reader does not infer coverage from a green probe.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-177` | `ledger_accounts` | `ledger_accounts_kind_matches_code`, a `CASE` over `code` with four ruled arms and `ELSE true`, plus its comment; and the first row this table has ever held, `fees_revenue / revenue / firm` | 0052 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed.** No approved module document proposes a chart of accounts as a schema delta: the seven codes are `0009`'s and what lands here is their `kind`, derived from postings `M05` already states. **`0009` IS NOT EDITED** and is superseded by addition from outside it, which is constitution `E2` and the shape of every section above.
+
+### The part a reader should carry forward, and it is not the CHECK
+
+**THE `ELSE true` IS THE RECORD OF A REFUSAL AND IT READS LIKE AN OVERSIGHT.** A reader arriving at a `CASE` with four arms and a permissive `ELSE` sees an incomplete constraint; what it actually is, in this file's own words, is a hole where an open question is stored, and three later migrations each fill part of it. **The hole was not free**: under `ELSE true` a code with a name and no ruled kind was writable, which `0055` closes and which `LEDGER-K1c` watches to this day. The cost of storing a refusal in a permissive branch is that the refusal is indistinguishable from a gap, and the only thing that made it legible was the constraint comment this file writes alongside it.
+
+---
+
+## 41. `0053` lands, and it is the one migration in this cluster nothing watches (2026-09-05)
+
+**Session 526, [ADR-180](../../docs/decisions/ADR-180.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `180` and `0053`.** Section 40's opening applies word for word. `0053` fills the first of the three holes `0052` left: `firm_treasury` is an `asset`, which [ADR-180](../../docs/decisions/ADR-180.md) reached as a judgement rather than a derivation and shipped unsigned for exactly that reason.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION.** [ADR-180](../../docs/decisions/ADR-180.md)'s two figures are reproduced exactly.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0053` applied forward-only into an empty database under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean.** Re-applying `0053` alone is refused at `duplicate key value violates unique constraint "ledger_accounts_firm_code_uq"` |
+| `public` object counts, `0052` then `0053` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints, 21 non-internal triggers, 107 functions. ALL SEVEN UNCHANGED.** The file drops one constraint and re-adds it under its own name, so nothing this catalogue counts moves |
+| `ledger_accounts` rows, `0052` then `0053` | **1 to 2.** The second is `firm_treasury / asset / firm` with a null `identity_id` |
+| `ledger_accounts_kind_matches_code`, read at `pg_constraint` | **five arms and `ELSE true`**, `0052`'s four plus `firm_treasury` ruled `asset`. `psp_clearing` and `reserve` still fall through |
+| the two figures [ADR-180](../../docs/decisions/ADR-180.md) states | **114 base tables at `0001`..`0053`** and **`ledger_accounts` at 1 row on the pre-`0053` baseline**, both reproduced to the unit |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+**WHERE THE RE-APPLICATION REFUSAL COMES FROM IS NOT WHERE A READER WOULD LOOK.** The `DROP CONSTRAINT` plus `ADD CONSTRAINT` pair re-applies without complaint, because the constraint it drops is the one it is about to write. What refuses the rerun is the `INSERT`, against a unique index on the firm codes, three statements later. **The DDL half of this file is idempotent by rerun and the DML half is what makes the file as a whole refuse**, which is the opposite of `0052`'s shape and worth knowing before anybody reasons about a partial replay.
+
+### NOTHING UNDER `scripts/db/` WATCHES THIS FILE, and it was executed in both directions
+
+`firm_treasury` appears in **no file under `scripts/db/`**, measured by grep over the directory. Two executions rather than one, so the claim is about behaviour and not about a search:
+
+| Perturbation | [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) | [`assert_ledger_scope_agrees.mjs`](../../scripts/db/assert_ledger_scope_agrees.mjs) |
+|---|---|---|
+| the full applied set, untouched | exit **0**, 15 `NOTICE` lines | exit **0** |
+| this file's seeded row deleted from the full applied set | exit **0** | exit **0** |
+| every migration on disk applied **with `0053` removed** | exit **0** | exit **0** |
+
+**BOTH READERS STAY GREEN IN BOTH DIRECTIONS, SO THIS MIGRATION HAS NO PROBE.** The set still applies without it because `0055` drops the same constraint name and `0055` and `0056` each carry the `firm_treasury` arm forward, so removing `0053` removes a seeded row and a predicate that is rewritten twice afterwards.
+
+**THE ARM IS LIVE AND THAT IS A DIFFERENT CLAIM FROM BEING WATCHED.** Executed on the full applied set, `UPDATE ledger_accounts SET kind = 'liability' WHERE code = 'firm_treasury'` is refused:
+
+```
+ERROR:  new row for relation "ledger_accounts" violates check constraint "ledger_accounts_kind_matches_code"
+```
+
+So the database enforces the ruling and no committed script has ever watched it do so. **A ruling [ADR-180](../../docs/decisions/ADR-180.md) itself calls a judgement rather than a derivation is the one in this cluster with no committed perturbation**, and that entry's own verification row 8 says in its own words that the probe *"does not touch `firm_treasury`"*. It is still true. Closing it is a probe block and not a migration, and it is named as owed rather than written here.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-180` | `ledger_accounts` | `ledger_accounts_kind_matches_code` superseded under its own name, five arms and `ELSE true`, plus its comment; and the row `firm_treasury / asset / firm` | 0053 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on section 40's reasoning. [ADR-180](../../docs/decisions/ADR-180.md) amends `M05` section 2.1's `LT-02`, `LT-06` and `LT-07` rows in prose rather than in schema, and this file carries the half a schema can hold. **`0009` AND `0052` ARE NOT EDITED**, which is constitution `E2`.
+
+### The part a reader should carry forward, and it is not the kind
+
+**A SUPERSESSION UNDER THE SAME NAME MOVES NOTHING THIS CATALOGUE COUNTS, AND THAT IS WHY THE OBJECT COUNTS ABOVE ARE ALL IDENTICAL.** Four of the six files in this cluster drop a constraint and re-add it under its own name; a reader watching table, index, CHECK, foreign-key and trigger totals for evidence that a migration did something would conclude `0053`, `0055` and `0056` are no-ops. **The delta a supersession makes is a predicate, and a count cannot see a predicate**, which is why `pg_get_constraintdef` is quoted in every section of this cluster and why `CI-06/retired-constraints` states in its own comments that a same-name re-add is the shape it does not close.
+
+---
+
+## 42. `0054` lands, and it is the first trigger in this schema that writes (2026-09-05)
+
+**Session 526, [ADR-183](../../docs/decisions/ADR-183.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `183` and `0054`.** Section 40's opening applies word for word. `0009` declared three per-identity ledger classes, `0052` and `0053` seeded the two firm rows, and the per-identity rows were left to a mechanism nobody wrote, so `identityAccount('trader_wallet')` threw at `chart.ts`'s `resolve` for every identity that had ever existed. This file makes provisioning coextensive with the identity's existence.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION.** One of them **disagrees with [ADR-183](../../docs/decisions/ADR-183.md) and with this migration's own header**, and the disagreement is reported with its cause executed under the counts.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0054` applied forward-only into an empty database under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean.** Re-applying `0054` alone is refused at `function "provision_identity_ledger_accounts" already exists with same argument types` |
+| `public` object counts, `0053` then `0054` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints ALL UNCHANGED; non-internal triggers 21 to 22 and functions 107 to 108**, both `+1` and both this file's |
+| `ledger_accounts` rows, `0053` then `0054` | **2 and 2, unchanged.** The backfill `CROSS JOIN`s `identities`, which has no rows on a fresh install, so the seeded total is a fact about an empty database and the trigger is what carries the ruling |
+| `identities_provision_ledger_accounts`, read at `pg_trigger` | `AFTER INSERT` `FOR EACH ROW` on `identities`, **`tgdeferrable` false, `tginitdeferred` false**, and it is an ordinary trigger rather than a constraint trigger |
+| `provision_identity_ledger_accounts`, read at `pg_proc` | `plpgsql`, **`provolatile = 'v'`** |
+| what one identity opens, executed inside a rolled-back transaction | **exactly 3 rows**, `promotional_credit`, `trader_wallet` and `trader_withdrawable`, all `identity` scoped |
+| the three figures [ADR-183](../../docs/decisions/ADR-183.md) states | **114 base tables**, **`ledger_accounts` at exactly 2 rows** at `0001`..`0053`, and **21 non-internal triggers to 22**, all three reproduced to the unit |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+### One figure disagrees with [ADR-183](../../docs/decisions/ADR-183.md) and with this file's own header, and the cause was executed rather than argued
+
+[ADR-183](../../docs/decisions/ADR-183.md) section 3 and this migration's header both state, of the schema at `0001`..`0053`, that there are **21 non-internal triggers over 19 distinct functions** and that **not one function body contains an `INSERT`, an `UPDATE` or a `DELETE`**, adding that *"two match the word `UPDATE` and both matches are inside an error-message string"*.
+
+**THE FIRST TWO NUMBERS REPRODUCE EXACTLY: 21 and 19**, read from `pg_trigger` joined to `pg_class` and counted distinct on `tgfoid`. **THE THIRD DOES NOT.** Read from `pg_proc.prosrc` over the 19 functions actually bound to a trigger, as whole words:
+
+| Word | Functions matching |
+|---|---|
+| `UPDATE` | **3**, not two |
+| `INSERT` | **2** |
+| `DELETE` | **1** |
+
+**THE CAUSE IS WHAT COUNTS AS A MATCH, AND IT WAS EXECUTED RATHER THAN INFERRED.** Stripping `--` comments and single-quoted string literals from each body and repeating the scan leaves **exactly one** function matching anything, `assert_adjustment_reversal_is_sound`, and its match is `FOR UPDATE;`, the row lock at the end of a `SELECT`. Of the other matches, two are inside error-message strings, two are inside `--` comments, and one is the comparison `TG_OP = 'DELETE'`. **So the ruling's own claim survives the measurement and the incidental count does not**: no trigger function at `0053` executes a write statement, which is the fact `0054`'s precedent argument rests on, while *"two match the word `UPDATE` and both are inside a string"* undercounts by one function and misplaces two matches that are in a comment and in a row lock.
+
+**NEITHER [ADR-183](../../docs/decisions/ADR-183.md) NOR `0054` IS AMENDED.** Both are dated records, the migration is merged and constitution `E2` makes it permanent, and the figure was true of the reading its author took. It is written here so a session repeating the measurement finds three where the record says two and knows why before concluding that a trigger started writing.
+
+### The probes that cover it, and all three were watched failing
+
+Three committed readers go red when this file is removed from the set. Measured by applying every migration on disk **with `0054` removed** and running each against the result:
+
+| Reader | Result without `0054` |
+|---|---|
+| [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) | **exit 3** at line 50, `PROBE FAILED: the fixture identity has no trader_wallet position. 0054 provisions it on INSERT INTO identities` |
+| [`assert_ledger_scope_agrees.mjs`](../../scripts/db/assert_ledger_scope_agrees.mjs) | **exit 1**, and on the forward-only `0001`..`0053` tree it reports **5 findings**, four of them naming this file's three codes and the fifth reading *"`0054`'s provisioning trigger opened NO position for a fresh identity"* |
+| [`probe_wallet_debit_provenance.sql`](../../scripts/db/probe_wallet_debit_provenance.sql) | **exit 3** at line 227, `LEDGER-C2: ledger_account <NULL> does not exist` |
+
+All three are exit 0 on the full applied set. **This is the best-covered file in the cluster**, which is the opposite of `0053` one number back and is worth stating beside it.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-183` | `identities`, `ledger_accounts` | `provision_identity_ledger_accounts()` and its comment; `identities_provision_ledger_accounts`, `AFTER INSERT FOR EACH ROW`; and a backfill over existing identities, which is empty on a fresh install | 0054 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on section 40's reasoning. **`0002` AND `0009` ARE NOT EDITED**, which is constitution `E2`.
+
+### The part a reader should carry forward, and it is not the trigger
+
+**THE ROW COUNT DOES NOT MOVE AND THE MIGRATION IS STILL THE ONE THAT CHANGES EVERYTHING.** `ledger_accounts` reads 2 before this file and 2 after it, because the backfill has no identities to walk on a fresh database. A reader measuring this file by what it seeds would conclude it did nothing. What it did is make every future `INSERT INTO identities` open three positions, which is a property of the schema and not of a count, and which only shows up when somebody writes an identity. **The three probes above are the only reason that property is visible at all**, and two of the three test it by inserting an identity and then reading what appeared.
+
+---
+
+## 43. `0055` lands, and it is the only file in this cluster that re-applies clean (2026-09-05)
+
+**Session 526, [ADR-186](../../docs/decisions/ADR-186.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `186` and `0055`.** Section 40's opening applies word for word. `0055` fills the last two holes `0052` left, rules `psp_clearing` and `reserve` both `asset`, and closes the `ELSE` from `true` to `false` so that minting a code requires ruling its kind in the same migration.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION.** [ADR-186](../../docs/decisions/ADR-186.md)'s figures at both of its measuring points are reproduced exactly.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0055` applied forward-only into an empty database under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean** |
+| `public` object counts, `0054` then `0055` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints, 22 non-internal triggers, 108 functions. ALL SEVEN UNCHANGED**, and so is `ledger_accounts` at 2 rows. This file seeds nothing and creates nothing |
+| `ledger_accounts_kind_matches_code`, read at `pg_constraint` | **seven arms and `ELSE false`.** `psp_clearing` and `reserve` join as `asset`, and the `ELSE` is the delta a count cannot see |
+| the figures [ADR-186](../../docs/decisions/ADR-186.md) states at `0001`..`0054` | **54 files, 114 base tables, `ledger_accounts` at 2 rows, 22 non-internal triggers**, and `pg_get_constraintdef` returning **five arms and `ELSE true`**. Every one reproduced |
+| the figures [ADR-186](../../docs/decisions/ADR-186.md) states at `0001`..`0055` | **55 files, 114 base tables, 2 rows, 22 non-internal triggers.** Every one reproduced |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+### RE-APPLYING THIS FILE IS ACCEPTED, and it is the only one of the six that is
+
+Every other file in this cluster is refused on a rerun. `0055` is not:
+
+| File | Re-applied against its own landing schema |
+|---|---|
+| `0052` | refused, `constraint "ledger_accounts_kind_matches_code" ... already exists` |
+| `0053` | refused, `duplicate key value violates unique constraint "ledger_accounts_firm_code_uq"` |
+| `0054` | refused, `function "provision_identity_ledger_accounts" already exists with same argument types` |
+| **`0055`** | **ACCEPTED, exit 0** |
+| `0056` | refused, `duplicate key value violates unique constraint "ledger_accounts_firm_code_uq"` |
+| `0057` | refused, `function "assert_terminal_withdrawal_obligation_is_zero" already exists with same argument types` |
+
+**THE REASON IS STRUCTURAL AND NOT ACCIDENTAL.** `0055` carries a `DROP CONSTRAINT`, an `ADD CONSTRAINT` and a `COMMENT`, and no `INSERT`, no `CREATE` and no `ALTER TABLE ... ADD COLUMN`. A drop of the name it is about to write, followed by a write of that name, is idempotent by rerun; `md5(pg_get_constraintdef(...))` is byte-identical before and after the second application, measured. **`0053`'s and `0056`'s refusals both come from their seeded rows rather than from their DDL**, so the same is true of their DDL halves and only `0055` has nothing else in it. That matters for one reason: **a rerun of `0055` against a later schema would silently install `0055`'s seven arms over `0056`'s eight**, dropping `withdrawals_in_flight`'s arm into the `ELSE false` and making the row `0056` seeded unwritable. Nothing refuses that, and it is the shape of a partial replay rather than of a normal migration run.
+
+### The probe that covers it, and the counterfactual that does not
+
+[`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql)'s `LEDGER-K1c` block is written for this file by name: it drops `ledger_accounts_code_is_declared` inside a transaction so the kind constraint stands alone, inserts a code with a name and no ruled kind, and requires a `check_violation`. Its own comment reads *"under `0053`'s `ELSE true` this `INSERT` LANDED; under `0055`'s `ELSE false` it must not"*.
+
+**AND THE REMOVAL COUNTERFACTUAL DOES NOT FIRE, WHICH IS STATED RATHER THAN HIDDEN.** Applying every migration on disk **with `0055` removed** leaves both readers at exit 0, because `0056` rewrites the same constraint with the same `ELSE false` and carries `psp_clearing` and `reserve` forward. The counterfactual that fires is the forward-only one: on `0001`..`0054` the probe dies inside `LEDGER-K1a` at
+
+```
+ERROR:  PROBE FAILED: LEDGER-K1 admitted reserve as a liability. Every declared code has a ruled kind and no firm code is a liability (ADR-186)
+```
+
+**exit 3.** So this file is watched at the ruling it introduced and not at the file that introduced it, which is the general condition of a middle link in a supersession chain and is why the forward-only ladder was measured for all six rather than the removal alone.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-186` | `ledger_accounts` | `ledger_accounts_kind_matches_code` superseded under its own name: seven arms, `psp_clearing` and `reserve` both `asset`, and `ELSE true` closed to `ELSE false`, plus its comment | 0055 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on section 40's reasoning. **`0009`, `0052` AND `0053` ARE NOT EDITED**, which is constitution `E2`.
+
+### The part a reader should carry forward, and it is not the two kinds
+
+**CLOSING AN `ELSE` FROM `true` TO `false` IS THE ONLY STATEMENT IN THIS CLUSTER THAT CONSTRAINS A MIGRATION THAT HAS NOT BEEN WRITTEN YET.** Every other arm rules a code that already exists. The `ELSE false` rules the ninth code nobody has minted: it makes a future `ALTER TABLE ... ADD` of a code without an arm fail at the first row rather than pass silently, which is what turns *"rule the kind in the same migration"* from an instruction in a header into a property of the database. `0056` is the immediate proof, and it does write its arm.
+
+---
+
+## 44. `0056` lands, and the count that moves is a row rather than an object (2026-09-05)
+
+**Session 526, [ADR-187](../../docs/decisions/ADR-187.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `187` and `0056`.** Section 40's opening applies word for word. This file mints the eighth ledger code, `withdrawals_in_flight`, the external leg's in-flight obligation and the only firm-scoped `liability` in the chart.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION.** [ADR-187](../../docs/decisions/ADR-187.md)'s figures at both of its measuring points are reproduced exactly.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0056` applied forward-only into an empty database under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean.** Re-applying `0056` alone is refused at `duplicate key value violates unique constraint "ledger_accounts_firm_code_uq"`, which is the seed rather than the DDL |
+| `public` object counts, `0055` then `0056` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints, 22 non-internal triggers, 108 functions. ALL SEVEN UNCHANGED.** Two constraints are dropped and re-added under their own names and one function is `CREATE OR REPLACE`, so nothing this catalogue counts moves |
+| `ledger_accounts` rows, `0055` then `0056` | **2 to 3.** The third is `withdrawals_in_flight / liability / firm` with a null `identity_id`, and it is the only count in the file that moves |
+| `ledger_accounts_code_is_declared`, read at `pg_constraint` | **seven members to eight**, `withdrawals_in_flight` joining the closed vocabulary |
+| `ledger_accounts_kind_matches_code`, read at `pg_constraint` | **seven arms to eight**, the eighth ruling `withdrawals_in_flight` a `liability`, and `ELSE false` carried forward from `0055` unchanged |
+| the figures [ADR-187](../../docs/decisions/ADR-187.md) states at `0001`..`0055` | **55 files, 114 base tables, 22 non-internal triggers, `ledger_accounts` at 2 rows**, and `pg_get_constraintdef` returning `0055`'s seven arms with `ELSE false`. Every one reproduced |
+| the figures [ADR-187](../../docs/decisions/ADR-187.md) states at `0001`..`0056` | **56 files, 114 base tables unchanged, 22 non-internal triggers unchanged, `ledger_accounts` at 3 rows.** Every one reproduced, including the three codes by name |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+### The probes that cover it, and both were watched failing
+
+Applying every migration on disk **with `0056` removed** and running each reader against the result:
+
+| Reader | Result without `0056` |
+|---|---|
+| [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) | **exit 3** inside `LEDGER-K2a`, `new row for relation "ledger_accounts" violates check constraint "ledger_accounts_code_is_declared"`, because the eighth code is no longer in the vocabulary the block perturbs |
+| [`assert_ledger_scope_agrees.mjs`](../../scripts/db/assert_ledger_scope_agrees.mjs) | **exit 1, 1 finding**: *"`withdrawals_in_flight`: `LEDGER_ACCOUNT_SCOPE` declares it and `ledger_accounts_code_is_declared` does not admit it"* |
+
+Both are exit 0 on the full applied set. **Three blocks of the probe are written for this file by name**, `LEDGER-K2a` a refusal, `LEDGER-K2b` the acceptance that stops the refusal being vacuous, and `LEDGER-K3` the assertion that the code is seeded exactly once and is firm-scoped, with a second half asserting **zero** identity-scoped rows in it. On the forward-only ladder the probe dies at `0001`..`0055` inside `LEDGER-K2a` at the same constraint, exit 3.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-187` | `ledger_accounts` | `ledger_accounts_code_is_declared` superseded under its own name, seven members to eight; `ledger_accounts_kind_matches_code` superseded, seven arms to eight, `ELSE false` unchanged; the row `withdrawals_in_flight / liability / firm`; both constraint comments and the table comment | 0056 | **landed** |
+| `ADR-187` | `ledger_entries` | `assert_ledger_account_class_declared()` replaced in place under `CREATE OR REPLACE`, so `LEDGER-C2`'s second statement of the vocabulary admits the eighth code | 0056 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on section 40's reasoning. **`0009`, `0027` AND `0055` ARE NOT EDITED**, which is constitution `E2`. `0027`'s function body is superseded by `CREATE OR REPLACE` from outside it, which changes no line of `0027` on disk.
+
+### The part a reader should carry forward, and it is not the eighth code
+
+**THIS FILE STATES THE VOCABULARY THREE TIMES AND THE DATABASE CHECKS ONLY TWO OF THEM AGAINST EACH OTHER.** `ledger_accounts_code_is_declared` holds the eight codes as a `CHECK`; `assert_ledger_account_class_declared` holds them again as a `NOT IN` literal inside a `plpgsql` body; `ledger_accounts_kind_matches_code` holds them a third time as `CASE` arms. Nothing in the database compares the three. **What compares them is [`assert_ledger_scope_agrees.mjs`](../../scripts/db/assert_ledger_scope_agrees.mjs), which is a script and not a constraint**, and its own header records that this is the gap [ADR-247](../../docs/decisions/ADR-247.md) named and did not write. A ninth code minted into the `CHECK` and missed in the trigger body would install cleanly, and the first posting against it would raise `LEDGER-C2` on a code the chart admits.
+
+---
+
+## 45. `0057` lands, and its own probe can no longer be run at it (2026-09-05)
+
+**Session 526, [ADR-189](../../docs/decisions/ADR-189.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `189` and `0057`.** Section 40's opening applies word for word, and this is the last of the six. `0057` makes a wallet withdrawal's terminal states discharge the obligation `0056` made postable, and makes a ledger transaction reversible at most once.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION.** [ADR-189](../../docs/decisions/ADR-189.md)'s figures are reproduced exactly, including both of the `+1` counts it states.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0057` applied forward-only into an empty database under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean.** Re-applying `0057` alone is refused at `function "assert_terminal_withdrawal_obligation_is_zero" already exists with same argument types` |
+| `public` object counts, `0056` then `0057` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints ALL UNCHANGED; non-internal triggers 22 to 23 and functions 108 to 109**, both `+1` and both this file's. `ledger_accounts` stays at 3 rows |
+| **the index count does NOT move**, and it is the number a reader would expect to | `DROP INDEX` followed by `CREATE UNIQUE INDEX` under the same name leaves `pg_indexes` at **397** on both sides. The delta is a property of the index and not a count of them |
+| `ledger_transactions_reversal_of_idx`, read at `pg_index` | **`indisunique` false at `0056` and true at `0057`**, and **`indpred` is NOT NULL on BOTH sides**, `WHERE (reversal_of IS NOT NULL)`. Uniqueness is the only property that moves |
+| `wallet_withdrawals_terminal_obligation_is_zero`, read at `pg_trigger` | a **CONSTRAINT trigger**, `tgconstraint` non-zero, **`tgdeferrable` and `tginitdeferred` both true**, `AFTER INSERT OR UPDATE FOR EACH ROW` under a `WHEN` clause naming `settled`, `failed` and `cancelled` |
+| the figures [ADR-189](../../docs/decisions/ADR-189.md) states | **57 files, 114 base tables unchanged, `ledger_accounts` at 3 rows unchanged, non-internal triggers 22 to 23 and functions 108 to 109.** Every one reproduced to the unit |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+**ONE PHRASE IN THIS FILE'S OWN `COMMENT ON INDEX` IS LOOSER THAN THE CATALOGUE.** It reads *"supersedes `0009`'s plain index under its own name"*. Measured at `0001`..`0056`, [`0009:98`](migrations/0009_ledger.sql)'s index is already **partial**, `WHERE (reversal_of IS NOT NULL)`, so what `0057` supersedes is a non-unique partial index and not a plain one. The predicate is carried over byte for byte. **`0057` IS NOT EDITED**, which is constitution `E2`; the correction lives here.
+
+### THE PROBE THAT COVERS THIS FILE CANNOT BE RUN AT THIS FILE, and that is the finding
+
+[`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) carries four blocks written for `0057` by name: `LEDGER-K4` for the unique reversal index, and `WD-C1`, `WD-C1`'s acceptance and `WD-C1`'s second assertion for the terminal-obligation trigger. **Run against `0001`..`0057`, the migration's own landing point, it dies at line 421:**
+
+```
+ERROR:  column "approved_at" of relation "wallet_withdrawals" does not exist
+```
+
+**exit 3.** That column arrives at [`0070:153`](migrations/0070_withdrawal_approval_and_dual_control.sql), thirteen migrations later. The probe was extended after `0070` landed, so **the tree on which `0057` was verified is no longer a tree its probe will run on**, and any later session re-deriving this file's verification from its landing point will get a failure that says nothing about `0057`. It is written here because a probe transcript quoted at a migration's own number is the shape every section in this file uses, and this is the first section that cannot produce one.
+
+**SO THE TRANSCRIPT IS QUOTED AT THE FULL APPLIED SET, WHERE IT IS GREEN**, and the counterfactual is the removal rather than the forward-only stop. `probe_ledger_constraints.sql` against every migration on disk: **15 `NOTICE` lines, exit 0.**
+
+```
+NOTICE:  LEDGER-C1 fired as expected
+NOTICE:  LEDGER-C2 fired as expected
+NOTICE:  LEDGER-K1a fired as expected
+NOTICE:  LEDGER-K1b accepted the ruled kind, as expected
+NOTICE:  LEDGER-K2a fired as expected
+NOTICE:  LEDGER-K2b accepted the ruled kind, as expected
+NOTICE:  LEDGER-K3: the eighth code is seeded once, firm-scoped, as expected
+NOTICE:  LEDGER-K1c fired as expected
+NOTICE:  zero-sum fired as expected
+NOTICE:  LEDGER-K4 fired as expected
+NOTICE:  WD-C1 fired as expected
+NOTICE:  WD-C1 accepted the reversed transition and the obligation is 0
+NOTICE:  WD-C1 assertion 2 fired as expected
+NOTICE:  LEDGER-C3 fired as expected
+NOTICE:  LEDGER-C3 fired as expected on UPDATE
+```
+
+**AND THE SAME RUN WITH `0057` REMOVED FROM THE SET** dies at `LEDGER-K4`, exit 3:
+
+```
+ERROR:  PROBE FAILED: LEDGER-K4 admitted a SECOND reversal of one transaction. SD-M5-05 makes a correction a compensating entry ...
+```
+
+**[`assert_ledger_scope_agrees.mjs`](../../scripts/db/assert_ledger_scope_agrees.mjs) STAYS GREEN WITHOUT `0057` and so does [`probe_payout_hold.sql`](../../scripts/db/probe_payout_hold.sql), which was checked rather than assumed.** That second one matters: `probe_payout_hold.sql` writes a `wallet_withdrawals` row to `settled`, which is inside this trigger's own `WHEN` clause, so a reader could reasonably expect it to exercise `WD-C1`. It is exit 0 with `0057` removed, so it does not. **`LEDGER-K4` and the three `WD-C1` blocks are the whole of this file's committed coverage.**
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-189` | `ledger_transactions` | `ledger_transactions_reversal_of_idx` superseded under its own name, non-unique partial to **UNIQUE** partial on the same predicate, plus its comment. `SD-M5-05`: a transaction is reversed at most once | 0057 | **landed** |
+| `ADR-189` | `wallet_withdrawals` | `assert_terminal_withdrawal_obligation_is_zero()` and its comment; `wallet_withdrawals_terminal_obligation_is_zero`, a `DEFERRABLE INITIALLY DEFERRED` constraint trigger over the three terminal statuses. `WD-C1` | 0057 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on section 40's reasoning. `SD-M5-05` is the row that already exists and what lands here is that delta's own consequence made enforceable. **`0009` IS NOT EDITED** and is superseded by addition from outside it, which is constitution `E2`.
+
+### The part a reader should carry forward, and it is not the trigger
+
+**THE SIX FILES IN THIS CLUSTER MOVE NO TABLE, NO INDEX, NO FOREIGN KEY AND NO UNIQUE CONSTRAINT BETWEEN THEM.** From `0051` to `0057` the catalogue reads **114 tables, 397 indexes, 167 foreign keys and 12 unique constraints, unchanged at every one of the seven stops.** What the six move is one CHECK constraint, two non-internal triggers, two functions and three rows, and the substance of four of them is a predicate that a count cannot see at all. **A reviewer measuring a supersession chain by object totals is measuring the one thing it does not touch**, which is why every section in this cluster quotes `pg_get_constraintdef` and `pg_index` rather than a number, and why `RI-37` says in its own `covers` that it never reads a section's content.
+

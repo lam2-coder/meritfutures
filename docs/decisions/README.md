@@ -346,6 +346,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-332](ADR-332.md) | the pool executor ADR-331 refused to mint. A closed vocabulary is widened by PARTITION, and the door that outlives a transaction may not leave one behind  (2026-09-05, status: proposed) |
 | [ADR-333](ADR-333.md) | the queue door this deployable never had. One file per PACKAGE is what makes one importer structural, and a door that cannot start a supervisor cannot be hurt by one it could not observe  (2026-09-05, status: proposed) |
 | [ADR-334](ADR-334.md) | two merged money-schema migrations had no landing record and four rows in a row reported the absence rather than repairing it. `RI-37` binds every migration on disk to a landing record in the delta manifest, the twenty other gaps are a shrink-only register rather than twenty sections written in one diff, and `0080` and `0081` get sections 38 and 39 measured against PostgreSQL 16.13 rather than reconstructed from their ADRs (2026-09-05, status: proposed) |
+| [ADR-335](ADR-335.md) | six of the twenty migrations `RI-37` registered as having no landing record get one, `0052` to `0057` measured against PostgreSQL 16.13 rather than reconstructed from their ADRs, the backlog register shrinks from twenty entries to fourteen in the same commit, and two figures in merged records are corrected by measurement without either record being amended (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

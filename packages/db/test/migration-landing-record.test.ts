@@ -121,7 +121,17 @@ function withoutSection(body: string, number: string): string {
  * from the check would make the case below assert that the check agrees with
  * itself. Written here, the day somebody writes one of these sections the case
  * goes red beside the register row, which is the friction a shrink-only
- * register is supposed to create. SIXTEEN OF THE TWENTY ARE MONEY PATH.
+ * register is supposed to create.
+ *
+ * IT WAS TWENTY AND ADR-335 TOOK SIX OUT. `0052` to `0057` now hold
+ * DELTA_MANIFEST sections 40 to 45 and their register rows came out in the same
+ * commit, which is leg 3 doing the job it was written for. NINE OF THE FOURTEEN
+ * BELOW OPEN WITH AN `E2 READ: MONEY PATH` HEADER, counted off the files rather
+ * than off a register row: all but `0039`, `0040`, `0041`, `0043` and `0073`.
+ * ADR-334 recorded sixteen of the original twenty as money path and the true
+ * figure is fifteen; `0073_operator_directory.sql:4` opens `NOT THE MONEY PATH
+ * BY FILE`, and ADR-334's own register row for it carries no marker, so the two
+ * halves of that diff disagreed and the machine-readable half was right.
  */
 const MIGRATION_NUMBERS_WITH_NO_SECTION = [
   '0037',
@@ -131,12 +141,6 @@ const MIGRATION_NUMBERS_WITH_NO_SECTION = [
   '0043',
   '0044',
   '0050',
-  '0052',
-  '0053',
-  '0054',
-  '0055',
-  '0056',
-  '0057',
   '0059',
   '0063',
   '0068',
@@ -168,19 +172,25 @@ describe('RI-37 holds on this repository', () => {
 
   // THE HALF A GREEN RUN CANNOT SHOW, AND IT IS THE SIZE OF THE BACKLOG.
   // Green on the live tree is consistent with two very different checks: one
-  // carrying a register of twenty real gaps, and one whose register absorbs
+  // carrying a register of fourteen real gaps, and one whose register absorbs
   // nothing because those migrations were recorded all along. This case
   // separates them WITHOUT reaching into the runner: give every backlog number
   // a landing section and leg 3 must report EVERY entry as stale, one finding
   // each. That count is the register's size, and it is only reachable if every
   // one of those numbers was genuinely unrecorded a moment ago.
-  test('the backlog register holds twenty migrations the manifest does not record', () => {
+  //
+  // THE LITERAL MOVED FROM 20 TO 14 AND THAT IS THE ASSERTION, NOT THE
+  // MAINTENANCE. A register that only shrinks is a register whose size is a
+  // claim, so the number is written twice here on purpose: once as the list's
+  // own length and once as a literal a session cannot change by editing the
+  // list. ADR-335 wrote six sections and deleted six rows in one commit.
+  test('the backlog register holds fourteen migrations the manifest does not record', () => {
     const closed = MIGRATION_NUMBERS_WITH_NO_SECTION.map(
       (number) => `## 9${number}. \`${number}\` lands, seeded by this case (2026-09-05)`,
     ).join('\n\n');
     const found = findings(estate(`${liveManifest()}\n${closed}\n`));
     expect(found).toHaveLength(MIGRATION_NUMBERS_WITH_NO_SECTION.length);
-    expect(found).toHaveLength(20);
+    expect(found).toHaveLength(14);
     for (const number of MIGRATION_NUMBERS_WITH_NO_SECTION) {
       expect(found.join('\n')).toContain(`backlog register holds \`${number}\``);
     }
@@ -233,6 +243,73 @@ describe('RI-37 goes red on the two sections that did not exist when it was writ
 });
 
 // -----------------------------------------------------------------------------
+// 2b. THE SIX SECTIONS ADR-335 WROTE, and the six register rows they closed
+// -----------------------------------------------------------------------------
+// EACH SECTION IS RECONSTRUCTED AWAY AND THE CHECK IS WATCHED REPORTING THAT
+// MIGRATION, which is the tree as it stood before ADR-335 -- with one difference
+// that matters and is asserted rather than assumed. On that tree the register
+// still held the row, so leg 1 was SILENT and the gap was invisible; here the
+// row is gone, so removing the section makes leg 1 speak. THAT IS THE PAIR THAT
+// PROVES THE SHRINK: a case removing a section can only be red if the register
+// row came out, and the size case above can only reach fourteen if it did.
+//
+// EVERY ONE HAS ITS COUNTERFACTUAL: the same manifest with the MIGRATION taken
+// away as well, on which no record is owed. A check red on both is catching
+// nothing.
+const ADR_335_SECTIONS = [
+  ['40', '0052', '0052_chart_of_accounts.sql'],
+  ['41', '0053', '0053_firm_treasury_kind.sql'],
+  ['42', '0054', '0054_identity_ledger_accounts.sql'],
+  ['43', '0055', '0055_last_two_ledger_kinds.sql'],
+  ['44', '0056', '0056_eighth_ledger_code.sql'],
+  ['45', '0057', '0057_terminal_withdrawal_obligation.sql'],
+] as const;
+
+describe('RI-37 goes red on each of the six sections ADR-335 wrote', () => {
+  for (const [section, number, file] of ADR_335_SECTIONS) {
+    test(`without section ${section} the check reports \`${number}\``, () => {
+      const found = findings(estate(withoutSection(liveManifest(), section)));
+      expect(found).toHaveLength(1);
+      expect(found[0]).toContain(`${file} is on disk`);
+      expect(found[0]).toContain(`carries no landing record for \`${number}\``);
+    });
+
+    test(`COUNTERFACTUAL: without section ${section} AND without \`${number}\`, green`, () => {
+      expect(findings(estate(withoutSection(liveManifest(), section), [file]))).toEqual([]);
+    });
+  }
+
+  // ALL SIX AT ONCE IS THE TREE ADR-335 WAS DISPATCHED AGAINST WITH ITS
+  // REGISTER ROWS ALREADY REMOVED, and the count is the assertion.
+  test('THE TREE AS DISPATCHED: none of the six sections, exactly six findings', () => {
+    let body = liveManifest();
+    for (const [section] of ADR_335_SECTIONS) body = withoutSection(body, section);
+    const found = findings(estate(body));
+    expect(found).toHaveLength(6);
+    for (const [, number] of ADR_335_SECTIONS) {
+      expect(found.join('\n')).toContain(`carries no landing record for \`${number}\``);
+    }
+  });
+
+  // AND THE HEADING SHAPE IS RE-ASSERTED ON THE NEW SECTIONS RATHER THAN
+  // INHERITED. Section 40's heading names `0052` before its verb and section
+  // 45's names `0057`; none of the six names another migration before the verb,
+  // so no section absorbs a sibling's obligation the way section 39's heading
+  // once absorbed `0080`'s. Removing section 40 must report `0052` and nothing
+  // else, which the per-section cases above already require one at a time; this
+  // one requires it of the cluster, where a cross-reference would hide.
+  test('no one of the six headings claims another of the six', () => {
+    for (const [section, number] of ADR_335_SECTIONS) {
+      const found = findings(estate(withoutSection(liveManifest(), section)));
+      expect(
+        found.map((f) => f.includes(`\`${number}\``)),
+        section,
+      ).toEqual([true]);
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
 // 3. THE SEEDS, one per leg
 // -----------------------------------------------------------------------------
 describe('RI-37 reads the manifest the way the manifest is written', () => {
@@ -253,7 +330,7 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
   // exemption left standing behind a repair.
   test('a backlog entry whose gap has been closed is itself a finding', () => {
     const found = findings(
-      estate(`${liveManifest()}\n## 40. \`0073\` lands, seeded by this case (2026-09-05)\n`),
+      estate(`${liveManifest()}\n## 99. \`0073\` lands, seeded by this case (2026-09-05)\n`),
     );
     expect(found).toHaveLength(1);
     expect(found[0]).toContain('backlog register holds `0073`');
