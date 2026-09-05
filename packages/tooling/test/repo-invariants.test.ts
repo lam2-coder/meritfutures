@@ -387,10 +387,34 @@ function cleanTree(): string {
     'docs/testing/SPANS.md',
     '# Spans\n\nThe corpus holds <!--gen:gate_count-->33<!--/gen--> gates.\n',
   );
+  // ADR-334. THE STUB GAINS THE MANIFEST'S TWO LANDING SHAPES, AND IT IS
+  // FIDELITY RATHER THAN EXEMPTION (ADR-330's phrase for the same repair).
+  // `RI-37` binds every migration in this estate to a landing record, and this
+  // file used to be two lines written for `RI-31`'s repeated-span leg while the
+  // estate carried four migrations, so the check refused to report on it at
+  // all. It records all four now, in both of the shapes the real manifest
+  // uses, so the clean-tree case ASSERTS something here: a fifth migration
+  // added to this fixture without a record turns it red. The generated span
+  // stays and stays UNREPEATED, which is what `RI-31` reads this file for.
   write(
     root,
     'packages/db/DELTA_MANIFEST.md',
-    '# Manifest\n\nThe corpus holds <!--gen:gate_count-->33<!--/gen--> gates.\n',
+    [
+      '# Manifest',
+      '',
+      'The corpus holds <!--gen:gate_count-->33<!--/gen--> gates.',
+      '',
+      '## 1. The migration sequence',
+      '',
+      '| # | File | Money path | Contents |',
+      '|---|---|---|---|',
+      '| 0008 | `risk` | no | a row of the migration sequence, which is the fold`s own record |',
+      '',
+      '## 13. `0078` lands, and a heading is the other shape (2026-09-05)',
+      '',
+      '## 14. `0079` and `0082` land, and a heading may name two (2026-09-05)',
+      '',
+    ].join('\n'),
   );
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(

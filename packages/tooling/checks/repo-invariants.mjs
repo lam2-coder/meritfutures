@@ -8888,6 +8888,351 @@ const ri36 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-37  EVERY MIGRATION HAS A LANDING RECORD IN THE DELTA MANIFEST
+// -----------------------------------------------------------------------------
+// ADR-334. `0080` (ADR-322) and `0081` (ADR-323) are MERGED money-schema
+// migrations and neither carries a landing section in
+// `packages/db/DELTA_MANIFEST.md`. The absence was reported three times and
+// repaired none: ADR-323's landmine list named it, ADR-327 carried it forward,
+// ADR-330 carried it forward again, and ADR-329 section 9 finding 5 was still
+// writing "`0080` and `0081` still carry no `DELTA_MANIFEST` section" four rows
+// later. Every one of those is a session writing a sentence because nothing
+// could write a failure.
+//
+// THE MANIFEST IS WHERE A MIGRATION'S EXECUTION LIVES, WHICH IS WHY THIS IS NOT
+// A DOCUMENTATION RULE. A landing section carries the install verification from
+// an empty database, the object counts read from `pg_tables`, `pg_indexes`,
+// `pg_constraint` and `pg_trigger`, the probe transcript and the counterfactual
+// that probe was watched failing on. Constitution E2 makes a merged migration
+// permanent, so that record is the ONLY place the reasoning behind a permanent
+// statement is written down at the migration's own number.
+//
+// A LANDING RECORD IS ONE OF EXACTLY TWO SHAPES AND NEITHER IS AN INVENTION.
+//
+//   1. A ROW OF THE MIGRATION SEQUENCE IN SECTION 1. That table is the record
+//      of where each delta was FOLDED, and for `0001` to `0029` it is the only
+//      record there is: the fold wrote no per-file section and never will,
+//      because sections 10 to 12 verify the fold as one set.
+//   2. A `## <n>.` SECTION HEADING NAMING THE NUMBER IN BACKTICKS. That is the
+//      shape sections 13 onward use, one per superseding migration, and section
+//      16's own note calls the sequence append-only. A HEADING CLAIMS ONLY THE
+//      NUMBERS BEFORE ITS VERB: every landing heading here reads `0028` lands
+//      or `0030` and `0031` land, and a number named AFTER the verb is a
+//      cross-reference rather than a claim. That narrowing was forced by the
+//      suite rather than designed: section 39's heading MENTIONS `0080` while
+//      recording `0081`, and the first reader written here took every
+//      backticked number and reported a clean tree with `0080` unrecorded.
+//
+// THE SECTION-1 LEG IS SCOPED TO SECTION 1 AND THAT IS LOAD BEARING. Section 14
+// (`0030` and `0031`) carries a table of the identical shape, and a reader that
+// took any four-digit first cell anywhere in the file would count a delta table
+// row or a counts table as a record. Both of those numbers ALSO have headings,
+// so the scoping costs nothing today and is what stops the leg widening on its
+// own the next time somebody writes a table.
+//
+// LEG 2 RUNS THE OTHER WAY: a number the manifest records must be a file on
+// disk. A section for a migration that does not exist is a record of something
+// that never landed, and it is the shape a renumbered or abandoned migration
+// leaves behind.
+//
+// LEG 3 IS THE BACKLOG AND IT IS A REGISTER RATHER THAN AN EXEMPTION LIST,
+// which is `CI-06/gate-inventory`'s UNPROBEABLE_ARTIFACTS rule and `CI-06e`'s:
+// AN ENTRY THAT NO LONGER NAMES A REAL GAP IS ITSELF A FINDING. Twenty
+// migrations on this tree have no landing record and SIXTEEN OF THEM ARE MONEY
+// PATH. Writing twenty sections in the diff that adds this check would be twenty
+// records nobody measured, which is the one thing a landing section may not be;
+// so they are enumerated here, with the file and the ADR that rules each, and
+// the register can only shrink. It is not a way to pass: a migration that is
+// NOT in it and has no record is a finding on the commit that adds it, so the
+// backlog cannot grow without somebody writing a line into this file.
+//
+// LEG 3 RUNS IN ONE DIRECTION AND THE OTHER IS DELIBERATELY NOT TAKEN. An entry
+// naming a migration this tree does not carry is INERT. Reporting it would make
+// the register a claim about ONE migration set rather than a property of the
+// check, and it would fire over every entry on any tree carrying a smaller set;
+// constitution E2 makes a merged migration permanent, so the state it would
+// guard is one the constitution already forbids. A MIS-KEYED ROW IS STILL
+// CAUGHT, by leg 1: a row that types the wrong number absorbs nothing, so the
+// file it meant to absorb is reported as having no record.
+//
+// FIVE THINGS IT DOES NOT DO.
+//   1. IT NEVER READS A SECTION'S CONTENT. Whether a landing section carries an
+//      install verification, a probe transcript or a counterfactual is the E2
+//      read and is not a parse. This check asserts the record EXISTS.
+//   2. It reads no database. The migration directory and one markdown file are
+//      the whole input.
+//   3. It says nothing about ORDER. Sections 35, 36 and 37 are `0079`, `0078`
+//      and `0082`, because the sequence is landing order and not migration
+//      order, and a check demanding otherwise would be inventing a rule the
+//      file's own section 16 contradicts.
+//   4. It says nothing about a migration number that is RESERVED and unwritten.
+//      `0058`, `0060` to `0062`, `0069`, `0071` and `0077` are rows of
+//      ALLOCATION's migration table with no file, and a reservation is not a
+//      landing.
+//   5. It does not read ALLOCATION at all, so a file on disk that no table ever
+//      claimed is invisible here. That is `CI-06f`'s and `CI-06w`'s subject.
+//
+// SILENT on a tree carrying no migrations directory and no manifest, on RI-23,
+// RI-24, RI-25, RI-26 and RI-36's precedent. The sentinels below are what stop
+// silence being a way to pass on a tree that DOES carry them.
+
+const MANIFEST_DOC = 'packages/db/DELTA_MANIFEST.md';
+
+/** The heading that opens the migration-sequence table. Section 1, and only it. */
+const MIGRATION_SEQUENCE_HEADING = /^## 1\.\s/;
+
+/** A migration file, by the name the whole estate cites it under. */
+const MIGRATION_FILE = /^(\d{4})_[a-z0-9_]+\.sql$/;
+
+/**
+ * The verb every landing heading in this file uses, and the boundary of a
+ * heading's CLAIM: numbers before it are recorded, numbers after it are prose.
+ */
+const LANDING_VERB = /\bland(?:s)?\b/;
+
+/**
+ * THE BACKLOG: migrations that landed with no record, each with the file and
+ * the ruling its own header cites.
+ *
+ * IT IS A REGISTER AND NOT AN EXEMPTION LIST, and the difference is leg 3: an
+ * entry naming a migration that HAS a record, or a migration that is not on
+ * disk, is a finding. So a session that writes one of these sections must
+ * delete its row here in the same commit, and the register decays in the one
+ * direction an allowlist has to decay in.
+ *
+ * IT IS NOT A RULING THAT THESE MIGRATIONS NEED NO RECORD. Every one of them
+ * is owed the section `0080` and `0081` get in ADR-334, and sixteen of the
+ * twenty are money path. What it records is that measuring twenty installs and
+ * twenty probe transcripts is a row of its own, dispatched knowing its size,
+ * rather than twenty sections written from twenty ADRs in one diff. A landing
+ * section that was reconstructed from an ADR instead of measured is the exact
+ * thing this check exists to make somebody stop and do properly.
+ */
+const LANDING_RECORD_BACKLOG = new Map([
+  ['0037', '0037_supersede_rule_states_high_water_bounds_balance.sql, ADR-053. MONEY PATH'],
+  ['0039', '0039_economic_calendar.sql, ADR-066 via FOLD-03'],
+  ['0040', '0040_report_schedules.sql, ADR-066 via FOLD-03'],
+  ['0041', '0041_contact_channel_complaints.sql, ADR-066 via FOLD-03'],
+  ['0043', '0043_admin_attributed_actions.sql, ADR-069 via FOLD-04'],
+  ['0044', '0044_fee_back_and_ladder_unlock.sql, ADR-070 via FOLD-05. MONEY PATH'],
+  ['0050', '0050_live_cache_and_role.sql, ADR-164. MONEY PATH'],
+  ['0052', '0052_chart_of_accounts.sql, ADR-177. MONEY PATH'],
+  ['0053', '0053_firm_treasury_kind.sql, ADR-180. MONEY PATH'],
+  ['0054', '0054_identity_ledger_accounts.sql, ADR-183. MONEY PATH'],
+  ['0055', '0055_last_two_ledger_kinds.sql, ADR-186. MONEY PATH'],
+  ['0056', '0056_eighth_ledger_code.sql, ADR-187. MONEY PATH'],
+  ['0057', '0057_terminal_withdrawal_obligation.sql, ADR-189. MONEY PATH'],
+  ['0059', '0059_reversal_chain.sql, ADR-193. MONEY PATH'],
+  ['0063', '0063_otp_challenge_consumption.sql, ADR-200. MONEY PATH'],
+  ['0068', '0068_dual_control_threshold_ceiling.sql, ADR-228. MONEY PATH'],
+  ['0070', '0070_withdrawal_approval_and_dual_control.sql, ADR-232. MONEY PATH'],
+  ['0072', '0072_terminal_withdrawal_transitions.sql, ADR-234. MONEY PATH'],
+  ['0073', '0073_operator_directory.sql, ADR-237'],
+  ['0074', '0074_firm_parameters.sql, ADR-252 is the ruling. MONEY PATH'],
+]);
+
+/**
+ * Every landing record `packages/db/DELTA_MANIFEST.md` carries, by migration
+ * number, with the site that carries it.
+ *
+ * @param {string} root
+ * @returns {{ records: Map<string, string[]>, rows: number, headings: number }}
+ */
+function landingRecords(root) {
+  /** @type {Map<string, string[]>} */
+  const records = new Map();
+  let rows = 0;
+  let headings = 0;
+  /** @param {string} number @param {string} where */
+  const note = (number, where) => {
+    const seen = records.get(number) ?? [];
+    seen.push(where);
+    records.set(number, seen);
+  };
+
+  let inSequence = false;
+  const lines = readFileSync(join(root, MANIFEST_DOC), 'utf8').split('\n');
+  lines.forEach((text, index) => {
+    const at = `${MANIFEST_DOC}:${index + 1}`;
+    if (text.startsWith('## ')) {
+      inSequence = MIGRATION_SEQUENCE_HEADING.test(text);
+      // THE CLAIM IS THE PART OF THE HEADING BEFORE THE WORD `land`, AND THAT
+      // IS A NARROWING THE SUITE FORCED RATHER THAN A FLOURISH. Section 39's
+      // heading reads "`0081` lands, and the record that was owed with it is
+      // written in the same commit as `0080`'s"; a reader taking every
+      // backticked number in the heading counted that MENTION as a record for
+      // `0080` and reported the tree clean with `0080` unrecorded, which the
+      // reconstruction case caught. Every landing heading in this file names
+      // its own migration before the verb -- `0028` lands, `0030` and `0031`
+      // land, `0048` and `0049` land -- and a heading with no `land` in it,
+      // like section 15's or section 22's, claims nothing.
+      const verb = LANDING_VERB.exec(text);
+      if (verb === null) return;
+      for (const named of text.slice(0, verb.index).matchAll(/`(\d{4})`/g)) {
+        headings += 1;
+        note(named[1] ?? '', `${at}, the section headed "${text.slice(3).trim().slice(0, 72)}"`);
+      }
+      return;
+    }
+    if (!inSequence) return;
+    const row = /^\|\s*\*{0,2}(\d{4})\*{0,2}\s*\|/.exec(text);
+    if (row === null) return;
+    rows += 1;
+    note(row[1] ?? '', `${at}, a row of the migration sequence in section 1`);
+  });
+
+  return { records, rows, headings };
+}
+
+/** @type {Invariant} */
+const ri37 = {
+  id: 'RI-37',
+  title: 'Every migration on disk has a landing record in the delta manifest',
+  covers:
+    'ADR-334. EVERY `nnnn_*.sql` UNDER `packages/db/migrations` AGAINST ' +
+    '`packages/db/DELTA_MANIFEST.md`, IN BOTH DIRECTIONS. `0080` (ADR-322) ' +
+    'and `0081` (ADR-323) are merged money-schema migrations that carry no ' +
+    'landing section, and the absence was written down as a landmine by ' +
+    'ADR-323, carried forward by ADR-327 and ADR-330 and still true at ' +
+    'ADR-329 section 9 finding 5, because nothing could write it down as a ' +
+    'failure. ' +
+    'A LANDING RECORD IS ONE OF TWO SHAPES, AND BOTH ARE THE MANIFEST`s OWN: ' +
+    'a row of the migration-sequence table in SECTION 1, which is the only ' +
+    'record `0001` to `0029` have or will have because the fold verifies them ' +
+    'as one set; or a `## <n>.` section heading naming the number in ' +
+    'backticks BEFORE ITS VERB, which is the shape every section from 13 ' +
+    'onward uses -- ``0028` lands`, ``0030` and `0031` land` -- so a number ' +
+    'named AFTER the verb is a cross-reference and claims nothing. THE ' +
+    'TABLE LEG IS SCOPED TO SECTION 1: section 14 carries a table of the same ' +
+    'shape and an unscoped reader would count a delta row or a counts row as ' +
+    'a record. ' +
+    'LEG 2 RUNS THE OTHER WAY: a number the manifest records must be a file on ' +
+    'disk, so a section for a migration that never landed is a finding. ' +
+    'LEG 3 IS THE BACKLOG REGISTER, and it is a register rather than an ' +
+    'exemption list on `CI-06/gate-inventory`s rule: an entry that no longer ' +
+    'names a real gap is ITSELF a finding, so a session writing one of those ' +
+    'sections must delete its row in the same commit and the register can only ' +
+    'shrink. IT RUNS IN ONE DIRECTION: an entry naming a migration this tree ' +
+    'does not carry is INERT, because reporting it would make the register a ' +
+    'claim about one migration set rather than a property of the check and ' +
+    'constitution E2 already forbids deleting a merged migration; a mis-keyed ' +
+    'row is caught by leg 1 instead, since the number it failed to absorb is ' +
+    'then reported as unrecorded. It holds the TWENTY migrations that have no record on this tree, ' +
+    'SIXTEEN of them money path, each with its file and the ADR its own header ' +
+    'cites. A migration outside it with no record is a finding on the commit ' +
+    'that adds it, so the backlog cannot grow without an edit to this file. ' +
+    'FIVE THINGS IT DOES NOT DO. It never reads a section`s CONTENT: whether a ' +
+    'record carries an install verification, object counts read from the ' +
+    'catalogue, a probe transcript and the counterfactual that probe was ' +
+    'watched failing on is the `E2` read and is not a parse. It reads no ' +
+    'database. It says nothing about ORDER, because sections 35, 36 and 37 are ' +
+    '`0079`, `0078` and `0082` and the sequence is LANDING order. It says ' +
+    'nothing about a reserved-unwritten number, because a reservation is not a ' +
+    'landing. And it does not read ALLOCATION, so a migration on disk that no ' +
+    'allocation row ever claimed is `CI-06f`s and `CI-06w`s subject and not ' +
+    'this one`s. ' +
+    'SILENT on a tree carrying no migrations directory or no manifest.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    // SILENT ON A TREE THAT CARRIES NEITHER INPUT, on RI-23, RI-24, RI-25,
+    // RI-26 and RI-36's precedent. The synthetic estates in
+    // `packages/tooling/test/repo-invariants.test.ts` carry neither.
+    const migrations = join(root, MIGRATIONS_DIR);
+    if (!existsSync(migrations) || !existsSync(join(root, MANIFEST_DOC))) return findings;
+
+    const files = readdirSync(migrations)
+      .filter((f) => MIGRATION_FILE.test(f))
+      .sort();
+
+    // RULE 1 AND NOT RULE 2, three times. Each of these is the reader having
+    // stopped reading rather than a corpus with nothing to say, and each would
+    // otherwise report a clean estate or a catastrophe in the wrong direction.
+    if (files.length === 0) {
+      throw new Error(
+        `RI-37 found no \`nnnn_*.sql\` in ${MIGRATIONS_DIR}, which exists. Zero migrations ` +
+          'means the file-name reader has moved, and every backlog row below would then ' +
+          'report as stale in the same run',
+      );
+    }
+
+    const { records, rows, headings } = landingRecords(root);
+    if (rows === 0) {
+      throw new Error(
+        `RI-37 parsed no migration-sequence row out of section 1 of ${MANIFEST_DOC}. That ` +
+          'table is the only landing record `0001` to `0029` have, so zero rows would ' +
+          'report twenty-nine merged migrations as unrecorded and name the wrong defect',
+      );
+    }
+    if (headings === 0) {
+      throw new Error(
+        `RI-37 parsed no \`## <n>.\` landing section out of ${MANIFEST_DOC}. That is the ` +
+          'shape every section from 13 onward uses, so zero means the heading reader has ' +
+          'moved rather than that no migration has ever been recorded',
+      );
+    }
+
+    // LEG 1. Every migration on disk is recorded, or is a backlog row.
+    const onDisk = new Set();
+    for (const file of files) {
+      const number = MIGRATION_FILE.exec(file)?.[1] ?? '';
+      onDisk.add(number);
+      if (records.has(number)) continue;
+      if (LANDING_RECORD_BACKLOG.has(number)) continue;
+      findings.push(
+        `${MIGRATIONS_DIR}/${file} is on disk and ${MANIFEST_DOC} carries no landing record ` +
+          `for \`${number}\`: no row of the migration sequence in section 1 and no ` +
+          `\`## <n>.\` section naming it. A merged migration is permanent (constitution ` +
+          'E2), so its landing section is the only place the install it was verified ' +
+          'against, the object counts it moved and the probe it was watched failing on are ' +
+          'written down at its own number. Write the section, claim its number in section ' +
+          "16's section-number table, and MEASURE it rather than reconstructing it from " +
+          'the ADR',
+      );
+    }
+
+    // LEG 2, the other direction.
+    for (const [number, sites] of [...records].sort()) {
+      if (onDisk.has(number)) continue;
+      findings.push(
+        `${MANIFEST_DOC} records \`${number}\` as landed at ${sites.join('; ')}, and ` +
+          `${MIGRATIONS_DIR} carries no such file. A landing record for a migration that ` +
+          'is not on disk is a record of something that never landed, which is what a ' +
+          'renumbered or abandoned migration leaves behind',
+      );
+    }
+
+    // LEG 3. The register shrinks, and a stale entry is a finding.
+    for (const [number, why] of LANDING_RECORD_BACKLOG) {
+      // AN ENTRY NAMING A MIGRATION THIS TREE DOES NOT CARRY IS INERT, AND
+      // THAT IS ONE DIRECTION DELIBERATELY NOT TAKEN. Reporting it would make
+      // the register a claim about ONE migration set rather than a property of
+      // the check, and it would fire over every entry on any tree carrying a
+      // smaller set -- which is exactly what the synthetic estate in
+      // `packages/tooling/test/repo-invariants.test.ts` is. Constitution E2
+      // makes a merged migration permanent, so the state it would guard is one
+      // the constitution already forbids. AND A MIS-KEYED ROW IS STILL CAUGHT,
+      // by leg 1 rather than here: a row that types the wrong number absorbs
+      // nothing, so the file it meant to absorb is reported as unrecorded.
+      if (!onDisk.has(number)) continue;
+      const sites = records.get(number);
+      if (sites === undefined) continue;
+      findings.push(
+        `RI-37's backlog register holds \`${number}\` (${why}) and ${MANIFEST_DOC} now ` +
+          `carries its landing record at ${sites.join('; ')}. The register may only ` +
+          'shrink, so the row comes out in the same commit as the section that closes ' +
+          'it. An exemption left standing behind a repair is how an allowlist stops ' +
+          'being read',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -8923,6 +9268,7 @@ export const CHECKS = [
   ri34,
   ri35,
   ri36,
+  ri37,
 ];
 
 // =============================================================================
