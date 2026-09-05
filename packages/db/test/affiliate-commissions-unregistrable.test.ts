@@ -2,8 +2,25 @@
 // packages/db/test/affiliate-commissions-unregistrable.test.ts -- CI-02, `unit`.
 // =============================================================================
 // ADR-253 SECTION 2, EXECUTED. `affiliate_commissions` IS A REAL TABLE THAT NO
-// MEMBER OF THE CLOSED SIX CAN HONESTLY NAME, AND THIS FILE IS THE ENUMERATION
-// RATHER THAN A PARAGRAPH ABOUT IT.
+// MEMBER OF THE CLOSED SIX COULD HONESTLY NAME AGAINST `0012`'s COLUMN SET, AND
+// THIS FILE IS THE ENUMERATION RATHER THAN A PARAGRAPH ABOUT IT.
+//
+// THE TABLE IS REGISTERED NOW AND THIS FILE IS NOT RETIRED BY THAT. Every case
+// below reads `0012`'s `CREATE TABLE` body, which constitution E2 makes
+// permanent, so every one of them is a claim about a column set that cannot
+// change rather than a claim about today. What they hold is the RECORD OF WHY
+// the table was unregistrable for eleven waves: `0078` (ADR-321, on ADR-304)
+// adds `affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE
+// RESTRICT` from OUTSIDE `0012` and the registration follows the column, so the
+// six refusals were right and the repair was never the vocabulary. Deleting this
+// file would delete the argument that a SEVENTH class was not owed.
+//
+// THE ONE CASE THAT WAS ABOUT TODAY IS REPOINTED RATHER THAN REMOVED, and it is
+// `the two-step`: the table is in `schema.ts` and in the registry now, and the
+// case says which migration put it there. `the fourth edge` below is new and is
+// this file's own stated condition being met -- it says a fourth edge re-opens
+// the enumeration, so the edge that ended it is asserted here rather than left
+// to a reader to notice.
 //
 // `scope.ts`'s header has argued with this table by name since ADR-106 and its
 // argument covers ONE of the six: a `derived` rule through `attributions`
@@ -23,12 +40,13 @@
 // affiliate. Case 8 is the control that closes it, and it is general rather
 // than about this table.
 //
-// WHY THE DDL AND NOT `schema.ts`. The subject of every claim here is a table
-// that is NOT in `schema.ts`, so there is no transcription to read and the
-// migration is the only source. Where a REGISTERED table is read below it is
-// read out of the migrations too, for the reason `scoped-db.test.ts` states
-// about its own fold: comparing a transcription with itself asserts that a copy
-// equals its copy.
+// WHY THE DDL AND NOT `schema.ts`. It read: "The subject of every claim here is
+// a table that is NOT in `schema.ts`, so there is no transcription to read and
+// the migration is the only source." The first half stopped being true with
+// ADR-321 and the reason survives it unchanged: comparing a transcription with
+// itself asserts that a copy equals its copy, which is `scoped-db.test.ts`'s
+// stated reason for its own fold. Every registered table read below is read out
+// of the migrations for that reason and not for the absent one.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -172,22 +190,58 @@ describe('the table is real, and it is absent one step earlier than the registry
     expect(creators).toEqual(['0012_disputes_and_affiliate_settlement.sql']);
   });
 
-  // THE TWO-STEP, AND THIS TABLE IS SHORT OF BOTH STEPS. `affiliateStatements`
-  // completed exactly this pair when it landed, which is why row `253` names it
-  // as the shape of the work.
-  test('it is in neither `schema.ts` nor the registry, while `affiliate_statements` is in both', () => {
+  // THE TWO-STEP, AND THIS TABLE COMPLETED IT WITH ADR-321. It read `it is in
+  // neither schema.ts nor the registry, while affiliate_statements is in both`,
+  // and that was true of every day between `0012` and `0078`.
+  // `affiliateStatements` completed exactly this pair when it landed, which is
+  // why row `253` names it as the shape of the work, and this table has now
+  // completed it on the same rule.
+  test("it is in `schema.ts` and in the registry, on `affiliate_statements`' rule", () => {
     const schema = readFileSync(SCHEMA_TS, 'utf8');
     const scope = readFileSync(SCOPE_TS, 'utf8');
 
-    expect(/export const affiliateCommissions\b/.test(schema)).toBe(false);
-    expect(TABLE_KEYS).not.toContain('affiliateCommissions' as TableKey);
-    expect(KEY_BY_SQL_NAME.has(SUBJECT)).toBe(false);
+    expect(/export const affiliateCommissions\b/.test(schema)).toBe(true);
+    expect(/^ {2}affiliateCommissions: \{$/m.test(scope)).toBe(true);
+    expect(TABLE_KEYS).toContain('affiliateCommissions' as TableKey);
+    expect(KEY_BY_SQL_NAME.get(SUBJECT)).toBe('affiliateCommissions');
+    expect(SCOPE_RULES.affiliateCommissions.class).toBe('derived');
 
     // The precedent, asserted in the same case so it cannot rot separately.
     expect(/export const affiliateStatements\b/.test(schema)).toBe(true);
     expect(/^ {2}affiliateStatements: \{$/m.test(scope)).toBe(true);
     expect(TABLE_KEYS).toContain('affiliateStatements' as TableKey);
     expect(SCOPE_RULES.affiliateStatements.class).toBe('derived');
+  });
+
+  // THE FOURTH EDGE, AND THIS FILE ASKED FOR IT BY NAME. `the three edges are
+  // exactly these three` below says a fourth edge added tomorrow re-opens the
+  // whole enumeration rather than being silently outgrown. This is that edge,
+  // and the point of asserting it HERE is that the three-edge case cannot see
+  // it: that reader is `0012`'s `CREATE TABLE` body and E2 makes the body
+  // permanent, so the enumeration stays a true statement about `0012` and this
+  // case is the one that says the table is no longer that body.
+  test('`0078` declares the fourth edge, from outside `0012`, and `0012` is untouched', () => {
+    const zero12 = readFileSync(
+      join(MIGRATIONS, '0012_disputes_and_affiliate_settlement.sql'),
+      'utf8',
+    );
+    const zero78 = readFileSync(join(MIGRATIONS, '0078_affiliate_commission_owner.sql'), 'utf8');
+
+    // The column is nowhere in `0012` and the enumeration above is therefore
+    // untouched by it.
+    expect(columnDefs(SUBJECT).has('affiliate_id')).toBe(false);
+    expect(zero12).not.toMatch(/affiliate_commissions[\s\S]*ADD COLUMN/i);
+
+    // And it is in `0078`, as an addition from outside the merged file.
+    expect(zero78).toMatch(
+      /ALTER TABLE affiliate_commissions\s+ADD COLUMN affiliate_id uuid NOT NULL REFERENCES affiliates\(id\) ON DELETE RESTRICT;/,
+    );
+    // The agreement constraint is what makes the denormalized column as sound as
+    // the attribution's own, and it is the half a later session is most likely
+    // to drop while keeping the column.
+    expect(zero78).toMatch(
+      /FOREIGN KEY \(attribution_id, affiliate_id\)\s+REFERENCES attributions \(id, affiliate_id\)/,
+    );
   });
 });
 
