@@ -1792,15 +1792,25 @@ const ci06h = {
           'schema 0079 installed and the failure moves to a deployable at boot ' +
           '(ADR-318)',
       ],
+      // AND ITS REJECTION 5 CHANGED MEANING RATHER THAN GOING AWAY. Until 0082
+      // that case asserted that merit_app held NOTHING on this schema, and it
+      // went red by 0082 succeeding, exactly as its own header said it would.
+      // It is rewritten to the narrower truth (ADR-327): the grant is exactly
+      // what was ruled and no wider. The needle text moves with it, because a
+      // pin describing a case the file no longer carries is how a required list
+      // stops being read.
       [
         'probe_pgboss_job_store.sql',
-        "0079's job store is no longer probed, so nothing asserts that " +
-          'pgboss.version still pins the version migrate: false reads, that ' +
-          'create_queue routes a job to the right partition and delete_queue ' +
-          'reclaims it, that an undeclared queue, an invented job state and a ' +
-          'keyless key_strict_fifo job are each refused, or that merit_app ' +
-          'still holds nothing at all on a schema inside the ledger PITR ' +
-          'boundary (ADR-318)',
+        "0079's job store and 0082's grant are no longer probed, so nothing " +
+          'asserts that pgboss.version still pins the version migrate: false ' +
+          'reads, that create_queue routes a job to the right partition and ' +
+          'delete_queue reclaims it, that an undeclared queue, an invented job ' +
+          'state and a keyless key_strict_fifo job are each refused, that ' +
+          'merit_app can actually declare a queue and enqueue, fetch, complete ' +
+          'and reap a job, that the privileges it holds inside the ledger PITR ' +
+          'boundary are EXACTLY the fifteen ADR-327 ruled and no wider, or that ' +
+          'a partitioned queue is refused it for want of CREATE (ADR-318, ' +
+          'ADR-327)',
       ],
       // 0078, ADR-321, on ADR-304. MONEY PATH. Pinned in the commit that wires
       // it, which is the rule rather than the exception: OI-07 has four recorded
