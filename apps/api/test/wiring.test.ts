@@ -684,7 +684,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'BECAUSE A DOOR THAT EXISTS AND IS NOT REACHED FROM THE REFUSING PATH IS NOT A DISCHARGE: ' +
     '`ScopedTx.lastClosedTradingDay(): Promise<string>` is DECLARED at ' +
     '`packages/db/src/scoped-db.ts:3635` and IMPLEMENTED at `:3782` on `source`, which is the ' +
-    'payout transaction itself; `lastClosedTradingDayStatement` (`:3224`) reads both calendar ' +
+    'payout transaction itself; `lastClosedTradingDayStatement` (`:3235`) reads both calendar ' +
     'tables and throws on an empty calendar, an EXHAUSTED one and a coverage gap alike; the ' +
     'return type is `string` so no caller holds an absent value to fold a UTC date into ' +
     '(ADR-146 clause 4); and `routes/payouts.ts:355` instructs a backend to call it. SO THE ' +
@@ -809,7 +809,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`min_settlement_lag_trading_days`, which M01 section 2.4 requires, and ' +
     '`rule-state-producibility.test.ts` link 8 decodes the document out of the README on every ' +
     'run to prove it. WHAT `plan` WAITS ON NOW IS THE SIZE ROW AND IT IS SMALLER AND NAMED: ' +
-    '`ScopedTx.catalogRowAt` returns `Promise<unknown>` (`packages/db/src/scoped-db.ts:3666`) ' +
+    '`ScopedTx.catalogRowAt` returns `Promise<unknown>` (`packages/db/src/scoped-db.ts:3726`) ' +
     'and `plan_version_sizes.payout_cap_schedule_cents` is itself `jsonb` holding cents ' +
     '(`packages/db/migrations/0004_catalog.sql:168`), so the second argument is a blob too. ' +
     'ADR-283 DID NOT TAKE IT AND ADR-286 IS THE RULING IT SAID SOMEBODY OWNS. THAT ROW LEFT ' +
@@ -906,7 +906,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'THE FIRM-READ CLAUSE IS ' +
     'DISCHARGED AND IS DELETED RATHER THAN KEPT BESIDE A DOOR THAT LANDED: `ScopedTx` now ' +
     'carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over `CATALOG_TABLE_KEYS` ' +
-    '(`packages/db/src/scoped-db.ts:3392`), a closed list of five `firm` keys that includes ' +
+    '(`packages/db/src/scoped-db.ts:3403`), a closed list of five `firm` keys that includes ' +
     "`planVersions` and `planVersionSizes`, so `PayoutTx.subject`'s `ResolvedPlan` inputs are " +
     'readable ON THE PAYOUT TRANSACTION and the two-transaction remedy ADR-211 clause 2 ruled ' +
     'is not needed. AN OLDER CLAUSE IS KEPT AS HISTORY BECAUSE IT WAS FALSE: this entry once ' +
@@ -1005,7 +1005,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(ADR-252, then ADR-265, both on ADR-238 ruling 1) AND THE CROSS-IDENTITY READ IS DELETED ' +
     '(ADR-262). THE `firm` READ CLAUSE THIS ENTRY LED WITH UNTIL ADR-233 STAYS DELETED: ' +
     '`ScopedTx` carries `catalogRows`, `catalogRowsWhere` and `catalogRowAt` over ' +
-    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3392`), whose five members are exactly ' +
+    '`CATALOG_TABLE_KEYS` (`packages/db/src/scoped-db.ts:3403`), whose five members are exactly ' +
     'the five tables this port reads, and the `attributions` write clause before it was ' +
     'discharged the same way by ADR-230. THIS PORT HAS LOST ITS LEAD BLOCKER TWICE AND ANSWERED ' +
     '503 AFTER EACH. WHAT REFUSES NOW, RE-DERIVED ON THIS TREE. FIRST, THE CAP, AND IT IS STILL ' +
@@ -1136,7 +1136,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   useTurnstileVerifier:
     'NOTHING. THIS PORT IS ALREADY LIVE AND THE ENTRY EXISTS TO SAY SO. ' +
     '`routes/auth.ts` initialises it with `cloudflareTurnstileVerifier()` at module scope ' +
-    '(`routes/auth.ts:642`), which reads `MERIT_TURNSTILE_SECRET` from `process.env` per call ' +
+    '(`routes/auth.ts:643`), which reads `MERIT_TURNSTILE_SECRET` from `process.env` per call ' +
     'and calls Cloudflare, so calling the setter from `start.ts` would install what is already ' +
     'installed. That would raise the wired count and serve nothing, and it is not a wiring, on ' +
     "`useCheckoutAdapters`'s stated rule three entries up. THE DIFFERENCE FROM THOSE THREE, AND " +
@@ -1251,7 +1251,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
     '`runBatch` IS A COMMAND AND `ApiDb` DOES OFFER ITS SHAPE. `firm(fn)` yields a `FirmTx`, ' +
-    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3527`) at the one reason ' +
+    'which carries `sqlExecutor(reason)` (`packages/db/src/scoped-db.ts:3587`) at the one reason ' +
     '`job-enqueue`, and that is structurally the `JobTransaction` `packages/queue` declares. It is ' +
     'blocked on an AUTHORITY and not a shape: `apps/api` declares no `@merit/queue`, and the ' +
     'manifest is the only place that capability can be acquired (ADR-117 section 5). Beyond it ' +

@@ -302,8 +302,10 @@ function jobTransactionMembers(): readonly string[] {
 test('the handle apps/api already holds satisfies the queue transaction structurally', () => {
   // THE CORRECTION TO THE ENTRY, AND IT IS A COMPILE-TIME FACT WITH A RUNTIME
   // WITNESS. `ApiDb.firm(fn)` hands its callback a `FirmTx`; `FirmTx` extends
-  // `TxCommon`, which carries `sqlExecutor(reason)`; `SqlExecutorReason` is
-  // `'job-enqueue'` and nothing else; and the `SqlExecutor` it returns declares
+  // `TxCommon`, which carries `sqlExecutor(reason)` at
+  // `TransactionSqlExecutorReason`, which is `'job-enqueue'` and nothing else
+  // (ADR-332 partitioned the vocabulary rather than widening this method's
+  // reach); and the `SqlExecutor` it returns declares
   // exactly `executeSql`, which is the whole of `JobTransaction`. So "None of
   // the four is a shape `ApiDb` offers" is FALSE of this method: the shape is
   // there today and the capability is not.

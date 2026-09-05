@@ -64,7 +64,8 @@
 // semi-join DELETE removes a subset and leaves the rest, while this writes a
 // superset. It is a FINDING for the pull-request body and possibly a
 // superseding entry, and it is NOT routed around: `sqlExecutor` would run the
-// statement, its one-member vocabulary is `'job-enqueue'`, and using that word
+// statement, the one word a transaction handle may write is `'job-enqueue'`,
+// and using that word
 // to run a status update is the second door ADR-102 exists to make somebody
 // write by hand.
 //
@@ -100,8 +101,9 @@ export interface ProvisioningSqlExecutor {
  *
  * A REAL `SystemTx` SATISFIES THIS STRUCTURALLY WITH NO ADAPTER: its `insert`
  * is generic over `TableKey`, which contains `'provisioningQueue'`, and its
- * `sqlExecutor` takes `SqlExecutorReason`, whose one member is `'job-enqueue'`.
- * The wiring session hands one in directly.
+ * `sqlExecutor` takes `TransactionSqlExecutorReason`, whose one member is
+ * `'job-enqueue'` (ADR-332 partitioned the vocabulary; a transaction handle
+ * admits that word and no other). The wiring session hands one in directly.
  */
 export interface ProvisioningTx {
   /**
