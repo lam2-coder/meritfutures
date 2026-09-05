@@ -12043,7 +12043,7 @@ Counts derived at reporting time off each runner's own last line: suite **312 fi
 
 ---
 
-## 2026-09-05 - Session 530: the detectors get four of their five ports, and the fifth turns out not to be an adapter ([ADR-349](decisions/ADR-349.md), proposed)
+## 2026-09-05 - Session 543: the detectors get four of their five ports, and the fifth turns out not to be an adapter ([ADR-349](decisions/ADR-349.md), proposed)
 
 **THE DISPATCH SAID THE DETECTORS ARE BUILT, TESTED AND NEVER RUN, BLOCKED ONLY ON AN ADAPTER. THE FIRST THREE QUARTERS REPRODUCE AND THE WORD "ONLY" DOES NOT.** `DetectorRunnerIo` has FIVE members. [`apps/worker/src/detectors/adapter.ts`](../apps/worker/src/detectors/adapter.ts) serves FOUR of them over [ADR-165](decisions/ADR-165.md)'s one door: the transaction, [ADR-157](decisions/ADR-157.md)'s three read terms, the clock and the nonce. **THE FIFTH IS THE EVENT SINK AND IT IS UNREACHABLE RATHER THAN UNWRITTEN**, in three parts: `RI-04` plus `node-linker=isolated` put the workspace's only composed writer beyond this deployable, `detector.run_degraded` is a row in no version of [EVENTS](architecture/EVENTS.md) at all, and `detector.run_completed`'s payload is one field short of the subject [ADR-205](decisions/ADR-205.md) added, which `test/event-sink.test.ts` section 4b already pins.
 
