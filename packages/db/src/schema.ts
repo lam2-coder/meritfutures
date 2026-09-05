@@ -2894,6 +2894,16 @@ export const payoutTransfers = pgTable('payout_transfers', {
 // (INV-WALLET-NO-DEPOSITS). `promotional_credit` is not in it either and must
 // not be: the loyalty perk lives in its own ledger class and in
 // `promotional_credit_grants`, and is never withdrawable.
+//
+// IT IS NULLABLE, AND ONLY ON A DEBIT. ADR-322, `0080`: provenance is what
+// value is MADE of, so it is a property of a CREDIT, and a debit consumes a
+// composition rather than having one (EVENTS.md 6.1). `0080`'s
+// `wallet_entries_provenance_follows_direction` is what makes that exact --
+// a credit still may not be written without a class -- and the transcription
+// carries only the nullability, because a CHECK has never been transcribed
+// here. The one member admissible on a debit is `correction`, which names a
+// mechanism rather than a source and which `0038`'s ADJ-C3 REQUIRES on the
+// wallet debit a reversing adjustment writes.
 export const walletEntries = pgTable('wallet_entries', {
   id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
   identityId: uuid('identity_id')
@@ -2904,7 +2914,8 @@ export const walletEntries = pgTable('wallet_entries', {
   // the ledger's signed convention, because reusing one convention for two
   // different questions is the shape of error ADR-027 was reversed over.
   amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
-  provenance: text('provenance').notNull(),
+  // NULLABLE ON A DEBIT ONLY. See this table's note above; `0080`.
+  provenance: text('provenance'),
   cause: text('cause').notNull(),
   // Polymorphic: a payout request, a purchase, or the corrected entry. It
   // declares no foreign key, so there is nothing a derived rule could traverse.

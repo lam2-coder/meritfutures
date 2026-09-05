@@ -2798,6 +2798,14 @@ describe('the transcription states the DDL type and nullability, not only the co
     // session to contain fills in, and R-01 is a containment lookup, so the
     // fabricated interval 0004 forced was not inert.
     ['trading_calendar', ['session_open_at', 'session_close_at']],
+    // 0080_wallet_debit_provenance.sql, ADR-322. THE THIRD CARRIER, and it
+    // arrived exactly as the note above predicted one would: a debit has no
+    // provenance (EVENTS.md 6.1), and 0011 made the column NOT NULL over a
+    // vocabulary its own comment calls kinds of credit, so the honest wallet
+    // debit was unwritable. The relaxation alone would be a widening;
+    // `wallet_entries_provenance_follows_direction` is what keeps a CREDIT
+    // required to carry its class, and a CHECK is not what this fold reads.
+    ['wallet_entries', ['provenance']],
   ];
 
   test('ALTER COLUMN DROP NOT NULL is FOLDED, and the column it names comes out nullable', () => {
@@ -2906,6 +2914,14 @@ describe('the transcription states the DDL type and nullability, not only the co
   // a `TYPE` on a table not listed here -- this is RED and the next session
   // reads the ruling before writing a regex. It covers UNREGISTERED tables too,
   // which the refusal assertion above cannot.
+  //
+  // THE FIFTH STATEMENT LANDED AND NO REGEX MOVED, which is the outcome this
+  // paragraph was written hoping for. `0080` (ADR-322) relaxes
+  // `wallet_entries.provenance`, and `DROP NOT NULL` is a shape ADR-103 already
+  // ruled and this fold already reads, so the only edits are the count below
+  // and the carrier row above. Had it been a `SET NOT NULL` or a `DEFAULT`, the
+  // count would have gone red in exactly the same way and the answer would have
+  // been a ruling rather than an increment.
   test('the migration set carries exactly the ALTER COLUMN statements this fold was ruled against', () => {
     const carriers = new Set<string>();
     let statements = 0;
@@ -2930,7 +2946,7 @@ describe('the transcription states the DDL type and nullability, not only the co
         ...new Set([...ALTER_COLUMN_TABLES.map(([t]) => t), ...RETYPED_COLUMNS.map(([t]) => t)]),
       ].sort(),
     );
-    expect(statements, 'the ALTER COLUMN statement count this fold was ruled against').toBe(4);
+    expect(statements, 'the ALTER COLUMN statement count this fold was ruled against').toBe(5);
   });
 
   // THE SAME CENSUS FOR ADR-278's MEMBER, AND FOR ADR-216's OWN REASON. The
