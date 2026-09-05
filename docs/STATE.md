@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->322<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->323<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -12041,3 +12041,31 @@ Counts derived at reporting time off each runner's own last line: suite **312 fi
 
 Counts derived at reporting time off each runner's own last line: suite **312 files / 7,636 passed / 10 skipped / 0 failed**, against a `1da7ba96` baseline reproduced **before the first edit** of **312 files / 7,626 passed / 10 skipped / 0 failed**, a delta of **+10 cases across two existing files with skips unchanged and no file added**; invariants **35 of 35** and gates **33 of 33**, both unchanged from the baseline; lint, `format:check` and typecheck clean. **Three seeded violations were watched red and restored green, and a fourth transcript is the one that matters**: the same seed run against the probe as [ADR-333](decisions/ADR-333.md) shipped it left `RI-35` GREEN. `pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run, both forbidden by the row.
 
+
+---
+
+## 2026-09-05 - Session 533: the adapter was complete, the install is refused, and the door is shut by something no entry had named ([ADR-342](decisions/ADR-342.md), proposed)
+
+**THE ROW WAS DISPATCHED TO INSTALL `databaseWithdrawalBackend` AND THE INSTALL IS REFUSED, WITH THE ARGUMENT.** MONEY PATH, **`E2` READ OWED**. `apps/api/src/start.ts` is untouched and still carries exactly **10** install calls.
+
+**THE ADAPTER IS NOT WHAT REFUSES, AND THAT IS THE FINDING RATHER THAN AN APOLOGY FOR ONE.** It is whole: **eleven of `WithdrawalTx`'s eleven members served**, the lock taken first and every gate decided under it, the FIFO composition consuming debits and cross-checking itself against the stored running balance, every read and write through `db.scoped`, and `parseFloat`, `toFixed`, `Math.round`, `Math.floor` and `Math.ceil` occurring **zero** times as calls in the module. A session reading the port and the adapter alone would conclude one line in `start.ts` was all that stood between this route and service.
+
+**THE HEADLINE IS THE BLOCKER NO ENTRY HAD EVER NAMED, AND IT IS THIS DEPLOYABLE'S OWN.** `C-27` refuses every caller of both withdrawal rows **before any handler body runs**: `endpointHandler` applies `authorize` ahead of `spec.handle`, both rows declare `passkey or dual_channel`, and `databaseAuthBackend` declares `elevate` **blocked on BOTH arms** for an absent WebAuthn ceremony and absent SMS delivery. So no session in a deployment can be elevated, no request reaches this port, and **the 503 this port is famous for is produced by code nothing reaches**.
+
+**THE DISPATCH READ THAT AS A CAVEAT AND IT IS THE DECIDING FACT, IN THE OPPOSITE DIRECTION.** The tempting reading is that installing is therefore free. It is the reverse: an install nothing can observe is an install nothing exercises and nothing falsifies, and it would **arm itself silently** on the day an unrelated row lands a WebAuthn ceremony or an SMS sender, opening the cash door as a side effect of an auth slice. **An install nobody notices is this branch's own defect with the sign flipped, and it is the worse one**, because the first is visible as a 503 and the second is visible as a payout. **No gate was weakened to reach the route and no second refusal was added.**
+
+**PAST THE INSERT THE ESTATE STILL CANNOT PAY.** The approval sweep now has a driver (`runWithdrawalApprovals`), an exported `LT-06` builder, a posting site and a manifest line; it has **no IO adapter and no clock**. `UNWIRED_WITHDRAWAL_APPROVAL_IO` is the only `WithdrawalApprovalSweepIo` in the tree, the job carries `disposition: 'unscheduled'`, and `apps/worker/src/index.ts` states the condition in its own words: the installation **must not be dispatched before a payment rail exists**, because past `approved` there is no exit and `0072`'s `WD-C2` refuses `approved --> cancelled` at the database. **The rail is FOUNDER-OWED and is not a slice.**
+
+**FOUR SENTENCES IN `wiring.test.ts`'s `useWithdrawalBackend` ENTRY WERE FALSE**, and are corrected in place as its **tenth** correction with all four kept where they were made: that no door drives `requested --> approved`, that `@merit/ledger` publishes no `LT-06` builder, that the manifest line is still owed, and that the entry is no longer waiting on a slice that could arrive here. **FOUR BLOCKERS DISSOLVED AND THE PORT DID NOT MOVE**, because what actually refuses was never any of them.
+
+**THE REFUSAL IS NO LONGER PROSE.** `INSTALL_BLOCKING_FINDINGS` carries the three live blockers with their sources and `wallet-withdrawals.test.ts` **RUNS** each one, so the day the IO adapter, the clock, `elevate` or the rail lands, the suite goes RED and the install is due a re-decision rather than a paragraph going quietly stale.
+
+**SEVEN SEEDS WATCHED RED AND RESTORED GREEN, AND ONE FOUND A DEFECT IN THIS ROW'S OWN CHECK.** Seed 4 commented `walletWithdrawalApprovalPosting` out of the ledger index and the case stayed **GREEN**: `toContain` over the whole file was **reading a comment as an export**. The assertion now extracts the export block and requires a live specifier; re-seeded RED, restored GREEN. **Seed 2's first failure was the seed rather than the check** and is recorded, because a seed that does not reproduce the violation proves nothing about the check.
+
+**`RI-15` AND `RI-16` CAUGHT THREE CITATIONS DRIFTING BY THIS ROW'S 106 INSERTED LINES, AND A FOURTH THAT WAS ALREADY WRONG.** `adr-172-transaction-dependencies.test.ts` had pointed at the wrong line for an unknown number of sessions and passed only because that form of the check fails on a **blank** line and 1527 was not blank. It is repointed at the line that holds the scope arm rather than at 1527 plus 106.
+
+**Nothing was wired, no migration was written and none was edited**: `git diff --stat origin/main -- packages/db/migrations scripts/db` is **EMPTY**. **`{declared: 24, wired: 10, blocked: 14}` is UNCHANGED and was not weakened**, because the wired count did not move. Three reservation rows written for `339`, `340` and `341`, each claiming nothing and deciding nothing, one naming its branch and two recording that a sweep of the fetched remote heads could not.
+
+**Next.** The founder's read of [ADR-342](decisions/ADR-342.md) and the three questions its approval block names, the first being whether refusing a row dispatched as an install was right. Then the general repair landmine 1 names: a check that reads each `BLOCKED` entry's cited artifacts the way `RI-35` reads absence claims, since four of this entry's reasons were discharged by rows in other deployables and nothing noticed.
+
+Counts derived at reporting time off each runner's own last line: suite **312 files / 7,671 passed / 10 skipped / 0 failed**, against a `c0d15f0c` baseline reproduced **before the first edit** of **312 files / 7,666 passed / 10 skipped / 0 failed**, a delta of **+5 cases in one existing file, skips unchanged and no file added**. Invariants **35 of 35** and gates **33 of 33**, both unchanged. `pnpm run lint` clean, `format:check` clean, `typecheck` exit 0. `pnpm run verify` and `scripts/corpus/falsify.mjs` **NOT run**, both forbidden by the row.
