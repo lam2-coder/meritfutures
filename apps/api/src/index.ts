@@ -73,14 +73,17 @@ export type {
   CsrfVerdict,
 } from './csrf.ts';
 export {
+  BODY_METHODS,
   compose,
   defineRoutes,
   discoverRouteModules,
   HTTP_METHODS,
+  installRawBodyParser,
   ROUTE_MODULE_DIR,
   RouteRegistryError,
 } from './registry.ts';
 export type {
+  BodyMethod,
   CompositionReport,
   HttpMethod,
   RouteDefinition,
