@@ -27,9 +27,13 @@
 //   4. THAT CONSTRUCTING THE DOOR OPENS NO SOCKET. `ci.yml`'s jobs run on bare
 //      `ubuntu-latest` with no services block, so a door whose construction
 //      needed a database would be a module this suite could not even import.
-//   5. THAT NOTHING IS WIRED. The door exists and no module calls it, which is
-//      the state ADR-326's register describes and which this row deliberately
-//      does not move.
+//   5. **THAT THE DOOR HAS EXACTLY ONE CALLER, AND WHICH ONE.** This heading
+//      read "THAT NOTHING IS WIRED. The door exists and no module calls it,
+//      which is the state ADR-326's register describes and which this row
+//      deliberately does not move", and ADR-338 moved it: the caller is
+//      `src/provisioning/queue-adapter.ts` and it is the saga's queue port. The
+//      case below is the SAME instrument with a different expected value, and
+//      what is still asserted as an absence is that nothing SPENDS the port.
 //
 // WHAT IT PROVES NOTHING ABOUT. Whether pg-boss's own plans succeed against the
 // applied schema: that needs a backend, `CI-04`'s second leg is still a dated
@@ -52,6 +56,12 @@ import { stripComments } from '../../../packages/tooling/checks/strip-comments.m
 
 import { WORKER_SUPERVISOR_REASON, queueExecutor } from '../src/db.ts';
 import { WORKER_BARREL_LEGS, WORKER_MODULES_NOT_RE_EXPORTED } from '../src/index.ts';
+import {
+  LIVE_PROVISIONING_QUEUE,
+  declareProvisioningQueue,
+  provisioningJobQueue,
+} from '../src/provisioning/queue-adapter.ts';
+import { PROVISIONING_QUEUE_NAME } from '../src/provisioning/saga.ts';
 import { LIVE_QUEUE, workerQueue } from '../src/queue.ts';
 import type { WorkerQueue } from '../src/queue.ts';
 
@@ -285,20 +295,175 @@ test('the door is a factory over an executor, so a suite substitutes a recorder'
 });
 
 // -----------------------------------------------------------------------------
-// 5. Nothing is wired, which is this row's own statement of what it did not do
+// 5. The door has exactly one caller, and it is the saga's queue port (ADR-338)
 // -----------------------------------------------------------------------------
 
-test('the door has no caller under src, so this row wired nothing', () => {
-  // **THE ROW THAT WRITES A DOOR IS NOT THE ROW THAT WIRES A JOB**, which is
-  // ADR-326 section 4's refusal and ADR-165 clause 5's rule about whose row an
-  // authority change is. The saga still calls its PORT, no adapter over this
-  // door exists, `test/schedule.test.ts` case 3.1's caller census is unmoved and
-  // the wired counts do not move either.
+test('the door has exactly one caller under src, and it is the provisioning queue adapter', () => {
+  // **THIS CASE READ `expect(callers).toEqual([])` UNDER THE HEADING "Nothing is
+  // wired, which is this row's own statement of what it did not do", AND ADR-338
+  // WIRED IT.** It is not deleted and it is not loosened to a length: the
+  // instrument is unchanged and only the expected value moved, which is
+  // `apps/api/test/ledger-posting-authority.test.ts`'s stated reason for an
+  // exact list over a `toContain` -- `toEqual([])` is what made the FIRST caller
+  // fail this case, and an exact list of one is what makes the SECOND one fail
+  // it. A door with two callers is a decision somebody takes in this file.
+  //
+  // THE COMMENT STRIPPER IS STILL THE INSTRUMENT, for ADR-165 section 9's
+  // recorded reason: `src/index.ts` and `src/queue.ts` both NAME `LIVE_QUEUE` in
+  // order to say what does and does not call it, and a substring test would read
+  // those sentences as callers.
   const callers = sourceFiles()
     .filter((file) => asPosix(file) !== 'src/queue.ts')
     .filter((file) =>
       /\bLIVE_QUEUE\b|\bworkerQueue\s*\(/.test(stripComments(readFileSync(file, 'utf8'))),
     )
     .map(asPosix);
-  expect(callers).toEqual([]);
+  expect(callers).toEqual(['src/provisioning/queue-adapter.ts']);
+});
+
+test('the adapter publishes enqueue and nothing else, so declareQueue does not reach the saga', () => {
+  // ONE METHOD OF THE DOOR'S TWO. `src/queue.ts` section 3 partitioned the
+  // executor vocabulary so that a declare runs on the POOL and an enqueue runs
+  // inside the caller's transaction; a port carrying both would let a step
+  // inside the pipeline reach the pool one. `Object.keys` and not the type, on
+  // `workerQueue()`'s own reason: the narrowing is an object literal, so the
+  // value HAS one property rather than merely being typed as having one.
+  expect(Object.keys(LIVE_PROVISIONING_QUEUE)).toEqual(['enqueue']);
+  expect(Object.keys(provisioningJobQueue(LIVE_QUEUE))).toEqual(['enqueue']);
+});
+
+test('the adapter hands the CALLER transaction to the door, unsubstituted', () => {
+  // **ADR-006's WHOLE CRITERION, AT THE ONE LAYER THIS ROW ADDED.** The saga
+  // produces the executor as `tx.sqlExecutor('job-enqueue')` off the same handle
+  // the `provisioning_queue` row is inserted on, and an adapter that reached for
+  // an executor of its own here would be the saga bug ADR-006 was accepted to
+  // remove. Asserted by OBJECT IDENTITY rather than by shape, because a
+  // substituted executor of the same shape is exactly the defect.
+  const seen: { tx: unknown; request: unknown }[] = [];
+  const door: WorkerQueue = {
+    declareQueue: () => Promise.reject(new Error('the saga may not declare a queue')),
+    enqueue: (tx, request) => {
+      seen.push({ tx, request });
+      return Promise.resolve('job-1' as never);
+    },
+  };
+  const callerTx = { executeSql: () => Promise.resolve({ rows: [] }) };
+  const request = { queue: PROVISIONING_QUEUE_NAME, payload: { a: 1 }, key: 'k' };
+
+  return provisioningJobQueue(door)
+    .enqueue(callerTx, request)
+    .then((jobId) => {
+      expect(jobId).toBe('job-1');
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.tx).toBe(callerTx);
+      expect(seen[0]?.request).toBe(request);
+    });
+});
+
+test('a deduplicated enqueue returns null through the adapter, because null is a success', () => {
+  // `job-queue.ts` brands `JobId` precisely so a caller cannot read this null as
+  // an error and retry, and `saga.ts` treats it as the success it is. An adapter
+  // that threw on it, or coerced it, would make an idempotency key decoration.
+  const door: WorkerQueue = {
+    declareQueue: () => Promise.resolve(),
+    enqueue: () => Promise.resolve(null),
+  };
+  return expect(
+    provisioningJobQueue(door).enqueue(
+      { executeSql: () => Promise.resolve({ rows: [] }) },
+      {
+        queue: PROVISIONING_QUEUE_NAME,
+        payload: {},
+      },
+    ),
+  ).resolves.toBeNull();
+});
+
+test('declareProvisioningQueue declares the saga queue by the ONE name that declares it', () => {
+  // IT MINTS NO NAME. `PROVISIONING_QUEUE_NAME` is declared in `saga.ts` and a
+  // second constant in the adapter would be two statements of one fact. The case
+  // reads the constant rather than the string, so a rename moves both together.
+  //
+  // **AND THE QUEUE IS NOT DECLARED ANYWHERE ELSE**, which is why this function
+  // exists at all: `0079_pgboss_job_store.sql` says in its own words that
+  // "`pgboss.queue` ships empty", and pg-boss refuses an undeclared queue.
+  const declared: string[] = [];
+  const door: WorkerQueue = {
+    declareQueue: (name) => {
+      declared.push(name);
+      return Promise.resolve();
+    },
+    enqueue: () => Promise.reject(new Error('a declare is not an enqueue')),
+  };
+  return declareProvisioningQueue(door).then(() => {
+    expect(declared).toEqual([PROVISIONING_QUEUE_NAME]);
+    expect(PROVISIONING_QUEUE_NAME).toBe('provisioning');
+  });
+});
+
+test('the live port is the real door and opens no socket until its first statement', async () => {
+  // PROOF OF WHICH DOOR, on the reason case 4 gives for the same measurement one
+  // layer down: the rejection is `client.ts`'s own `DATABASE_URL is unset`, so an
+  // adapter built over a second pool, or over a double, would fail differently or
+  // not at all. Importing this module has already happened at the head of this
+  // file and connected nothing.
+  const before = process.env['DATABASE_URL'];
+  delete process.env['DATABASE_URL'];
+  try {
+    await expect(
+      LIVE_PROVISIONING_QUEUE.enqueue(
+        { executeSql: () => Promise.resolve({ rows: [] }) },
+        { queue: PROVISIONING_QUEUE_NAME, payload: {} },
+      ),
+    ).rejects.toThrow(/DATABASE_URL/);
+  } finally {
+    if (before !== undefined) process.env['DATABASE_URL'] = before;
+  }
+});
+
+test('nothing enqueues, which is what stops the job store growing', () => {
+  // **THE HALF THIS ROW DID NOT WIRE, ASSERTED RATHER THAN PROMISED.** The door
+  // withholds `consume` and `start`, so nothing in this deployable may drain
+  // `pgboss.job`; what keeps that from being a growing table is that nothing
+  // WRITES to it, and that is a fact about the tree which this case reads. The
+  // day a caller lands, this case goes red and the row that lands it owes a
+  // drain or owes the argument for running without one (ADR-338 section 4).
+  //
+  // THE ADAPTER'S OWN MODULE IS EXCLUDED because it declares the two names, and
+  // nothing else is.
+  // **THE INSTRUMENT EXCLUDES THREE MODULES BY NAME AND THE EXCLUSIONS WERE
+  // MEASURED RATHER THAN ANTICIPATED.** The first draft of this case excluded
+  // only the adapter and reported three "spenders", every one of them a
+  // re-export or a declaration: `src/provisioning/queue-adapter.ts` declares the
+  // two names, and `src/index.ts` and `src/provisioning/index.ts` are BARRELS
+  // whose `export { LIVE_PROVISIONING_QUEUE, ... }` clause is a bare reference
+  // that no comment stripper removes. That is ADR-165 section 9's finding in a
+  // third costume, and the answer here is the register's own: name the three
+  // modules, and count a CALL and never a mention anywhere else.
+  const declaring = new Set([
+    'src/provisioning/queue-adapter.ts',
+    'src/index.ts',
+    'src/provisioning/index.ts',
+  ]);
+  const spenders = sourceFiles()
+    .filter((file) => !declaring.has(asPosix(file)))
+    .filter((file) => {
+      const body = stripComments(readFileSync(file, 'utf8'));
+      return (
+        /\bLIVE_PROVISIONING_QUEUE\s*[.,)]/.test(body) ||
+        /(?<!function )\bdeclareProvisioningQueue\s*\(/.test(body) ||
+        /(?<!function )\brunProvisioningSaga\s*\(/.test(body)
+      );
+    })
+    .map(asPosix);
+  expect(spenders).toEqual([]);
+
+  // AND THE THREE EXCLUSIONS ARE NOT A HOLE, because each is asserted elsewhere:
+  // the adapter's own surface is the case above, and both barrels are held by
+  // `test/digests.test.ts`'s total sweep over `WORKER_BARREL_LEGS`,
+  // `WORKER_MODULES_BEHIND_A_LEG` and `WORKER_MODULES_NOT_RE_EXPORTED`.
+  for (const module of declaring)
+    expect(sourceFiles().map(asPosix), `${module} is excluded and does not exist`).toContain(
+      module,
+    );
 });
