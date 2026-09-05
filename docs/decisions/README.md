@@ -352,6 +352,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-338](ADR-338.md) | the saga's queue port gets its first live implementation over the door ADR-333 wired to nothing, the enqueue half is taken and the drain is refused with the argument for refusing it, and the invariant written to fail on good news is found unable to see the wiring and able to see a sentence about it (2026-09-05, status: proposed) |
 | [ADR-339](ADR-339.md) | the letter that heads four sections gets a derived register and NOT a gate, because every gate the lettered sequence could carry is refused by a rule this file already wrote, and the one thing that actually failed was a count in prose (2026-09-05, status: proposed) |
 | [ADR-340](ADR-340.md) | the raw webhook body parser is registered by `compose` rather than by the test suite, the scope is one encapsulation context and the argument for that is measured, and two sentences that could not be checked while every webhook answered 500 are found wrong the moment they can be (2026-09-05, status: proposed) |
+| [ADR-344](ADR-344.md) | the hourly expiry sweep gets four of its five ports over this deployable's own doors, the fifth is a required argument because the event producer and the only handle that can write an event are in the two deployables that cannot import each other, and the job stays unscheduled for a blocker that is now a call which does not compile (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
