@@ -124,6 +124,52 @@
 // value writes NO `detector_runs` row. That is the second blocker; the empty
 // `detector_definitions` table is the third. The row's `why` enumerates all
 // three.
+// **AND ADR-345 TOOK THE THIRD BITE, WHICH IS WHY THE PARAGRAPH ABOVE'S "EIGHT"
+// IS ALREADY STALE AND IS KEPT ANYWAY per `RI-14`.** `./recon/adapter.ts` builds
+// a `ReconSweepIo` over this deployable's one door, so `UNWIRED_RECON_SWEEP_IO`
+// is no longer THE ONLY inhabitant of its port type either. **THE TWO ROWS
+// LANDED IN THE SAME WAVE AND EACH COUNTED NINE DOWN TO EIGHT WITHOUT SEEING THE
+// OTHER**, which is this file's own lesson about hand-typed counts arriving one
+// register over. **DERIVED AT THIS MERGE RATHER THAN SUBTRACTED**: of the nine
+// `UNWIRED_*_IO` values, a census for a function or a value under `src/` whose
+// type is the same port finds one for `ExpirySweepIo` and one for
+// `ReconSweepIo` and none for the other seven. **THE VALUES THEMSELVES DID NOT
+// MOVE AND NEITHER DID THE CALLER CENSUS**: all nine are still exported, still
+// the DEFAULT, and refusing is still the correct outcome for a deployment that
+// installs nothing; nothing under `src/` calls `runReconciliationSweep`, and the
+// recon row's own `why` carries the three blockers that are not an adapter.
+// **WIRING AND SCHEDULING ARE TWO DECISIONS AND THIS FILE IS WHERE THE SECOND
+// ONE IS RECORDED**, which is the whole reason the disposition is derived from a
+// census rather than typed.
+//
+// **AND THE CENSUS ABOVE IS A CENSUS OF CONSTRUCTORS, WHICH IS SAID BECAUSE IT
+// IS NOT THE SAME QUESTION.** `UNWIRED_RULE_STATE_WRITER_IO` is counted among
+// the seven and `batch/adapter.ts` composes a `RuleStateWriterIo` INLINE at its
+// `writeRuleState` leg, so that one has an inhabitant no grep for a returned
+// type will find. Reported here rather than repaired: the number this file cares
+// about is which JOBS have no live io, and that one is a leg of a job that runs.
+//
+// **BOTH PARAGRAPHS ABOVE CALL THEMSELVES THE THIRD BITE AND BOTH SAY SEVEN,
+// AND NEITHER IS THE COUNT ON THIS TREE.** ADR-349 and ADR-345 landed in the
+// same wave on branches that could not see each other, exactly as ADR-344 and
+// ADR-350 did one paragraph up, and each subtracted its own adapter from eight
+// and arrived at seven. Both are kept whole under `RI-14` because each was
+// correct over the tree it was derived on. **DERIVED AT THIS MERGE, OVER ALL
+// THREE ROWS AT ONCE: THE COUNT IS SIX.** Of the nine `UNWIRED_*_IO` values, a
+// census for a declaration under `apps/worker/src` whose RETURN type is the
+// same port finds `./sweeps/expiry-adapter.ts` for `ExpirySweepIo`,
+// `./detectors/adapter.ts` for `DetectorRunnerIo` and `./recon/adapter.ts` for
+// `ReconSweepIo`, and nothing for the other six. **THE NINE VALUES STILL DID
+// NOT MOVE AND NEITHER DID THE CALLER CENSUS**: all nine are still exported,
+// still the DEFAULT, refusing is still the correct outcome for a deployment
+// that installs nothing, and nothing under any `src/` calls `runExpirySweep`,
+// `runDetectors` or `runReconciliationSweep`. **THE CENSUS IS OF CONSTRUCTORS
+// AND THAT IS NOT THE SAME QUESTION**, which is ADR-345's caveat and it
+// survives the correction: `UNWIRED_RULE_STATE_WRITER_IO` is among the six and
+// `batch/adapter.ts:908` composes a `RuleStateWriterIo` INLINE through
+// `writeRuleStateVia`, so that one has an inhabitant no grep for a returned
+// type will find. Reported and not repaired: the number this file cares about
+// is which JOBS have no live io, and that one is a leg of a job that runs.
 //
 // **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
 // is the reason this row does not simply write eleven adapters. `ADR-305`
@@ -330,9 +376,21 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'per-identity ledger reconciliation',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_RECON_SWEEP_IO` is the only `ReconSweepIo` in the tree. Its row is S1 because a ' +
-      'per-identity error hides behind a global zero (GS-231), and an S1 switch watching a job ' +
-      'nobody wired is the state this list exists to make legible.',
+      'THE FIRST CLAUSE OF THIS ROW READ "`UNWIRED_RECON_SWEEP_IO` is the only `ReconSweepIo` in ' +
+      'the tree" AND ADR-345 MADE IT FALSE, and it is kept beside its correction per RI-14. ' +
+      '`./recon/adapter.ts` is a second inhabitant, so the sweep is RUNNABLE against a real ' +
+      'database and this row stays unscheduled for reasons that are not the adapter. ' +
+      'THE BLOCK HAS NO RELEASE: the sweep sets `accounts.recon_blocked` on a mismatch and ' +
+      '`0014_marks.sql` reserves the clearing for a HUMAN, and nothing in this tree clears it in ' +
+      'code or in a route, so a clock today is a control that can stop eligibility and no ' +
+      'control that can restore it. THE RUN NEEDS A `batch_run_id` NOBODY IS MINTING: OVERVIEW ' +
+      'section 5.2 puts this stage INSIDE the nightly batch and `runReconciliationSweep` refuses ' +
+      'a non-uuid rather than generating one, so the caller is `batch/`s and not this file`s. ' +
+      'AND THE SWITCH WOULD BE SATISFIED BY THE WRONG CHECK: the row above is INV-M20-10`s ' +
+      'per-identity WALLET assertion, S1 because a per-identity error hides behind a global zero ' +
+      '(GS-231), and this sweep compares a rule state against a vendor mark per ACCOUNT-DAY. ' +
+      'That registration mismatch is reported in ADR-345 as an open question and is not ' +
+      'repaired here.',
   },
   {
     module: './sweeps/expiry.ts',

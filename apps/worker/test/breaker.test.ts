@@ -985,19 +985,28 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // reachable. That row's fence carries `apps/worker/test/**`, so this file is
     // inside it and the line is assigned rather than reached for.
     './detectors/adapter.ts',
+    // ADR-345, session 536, AND THE SEVENTH TIME, ARRIVING IN THE SAME WAVE AS
+    // THE SIXTH. The reconciliation sweep's adapter over `WorkerDb`. Both rows
+    // wrote the line above their own and both typed 30; the count below is
+    // derived at this merge instead. Its two neighbours `./recon/ports.ts` and
+    // `./recon/sweep.ts` are matched by the regex above and were never
+    // enumerated here, which is session 387's choice and not a gap this row
+    // repairs.
+    './recon/adapter.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  // 32 SINCE THE INTEGRATION MERGE OF ADR-350 AND ADR-349, WHICH ADDED
-  // `./batch/statistics-adapter.ts` AND `./detectors/adapter.ts` ON TOP OF
-  // ADR-344's `./sweeps/expiry-adapter.ts`. **THREE CONCURRENT ROWS EACH ADDED A
-  // LEG AND EACH TYPED ONE LESS THAN THE TRUTH.** ADR-350 wrote 31 counting its
-  // own leg over 344's, ADR-349 wrote 31 counting its own leg over 344's, and
-  // neither branch could see the other. That is exactly what this literal exists
-  // to catch: a keep-both merge of the enumerations type-checks and leaves the
-  // total short. The number below is the one the assertion reported when both
-  // legs were present, not the one either branch predicted. It was 30 from
-  // ADR-344, which added `./sweeps/expiry-adapter.ts`, 29 from
-  // session 516, which added `./withdrawals/approval-sweep.ts` AND
+  // 33 SINCE FOUR CONCURRENT ROWS LANDED IN ONE WAVE, adding
+  // `./sweeps/expiry-adapter.ts` (ADR-344), `./batch/statistics-adapter.ts`
+  // (ADR-350), `./detectors/adapter.ts` (ADR-349) and `./recon/adapter.ts`
+  // (ADR-345). **EACH OF THE FOUR TYPED A NUMBER ONE OR TWO SHORT AND NONE OF
+  // THEM COULD SEE THE OTHERS**: 344 wrote 30, and 350, 349 and 345 each wrote
+  // 31 counting only its own leg on top of 344's. That is this literal's whole
+  // purpose arriving four times at once: a keep-both merge of the enumerations
+  // type-checks and leaves the total short, so the merge that keeps every leg is
+  // the merge that has to COUNT them. The number below is what the assertion
+  // reported with all four legs present, not what any branch predicted. It was
+  // 29 from session 516, which added
+  // `./withdrawals/approval-sweep.ts` AND
   // `./withdrawals/ports.ts`, 27 from session 511, which added
   // `./sweeps/ledger.ts`, 26 from session 431, which added `./batch/adapter.ts`,
   // 25 from session 395, which added `./batch/state-writer.ts`, and 24 from
@@ -1019,5 +1028,5 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
   // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
   // path shape in its regex. They are guarded there and not here.
-  expect(new Set(legs).size).toBe(32);
+  expect(new Set(legs).size).toBe(33);
 });
