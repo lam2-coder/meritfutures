@@ -931,7 +931,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`rules` decoder and neither is importable here, and the day either count moves this entry ' +
     'goes red rather than stale. A ' +
     'PARTIAL BACKEND IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are ' +
-    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1217`, and ' +
+    'both constructible today (`payoutRequests` is `owned`, `scope.ts:1245`, and ' +
     '`databaseIdempotencyStore` exists at `src/idempotency-store.ts:144`), and installing them ' +
     'beside a `transact` whose `subject` rejects would put a live-looking route in front of the ' +
     'arm that approves payouts. **AND THAT SENTENCE STOPPED BEING A WARNING AND BECAME A ' +
@@ -1223,7 +1223,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`admin-source/liability.ts`). THE POINTER IS A NAME RATHER THAN A NUMBER, on ADR-212, ' +
     'because this citation has now been broken twice by lines inserted above it. ' +
     'What refuses it is THE DOOR: `reconciliations` is scope ' +
-    'class `derived` (`packages/db/src/scope.ts:1406`), so `firm` refuses the key AT COMPILE ' +
+    'class `derived` (`packages/db/src/scope.ts:1434`), so `firm` refuses the key AT COMPILE ' +
     'TIME and `scoped` has no identity on this surface, and ADR-171 clause 1 refuses the ' +
     '`SystemTx` door until an `AdminSessionSource` a deployment can install exists. ADR-237 ' +
     'measured that condition as UNMET. ' +
@@ -1252,12 +1252,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'assertion verifier is not. SECOND AND INDEPENDENT: ' +
     '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
-    'class `owned` on `identity_id` (`packages/db/src/scope.ts:951`). `db.firm` refuses that key ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:970`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1579-1581`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1607-1609`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
-    '(`packages/db/src/scope.ts:1100`), so the audit half alone has a door and the subject half ' +
+    '(`packages/db/src/scope.ts:1119`), so the audit half alone has a door and the subject half ' +
     "does not, which is the one-live-arm shape this file refuses on `usePayoutBackend`'s stated " +
     'rule. ADR-231 DOES NOT REACH THIS ONE AND THE REASON IS THE ADDRESS: `db.publicLookup` is ' +
     'READ ONLY and its vocabulary is `certificates` by `code`, while this route locks and ' +

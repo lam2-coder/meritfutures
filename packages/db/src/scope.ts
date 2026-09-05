@@ -32,6 +32,7 @@ import {
   accountStatusHistory,
   adminActions,
   affiliateClicks,
+  affiliateCommissions,
   affiliateCreatives,
   affiliates,
   affiliateStatements,
@@ -196,16 +197,22 @@ import {
  * words, and the disclosure is WORSE at arity two rather than milder: at three
  * a member learns a set, at two they learn precisely who.
  *
- * `affiliate_commissions` IS STILL ABSENT AND IT IS ONE COLUMN AWAY RATHER THAN
- * ONE CLASS AWAY. Its only path to an identity is `attribution_id uuid NOT NULL
- * REFERENCES attributions(id)`; `attributions` is `pair`, so a `derived` rule
- * through it COMPILES and then THROWS, because `scopePredicate` recurses and a
- * chain terminates at `owned` or at `root` or it does not terminate. This
- * paragraph asked for a ruling for a wave after ADR-253 made it: no member of
- * the six fits and `firm` is FALSE here. ADR-304 rules there is NO SEVENTH -- a
- * class would key live money to `affiliate_identity_id`, which `0012` freezes at
- * purchase, while the statement that PAYS keys on `affiliates` as it stands --
- * so the repair is `affiliate_id`, and `0078` is reserved and NOT WRITTEN.
+ * `affiliate_commissions` IS PRESENT SINCE `0078`, AND THE COLUMN IS WHAT MADE
+ * IT PRESENT RATHER THAN A CLASS. THIS PARAGRAPH READ "IS STILL ABSENT AND IT IS
+ * ONE COLUMN AWAY RATHER THAN ONE CLASS AWAY ... `0078` is reserved and NOT
+ * WRITTEN", and it is quoted rather than deleted because the clauses under it
+ * still hold and are the reason the table was unregistrable for eleven waves.
+ * Its only path to an identity WAS `attribution_id uuid NOT NULL REFERENCES
+ * attributions(id)`; `attributions` is `pair`, so a `derived` rule through it
+ * COMPILES and then THROWS, because `scopePredicate` recurses and a chain
+ * terminates at `owned` or at `root` or it does not terminate. No member of the
+ * six fitted that column set and `firm` was FALSE here. ADR-304 ruled there is
+ * NO SEVENTH -- a class would key live money to `affiliate_identity_id`, which
+ * `0012` freezes at purchase, while the statement that PAYS keys on `affiliates`
+ * as it stands -- so the repair is `affiliate_id`, and `0078` (ADR-321) writes
+ * it. The rule is `derived` via `affiliates`, which is the three siblings' rule
+ * a fourth time; its `why` carries ADR-253 section 6's standing condition, which
+ * this registration INHERITS and does not discharge.
  *
  * `identity_merges` IS ABSENT AND IT IS NO LONGER UNREGISTRABLE. It is the
  * fourth table in this tree carrying two `REFERENCES identities(id)` columns --
@@ -490,6 +497,18 @@ export const TABLES = {
   operators,
   operatorSessions,
   firmParameters,
+  // ADR-321, on ADR-304. THE FOURTH TABLE ON THE AFFILIATE SETTLEMENT RAIL, and
+  // the first key in this registry whose obstruction was a COLUMN rather than a
+  // class. `0012` gave it one path to an identity, `attribution_id` into
+  // `attributions`, which is `pair`, so a `derived` rule through it compiled and
+  // threw; ADR-253 section 6 left open whether a SEVENTH class was the repair
+  // and ADR-304 refused one. `0078` adds `affiliate_id uuid NOT NULL REFERENCES
+  // affiliates(id) ON DELETE RESTRICT`, which is the declaration the three
+  // siblings above already carry, and the rule below is their rule a fourth
+  // time. THE MIGRATION IS WHAT NEEDED THE RULING AND THIS REGISTRATION IS A
+  // TRANSCRIPTION, which is why the order cannot be inverted: a rule naming a
+  // column that does not exist is asserted against nothing.
+  affiliateCommissions,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -1210,7 +1229,16 @@ export const SCOPE_RULES = {
     localColumn: 'affiliate_id',
     foreignColumn: 'id',
     traversal: 'hop',
-    why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0012_disputes_and_affiliate_settlement.sql), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THIS IS THE THIRD TABLE ON EXACTLY THE SHAPE `affiliate_creatives` AND `affiliate_clicks` WERE REGISTERED ON, and it is registered without a ruling for that reason: the DDL declares one edge, the edge terminates one hop out at an `owned` table, and no column of this row is declared against `identities(id)` for ADR-101 clause 1 to refuse. WHAT A STATEMENT IS ABOUT IS THE AFFILIATE AND NEVER THE BUYERS WHOSE PURCHASES BUILT IT: the row carries `total_cents` and no line items, and the line items are `affiliate_commissions`, which is UNREGISTERED and stays so -- a scoped read of this table therefore returns a person their own periods and totals and hands them nobody else's uuid, which is the property that makes `derived` admissible here and refuses it one table over. `total_cents bigint NOT NULL` IS SIGNED and a clawback-heavy month is negative, so a wrong rule here shows one affiliate what another is owed; `affiliates.balance_cents` one hop out is signed for the same reason and is already `owned`. `paid_transfer_ref text NULL` IS THE AVAILABLE MISTAKE AND IT IS NOT A COLUMN A RULE COULD NAME: it carries no foreign key at all, so there is nothing to traverse, and it names a row in a payment provider's database rather than one in this one, which is `payout_destinations`' `destination_ref` argument arriving on the affiliate rail. A SCOPED READ RETURNS EVERY PERIOD INCLUDING THE VOID ONES, and that is deliberate: `status` admits `void` and `affiliate_statements_issued_has_date` keeps a non-draft statement's `issued_at` present, so what Merit told an affiliate and later voided stays quotable, which is `tos_acceptances`' history argument on a money document.",
+    why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0012_disputes_and_affiliate_settlement.sql), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THIS IS THE THIRD TABLE ON EXACTLY THE SHAPE `affiliate_creatives` AND `affiliate_clicks` WERE REGISTERED ON, and it is registered without a ruling for that reason: the DDL declares one edge, the edge terminates one hop out at an `owned` table, and no column of this row is declared against `identities(id)` for ADR-101 clause 1 to refuse. WHAT A STATEMENT IS ABOUT IS THE AFFILIATE AND NEVER THE BUYERS WHOSE PURCHASES BUILT IT: the row carries `total_cents` and no line items, and the line items are `affiliate_commissions`, WHICH IS NOW REGISTERED ON THIS SAME RULE (0078, ADR-321). THIS CLAUSE READ \"which is UNREGISTERED and stays so\" and the second half of that was a forecast rather than a finding: what refused the line items was their COLUMN SET and not this table's argument, and ADR-304 ruled the repair a column. The property this sentence rests on is untouched -- a scoped read of this table returns a person their own periods and totals and hands them nobody else's uuid -- and it is now true of the line items too, because `affiliate_commissions.affiliate_id` reaches the same `affiliates` row and no column of either declares an identity. `total_cents bigint NOT NULL` IS SIGNED and a clawback-heavy month is negative, so a wrong rule here shows one affiliate what another is owed; `affiliates.balance_cents` one hop out is signed for the same reason and is already `owned`. `paid_transfer_ref text NULL` IS THE AVAILABLE MISTAKE AND IT IS NOT A COLUMN A RULE COULD NAME: it carries no foreign key at all, so there is nothing to traverse, and it names a row in a payment provider's database rather than one in this one, which is `payout_destinations`' `destination_ref` argument arriving on the affiliate rail. A SCOPED READ RETURNS EVERY PERIOD INCLUDING THE VOID ONES, and that is deliberate: `status` admits `void` and `affiliate_statements_issued_has_date` keeps a non-draft statement's `issued_at` present, so what Merit told an affiliate and later voided stays quotable, which is `tos_acceptances`' history argument on a money document.",
+  },
+
+  affiliateCommissions: {
+    class: 'derived',
+    via: 'affiliates',
+    localColumn: 'affiliate_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0078_affiliate_commission_owner.sql, ADR-321, on ADR-304), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THIS IS THE FOURTH TABLE ON EXACTLY THE SHAPE `affiliate_creatives`, `affiliate_clicks` AND `affiliate_statements` WERE REGISTERED ON, and it is registered without a ruling for that reason: the DDL declares the edge, the edge terminates one hop out at an `owned` table, and no column of this row is declared against `identities(id)` for ADR-101 clause 1 to refuse. THE EDGE IS DECLARED BY `0078` AND NOT BY `0012`, WHICH IS THE WHOLE HISTORY OF THIS ROW. This registry argued with this table by name for eleven waves and every refusal it recorded was correct on the column set it was written against: `0012`'s row carried ONE path to an identity, `attribution_id` into `attributions`, which is `pair`, so a `derived` rule through it COMPILED and then THREW. ADR-253 refused all six classes and left open whether a SEVENTH was owed; ADR-304 ruled that the vocabulary was never what was missing and that the repair is the column the three siblings already carry. `attribution_id` IS STILL NOT THE RULE AND IT IS THE AVAILABLE MISTAKE: it is NOT NULL, it is single-valued, and a rule naming it compiles at every call site and throws the first time anybody reads the table, which is `notifications.kind`'s trap on the affiliate rail. `amount_cents bigint NOT NULL` IS SIGNED and a clawback row is negative, so a wrong rule here shows one affiliate the money another is owed, or owes; `affiliate_statements.total_cents` one table over and `affiliates.balance_cents` one hop out are signed for the same reason. THE DENORMALIZED COLUMN CANNOT DISAGREE WITH ITS PARENT AND THAT IS A CONSTRAINT RATHER THAN A CONVENTION: `affiliate_commissions_attribution_owner_fk` references the PAIR `attributions (id, affiliate_id)`, so a commission whose affiliate differs from its attribution's is unwritable from either side, which is `reserve_coverage_snapshots_anchor_fk` (0049)'s idiom and is what makes a rule on the derived column as sound as one on the attribution would have been. THIS REGISTRATION INHERITS ADR-253 SECTION 6'S STANDING CONDITION AND DOES NOT DISCHARGE IT, and the condition attaches to ROW-LEVEL READABILITY BY ANY ROUTE rather than to the class that was refused: an affiliate who can read commission rows learns HOW MANY attributions they have and can address each one, and IF ANY DOOR EVER RESOLVES AN `attributions` ROW FROM ITS ID FOR A PARTY, the uuid stops being opaque and ADR-106's ground returns one hop out. A `derived` rule returns the same rows the seventh class would have, carrying the same `attribution_id`, so the condition holds against this rule exactly as it held against the class. It holds TODAY: the one door in this estate that resolves anything about an attribution is `attributionAffiliate`, which takes an `affiliateId` and returns one bit (ADR-262), and nothing anywhere resolves an `attributions` row from its id for a party. The day something does, this rule is what has to be re-argued.",
   },
 
   payoutRequests: {

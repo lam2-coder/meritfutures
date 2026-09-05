@@ -192,6 +192,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   operators: 'operators',
   operatorSessions: 'operator_sessions',
   firmParameters: 'firm_parameters',
+  affiliateCommissions: 'affiliate_commissions',
 };
 
 /**
@@ -461,13 +462,13 @@ describe('the registry is total', () => {
   // IT READABLE THROUGH `firmDb()` AND NOTHING ELSE: the key is deliberately
   // NOT added to `CATALOG_TABLE_KEYS`, so a scoped transaction still refuses it
   // and `accountCap()` is no nearer implementable than it was.
-  test('115 declared relations, 115 scope rules, 0 reachable without one', () => {
+  test('116 declared relations, 116 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(115);
-    expect(rules).toBe(115);
+    expect(declared).toBe(116);
+    expect(rules).toBe(116);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, AND IT IS
@@ -525,6 +526,16 @@ describe('the registry is total', () => {
     // the arithmetic this assertion exists to make checkable: a table created
     // and left unregistered moves one number and not the other.
     //
+    // 116 SINCE `0078`, AND `affiliate_commissions` IS THE 116th REGISTRATION.
+    // THE FIRST ROW IN THIS COMMENT WHERE THE TWO NUMBERS MOVE APART BY DESIGN:
+    // `createdTables` is UNCHANGED at 118, because `0078` creates no table. It
+    // adds ONE COLUMN to a table `0012` created eleven waves ago, and that
+    // column is the whole of what made the relation registrable -- ADR-253
+    // refused all six classes against `0012`'s column set and ADR-304 ruled that
+    // the vocabulary was never what was missing. So this is the arithmetic in
+    // its other direction: a table registered without being created moves the
+    // registry and not the DDL count, exactly as a table created and left
+    // unregistered moves the DDL count and not the registry.
     // 118 SINCE `0074`, AND `firm_parameters` IS THE 115th REGISTRATION.
     // Both numbers moved by one in the same commit, which is
     // `payout_destinations`' shape: ADR-238 ruling 1 had already ruled the
@@ -698,12 +709,33 @@ describe('a scope rule is checked against the DDL, not against itself', () => {
     }
   });
 
+  // THE READER HERE IS THE FOLD AND NOT THE `CREATE TABLE`, AND IT WAS THE
+  // `CREATE TABLE` UNTIL `0078`. ADR-094's rule is that a table is read AS OF
+  // THE LAST MIGRATION, and this assertion had never needed it: every `derived`
+  // rule registered before ADR-321 named a column its table's own `CREATE TABLE`
+  // body declared, so `ddlColumnDefs` and the fold returned the same definition
+  // and the difference was invisible.
+  //
+  // `affiliate_commissions.affiliate_id` IS THE FIRST ONE THAT IS NOT. `0012` is
+  // merged and constitution E2 makes its `CREATE TABLE` body permanent, so the
+  // column ADR-304 ruled owed could only ever arrive as `0078`'s `ADD COLUMN` --
+  // and read at the CREATE this rule names a column that does not exist. WATCHED
+  // FAILING BEFORE IT WAS MOVED, at `affiliate_commissions.affiliate_id: expected
+  // undefined to be defined`, which is a correct reading of `0012` and a wrong
+  // reading of the database.
+  //
+  // `foldTableDefs` IS THE SAME READER THE ADR-101 CLAUSES ALREADY USE and is
+  // hoisted below; a second parser for one fact is ADR-092 section 5's measured
+  // hazard. The `firm` assertion two cases down still reads the CREATE and is
+  // still blind in the same way, which ADR-101 section 8 already records as a
+  // finding about what the `firm` class promises; it is left where that entry put
+  // it rather than repaired from a session ruling on a different table.
   test('every derived rule names a foreign key the DDL actually declares', () => {
     for (const key of TABLE_KEYS) {
       const rule = SCOPE_RULES[key];
       if (rule.class !== 'derived') continue;
-      const here = ddlColumnDefs(sqlText, SQL_NAME[key]).get(rule.localColumn);
-      const there = ddlColumnDefs(sqlText, SQL_NAME[rule.via]).get(rule.foreignColumn);
+      const here = foldTableDefs(SQL_NAME[key]).get(rule.localColumn);
+      const there = foldTableDefs(SQL_NAME[rule.via]).get(rule.foreignColumn);
       expect(here, `${SQL_NAME[key]}.${rule.localColumn}`).toBeDefined();
       expect(there, `${SQL_NAME[rule.via]}.${rule.foreignColumn}`).toBeDefined();
 
