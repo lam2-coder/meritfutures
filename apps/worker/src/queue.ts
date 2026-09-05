@@ -123,9 +123,24 @@
 // -----------------------------------------------------------------------------
 // WHAT THIS FILE DOES NOT DO, AND MUST NOT GROW
 // -----------------------------------------------------------------------------
-// **NOTHING HERE IS WIRED AND NOTHING IS SCHEDULED.** No module calls this door,
-// `test/queue.test.ts` asserts that over the tree, and the saga still enqueues
-// through `ProvisioningJobQueue`, its port. ADR-326 section 4's refusal stands
+// **THIS PARAGRAPH READ "NOTHING HERE IS WIRED AND NOTHING IS SCHEDULED. No
+// module calls this door, `test/queue.test.ts` asserts that over the tree, and
+// the saga still enqueues through `ProvisioningJobQueue`, its port", AND ADR-338
+// MADE THE FIRST TWO CLAUSES FALSE.** It is kept beside its correction rather
+// than deleted, per `RI-14`, and `RI-35` holds the correction to the tree: the
+// register moved `worker-queue-door-caller` to `retired` in the same commit that
+// falsified it, so a tree where the caller went away turns leg 3 red here
+// instead of leaving a correction to be believed.
+//
+// **`src/provisioning/queue-adapter.ts` IS THE CALLER AND IT IS THE ONLY ONE.**
+// It takes this door and returns the saga's `ProvisioningJobQueue`, narrowing
+// two published methods to the one the saga names, and `test/queue.test.ts` case
+// 5 pins the caller list at exactly that path -- an exact list and not a length,
+// so a SECOND caller is a decision somebody takes in that file. **NOTHING IS
+// SCHEDULED STILL, AND NOTHING IS ENQUEUED**: no module calls the adapter or the
+// saga either, so the door is reachable and unspent.
+//
+// ADR-326 section 4's refusal stands
 // unchanged: the blockers on the eleven unscheduled entry points are ADAPTERS
 // rather than clocks, and **the withdrawal driver gets no clock at all until the
 // payment rail exists**, because a live clock in front of it posts `LT-06` into

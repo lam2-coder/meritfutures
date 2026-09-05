@@ -35,14 +35,27 @@
 //    the status of its last moment", and that page's whole grammar is the
 //    ABSENCE of a completion signal by an expected-by time, which presumes
 //    discrete runs with discrete completions.
-// 3. **THE ROLE THIS DEPLOYABLE CONNECTS AS CANNOT REACH THE STORE.**
-//    `0026_roles_and_grants.sql` grants `USAGE` and default privileges
+// 3. **THIS ITEM READ "THE ROLE THIS DEPLOYABLE CONNECTS AS CANNOT REACH THE
+//    STORE. `0026_roles_and_grants.sql` grants `USAGE` and default privileges
 //    `IN SCHEMA public` and nowhere else, so `merit_app` holds neither `USAGE`
 //    nor `CREATE` on `pgboss`. `0079` states that as a deliberate omission and
 //    `probe_pgboss_job_store.sql` REJECTION 5 asserts the absence, naming
 //    `ADR-305` slice 8 as the row that owes the ruling. `ADR-326` rules it and
 //    the migration that acts on the ruling is owed by a row whose fence holds
-//    `packages/db/**`, which `ADR-326`'s does not.
+//    `packages/db/**`, which `ADR-326`'s does not", AND
+//    `0082_pgboss_app_grants.sql` MADE IT FALSE ON THE DAY IT MERGED
+//    (`ADR-327`, 2026-09-03).** It is kept beside its correction rather than
+//    deleted, per `RI-14`, and ADR-338 registered it so `RI-35` holds the
+//    correction to the tree. **THE ROLE REACHES THE STORE NOW**: `0082` grants
+//    `USAGE` on `pgboss` plus the fifteen table privileges pg-boss was measured
+//    to need, and `CREATE` is still withheld because `create_queue` runs DDL
+//    only for a PARTITIONED queue, which `declareQueue` never asks for. **THE
+//    ITEM'S CONCLUSION SURVIVES ANYWAY AND ITEMS 1 AND 2 CARRY IT**: a grant is
+//    not a cron primitive, and this deployable is still a one-shot process.
+//    **FOUND BY ADR-338 RATHER THAN BY A CHECK**, which is the whole argument
+//    for registering it: `0079`'s falsification of a neighbouring sentence one
+//    package over is `RI-35`'s own occurrence 3, and this is the same shape at a
+//    site the register had never met.
 //
 // SO A SCHEDULED JOB HERE MEANS: an external scheduler starts a process, the
 // process runs the job once, prints its completion line and exits, and the exit
@@ -59,6 +72,16 @@
 // else on this list. A schedule in front of a job with no live adapter is a
 // scheduler that starts a process to throw, so the blocker is the adapter and
 // the clock is downstream of it.
+//
+// **THE OPENING CLAUSE IS NOW TRUE OF EVERY PORT EXCEPT ONE AND IT IS KEPT
+// WHOLE, per `RI-14`.** ADR-338 wrote `./provisioning/queue-adapter.ts`, so
+// `ProvisioningJobQueue` has a live inhabitant and the provisioning saga is
+// written against FOUR ports of which ONE is now implemented. **THE NINE
+// `UNWIRED_*_IO` VALUES DID NOT MOVE** and neither did the caller census: the
+// saga's other three ports are a vendor adapter that does not exist and two
+// that `provisioning/ports.ts` measures as blocked by `ADR-102`'s `WHERE`-less
+// system write path, so the row below stays `unscheduled` and the disposition
+// case that derives it from the tree stays green for the reason it always had.
 //
 // **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
 // is the reason this row does not simply write eleven adapters. `ADR-305`
@@ -218,7 +241,17 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'job store: `enqueueProvisioningOp` puts the row and the job on one transaction through a ' +
       '`ProvisioningJobQueue`. The `JobQueue` that `@merit/queue` publishes satisfies that port ' +
       'structurally, and the header above measures the store as unreachable by the role this ' +
-      'deployable connects as.',
+      'deployable connects as. ' +
+      'THE FIRST CLAUSE AND THE LAST ARE BOTH FALSE NOW AND ARE KEPT BESIDE THEIR CORRECTION ' +
+      'per RI-14. `0082` (ADR-327) made the role reach the store, and ADR-338 wrote ' +
+      '`./provisioning/queue-adapter.ts`, so `ProvisioningJobQueue` has a live inhabitant and ' +
+      'the job store is reachable from here. WHAT IS STILL TRUE IS THE HALF THAT KEEPS THIS ROW ' +
+      'UNSCHEDULED: there is NO CALLER, and three of the saga`s four ports have no ' +
+      'implementation, the platform one because `packages/rithmic` implements nothing and the ' +
+      'advance and read ones because ADR-102`s system write path renders no WHERE clause. ' +
+      'AND NOTHING DRAINS THE QUEUE: this deployable`s door withholds `consume` and `start` on ' +
+      'ADR-241`s one-shot ruling, so the row that gives this job a caller owes a drain or owes ' +
+      'the argument for running without one.',
   },
   {
     module: './recon/sweep.ts',
