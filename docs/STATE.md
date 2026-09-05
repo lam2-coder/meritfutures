@@ -12085,7 +12085,6 @@ Counts derived at reporting time off each runner's own last line: suite **313 fi
 
 Counts derived at reporting time off each runner's own last line: suite **313 files / 7,674 passed / 10 skipped / 0 failed**, against a `c0d15f0c` baseline reproduced **before the first edit** of **312 files / 7,666 passed / 10 skipped / 0 failed**, a delta of **+8 cases in +1 new file with skips unchanged**; invariants **35 of 35** and gates **33 of 33**, both unchanged from the baseline because this row adds neither; lint, `format:check` and typecheck clean. **Three seeded violations were watched red and restored green.** `pnpm run verify` was NOT run and `scripts/corpus/falsify.mjs` was NOT run, both forbidden by the row.
 
-
 ---
 
 ## 2026-09-05 - Session 532: the expiry sweep gets four of its five ports, and the fifth is a fence running the wrong way round a handle ([ADR-344](decisions/ADR-344.md), proposed)
