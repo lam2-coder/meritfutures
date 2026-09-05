@@ -166,9 +166,9 @@ const allocationDoc = (rows: readonly string[]): string =>
   '# Number allocation\n\n## Reservations\n\n' +
   '| 164 | `PayoutTx.ledger` (`routes/payouts.ts:395`) is required, and the worker at ' +
   "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts; both are scope " +
-  'class `derived` (`scope.ts:536,545`) |\n' +
+  'class `derived` (`scope.ts:555,566`) |\n' +
   '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395`, and ' +
-  'both plan tables are scope class `firm` (`scope.ts:506,511`) |\n' +
+  'both plan tables are scope class `firm` (`scope.ts:525,536`) |\n' +
   '\n## The invariant register\n\n' +
   '| Number | Claimed by | What it asserts |\n| --- | --- | --- |\n' +
   rows.join('\n') +
@@ -280,6 +280,20 @@ function cleanTree(): string {
   // `firm` and `derived` stay where they are here and the blank line alone
   // moves, which is the shape the register actually holds.
   //
+  // AND ALL FOUR MOVED A FOURTH TIME UNDER ADR-321, BY NINETEEN, WHICH IS THE
+  // SECOND TIME EVERY NUMBER MOVED AT ONCE AND THE FIRST TIME A REGISTERED
+  // FINDING WENT GREEN BY ACCIDENT. `0078` registered `affiliate_commissions`,
+  // so `scope.ts` gained an import, a `TABLES` entry, a `SCOPE_RULES` rule and a
+  // rewritten class-docblock paragraph, and every declaration below them shifted
+  // by nineteen. THE SHAPE IS UNCHANGED AND IT HAD TO BE RESTORED RATHER THAN
+  // LEFT: at the old numbers `scope.ts:536` landed one line off a `derived` in
+  // the moved docblock and `scope.ts:547` two lines off another, so BOTH halves
+  // of that pointer went green and the register entry naming the first one
+  // exempted nothing -- which is a finding of its own, by that entry's own rule.
+  // All four numbers therefore move with the tree, `firm` and `derived` move
+  // here with them, and the four-pointers-two-green shape the real document
+  // holds is reproduced rather than described.
+  //
   // AND IT MOVED A THIRD TIME UNDER ADR-262, BY SIXTY-FIVE, WHICH IS THE FIRST
   // MOVE LARGE ENOUGH TO NEED THE FIXTURE TO GROW. That entry added
   // `PairCounterparty` beside `PairWriter` and a `counterparty` block inside the
@@ -292,9 +306,9 @@ function cleanTree(): string {
   write(
     root,
     'packages/db/src/scope.ts',
-    Array.from({ length: 1025 }, (_, i) => {
-      if (i + 1 === 976) return '';
-      const name = { 511: 'firm', 545: 'derived' }[i + 1];
+    Array.from({ length: 1044 }, (_, i) => {
+      if (i + 1 === 995) return '';
+      const name = { 536: 'firm', 566: 'derived' }[i + 1];
       return name === undefined ? '//' : `// class: '${name}',`;
     })
       .join('\n')
@@ -316,7 +330,7 @@ function cleanTree(): string {
   write(
     root,
     'apps/worker/src/provisioning/payload.ts',
-    '// The payload is flat, and `scope.ts:976` repeats it at length.\n',
+    '// The payload is flat, and `scope.ts:995` repeats it at length.\n',
   );
   write(
     root,

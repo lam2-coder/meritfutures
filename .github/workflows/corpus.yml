@@ -823,3 +823,27 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_pgboss_job_store.sql
+
+      # 0078, ADR-321, on ADR-304. MONEY PATH. `affiliate_commissions.
+      # amount_cents` is signed money Merit owes a named affiliate, and until
+      # `0078` the table named no affiliate at all.
+      #
+      # THREE ACCEPTANCES BEFORE THE FIRST REJECTION, on DELTA_MANIFEST section
+      # 13's discipline. `0078` exists to make a CORRECT commission row writable
+      # for the first time, so a guard that refused every write would satisfy
+      # every rejection in the file and close nothing; SUCCESS 2 is the clawback,
+      # which is the compensating row a new NOT NULL column is most likely to
+      # have broken.
+      #
+      # REJECTIONS 2, 3 AND 5 ARE ONE CONSTRAINT SEEN FROM THREE SIDES and they
+      # are the whole ruling. `affiliate_commissions_attribution_owner_fk`
+      # references the PAIR `attributions (id, affiliate_id)`, so a commission
+      # cannot be INSERTed naming the wrong affiliate, cannot be UPDATEd into
+      # naming one, and cannot be made wrong by MOVING the attribution
+      # underneath it. Delete this step and nothing executes the difference
+      # between a denormalized column that agrees with its parent and one that
+      # merely happens to.
+      - name: Probe the affiliate commission owner (0078)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_affiliate_commission_owner.sql

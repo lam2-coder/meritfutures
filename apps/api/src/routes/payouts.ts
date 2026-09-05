@@ -64,8 +64,8 @@
 // type fact rather than a preference. `postTransaction` takes a `LedgerTx`,
 // whose `insert` names the two members of `LedgerWriteKey`
 // (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`:
-// `ledgerTransactions` (`packages/db/src/scope.ts:903`) and `ledgerEntries`
-// (`packages/db/src/scope.ts:894`); `ScopedTx.insert` takes
+// `ledgerTransactions` (`packages/db/src/scope.ts:922`) and `ledgerEntries`
+// (`packages/db/src/scope.ts:913`); `ScopedTx.insert` takes
 // `OwnedTableKey` (`scoped-db.ts:3547`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
 // (`scoped-db.ts:2138`), a closed list of ONE. So the ONLY handle that

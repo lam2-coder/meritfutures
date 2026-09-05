@@ -2439,9 +2439,9 @@ const CITATIONS_OWNED_ELSEWHERE = [
   //   `detectors/identity.ts:1609`   quotes "flags attach to HUMANS, not to
   //                                  accounts" at `0008_risk.sql:107`, which is
   //                                  BLANK. The sentence is at `:111`
-  //   `provisioning/payload.ts:21`   `scope.ts:976` is `},`, the close of the
+  //   `provisioning/payload.ts:21`   `scope.ts:995` is `},`, the close of the
   //                                  `kycFunnelEvents` entry. The `payload
-  //                                  jsonb` sentence it quotes is at `:1291`,
+  //                                  jsonb` sentence it quotes is at `:1319`,
   //                                  inside `provisioningQueue`
   //
   // A THIRD IS MEASURED AND DELIBERATELY NOT REGISTERED, because this check does
@@ -2454,7 +2454,7 @@ const CITATIONS_OWNED_ELSEWHERE = [
   // `nearestName`'s own rule that a suffix path is answered by all of them. That
   // is miss (10) and it is stated rather than tuned away.
   { file: 'apps/worker/src/detectors/identity.ts', cites: '0008_risk.sql:107', name: null },
-  { file: 'apps/worker/src/provisioning/payload.ts', cites: 'scope.ts:976', name: null },
+  { file: 'apps/worker/src/provisioning/payload.ts', cites: 'scope.ts:995', name: null },
 ];
 
 /**
@@ -3540,14 +3540,14 @@ const WAVE_06 = 'docs/plans/WAVE-06-admin-console-transport.md';
  * matches nothing and becomes a finding of its own.
  *
  * TWO MORE ARRIVED WITH THE COMMA LIST (ADR-212), AND THEY WERE NEVER READ AT
- * ALL BEFORE IT. `` `scope.ts:536,545` `` and `` `scope.ts:506,511` `` are the
+ * ALL BEFORE IT. `` `scope.ts:555,564` `` and `` `scope.ts:525,530` `` are the
  * shape the tail expression did not match, so the WHOLE token fell through as
  * prose and neither number in either was ever resolved. Read now, all four
  * pointers are 200-plus lines out -- `ledgerTransactions` and `ledgerEntries`
- * are at `scope.ts:766` and `:757`, `planVersions` and `planVersionSizes` at
- * `:726` and `:731` -- and TWO of the four go green anyway, on the coincidence
- * this entry's own subject is about: `derived` sits at `:542` inside
- * `DerivedRule` and `firm` at `:513` inside a docblock, both within the window
+ * are at `scope.ts:785` and `:776`, `planVersions` and `planVersionSizes` at
+ * `:745` and `:750` -- and TWO of the four go green anyway, on the coincidence
+ * this entry's own subject is about: `derived` sits at `:561` inside
+ * `DerivedRule` and `firm` at `:532` inside a docblock, both within the window
  * of the pointer beside them. The two the window does catch are registered
  * here. THE ROWS ARE NOT REPAIRED AND THAT IS DELIBERATE: rows 164 and 168 are
  * other sessions' dated reservations, this register already holds three
@@ -3558,8 +3558,8 @@ const WAVE_06 = 'docs/plans/WAVE-06-admin-console-transport.md';
  * @type {readonly {file: string, cites: string, name: string | null}[]}
  */
 const DOC_CITATIONS_OWNED_ELSEWHERE = [
-  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:536', name: 'derived' },
-  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:506', name: 'firm' },
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:555', name: 'derived' },
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'scope.ts:525', name: 'firm' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'ledger' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'LedgerTx' },
   { file: 'docs/decisions/ALLOCATION.md', cites: 'sweeps/ports.ts:219', name: 'systemDb' },
