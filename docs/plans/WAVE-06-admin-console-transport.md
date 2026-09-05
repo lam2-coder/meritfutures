@@ -215,8 +215,8 @@ the one shape in which both mechanical halves of ruling 3 go silent in the deplo
 ## 4. What the operator surface actually registers, over a real `compose()`
 
 **`CompositionReport.registered` was produced rather than grepped, because a grep over route files has
-been wrong twice.** [`registry.ts:193`](../../apps/api/src/registry.ts) declares the report and
-[`registry.ts:217`](../../apps/api/src/registry.ts) is `compose`. Run over
+been wrong twice.** [`registry.ts:250`](../../apps/api/src/registry.ts) declares the report and
+[`registry.ts:284`](../../apps/api/src/registry.ts) is `compose`. Run over
 `discoverRouteModules()` on `8742c3b`, the `operator` surface registers **27** and withholds **45**:
 
 ```
