@@ -357,17 +357,23 @@ describe('the executor contract is the vendor`s, read from the installed pg-boss
 // went away again leaves a correction asserting something untrue in the other
 // direction.
 //
-// THE PRINCIPLED HOME FOR THIS IS `RI-35`'s REGISTER AND IT IS OUTSIDE ADR-332's
-// FENCE, WHICH IS SAID HERE RATHER THAN LEFT FOR A READER TO NOTICE. The entry a
-// later row owes is an artifact keyed on `packages/db` exporting
+// THE PRINCIPLED HOME FOR THIS IS `RI-35`'s REGISTER, AND **ADR-333 TOOK THE
+// ENTRY ADR-332 LEFT OWED**, in the exact shape this comment specified: an
+// artifact keyed `db-pool-sql-executor` on `packages/db` exporting
 // `poolSqlExecutor`, with a `retired` claim at `packages/queue/src/index.ts`
-// anchored on the quotation below -- the same shape `db-transaction-and-sql-executor`
-// already has for ADR-102's pair. `RI-35` did not go red here, because that
-// sentence was never registered and no absence marker in its written vocabulary
-// reaches it, so the register could not be amended under this row's grant.
-// ADR-328's own header names this shape as the one that does not scale: one
-// hand-built derivation for one site. It is built anyway, because the
-// alternative is a correction nothing holds to the tree at all.
+// anchored on the quotation below, which is the shape
+// `db-transaction-and-sql-executor` already has for ADR-102's pair. That row
+// could take it because it was amending the register anyway: writing
+// `apps/worker/src/queue.ts` flipped `queue-door` to `present` and turned three
+// `live` claims red, so the register moved in the same commit and this entry
+// moved with it.
+//
+// **THE CASE BELOW IS KEPT AND NOT DELETED**, because it asserts two things the
+// register entry does not: that `packages/queue/src/index.ts` still carries the
+// quotation at all, and that `pg-boss-queue.ts`'s `@param` still names the
+// executor it requires. `RI-35` binds the disposition; this binds the two SITES.
+// ADR-328's own header names one hand-built derivation for one site as the shape
+// that does not scale, and the register is now carrying the half that scales.
 describe('the correction packages/queue publishes is held to the door that justifies it', () => {
   test('the retired refusal stands only while `packages/db` exports the pool executor', () => {
     const quote =
