@@ -37,11 +37,24 @@
 //
 // So it is off, and the schema arrives the way every other table in this system
 // arrives: as a numbered migration, whose body pg-boss itself emits through
-// `getConstructionPlans(schema)`. THAT MIGRATION DOES NOT EXIST YET and this
-// package cannot write it: migration numbers are allocated in ALLOCATION and
-// `packages/db/migrations/**` is outside session 147's fence. `start()` against
-// a database with no pg-boss schema therefore FAILS, loudly, which is the right
-// failure: the alternative is a silent install.
+// `getConstructionPlans(schema)`. `0079_pgboss_job_store.sql` is that migration
+// (ADR-318, 2026-09-03) and `0082_pgboss_app_grants.sql` is the grant that makes
+// it reachable by the application role (ADR-327). `start()` against a database
+// carrying neither FAILS, loudly, which is the right failure: the alternative is
+// a silent install.
+//
+// **THIS PARAGRAPH READ "THAT MIGRATION DOES NOT EXIST YET and this package
+// cannot write it: migration numbers are allocated in ALLOCATION and
+// `packages/db/migrations/**` is outside session 147's fence", AND `0079` MADE
+// IT FALSE ON THE DAY IT MERGED.** It is kept beside its correction rather than
+// deleted, because the shape of the error is the point and it is the point for
+// the FOURTH time: ADR-324 repaired one site of this class, ADR-326 repaired the
+// worker barrel's, and ADR-326 section 8 finding 1 named this one and left it,
+// on the argument that the row which repairs it should bring an assertion rather
+// than a wording change. `test/surface.test.ts` now reads
+// `packages/db/migrations` and fails on the retired wording, so the next
+// migration that changes this answer turns a case red instead of a comment
+// stale. A sentence about a directory should be derived from that directory.
 
 import { PgBoss } from 'pg-boss';
 

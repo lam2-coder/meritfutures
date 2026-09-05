@@ -32,7 +32,7 @@ import { describe, expect, test } from 'vitest';
 
 import { JOB_QUEUE_METHODS } from '../src/job-queue.ts';
 import * as queuePackage from '../src/index.ts';
-import { pgBossQueue } from '../src/pg-boss-queue.ts';
+import { QUEUE_SCHEMA, pgBossQueue } from '../src/pg-boss-queue.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -143,5 +143,106 @@ describe('the vendor is contained', () => {
       }
     }
     expect(manifests).toEqual(['packages/queue/package.json']);
+  });
+});
+
+// =============================================================================
+// The header's claim about `packages/db/migrations`, derived from that directory
+// =============================================================================
+// ADR-327, on ADR-326 section 8 finding 1 and ADR-324.
+//
+// `pg-boss-queue.ts`'s header said "THAT MIGRATION DOES NOT EXIST YET" for three
+// days after `0079_pgboss_job_store.sql` merged, and NOTHING WENT RED, because
+// nothing derived the claim from the directory it was about. That is the fourth
+// recorded site of one defect: ADR-324 repaired one, ADR-326 repaired the worker
+// barrel's, ADR-326 section 8 named this one, and each repair before this one was
+// a wording change that the next migration could stale again.
+//
+// SO THE REPAIR IS THIS BLOCK AND NOT THE SENTENCE. Both halves are read out of
+// `packages/db/migrations` at the moment the case runs: a migration installs the
+// schema, and a migration grants the application role USAGE on it. A file
+// superseding either one turns these red rather than leaving a comment behind.
+describe("the header's migration claims are read from packages/db/migrations", () => {
+  /**
+   * Every migration's STATEMENTS, keyed by filename, comments excluded.
+   *
+   * IT KEEPS THE LINES THAT START A STATEMENT RATHER THAN STRIPPING COMMENTS.
+   * Every `GRANT`, `REVOKE` and `CREATE SCHEMA` in this directory begins at
+   * column zero and every comment line begins with `--`, so a line filter
+   * separates them exactly. The alternative is a fourth comment stripper, which
+   * `RI-30` refuses by name and by idiom, and it would be one written for SQL by
+   * a file whose subject is a queue. An empty result is a failure and not a pass.
+   */
+  function statements(): Map<string, string> {
+    const dir = join(ROOT, 'packages/db/migrations');
+    const out = new Map<string, string>();
+    for (const f of readdirSync(dir).sort()) {
+      if (!f.endsWith('.sql')) continue;
+      const kept = readFileSync(join(dir, f), 'utf8')
+        .split('\n')
+        .filter((line) => /^(GRANT|REVOKE|CREATE SCHEMA)\b/i.test(line));
+      out.set(f, kept.join('\n'));
+    }
+    if (out.size === 0) throw new Error('no migrations found; the case cannot run');
+    return out;
+  }
+
+  test('a migration installs the schema this file names, and the header no longer denies it', () => {
+    const installs = [...statements()]
+      .filter(([, body]) =>
+        new RegExp(`^CREATE SCHEMA IF NOT EXISTS ${QUEUE_SCHEMA}\\b`, 'm').test(body),
+      )
+      .map(([name]) => name);
+    expect(
+      installs,
+      `no migration creates the ${QUEUE_SCHEMA} schema. Either one was superseded or this ` +
+        "package's header is right again and should say so",
+    ).toEqual(['0079_pgboss_job_store.sql']);
+
+    // THE RETIRED WORDING, ASSERTED IN THE DIRECTION THAT KEEPS RI-14 TRUE: the
+    // claim must not stand on its own, and the block that marks it as history
+    // must be present. A file that deletes the false sentence outright leaves the
+    // next reader nothing to check.
+    const header = readFileSync(join(ROOT, 'packages/queue/src/pg-boss-queue.ts'), 'utf8');
+    const retired = header.indexOf('THIS PARAGRAPH READ');
+    expect(retired, 'the paragraph retiring the stale claim is gone').toBeGreaterThan(-1);
+    expect(
+      header.slice(0, retired),
+      'the header states THAT MIGRATION DOES NOT EXIST YET as a live claim again, and ' +
+        `${installs[0]} is on disk`,
+    ).not.toContain('THAT MIGRATION DOES NOT EXIST YET');
+  });
+
+  test('a migration grants the application role USAGE on it, and never CREATE', () => {
+    // THE SECOND HALF, AND THE ONE THAT MATTERS TO A RUNNING DEPLOYABLE. `0079`
+    // installed the schema and granted nothing, so every method below threw
+    // `permission denied for schema pgboss` for three days while the header said
+    // the store was the problem. ADR-327 ruled the grant and `0082` writes it.
+    const bodies = [...statements()];
+    const grants = bodies
+      .filter(([, body]) =>
+        new RegExp(`^GRANT[^;]*\\bUSAGE ON SCHEMA ${QUEUE_SCHEMA}\\b`, 'im').test(body),
+      )
+      .map(([name]) => name);
+    expect(
+      grants,
+      `no migration grants USAGE ON SCHEMA ${QUEUE_SCHEMA}, so every method of the queue ` +
+        'this file returns throws for the role the application connects as',
+    ).toEqual(['0082_pgboss_app_grants.sql']);
+
+    // AND THE REFUSAL, WHICH IS THE RULING RATHER THAN THE WIRING. ADR-326
+    // section 3.3 ruled that the application role must never hold CREATE on a
+    // schema inside the ledger's restore boundary, and `create_queue` needs it
+    // only for a PARTITIONED queue, which `declareQueue` below never asks for.
+    const creates = bodies
+      .filter(([, body]) =>
+        new RegExp(`^GRANT[^;]*\\bCREATE\\b[^;]*\\bON SCHEMA ${QUEUE_SCHEMA}\\b`, 'im').test(body),
+      )
+      .map(([name]) => name);
+    expect(
+      creates,
+      'a migration grants CREATE on the queue schema. ADR-326 section 3.3 refuses it: that is ' +
+        "DDL inside the ledger's PITR boundary, held by the role 0026 revokes it from on public",
+    ).toEqual([]);
   });
 });

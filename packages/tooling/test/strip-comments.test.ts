@@ -26,8 +26,6 @@ import { stripComments } from '../checks/strip-comments.mjs';
 const naive = (source: string): string =>
   source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
-const BARREL = 'apps/worker/src/index.ts';
-
 /** Every JavaScript-family source file in the workspace, `node_modules` aside. */
 function sourceFilesUnder(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -37,6 +35,68 @@ function sourceFilesUnder(dir: string, out: string[] = []): string[] {
     else if (/\.(ts|tsx|mts|mjs|js|jsx)$/.test(entry.name)) out.push(full);
   }
   return out;
+}
+
+/**
+ * The file the naive idiom mangles most, among those carrying a PHANTOM span.
+ *
+ * DERIVED RATHER THAN NAMED, and the reason is this file's own subject one level
+ * up: the two cases below named `apps/worker/src/index.ts`, and they turned red
+ * when ADR-327 removed one glob from one prose sentence in it. A hand-named
+ * subject for a property about the whole tree is the same defect as a
+ * hand-maintained count, and it fails the same way, which is silently until
+ * somebody edits a comment.
+ *
+ * A PHANTOM SPAN IS THE SUBJECT AND A REAL BLOCK COMMENT IS NOT. The first
+ * `/*`..`*\/` match in a file is usually a JSDoc, which BOTH the idiom and the
+ * scanner remove correctly and which therefore proves nothing. The span this
+ * suite is about is the one whose OPENER sits inside a `//` line comment, so the
+ * search skips matches until it finds one.
+ *
+ * "Mangles most" is the characters the SCANNER keeps and the IDIOM deletes,
+ * because that is exactly the quantity an absence check over the idiom's output
+ * cannot see. An empty walk THROWS rather than returning a winner.
+ */
+function phantomSpan(source: string): RegExpExecArray | null {
+  const spans = /\/\*[\s\S]*?\*\//g;
+  let match = spans.exec(source);
+  while (match !== null) {
+    const lineStart = source.lastIndexOf('\n', match.index) + 1;
+    if (source.slice(lineStart, match.index).includes('//')) return match;
+    match = spans.exec(source);
+  }
+  return null;
+}
+
+function sourceTree(): readonly string[] {
+  const files = [
+    ...sourceFilesUnder(join(REPO_ROOT, 'apps')),
+    ...sourceFilesUnder(join(REPO_ROOT, 'packages')),
+  ];
+  if (files.length < 100) {
+    throw new Error(
+      `the source walk found ${files.length} file(s); this suite compares an idiom against a ` +
+        'scanner over the real tree, and an empty walk would report PASS in silence',
+    );
+  }
+  return files;
+}
+
+function worstVictim(): { readonly path: string; readonly source: string; readonly eaten: number } {
+  let best: { path: string; source: string; eaten: number } | undefined;
+  for (const path of sourceTree()) {
+    const source = readFileSync(path, 'utf8');
+    if (phantomSpan(source) === null) continue;
+    const eaten = stripComments(source).length - naive(source).length;
+    if (best === undefined || eaten > best.eaten) best = { path, source, eaten };
+  }
+  if (best === undefined) {
+    throw new Error(
+      'no file in the tree carries a block-comment opener inside a line comment. That is the ' +
+        'whole subject of this suite, so its absence is a finding rather than a pass',
+    );
+  }
+  return best;
 }
 
 describe('a block-comment opener inside a line comment', () => {
@@ -58,36 +118,65 @@ describe('a block-comment opener inside a line comment', () => {
     expect(code).not.toContain('P3-l');
   });
 
-  test('the worker barrel is 2,753 characters to the idiom and is not to the scanner', () => {
-    const source = readFileSync(join(REPO_ROOT, BARREL), 'utf8');
+  test('the idiom silently deletes source the scanner keeps, over the whole tree', () => {
+    // **THIS CASE AND THE ONE BELOW NAMED `apps/worker/src/index.ts` UNTIL
+    // ADR-327, AND WHAT HAPPENED TO THEM IS THIS SUITE'S OWN SUBJECT.** The
+    // barrel's phantom span opened on the `/**` inside a single prose glob, in a
+    // sentence saying the `pgboss` grant was owed. `0082` discharged that
+    // blocker, ADR-327 retired the sentence, the opener went with it, and two
+    // cases about an IDIOM turned red on a comment edit in another package.
+    //
+    // ADR-279 section 2 reported 55,728 characters to 2,753 on that one file.
+    // The number was never the property and the FILE was never the property
+    // either: what matters is that the idiom removes source across the tree and
+    // that every absence check reading its output is asking a question of a file
+    // with the declarations taken out. So both halves are derived here.
+    let total = 0;
+    let losing = 0;
+    for (const path of sourceTree()) {
+      const source = readFileSync(path, 'utf8');
+      const eaten = stripComments(source).length - naive(source).length;
+      if (eaten > 0) {
+        total += eaten;
+        losing += 1;
+      }
+    }
+    expect(losing).toBeGreaterThan(200);
+    expect(total).toBeGreaterThan(50_000);
 
-    // THE MEASUREMENT ADR-279 SECTION 2 REPORTS, ASSERTED RATHER THAN QUOTED.
-    // The exact numbers are not pinned: this file grows every wave and a case
-    // that pinned 55,728 would be red on the next prose edit for no reason.
-    // The RATIO is the property, and it is not close.
-    expect(source.length).toBeGreaterThan(50_000);
-    expect(naive(source).length).toBeLessThan(source.length / 10);
-    expect(stripComments(source).length).toBeGreaterThan(naive(source).length * 4);
-
-    // The barrel's job is its export list, and that is what the idiom deletes.
-    expect(naive(source)).not.toContain('PROVISIONING_OPERATIONS');
-    expect(stripComments(source)).toContain('PROVISIONING_OPERATIONS');
+    // And it is concentrated rather than spread thin: one file loses more than
+    // ten thousand characters on its own.
+    const { path, eaten } = worstVictim();
+    expect(eaten, `${path} is the worst case and the idiom barely touches it`).toBeGreaterThan(
+      10_000,
+    );
   });
 
   test('a local clock read placed inside the phantom span survives the scanner', () => {
-    const source = readFileSync(join(REPO_ROOT, BARREL), 'utf8');
-    const seeded = source.replace(
-      "export type { Transition, TransitionRefusal } from './provisioning/index.ts';",
-      "export type { Transition, TransitionRefusal } from './provisioning/index.ts';\n" +
-        'export const SEEDED = new Date().getHours();',
-    );
+    // SEED 12, AS ADR-277 SECTION 7 LEFT IT AND ADR-279 SECTION 2 WATCHED IT ON
+    // THE REAL TREE: under the idiom `RI-28` reported PASS with this line live in
+    // a shipped source file. The span is now derived along with the file, so the
+    // seed lands inside it by construction rather than by somebody having checked
+    // once that a chosen line number was still inside it.
+    const { path, source } = worstVictim();
+    const span = phantomSpan(source);
+    expect(span, `${path} carries no phantom block for the idiom to open`).not.toBeNull();
+
+    // The end of the line the OPENER sits on, which is inside the span and is a
+    // line boundary, so the seeded declaration lands as its own statement.
+    const at = source.indexOf('\n', span?.index ?? 0);
+    expect(at, 'the phantom span holds no line boundary to seed at').toBeGreaterThan(-1);
+    expect(at).toBeLessThan((span?.index ?? 0) + (span?.[0].length ?? 0));
+
+    // THE SENTINEL IS UNIQUE AND `getHours` IS NOT. The derived victim is
+    // whatever file the idiom mangles most, and one candidate carries the string
+    // `getHours` in its own fixtures, which would have made this case pass for a
+    // reason that has nothing to do with the seed.
+    const seeded = `${source.slice(0, at)}\nexport const SEEDED_PHANTOM_CLOCK = new Date().getHours();${source.slice(at)}`;
     expect(seeded).not.toBe(source);
 
-    // THIS IS SEED 12, AS ADR-277 SECTION 7 LEFT IT AND ADR-279 SECTION 2
-    // WATCHED IT ON THE REAL TREE: under the idiom `RI-28` reported PASS with
-    // this line live in a shipped source file.
-    expect(naive(seeded)).not.toContain('getHours');
-    expect(stripComments(seeded)).toContain('new Date().getHours()');
+    expect(naive(seeded)).not.toContain('SEEDED_PHANTOM_CLOCK');
+    expect(stripComments(seeded)).toContain('SEEDED_PHANTOM_CLOCK = new Date().getHours()');
   });
 });
 
