@@ -814,6 +814,9 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **46** | session 527, `0068` ([ADR-228](../../docs/decisions/ADR-228.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0068` lands, and it is the first of three consecutive sections closing the withdrawal-approval run that `RI-37`'s backlog register held. **45 is the maximum this table has ever held and 46 is the next free number.** **SECTION NUMBERS ARE LANDING ORDER**, which 35, 36 and 37 prove by being `0079`, `0078` and `0082`. **Within the three the order is MIGRATION order, and the reason is NOT [ADR-335](../../docs/decisions/ADR-335.md)'s**: these three supersede nothing and share no constraint name. They are a CITATION chain, each file naming the one before it in its own text, so a reader taking them out of order reads a reference to a file that has not been introduced |
 | **47** | session 527, `0070` ([ADR-232](../../docs/decisions/ADR-232.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0070` lands, **and the section records that this migration is the floor under [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) and [`probe_payout_hold.sql`](../../scripts/db/probe_payout_hold.sql)**, which is section 45's finding measured from the other side. It also records that every control the file was written for is unreachable from the only writer of its edge |
 | **48** | session 527, `0072` ([ADR-234](../../docs/decisions/ADR-234.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0072` lands, **and the section records that the conditional in the migration's own header has since been met**: the `LT-06` driver it says does not exist is wired today. **NONE OF THESE THREE ROWS IS WRITTEN ON SOMEBODY ELSE'S BEHALF**, which is this table's standing rule: each is written in the same commit as the section it claims and as the deletion of that migration's row from `RI-37`'s backlog register. **The rows this table still owes are unchanged and are NOT filled in here**: 24, 26 to 30 and 32 to 34 are claimed by headings and have no row, and nothing compares this table to the headings |
+| **49** | session 530, `0037` ([ADR-053](../../docs/decisions/ADR-053.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0037` lands, **and it is the first section in this file whose migration moves not one object count**: the supersession renames a `CHECK`, so one leaves and one arrives and all seven catalogue totals hold |
+| **50** | session 530, `0059` ([ADR-193](../../docs/decisions/ADR-193.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0059` lands. It is the one migration of the eleven that appeared in this file **zero times in any form**, re-derived rather than inherited from [ADR-334](../../docs/decisions/ADR-334.md) |
+| **51** | session 530, `0063` ([ADR-200](../../docs/decisions/ADR-200.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0063` lands, **and the section records a money-path guard that no reader under `scripts/db/` watches**, established by removing the file and again by dropping the trigger |
 | **24** | session 135, `0046` ([ADR-079](../../docs/decisions/ADR-079.md)), TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0046` lands, and the constraint it replaces was pointed at the wrong column all along. **Named as owed by the `25` row on 2026-08-23 and again by the `45` and `48` rows on 2026-09-05**, and written here on the amended rule above rather than on session 135's behalf |
 | **26** | [ADR-128](../../docs/decisions/ADR-128.md)'s session 240, `0048` and `0049`, TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0048` and `0049` land. **One number for two migrations, which is the `14` row's shape and not a defect**: a section records a landing and a landing may be two files |
 | **28** | session 293, `0051` ([ADR-169](../../docs/decisions/ADR-169.md)), TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0051` lands and `OI-06 (payout destinations)` closes. **`27` IS NOT ADDED BESIDE IT, AND THAT IS THE DIFFERENCE BETWEEN NAMING A GAP AND MEASURING ONE.** `27` heads no section in this file at all, so nothing claims it and this table owes it no row. The `31` row states that precisely and the `45` and `48` rows compressed it to *"26 to 30"*, which is why **eight** rows land here rather than nine |
@@ -3090,3 +3093,131 @@ Applying every migration on disk **with `0072` removed** and running all 22 prob
 **SO THE SENTENCE IS NOT STALE, IT IS DISCHARGED, AND THAT IS THE WHOLE ARGUMENT FOR WRITING A CONTROL BEFORE THE ROW IT CONTROLS.** `0072` was merged on 2026-08-29 against a schema no door drove; the door landed afterwards and the arrow it would have opened was already refused. Section 34 recorded the same shape one migration set earlier under the heading *"the control arrives before the row it controls"*. **The reader who should carry this is the one who finds a migration whose header says its own hazard is theoretical**: that is a claim about a tree, and the tree moves.
 
 ---
+
+## 49. `0037` lands, and the supersession is a RENAME, so the count that would show it does not move (2026-09-05)
+
+**Session 530, [ADR-053](../../docs/decisions/ADR-053.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `053` and `0037`. THE SECTION IS DATED TODAY AND THE MIGRATION IS NOT.** [ADR-334](../../docs/decisions/ADR-334.md) shipped `RI-37` with a shrink-only register of merged migrations carrying no landing record; [ADR-335](../../docs/decisions/ADR-335.md) closed the chart-of-accounts run and [ADR-336](../../docs/decisions/ADR-336.md) the withdrawal-approval run. [ADR-351](../../docs/decisions/ADR-351.md) is the row that closes what those two left, and this is the first of its eleven sections.
+
+**EVERY FIGURE BELOW WAS READ OFF A DATABASE THIS SESSION BUILT AND NONE IS COPIED OUT OF [ADR-053](../../docs/decisions/ADR-053.md).** A landing record transcribed from its own ruling is a second copy of the ruling and is not a record of what landed.
+
+`0037` supersedes one `CHECK`. [`0015:208`](migrations/0015_rule_states.sql) declared `rule_states_high_water_bounds_balance` as the bare `high_water_balance_cents >= balance_cents`; [`0037:124`](migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) drops that name and [`0037:143`](migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) adds `rule_states_high_water_bounds_balance_unlocked` in its place.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `packages/db/migrations/*.sql` applied forward-only into an empty database under `ON_ERROR_STOP=1` and stopped at `0036`, then at `0037`. Counts read from `pg_tables`, `pg_indexes`, `pg_constraint`, `pg_trigger` and `pg_proc`.
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0036` then `0037` | **102 tables, 354 indexes, 404 CHECK constraints, 144 foreign keys, 11 unique constraints, 10 non-internal triggers, 93 functions.** **NOT ONE OF THE SEVEN MOVES**, because one constraint leaves and one arrives in the same file |
+| the predicate, read back at `pg_get_constraintdef` | `CHECK ((floor_locked OR (high_water_balance_cents >= balance_cents)))`, and the old name resolves to nothing |
+| re-applying `0037` against `0001`..`0037` | **refused** at `constraint "rule_states_high_water_bounds_balance" of relation "rule_states" does not exist`. The `DROP` carries no `IF EXISTS`, so the refusal lands on the first statement rather than on the `ADD` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0037` | **holds**, exit 0 |
+
+**THE ZERO ROW IS THE ONE A READER SHOULD NOT SKIP.** A session auditing this estate by diffing object counts either side of a migration would conclude `0037` did nothing. What it did was change what a column may hold on every funded account in the system, and no count this catalogue keeps can see a predicate.
+
+### The probe that covers it, and it is watched in BOTH directions
+
+[`probe_rule_states_high_water_bound.sql`](../../scripts/db/probe_rule_states_high_water_bound.sql) is load-bearing twice over, and both counterfactuals were run rather than reasoned:
+
+- **Remove the file from the set.** Every other migration on disk applies, and the probe dies at [line 118](../../scripts/db/probe_rule_states_high_water_bound.sql), `PROBE FAILED: GS-016 day two is unwritable, the high-water bound has been re-tightened`. That is the DEFECT half: without `0037` a locked account making a new closing high cannot be written.
+- **Drop `rule_states_high_water_bounds_balance_unlocked` from the fully applied schema.** The probe dies at [line 185](../../scripts/db/probe_rule_states_high_water_bound.sql), `PROBE FAILED: an unlocked state row with hwb below balance was admitted`. That is the GUARD half: the arm `0037` kept is still enforced and is still watched by name.
+
+**Two counterfactuals rather than one, because a single removal proves only that the file is needed and not that its remaining arm still bites.** No other section in this file has had both available; `0037` does because it is a rename rather than a deletion, and the name it installed is still on the schema for a perturbation to reach.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-053` | `rule_states` | `rule_states_high_water_bounds_balance` dropped and `rule_states_high_water_bounds_balance_unlocked` added, `floor_locked OR high_water_balance_cents >= balance_cents`, with its column and constraint comments | 0037 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed.** No module document proposes this: it is a defect in a merged file, found after the fold. **[`0015`](migrations/0015_rule_states.sql) IS NOT EDITED.** It is superseded from outside, which is constitution `E2` and which `0037`'s own header states before its DDL.
+
+### The part a reader should carry forward
+
+**A SUPERSESSION UNDER A NEW NAME IS LEGIBLE AND A SUPERSESSION UNDER THE OLD NAME IS NOT.** [ADR-335](../../docs/decisions/ADR-335.md) recorded the opposite case: `ledger_accounts_kind_matches_code` was dropped and re-added under its own name four times, and the consequence is that **no database this repository can build holds the predicate `0052` installed**. `0037` renamed, so both predicates are still distinguishable and the probe can name the one it is testing in a `GET STACKED DIAGNOSTICS` clause. The cost of renaming is one stale citation anywhere the old name was written down; the cost of not renaming is that the record of what a constraint used to be survives only in prose.
+
+---
+
+## 50. `0059` lands, and the second half of a promise made ten migrations earlier is finally enforceable (2026-09-05)
+
+**Session 530, [ADR-193](../../docs/decisions/ADR-193.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `193` and `0059`.** Section 49's opening applies. `0059` is the second of the eleven and it is the one [ADR-334](../../docs/decisions/ADR-334.md) reported as appearing in this file **zero times in any form**; that was re-derived here before anything was written, `grep -c '0059' packages/db/DELTA_MANIFEST.md` returning **0**, and it was the only one of the eleven for which that was true.
+
+**EVERY FIGURE BELOW IS A `psql` RUN AGAINST A DATABASE BUILT FOR THIS SECTION.** [ADR-193](../../docs/decisions/ADR-193.md) is read for what it ruled and not for what it measured.
+
+[`0009:103-104`](migrations/0009_ledger.sql) promised two rules and its row-level `CHECK` could carry one. `0059` carries the second: a reversal may not chain onto another reversal.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0057` then `0059` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints; triggers 23 to 24 and functions 109 to 110.** TWO objects arrive and both are the same control |
+| the trigger, read back at `pg_get_triggerdef` | `BEFORE INSERT OR UPDATE ON public.ledger_transactions FOR EACH ROW WHEN ((new.reversal_of IS NOT NULL)) EXECUTE FUNCTION assert_reversal_does_not_chain()`. **The `WHEN` clause is the arm and the function re-checks it anyway** ([`0059:178-180`](migrations/0059_reversal_chain.sql)) |
+| re-applying `0059` against `0001`..`0059` | **refused** at `function "assert_reversal_does_not_chain" already exists with same argument types` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0059` | **holds**, exit 0 |
+
+### The probe that covers it, established by removing the file
+
+Applying every migration on disk **with `0059` removed** reaches the end cleanly, and [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) dies inside `LEDGER-C3` at [line 612](../../scripts/db/probe_ledger_constraints.sql):
+
+```
+ERROR:  PROBE FAILED: LEDGER-C3 admitted a reversal of a reversal. 0009:103-104
+says a reversal may not chain onto another reversal and its CHECK can only say
+reversal_of <> id.
+```
+
+**This is the cleanest counterfactual of the eleven**: the set still installs without the file, so the failure is the probe reporting a missing control rather than a schema that would not build. Of the readers under `scripts/db/`, that one and only that one moves; [`probe_wallet_debit_provenance.sql`](../../scripts/db/probe_wallet_debit_provenance.sql) also names `reversal_of` and stays green with `0059` removed, which was checked rather than assumed.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-193` | `ledger_transactions` | `assert_reversal_does_not_chain()` and the `ledger_transactions_reversal_does_not_chain` trigger, `BEFORE INSERT OR UPDATE ... WHEN (new.reversal_of IS NOT NULL)` | 0059 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed.** `SD-M5-05` is cited in the file as the delta that built the ledger; the chain rule is a sentence `0009` already wrote and could not enforce. **[`0009`](migrations/0009_ledger.sql) IS NOT EDITED**, and the sentence in it that promises two rules is still there, still promising two, which is the condition constitution `E2` leaves behind and which this section exists to explain.
+
+### The part a reader should carry forward, and it is about `FOR UPDATE`
+
+**THE GUARD TAKES A ROW LOCK ON THE TRANSACTION BEING REVERSED** ([`0059:183-185`](migrations/0059_reversal_chain.sql)), and that is what makes it an enforcement rather than a check. Two concurrent reversals of the same original would each read the other as unlinked without it, and both would commit. **A row-level `CHECK` could never have taken that lock**, which is the deeper reason the second clause of `0009`'s comment waited for a trigger rather than for a longer predicate.
+
+---
+
+## 51. `0063` lands, and it is the only guard in this cluster that nothing under `scripts/db/` watches (2026-09-05)
+
+**Session 530, [ADR-200](../../docs/decisions/ADR-200.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `200` and `0063`.** Section 49's opening applies. **AUTH is a money path** and this file's own header opens `E2 READ: MONEY PATH`, which was read off the file rather than taken from the dispatch.
+
+Two merged sentences claimed a control the schema did not carry. [`0002:328-330`](migrations/0002_identity.sql) says OTP single use is *"enforced by the database rather than by the handler"* and backs it with `otp_challenges_unconsumed_uq`, a unique index on `(id) WHERE consumed_at IS NULL`. **A partial unique index on the primary key refuses nothing**, because the primary key already refuses it. `0063` is the control those sentences describe.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0059` then `0063` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints; triggers 24 to 25 and functions 110 to 111.** No index is added and none is dropped: the index `0002` cited is still there and still refuses nothing |
+| the trigger, read back at `pg_get_triggerdef` | `BEFORE UPDATE ON public.otp_challenges FOR EACH ROW WHEN ((old.consumed_at IS NOT NULL)) EXECUTE FUNCTION assert_otp_consumption_is_write_once()` |
+| re-applying `0063` against `0001`..`0063` | **refused at the TRIGGER and not at the function**: `trigger "otp_challenges_consumption_is_write_once" for relation "otp_challenges" already exists`. [`0063:100`](migrations/0063_otp_challenge_consumption.sql) is a `CREATE OR REPLACE FUNCTION`, so that statement is idempotent by rerun and the file is not |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0063` | **holds**, exit 0 |
+
+### NOTHING UNDER `scripts/db/` GOES RED WITHOUT IT, and that was measured twice
+
+Applying every migration on disk **with `0063` removed** reaches the end, and **all of the readers under `scripts/db/` exit 0**. Dropping the trigger from the fully applied schema gives the same answer. [`probe_phone_identity.sql`](../../scripts/db/probe_phone_identity.sql) names `otp_challenges` and is the file a reader would expect to cover this; it is green in both directions, which was executed rather than inferred from the grep.
+
+**THE GUARD IS LIVE AND WAS WATCHED BEING LIVE**, on the applied schema, in three executed cases:
+
+| Statement against a consumed challenge | Result |
+|---|---|
+| move `consumed_at` forward | **refused.** `otp_challenges.consumed_at is write once: challenge ... was consumed at ... and this statement would set it to ...` |
+| set `consumed_at` back to `NULL` | **refused**, same message with `<NULL>` in the second position |
+| update `attempts` and leave `consumed_at` alone | **accepted**, `UPDATE 1` |
+
+The third case is the one worth keeping: the trigger is narrow, and a row that has been consumed is not frozen, only its consumption is.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-200` | `otp_challenges` | `assert_otp_consumption_is_write_once()` and the `otp_challenges_consumption_is_write_once` trigger, `BEFORE UPDATE ... WHEN (old.consumed_at IS NOT NULL)` | 0063 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed.** The delta is a defect in a merged file's claim about itself. **[`0002`](migrations/0002_identity.sql) IS NOT EDITED and its two sentences are still false about the index they cite.** They are true about the schema as a whole from `0063` onward, which is a different thing, and this row is the only place that distinction is written down.
+
+### The part a reader should carry forward, and it is the coverage gap
+
+**A MONEY-PATH GUARD WITH NO COMMITTED READER IS A GUARD THAT CAN BE DROPPED BY A LATER MIGRATION AND REPORTED GREEN.** `0059` in the section above is covered at a named line of one probe; `0063` is covered by nothing this repository runs against a database. The three refusals above are this session's, taken by hand, and they are gone the moment this section is read rather than run. **Closing it is a probe block rather than a migration**, and it is named here as owed rather than written, on the rule this row inherited: `scripts/db/**` shows a one-file diff for a citation repair and nothing else.

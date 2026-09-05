@@ -9077,14 +9077,17 @@ const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
  * of measured is the exact thing this check exists to make somebody stop and do
  * properly.
  *
- * IT HAS SHRUNK TWICE AND EACH SHRINK IS THE MECHANISM WORKING. ADR-334 opened
- * it at TWENTY entries. ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for
- * `0052` to `0057`, the chart-of-accounts and ledger-code run, and deleted
+ * IT HAS SHRUNK THREE TIMES AND EACH SHRINK IS THE MECHANISM WORKING. ADR-334
+ * opened it at TWENTY entries. ADR-335 wrote DELTA_MANIFEST sections 40 to 45
+ * for `0052` to `0057`, the chart-of-accounts and ledger-code run, and deleted
  * those six rows in the same commit. ADR-336 wrote sections 46 to 48 for
  * `0068`, `0070` and `0072`, the withdrawal-approval run, and deleted those
- * three. Both measured against PostgreSQL 16.13 rather than reconstructed.
- * ELEVEN remain and SIX of them open with an `E2 READ: MONEY PATH` header,
- * counted off the files rather than off these rows.
+ * three. ADR-351 is taking the rest, and this commit is its first cluster:
+ * sections 49 to 51 for `0037`, `0059` and `0063`, all three money path by
+ * their own headers. All measured against PostgreSQL 16.13 rather than
+ * reconstructed. EIGHT remain and THREE of them open with an
+ * `E2 READ: MONEY PATH` header, counted off the files rather than off these
+ * rows.
  *
  * THE MONEY-PATH FIGURE ADR-334 RECORDED WAS SIXTEEN OF TWENTY AND THE MEASURED
  * FIGURE IS FIFTEEN. `0073_operator_directory.sql:4` opens `NOT THE MONEY PATH
@@ -9095,15 +9098,12 @@ const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
  * was right. No merged record is amended; ADR-335 reports it.
  */
 const LANDING_RECORD_BACKLOG = new Map([
-  ['0037', '0037_supersede_rule_states_high_water_bounds_balance.sql, ADR-053. MONEY PATH'],
   ['0039', '0039_economic_calendar.sql, ADR-066 via FOLD-03'],
   ['0040', '0040_report_schedules.sql, ADR-066 via FOLD-03'],
   ['0041', '0041_contact_channel_complaints.sql, ADR-066 via FOLD-03'],
   ['0043', '0043_admin_attributed_actions.sql, ADR-069 via FOLD-04'],
   ['0044', '0044_fee_back_and_ladder_unlock.sql, ADR-070 via FOLD-05. MONEY PATH'],
   ['0050', '0050_live_cache_and_role.sql, ADR-164. MONEY PATH'],
-  ['0059', '0059_reversal_chain.sql, ADR-193. MONEY PATH'],
-  ['0063', '0063_otp_challenge_consumption.sql, ADR-200. MONEY PATH'],
   ['0073', '0073_operator_directory.sql, ADR-237'],
   ['0074', '0074_firm_parameters.sql, ADR-252 is the ruling. MONEY PATH'],
 ]);
@@ -9244,12 +9244,13 @@ const ri37 = {
     'claim about one migration set rather than a property of the check and ' +
     'constitution E2 already forbids deleting a merged migration; a mis-keyed ' +
     'row is caught by leg 1 instead, since the number it failed to absorb is ' +
-    'then reported as unrecorded. IT OPENED AT TWENTY UNDER ADR-334 AND HOLDS ELEVEN, ' +
-    'SIX of them carrying an `E2 READ: MONEY PATH` header, each with its file and the ADR its own header ' +
+    'then reported as unrecorded. IT OPENED AT TWENTY UNDER ADR-334 AND HOLDS EIGHT, ' +
+    'THREE of them carrying an `E2 READ: MONEY PATH` header, each with its file and the ADR its own header ' +
     'cites; ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for `0052` to `0057` ' +
-    'and deleted those six rows in the same commit, and ADR-336 wrote sections ' +
-    '46 to 48 for `0068`, `0070` and `0072` and deleted those three, which is ' +
-    'leg 3 doing its work rather than an allowlist being trimmed. ' +
+    'and deleted those six rows in the same commit, ADR-336 wrote sections ' +
+    '46 to 48 for `0068`, `0070` and `0072` and deleted those three, and ADR-351 ' +
+    'wrote sections 49 to 51 for `0037`, `0059` and `0063` and deleted those ' +
+    'three, which is leg 3 doing its work rather than an allowlist being trimmed. ' +
     'A migration outside it with no record is a finding on the commit ' +
     'that adds it, so the backlog cannot grow without an edit to this file. ' +
     'LEG 4 IS THE OTHER REGISTRY IN THE SAME FILE AND IT CLOSES THIS CHECK`s ' +

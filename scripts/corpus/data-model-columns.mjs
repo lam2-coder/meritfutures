@@ -54,15 +54,26 @@
 //    `columnCatalogue()` that answers exactly this question, and OQ-P1-04's
 //    ruling is one parser called twice rather than two expressions of one parse.
 //    IT CAN NOW BE IMPORTED, AND THE BLOCKER THIS PARAGRAPH NAMED IS SPENT.
-//    `gates.mjs:9118` reads `export const GATES = [`, and `:9324` opens the
-//    guard `const invokedDirectly = ...` closed at `:9327` by
+//    `gates.mjs:9129` reads `export const GATES = [`, and `:9335` opens the
+//    guard `const invokedDirectly = ...` closed at `:9338` by
 //    `if (invokedDirectly) process.exit(main());`, under a comment reading
 //    "Importable by the suite that reads this report, runnable by CI-06". That
 //    guard landed in `55824c62` on 2026-08-30 for ADR-294, three sessions after
-//    this header was written, and the same file also exports `EXIT` at `:9202`
-//    and `runGates` at `:9227`. So the duplication below is now a DEFERRAL WITH
+//    this header was written, and the same file also exports `EXIT` at `:9213`
+//    and `runGates` at `:9238`. So the duplication below is now a DEFERRAL WITH
 //    NO BLOCKER rather than a blocked repair, and its remedy clause at the foot
 //    of this paragraph is available and unclaimed.
+//
+//    ALL FIVE OF THOSE NUMBERS MOVED BY ELEVEN ON 2026-09-05 AND THEY READ
+//    `:9118`, `:9324`, `:9327`, `:9202` and `:9227` UNTIL THAT DAY. ADR-351
+//    raised one entry in `gates.mjs`'s `RETIRED_REGISTER` and wrote out why,
+//    which added eleven lines above every one of them. Nothing about this file
+//    or that one changed otherwise, and `RI-15` is what reported the drift the
+//    same run it was created in. THE STANDING COST IS RECORDED RATHER THAN
+//    SOLVED: five pointers into one file's line numbers is a citation that any
+//    edit to a comment nine thousand lines up will break, and `RI-15` catching
+//    it every time is the control that makes that cost affordable rather than
+//    an argument that the pointers are safe.
 //
 //    **THIS PARAGRAPH READ "IT CANNOT BE IMPORTED: `gates.mjs` ends in
 //    `process.exit(main())` at module scope with no direct-invocation guard, so
