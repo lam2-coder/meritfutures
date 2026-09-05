@@ -1802,6 +1802,25 @@ const ci06h = {
           'still holds nothing at all on a schema inside the ledger PITR ' +
           'boundary (ADR-318)',
       ],
+      // ADR-322, 0080. Pinned in the commit that wires it.
+      //
+      // THE PIN IS THE HALF THAT LASTS. The probe's ACCEPTANCE 1 is the only
+      // assertion anywhere that a wallet DEBIT carrying no provenance is
+      // writable, which is the whole of what 0080 buys and the row ADR-305
+      // slice 7's withdrawal driver has to write. Its ACCEPTANCE 4 is the only
+      // assertion that 0038's ADJ-C3 is still SATISFIABLE, and a later
+      // tightening of this column into a biconditional would install cleanly
+      // and make a merged constraint trigger unsatisfiable with nothing else
+      // noticing.
+      [
+        'probe_wallet_debit_provenance.sql',
+        "ADR-322's wallet debit provenance is no longer probed, so nothing " +
+          'asserts that a debit with no provenance is writable, that a debit ' +
+          'labelled with a credit class is refused, that a credit with no ' +
+          'class is refused rather than admitted by a CHECK evaluating to ' +
+          'NULL, that INV-WALLET-NO-DEPOSITS survived the relaxation, or that ' +
+          "0038's ADJ-C3 reversal is still satisfiable (0080)",
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);

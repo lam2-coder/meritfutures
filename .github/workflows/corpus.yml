@@ -823,3 +823,28 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_pgboss_job_store.sql
+
+      # ADR-322, `0080`. THE WALLET DEBIT THAT COULD NOT BE WRITTEN.
+      #
+      # `0011` made `wallet_entries.provenance` NOT NULL over three values its
+      # own comment calls kinds of CREDIT, on a table whose `direction` admits
+      # `'debit'`. So the honest withdrawal debit raised not_null_violation and
+      # a debit labelled `payout` committed, which is the wrong way round and
+      # which an inventory of refusals scores as a working schema.
+      #
+      # ACCEPTANCE 1 IS THE CASE TO READ AND IT IS THE ONE THIS FILE EXISTS FOR.
+      # Every rejection here passes against a column that refuses everything,
+      # including against `0001`..`0079` for two of them; what separates `0080`
+      # from a wall is that the honest debit is now writable. Watched failing
+      # against the pre-`0080` set before the migration was written.
+      #
+      # ACCEPTANCE 4 executes a whole `account_adjustments` reversal through
+      # `0038`'s two DEFERRED constraint triggers, because ADR-322's one
+      # concession -- that `'correction'` stays admissible on a debit -- is a
+      # claim about ADJ-C3 rather than about the new CHECK. A tidier
+      # biconditional would install cleanly, satisfy every other case in the
+      # file, and make a merged trigger unsatisfiable.
+      - name: Probe ADR-322's wallet debit provenance (0080)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_wallet_debit_provenance.sql
