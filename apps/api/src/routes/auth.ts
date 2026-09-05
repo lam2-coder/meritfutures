@@ -108,8 +108,9 @@
 // and every reader follows it as one, so a pointer quoted as HISTORY must not
 // wear the shape that says follow me. `:701` is a blank line today, which is
 // exactly what the sentence is about and exactly what `RI-15` would have to
-// report if it were still spelled as a citation (ADR-212). `sqlExecutor`'s vocabulary is unmoved at
-// `'job-enqueue'` and was never spent.
+// report if it were still spelled as a citation (ADR-212). The reason a request
+// handler may write through `sqlExecutor` is unmoved at `'job-enqueue'` and was
+// never spent.
 //
 // WHAT WIRING IT FOUND IS ONE SENTENCE AND IT IS IN `auth-backend.ts`'s HEADER:
 // **ADR-112 unblocked everything a session can DO and nothing that makes one.**

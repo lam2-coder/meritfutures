@@ -343,6 +343,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-329](ADR-329.md) | two design records said `not null` about a column that is nullable and nothing compared the two. `RI-36` folds `ALTER` over `CREATE TABLE` and reconciles every design record's declared nullability against the schema the migrations leave, the two records are reconstructed and watched going red, and `wallet_entries.provenance` is repaired to say the direction rule rather than to say `null` (2026-09-05, status: proposed) |
 | [ADR-330](ADR-330.md) | the sweep stopped at `scripts/` and the seventh occurrence was sitting in the directory it does not read. `RI-35`'s leg 6 is widened to `scripts/`, `.sql` included, the three claims it surfaces are disposed of, and `data-model-columns.mjs`'s false import clause is repaired with a derivation (2026-09-05, status: proposed) |
 | [ADR-331](ADR-331.md) | the executor that lost the rows. `pg` answers a multi-statement plan with one result per statement, the accessor read `.rows` off the array, and the flattening lands on the side that destroyed it  (2026-09-05, status: proposed) |
+| [ADR-332](ADR-332.md) | the pool executor ADR-331 refused to mint. A closed vocabulary is widened by PARTITION, and the door that outlives a transaction may not leave one behind  (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

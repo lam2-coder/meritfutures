@@ -312,19 +312,86 @@ describe('the executor contract is the vendor`s, read from the installed pg-boss
     expect(body.slice(0, body.indexOf('\n}'))).toContain('flatMap(i => i.rows)');
   });
 
-  test('`packages/db`s executor carries both of `pg`s answers', () => {
+  test('`packages/db`s executor carries both of `pg`s answers, in ONE place, for BOTH producers', () => {
     // THE MERIT HALF, BOUND TO THE TWO ABOVE SO THE THREE FAIL TOGETHER. Read
     // rather than imported, for the reason `write-accessor.test.ts` states from
     // the other direction: neither package declares a dependency on the other,
     // and structural typing is what binds them.
+    //
+    // ADR-332 GAVE `packages/db` A SECOND PRODUCER OF THIS SHAPE and this case
+    // moved with it rather than being left asserting one of the two. The
+    // transaction-bound `sqlExecutorOn` and the pool-bound `poolSqlExecutor`
+    // answer the SAME vendor contract, so a tree where one flattens and the
+    // other does not is the ADR-331 defect surviving on the half nobody looked
+    // at. The normalisation is therefore ONE function and this case asserts that
+    // both producers route through it, which is a stronger property than the
+    // branch being present twice.
     const executor = readFileSync(join(ROOT, 'packages/db/src/scoped-db.ts'), 'utf8');
-    const open = executor.indexOf('function sqlExecutorOn(');
-    expect(open, 'packages/db no longer declares sqlExecutorOn').toBeGreaterThan(-1);
+    const open = executor.indexOf('function oneResultFrom(');
+    expect(open, 'packages/db no longer declares oneResultFrom').toBeGreaterThan(-1);
     const declaration = executor.slice(open, executor.indexOf('\n}', open));
     expect(
       declaration,
-      'sqlExecutorOn does not branch on the array `pg` returns for a multi-statement plan',
+      'oneResultFrom does not branch on the array `pg` returns for a multi-statement plan',
     ).toContain('Array.isArray(result)');
     expect(declaration).toContain('flatMap((one) => one.rows)');
+
+    for (const producer of ['function sqlExecutorOn(', 'export function poolSqlExecutor(']) {
+      const at = executor.indexOf(producer);
+      expect(at, `packages/db no longer declares ${producer}`).toBeGreaterThan(-1);
+      expect(
+        executor.slice(at, executor.indexOf('\n}\n', at)),
+        `${producer} does not normalise through oneResultFrom`,
+      ).toContain('oneResultFrom(');
+    }
+  });
+});
+
+// =============================================================================
+// THE PARAGRAPH THIS PACKAGE RETIRED, BOUND TO THE THING THAT RETIRED IT
+// =============================================================================
+// ADR-332. `src/index.ts` quotes ADR-331's refusal to publish a pool-shaped
+// executor and says the row that published it is this one. Under `RI-14` a
+// retired sentence is kept beside its correction, and under `RI-35` leg 3 a
+// retired claim is only legitimate WHILE THE TREE FALSIFIES IT: an artifact that
+// went away again leaves a correction asserting something untrue in the other
+// direction.
+//
+// THE PRINCIPLED HOME FOR THIS IS `RI-35`'s REGISTER AND IT IS OUTSIDE ADR-332's
+// FENCE, WHICH IS SAID HERE RATHER THAN LEFT FOR A READER TO NOTICE. The entry a
+// later row owes is an artifact keyed on `packages/db` exporting
+// `poolSqlExecutor`, with a `retired` claim at `packages/queue/src/index.ts`
+// anchored on the quotation below -- the same shape `db-transaction-and-sql-executor`
+// already has for ADR-102's pair. `RI-35` did not go red here, because that
+// sentence was never registered and no absence marker in its written vocabulary
+// reaches it, so the register could not be amended under this row's grant.
+// ADR-328's own header names this shape as the one that does not scale: one
+// hand-built derivation for one site. It is built anyway, because the
+// alternative is a correction nothing holds to the tree at all.
+describe('the correction packages/queue publishes is held to the door that justifies it', () => {
+  test('the retired refusal stands only while `packages/db` exports the pool executor', () => {
+    const quote =
+      'That door is not published by `packages/db` and the\n// reason it would need is not a member of `SqlExecutorReason`';
+    const barrel = readFileSync(join(ROOT, 'packages/queue/src/index.ts'), 'utf8');
+    expect(
+      barrel.includes(quote),
+      'packages/queue/src/index.ts no longer quotes ADR-331`s refusal; move this case with it',
+    ).toBe(true);
+
+    const db = readFileSync(join(ROOT, 'packages/db/src/index.ts'), 'utf8');
+    expect(
+      /^\s*poolSqlExecutor,\s*$/m.test(db),
+      'the paragraph above is quoted as HISTORY and `@merit/db` no longer exports ' +
+        '`poolSqlExecutor`, so the refusal it retires is true again and the correction is not',
+    ).toBe(true);
+
+    // THE ADAPTER NAMES IT TOO, and that site is bound here rather than left to
+    // rot on its own: `pg-boss-queue.ts` is the file a session writing the one
+    // door opens first, so a name it carries has to be a name that exists.
+    const adapter = readFileSync(join(ROOT, 'packages/queue/src/pg-boss-queue.ts'), 'utf8');
+    expect(
+      adapter.includes("`@merit/db`'s `poolSqlExecutor('job-supervisor')` IS THAT VALUE"),
+      'the adapter no longer names the executor its `@param` requires; move this case with it',
+    ).toBe(true);
   });
 });

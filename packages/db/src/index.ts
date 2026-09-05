@@ -67,25 +67,42 @@ export {
 // `SystemReason` stays at two members, which is ADR-096 clause 3 kept.
 //
 // `SqlExecutor` is the shape `packages/queue`'s `JobTransaction` declares, and
-// `transaction()` is its only producer. Nothing in this workspace could enqueue
+// `transaction()` WAS its only producer. Nothing in this workspace could enqueue
 // a job before it existed. NEITHER PACKAGE DEPENDS ON THE OTHER and the two
 // shapes are bound by an assertion in `test/write-accessor.test.ts` that reads
 // `job-queue.ts` rather than restating it.
+//
+// `poolSqlExecutor` IS THE SECOND PRODUCER AND IT IS A DIFFERENT LIFETIME
+// (ADR-332). `transaction()`'s executor is one statement inside the caller's
+// unit of work, which is what an enqueue must be; this one OUTLIVES every
+// transaction, which is what a supervisor must be, because every plan pg-boss
+// wraps in `locked()` carries its own `COMMIT` and would commit the caller's
+// (ADR-331 section 5, measured). The two are not interchangeable in either
+// direction and the type says so: `SqlExecutorReason` has two members and each
+// producer's parameter type is an `Extract` of ONE of them, so the vocabulary
+// widened and neither caller gained reach.
+//
+// IT IS THE ONE POOL AND NOT A SECOND ONE. `client()` is still unexported, this
+// door resolves the pool through it per statement, and `closeClient` ends both.
+// ADR-084 section 2 is why that matters rather than being tidy.
 // `tenancyColumns` is the plural and `tenancyColumn` reads it (ADR-106). The
 // list exists because a `pair` row has TWO tenancy columns, and the guard that
 // refuses a caller naming one has to refuse the caller naming the other.
 export {
   firmDb,
+  poolSqlExecutor,
   transaction,
   tenancyColumn,
   tenancyColumns,
   type FirmDb,
   type FirmTx,
   type OwnedTableKey,
+  type PoolSqlExecutorReason,
   type ScopedTx,
   type SqlExecutor,
   type SqlExecutorReason,
   type SystemTx,
+  type TransactionSqlExecutorReason,
   type WriteValues,
 } from './scoped-db.ts';
 

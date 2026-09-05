@@ -970,7 +970,7 @@ export interface EvidenceExportRequest {
  * wrong authority and `firmDb()` reads only rows that belong to nobody.
  * `SystemReason` is closed at two members and ADR-102 already accepted
  * `'operator-console'` for exactly this: "The admin liability dashboard".
- * `SqlExecutorReason` has one member, `'job-enqueue'`, and it is not this.
+ * A transaction handle admits one reason, `'job-enqueue'`, and it is not this.
  *
  * THE SHAPE WAS THE OBSTRUCTION AND IT IS NOT ONE ANY MORE, AND THE CORRECTION
  * IS WRITTEN HERE BECAUSE THIS IS THE SENTENCE EVERY LATER READER CITED.

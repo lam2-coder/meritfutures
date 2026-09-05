@@ -24,9 +24,9 @@
 // with `identity_b = X`, and this module spells that as TWO reads unioned in
 // memory rather than reaching for a predicate the accessor does not offer.
 //
-// The alternative would be `sqlExecutor`, whose vocabulary has one member that
-// is not this, and P7's rules foreclose joining it. Two calls is the whole cost
-// of that foreclosure here.
+// The alternative would be `sqlExecutor`, and the one reason a handle like this
+// could write is not this one, and P7's rules foreclose joining it. Two calls is
+// the whole cost of that foreclosure here.
 //
 // -----------------------------------------------------------------------------
 // SUPPRESSED EDGES ARE SHOWN AND NOT TRAVERSED, AND BOTH HALVES ARE RULINGS

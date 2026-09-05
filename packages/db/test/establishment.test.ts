@@ -379,17 +379,27 @@ describe('the vocabulary that moves is the table and never the reason', () => {
     expect(derived.length).toBeGreaterThan(parentedMembers().length);
   });
 
-  test('`SystemReason` is still exactly two members and `SqlExecutorReason` still one', () => {
+  test('`SystemReason` is still exactly two members and no ESTABLISHMENT reason was minted', () => {
     // ADR-126 clause 2 keeps both closed and says so in the entry. Watched here
     // as well as in `packages/ledger/test/accessor-bind.test.ts`, because this
     // is the entry that had a live argument for widening one of them.
+    //
+    // THE SECOND HALF ASSERTED `SqlExecutorReason` AT ONE MEMBER UNTIL ADR-332,
+    // which minted a second for the pool-shaped producer that constructs the job
+    // queue. That is not the widening this file was written against: the one it
+    // refused was a member for an ESTABLISHMENT handler, a caller holding a
+    // transaction. So the assertion follows the property rather than the count,
+    // and reads the member a transaction handle may write.
     const source = readAccessor();
     const reasons = /export type SystemReason =([^;]+);/.exec(source)?.[1] ?? '';
     expect([...reasons.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]).sort()).toEqual([
       'nightly-batch',
       'operator-console',
     ]);
-    const raw = /export type SqlExecutorReason =([^;]+);/.exec(source)?.[1] ?? '';
+    const raw =
+      /export type TransactionSqlExecutorReason = Extract<SqlExecutorReason,([^>]+)>;/.exec(
+        source,
+      )?.[1] ?? '';
     expect([...raw.matchAll(/'([a-z-]+)'/g)].map((m) => m[1])).toEqual(['job-enqueue']);
   });
 

@@ -1302,7 +1302,7 @@ export function selectStatement(
 // A ROW LOCK AND NOT AN ADVISORY LOCK, AND THE DIFFERENCE IS WHICH DOOR IT GOES
 // THROUGH. `pg_advisory_xact_lock(bigint)` is what the invariants' prose names,
 // and there is no way to send it that is not `sqlExecutor` -- which would mean
-// widening a one-member raw-SQL vocabulary to smuggle in a primitive, which is
+// widening the raw-SQL vocabulary a transaction handle may spend, which is
 // the exact reach-around P5 section 11 rule 10 exists to foreclose and the one
 // P7 section 11 rule 10 repeats. A row lock says the same thing THROUGH THE
 // ACCESSOR: it takes the tenancy predicate the matching read takes, so a caller
@@ -1445,7 +1445,18 @@ export function firmDb(): FirmDb {
 // DECLARES, in exchange for one table at one verb. A closed vocabulary of WHICH
 // grants exactly what it names. So both constructions below take a TABLE
 // vocabulary, `SystemReason` stays at two members for the third time (ADR-096
-// clause 3, ADR-102 clause 3, and here), and `SqlExecutorReason` stays at one.
+// clause 3, ADR-102 clause 3, and here), and `SqlExecutorReason` stayed at one.
+//
+// **THAT LAST CLAUSE READ "and `SqlExecutorReason` stays at one", AND ADR-332
+// MOVED IT TO TWO.** It is kept beside its correction under `RI-14` rather than
+// rewritten away, because the rule it states did not move and the exception has
+// to be readable next to it. What widened is not the reach of any caller: the
+// second member exists for a PRODUCER this file did not have, an executor on the
+// POOL, and each producer's parameter type is an `Extract` of one member, so a
+// transaction handle still admits exactly `'job-enqueue'` and the pool door
+// admits exactly `'job-supervisor'`. The general form survives intact -- the
+// vocabulary that moves is the TABLE and never the REASON -- because nothing a
+// caller could already reach reaches one row further than it did.
 //
 // THIS SENTENCE USED TO STATE THE TWO FIGURES AND ADR-157 MOVED ONE OF THEM.
 // It read "all 104 registered tables at six verbs", and the verb count went to
@@ -3499,8 +3510,54 @@ function refuseUncatalogued(key: string): void {
 // `JobTransaction` itself, THIS CLOSES THE ACCIDENTAL DOOR AND NOT THE
 // DELIBERATE ONE, and `job-queue.ts` states the same limit about itself.
 
-/** Why raw SQL is running on this transaction. One member, and joining it is a diff. */
-export type SqlExecutorReason = 'job-enqueue';
+/**
+ * Why raw SQL is running on a connection this package owns.
+ *
+ * TWO MEMBERS SINCE ADR-332, AND THE VOCABULARY IS STILL CLOSED BECAUSE IT IS
+ * PARTITIONED. The two words are not two callers and they are not two services.
+ * They are the queue's two CONNECTION LIFETIMES, and a lifetime is the one thing
+ * about this shape that no type can carry: `job-queue.ts` says so in its own
+ * words, that "being inside a transaction is a fact about a connection at a
+ * moment and no TypeScript type observes a moment".
+ *
+ *   `job-enqueue`     one statement INSIDE the caller's open transaction, so
+ *                     the job rides the state change that caused it (ADR-006).
+ *   `job-supervisor`  a handle that OUTLIVES every transaction, for the work
+ *                     pg-boss does on its own schema: queue metadata, the
+ *                     polling fetch, maintenance and completion.
+ *
+ * THE SECOND ONE EXISTS BECAUSE THE FIRST PRODUCER CANNOT DO ITS JOB, WHICH IS A
+ * MEASUREMENT AND NOT A PREFERENCE. ADR-331 section 5 ran it: every plan pg-boss
+ * wraps in its `locked()` helper renders `BEGIN ... COMMIT` as one string, so
+ * one of them on a caller's open transaction COMMITS IT, and the in-transaction
+ * test flips from true to false one statement into construction. A supervisor
+ * built on `job-enqueue`'s producer destroys the property `job-enqueue` exists
+ * for. That entry refused to mint this member on that evidence, because a member
+ * minted there would "name the right intention on the wrong producer".
+ *
+ * SO EACH PRODUCER ADMITS ONE MEMBER AND NEITHER GAINED REACH. The two aliases
+ * below are what makes the widening cost nothing: the transaction method takes
+ * `TransactionSqlExecutorReason` and the pool door takes
+ * `PoolSqlExecutorReason`, so `tx.sqlExecutor('job-supervisor')` and
+ * `poolSqlExecutor('job-enqueue')` are both compile errors before either is a
+ * runtime throw. Adding a THIRD member is still a diff on this file with an
+ * argument attached, and it now also has to say which producer it belongs to,
+ * because a member belonging to neither is a word nothing can spend.
+ */
+export type SqlExecutorReason = 'job-enqueue' | 'job-supervisor';
+
+/**
+ * The one member a caller holding a TRANSACTION may write.
+ *
+ * DECLARED AS AN `Extract` RATHER THAN AS THE LITERAL, so the two spellings
+ * cannot drift apart: a rename of the member in the union above leaves this
+ * `never`, and `sqlExecutor(reason: never)` is a method no caller can call.
+ * A copy of the literal would simply stop matching and say nothing.
+ */
+export type TransactionSqlExecutorReason = Extract<SqlExecutorReason, 'job-enqueue'>;
+
+/** The one member the POOL door admits, for `Extract`'s reason above. ADR-332. */
+export type PoolSqlExecutorReason = Extract<SqlExecutorReason, 'job-supervisor'>;
 
 /**
  * A SQL executor bound to one open transaction.
@@ -3522,9 +3579,12 @@ interface TxCommon {
   /**
    * A raw SQL executor on this transaction's connection.
    *
-   * The one door out of this file, and it is a word somebody has to write.
+   * A door out of this file, and it is a word somebody has to write. The
+   * PARAMETER TYPE is the narrow one and not the vocabulary: a handle here is
+   * one open transaction, and `'job-supervisor'` names an executor that must
+   * outlive one, so this method may not be handed that word (ADR-332).
    */
-  sqlExecutor(reason: SqlExecutorReason): SqlExecutor;
+  sqlExecutor(reason: TransactionSqlExecutorReason): SqlExecutor;
 }
 
 /**
@@ -4069,7 +4129,43 @@ export function firmTx(source: StatementSource, conn: PoolClient): FirmTx {
 }
 
 /**
- * The raw executor, bound to one connection.
+ * `pg`'s two answers, reduced to the one `SqlExecutor` declares.
+ *
+ * ONE STATEMENT OR MANY, AND THE MANY USED TO COME BACK EMPTY (ADR-331).
+ * `pg` resolves a MULTI-STATEMENT string to a `Result[]`, one element per
+ * statement, and `.rows` on an array is `undefined`. The transaction-bound
+ * executor used to read that property and hand back `{ rows: undefined }`, which
+ * is not the type it declares and is a wrong answer rather than a throw.
+ * Measured on this tree: pg-boss's own `locked()` plan renders six statements,
+ * `pg` returns an array of six, and the rows the caller wanted sit in element
+ * four with empty arrays either side. Flattening in order is what recovers them,
+ * and it is what the vendor does: `unwrapSQLResult` in `pg-boss/dist/tools.js`,
+ * applied by every adapter that library ships, because an adapter that
+ * normalises to `{ rows }` is the side that destroyed the array and therefore
+ * the only side that can flatten it. This file may not name that vendor, so the
+ * semantics are reproduced here and `packages/queue/test/surface.test.ts` holds
+ * them to it.
+ *
+ * IT IS ONE FUNCTION FOR BOTH PRODUCERS, AND THAT IS A RULING RATHER THAN A
+ * HELPER SOMEBODY LIKED (ADR-332). Appendix F2's rule of three refuses a shared
+ * helper invented for a hypothetical second caller; this one has two REAL call
+ * sites on the day it lands, and what they share is not a convenience but a
+ * VENDOR CONTRACT. `IDatabase.executeSql` is ONE contract, so a tree where the
+ * transaction door flattens and the pool door does not is the ADR-331 defect
+ * surviving on the half nobody looked at -- silently, because the case that
+ * catches it reads a producer by name.
+ */
+function oneResultFrom(answer: unknown): { rows: unknown[] } {
+  // `pg`'s own two answers, and there is no third: the extended protocol a
+  // parameterised call takes cannot carry a second statement at all.
+  const result = answer as { rows: unknown[] } | { rows: unknown[] }[];
+  return Array.isArray(result)
+    ? { rows: result.flatMap((one) => one.rows) }
+    : { rows: result.rows };
+}
+
+/**
+ * The raw executor, bound to one connection and to one OPEN TRANSACTION.
  *
  * IT TAKES THE CONNECTION AND NOT A DRIZZLE HANDLE, and that is not an
  * implementation detail. `JobTransaction.executeSql` is `(text, values)` with
@@ -4078,21 +4174,13 @@ export function firmTx(source: StatementSource, conn: PoolClient): FirmTx {
  * it as template chunks, and a text transform over somebody else's SQL breaks
  * the first time a dollar-quoted string or a literal `$1` goes through it.
  *
- * ONE STATEMENT OR MANY, AND THE MANY USED TO COME BACK EMPTY (ADR-331).
- * `pg` resolves a MULTI-STATEMENT string to a `Result[]`, one element per
- * statement, and `.rows` on an array is `undefined`. This function used to read
- * that property and hand back `{ rows: undefined }`, which is not the type it
- * declares and is a wrong answer rather than a throw. Measured on this tree:
- * pg-boss's own `locked()` plan renders six statements, `pg` returns an array of
- * six, and the rows the caller wanted sit in element four with empty arrays
- * either side. Flattening in order is what recovers them, and it is what the
- * vendor does: `unwrapSQLResult` in `pg-boss/dist/tools.js`, applied by every
- * adapter that library ships, because an adapter that normalises to `{ rows }`
- * is the side that destroyed the array and therefore the only side that can
- * flatten it. This file may not name that vendor, so the semantics are
- * reproduced here and `packages/queue/test/surface.test.ts` holds them to it.
+ * WHAT IT CANNOT BE USED FOR IS NAMED IN ITS PARAMETER TYPE (ADR-332). It is the
+ * enqueue's executor and nothing else: a plan carrying its own `BEGIN` and
+ * `COMMIT` run here COMMITS THE CALLER'S TRANSACTION, measured by ADR-331
+ * section 5, so a supervisor takes `poolSqlExecutor` and this signature refuses
+ * that word before the check below ever sees it.
  */
-function sqlExecutorOn(conn: PoolClient, reason: SqlExecutorReason): SqlExecutor {
+function sqlExecutorOn(conn: PoolClient, reason: TransactionSqlExecutorReason): SqlExecutor {
   // The vocabulary is closed by the TYPE. This reads it so the parameter is not
   // decorative, and so a cast past the type still names its reason.
   if (reason !== 'job-enqueue') {
@@ -4100,13 +4188,7 @@ function sqlExecutorOn(conn: PoolClient, reason: SqlExecutorReason): SqlExecutor
   }
   return {
     async executeSql(text: string, values?: unknown[]): Promise<{ rows: unknown[] }> {
-      // `pg`'s own two answers, and there is no third: the extended protocol a
-      // parameterised call takes cannot carry a second statement at all.
-      const result = (await conn.query(text, values)) as unknown as
-        { rows: unknown[] } | { rows: unknown[] }[];
-      return Array.isArray(result)
-        ? { rows: result.flatMap((one) => one.rows) }
-        : { rows: result.rows };
+      return oneResultFrom(await conn.query(text, values));
     },
   };
 }
@@ -4152,6 +4234,126 @@ function poolFromClient(): Pool {
     );
   }
   return candidate as Pool;
+}
+
+/** PostgreSQL's `ReadyForQuery` status: idle, in a transaction, or in a failed one. */
+const BACKEND_IS_IDLE = 'I';
+
+/**
+ * A SQL executor on the POOL, for the one caller that must outlive every
+ * transaction (ADR-332).
+ *
+ * -----------------------------------------------------------------------------
+ * WHY IT EXISTS, WHICH IS A MEASUREMENT AND NOT A CONVENIENCE
+ * -----------------------------------------------------------------------------
+ * pg-boss holds one handle for the life of the boss and polls on it, and most of
+ * what it sends is wrapped in its own `locked()` helper, which renders
+ * `BEGIN ... COMMIT` as ONE multi-statement string. Handed a caller's open
+ * transaction, the first such plan COMMITS IT: ADR-331 section 5 measured the
+ * in-transaction test flipping from true to false one plan into `declareQueue`,
+ * which is ADR-006's whole consequence -- an enqueue riding the state change
+ * that caused it -- destroyed at construction. So the constructor's executor has
+ * to be pool-shaped, one connection per statement, which is what the vendor's
+ * own driver is (`this.pool.query(text, values)`).
+ *
+ * IT COULD ONLY COME FROM THIS PACKAGE. `merit/no-raw-db-client` (VG-4) bans
+ * `pg` outside `packages/db` and ADR-084 section 9 keeps `client()` unexported
+ * permanently, so a deployable cannot build one for itself. That is what made
+ * this a ruling rather than a chore, and ADR-331 refused to mint it as a means
+ * inside a row about something else.
+ *
+ * -----------------------------------------------------------------------------
+ * IT IS THE POOL `client()` HOLDS, AND NEVER ONE OF ITS OWN
+ * -----------------------------------------------------------------------------
+ * ADR-084 section 2 chose `pg` over postgres.js at a measured cost of 14
+ * packages BECAUSE "a transaction is per-connection, so a second driver is a
+ * second pool and that consequence stops being implementable". A door here that
+ * opened a pool would spend that cost and buy nothing with it. `poolFromClient`
+ * is the one resolver and it reads `client()`, so this door and every
+ * `transaction(handle, fn)` in this file share one pool, one `DATABASE_URL` and
+ * one `closeClient()`.
+ *
+ * THE POOL IS RESOLVED PER STATEMENT AND NOT AT CONSTRUCTION, which keeps
+ * `client.ts`'s laziness: importing `@merit/db` must open no socket, and so must
+ * constructing a queue over this. The first STATEMENT is what needs a
+ * connection, and `client()` memoises the pool after it.
+ *
+ * -----------------------------------------------------------------------------
+ * WHAT STOPS THIS BECOMING "RUN ANY SQL ON THE POOL", WHICH IS THE THING
+ * `client()` STAYING UNEXPORTED EXISTS TO PREVENT
+ * -----------------------------------------------------------------------------
+ * 1. THE WORD. `'job-supervisor'` is a closed vocabulary's member, refused past
+ *    a cast below, so "ran raw SQL outside every transaction" is a diff a
+ *    reviewer reads rather than a property nobody looked at.
+ * 2. THE PARTITION. The vocabulary widened and NEITHER PRODUCER GAINED REACH:
+ *    this door takes `PoolSqlExecutorReason` and a transaction handle takes
+ *    `TransactionSqlExecutorReason`, each an `Extract` of one member, so neither
+ *    can be handed the other's word.
+ * 3. IT HANDS OUT ONE METHOD AND NOT A HANDLE. There is no `connect`, no
+ *    Drizzle, no schema and no key vocabulary, and `transaction()` has no
+ *    overload taking this value: there is no argument position anywhere in this
+ *    file where it becomes a scope. So a caller gets one statement at a time and
+ *    cannot make two of them one unit of work AT THE ACCESSOR.
+ * 4. AND IT CANNOT MAKE TWO OF THEM ONE UNIT OF WORK AT THE DATABASE EITHER,
+ *    WHICH IS THE LEG THAT HAD TO BE BUILT RATHER THAN OBSERVED. `pg`'s pool
+ *    returns a released client to the idle set and hands the SAME backend to the
+ *    next caller, so a bare `BEGIN` through a door built on `pool.query` outlives
+ *    its own statement: measured on this tree, three statements reported one
+ *    `pg_backend_pid` and `in_a_transaction` true after the `BEGIN`. On THIS pool
+ *    the next caller can be `transaction()` running a money write, so that is not
+ *    a queue defect, it is this door poisoning the accessor it lives in.
+ *
+ *    So the connection is released with DESTROY whenever the backend is not
+ *    idle, which `pg`'s own `getTransactionStatus()` answers from the backend's
+ *    last `ReadyForQuery` rather than from anything this file guesses. A
+ *    statement that opens a transaction and does not close it burns its
+ *    connection instead of pooling it, and nothing it left behind -- the
+ *    transaction, a `SET`, a temp table -- can be found by anybody else.
+ *
+ * THE COST OF LEG 4 IS ZERO ON EVERYTHING pg-boss SENDS, and that is why it is
+ * affordable rather than a churn: `locked()` closes its own `BEGIN`, so the
+ * backend is idle when the statement returns and the connection goes back to the
+ * pool like any other. `packages/db/test/pool-executor.test.ts` asserts both
+ * halves against a real backend, the dirty one burned and the balanced one kept.
+ */
+export function poolSqlExecutor(reason: PoolSqlExecutorReason): SqlExecutor {
+  // The vocabulary is closed by the TYPE, and this reads it for `sqlExecutorOn`'s
+  // own stated reason: so the parameter is not decorative, and so a cast past the
+  // type still names its reason. It runs BEFORE the pool is resolved, so a wrong
+  // word is refused without a connection being wanted.
+  if (reason !== 'job-supervisor') {
+    throw new Error(`"${String(reason)}" is not a reason to run raw SQL on the pool.`);
+  }
+  return {
+    async executeSql(text: string, values?: unknown[]): Promise<{ rows: unknown[] }> {
+      const conn = await poolFromClient().connect();
+      let answer: unknown;
+      try {
+        answer = await conn.query(text, values);
+      } catch (cause) {
+        // A statement that FAILED may have left a failed transaction ('E'), and
+        // the error is the caller's to see rather than this line's to explain.
+        conn.release(true);
+        throw cause;
+      }
+      // `getTransactionStatus()` is `pg`'s own published reader of the backend's
+      // last `ReadyForQuery`: `'I'` idle, `'T'` in a transaction, `'E'` in a
+      // failed one, `null` before the first. A completed statement has always
+      // produced one, so `null` here means the driver stopped answering, and the
+      // connection is destroyed FIRST and the failure raised after, which is the
+      // safe order: fail closed, then loudly.
+      const status = conn.getTransactionStatus();
+      conn.release(status !== BACKEND_IS_IDLE);
+      if (status === null) {
+        throw new Error(
+          'pg reported no transaction status after a completed statement, so this door cannot ' +
+            'tell a clean connection from one left inside a transaction. The connection was ' +
+            'destroyed rather than pooled. packages/db has to follow the driver: ADR-332 leg 4.',
+        );
+      }
+      return oneResultFrom(answer);
+    },
+  };
 }
 
 export function transaction<T>(handle: ScopedDb, fn: (tx: ScopedTx) => Promise<T>): Promise<T>;

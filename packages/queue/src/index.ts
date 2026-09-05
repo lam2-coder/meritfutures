@@ -52,9 +52,26 @@
 // after it, so ADR-006's whole consequence is gone one statement into
 // construction. The executor that constructs the queue therefore has to be
 // POOL-shaped, one connection per statement, which is what the vendor's own
-// driver is. That door is not published by `packages/db` and the reason it
-// would need is not a member of `SqlExecutorReason`; ADR-331 refuses to mint
-// either as a means and leaves both owed to the row whose subject they are.
+// driver is.
+//
+// **THAT PARAGRAPH ENDED "That door is not published by `packages/db` and the
+// reason it would need is not a member of `SqlExecutorReason`; ADR-331 refuses
+// to mint either as a means and leaves both owed to the row whose subject they
+// are", AND ADR-332 IS THAT ROW.** It is kept beside its correction rather than
+// deleted, per RI-14. Both halves landed at once, because ADR-331 ruled they
+// were owed together: `@merit/db` exports `poolSqlExecutor`, which takes
+// `'job-supervisor'`, a SECOND member of a vocabulary that is still closed
+// because it is PARTITIONED -- each producer's parameter type is an `Extract` of
+// ONE member, so a transaction handle still admits `'job-enqueue'` and nothing
+// else, and the widening bought no caller a row it could not already reach.
+//
+// AND THE CONSTRUCTOR HALF IS NO LONGER "MEASURED UNUSABLE" IN EITHER OF ITS
+// TWO SENSES. Against PostgreSQL 16.13 as `merit_app` over `0001`..`0082`, a
+// queue constructed on that door ran `start()`, `declareQueue` and a full
+// supervise pass: 77 statements, ZERO failures, both the monitor and the
+// maintain phase reached on every queue, while `enqueue` stayed on its caller's
+// transaction in both directions -- present after a COMMIT and absent after a
+// ROLLBACK. ADR-332 sections 6 and 7.
 //
 // **THIS HEADING READ "IT HOLDS NO CONNECTION, AND THE THING IT NEEDS DOES NOT
 // EXIST YET", AND UNDER IT: "`@merit/db` CANNOT SUPPLY EITHER ONE TODAY ... its
@@ -67,11 +84,20 @@
 // as retired against the two exports that falsified it, so a tree where they
 // went away turns the correction red instead of leaving it to be believed.
 //
-// WHAT IS STILL ABSENT IS THE DOOR AND NOT THE SUPPLY.
+// WHAT IS STILL ABSENT IS THE IMPORTER, AND SINCE ADR-332 IT IS THE ONLY THING.
 // NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`. It is in `apps/worker`'s
 // manifest since ADR-327 and reaches no `src/` file there, so what ships from
 // here is the interface, its adapter and the suite that proves the enqueue
 // joins the transaction it is given. `RI-35` holds that sentence to the tree.
+//
+// **THIS HEADING READ "WHAT IS STILL ABSENT IS THE DOOR AND NOT THE SUPPLY",
+// WHICH ADR-332 MADE AMBIGUOUS RATHER THAN FALSE**, and the ambiguity is worth
+// one line because a session reads a heading to decide what to build. Two
+// different things were called the door: the pool-shaped executor `packages/db`
+// owes, which now exists, and the module under `apps/worker/src` that takes it
+// and names a queue, which does not. Only the second is left, and ADR-332
+// deliberately did not write it: ADR-331 section 4 clause 4 rules that the row
+// widening the vocabulary and the row importing the package are different rows.
 
 export { JOB_QUEUE_METHODS } from './job-queue.ts';
 export type {

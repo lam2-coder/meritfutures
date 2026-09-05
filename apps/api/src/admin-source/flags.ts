@@ -174,8 +174,8 @@ export type AdminRowFilter = Readonly<Record<string, unknown>>;
  * off `open`; the mirror concern for a READ source is that it holds no grant to
  * move anything at all, and here that is a type rather than a convention.
  *
- * `sqlExecutor`'s absence is the one worth naming twice. `SqlExecutorReason` has
- * one member and P7's rules foreclose joining it; a read shape that could reach
+ * `sqlExecutor`'s absence is the one worth naming twice. A transaction handle
+ * admits one reason and P7's rules foreclose joining it; a read shape that could reach
  * the executor would make that foreclosure a matter of discipline, and this
  * interface makes it a matter of what the value has on it.
  */
