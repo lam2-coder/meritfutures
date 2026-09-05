@@ -595,8 +595,13 @@ export type AffiliateStats = {
 // where the contract's own comment is the shape of a state rather than a note
 // about it. `GET /wallet` and `GET /wallet/entries` are both REGISTERED and both
 // WIRED, measured through `CompositionReport.registered` over a real `compose()`
-// rather than by grep, and `apps/api/src/start.ts:97` calls
-// `useWalletBackend(databaseWalletBackend(LIVE_DB))`.
+// rather than by grep, and `apps/api/src/start.ts:109` calls
+// `useWalletBackend(databaseWalletBackend(LIVE_DB))`. THAT POINTER READ LINE 97
+// AND WAS EIGHT LINES OUT BEFORE ADR-347 MOVED IT FOUR MORE. No check reported
+// it: RI-15's vacancy rule fires on a blank line or a bare closing brace and
+// that line was a comment marker, and no backticked name binds ahead of the
+// citation, so resolution and range were all that was ever asserted about it.
+// The old number is written out of citation grammar on purpose (ADR-212).
 //
 // THE HEADER OF THIS FILE SAID THE AUTH TYPES WOULD ARRIVE WITH THEIR OWN
 // SESSION AND `SessionRow` BELOW IS THAT PROMISE KEPT, not a fence widened. What
