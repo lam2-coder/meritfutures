@@ -1802,6 +1802,27 @@ const ci06h = {
           'still holds nothing at all on a schema inside the ledger PITR ' +
           'boundary (ADR-318)',
       ],
+      // 0078, ADR-321, on ADR-304. MONEY PATH. Pinned in the commit that wires
+      // it, which is the rule rather than the exception: OI-07 has four recorded
+      // occurrences of a probe wired and left unpinned.
+      //
+      // THREE OF ITS FIVE REJECTIONS ARE ONE CONSTRAINT SEEN FROM THREE SIDES,
+      // and that constraint is the whole ruling rather than a hardening of it.
+      // Deleting this step deletes the only executable statement of the
+      // difference between a denormalized affiliate column that AGREES with its
+      // attribution and one that merely happens to today -- and the acceptance
+      // half goes with it, which is the half that says a correct commission and
+      // its clawback are still writable at all.
+      [
+        'probe_affiliate_commission_owner.sql',
+        "0078's affiliate commission owner is no longer probed, so nothing " +
+          'asserts that a commission naming the wrong affiliate is refused BY ' +
+          'NAME on insert, on update and when the attribution is moved beneath ' +
+          'it, that the column is NOT NULL with no DEFAULT so a forgetful writer ' +
+          'fails instead of being handed an affiliate, that an affiliate Merit ' +
+          'owes money to cannot be deleted, or that a correct accrual and its ' +
+          'compensating clawback are still writable (ADR-321)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
