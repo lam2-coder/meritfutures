@@ -4936,6 +4936,69 @@ export const attributions = pgTable('attributions', {
 });
 
 // -----------------------------------------------------------------------------
+// affiliate_commissions -- 0012_disputes_and_affiliate_settlement.sql, PLUS ONE
+// COLUMN FROM 0078_affiliate_commission_owner.sql (ADR-321)
+// -----------------------------------------------------------------------------
+// `derived` via `affiliates` on `affiliate_id`, which is `affiliate_creatives`',
+// `affiliate_clicks`' and `affiliate_statements`' rule a fourth time on a fourth
+// table that now declares the identical edge.
+//
+// THE TABLE COULD NOT BE DECLARED HERE AT ALL UNTIL `0078`, AND THE REASON WAS
+// THE COLUMN SET RATHER THAN THE VOCABULARY. `0012`'s row carried one path to an
+// identity, `attribution_id` into `attributions`, which is `pair`: a `derived`
+// rule through it compiles and then throws, because a chain terminates at
+// `owned` or at `root` or it does not terminate. ADR-253 section 6 left open
+// whether a SEVENTH scope class was the repair and ADR-304 answered no. `0078`
+// adds the column the other three tables on this rail carry, and the
+// registration beside it needed no ruling for the same reason theirs did not.
+//
+// `affiliateId` CARRIES NO `.references()` AND THAT IS THIS FILE'S RULE RATHER
+// THAN AN OMISSION. The header states that a column carries one only when its
+// `CREATE TABLE` body declares the FK inline; this one is declared inside
+// `0078`'s `ADD COLUMN`, which the fold reads for its column NAME alone, so a
+// constraint claimed here would be a claim nothing in this package checks.
+// `payoutRequests.holdFlagId` is the same position on the payout table.
+//
+// NEITHER IS `affiliate_commissions_attribution_owner_fk`, AND IT IS THE MORE
+// IMPORTANT OMISSION. `0078` names the PAIR `(attribution_id, affiliate_id)`
+// against `attributions (id, affiliate_id)`, so the denormalized affiliate
+// cannot disagree with the attribution it was derived from. Drizzle's
+// `.references()` is single-column and a composite edge has no expression here
+// at all, which is `reserve_coverage_snapshots`' position in `scope.ts` arriving
+// on the transcription: the constraint lives in the database and this file does
+// not restate it.
+//
+// `amount_cents` IS SIGNED AND THAT IS WHAT MAKES THE TENANCY MATTER, which is
+// `affiliate_statements.total_cents`' sentence one table over: a clawback row is
+// negative, so a wrong rule here shows one affiliate the money another is owed.
+export const affiliateCommissions = pgTable('affiliate_commissions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  attributionId: uuid('attribution_id')
+    .notNull()
+    .references(() => attributions.id),
+  // 0078. NOT NULL with NO DEFAULT: a default here is a wrong affiliate waiting
+  // for the first writer that forgets the column.
+  affiliateId: uuid('affiliate_id').notNull(),
+  // Signed: a clawback row is negative. The clawback is a COMPENSATING ROW,
+  // never an update to the original, for the same reason a ledger reversal is.
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  // CHECKed in the DDL to accrued, payable, paid, clawed_back.
+  status: text('status').notNull().default('accrued'),
+  // The refund window, Merit's own clock.
+  payableAfter: date('payable_after').notNull(),
+  // SD-M8-01. THE SECOND CLOCK, and it is the card networks' rather than ours.
+  chargebackWindowEndsOn: date('chargeback_window_ends_on').notNull(),
+  // SD-M8-01. Which commission this row claws back. Null on an accrual, and the
+  // self-reference needs the `(): AnyPgColumn =>` return type for the reason
+  // `contentDocuments.supersededBy` states.
+  clawbackOf: uuid('clawback_of').references((): AnyPgColumn => affiliateCommissions.id),
+  // SD-M8-01. Which statement paid it. Null until paid.
+  paidInStatementId: uuid('paid_in_statement_id').references(() => affiliateStatements.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
 // otp_challenges -- 0002_identity.sql, PLUS TWO COLUMNS AND ONE RELAXATION
 // FROM 0029_phone_identity_and_auth.sql (SD-M16-05)
 // -----------------------------------------------------------------------------
