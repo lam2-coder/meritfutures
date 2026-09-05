@@ -8294,6 +8294,600 @@ const ri34 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-36, whose subject is a design record that STATES a nullability the schema
+// stopped having
+// -----------------------------------------------------------------------------
+// ADR-329. `docs/architecture/data-model/` carries one design record per table
+// and every record states, per column, whether the column is `not null`. TWO
+// RECORDS SAID `not null` ABOUT A COLUMN THAT IS NULLABLE, ON CONSECUTIVE DAYS,
+// AND NOTHING WENT RED:
+//
+//   `0080` (ADR-322) made `wallet_entries.provenance` nullable and
+//   direction-conditional; the record went on reading `` `provenance` | text |
+//   not null ``, and ADR-322 reported it as a landmine.
+//
+//   `0081` (ADR-323) dropped both `NOT NULL`s on `purchases.psp` and
+//   `purchases.psp_reference`; the record went on reading `not null` for both,
+//   and ADR-323 reported it as a landmine AND as a pattern, because it was the
+//   second occurrence in two rows.
+//
+// `CI-06i` reconciles the TABLE SET in both directions and stops at the name;
+// `scripts/corpus/data-model-columns.mjs` reconciles the COLUMN SET and says in
+// its own `covers` line that it reads names "and never types, nullability,
+// defaults or collation". So the axis that both landmines lived on was the one
+// axis no check in this repository read.
+//
+// WHY IT IS AN INVARIANT AND NOT A CI-06 GATE, decided rather than defaulted.
+// The subject is a document, which argues for `gates.mjs`; three things argue
+// louder for here. This file ALREADY READS THIS MIGRATION SET: `RI-26` folds
+// `packages/db/migrations` with `stripSqlComments`, `topLevelSegments`,
+// `columnRenamesIn` and a `DROP COLUMN` throw, and the first two are reused
+// below rather than written a second time. The `CI-06<letter>` series is CLOSED
+// at `w` (ADR-131, `CI-06/closed-letter-series`), so the letter the dispatch
+// named does not exist and a corpus gate would be a slug either way. And
+// `gates.mjs` is nine thousand lines of JavaScript that `scripts/corpus`'s own
+// `tsconfig.json` sets `checkJs: false` over, in writing; `packages/tooling`
+// sets `checkJs: true`, so a check written here is type-checked and the same
+// check written there is not.
+//
+// THE HARD PART IS NOT NULLABILITY, IT IS `ALTER`. A column's nullability is
+// its `CREATE TABLE` declaration AS AMENDED by every later `ALTER COLUMN ...
+// DROP NOT NULL` and `SET NOT NULL` in migration order. A reader that stopped
+// at the `CREATE TABLE` would call `wallet_entries.provenance` NOT NULL and
+// `purchases.psp` NOT NULL, agree with both stale records, and report a clean
+// estate over the exact two defects it was written for. So the fold below walks
+// the set in filename order and applies the statements, and every shape it
+// cannot model is a THROW rather than a skip.
+//
+// WHAT IT DEMANDS ABOUT A CHECK: NOTHING, AND THAT IS THE LIMIT IT ACCEPTS.
+// After `0080` `wallet_entries.provenance` is not simply nullable: it is
+// REQUIRED on a credit and null-or-`correction` on a debit, enforced by
+// `wallet_entries_provenance_follows_direction`. This check reads the column's
+// own `NOT NULL` and is blind to that CHECK, so a record that says only `null`
+// passes it. THE CHECK IS NOT UNGUARDED, it is guarded somewhere else: its
+// semantics are executed against a real database by
+// `scripts/db/probe_wallet_debit_provenance.sql` and
+// `scripts/db/probe_purchase_processor_columns.sql`, which `RI-24` requires
+// `corpus.yml` to run and `CI-06h` to pin. Reading a CHECK expression out of
+// the tree would be an expression parser, which is a second hard thing to keep
+// true, for an assertion a probe already makes better. The wider check -- a
+// record's TYPE, DEFAULT and CONSTRAINT text against the DDL -- is named as
+// OWED in ADR-329 section 7 and is not attempted here.
+//
+// FOUR MORE THINGS IT DOES NOT DO.
+//   1. It says nothing about a column only one side names. That is
+//      `data-model-columns.mjs`'s subject in both directions, and one defect
+//      reported by two checks is the collision `CI-06d` and `CI-06e` divide a
+//      population to avoid. (That gate is still unregistered; ADR-329 section 8
+//      reports it rather than registering it.)
+//   2. It reads the FIRST CELL of a `| Column |` table and the cell under that
+//      table's own `Constraints` header, so a nullability written in prose
+//      below the table is invisible to it exactly as it is to a reader skimming
+//      the table.
+//   3. A STRUCK-THROUGH ROW IS A TOMBSTONE AND NOT A CLAIM, which is
+//      `data-model-columns.mjs`'s ruling on `ADR-029`'s
+//      `kyc_verifications.~~dedupe_matched_identity_id~~` and is inherited here
+//      rather than re-decided.
+//   4. No database. The migration set in the tree is the whole input.
+const DATA_MODEL_DIR = 'docs/architecture/data-model';
+
+/**
+ * The `### <table>` heading that makes a file a design record.
+ *
+ * `CI-06i`'s predicate, verbatim, and it owns the finding about a heading that
+ * disagrees with its filename. This check reports only that it could not read
+ * one, by skipping the file.
+ */
+const DESIGN_RECORD_HEADING = /^### ([a-z][a-z0-9_]*)\s*$/m;
+
+/**
+ * A `CREATE TABLE` segment that is a table-level clause rather than a column.
+ *
+ * `RI-26`'s `temporalColumnFrom` list plus `partition`, which that reader can
+ * omit because a partition clause declares no temporal type and this one cannot
+ * because it would otherwise read `partition` as a column name.
+ */
+const TABLE_LEVEL_CLAUSE =
+  /^(constraint|primary|unique|check|foreign|exclude|like|deferrable|partition)\b/i;
+
+/**
+ * Whether one column definition declares the column NOT NULL.
+ *
+ * AT THE TOP LEVEL AND NEVER INSIDE PARENTHESES, which is the whole difficulty.
+ * `wallet_entries.balance_after_cents` is `bigint NOT NULL CHECK
+ * (balance_after_cents >= 0)` and `account_adjustments` carries CHECK bodies
+ * spelling `IS NOT NULL`; a textual scan would read the constraint as the
+ * column's own nullability. `packages/db/test/scoped-db.test.ts`'s
+ * `withoutNotNull` scans at depth zero for exactly this reason and this is the
+ * same rule.
+ *
+ * `PRIMARY KEY` COUNTS AND THE WORDS ARE OFTEN ABSENT. `wallet_dormancy` is
+ * `identity_id uuid PRIMARY KEY REFERENCES identities(id)` with no `NOT NULL`
+ * text at all, and `declaredNotNull` in that same suite reads the key as well
+ * as the words for the same reason.
+ *
+ * @param {string} def
+ * @returns {boolean}
+ */
+function declaresNotNull(def) {
+  let depth = 0;
+  for (let i = 0; i < def.length; i += 1) {
+    const ch = def[i];
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth -= 1;
+    if (depth !== 0) continue;
+    const previous = def[i - 1];
+    if (i !== 0 && previous !== undefined && !/\s/.test(previous)) continue;
+    const rest = def.slice(i);
+    if (/^NOT\s+NULL\b/i.test(rest) || /^PRIMARY\s+KEY\b/i.test(rest)) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether one column definition makes the column GENERATED ALWAYS AS a stored
+ * expression.
+ *
+ * IT IS THE ONE COLUMN SHAPE WHOSE RECORD IS ALLOWED TO SAY NOTHING, and the
+ * admission is mechanical rather than a written list. Six columns in this set
+ * are generated; the five whose DDL does not also say `NOT NULL` are the only
+ * five columns of 1,374 whose record states no nullability at all, and each of
+ * those cells spends itself on the expression instead. Every OTHER silent cell
+ * is a finding, which is what stops this check being satisfied by deleting the
+ * words `not null` from a row.
+ *
+ * `AS IDENTITY` is excluded because it is the primary-key idiom of this estate
+ * and those columns are NOT NULL by their key.
+ *
+ * @param {string} def
+ * @returns {boolean}
+ */
+const isGenerated = (def) => /\bGENERATED\s+ALWAYS\s+AS\s*\(/i.test(def);
+
+/**
+ * One table's columns, keyed by name, with the nullability the set LEAVES them.
+ *
+ * @typedef {{ notNull: boolean, def: string, where: string }} FoldedColumn
+ */
+
+/**
+ * The whole migration set folded to `table -> column -> FoldedColumn`, plus the
+ * statements the fold cannot model.
+ *
+ * SCHEMA-QUALIFIED RELATIONS ARE NOT READ AT ALL, and that is what keeps
+ * `0079`'s pg-boss installation out of this. Every `CREATE TABLE` and `ALTER
+ * TABLE` it writes names `pgboss.<something>`, including the `ADD PRIMARY KEY`
+ * that would otherwise be an unmodelled statement, and `docs/architecture/
+ * data-model/` records no relation outside `public`.
+ *
+ * @param {string} root
+ * @returns {{ tables: Map<string, Map<string, FoldedColumn>>, unmodelled: string[], files: string[] }}
+ */
+export function foldColumnNullability(root) {
+  const dir = join(root, MIGRATIONS_DIR);
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+  /** @type {Map<string, Map<string, FoldedColumn>>} */
+  const tables = new Map();
+  /** @type {string[]} */
+  const unmodelled = [];
+
+  for (const file of files) {
+    const code = stripSqlComments(readFileSync(join(dir, file), 'utf8'));
+
+    const create = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s*\(/gi;
+    for (let m = create.exec(code); m !== null; m = create.exec(code)) {
+      const table = (m[1] ?? '').toLowerCase();
+      let depth = 1;
+      let i = m.index + m[0].length;
+      const start = i;
+      for (; i < code.length && depth > 0; i += 1) {
+        if (code[i] === '(') depth += 1;
+        else if (code[i] === ')') depth -= 1;
+      }
+      if (depth !== 0) {
+        unmodelled.push(`${file}: CREATE TABLE ${table} has an unbalanced body`);
+        continue;
+      }
+      const columns = tables.get(table) ?? new Map();
+      tables.set(table, columns);
+      /** @type {string[]} */
+      const keyed = [];
+      for (const segment of topLevelSegments(code.slice(start, i - 1))) {
+        const def = segment.replace(/\s+/g, ' ').trim();
+        if (def === '') continue;
+        if (TABLE_LEVEL_CLAUSE.test(def)) {
+          // A TABLE-LEVEL `PRIMARY KEY (a, b)` MAKES ITS COLUMNS NOT NULL AND
+          // THE COLUMN DEFINITIONS DO NOT SAY SO. Sixteen tables in this set
+          // are keyed that way, `wallet_spend_limits` and `firm_parameters`
+          // among them, and a reader that dropped the clause would call every
+          // one of those key columns nullable.
+          const key = /^(?:CONSTRAINT\s+[a-z_][a-z0-9_]*\s+)?PRIMARY\s+KEY\s*\(([^)]*)\)/i.exec(
+            def,
+          );
+          if (key?.[1] !== undefined) {
+            for (const name of key[1].split(',')) keyed.push(name.trim().toLowerCase());
+          }
+          if (/^LIKE\b/i.test(def)) {
+            unmodelled.push(`${file}: CREATE TABLE ${table} imports columns with LIKE`);
+          }
+          continue;
+        }
+        const name = /^([a-z_][a-z0-9_]*)\b/i.exec(def)?.[1];
+        if (name === undefined) continue;
+        columns.set(name.toLowerCase(), { notNull: declaresNotNull(def), def, where: file });
+      }
+      for (const name of keyed) {
+        const column = columns.get(name);
+        if (column === undefined) {
+          unmodelled.push(`${file}: ${table} PRIMARY KEY names ${name}, which it declares nowhere`);
+          continue;
+        }
+        column.notNull = true;
+      }
+    }
+
+    const alter = /\bALTER\s+TABLE\s+(?:ONLY\s+)?([a-z_][a-z0-9_]*)(?![.\w])/gi;
+    for (let m = alter.exec(code); m !== null; m = alter.exec(code)) {
+      const table = (m[1] ?? '').toLowerCase();
+      let depth = 0;
+      let i = m.index + m[0].length;
+      for (; i < code.length; i += 1) {
+        if (code[i] === '(') depth += 1;
+        else if (code[i] === ')') depth -= 1;
+        else if (code[i] === ';' && depth === 0) break;
+      }
+      const body = code.slice(m.index + m[0].length, i);
+      alter.lastIndex = i;
+      const columns = tables.get(table);
+
+      for (const segment of topLevelSegments(body)) {
+        const clause = segment.replace(/\s+/g, ' ').trim();
+        if (clause === '') continue;
+
+        const added =
+          /^ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-z_][a-z0-9_]*)"?\s+(.+)$/i.exec(clause);
+        if (added?.[1] !== undefined && added[2] !== undefined) {
+          if (columns === undefined) {
+            unmodelled.push(`${file}: ADD COLUMN on ${table}, which no CREATE TABLE here makes`);
+            continue;
+          }
+          const def = `${added[1]} ${added[2]}`;
+          columns.set(added[1].toLowerCase(), {
+            notNull: declaresNotNull(def),
+            def,
+            where: file,
+          });
+          continue;
+        }
+
+        const moved = /^ALTER\s+COLUMN\s+"?([a-z_][a-z0-9_]*)"?\s+(DROP|SET)\s+NOT\s+NULL$/i.exec(
+          clause,
+        );
+        if (moved?.[1] !== undefined) {
+          const column = columns?.get(moved[1].toLowerCase());
+          if (column === undefined) {
+            unmodelled.push(
+              `${file}: ALTER COLUMN ${table}.${moved[1]} ${moved[2]} NOT NULL, and the fold ` +
+                'has no such column',
+            );
+            continue;
+          }
+          column.notNull = /^SET$/i.test(moved[2] ?? '');
+          column.where = file;
+          continue;
+        }
+
+        // EVERY OTHER `ALTER COLUMN` IS SKIPPED RATHER THAN REFUSED, and it is
+        // the one place this fold is deliberately narrower than
+        // `scoped-db.test.ts`'s. `TYPE`, `SET DEFAULT` and `DROP DEFAULT` move
+        // no column's nullability, and `0067` is the only `TYPE` in the set.
+        if (/^ALTER\s+COLUMN\b/i.test(clause)) continue;
+
+        if (/^RENAME\s+TO\b/i.test(clause)) {
+          unmodelled.push(`${file}: ALTER TABLE ${table} RENAME TO, which moves a whole record`);
+          continue;
+        }
+        if (/^RENAME\s+CONSTRAINT\b/i.test(clause)) continue;
+        const renamed =
+          /^RENAME\s+(?:COLUMN\s+)?"?([a-z_][a-z0-9_]*)"?\s+TO\s+"?([a-z_][a-z0-9_]*)"?$/i.exec(
+            clause,
+          );
+        if (renamed?.[1] !== undefined && renamed[2] !== undefined) {
+          const from = renamed[1].toLowerCase();
+          const to = renamed[2].toLowerCase();
+          const column = columns?.get(from);
+          if (column === undefined) {
+            unmodelled.push(
+              `${file}: RENAME COLUMN ${table}.${from} TO ${to}, and the fold has no such column`,
+            );
+            continue;
+          }
+          columns?.delete(from);
+          columns?.set(to, column);
+          continue;
+        }
+        if (/^DROP\s+COLUMN\b/i.test(clause)) {
+          unmodelled.push(`${file}: ${table} DROP COLUMN, which this fold cannot replay`);
+          continue;
+        }
+        if (/PRIMARY\s+KEY\b/i.test(clause) && /^(ADD|DROP)\b/i.test(clause)) {
+          unmodelled.push(`${file}: ${table} ${clause.slice(0, 70)}, which moves a key`);
+          continue;
+        }
+      }
+    }
+  }
+
+  return { tables, unmodelled, files };
+}
+
+/**
+ * One `Constraints` cell split into the terms a reader reads it as.
+ *
+ * TOP-LEVEL COMMAS ONLY, off `topLevelSegments`, because a cell routinely reads
+ * `not null, check in (\`psp_a\`,\`psp_b\`)` and the commas inside the vocabulary
+ * are not term boundaries.
+ *
+ * @param {string} cell
+ * @returns {string[]}
+ */
+const constraintTerms = (cell) =>
+  topLevelSegments(cell)
+    .map((term) => term.replace(/[*`]/g, '').replace(/\s+/g, ' ').trim().toLowerCase())
+    .filter((term) => term !== '');
+
+/**
+ * What a `Constraints` cell STATES about its column's nullability, or `null`
+ * when it states nothing.
+ *
+ * IT READS TERMS AND NOT THE CELL, AND THAT IS A MEASUREMENT RATHER THAN A
+ * PREFERENCE. The first reader written for this check tested the whole cell for
+ * `not null`, and it produced two findings against records that are TRUE:
+ *
+ *   `account_adjustments.promotional_credit_grant_id` reads `null, unique where
+ *   not null, fk ...`, where the phrase belongs to an INDEX PREDICATE.
+ *
+ *   `trading_calendar.session_open_at` and `.session_close_at` read `**null
+ *   exactly when \`is_holiday\`** (\`0032\`, was \`not null\`)`, where the phrase
+ *   is the record QUOTING WHAT IT USED TO SAY, beside the migration that
+ *   changed it. Those two cells are the best-maintained nullability lines in
+ *   the directory.
+ *
+ * Working agreements section 9: never weaken a gate to pass it, and a true line
+ * that trips a gate means the gate is wrong. Both cells stand exactly as they
+ * were and the reader moved.
+ *
+ * THE FIRST TERM THAT SPEAKS DECIDES, so `fk identities, not null, on delete
+ * restrict` is NOT NULL and `null, **fk added in \`0007\`**` is nullable. `pk`
+ * is the estate's spelling of a primary key and implies NOT NULL exactly as the
+ * DDL side does.
+ *
+ * @param {string} cell
+ * @returns {boolean | null}
+ */
+function statedNullability(cell) {
+  for (const term of constraintTerms(cell)) {
+    if (/^not null\b/.test(term)) return true;
+    if (/^null\b/.test(term)) return false;
+    if (/^pk\b/.test(term) || /^primary key\b/.test(term)) return true;
+  }
+  return null;
+}
+
+/**
+ * Every column one design record CLAIMS, with the cell that states it.
+ *
+ * @param {string} body
+ * @param {string} table
+ * @returns {{ column: string, cell: string, line: number }[]}
+ */
+function recordColumnClaims(body, table) {
+  /** @type {{ column: string, cell: string, line: number }[]} */
+  const claims = [];
+  /** @type {string[] | null} */
+  let header = null;
+  const lines = body.split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const text = lines[i] ?? '';
+    if (!text.startsWith('|')) {
+      header = null;
+      continue;
+    }
+    const cells = text
+      .split('|')
+      .slice(1, -1)
+      .map((cell) => cell.trim());
+    const first = cells[0] ?? '';
+    if (/^:?-+:?$/.test(first.replace(/\s/g, ''))) continue;
+    if (/^\*{0,2}Column\*{0,2}$/i.test(first)) {
+      header = cells.map((cell) => cell.replace(/\*/g, '').trim().toLowerCase());
+      continue;
+    }
+    if (header === null) continue;
+    const at = header.indexOf('constraints');
+    if (at < 0) continue;
+    // A TOMBSTONE IS NOT A CLAIM. `data-model-columns.mjs`'s ruling, inherited.
+    if (first.includes('~~')) continue;
+    const cell = cells[at] ?? '';
+    for (const named of first.matchAll(/`(?:([a-z_][a-z0-9_]*)\.)?([a-z_][a-z0-9_]*)`/g)) {
+      if (named[1] !== undefined && named[1] !== table) continue;
+      const column = named[2];
+      if (column === undefined) continue;
+      claims.push({ column: column.toLowerCase(), cell, line: i + 1 });
+    }
+  }
+  return claims;
+}
+
+/** @type {Invariant} */
+const ri36 = {
+  id: 'RI-36',
+  title: "A design record's nullability is the nullability the migrations leave",
+  covers:
+    'ADR-329. EVERY `### <table>` DESIGN RECORD UNDER ' +
+    '`docs/architecture/data-model/`, COLUMN BY COLUMN, AGAINST THE MIGRATION ' +
+    'SET AS IT LEAVES THAT COLUMN. `CI-06i` reconciles the TABLE set in both ' +
+    'directions and `scripts/corpus/data-model-columns.mjs` the COLUMN set; ' +
+    'both stop at the name, and the axis neither reads is the one two records ' +
+    'went stale on in two consecutive rows -- `wallet_entries.provenance` after ' +
+    '`0080` (ADR-322) and `purchases.psp` and `.psp_reference` after `0081` ' +
+    '(ADR-323), each reported as a landmine because nothing could report it as ' +
+    'a failure. ' +
+    'THE FOLD IS THE CHECK. A column is read as its `CREATE TABLE` declaration ' +
+    'AMENDED by every later `ALTER COLUMN ... DROP NOT NULL` and `SET NOT ' +
+    'NULL` in filename order, with `ADD COLUMN` and `RENAME COLUMN` folded and ' +
+    'a table-level `PRIMARY KEY (...)` making its columns NOT NULL. A reader ' +
+    'that stopped at the `CREATE TABLE` would agree with BOTH stale records, ' +
+    'because a later migration is what made both columns nullable. ' +
+    'LEG 1 IS THE COMPARISON, IN BOTH DIRECTIONS: a record that says `not ' +
+    'null` about a nullable column and a record that says `null` about a NOT ' +
+    'NULL one are both findings. LEG 2 IS SILENCE: a record row that states no ' +
+    'nullability at all is a finding unless the DDL declares that column ' +
+    '`GENERATED ALWAYS AS (...)`, which is the only shape in this set whose ' +
+    'cell spends itself on an expression instead. Without leg 2 the check is ' +
+    'satisfied by deleting two words from a row. LEG 3 IS THE MODEL: `DROP ' +
+    'COLUMN`, a table `RENAME TO`, a `LIKE` body and any statement that adds ' +
+    'or drops a PRIMARY KEY are shapes this fold cannot replay, and each is a ' +
+    'THROW rather than a skip. ' +
+    'IT DEMANDS NOTHING ABOUT A CHECK CONSTRAINT AND THAT IS THE LIMIT IT ' +
+    'ACCEPTS. After `0080` `wallet_entries.provenance` is REQUIRED on a credit ' +
+    'and null-or-`correction` on a debit by ' +
+    '`wallet_entries_provenance_follows_direction`; this reads the column`s own ' +
+    '`NOT NULL` and is blind to that, so a record saying only `null` passes. ' +
+    'The constraint is guarded by ' +
+    '`scripts/db/probe_wallet_debit_provenance.sql` and ' +
+    '`scripts/db/probe_purchase_processor_columns.sql`, which `RI-24` requires ' +
+    'to run and `CI-06h` to pin, and a record`s TYPE, DEFAULT and CONSTRAINT ' +
+    'text against the DDL is named OWED in ADR-329 rather than attempted. ' +
+    'FOUR MORE THINGS IT DOES NOT DO. It says nothing about a column only one ' +
+    'side names, which is `data-model-columns.mjs`s subject in both ' +
+    'directions. It reads the first cell of a `| Column |` table and that ' +
+    'table`s own `Constraints` column, so a nullability written in prose below ' +
+    'the table is invisible to it. A STRUCK-THROUGH ROW IS A TOMBSTONE AND NOT ' +
+    'A CLAIM, inherited from `data-model-columns.mjs` and ADR-029. And it ' +
+    'reads no database: the migration set in the tree is the whole input. ' +
+    'SILENT on a tree carrying no migrations directory or no design records.',
+  /** @param {string} root */
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    // SILENT ON A TREE THAT CARRIES NEITHER INPUT, on RI-23, RI-24, RI-25 and
+    // RI-26's precedent. The fixture estates in
+    // `packages/tooling/test/repo-invariants.test.ts` carry neither, and a
+    // check that reported on them would be reporting on a tree that is not
+    // this repository. The sentinels below are what stop silence being a way
+    // to pass on a tree that DOES carry them.
+    const migrations = join(root, MIGRATIONS_DIR);
+    const records = join(root, DATA_MODEL_DIR);
+    if (!existsSync(migrations) || !existsSync(records)) return findings;
+
+    const { tables, unmodelled, files } = foldColumnNullability(root);
+
+    // LEG 3, AND IT IS RULE 1 RATHER THAN RULE 2. This is not an input the
+    // check cannot reach; it is a migration set whose shape the fold does not
+    // model, and reporting on it would be claiming to have checked something
+    // that was not checked.
+    if (unmodelled.length > 0) {
+      throw new Error(
+        `RI-36 found ${unmodelled.length} statement(s) under ${MIGRATIONS_DIR} that this fold ` +
+          `cannot replay, so its nullability is no longer the schema's: ${unmodelled.join('; ')}. ` +
+          'Teach the fold the statement before trusting this check again',
+      );
+    }
+    if (tables.size === 0) {
+      throw new Error(
+        `RI-36 found no unqualified CREATE TABLE in the ${files.length} migration(s) under ` +
+          `${MIGRATIONS_DIR}. Zero means the reader or the comment stripper has moved, and ` +
+          'every column in the schema now reports as undeclared rather than as nullable',
+      );
+    }
+
+    // THE READER IS WATCHED DISCRIMINATING RATHER THAN ASSUMED TO. A
+    // `declaresNotNull` that returned a constant would agree with roughly one
+    // record row in ten and disagree loudly with the rest, which looks like a
+    // corpus-wide catastrophe rather than a broken reader; both dispositions
+    // present is the cheap assertion that says which it is.
+    const declared = [...tables.values()].flatMap((columns) => [...columns.values()]);
+    const notNulls = declared.filter((column) => column.notNull).length;
+    if (notNulls === 0 || notNulls === declared.length) {
+      throw new Error(
+        `RI-36 read ${declared.length} column(s) under ${MIGRATIONS_DIR} and ${notNulls} of ` +
+          'them as NOT NULL. A schema is never all of one and none of the other, so this is ' +
+          'the nullability reader having degraded to a constant rather than a finding',
+      );
+    }
+
+    let compared = 0;
+    const documents = readdirSync(records)
+      .filter((f) => /^[a-z][a-z0-9_]*\.md$/.test(f))
+      .sort();
+
+    for (const document of documents) {
+      const body = readFileSync(join(records, document), 'utf8');
+      const heading = DESIGN_RECORD_HEADING.exec(body);
+      // `CI-06i` owns "this file is not a readable design record" and owns "no
+      // migration creates this table". Reporting either here would make one
+      // defect two findings in two runners.
+      if (heading?.[1] === undefined) continue;
+      const table = heading[1];
+      const columns = tables.get(table);
+      if (columns === undefined) continue;
+
+      for (const { column, cell, line } of recordColumnClaims(body, table)) {
+        const folded = columns.get(column);
+        // Only one side names it: `data-model-columns.mjs`'s finding, and not
+        // this one's.
+        if (folded === undefined) continue;
+        compared += 1;
+        const stated = statedNullability(cell);
+        const where = `${DATA_MODEL_DIR}/${document}:${line}`;
+
+        if (stated === null) {
+          if (isGenerated(folded.def)) continue;
+          findings.push(
+            `${where}: the record states no nullability for \`${table}.${column}\`, and the ` +
+              `migrations declare it ${folded.notNull ? 'NOT NULL' : 'nullable'} ` +
+              `(${folded.where}). A row that says nothing is a row this check cannot ` +
+              'compare, and silence is how a stale `not null` gets repaired by deletion ' +
+              'rather than by correction. Its DDL is: ' +
+              folded.def,
+          );
+          continue;
+        }
+        if (stated === folded.notNull) continue;
+
+        findings.push(
+          `${where}: the record says \`${table}.${column}\` is ` +
+            `${stated ? '`not null`' : 'nullable'} and the migration set leaves it ` +
+            `${folded.notNull ? 'NOT NULL' : 'nullable'} as of ${folded.where}. A design ` +
+            'record is what the next module is built from, so a column stated the wrong way ' +
+            'round is a module written against a schema that does not exist. Its DDL is: ' +
+            folded.def,
+        );
+      }
+    }
+
+    // RULE 2 ON THE HALF A MISSING-INPUT GUARD CANNOT SEE. Every record could
+    // parse to a heading and none to a `| Column |` table, or the claim reader
+    // could stop matching backticked names, and the loop above would then
+    // report nothing at all while asserting nothing at all.
+    if (compared === 0) {
+      throw new Error(
+        `RI-36 compared no column at all over ${documents.length} design record(s) in ` +
+          `${DATA_MODEL_DIR} and ${tables.size} table(s) in ${files.length} migration(s). ` +
+          'Zero comparisons is the record reader having stopped reading, not a corpus with ' +
+          'nothing to say',
+      );
+    }
+
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -8328,6 +8922,7 @@ export const CHECKS = [
   ri33,
   ri34,
   ri35,
+  ri36,
 ];
 
 // =============================================================================
