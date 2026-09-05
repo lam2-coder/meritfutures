@@ -807,6 +807,9 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **43** | session 526, `0055` ([ADR-186](../../docs/decisions/ADR-186.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0055` lands, **and it is the only migration in this repository measured to re-apply CLEAN against its own landing schema**, which the section states with the partial-replay hazard that follows from it |
 | **44** | session 526, `0056` ([ADR-187](../../docs/decisions/ADR-187.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0056` lands. The eighth ledger code, and the only count it moves is a row |
 | **45** | session 526, `0057` ([ADR-189](../../docs/decisions/ADR-189.md)), written by [ADR-335](../../docs/decisions/ADR-335.md) | **allocated.** `0057` lands, **and it is the first section in this file that could not quote a probe transcript at its own migration's landing point**: [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) reads a column `0070` adds, so the transcript is quoted at the full applied set and the counterfactual is a removal. **NONE OF THESE SIX ROWS IS WRITTEN ON SOMEBODY ELSE'S BEHALF**, which is this table's standing rule: each is written in the same commit as the section it claims and as the deletion of that migration's row from `RI-37`'s backlog register. **The rows this table still owes are unchanged and are NOT filled in here**: 24, 26 to 30 and 32 to 34 are claimed by headings and have no row, and nothing compares this table to the headings |
+| **46** | session 527, `0068` ([ADR-228](../../docs/decisions/ADR-228.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0068` lands, and it is the first of three consecutive sections closing the withdrawal-approval run that `RI-37`'s backlog register held. **45 is the maximum this table has ever held and 46 is the next free number.** **SECTION NUMBERS ARE LANDING ORDER**, which 35, 36 and 37 prove by being `0079`, `0078` and `0082`. **Within the three the order is MIGRATION order, and the reason is NOT [ADR-335](../../docs/decisions/ADR-335.md)'s**: these three supersede nothing and share no constraint name. They are a CITATION chain, each file naming the one before it in its own text, so a reader taking them out of order reads a reference to a file that has not been introduced |
+| **47** | session 527, `0070` ([ADR-232](../../docs/decisions/ADR-232.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0070` lands, **and the section records that this migration is the floor under [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) and [`probe_payout_hold.sql`](../../scripts/db/probe_payout_hold.sql)**, which is section 45's finding measured from the other side. It also records that every control the file was written for is unreachable from the only writer of its edge |
+| **48** | session 527, `0072` ([ADR-234](../../docs/decisions/ADR-234.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0072` lands, **and the section records that the conditional in the migration's own header has since been met**: the `LT-06` driver it says does not exist is wired today. **NONE OF THESE THREE ROWS IS WRITTEN ON SOMEBODY ELSE'S BEHALF**, which is this table's standing rule: each is written in the same commit as the section it claims and as the deletion of that migration's row from `RI-37`'s backlog register. **The rows this table still owes are unchanged and are NOT filled in here**: 24, 26 to 30 and 32 to 34 are claimed by headings and have no row, and nothing compares this table to the headings |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -2901,3 +2904,177 @@ ERROR:  PROBE FAILED: LEDGER-K4 admitted a SECOND reversal of one transaction. S
 
 **THE SIX FILES IN THIS CLUSTER MOVE NO TABLE, NO INDEX, NO FOREIGN KEY AND NO UNIQUE CONSTRAINT BETWEEN THEM.** From `0051` to `0057` the catalogue reads **114 tables, 397 indexes, 167 foreign keys and 12 unique constraints, unchanged at every one of the seven stops.** What the six move is one CHECK constraint, two non-internal triggers, two functions and three rows, and the substance of four of them is a predicate that a count cannot see at all. **A reviewer measuring a supersession chain by object totals is measuring the one thing it does not touch**, which is why every section in this cluster quotes `pg_get_constraintdef` and `pg_index` rather than a number, and why `RI-37` says in its own `covers` that it never reads a section's content.
 
+
+## 46. `0068` lands, and the bound arrives before anything can reach the number it bounds (2026-09-05)
+
+**Session 527, [ADR-228](../../docs/decisions/ADR-228.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `228` and `0068`. THE SECTION IS DATED TODAY AND THE MIGRATION IS NOT.** [ADR-334](../../docs/decisions/ADR-334.md) shipped `RI-37` with a shrink-only register of twenty merged migrations carrying no landing record; [ADR-335](../../docs/decisions/ADR-335.md) closed six of them and left fourteen. This is the first of three sections closing the withdrawal-approval run, `0068`, `0070` and `0072`, and [ADR-336](../../docs/decisions/ADR-336.md) is the row that writes them.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION AND NONE IS COPIED OUT OF [ADR-228](../../docs/decisions/ADR-228.md).** Every figure that entry states is reproduced exactly and the agreement is stated rather than assumed, because a landing record whose numbers were transcribed from its own ADR is a copy and not a record.
+
+`0038:191-192` shipped `dual_control_threshold_cents bigint NOT NULL CHECK (> 0)` on `account_adjustments`, per row, so the writer of an adjustment chose the line its own amount was measured against. `0068` is the ceiling and nothing else: one `CHECK`, one `COMMENT`, no column, no table, no trigger.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0068` applied forward-only into an empty database under `ON_ERROR_STOP=1`, counts read from `pg_tables`, `pg_indexes`, `pg_constraint`, `pg_trigger` and `pg_proc` rather than from a grep:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean**, 64 files. Re-applying `0068` alone is refused at `constraint "account_adjustments_dual_control_threshold_ceiling" for relation "account_adjustments" already exists`, and re-applying `0001` at `type "identity_status" already exists` |
+| `public` object counts, `0067` then `0068` | **115 tables, 401 indexes, 167 foreign keys, 12 unique constraints, 26 non-internal triggers, 107 functions ALL UNCHANGED; CHECK constraints 495 to 496.** ONE object is created and it is a CHECK |
+| `account_adjustments_dual_control_threshold_ceiling`, read at `pg_constraint` | `CHECK ((dual_control_threshold_cents <= 500000))`. **A ceiling and not an equality, and NOT NULL-guarded**, because `0038` declares the column `NOT NULL` |
+| the two figures [ADR-228](../../docs/decisions/ADR-228.md) states | **64 migration files and 115 tables at `0001`..`0068`**, both reproduced to the unit off `ls` and `information_schema.tables` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+**[ADR-228](../../docs/decisions/ADR-228.md) SECTION 3.2's FOUR CASES WERE RE-EXECUTED ON THE FULL APPLIED SET INSIDE A ROLLED-BACK TRANSACTION AND ALL FOUR REPRODUCE.** A row carrying an unresolvable identity uuid reaches every `CHECK` before the foreign key, so a foreign-key error is the signal that the checks passed:
+
+| Case | amount, threshold | Result today |
+|---|---|---|
+| A. the attack | `100000000`, `9223372036854775807` | **REFUSED**, `account_adjustments_dual_control_threshold_ceiling` |
+| B. honest threshold | `100000000`, `500000` | **REFUSED**, `account_adjustments_dual_control_above_threshold` |
+| C. sub-threshold | `499999`, `500000` | **PERMITTED**, reaches `account_adjustments_identity_id_fkey` |
+| D. a stricter threshold | `100`, `10000` | **PERMITTED**, reaches the same foreign key |
+
+**AND THE BOUNDARY WAS WALKED RATHER THAN ASSUMED.** At `dual_control_threshold_cents = 500000` the row reaches the foreign key; at `500001` it is refused by name. The ceiling is inclusive and the cent above it is unwritable.
+
+### NOTHING UNDER `scripts/db/` WATCHES THIS FILE, established by removing it
+
+Applying every migration on disk **with `0068` removed** and running all 22 probes, [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql), [`assert_ledger_scope_agrees.mjs`](../../scripts/db/assert_ledger_scope_agrees.mjs) and [`assert_append_only_grants.mjs`](../../scripts/db/assert_append_only_grants.mjs) against the result: **every one of them exits 0.** So no committed reader goes red without this file.
+
+**AND THE ATTACK IS LIVE AGAIN THE MOMENT THE FILE IS GONE, WHICH IS THE COUNTERFACTUAL THAT MATTERS.** Case A re-run against the set with `0068` removed:
+
+```
+ERROR:  insert or update on table "account_adjustments"
+        violates foreign key constraint "account_adjustments_identity_id_fkey"
+```
+
+**A 100000000-integer-cent credit naming a threshold no adjustment can reach cleared every `CHECK` on the table** and stopped on a random identity uuid. Against a real identity it commits. That is [ADR-228](../../docs/decisions/ADR-228.md) section 3.2's own paragraph reproduced eight migrations later, and it is the only executed evidence in this repository that this file does anything.
+
+**AND THE ONE COMMITTED WRITER OF THE TABLE SITS EXACTLY ON THE BOUND.** [`probe_wallet_debit_provenance.sql:126-133`](../../scripts/db/probe_wallet_debit_provenance.sql) writes `account_adjustments` with `dual_control_threshold_cents` of **500000**, which is the ceiling's own value, so the constraint is evaluated on every run of that probe and accepted on every run of it. **A probe that only ever writes the permitted value measures that the constraint is installed and nothing about where it cuts**, which is the difference between a constraint being exercised and a constraint being watched. The refusal at `500001` above is this file's only executed perturbation and it lives in [ADR-336](../../docs/decisions/ADR-336.md) rather than under `scripts/db/`.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-228` | `account_adjustments` | `account_adjustments_dual_control_threshold_ceiling`, `dual_control_threshold_cents <= 500000`, plus its comment. The bound `0038` shipped the column without | 0068 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed.** No approved module document proposes a bound on this column: `0038`'s column is `SD-M6`'s and what lands here is the founder answer of 2026-08-29 made structural. **`0038` IS NOT EDITED** and is superseded by addition from outside it, which is constitution `E2` and the shape of every section above.
+
+### The part a reader should carry forward, and it is not the number
+
+**ONE SENTENCE IN THIS FILE'S HEADER IS FALSE ON TODAY'S TREE AND IT WAS TRUE ON THE DAY IT WAS WRITTEN.** Header item 1 states that `grep -c 'dual_control'` over `payouts.ts`, `admin-payouts.ts`, `wallet-withdrawals.ts` and `wallet.ts` returns *"0, 0, 0 and 0"*. Measured today: **0, 0, 5 and 0.** `wallet-withdrawals.ts` gained the five the moment [`0070`](migrations/0070_withdrawal_approval_and_dual_control.sql) put `dual_control_approval_id` and `dual_control_threshold_cents` on `wallet_withdrawals` two migrations later, which is exactly the undischarged threshold this file's own item 1 says is owed. **`0068` IS NOT EDITED**, which is constitution `E2`: the correction lives here, and the reader who needed it is the one running that grep to check whether the gap is still open. It is not, on the withdrawal path; it remains open on `payout_requests`, where all four counts are still 0.
+
+---
+
+## 47. `0070` lands, and the half of it that carries the whole control is reachable from no writer in this tree (2026-09-05)
+
+**Session 527, [ADR-232](../../docs/decisions/ADR-232.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `232` and `0070`.** Section 46's opening applies word for word. `0070` gives `wallet_withdrawals` the four columns its approval edge never had, and puts `0068`'s ceiling on the threshold column in the same statement that creates it.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION.** [ADR-232](../../docs/decisions/ADR-232.md)'s figures are reproduced exactly, including its twelve executed cases.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0070` applied forward-only into an empty database under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean**, 65 files. Re-applying `0070` alone is refused at `column "approved_at" of relation "wallet_withdrawals" already exists`, and re-applying `0001` at `type "identity_status" already exists` |
+| `public` object counts, `0068` then `0070` | **115 tables, 401 indexes and 12 unique constraints UNCHANGED; CHECK constraints 496 to 502, foreign keys 167 to 168, non-internal triggers 26 to 27, functions 112 to 113.** Six CHECKs, one foreign key, one constraint trigger and one function, and NOT ONE INDEX: four columns land unindexed |
+| the six CHECKs, read at `pg_constraint` | `..._approved_has_timestamp`, `..._unapproved_records_no_approval`, `..._dual_control_names_an_approver`, `..._operator_approval_records_threshold`, `..._operator_approval_dual_controlled` and `..._dual_control_threshold_ceiling`. The last reads `dual_control_threshold_cents IS NULL OR (> 0 AND <= 500000)`, which is `0068`'s bound **plus** `0038`'s `> 0`, on a column that is nullable here and `NOT NULL` there |
+| `wallet_withdrawals_dual_control_is_real`, read at `pg_trigger` | a **CONSTRAINT trigger**, `tgconstraint` non-zero, **`tgdeferrable` and `tginitdeferred` both true**, `AFTER INSERT OR UPDATE FOR EACH ROW` under `WHEN (new.dual_control_approval_id IS NOT NULL)` |
+| the three figures [ADR-232](../../docs/decisions/ADR-232.md) states | **65 migration files, 115 base tables and 27 non-internal triggers at `0001`..`0070`.** Every one reproduced to the unit |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+**[ADR-232](../../docs/decisions/ADR-232.md) SECTION 8's TWELVE CASES WERE RE-EXECUTED ON THE FULL APPLIED SET INSIDE A ROLLED-BACK TRANSACTION AND ALL TWELVE REPRODUCE**, including its own note about case `K`: a `requested` row carrying `approved_by` is refused by `..._operator_approval_records_threshold` where `..._unapproved_records_no_approval` would also refuse it, and PostgreSQL reports the first. **`..._unapproved_records_no_approval` was then isolated rather than left inferred**, by a `requested` row carrying a recorded threshold and no `approved_at`, which it refuses by name. All four trigger arms fire under their own labels, `WD-DC2`, `WD-DC3` and `WD-DC4` from the trigger and `WD-DC1` from the foreign key, which is what this file's own comment predicts: the reference is checked first, so the trigger's `IF NOT FOUND` branch is defensive against a path the foreign key already closes.
+
+### THE PROBE THIS FILE MAKES RUNNABLE, AND [ADR-335](../../docs/decisions/ADR-335.md) SECTION 4 SEEN FROM THE OTHER SIDE
+
+Section 45 recorded that [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) **cannot be run at `0057`**, dying at `column "approved_at" of relation "wallet_withdrawals" does not exist`, because that column arrives here. **Measured forward along the ladder, `0070` is the stop at which it starts working:**
+
+| Stop | `probe_ledger_constraints.sql` | `probe_payout_hold.sql` |
+|---|---|---|
+| `0001`..`0067` | **exit 3**, `column "approved_at" ... does not exist` | **exit 3**, same error |
+| `0001`..`0068` | **exit 3**, same error | **exit 3**, same error |
+| **`0001`..`0070`** | **exit 0**, 15 `NOTICE` lines | **exit 0**, 11 `NOTICE` lines |
+| `0001`..`0072` | **exit 0**, 15 `NOTICE` lines | **exit 0**, 11 `NOTICE` lines |
+
+**SO A MIGRATION THAT ADDS NO ASSERTION TO EITHER PROBE IS THE MIGRATION BOTH OF THEM REQUIRE**, and thirteen sections of this file record verification transcripts taken at stops where neither probe would run today. That is not a defect in either file: [ADR-232](../../docs/decisions/ADR-232.md)'s own fence records that `CI-06h` went red on `0070`'s first push, that five fixture rows across the two probes wrote a post-approval status with no `approved_at`, and that the fixtures were amended rather than the constraint narrowed. **The consequence is that the probes now carry a floor**, and it is `0070`.
+
+### THE OPERATOR ARM IS UNREACHED BY EVERY COMMITTED READER AND BY THE ONLY WRITER, and both halves were executed
+
+Applying every migration on disk **with `0070` removed**, the two probes above go red and **the twenty other probes and all three assert scripts stay green.** Both refusals are `column "approved_at" ... does not exist`: neither reader reaches an assertion about anything `0070` rules. **A dependency is not coverage**, and the difference was measured rather than argued:
+
+`assert_withdrawal_dual_control_is_real()` was replaced, in a scratch copy of the fully applied database, with a body that raises on entry. **Every probe under `scripts/db/` was then run against that copy and the tripwire fired ZERO times.** No committed reader ever writes `dual_control_approval_id`, so the trigger's `WHEN` clause is never satisfied and `WD-DC1` to `WD-DC4` have never been evaluated by anything in this repository.
+
+**AND THE ONLY WRITER OF THIS EDGE TAKES THE MACHINE ARM BY CONSTRUCTION.** [`apps/worker/src/withdrawals/approval-sweep.ts:563-565`](../../apps/worker/src/withdrawals/approval-sweep.ts) writes `approvedBy`, `dualControlApprovalId` and `dualControlThresholdCents` all `null`, with a comment saying the DDL requires it. `approved_by IS NULL` is the first disjunct of `..._operator_approval_dual_controlled` and the guard on `..._operator_approval_records_threshold`, so **the threshold, the ceiling and the four trigger arms are unreachable from any code path in this tree**, exactly as [ADR-232](../../docs/decisions/ADR-232.md) section 3 rules they should be until an operator door exists. **What is watched is the machine arm; what is unwatched is every control this file was written for**, and the two are not the same claim.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-232` | `wallet_withdrawals` | `approved_at`, `approved_by`, `dual_control_approval_id` (FK to `dual_control_approvals`, `ON DELETE RESTRICT`) and `dual_control_threshold_cents`, all nullable, all commented | 0070 | **landed** |
+| `ADR-232` | `wallet_withdrawals` | six CHECK constraints binding the four columns to each other and to `status`, including `..._operator_approval_dual_controlled` at 500000 integer cents and `..._dual_control_threshold_ceiling` | 0070 | **landed** |
+| `ADR-232` | `wallet_withdrawals` | `assert_withdrawal_dual_control_is_real()` and `wallet_withdrawals_dual_control_is_real`, a `DEFERRABLE INITIALLY DEFERRED` constraint trigger. `SD-M6-05` made enforceable: `WD-DC1` to `WD-DC4` | 0070 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on section 46's reasoning. `SD-M6-05` is the row that already exists and what lands here is that delta's own consequence on a second table. **`0011`, `0016` AND `0038` ARE NOT EDITED**, which is constitution `E2`.
+
+### The part a reader should carry forward, and it is not the threshold
+
+**HEADER SECTION 5 ITEM 1 SAYS THIS FILE DRIVES NO EDGE, AND THAT STOPPED BEING TRUE.** It states that *"Nothing in this tree writes `wallet_withdrawals.status` after the creation INSERT"* and names two writers, the `INSERT` in `wallet-withdrawals.ts` and one `UPDATE` in `apps/worker/src/sweeps/expiry.ts` that moves the freeze trio only. **There is now a third and it drives exactly this edge**: [`apps/worker/src/withdrawals/approval-sweep.ts`](../../apps/worker/src/withdrawals/approval-sweep.ts), whose own first line calls it *"THE `LT-06` WITHDRAWAL-APPROVAL DRIVER"*, ruled by [ADR-316](../../docs/decisions/ADR-316.md) and transcribed by [ADR-325](../../docs/decisions/ADR-325.md), wired at [`schedule.ts:245`](../../apps/worker/src/schedule.ts) under `entryPoint: 'runWithdrawalApprovals'`. **`0070` IS NOT EDITED**, which is constitution `E2`; the correction lives here, and it matters because a reader taking that sentence as current would conclude the four columns are still unwritten in production shape and they are not.
+
+---
+
+## 48. `0072` lands, and the conditional its own header wrote has since come true (2026-09-05)
+
+**Session 527, [ADR-234](../../docs/decisions/ADR-234.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `234` and `0072`.** Section 46's opening applies word for word, and this is the last of the three. `0072` makes the three arrows into `[*]` the only ways in, makes none of the three a way out, and gives `cancelled` the clock the other two terminal statuses already had.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION.** [ADR-234](../../docs/decisions/ADR-234.md)'s figures are reproduced exactly.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0072` applied forward-only into an empty database under `ON_ERROR_STOP=1`:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean**, 66 files. Re-applying `0072` alone is refused at `column "cancelled_at" of relation "wallet_withdrawals" already exists`, and re-applying `0001` at `type "identity_status" already exists` |
+| `public` object counts, `0070` then `0072` | **115 tables, 401 indexes, 168 foreign keys and 12 unique constraints UNCHANGED; CHECK constraints 502 to 504, non-internal triggers 27 to 29, functions 113 to 114.** TWO triggers over ONE function, which the file's own header records as PostgreSQL and not a preference: a `WHEN` clause on an `INSERT` trigger may not reference `OLD` |
+| the two CHECKs, read at `pg_constraint` | `..._cancelled_has_timestamp`, `status <> 'cancelled' OR cancelled_at IS NOT NULL`, and `..._uncancelled_records_no_cancellation`, its converse. The pair shape `0070` used, applied to the third terminal clock |
+| **the two triggers are NOT DEFERRABLE, and the file does not say so** | read at `pg_trigger`: both are CONSTRAINT triggers with `tgconstraint` non-zero and **`tgdeferrable` and `tginitdeferred` both FALSE**, because `CREATE CONSTRAINT TRIGGER` without a `DEFERRABLE` clause defaults to `NOT DEFERRABLE INITIALLY IMMEDIATE`. `0057`'s and `0070`'s constraint triggers on the same table are both `DEFERRABLE INITIALLY DEFERRED`. **`WD-C2` therefore decides at the statement and `WD-C1` decides at the commit**, on one table, and a reader reasoning about ordering from `0057`'s comment alone would get it wrong |
+| the two figures [ADR-234](../../docs/decisions/ADR-234.md) states | **66 migration files and 115 base tables at `0001`..`0072`**, both reproduced to the unit |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds**, exit 0 |
+
+**ALL FOUR `WD-C2` ARMS AND BOTH CHECKS WERE PERTURBED ON THE FULL APPLIED SET INSIDE A ROLLED-BACK TRANSACTION**, which reproduces [ADR-234](../../docs/decisions/ADR-234.md) section 6's cases `C`, `E`, `I`, `J`, `K`, `M` and `N`:
+
+| Perturbation | Result |
+|---|---|
+| `INSERT` at `settled` | **REFUSED**, `WD-C2`, *"is created at terminal status settled"* |
+| `cancelled --> requested` | **REFUSED**, `WD-C2` assertion 1, and the message names LEAVING rather than entering |
+| `approved --> cancelled` | **REFUSED**, `WD-C2`, *"cannot be cancelled from approved"* |
+| `approved --> settled` | **REFUSED**, `WD-C2`, *"cannot reach settled from approved"* |
+| `cooling --> cancelled` | **PERMITTED**, which is the drawn arrow |
+| `cancelled` with `cancelled_at` NULL | **REFUSED**, `wallet_withdrawals_cancelled_has_timestamp` |
+| `cancelled_at` on a `requested` row | **REFUSED**, `wallet_withdrawals_uncancelled_records_no_cancellation` |
+
+**AND `transferring --> failed` WITH NO `LT-09` IS REFUSED BY `WD-C1` AND NOT BY `WD-C2`**, which is [ADR-234](../../docs/decisions/ADR-234.md) case `G` reproduced and is the ordering the deferrability row above explains: `0072`'s trigger accepts the arrow at the statement and `0057`'s refuses the obligation at the commit.
+
+### THIS FILE HAS NO PROBE, AND THE ARROW ONE PROBE WALKS IS THE ONE IT ACCEPTS
+
+Applying every migration on disk **with `0072` removed** and running all 22 probes, [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql), [`assert_ledger_scope_agrees.mjs`](../../scripts/db/assert_ledger_scope_agrees.mjs) and [`assert_append_only_grants.mjs`](../../scripts/db/assert_append_only_grants.mjs): **every one exits 0.** No committed reader goes red without this file.
+
+**AND THE FUNCTION IS ENTERED, WHICH IS A DIFFERENT CLAIM AND WAS MEASURED SEPARATELY.** `assert_withdrawal_terminal_transition_is_drawn()` was replaced, in a scratch copy of the fully applied database, with a body that raises a `NOTICE` and returns. Run against every probe, it fires **four times, all of them `UPDATE transferring -> failed`, all inside [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql)** at lines 445, 476, 538 and 584. That is [ADR-234](../../docs/decisions/ADR-234.md)'s *"one drawn arrow in this estate that any fixture actually walks"*, measured, and it is the arm this trigger **permits**. **Every arm it refuses is unwatched**: the four `WD-C2` refusals above live in [ADR-336](../../docs/decisions/ADR-336.md) and in [ADR-234](../../docs/decisions/ADR-234.md) section 6 and nowhere under `scripts/db/`. A probe that walks only the permitted arrow measures that the trigger does not fire wrongly, and nothing about whether it fires at all.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-234` | `wallet_withdrawals` | `cancelled_at` and its comment; `..._cancelled_has_timestamp` and `..._uncancelled_records_no_cancellation`, the pair shape `0070` set | 0072 | **landed** |
+| `ADR-234` | `wallet_withdrawals` | `assert_withdrawal_terminal_transition_is_drawn()` and its comment; `wallet_withdrawals_not_born_terminal` and `wallet_withdrawals_terminal_transition_is_drawn`, two NOT DEFERRABLE constraint triggers over one function. `WD-C2` | 0072 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on section 46's reasoning. `STATE_MACHINES` section 3.2 is the drawing and what lands here is the drawing made enforceable. **`0011`, `0031`, `0057` AND `0070` ARE NOT EDITED**, which is constitution `E2`.
+
+### The part a reader should carry forward, and it is not the trigger
+
+**THIS FILE'S HEADER WROTE A CONDITIONAL AND THE CONDITION HAS SINCE BEEN MET.** [`0072:27-34`](migrations/0072_terminal_withdrawal_transitions.sql) says a cancel from `approved` *"Today it lands harmlessly, because no door drives the approval edge and `LT-06` therefore never posts"*, and that **"THE DAY THE POSTING LANDS IT STOPS BEING HARMLESS"**. **The posting has landed.** [`approval-sweep.ts`](../../apps/worker/src/withdrawals/approval-sweep.ts) drives `requested --> approved` and `cooling --> approved` and posts `LT-06` in the same transaction, wired at [`schedule.ts:245`](../../apps/worker/src/schedule.ts); its own step list names *"6. POST `LT-06`"*.
+
+**SO THE SENTENCE IS NOT STALE, IT IS DISCHARGED, AND THAT IS THE WHOLE ARGUMENT FOR WRITING A CONTROL BEFORE THE ROW IT CONTROLS.** `0072` was merged on 2026-08-29 against a schema no door drove; the door landed afterwards and the arrow it would have opened was already refused. Section 34 recorded the same shape one migration set earlier under the heading *"the control arrives before the row it controls"*. **The reader who should carry this is the one who finds a migration whose header says its own hazard is theoretical**: that is a claim about a tree, and the tree moves.
+
+---

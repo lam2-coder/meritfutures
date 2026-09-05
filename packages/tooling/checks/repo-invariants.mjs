@@ -9009,12 +9009,14 @@ const LANDING_VERB = /\bland(?:s)?\b/;
  * of measured is the exact thing this check exists to make somebody stop and do
  * properly.
  *
- * IT HAS SHRUNK ONCE AND THE SHRINK IS THE MECHANISM WORKING. ADR-334 opened it
- * at TWENTY entries. ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for `0052`
- * to `0057`, the chart-of-accounts and ledger-code run, each measured against
- * PostgreSQL 16.13 rather than reconstructed, and deleted those six rows in the
- * same commit. FOURTEEN remain and NINE of them open with an `E2 READ: MONEY
- * PATH` header, counted off the files rather than off these rows.
+ * IT HAS SHRUNK TWICE AND EACH SHRINK IS THE MECHANISM WORKING. ADR-334 opened
+ * it at TWENTY entries. ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for
+ * `0052` to `0057`, the chart-of-accounts and ledger-code run, and deleted
+ * those six rows in the same commit. ADR-336 wrote sections 46 to 48 for
+ * `0068`, `0070` and `0072`, the withdrawal-approval run, and deleted those
+ * three. Both measured against PostgreSQL 16.13 rather than reconstructed.
+ * ELEVEN remain and SIX of them open with an `E2 READ: MONEY PATH` header,
+ * counted off the files rather than off these rows.
  *
  * THE MONEY-PATH FIGURE ADR-334 RECORDED WAS SIXTEEN OF TWENTY AND THE MEASURED
  * FIGURE IS FIFTEEN. `0073_operator_directory.sql:4` opens `NOT THE MONEY PATH
@@ -9034,9 +9036,6 @@ const LANDING_RECORD_BACKLOG = new Map([
   ['0050', '0050_live_cache_and_role.sql, ADR-164. MONEY PATH'],
   ['0059', '0059_reversal_chain.sql, ADR-193. MONEY PATH'],
   ['0063', '0063_otp_challenge_consumption.sql, ADR-200. MONEY PATH'],
-  ['0068', '0068_dual_control_threshold_ceiling.sql, ADR-228. MONEY PATH'],
-  ['0070', '0070_withdrawal_approval_and_dual_control.sql, ADR-232. MONEY PATH'],
-  ['0072', '0072_terminal_withdrawal_transitions.sql, ADR-234. MONEY PATH'],
   ['0073', '0073_operator_directory.sql, ADR-237'],
   ['0074', '0074_firm_parameters.sql, ADR-252 is the ruling. MONEY PATH'],
 ]);
@@ -9127,11 +9126,12 @@ const ri37 = {
     'claim about one migration set rather than a property of the check and ' +
     'constitution E2 already forbids deleting a merged migration; a mis-keyed ' +
     'row is caught by leg 1 instead, since the number it failed to absorb is ' +
-    'then reported as unrecorded. IT OPENED AT TWENTY UNDER ADR-334 AND HOLDS FOURTEEN, ' +
-    'NINE of them carrying an `E2 READ: MONEY PATH` header, each with its file and the ADR its own header ' +
+    'then reported as unrecorded. IT OPENED AT TWENTY UNDER ADR-334 AND HOLDS ELEVEN, ' +
+    'SIX of them carrying an `E2 READ: MONEY PATH` header, each with its file and the ADR its own header ' +
     'cites; ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for `0052` to `0057` ' +
-    'and deleted those six rows in the same commit, which is leg 3 doing its ' +
-    'work rather than an allowlist being trimmed. ' +
+    'and deleted those six rows in the same commit, and ADR-336 wrote sections ' +
+    '46 to 48 for `0068`, `0070` and `0072` and deleted those three, which is ' +
+    'leg 3 doing its work rather than an allowlist being trimmed. ' +
     'A migration outside it with no record is a finding on the commit ' +
     'that adds it, so the backlog cannot grow without an edit to this file. ' +
     'FIVE THINGS IT DOES NOT DO. It never reads a section`s CONTENT: whether a ' +

@@ -143,9 +143,6 @@ const MIGRATION_NUMBERS_WITH_NO_SECTION = [
   '0050',
   '0059',
   '0063',
-  '0068',
-  '0070',
-  '0072',
   '0073',
   '0074',
 ] as const;
@@ -179,18 +176,19 @@ describe('RI-37 holds on this repository', () => {
   // each. That count is the register's size, and it is only reachable if every
   // one of those numbers was genuinely unrecorded a moment ago.
   //
-  // THE LITERAL MOVED FROM 20 TO 14 AND THAT IS THE ASSERTION, NOT THE
+  // THE LITERAL MOVED FROM 20 TO 14 TO 11 AND THAT IS THE ASSERTION, NOT THE
   // MAINTENANCE. A register that only shrinks is a register whose size is a
   // claim, so the number is written twice here on purpose: once as the list's
   // own length and once as a literal a session cannot change by editing the
-  // list. ADR-335 wrote six sections and deleted six rows in one commit.
-  test('the backlog register holds fourteen migrations the manifest does not record', () => {
+  // list. ADR-335 wrote six sections and deleted six rows in one commit, and
+  // ADR-336 wrote three and deleted three in one commit.
+  test('the backlog register holds eleven migrations the manifest does not record', () => {
     const closed = MIGRATION_NUMBERS_WITH_NO_SECTION.map(
       (number) => `## 9${number}. \`${number}\` lands, seeded by this case (2026-09-05)`,
     ).join('\n\n');
     const found = findings(estate(`${liveManifest()}\n${closed}\n`));
     expect(found).toHaveLength(MIGRATION_NUMBERS_WITH_NO_SECTION.length);
-    expect(found).toHaveLength(14);
+    expect(found).toHaveLength(11);
     for (const number of MIGRATION_NUMBERS_WITH_NO_SECTION) {
       expect(found.join('\n')).toContain(`backlog register holds \`${number}\``);
     }
@@ -300,6 +298,64 @@ describe('RI-37 goes red on each of the six sections ADR-335 wrote', () => {
   // one requires it of the cluster, where a cross-reference would hide.
   test('no one of the six headings claims another of the six', () => {
     for (const [section, number] of ADR_335_SECTIONS) {
+      const found = findings(estate(withoutSection(liveManifest(), section)));
+      expect(
+        found.map((f) => f.includes(`\`${number}\``)),
+        section,
+      ).toEqual([true]);
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 2c. THE THREE SECTIONS ADR-336 WROTE, and the three register rows they closed
+// -----------------------------------------------------------------------------
+// SECTION 2b's REASONING APPLIES WORD FOR WORD AND THE PAIR IS THE SAME PAIR.
+// Each section is reconstructed away and the check is watched reporting that
+// migration, which can only be red because the register row came out; each has
+// its counterfactual, the same manifest with the MIGRATION taken away as well,
+// on which no record is owed.
+//
+// AND THE HEADING-SHAPE CASE IS RE-RUN OVER THIS CLUSTER RATHER THAN INHERITED
+// FROM ADR-335's. These three headings are the first in the file where a
+// SIBLING of the cluster is named in the heading text at all: section 47's
+// heading is about `0070` and section 48's about `0072`, and the reader must
+// still report exactly one migration per removal. Three consecutive headings
+// for three consecutive migrations is where a widened reader would show.
+const ADR_336_SECTIONS = [
+  ['46', '0068', '0068_dual_control_threshold_ceiling.sql'],
+  ['47', '0070', '0070_withdrawal_approval_and_dual_control.sql'],
+  ['48', '0072', '0072_terminal_withdrawal_transitions.sql'],
+] as const;
+
+describe('RI-37 goes red on each of the three sections ADR-336 wrote', () => {
+  for (const [section, number, file] of ADR_336_SECTIONS) {
+    test(`without section ${section} the check reports \`${number}\``, () => {
+      const found = findings(estate(withoutSection(liveManifest(), section)));
+      expect(found).toHaveLength(1);
+      expect(found[0]).toContain(`${file} is on disk`);
+      expect(found[0]).toContain(`carries no landing record for \`${number}\``);
+    });
+
+    test(`COUNTERFACTUAL: without section ${section} AND without \`${number}\`, green`, () => {
+      expect(findings(estate(withoutSection(liveManifest(), section), [file]))).toEqual([]);
+    });
+  }
+
+  // ALL THREE AT ONCE IS THE TREE ADR-336 WAS DISPATCHED AGAINST WITH ITS
+  // REGISTER ROWS ALREADY REMOVED, and the count is the assertion.
+  test('THE TREE AS DISPATCHED: none of the three sections, exactly three findings', () => {
+    let body = liveManifest();
+    for (const [section] of ADR_336_SECTIONS) body = withoutSection(body, section);
+    const found = findings(estate(body));
+    expect(found).toHaveLength(3);
+    for (const [, number] of ADR_336_SECTIONS) {
+      expect(found.join('\n')).toContain(`carries no landing record for \`${number}\``);
+    }
+  });
+
+  test('no one of the three headings claims another of the three', () => {
+    for (const [section, number] of ADR_336_SECTIONS) {
       const found = findings(estate(withoutSection(liveManifest(), section)));
       expect(
         found.map((f) => f.includes(`\`${number}\``)),
