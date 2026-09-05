@@ -83,6 +83,14 @@ import { ri11 } from './ui-server-endpoints.mjs';
 // here and there is no cycle to depend on an import order.
 import { ri18For } from './response-shape-copies.mjs';
 
+// RI-35 IS THE THIRD CHECK IN ITS OWN FILE, on RI-11's and RI-18's precedent,
+// AND ITS DEPENDENCY RUNS ONE WAY LIKE RI-18's. It carries two written
+// registers and the argument for their shape, which is more prose than any
+// neighbour in this file has, and nothing in `absence-claims.mjs` imports this
+// module, so the `CHECKS` literal at the foot of this file can name it without
+// depending on an import order.
+import { ri35 } from './absence-claims.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /**
@@ -8319,6 +8327,7 @@ export const CHECKS = [
   ri31,
   ri33,
   ri34,
+  ri35,
 ];
 
 // =============================================================================
