@@ -709,6 +709,43 @@ function absenceClaimEstate(root: string): void {
     'GRANT USAGE ON SCHEMA pgboss TO merit_app;\n',
   );
 
+  // ADR-330. THE ESTATE REACHES `scripts/` NOW, AND THESE THREE FILES ARE
+  // FIDELITY RATHER THAN EXEMPTION. `RI-35`'s sweep was widened to read
+  // `scripts/`, so the register gained claim sites there and the loop below
+  // materialises them -- which drags in two OTHER checks' subjects, and both
+  // were repaired by making the fixture more like this repository rather than
+  // by narrowing anything.
+  //
+  //   `scripts/corpus/gates.mjs` is what the `gates-importable` probe READS. It
+  //   throws on a missing file rather than reporting `absent`, which is rule 2,
+  //   so a fixture without it makes every case in this file an ERROR. It carries
+  //   the two halves the probe asserts -- the `GATES` export and the
+  //   direct-invocation guard -- and a `ci06h` block, because `RI-24` reads that
+  //   block for the pins below.
+  //
+  //   `.github/workflows/corpus.yml` is `RI-24`'s other half. One registered
+  //   claim site is `scripts/db/assert_pgboss_schema_matches_library.mjs`, whose
+  //   name matches that check's `assert_*` discovery, so materialising it put an
+  //   assertion on disk that no workflow ran. The real repository runs and pins
+  //   it; the fixture now does too.
+  write(
+    root,
+    'scripts/corpus/gates.mjs',
+    'const REQUIRED = 1;\n' +
+      "const ci06h = {\n  id: 'CI-06h',\n" +
+      "  run: () => ['assert_pgboss_schema_matches_library.mjs', REQUIRED],\n};\n" +
+      'export const GATES = [ci06h];\n' +
+      'const main = () => 0;\n' +
+      'const invokedDirectly = false;\n' +
+      'if (invokedDirectly) process.exit(main());\n',
+  );
+  write(
+    root,
+    '.github/workflows/corpus.yml',
+    'jobs:\n  corpus:\n    steps:\n' +
+      '      - run: node scripts/db/assert_pgboss_schema_matches_library.mjs\n',
+  );
+
   /** Every registered claim, grouped by the site that carries it. */
   const bySite = new Map<string, string[]>();
   for (const claim of ABSENCE_CLAIMS) {
@@ -1889,6 +1926,12 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     const root = cleanTree();
     rmSync(join(root, 'apps'), { recursive: true });
     rmSync(join(root, 'packages'), { recursive: true });
+    // ADR-330: `scripts/` too. `RI-15`'s walk always read it; what changed is
+    // that `RI-35`'s register now names sites there, so `cleanTree` materialises
+    // two source files under it and "no source file at all" stopped being true
+    // of this tree. The sentinel is about a walk that reaches NOTHING, so the
+    // fixture has to leave nothing rather than the assertion being softened.
+    rmSync(join(root, 'scripts'), { recursive: true });
     rmSync(join(root, 'vitest.config.ts'));
     rmSync(join(root, 'eslint.config.js'));
     expect(() => findings('RI-15', root)).toThrow(/NO source file/);

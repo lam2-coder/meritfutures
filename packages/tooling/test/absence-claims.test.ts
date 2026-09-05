@@ -1,5 +1,5 @@
 // =============================================================================
-// RI-35 IS WATCHED CATCHING THE FOUR OCCURRENCES THAT MOTIVATED IT
+// RI-35 IS WATCHED CATCHING THE OCCURRENCES THAT MOTIVATED IT
 // =============================================================================
 // `repo-invariants.test.ts`'s rule, which is falsify.mjs's rule: a check that
 // has only ever been seen pass is indistinguishable from a check that cannot
@@ -17,9 +17,15 @@
 // working would fail these cases rather than pass a second implementation of
 // itself. What the fixtures write is the DDL and the prose, which is the input
 // side, and that is where this file is allowed to keep its own spelling.
+//
+// ADR-330 ADDED THE SEVENTH, AND IT IS THE FIRST ONE A CHECK FOUND RATHER THAN
+// A READER. Its reconstruction sits at the foot of this file with the cases
+// holding the widened sweep scope open, and its counterfactual is a different
+// shape from the four above: it was falsified by a GUARD landing inside a file
+// that already existed rather than by a migration arriving.
 // =============================================================================
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -651,6 +657,50 @@ describe('the shipped register holds on this repository', () => {
     }
   });
 
+  // ADR-330. THE SEVENTH IS REGISTERED TOO, and its site is the reason the
+  // sweep was widened, so a session that narrows the scope back to the shipped
+  // tree loses this binding and this case says so at that moment.
+  test('the seventh occurrence is registered, retired, at its own file under `scripts/`', () => {
+    const at = ABSENCE_CLAIMS.filter(
+      (c) => c.site === 'scripts/corpus/data-model-columns.mjs' && c.disposition === 'retired',
+    );
+    expect(at).toHaveLength(1);
+    expect(at[0]?.artifact).toBe('gates-importable');
+  });
+
+  // THE STALE SENTENCE IS ASSERTED ABSENT FROM THE LIVE FILE EXCEPT AS A QUOTED
+  // RETIREMENT, which is `RI-14`'s shape and ADR-329 section 6's rule. Without
+  // it, the case above goes on asserting a binding over a repair somebody
+  // reverted, and reports GREEN while the file says the false thing again.
+  test('the repaired header states the retirement and no longer asserts the absence', () => {
+    const body = readFileSync(join(REPO_ROOT, 'scripts/corpus/data-model-columns.mjs'), 'utf8');
+    const lines = body.split('\n').filter((l) => l.includes('IT CANNOT BE IMPORTED'));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('THIS PARAGRAPH READ');
+    expect(body).toContain('IT CAN NOW BE IMPORTED');
+  });
+
+  // THE TWO THE WIDENED SCOPE SURFACED AND COULD NOT BIND. Both quote somebody
+  // else's thrown error text -- pg-boss's and PostgreSQL's -- so both are
+  // `unbindable` with a reason rather than a narrowed needle, and leg 4 already
+  // demands the reason be readable. This case demands they stay unbound: an
+  // entry quietly given a disposition would be a claim about a vendor's
+  // behaviour asserted against this tree.
+  test('the two claims the widened scope surfaced are unbindable and name no artifact', () => {
+    for (const site of [
+      'scripts/db/assert_pgboss_schema_matches_library.mjs',
+      'scripts/db/probe_pgboss_job_store.sql',
+    ]) {
+      const at = ABSENCE_CLAIMS.filter((c) => c.site === site && c.unbindable !== undefined);
+      expect({ site, count: at.length }).toEqual({ site, count: 1 });
+      expect({ site, artifact: at[0]?.artifact, disposition: at[0]?.disposition }).toEqual({
+        site,
+        artifact: undefined,
+        disposition: undefined,
+      });
+    }
+  });
+
   // EVERY PROBE IS WATCHED RETURNING BOTH VALUES SOMEWHERE IN THIS FILE OR
   // HERE. A probe that can only ever answer one way is a leg that cannot fail,
   // which is the defect one layer under the one this check is about.
@@ -666,5 +716,226 @@ describe('the shipped register holds on this repository', () => {
   test('both answers occur on this tree, so neither branch is unreachable', () => {
     const answers = new Set(ABSENCE_ARTIFACTS.map((a) => a.probe(REPO_ROOT)));
     expect([...answers].sort()).toEqual(['absent', 'present']);
+  });
+});
+
+// =============================================================================
+// ADR-330. THE SEVENTH OCCURRENCE, AND THE SCOPE THAT COULD NOT SEE IT
+// =============================================================================
+// ADR-328 shipped leg 6 over `apps/*/src` and `packages/*/src` and said in its
+// own approval block that `scripts/` was the weakest line it drew, because
+// occurrence 4 lived there and was registered by hand for exactly that reason.
+// ADR-329 finding 6 then found the SEVENTH occurrence at
+// `scripts/corpus/data-model-columns.mjs`, in the directory the sweep did not
+// read. These cases hold the widened scope open.
+//
+// THE COUNTERFACTUAL HERE IS A DIFFERENT SHAPE FROM THE FOUR ABOVE, and it is
+// worth naming. Occurrences 1 to 4 were falsified by a MIGRATION, so their
+// counterfactual is the migration set with one file removed. This one was
+// falsified by a GUARD landing inside a file that already existed, so its
+// counterfactual is the same file as it stood before `55824c62`: ending in an
+// unguarded `process.exit(main())` with nothing exported.
+// =============================================================================
+
+describe('the seventh occurrence, in the directory the sweep learned to read', () => {
+  // The verbatim text out of `git show aef3bfc7:scripts/corpus/data-model-columns.mjs`
+  // lines 56 to 59, which is the commit that carried the widened sweep and was
+  // RED at this line by construction.
+  const OCCURRENCE_7 =
+    '//    IT CANNOT BE IMPORTED: `gates.mjs` ends in `process.exit(main())` at module\n' +
+    '//    scope with no direct-invocation guard, so importing it runs every gate and\n' +
+    '//    exits the process. Adding that guard is a behavioural edit to a file two\n' +
+    '//    other sessions are live in, which is a merge hazard this file is not worth.\n';
+
+  /** `gates.mjs` as it stands: exporting its gates and guarding its own run. */
+  const GUARDED =
+    'export const GATES = [];\n' +
+    'const invokedDirectly = process.argv[1] !== undefined;\n' +
+    'if (invokedDirectly) process.exit(main());\n';
+
+  /** `gates.mjs` as it stood before `55824c62`, which is what the sentence described. */
+  const UNGUARDED = 'const GATES = [];\nprocess.exit(main());\n';
+
+  const register = {
+    artifacts: only(['gates-importable']),
+    claims: [
+      {
+        site: 'scripts/corpus/data-model-columns.mjs',
+        claim: 'IT CANNOT BE IMPORTED: `gates.mjs` ends in `process.exit(main())` at module',
+        disposition: 'live' as const,
+        artifact: 'gates-importable',
+        why: 'the header as it stood on 2026-09-05, before ADR-330 repaired it',
+      },
+    ],
+  };
+
+  test('RED: the header says it cannot be imported and the guard is in the file', () => {
+    const root = bareTree();
+    write(root, 'scripts/corpus/data-model-columns.mjs', OCCURRENCE_7);
+    write(root, 'scripts/corpus/gates.mjs', GUARDED);
+
+    const findings = checkAbsenceClaims(root, register);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('scripts/corpus/data-model-columns.mjs says');
+    expect(findings[0]).toContain('IT CANNOT BE IMPORTED');
+    expect(findings[0]).toContain('EXISTS. The sentence is false');
+  });
+
+  test('GREEN: the same header against an unguarded `gates.mjs`, which is when it was true', () => {
+    const root = bareTree();
+    write(root, 'scripts/corpus/data-model-columns.mjs', OCCURRENCE_7);
+    write(root, 'scripts/corpus/gates.mjs', UNGUARDED);
+    expect(checkAbsenceClaims(root, register)).toEqual([]);
+  });
+
+  test('THE PROBE READS BOTH HALVES: a guard with nothing exported is still absent', () => {
+    // The false sentence justified a DUPLICATED PARSER, and the remedy it names
+    // is to import the original. A guard with no export makes the module safe to
+    // import and supplies nothing to import, so calling the artifact present off
+    // the guard alone would retire a sentence whose remedy is still unavailable.
+    const root = bareTree();
+    write(root, 'scripts/corpus/data-model-columns.mjs', OCCURRENCE_7);
+    write(
+      root,
+      'scripts/corpus/gates.mjs',
+      'const GATES = [];\nconst invokedDirectly = true;\nif (invokedDirectly) process.exit(main());\n',
+    );
+    expect(checkAbsenceClaims(root, register)).toEqual([]);
+  });
+
+  test('LEG 6 REPORTS IT BY DISCOVERY, which is what the widened scope buys', () => {
+    // THE HALF THAT PROVES THE SCOPE RATHER THAN THE REGISTER ENTRY. With the
+    // artifact registered and the SITE not, leg 6 has to find the line itself.
+    // Under ADR-328's scope this file is invisible and the run is clean.
+    const root = bareTree();
+    write(root, 'scripts/corpus/data-model-columns.mjs', OCCURRENCE_7);
+    write(root, 'scripts/corpus/gates.mjs', GUARDED);
+    const findings = checkAbsenceClaims(root, {
+      artifacts: only(['gates-importable']),
+      claims: [
+        {
+          site: 'scripts/corpus/gates.mjs',
+          claim: 'export const GATES = [];',
+          disposition: 'retired' as const,
+          artifact: 'gates-importable',
+          why: 'the filler that keeps `gates-importable` off leg 5 so the sweep reports alone',
+        },
+      ],
+    });
+    expect(findings.join('\n')).toContain('scripts/corpus/data-model-columns.mjs:1');
+    expect(findings.join('\n')).toContain('names a registered artifact and asserts an absence');
+  });
+
+  test('AND THE OLD SCOPE WOULD NOT HAVE SEEN IT, asserted rather than left to be inferred', () => {
+    // THE SAME BYTES, ONE DIRECTORY OVER, WHERE NEITHER SCOPE READS. This is the
+    // design decision most likely to be reverted by somebody tidying the walk,
+    // so it is pinned: the sweep reports the line because of WHERE the file is,
+    // and a scope that reaches neither `src/` nor `scripts/` is silent on it.
+    const root = bareTree();
+    write(root, 'tools/data-model-columns.mjs', OCCURRENCE_7);
+    write(root, 'scripts/corpus/gates.mjs', GUARDED);
+    expect(
+      checkAbsenceClaims(root, {
+        artifacts: only(['gates-importable']),
+        claims: [
+          {
+            site: 'scripts/corpus/gates.mjs',
+            claim: 'export const GATES = [];',
+            disposition: 'retired' as const,
+            artifact: 'gates-importable',
+            why: 'the filler that keeps `gates-importable` off leg 5',
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('the widened scope: what it reads, and what it still refuses to read', () => {
+  const GUARDED =
+    'export const GATES = [];\n' +
+    'const invokedDirectly = process.argv[1] !== undefined;\n' +
+    'if (invokedDirectly) process.exit(main());\n';
+
+  const filler = {
+    site: 'packages/queue/src/job-queue.ts',
+    claim: 'export const JOB_QUEUE_METHODS = [];',
+    disposition: 'live' as const,
+    artifact: 'queue-door',
+    why: 'the filler that keeps `queue-door` off leg 5 so the sweep reports alone',
+  };
+
+  test('`.sql` UNDER `scripts/` IS SWEPT, which is the shape occurrence 4 lived in', () => {
+    const root = bareTree();
+    write(
+      root,
+      'scripts/db/probe_something.sql',
+      '-- pg-boss owns this schema and\n-- no module here imports it\n',
+    );
+    const findings = checkAbsenceClaims(root, {
+      artifacts: only(['queue-door']),
+      claims: [filler],
+    });
+    expect(findings.join('\n')).toContain('scripts/db/probe_something.sql:2');
+    expect(findings.join('\n')).toContain('names a registered artifact and asserts an absence');
+  });
+
+  test('a directory named `test` under `scripts/` is NOT swept', () => {
+    // `apps/*/src` gets this exclusion structurally, because the suites sit
+    // beside `src/` rather than inside it. Under `scripts/` it is written, and
+    // the reason is the one this check's header already gives: a case asserting
+    // a refusal QUOTES the refusal, so a test carrying a claim string is the
+    // assertion and not a second claim site.
+    //
+    // THE NON-TEST FILE BESIDE IT IS LOAD BEARING AND SAYS SO. The sentinel
+    // below counts swept files AFTER this exclusion, so a `scripts/` holding
+    // nothing but a suite is a MOVED LAYOUT and throws. This fixture is a
+    // `scripts/` that is being swept normally and is silent on the one
+    // directory inside it that is excluded, which is the property under test.
+    const root = bareTree();
+    write(root, 'scripts/demo/run.mjs', 'export const run = () => 0;\n');
+    write(
+      root,
+      'scripts/demo/test/world.test.ts',
+      "it('refuses', () => {\n  // `@merit/queue` is real and no module here imports it\n});\n",
+    );
+    expect(checkAbsenceClaims(root, { artifacts: only(['queue-door']), claims: [filler] })).toEqual(
+      [],
+    );
+  });
+
+  test('a `scripts/` that exists and yields no swept file is an ERROR, not a narrower sweep', () => {
+    // RULE 2, in the half the widening added. A `scripts/` whose layout moved
+    // would make leg 6 silently stop reading a directory it was extended to
+    // reach, and every claim site under it would go unswept while the run
+    // reported clean.
+    const root = bareTree();
+    write(root, 'scripts/README.md', '# not a swept shape\n');
+    expect(() =>
+      checkAbsenceClaims(root, { artifacts: only(['queue-door']), claims: [filler] }),
+    ).toThrow(/found no swept file under scripts\//);
+  });
+
+  test('a tree with NO `scripts/` at all is skipped rather than thrown on', () => {
+    // The split `shippedSources` already makes when it skips an absent `apps` or
+    // `packages`. A tree that declares no `scripts/` has one fewer place to look
+    // and was not mis-measured, which is why every case above this one runs on a
+    // `bareTree` that has none.
+    const root = bareTree();
+    expect(checkAbsenceClaims(root, { artifacts: only(['queue-door']), claims: [filler] })).toEqual(
+      [],
+    );
+  });
+
+  test('THE PROBES DID NOT MOVE WITH THE SWEEP, which is the risk of widening a shared walk', () => {
+    // `queue-door` says in words that it is about a module under `apps/*&#47;src`
+    // or `packages/*&#47;src`. If the widening had been done by editing
+    // `shippedSources` in place, an importer under `scripts/` would have made
+    // this probe report the door BUILT, retiring three live claims by editing a
+    // file walk. It is a second function for exactly this reason.
+    const root = bareTree();
+    write(root, 'scripts/demo/run.mjs', "import { pgBossQueue } from '@merit/queue';\n");
+    write(root, 'scripts/corpus/gates.mjs', GUARDED);
+    expect(artifact('queue-door').probe(root)).toBe('absent');
   });
 });
