@@ -14,8 +14,8 @@
 | `currency` | char(3) | not null default `'USD'` | reserved for multi-currency, never used in v1 math (Wave 2 gate ruling 5) |
 | `coupon_id` | uuid | fk coupons, null, on delete restrict | |
 | `affiliate_id` | uuid | fk affiliates, null, on delete restrict | attribution resolved at purchase |
-| `psp` | text | not null, check in (`psp_a`,`psp_b`) | which MID took it |
-| `psp_reference` | text | not null | |
+| `psp` | text | null, **present exactly when `payment_method` is not `wallet`** (`purchases_processor_columns_follow_method`, `0081`), check in (`psp_a`,`psp_b`) | which MID took it. **The `NOT NULL` was dropped in [`0081`](../../../packages/db/migrations/0081_purchase_processor_columns.sql) ([ADR-323](../../decisions/ADR-323.md)): a wallet-funded purchase called no processor, so it names none**, and the `CHECK` is what makes the absence exact rather than merely permitted |
+| `psp_reference` | text | null, **present exactly when `payment_method` is not `wallet`** (`purchases_processor_columns_follow_method`, `0081`) | the processor's own reference for the payment. Under `psp` and `mixed` the `CHECK` still requires it AT INSERT, so this column being nullable does **not** buy the deferred stamping [ADR-323](../../decisions/ADR-323.md) finding 8 says is still owed |
 | `mid_reference` | text | null | the specific merchant account, for MID health |
 | `status` | `purchase_status` enum(`pending`,`paid`,`failed`,`refunded`,`charged_back`) | not null default `pending` | |
 | `paid_at` | timestamptz | null | |
@@ -32,6 +32,6 @@
 | `created_at`, `updated_at` | timestamptz | not null default now() | |
 
 Indexes: unique `purchases_psp_reference_uq (psp, psp_reference)`, the idempotency anchor for webhooks; `purchases_identity_created_idx (identity_id, created_at desc)`; `purchases_pending_idx (created_at)` where `status = 'pending'` (the paid-not-provisioned alarm query); `purchases_refundable_idx (refundable_until)` where `first_trade_at is null and refundable_until is not null` (the refund-window closer); `purchases_parent_account_idx (parent_account_id)` where not null.
-Constraints: `purchases_price_arithmetic` (`amount_paid_cents = list_price_cents - discount_cents`); `purchases_discount_within_list`; `purchases_wallet_leg_matches_method`; `purchases_wallet_debit_is_posted` (a wallet debit that posted no ledger transaction is money that moved outside the ledger); `purchases_reset_has_parent`; `purchases_paid_has_timestamp`.
+Constraints: `purchases_price_arithmetic` (`amount_paid_cents = list_price_cents - discount_cents`); `purchases_discount_within_list`; `purchases_wallet_leg_matches_method`; `purchases_wallet_debit_is_posted` (a wallet debit that posted no ledger transaction is money that moved outside the ledger); `purchases_reset_has_parent`; `purchases_paid_has_timestamp`; `purchases_processor_columns_follow_method` (**`0081`**: both processor columns absent under `wallet`, both present under `psp` and `mixed`, and a total `CASE` so a fourth `payment_method` is refused rather than admitted by a NULL).
 Retention: forever.
 Why the wallet constraints are three and not one: together they make "a wallet purchase that looks like a stalled PSP purchase" **unrepresentable**, which is the whole point of `SD-M3-06`. Without an explicit method the wallet path is indistinguishable from a PSP purchase whose webhook never arrived, which is exactly the state FM-M3-01 pages on.
