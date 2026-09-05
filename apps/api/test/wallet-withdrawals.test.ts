@@ -1950,8 +1950,19 @@ describe('why the complete adapter is not installed, RUN rather than read (ADR-3
     // LT-06 builder" and `F2` as a manifest line the worker was owed. BOTH ARE
     // DISCHARGED and this case is what stops either sentence returning: it
     // asserts the positive, so a session restating the absence lands red.
+    // THE EXPORT SPECIFIER AND NOT THE NAME ANYWHERE IN THE FILE. This case was
+    // written the weak way first and a seeded violation walked past it: the
+    // line commented OUT still carries the identifier, so `toContain` held
+    // while the package published nothing. The block is extracted and the line
+    // is required to be live.
     const index = readFileSync(join(REPO, 'packages', 'ledger', 'src', 'index.ts'), 'utf8');
-    expect(index).toContain('walletWithdrawalApprovalPosting');
+    const reversalExports = /export \{([^}]*)\} from '\.\/reversal\.ts';/.exec(index)?.[1];
+    expect(reversalExports, 'no export block from `reversal.ts`').toBeDefined();
+    const published = (reversalExports ?? '')
+      .split('\n')
+      .map((line) => line.trim().replace(/,$/, ''))
+      .filter((line) => line !== '' && !line.startsWith('//'));
+    expect(published).toContain('walletWithdrawalApprovalPosting');
 
     const manifest: unknown = JSON.parse(
       readFileSync(join(REPO, 'apps', 'worker', 'package.json'), 'utf8'),
