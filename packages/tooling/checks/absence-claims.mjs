@@ -140,8 +140,61 @@ const MIGRATIONS_DIR = 'packages/db/migrations';
 /** Directories the walk never enters. `repo-invariants.mjs` skips the same set. */
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.next']);
 
-/** The extensions the sweep reads. */
+/** The extensions the sweep reads in the shipped scope, and the import probes with it. */
 const SWEPT = /\.(ts|tsx|mts|mjs|js)$/;
+
+/**
+ * The second sweep scope, added by ADR-330.
+ *
+ * ADR-328's OWN APPROVAL BLOCK NAMED THIS AS THE CHANGE THAT WOULD MOST IMPROVE
+ * THE CHECK, and it was right one row later: occurrence 4 lived under
+ * `scripts/db/` and had to be registered BY HAND because leg 6 could not see it,
+ * and ADR-329 finding 6 then found the SEVENTH occurrence at
+ * `scripts/corpus/data-model-columns.mjs`, in the directory the sweep does not
+ * read. A sweep that stops at the shipped tree is a sweep whose blind spot is a
+ * directory somebody can name.
+ *
+ * WHY THE WHOLE DIRECTORY AND NOT `corpus/` PLUS `db/`. Measured at the moment
+ * this line was written: `scripts/` holds 31 js-family files (16,517 lines under
+ * `corpus/`, 1,584 under `db/`, 6,636 elsewhere) and 23 `.sql` files (10,216
+ * lines), against a shipped scope of 338 files and 150,916 lines. Restricting it
+ * to the two subdirectories that have produced an occurrence would save 14 files
+ * and surface nothing: `scripts/ci` and `scripts/demo` produce ZERO findings
+ * today. A written list of subdirectories is a register somebody has to keep,
+ * which is the cost ADR-329 section 7 refused for its generated-column
+ * admission; a whole directory is a rule nobody has to maintain.
+ */
+const SCRIPTS_DIR = 'scripts';
+
+/**
+ * What the sweep reads under `scripts/`: the same family, PLUS `.sql`.
+ *
+ * `.sql` IS IN, AND THE REASON IS THAT LEAVING IT OUT WOULD BE HALF A REPAIR.
+ * Occurrence 4 lived in `scripts/db/probe_pgboss_job_store.sql`. Widening the
+ * scope to the directory that occurrence lived in and then excluding the FILE
+ * SHAPE it lived in reproduces the blind spot at one level down.
+ *
+ * THE LEXER OBJECTION IS REAL AND DOES NOT APPLY TO THIS SWEEP, which is worth
+ * saying plainly rather than waving away. A `.sql` comment opens `--` and a
+ * JavaScript one opens `//`, and a parser that had to tell a comment from a
+ * string literal would need a second lexer for the second shape. THIS SWEEP
+ * PARSES NOTHING. It is a per-line regular-expression scan over raw text, in
+ * both shapes, and this file's header says why it can never strip comments: the
+ * claims it reads LIVE IN COMMENTS. So `.sql` costs one alternative in this
+ * character class and no reader at all, and `RI-30`'s single stripper in
+ * `packages/tooling` is not imported here for the reason that header already
+ * gives rather than for a new one.
+ *
+ * WHAT IT COSTS IS STATED RATHER THAN HIDDEN, AND IT IS ONE LINE. Measured over
+ * the 23 `.sql` files at the moment this line was written: 26 carry a word from
+ * the absence vocabulary and exactly ONE also carries a registered needle within
+ * the window. It is `probe_pgboss_job_store.sql:72`, which quotes PostgreSQL's
+ * own `relation "pgboss.version" does not exist`, and it is registered
+ * `unbindable` below beside the reason. A raw scan cannot tell a quoted error
+ * string from the file's own assertion IN EITHER SHAPE, which is why that entry
+ * and one more like it are in the register rather than in a narrowed needle.
+ */
+const SWEPT_SCRIPTS = /\.(ts|tsx|mts|mjs|js|sql)$/;
 
 /**
  * How far from an absence word the sweep looks for the artifact's name.
@@ -222,6 +275,65 @@ function shippedSources(root) {
     }
   }
   return out.filter((rel) => SWEPT.test(rel));
+}
+
+/**
+ * Every swept file under `scripts/`, repo-relative. ADR-330.
+ *
+ * IT EXCLUDES ANY DIRECTORY NAMED `test`, on `shippedSources`' own written
+ * reason arriving in a directory whose layout does not supply it for free: a
+ * case that asserts a refusal QUOTES the refusal, so a test carrying a claim
+ * string is the assertion and not a second claim site. Under `apps/*&#47;src`
+ * and `packages/*&#47;src` that exclusion is structural, because the suites sit
+ * beside `src/` rather than inside it. Under `scripts/` it has to be written,
+ * and `scripts/demo/test/` is the one directory it reaches today. MEASURED: the
+ * four files there produce zero findings, so this is a rule stated ahead of the
+ * case rather than an exemption bought to make a run green.
+ *
+ * A MISSING `scripts/` IS SKIPPED AND A PRESENT-BUT-UNREADABLE ONE THROWS, and
+ * the split is the one `shippedSources` already makes when it skips an absent
+ * `apps` or `packages`. A tree that declares no `scripts/` is a tree with one
+ * fewer place to look; a `scripts/` that exists and yields nothing is the layout
+ * having moved under the check, which is rule 2 and never a quiet zero.
+ *
+ * @param {string} root
+ * @returns {string[]}
+ */
+function scriptSources(root) {
+  if (!existsSync(join(root, SCRIPTS_DIR))) return [];
+  /** @type {string[]} */
+  const out = [];
+  walk(root, SCRIPTS_DIR, out);
+  const swept = out.filter(
+    (rel) => SWEPT_SCRIPTS.test(rel) && !rel.split('/').slice(1, -1).includes('test'),
+  );
+  if (swept.length === 0) {
+    throw new Error(
+      `RI-35 found no swept file under ${SCRIPTS_DIR}/, which exists. Zero means the layout ` +
+        'moved or the extension test is wrong, and leg 6 would sweep the shipped tree alone ' +
+        'while reporting a clean run over the directory ADR-330 widened it to reach',
+    );
+  }
+  return swept;
+}
+
+/**
+ * The whole of leg 6's scope: the shipped tree AND `scripts/`.
+ *
+ * IT IS A SECOND FUNCTION AND NOT A WIDER `shippedSources`, DELIBERATELY. Three
+ * probes read `shippedSources`, and `queue-door`'s register entry says in words
+ * what it means: "a module under `apps/*&#47;src` or `packages/*&#47;src`,
+ * outside `packages/queue` itself, that imports `@merit/queue`". Widening that
+ * function in place would silently rewrite what three registered artifacts
+ * ASSERT while appearing to change only where the sweep looks, which is a
+ * change to eight live claims made by editing a file walk. The sweep widens and
+ * the probes do not move.
+ *
+ * @param {string} root
+ * @returns {string[]}
+ */
+function sweptSources(root) {
+  return [...shippedSources(root), ...scriptSources(root)];
 }
 
 /**
@@ -490,6 +602,35 @@ export const ABSENCE_ARTIFACTS = [
       return runsATransaction && yieldsAnExecutor ? 'present' : 'absent';
     },
   },
+  {
+    key: 'gates-importable',
+    names:
+      '`scripts/corpus/gates.mjs` being importable by a second reader: it exports its gate ' +
+      'array AND guards its own invocation, so importing it does not run every gate and exit ' +
+      'the process',
+    needles: [/direct-invocation guard/i, /process\.exit\(main\(\)\)/],
+    sweptBy:
+      'the two phrasings that NAME THE ARTIFACT rather than the file, and the distinction is ' +
+      'the measurement. `gates.mjs` reaches 87 lines over the widened scope, 47 of them in ' +
+      '`falsify.mjs` alone, about the runner in general; ADR-328s own rule is that a needle ' +
+      'which mostly names other things is a needle that registers noise, and it was measured ' +
+      'reaching one further line, `falsify.mjs:3217`s expectation string `and no file ' +
+      'provides it`, which asserts nothing about this tree. The two kept here name the guard ' +
+      'and the unguarded shape it replaced: together they reach TEN lines over the widened ' +
+      'scope, of which the seventh occurrence is the only one carrying an absence word ' +
+      'within the window',
+    probe: (root) => {
+      // BOTH HALVES, BECAUSE THE FALSE SENTENCE MADE TWO CLAIMS. It said the
+      // module ends in `process.exit(main())` at module scope with no guard, and
+      // the duplication it justified needs an EXPORT to be repaired as well as a
+      // guard. A probe reading one half would call the artifact present off a
+      // guard with nothing exported behind it.
+      const body = requireFile(root, 'scripts/corpus/gates.mjs');
+      const exportsItsGates = /^export const GATES\b/m.test(body);
+      const guarded = /^\s*if \(invokedDirectly\) process\.exit\(main\(\)\);/m.test(body);
+      return exportsItsGates && guarded ? 'present' : 'absent';
+    },
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -522,6 +663,15 @@ const ABSENCE_MARKERS = [
   /\bgrants nothing\b/i,
   /\bnot here\b/i,
   /\bunexercised\b/i,
+  // ADR-330. The seventh occurrence's own words, and the first entry added to
+  // this vocabulary since it was written. MEASURED over the widened scope at the
+  // moment it was added: it reaches TWO lines. One is the seventh occurrence,
+  // `scripts/corpus/data-model-columns.mjs`, and the other is
+  // `apps/worker/src/live/ports.ts:39`, which says a type "cannot be imported
+  // here whatever the" fence allows -- a TRUE sentence about a fence, carrying
+  // no registered needle within the window, and therefore silent. Nothing about
+  // it was rewritten to accommodate this marker.
+  /\bcannot be imported\b/i,
 ];
 
 // -----------------------------------------------------------------------------
@@ -639,6 +789,40 @@ export const ABSENCE_CLAIMS = [
     disposition: 'retired',
     artifact: 'db-transaction-and-sql-executor',
     why: 'OCCURRENCE 5, found while sizing this row and repaired by it. ADR-328 section 5',
+  },
+
+  // --- ADR-330: what the sweep saw the day it learned to read `scripts/` -----
+  {
+    site: 'scripts/corpus/data-model-columns.mjs',
+    claim: 'IT CANNOT BE IMPORTED: `gates.mjs` ends in `process.exit(main())` at module',
+    disposition: 'live',
+    artifact: 'gates-importable',
+    why: 'OCCURRENCE 7, reported by leg 6 the moment the sweep reached `scripts/`. ADR-329',
+  },
+  {
+    site: 'scripts/db/assert_pgboss_schema_matches_library.mjs',
+    claim: '`check()` throws `pg-boss is not installed` when the',
+    unbindable:
+      'it quotes the pg-boss library`s own thrown error string verbatim, so the sentence ' +
+      'states what a VENDOR FUNCTION DOES when a version table is absent and states nothing ' +
+      'about what this tree lacks. No probe over this tree can report a function`s behaviour ' +
+      'in a dependency, which is the same limit ADR-328 recorded for occurrence 4`s ' +
+      'behaviour half. The needle `pg-boss` is correct and the marker `not installed` landed ' +
+      'INSIDE A QUOTATION, which a per-line scan over raw text cannot see in any file shape',
+    why:
+      'the sweep`s first false positive under the widened scope, registered rather than ' +
+      'narrowed away: tightening `not installed` would blind the vocabulary to occurrence 2',
+  },
+  {
+    site: 'scripts/db/probe_pgboss_job_store.sql',
+    claim: 'dies at SUCCESS 1 with `relation "pgboss.version" does not exist`, exit 3, and',
+    unbindable:
+      'it quotes PostgreSQL`s own error text verbatim while RECORDING AN OBSERVED ' +
+      'COUNTERFACTUAL: what this probe did when executed against `0001`..`0076`, a migration ' +
+      'range that is not this tree. The sentence is a dated observation about a tree that no ' +
+      'longer exists, so a probe over the tree that does exist can neither confirm nor ' +
+      'falsify it, and `RI-15` and `RI-16` exclude dated records for the same reason',
+    why: 'the one line `.sql` costs, named in `SWEPT_SCRIPTS` before it was registered here',
   },
 ];
 
@@ -795,12 +979,21 @@ export function checkAbsenceClaims(root, register) {
   // ---------------------------------------------------------------------------
   // LEG 6. THE SWEEP, PER ARTIFACT AND NOT PER TREE.
   //
-  // A line in the shipped scope that names a registered artifact AND carries a
+  // A line in the swept scope that names a registered artifact AND carries a
   // word from the absence vocabulary must be a registered claim. THIS IS THE LEG
   // THAT SCALES: `0079` falsified two sentences in two packages, ADR-326
   // repaired one and ADR-327 repaired the other a row later, because nothing
   // bound the second. Register the artifact once and every site naming it has to
   // be accounted for.
+  //
+  // THE SCOPE IS `apps/*&#47;src`, `packages/*&#47;src` AND `scripts/` SINCE
+  // ADR-330, and the widening is that entry's whole subject. ADR-328 shipped
+  // this leg over the first two and said in its own approval block that
+  // `scripts/` was the weakest line it drew, because occurrence 4 lived there
+  // and was registered by hand precisely because the sweep could not see it.
+  // ADR-329 finding 6 then found the seventh occurrence at
+  // `scripts/corpus/data-model-columns.mjs`. A blind spot somebody can name in
+  // an approval block is a blind spot with a row waiting to fall into it.
   //
   // IT SWEEPS ONLY THE NEEDLES SOMEBODY REGISTERED, which is the limit that
   // keeps it honest rather than the limit that makes it weak. A tree-wide grep
@@ -810,12 +1003,12 @@ export function checkAbsenceClaims(root, register) {
   // ---------------------------------------------------------------------------
   const needles = artifacts.flatMap((artifact) => artifact.needles);
   if (needles.length > 0) {
-    const files = shippedSources(root);
+    const files = sweptSources(root);
     if (files.length === 0) {
       throw new Error(
-        'RI-35 found no source file under any `apps/*/src` or `packages/*/src` to sweep. ' +
-          'Zero means the layout moved, and the sweep would report every registered artifact ' +
-          'as unclaimed anywhere',
+        'RI-35 found no source file under any `apps/*/src` or `packages/*/src` to sweep, and ' +
+          'none under `scripts/` either. Zero means the layout moved, and the sweep would ' +
+          'report every registered artifact as unclaimed anywhere',
       );
     }
     /** @type {Map<string, Claim[]>} */
@@ -871,9 +1064,19 @@ export const ri35 = {
     'carries a reason of at least 40 characters, on CI-06/gate-inventory`s precedent for a ' +
     'condition no probe over the tree can report. (5) No artifact is furniture: one nobody ' +
     'claims is a finding. (6) THE SWEEP, which is the leg that scales: a line in ' +
-    '`apps/*/src` or `packages/*/src` that matches a registered needle AND a word from the ' +
-    'written absence vocabulary must be a registered claim. `0079` falsified two sentences ' +
-    'in two packages and two separate rows repaired them, because nothing bound the second. ' +
+    '`apps/*/src`, `packages/*/src` OR `scripts/` that matches a registered needle AND a ' +
+    'word from the written absence vocabulary must be a registered claim. `0079` falsified ' +
+    'two sentences in two packages and two separate rows repaired them, because nothing ' +
+    'bound the second. THE `scripts/` HALF OF THAT SCOPE IS ADR-330 AND IT IS A REPAIR OF ' +
+    'THIS CHECK RATHER THAN AN ADDITION TO IT: ADR-328 shipped leg 6 over the shipped tree ' +
+    'alone and its own approval block named `scripts/` as the weakest line it drew, because ' +
+    'occurrence 4 lived there and had to be registered by hand; ADR-329 finding 6 then found ' +
+    'the SEVENTH occurrence at `scripts/corpus/data-model-columns.mjs`, and leg 6 reported it ' +
+    'the moment the scope reached it. The whole directory is swept rather than a written list ' +
+    'of subdirectories, `.sql` INCLUDED because occurrence 4 was a `.sql` file and a scope ' +
+    'that reaches the directory but not the file shape reproduces the blind spot one level ' +
+    'down, and any directory named `test` excluded on the reason `apps/*/src` gets ' +
+    'structurally: a case asserting a refusal quotes it. ' +
     'BOTH REGISTERS ARE WRITTEN AND NEVER COMPUTED, on CI-06/gate-inventory`s rule for its ' +
     'own probe table. WHAT IT DOES NOT DO, and each of these is a real hole rather than a ' +
     'modesty clause. IT SWEEPS ONLY REGISTERED NEEDLES: an absence claim about an artifact ' +
@@ -885,9 +1088,12 @@ export const ri35 = {
     'whose needle and whose absence word land on different lines is missed, which is why ' +
     'two artifacts here register no needle at all and say so. IT READS TEXT AND NEVER ' +
     'MEANING: a line carrying a needle and a marker while asserting no absence is a false ' +
-    'positive that has to be registered or have its needle tightened. IT EXCLUDES `docs/` ' +
-    'AND `test/`: a dated record quoting a false sentence is written out of citation ' +
-    'grammar (ADR-212, RI-15, RI-16) and a case asserting a refusal quotes it. AND IT ' +
+    'positive that has to be registered or have its needle tightened, and BOTH of the two ' +
+    'the widened scope surfaced are QUOTED ERROR STRINGS -- pg-boss`s own thrown text and ' +
+    'PostgreSQL`s -- registered `unbindable` rather than narrowed away, because a per-line ' +
+    'scan over raw text cannot tell a quotation from an assertion in any file shape. IT ' +
+    'EXCLUDES `docs/` AND `test/`: a dated record quoting a false sentence is written out of ' +
+    'citation grammar (ADR-212, RI-15, RI-16) and a case asserting a refusal quotes it. AND IT ' +
     'CANNOT SEE A CLAIM ABOUT BEHAVIOUR RATHER THAN EXISTENCE: `0079`s header said granting ' +
     'the queue role means granting CREATE, which ADR-327 falsified by RUNNING pg-boss, and ' +
     'no probe over this tree reports what a function does under an option no caller passes. ' +
