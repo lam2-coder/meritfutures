@@ -149,10 +149,7 @@ test('every `emit` in this workspace is in this deployable, and there are nine',
 // an array with a length assertion beside it.
 
 type EmittedName =
-  | ExpiryEventName
-  | DetectorEventName
-  | ApprovalEventName
-  | typeof BREAKER_STATE_CHANGED;
+  ExpiryEventName | DetectorEventName | ApprovalEventName | typeof BREAKER_STATE_CHANGED;
 
 /**
  * Each name, against the module that SPELLS IT as a literal.
