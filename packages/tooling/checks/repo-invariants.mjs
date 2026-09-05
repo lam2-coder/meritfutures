@@ -9002,12 +9002,27 @@ const LANDING_VERB = /\bland(?:s)?\b/;
  * direction an allowlist has to decay in.
  *
  * IT IS NOT A RULING THAT THESE MIGRATIONS NEED NO RECORD. Every one of them
- * is owed the section `0080` and `0081` get in ADR-334, and sixteen of the
- * twenty are money path. What it records is that measuring twenty installs and
- * twenty probe transcripts is a row of its own, dispatched knowing its size,
- * rather than twenty sections written from twenty ADRs in one diff. A landing
- * section that was reconstructed from an ADR instead of measured is the exact
- * thing this check exists to make somebody stop and do properly.
+ * is owed the section `0080` and `0081` get in ADR-334. What it records is that
+ * measuring an install and a probe transcript per migration is a row of its own,
+ * dispatched knowing its size, rather than twenty sections written from twenty
+ * ADRs in one diff. A landing section that was reconstructed from an ADR instead
+ * of measured is the exact thing this check exists to make somebody stop and do
+ * properly.
+ *
+ * IT HAS SHRUNK ONCE AND THE SHRINK IS THE MECHANISM WORKING. ADR-334 opened it
+ * at TWENTY entries. ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for `0052`
+ * to `0057`, the chart-of-accounts and ledger-code run, each measured against
+ * PostgreSQL 16.13 rather than reconstructed, and deleted those six rows in the
+ * same commit. FOURTEEN remain and NINE of them open with an `E2 READ: MONEY
+ * PATH` header, counted off the files rather than off these rows.
+ *
+ * THE MONEY-PATH FIGURE ADR-334 RECORDED WAS SIXTEEN OF TWENTY AND THE MEASURED
+ * FIGURE IS FIFTEEN. `0073_operator_directory.sql:4` opens `NOT THE MONEY PATH
+ * BY FILE`, so the header is absent; a substring search for `MONEY PATH` over
+ * those twenty returns EIGHTEEN, because `0041:4` and `0043:4` read `NON-MONEY
+ * PATH` as well. ADR-334's own row for `0073` below carries no marker, so the
+ * two halves of that entry disagreed and this one, the machine-readable half,
+ * was right. No merged record is amended; ADR-335 reports it.
  */
 const LANDING_RECORD_BACKLOG = new Map([
   ['0037', '0037_supersede_rule_states_high_water_bounds_balance.sql, ADR-053. MONEY PATH'],
@@ -9017,12 +9032,6 @@ const LANDING_RECORD_BACKLOG = new Map([
   ['0043', '0043_admin_attributed_actions.sql, ADR-069 via FOLD-04'],
   ['0044', '0044_fee_back_and_ladder_unlock.sql, ADR-070 via FOLD-05. MONEY PATH'],
   ['0050', '0050_live_cache_and_role.sql, ADR-164. MONEY PATH'],
-  ['0052', '0052_chart_of_accounts.sql, ADR-177. MONEY PATH'],
-  ['0053', '0053_firm_treasury_kind.sql, ADR-180. MONEY PATH'],
-  ['0054', '0054_identity_ledger_accounts.sql, ADR-183. MONEY PATH'],
-  ['0055', '0055_last_two_ledger_kinds.sql, ADR-186. MONEY PATH'],
-  ['0056', '0056_eighth_ledger_code.sql, ADR-187. MONEY PATH'],
-  ['0057', '0057_terminal_withdrawal_obligation.sql, ADR-189. MONEY PATH'],
   ['0059', '0059_reversal_chain.sql, ADR-193. MONEY PATH'],
   ['0063', '0063_otp_challenge_consumption.sql, ADR-200. MONEY PATH'],
   ['0068', '0068_dual_control_threshold_ceiling.sql, ADR-228. MONEY PATH'],
@@ -9118,9 +9127,12 @@ const ri37 = {
     'claim about one migration set rather than a property of the check and ' +
     'constitution E2 already forbids deleting a merged migration; a mis-keyed ' +
     'row is caught by leg 1 instead, since the number it failed to absorb is ' +
-    'then reported as unrecorded. It holds the TWENTY migrations that have no record on this tree, ' +
-    'SIXTEEN of them money path, each with its file and the ADR its own header ' +
-    'cites. A migration outside it with no record is a finding on the commit ' +
+    'then reported as unrecorded. IT OPENED AT TWENTY UNDER ADR-334 AND HOLDS FOURTEEN, ' +
+    'NINE of them carrying an `E2 READ: MONEY PATH` header, each with its file and the ADR its own header ' +
+    'cites; ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for `0052` to `0057` ' +
+    'and deleted those six rows in the same commit, which is leg 3 doing its ' +
+    'work rather than an allowlist being trimmed. ' +
+    'A migration outside it with no record is a finding on the commit ' +
     'that adds it, so the backlog cannot grow without an edit to this file. ' +
     'FIVE THINGS IT DOES NOT DO. It never reads a section`s CONTENT: whether a ' +
     'record carries an install verification, object counts read from the ' +
