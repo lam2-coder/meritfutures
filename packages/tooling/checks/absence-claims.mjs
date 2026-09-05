@@ -155,14 +155,15 @@ const SWEPT = /\.(ts|tsx|mts|mjs|js)$/;
  * directory somebody can name.
  *
  * WHY THE WHOLE DIRECTORY AND NOT `corpus/` PLUS `db/`. Measured at the moment
- * this line was written: `scripts/` holds 31 js-family files (16,517 lines under
- * `corpus/`, 1,584 under `db/`, 6,636 elsewhere) and 23 `.sql` files (10,216
- * lines), against a shipped scope of 338 files and 150,916 lines. Restricting it
- * to the two subdirectories that have produced an occurrence would save 14 files
- * and surface nothing: `scripts/ci` and `scripts/demo` produce ZERO findings
- * today. A written list of subdirectories is a register somebody has to keep,
- * which is the cost ADR-329 section 7 refused for its generated-column
- * admission; a whole directory is a rule nobody has to maintain.
+ * this line was written: the swept part of `scripts/` is 50 files and 33,992
+ * lines -- 9 files and 16,364 lines under `corpus/`, 27 and 11,800 under `db/`,
+ * 14 and 5,828 everywhere else -- against a shipped scope of 338 files and
+ * 150,916 lines. Restricting it to the two subdirectories that have produced an
+ * occurrence would save 14 files and 5,828 lines and would surface NOTHING:
+ * `scripts/ci` and `scripts/demo` produce ZERO findings today. A written list of
+ * subdirectories is a register somebody has to keep, which is the cost ADR-329
+ * section 7 refused for its generated-column admission; a whole directory is a
+ * rule nobody has to maintain.
  */
 const SCRIPTS_DIR = 'scripts';
 
@@ -611,7 +612,7 @@ export const ABSENCE_ARTIFACTS = [
     needles: [/direct-invocation guard/i, /process\.exit\(main\(\)\)/],
     sweptBy:
       'the two phrasings that NAME THE ARTIFACT rather than the file, and the distinction is ' +
-      'the measurement. `gates.mjs` reaches 87 lines over the widened scope, 47 of them in ' +
+      'the measurement. `gates.mjs` reaches 84 lines over the widened scope, 32 of them in ' +
       '`falsify.mjs` alone, about the runner in general; ADR-328s own rule is that a needle ' +
       'which mostly names other things is a needle that registers noise, and it was measured ' +
       'reaching one further line, `falsify.mjs:3217`s expectation string `and no file ' +

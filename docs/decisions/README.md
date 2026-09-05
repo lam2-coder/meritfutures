@@ -341,6 +341,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-327](ADR-327.md) | the schema the application role could not see. The privilege set is measured rather than reasoned, `CREATE` is refused and nothing needed it, and the sentence saying otherwise is superseded in a file nobody may edit  (2026-09-05, status: proposed) |
 | [ADR-328](ADR-328.md) | a sentence that outlived the tree, four times, each repaired by hand. `RI-35` binds an absence claim to the artifact it names and asserts the artifact is still absent, the four occurrences are reconstructed and watched going red, and the fifth site found while sizing the row is repaired with a derivation (2026-09-05, status: proposed) |
 | [ADR-329](ADR-329.md) | two design records said `not null` about a column that is nullable and nothing compared the two. `RI-36` folds `ALTER` over `CREATE TABLE` and reconciles every design record's declared nullability against the schema the migrations leave, the two records are reconstructed and watched going red, and `wallet_entries.provenance` is repaired to say the direction rule rather than to say `null` (2026-09-05, status: proposed) |
+| [ADR-330](ADR-330.md) | the sweep stopped at `scripts/` and the seventh occurrence was sitting in the directory it does not read. `RI-35`'s leg 6 is widened to `scripts/`, `.sql` included, the three claims it surfaces are disposed of, and `data-model-columns.mjs`'s false import clause is repaired with a derivation (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
