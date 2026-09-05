@@ -866,8 +866,10 @@ const ELIGIBILITY_BLOCKER =
   'sentence reads as live to every grep: it said the adapter refused the account-day load by ' +
   'name and that this deployment resolved none of its six fields. ADR-258 resolved five of ' +
   'them and ADR-260 resolved the sixth, so `postgresBatchPorts` now serves EVERY method ' +
-  '`runNightlyBatch` calls and the fold completes; `accountDaysFrom` and `storedRuleStates` ' +
-  'still refuse and neither is on that path. So the honest clause is smaller: no scheduled run ' +
+  "`runNightlyBatch` calls and the fold completes. THIS CLAUSE ALSO SAID THE REPLAY AUDIT'S " +
+  'TWO READS STILL REFUSED, AND ADR-346 WROTE THEM, so what survives is the half that never ' +
+  'depended on them: NEITHER IS ON THAT PATH, the audit runs, and the nightly fold is not what ' +
+  'runs it. So the honest clause is smaller: no scheduled run ' +
   'has written against this database, the table is still empty, and a confident verdict ' +
   'computed off an empty table is a wrong answer where a 503 is an honest one. (2) EVEN GIVEN AN ' +
   'ADAPTER THE WRITER WOULD REFUSE: `RuleStateWriterIo.encodeEngineGates` has no ' +

@@ -357,6 +357,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-347](ADR-347.md) | `INV-M11-05`'s rate limit is built in the two dimensions that are real, per-ASN is refused with its blocker named rather than faked, an absent limit is a refusal, and the dispatch's own description of the exposed surface is wrong in both directions (2026-09-05, status: proposed) |
 | [ADR-351](ADR-351.md) | the eleven migrations `RI-37` still registered as having no landing record get one, all eleven measured against PostgreSQL 16.13 rather than reconstructed, the backlog register that opened at twenty reaches zero and stops being a register, and the manifest's superseded `OI` table is found carrying nine stale STATE cells that its own superseding banner never claimed to supersede (2026-09-05, status: proposed) |
 | [ADR-350](ADR-350.md) | M12's statistics run gets a live adapter over the one door, four of six read ports are served against the real tables and two refuse because Merit cannot yet produce the fact its own definition asks for, the job is deliberately NOT scheduled, and the port that says which payout closed an account was reading a null test that would have deleted every graduated trader's ordinary payouts from the published average (2026-09-05, status: proposed) |
+| [ADR-346](ADR-346.md) | the replay self-audit gets its adapter and it still may not halt, because B.1's halt has no column the corpus names and the finding cannot tell a nightly run from a dry run (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

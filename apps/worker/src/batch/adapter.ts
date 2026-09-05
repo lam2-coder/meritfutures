@@ -12,7 +12,7 @@
 // deployable has exactly one file naming that package, and this file is not it.
 //
 // -----------------------------------------------------------------------------
-// FIVE OF TEN ARE WHOLE AND FIVE REFUSE BY NAME
+// EIGHT OF TEN ARE WHOLE AND TWO REFUSE BY NAME
 // -----------------------------------------------------------------------------
 // `databaseAccountReads` serves one of four and `databaseAuthBackend` four of
 // sixteen, and in every case the refusal carries the blocker rather than a
@@ -27,11 +27,29 @@
 // | `accountsWithLiveMark`   | SERVED. `daily_marks` for the day, unsuperseded  |
 // | `accountsWithStoredState`| SERVED. every `rule_states.account_id`           |
 // | `loadAccountDay`         | SERVED. SIX FIELDS OF SIX, `ADR-260`             |
-// | `accountDaysFrom`        | REFUSES. INV-04's whole-history walk is unwritten |
-// | `storedRuleStates`       | REFUSES. no `RuleStateRow` READER, ADR-239 B     |
+// | `accountDaysFrom`        | SERVED. THE WALK, `ADR-346`. See below           |
+// | `storedRuleStates`       | SERVED. the `RuleStateRow` reader, `ADR-346`     |
 // | `writeRuleState`         | COMPOSED AND WHOLE, `ADR-250`. See below          |
 // | `raiseReconciliation`    | REFUSES. no event writer in this deployable      |
-// | `raiseDivergence`        | REFUSES. no event writer in this deployable      |
+// | `raiseDivergence`        | REFUSES. THREE BLOCKERS, `ADR-346`. See below    |
+//
+// **THE TWO ROWS THAT MOVED ARE THE REPLAY SELF-AUDIT'S TWO READS, AND MOVING
+// THEM IS THE WHOLE OF WHAT `ADR-346` CHANGES ABOUT WHAT THIS DEPLOYABLE CAN
+// DO.** `runReplayAudit` calls exactly `calendarWatermark`, `calendarSlice`,
+// `accountsWithStoredState`, `storedRuleStates`, `accountDaysFrom` and, ON A
+// FINDING ONLY, `raiseDivergence`. Five of those six now answer, so `INV-04`'s
+// comparison runs against a real database and a book that agrees returns a
+// report. A book that DISAGREES reaches the sixth and this deployment throws
+// there, which is stated in the divergence section below rather than left for a
+// reader to discover in an incident.
+//
+// **AND THE AUDIT WRITES NO `rule_states` ROW, WHICH IS STRUCTURAL RATHER THAN
+// DISCIPLINED.** `M01` `B.4` steps 2 through 4 put every rewrite of stored state
+// behind a dry run, a founder approval recorded as an `admin_actions` row
+// carrying the report's digest, and a separate audited rewrite job.
+// `runReplayAudit` names no write port but `raiseDivergence`, so there is no
+// argument position through which this adapter's `writeRuleState` could reach
+// the audit at all.
 //
 // **THE `loadAccountDay` ROW HAS READ "REFUSES" AND THEN "FIVE OF SIX", AND IT
 // NOW READS SERVED.** It said six fields refused and `prior` needed a codec;
@@ -50,10 +68,18 @@
 // REPORT: THE NIGHTLY FOLD NOW COMPLETES ON THIS DEPLOYABLE.** `runNightlyBatch`
 // calls exactly `calendarWatermark`, `calendarSlice`, `accountsWithLiveMark`,
 // `loadAccountDay` and `writeRuleState`, and every one of the five now answers.
-// `accountDaysFrom` and `storedRuleStates` still refuse and neither is on that
-// path; they are the replay audit's, which is unscheduled. So the sixth field
-// resolving is not a comment change: it is the batch writing `rule_states` rows
-// where it stopped at the first account before.
+// So the sixth field resolving is not a comment change: it is the batch writing
+// `rule_states` rows where it stopped at the first account before.
+//
+// **THE SENTENCE THAT STOOD HERE SAID "`accountDaysFrom` AND `storedRuleStates`
+// STILL REFUSE AND NEITHER IS ON THAT PATH; THEY ARE THE REPLAY AUDIT'S, WHICH
+// IS UNSCHEDULED", AND `ADR-346` MADE THE FIRST HALF FALSE.** It is kept beside
+// its correction rather than deleted, per `RI-14`. The second half is still
+// true and is now the ONLY thing keeping the audit off a clock: neither read is
+// on `runNightlyBatch`'s path, so nothing above changed when they landed, and
+// `apps/worker/src/schedule.ts` still carries `runReplayAudit` as `unscheduled`
+// because a divergence has nowhere to go. Scheduling it is not this row's and
+// the divergence section below says what it is waiting on.
 //
 // **AND THE RESOLVER REFUSES PER ACCOUNT RATHER THAN NEVER.** `resolveExternalGates`
 // throws an `ExternalGatesRefusal` naming the leg, and the loudest case is the
@@ -124,7 +150,14 @@ import {
 } from '@merit/rules-engine';
 
 import type { WorkerDb } from '../db.ts';
-import type { AccountDay, BatchPorts, BatchReadPort, BatchWritePort } from './ports.ts';
+import type {
+  AccountDay,
+  BatchPorts,
+  BatchReadPort,
+  BatchWritePort,
+  RuleStateRow,
+  StoredContextGates,
+} from './ports.ts';
 import { writeRuleStateVia } from './state-writer.ts';
 
 /**
@@ -166,35 +199,16 @@ export class BatchPortUnwired extends Error {
   }
 }
 
-/**
- * `accountDaysFrom`'s blocker, WHICH IS NOW ITS OWN AND IS ALL THAT IS LEFT OF IT.
- *
- * **IT USED TO BE `loadAccountDay`'s BLOCKER PLUS ONE MORE, AND THE FIRST HALF IS
- * GONE.** `ADR-260` resolved `external`, so the shared constant this string was
- * built on top of no longer exists, and what remains is the half that was always
- * this port's alone: `INV-04`'s left-hand side is every day from day one, which
- * is a walk over the account's whole mark history rather than one call repeated.
- * No session has written that walk.
- *
- * SPLITTING THE TWO WAS `ADR-258`'s CALL AND IT IS WHY THIS READS CORRECTLY
- * TODAY: a shared constant would now name a discharged blocker on a port that
- * still refuses for a reason nobody has touched.
- */
-const ACCOUNT_DAYS_FROM_BLOCKER =
-  "it is INV-04's whole input history rather than one day, so it is a walk over every live " +
-  '`daily_marks` row for the account with a per-day prior, and no session has written that ' +
-  'walk. `loadAccountDay` serves ONE day off the same tables (ADR-258, ADR-260), so what this ' +
-  'port owes is the walk and not a field: a per-day loop over that reader would re-read the ' +
-  'plan, the identity and the chain once per day, which is the shape this port exists to ' +
-  'replace rather than to wrap';
-
-/** The blocker every `engine_gates` READ shares. `ADR-239` slice A. */
-const DECODER_BLOCKER =
-  'THE CODEC LANDED (ADR-250) AND THIS REASON NARROWS TO WHAT IS LEFT. ' +
-  '`decodeEngineGates` (`packages/rules-engine/src/gates-codec.ts`) rebuilds an ' +
-  '`EngineGateResults` whose cents are `bigint`, and this file imports its encoder. ' +
-  'WHAT IS ABSENT IS A `RuleStateRow` READER: one jsonb leaf decoded is not a row rebuilt, ' +
-  '`contextGates` has its own stored shape, and the rest of that read is ADR-239 slice B';
+// THE TWO CONSTANTS THAT CARRIED THE REPLAY AUDIT'S READ BLOCKERS ARE DELETED
+// RATHER THAN REWORDED, on the rule `wiring.test.ts` states for retired reasons
+// and this file already spent once on `loadAccountDay`: a name reproduced beside
+// a claim that it is gone reads as live to every grep and to every predicate
+// asserting its absence. What each SAID is recorded in `ADR-346` section 2 and
+// is not written out here. One of the two was discharged by writing the walk it
+// named; the other narrowed to nothing once `toRuleState` was read honestly,
+// because a `RuleStateRow` is that reader's twenty-two fields plus four, and
+// the four are the account id, the stored context gates, the hash bytes and the
+// calendar stamp.
 
 /** The blocker both event channels share. */
 const EVENT_SINK_BLOCKER =
@@ -204,6 +218,58 @@ const EVENT_SINK_BLOCKER =
   'undeclared import does not resolve at all. `EVENTS.md:194` names ' +
   '`replay.divergence_detected` one of the two events that must never be quiet, so a channel ' +
   'that swallowed a finding here would be the quiet this deployable exists to end';
+
+/**
+ * `raiseDivergence`'s blocker, WHICH IS THREE AND NOT ONE. `ADR-346`.
+ *
+ * **IT SHARED `EVENT_SINK_BLOCKER` WITH `raiseReconciliation` AND IT IS SPLIT
+ * OFF FOR `ADR-258`'s REASON ONE PORT UP**: a shared constant reads as one
+ * blocker, and discharging the sink would leave this port refusing for two
+ * reasons the sink's sentence never mentioned. Reconciliation's refusal really
+ * is the sink alone and keeps the shared one.
+ *
+ * THE THREE ARE ORDERED CHEAPEST FIRST AND THE THIRD IS THE RULING.
+ *
+ *   1. THE SINK, which is the shared blocker above and is re-derived rather
+ *      than inherited: `EVENT_CATALOGUE` in `apps/api/src/events.ts` carries ten
+ *      names and not one of them begins `replay.`, so `buildEvent` would refuse
+ *      this name on `ADR-159` clause 1 even if the fence between the two
+ *      deployables did not exist. `event-sink.test.ts` holds the fence.
+ *   2. THE MODE IS NOT ON THE FINDING. `ReplayDivergenceFinding` carries an
+ *      account, a day, an engine version and the fields that moved, and NOT
+ *      `ReplayAuditConfig.mode`, so an adapter cannot tell `B.4` step 1's
+ *      nightly detection from `B.4` step 2's dry run. Step 2 says "writing
+ *      nothing" and step 4 says its findings are "an audit trail rather than as
+ *      alerts", so a halt written on every finding would halt THE WHOLE BOOK on
+ *      the first engine upgrade, which is `B.4`'s own opening sentence about
+ *      burying the one real divergence.
+ *   3. `B.1`'s HALT HAS NO COLUMN AND THE CORPUS IS SILENT ON WHICH. "Any
+ *      difference halts payout eligibility for that account and pages" is the
+ *      commitment; the two flags that carry such a halt are already spoken for.
+ *      `accounts.recon_blocked` is RECONCILIATION's, which `0064` states in
+ *      terms, and `ports.ts` keeps the two channels apart by name because
+ *      collapsing them "would make a replay divergence indistinguishable from a
+ *      vendor arithmetic failure on the page". `accounts.payouts_frozen` is an
+ *      INVESTIGATION's, and `STATE_MACHINES` section 6 requires a written reason
+ *      and a ToS clause on the transition that sets it, neither of which a job
+ *      has. `ADR-346` records the open question rather than choosing, because a
+ *      halt written into the wrong channel is a halt whose reason nobody can
+ *      read and whose release nobody owns.
+ */
+const REPLAY_DIVERGENCE_BLOCKER =
+  'THE FINDING HAS THREE BLOCKERS AND ONLY THE FIRST IS THE EVENT SINK (ADR-346). (1) THE ' +
+  'SINK: `EVENT_CATALOGUE` in `apps/api/src/events.ts` carries ten names and none of them ' +
+  'begins `replay.`, so the only composed writer in this tree would refuse this name on ' +
+  'ADR-159 clause 1 before the fence between the deployables was even reached. (2) THE MODE ' +
+  'IS NOT ON THE FINDING: `ReplayDivergenceFinding` carries no `ReplayMode`, so this adapter ' +
+  "cannot tell B.4 step 1's nightly detection from B.4 step 2's dry run, which is the run " +
+  'that writes NOTHING, and a halt on every finding would halt the whole book on the first ' +
+  "engine upgrade. (3) B.1's HALT HAS NO COLUMN: `accounts.recon_blocked` is " +
+  "reconciliation's channel (0064) and `ports.ts` keeps the two apart by name, and " +
+  "`accounts.payouts_frozen` is an investigation's and requires a written reason and a ToS " +
+  'clause no job can supply. ADR-346 records that as an OPEN QUESTION rather than choosing ' +
+  'one. A divergence therefore STOPS THIS RUN with a non-zero exit (ADR-241) rather than ' +
+  'halting the account, and that is a refusal and not the control B.1 specifies';
 
 // -----------------------------------------------------------------------------
 // Reading rows the accessor typed as `unknown`
@@ -772,12 +838,57 @@ function readPort(db: WorkerDb): BatchReadPort {
       return await db.batch(async (tx) => resolveAccountDay(tx, accountId, tradingDay));
     },
 
-    accountDaysFrom(): Promise<never> {
-      return Promise.reject(new BatchPortUnwired('accountDaysFrom', ACCOUNT_DAYS_FROM_BLOCKER));
+    /**
+     * One account's whole input history, oldest first. `INV-04`'s LEFT-HAND SIDE.
+     *
+     * **IT IS THE WALK AND NOT A LOOP OVER `loadAccountDay`, WHICH IS THE ONE
+     * THING THE RETIRED BLOCKER GOT RIGHT.** Every fact that is the ACCOUNT's
+     * rather than the DAY's is read once for the whole history: the account row,
+     * the pinned plan and its size row, the identity, the KYC chain, the payout
+     * requests and the stored states. A per-day loop over the one-day reader
+     * would re-read all seven once per trading day, which on `B.5`'s own figure
+     * of 250 days per account is 250 plan resolutions to fold one life.
+     *
+     * **`prior` IS RESOLVED AND IS STILL NOT READ BY THE AUDIT.** `ports.ts`
+     * says so at the port and `replay.ts` says why: folding from a stored prior
+     * would audit the value being audited. It is filled because the field is
+     * required and because a value invented for it would be the one thing this
+     * file never does, and it costs no read: the account's `rule_states` rows
+     * are already in hand for the same reason.
+     *
+     * **`external` IS RESOLVED ONCE PER ACCOUNT AND CARRIES TODAY'S CONTEXT, NOT
+     * THE DAY'S, AND THE AUDIT NEVER READS IT EITHER.** `INV-23` keeps the
+     * context gates out of the replayed state and `ADR-026` `C-07` keeps them out
+     * of the hash, so `replay.ts` builds no context side at all and compares
+     * none. What that buys is a real cost and it is stated rather than hidden:
+     * `resolveExternalGates` REFUSES a leg it cannot derive, and a refusal here
+     * stops the audit for the whole book at that account, over a field the audit
+     * does not consume. The narrower port that would remove the cost is
+     * `ADR-346` section 5's named repair and it is a contract change rather than
+     * an adapter change, so it is registered and not taken here.
+     */
+    async accountDaysFrom(accountId: string): Promise<readonly AccountDay[]> {
+      return await db.batch(async (tx) => resolveAccountHistory(tx, accountId));
     },
 
-    storedRuleStates(): Promise<never> {
-      return Promise.reject(new BatchPortUnwired('storedRuleStates', DECODER_BLOCKER));
+    /**
+     * One account's stored `rule_states` rows, oldest first. `INV-04`'s RIGHT.
+     *
+     * **THE HASH IS THE BYTES STORAGE RETURNED AND IS NEVER RECOMPUTED HERE.**
+     * `ports.ts` and `replay.ts` both state the consequence of getting this
+     * wrong and it is the whole book: `jsonb` does not preserve key order, so a
+     * hash re-derived from what Postgres gives back is a different serializer
+     * and would disagree with every hash the batch wrote. `bytesOf` below
+     * returns the column and this method has no path to `stateHash()` at all.
+     *
+     * SORTED BY `trading_day`, because `ports.ts` says oldest first and
+     * `auditAccount` reports its findings in the order this array arrived.
+     */
+    async storedRuleStates(accountId: string): Promise<readonly RuleStateRow[]> {
+      const rows = await db.batch(async (tx) => tx.rowsWhere('ruleStates', { accountId }));
+      return rows
+        .map((value) => toRuleStateRow(value, accountId))
+        .sort((a, b) => (a.tradingDay < b.tradingDay ? -1 : a.tradingDay > b.tradingDay ? 1 : 0));
     },
   };
 }
@@ -803,8 +914,18 @@ function writePort(db: WorkerDb): BatchWritePort {
       return Promise.reject(new BatchPortUnwired('raiseReconciliation', EVENT_SINK_BLOCKER));
     },
 
+    /**
+     * `INV-04`'s finding, AND THE ONE PORT THE AUDIT STILL CANNOT REACH.
+     *
+     * The three blockers are on `REPLAY_DIVERGENCE_BLOCKER` and the third is a
+     * ruling the corpus does not make. A throw here stops the run and leaves a
+     * non-zero exit status (`ADR-241`), which is loud and is NOT `B.1`'s halt:
+     * the diverged account stays payout eligible until somebody reads the exit
+     * code. That is said out loud so this method is not read as a control it is
+     * not.
+     */
     raiseDivergence(): Promise<never> {
-      return Promise.reject(new BatchPortUnwired('raiseDivergence', EVENT_SINK_BLOCKER));
+      return Promise.reject(new BatchPortUnwired('raiseDivergence', REPLAY_DIVERGENCE_BLOCKER));
     },
   };
 }
@@ -1380,6 +1501,168 @@ function toRuleState(value: unknown, at: string): StoredPrior {
 }
 
 /**
+ * One `rule_states` row as a `RuleStateRow`: `toRuleState`'s twenty-two fields
+ * PLUS FOUR, and the four are exactly the ones `ADR-250` section 7 priced.
+ *
+ * **THAT ENTRY'S ARITHMETIC IS WHAT MADE THIS SMALL, AND IT IS QUOTED RATHER
+ * THAN SUMMARISED BECAUSE IT IS THE REASON THE PORT STOPPED REFUSING.** It said
+ * a `RuleStateRow` is "twenty-odd columns read back and rebuilt: `contextGates`
+ * has its own stored shape, `calendarRevisionId` crosses a `bigint` column into
+ * a `number | null` field ... ONE `jsonb` LEAF DECODED IS NOT A ROW REBUILT."
+ * Every clause of that is true and the list is COMPLETE: this file's own header
+ * already enumerated the three fields a `RuleState` does not carry, and the
+ * fourth is the account id, which the caller passes in. So the row is the prior
+ * reader plus `accountId`, `contextGates`, `stateHash` and `calendarRevisionId`,
+ * and it is composed rather than transcribed.
+ *
+ * **COMPOSED AND NOT TRANSCRIBED IS THE POINT AND NOT A STYLE.** The two readers
+ * would otherwise be two expressions of one column list, which is `FM-16`, and
+ * the direction it would fail in is the worst available: `priorState` feeds the
+ * NIGHTLY FOLD and this feeds the AUDIT OF THAT FOLD, so a field read one way
+ * here and another way there would make the audit agree with a batch that was
+ * wrong, or diverge from one that was right, and in both cases the disagreement
+ * would be between two copies of this file rather than between the engine and
+ * storage.
+ *
+ * THE `accountId` IS THE CALLER'S AND THE COLUMN IS CHECKED AGAINST IT. The port
+ * read by `account_id`, so a row that came back carrying a different one is a
+ * predicate that did not hold, and an audit that renamed such a row into the
+ * account it asked for would compare one trader's day against another's.
+ */
+function toRuleStateRow(value: unknown, accountId: string): RuleStateRow {
+  const row = asRow(value, 'ruleStates');
+  const tradingDay = text(row, 'tradingDay', 'ruleStates');
+  const at = `rule_states[${accountId}:${tradingDay}]`;
+
+  const stored = text(row, 'accountId', at);
+  if (stored !== accountId)
+    throw new BatchRowError(
+      `${at} carries account_id ${stored}, and the read that returned it named ${accountId}. ` +
+        'The row is refused rather than renamed: an audit that compared it would be comparing ' +
+        "one trader's day against another's",
+    );
+
+  return {
+    ...toRuleState(row, at),
+    accountId,
+    contextGates: toStoredContextGates(row['contextGates'], `${at}.context_gates`),
+    stateHash: bytesOf(row, 'stateHash', at),
+    calendarRevisionId: revisionOf(row, at),
+  };
+}
+
+/**
+ * `rule_states.context_gates`, `SD-06`'s never-replayed half, decoded.
+ *
+ * **IT IS READ AND IT IS NOT COMPARED, AND BOTH HALVES MATTER.** `INV-23` keeps
+ * these five out of the replayed state and `ADR-026` `C-07` keeps them out of
+ * the hash, so `HASHED_COLUMNS` never names this field and no divergence can be
+ * attributed to it. It is on `RuleStateRow` because `0015` declares the column
+ * `NOT NULL` and the write port has to carry it, and a reader that returned a
+ * row without it would be a reader whose output the writer cannot round-trip.
+ *
+ * `pass` IS NOT DERIVED FROM ITS NEIGHBOUR ON ANY LEG. `0015`'s claim for the
+ * column is that these "were true on the day and may not be true now", so the
+ * stored `pass` is the verdict the batch recorded and re-deriving it from the
+ * stored `status` would be this reader deciding, years later, what a status
+ * meant. That is `external-gates.ts`'s question and this is not that file.
+ */
+function toStoredContextGates(value: unknown, at: string): StoredContextGates {
+  const gates = jsonRecord(value, at);
+  const leg = (key: string): Record<string, unknown> =>
+    jsonRecord(jsonField(gates, key, at), `${at}.${key}`);
+
+  const accountActive = leg('accountActive');
+  const kycVerified = leg('kycVerified');
+  const notFrozen = leg('notFrozen');
+  const reconClear = leg('reconClear');
+  const noPayoutInFlight = leg('noPayoutInFlight');
+
+  return {
+    accountActive: {
+      pass: jsonFlag(jsonField(accountActive, 'pass', at), `${at}.accountActive.pass`),
+      status: jsonText(jsonField(accountActive, 'status', at), `${at}.accountActive.status`),
+    },
+    kycVerified: {
+      pass: jsonFlag(jsonField(kycVerified, 'pass', at), `${at}.kycVerified.pass`),
+      state: jsonText(jsonField(kycVerified, 'state', at), `${at}.kycVerified.state`),
+    },
+    notFrozen: {
+      pass: jsonFlag(jsonField(notFrozen, 'pass', at), `${at}.notFrozen.pass`),
+      reason: jsonNullable(
+        jsonField(notFrozen, 'reason', at),
+        `${at}.notFrozen.reason`,
+        (raw, where) => jsonText(raw, where),
+      ),
+    },
+    reconClear: { pass: jsonFlag(jsonField(reconClear, 'pass', at), `${at}.reconClear.pass`) },
+    noPayoutInFlight: {
+      pass: jsonFlag(jsonField(noPayoutInFlight, 'pass', at), `${at}.noPayoutInFlight.pass`),
+    },
+  };
+}
+
+/**
+ * `rule_states.state_hash`, AS THE BYTES STORAGE RETURNED.
+ *
+ * **THE ONE COLUMN IN THIS FILE THAT MUST NOT BE RE-DERIVED, AND THE REASON IS
+ * THE WHOLE BOOK.** `ports.ts` states it at the field and `replay.ts` calls it
+ * "the single most important sentence in the file": the hash was computed over
+ * the engine's canonical serialization in its declared field order, `jsonb` does
+ * not preserve key order, and a hash recomputed from what Postgres gives back is
+ * a different serializer that "would disagree with every hash this batch wrote".
+ * A re-hash here would diverge every row on the first run.
+ *
+ * THIRTY-TWO BYTES OR THE ROW IS REFUSED. `rule_states_hash_is_sha256` is that
+ * length at the store (`0015`), so a shorter value is a row the database says
+ * cannot exist, and comparing a truncated digest is how two different states
+ * come to agree.
+ */
+function bytesOf(row: Record<string, unknown>, column: string, at: string): Buffer {
+  const value = row[column];
+  if (!Buffer.isBuffer(value))
+    throw new BatchRowError(
+      `${at}.${column} is not bytes on the row the accessor returned; it is ${typeof value}. ` +
+        'The stored hash is COMPARED and never recomputed (ADR-026 C-07, B.2), so there is no ' +
+        'second value this reader could fall back to',
+    );
+  if (value.length !== 32)
+    throw new BatchRowError(
+      `${at}.${column} is ${String(value.length)} byte(s) and rule_states_hash_is_sha256 (0015) ` +
+        'makes it thirty-two. A truncated digest is how two different states come to agree',
+    );
+  return value;
+}
+
+/**
+ * `rule_states.calendar_revision_id`, `ADR-047`'s stamp, as a `number | null`.
+ *
+ * `null` IS A FACT AND NOT AN ABSENCE OF ONE, which is `calendarWatermark`'s own
+ * sentence read from the other side: a row stamped `null` was folded under a
+ * calendar that had never been corrected, and `inScopeForDetection` compares it
+ * against the watermark by equality, so reading it as anything else would put
+ * every pre-correction row out of scope and trip `OI-14` over a whole book.
+ *
+ * THE SAFE-INTEGER GUARD IS `calendarWatermark`'s AND IT IS HERE FOR THE OTHER
+ * DIRECTION. That one refuses to STAMP a revision past `Number.MAX_SAFE_INTEGER`
+ * and this one refuses to READ one back, because a stamp rounded on the way in
+ * would compare equal to a watermark rounded the same way and the scope check
+ * would pass on two numbers that are both wrong.
+ */
+function revisionOf(row: Record<string, unknown>, at: string): number | null {
+  const value = bigintOrNull(row, 'calendarRevisionId', at);
+  if (value === null) return null;
+  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < -BigInt(Number.MAX_SAFE_INTEGER))
+    throw new BatchRowError(
+      `${at}.calendarRevisionId is ${value.toString(10)}, which is past Number.MAX_SAFE_INTEGER ` +
+        'and `RuleStateRow.calendarRevisionId` is a `number`. A stamp rounded here compares ' +
+        'equal to a watermark rounded the same way, so B.4 step 1 would scope on two wrong ' +
+        'numbers that agree',
+    );
+  return Number(value);
+}
+
+/**
  * `breach_kind`, with `0065`'s own pairing checked on the way past.
  *
  * `rule_states_breach_flag_matches_kind` is `breached = (breach_kind IS NOT
@@ -1424,30 +1707,72 @@ async function liveMark(
   accountId: string,
   tradingDay: TradingDay,
 ): Promise<LiveMark | null> {
-  const rows = await tx.rowsWhere('dailyMarks', { accountId, tradingDay });
-  const live = rows
-    .map((value) => asRow(value, 'dailyMarks'))
-    .filter((row) => row['supersededBy'] === null || row['supersededBy'] === undefined);
+  const live = liveMarksByDay(
+    await tx.rowsWhere('dailyMarks', { accountId, tradingDay }),
+    accountId,
+  );
+  const row = live.get(tradingDay);
+  return row === undefined ? null : renderMark(row);
+}
 
-  const first = live[0];
-  if (first === undefined) return null;
-  if (live.length > 1)
-    throw new BatchRowError(
-      `daily_marks holds ${String(live.length)} unsuperseded rows for account ${accountId} on ` +
-        `${tradingDay}, and daily_marks_account_day_uq makes that unwritable. The fold refuses ` +
-        'rather than choosing one, because either choice is a money row nobody can re-derive',
-    );
+/**
+ * `0014`'s SUPERSESSION RULE, APPLIED ONCE FOR BOTH READERS.
+ *
+ * `liveMark` narrows to one day and the history walk takes every day, and the
+ * rule they share is the whole of what makes a mark foldable: a correction is a
+ * NEW row with the old one pointing at it, so a row carrying `superseded_by` is
+ * never folded, and two LIVE rows on one day is refused rather than resolved.
+ *
+ * **ONE EXPRESSION RATHER THAN TWO, AND THE DIRECTION OF THE HAZARD IS WHY.**
+ * The one-day reader feeds the NIGHTLY FOLD and the walk feeds THE AUDIT OF THAT
+ * FOLD. A supersession rule written twice could drift, and the drift would show
+ * up as a replay divergence on every corrected day: the audit would fold the
+ * superseded mark, disagree with a batch that was right, and page. Two copies of
+ * this predicate is the one defect that makes the self-audit lie in the
+ * expensive direction.
+ */
+function liveMarksByDay(
+  values: readonly unknown[],
+  accountId: string,
+): Map<string, Record<string, unknown>> {
+  const byDay = new Map<string, Record<string, unknown>[]>();
+  for (const value of values) {
+    const row = asRow(value, 'dailyMarks');
+    const superseded = row['supersededBy'];
+    if (superseded !== null && superseded !== undefined) continue;
+    const day = text(row, 'tradingDay', 'dailyMarks');
+    const bucket = byDay.get(day);
+    if (bucket === undefined) byDay.set(day, [row]);
+    else bucket.push(row);
+  }
 
+  const live = new Map<string, Record<string, unknown>>();
+  for (const [day, rows] of byDay) {
+    const first = rows[0];
+    if (first === undefined) continue;
+    if (rows.length > 1)
+      throw new BatchRowError(
+        `daily_marks holds ${String(rows.length)} unsuperseded rows for account ${accountId} on ` +
+          `${day}, and daily_marks_account_day_uq makes that unwritable. The fold refuses ` +
+          'rather than choosing one, because either choice is a money row nobody can re-derive',
+      );
+    live.set(day, first);
+  }
+  return live;
+}
+
+/** One live `daily_marks` row as the engine's `DailyMark`. */
+function renderMark(row: Record<string, unknown>): LiveMark {
   return {
-    tradingDay: text(first, 'tradingDay', 'dailyMarks') as TradingDay,
-    openingBalanceCents: bigintOf(first, 'openingBalanceCents', 'dailyMarks'),
-    closingBalanceCents: bigintOf(first, 'closingBalanceCents', 'dailyMarks'),
-    highBalanceCents: bigintOf(first, 'highBalanceCents', 'dailyMarks'),
-    lowBalanceCents: bigintOf(first, 'lowBalanceCents', 'dailyMarks'),
-    realizedPnlCents: bigintOf(first, 'realizedPnlCents', 'dailyMarks'),
-    adjustmentCents: bigintOf(first, 'adjustmentCents', 'dailyMarks'),
-    fillCount: count(first, 'fillCount', 'dailyMarks'),
-    sourceHash: digest(first, 'sourceHash', 'dailyMarks'),
+    tradingDay: text(row, 'tradingDay', 'dailyMarks') as TradingDay,
+    openingBalanceCents: bigintOf(row, 'openingBalanceCents', 'dailyMarks'),
+    closingBalanceCents: bigintOf(row, 'closingBalanceCents', 'dailyMarks'),
+    highBalanceCents: bigintOf(row, 'highBalanceCents', 'dailyMarks'),
+    lowBalanceCents: bigintOf(row, 'lowBalanceCents', 'dailyMarks'),
+    realizedPnlCents: bigintOf(row, 'realizedPnlCents', 'dailyMarks'),
+    adjustmentCents: bigintOf(row, 'adjustmentCents', 'dailyMarks'),
+    fillCount: count(row, 'fillCount', 'dailyMarks'),
+    sourceHash: digest(row, 'sourceHash', 'dailyMarks'),
   };
 }
 
@@ -1470,21 +1795,47 @@ async function settlementsOn(
   accountId: string,
   tradingDay: TradingDay,
 ): Promise<readonly Settlement[]> {
-  const rows = await tx.rowsWhere('payoutRequests', { accountId });
+  const facts = settledFacts(await tx.rowsWhere('payoutRequests', { accountId }));
+  return byOrdinal(facts.filter((fact) => fact.effectiveTradingDay === tradingDay));
+}
+
+/**
+ * EVERY settled `payout_requests` row of one account, as facts, unbucketed.
+ *
+ * `settlementsOn` takes the ones landing on a day and the history walk buckets
+ * all of them, and the STATUS TERM and the DAY COLUMN are read in one place for
+ * the reason `liveMarksByDay` gives: swapping `settled_trading_day` for
+ * `effective_trading_day` changes whose money moves, and a batch and the audit
+ * of that batch reading the pair differently is a divergence neither side is
+ * wrong about.
+ */
+function settledFacts(values: readonly unknown[]): readonly Settlement[] {
   const facts: Settlement[] = [];
-  for (const value of rows) {
+  for (const value of values) {
     const row = asRow(value, 'payoutRequests');
     if (text(row, 'status', 'payoutRequests') !== 'settled') continue;
-    if (textOrNull(row, 'effectiveTradingDay', 'payoutRequests') !== tradingDay) continue;
+    const effective = textOrNull(row, 'effectiveTradingDay', 'payoutRequests');
+    if (effective === null)
+      throw new BatchRowError(
+        `payout_requests[${text(row, 'id', 'payoutRequests')}] is settled and carries no ` +
+          'effective_trading_day, which payout_requests_settled_has_trading_days makes ' +
+          'unwritable (0010). SD-03 puts the fact on the day the balance moved, and a ' +
+          'settlement with no such day is a fold nobody can place',
+      );
     facts.push({
       payoutRequestId: text(row, 'id', 'payoutRequests'),
       ordinal: count(row, 'payoutOrdinal', 'payoutRequests'),
       approvedCents: bigintOf(row, 'approvedCents', 'payoutRequests'),
       basisTradingDay: text(row, 'basisTradingDay', 'payoutRequests') as TradingDay,
-      effectiveTradingDay: tradingDay,
+      effectiveTradingDay: effective as TradingDay,
     });
   }
-  return facts.sort((a, b) => a.ordinal - b.ordinal);
+  return facts;
+}
+
+/** `applySettlement` is idempotent per request, so the ORDER is the report's. */
+function byOrdinal(facts: readonly Settlement[]): readonly Settlement[] {
+  return [...facts].sort((a, b) => a.ordinal - b.ordinal);
 }
 
 // -----------------------------------------------------------------------------
@@ -1531,6 +1882,105 @@ export async function resolveAccountDay(
     // `date NOT NULL`, so an account row that exists carries one.
     openedOn: text(account, 'openedOn', 'accounts') as TradingDay,
   };
+}
+
+/**
+ * ONE ACCOUNT'S WHOLE INPUT HISTORY, OLDEST FIRST. `INV-04`'s LEFT-HAND SIDE.
+ *
+ * **EIGHT READS FOR A WHOLE LIFE, AND THAT COUNT IS THE PORT'S REASON FOR
+ * EXISTING RATHER THAN AN OPTIMISATION.** `resolveAccountDay` above answers ONE
+ * day and takes six reads to do it, five of which answer questions about the
+ * ACCOUNT and not about the day: the account row, the plan version, the size
+ * grid, the identity, the KYC chain and the payout requests. Repeating it per
+ * day over `B.5`'s figure of 250 trading days is 1,500 reads to fold one life
+ * and 7.5 million to audit a 5,000 account book, which is the shape the retired
+ * blocker on this port said it existed to replace rather than to wrap. Here each
+ * of those is read ONCE and only `daily_marks` and `rule_states` are added.
+ *
+ * -----------------------------------------------------------------------------
+ * WHAT THIS SHARES WITH THE ONE-DAY READER, AND WHY SHARING IT IS THE POINT
+ * -----------------------------------------------------------------------------
+ * `resolvePinnedPlan`, `externalGates`, `liveMarksByDay`, `renderMark`,
+ * `settledFacts`, `priorFrom` and `toRuleState` are all the one-day reader's and
+ * are CALLED rather than restated. `replay.ts`'s whole subject is that a second
+ * expression of one fold can drift from the first; the same is true one layer
+ * down of a second expression of one READ, and the drift would be worse here
+ * because it would be invisible: the batch would fold one set of inputs, the
+ * audit would fold a slightly different set, and the divergence would be
+ * reported against the ENGINE, which was right both times.
+ *
+ * -----------------------------------------------------------------------------
+ * THREE THINGS THIS DOES THAT A READER SHOULD NOT HAVE TO INFER
+ * -----------------------------------------------------------------------------
+ *   1. THE DAYS ARE THE LIVE MARKS AND NOTHING ELSE. A superseded mark is not a
+ *      day (`0014`), and an account with no live mark has no history rather than
+ *      an empty one. `replay` sorts what it is given anyway, and the array is
+ *      sorted here too because `ports.ts` promises oldest first and a caller
+ *      that read `days[0]` for an opening fact would otherwise read whichever
+ *      row the accessor returned first.
+ *   2. A SETTLED FACT WHOSE EFFECTIVE DAY CARRIES NO LIVE MARK IS ATTACHED TO NO
+ *      DAY, AND THE FOLD IS IDENTICAL EITHER WAY. `replay` FLATTENS whatever
+ *      buckets it is handed and re-buckets by `effectiveTradingDay`
+ *      (`groupSettlementsByEffectiveDay`), then reads the bucket for each MARK,
+ *      so a fact whose day has no mark is never read no matter which day it
+ *      arrived attached to. That is also exactly what the nightly fold does with
+ *      it, because that fold runs per live mark too. A settlement stranded that
+ *      way is a finding for reconciliation and there is nothing here for the
+ *      audit to repair.
+ *   3. `prior` IS FILLED AND `external` IS FILLED AND THE AUDIT READS NEITHER.
+ *      Both are on `AccountDay` because the type requires them, both are real
+ *      values off real rows, and `accountDaysFrom`'s docstring at the port says
+ *      what each costs.
+ */
+async function resolveAccountHistory(
+  tx: BatchTx,
+  accountId: string,
+): Promise<readonly AccountDay[]> {
+  const account = asRow(
+    (await tx.rowAt('accounts', { id: accountId })) ?? missing('accounts', accountId),
+    'accounts',
+  );
+
+  // THE ACCOUNT'S FACTS, READ ONCE FOR THE WHOLE LIFE. `INV-16` makes the plan
+  // version an input pinned on the account and `ADR-051` makes `opened_on` an
+  // account fact, so neither can differ between two days of one life -- which is
+  // exactly what `lifeOf` in `replay.ts` asserts on the way back in.
+  const plan = await resolvePinnedPlan(
+    tx,
+    text(account, 'planVersionId', 'accounts'),
+    bigintOf(account, 'sizeCents', 'accounts'),
+  );
+  const openedOn = text(account, 'openedOn', 'accounts') as TradingDay;
+  const external = await externalGates(tx, account, accountId);
+
+  const live = liveMarksByDay(await tx.rowsWhere('dailyMarks', { accountId }), accountId);
+  const states = (await tx.rowsWhere('ruleStates', { accountId })).map((value) =>
+    asRow(value, 'ruleStates'),
+  );
+
+  const settlements = new Map<string, Settlement[]>();
+  for (const fact of settledFacts(await tx.rowsWhere('payoutRequests', { accountId }))) {
+    const bucket = settlements.get(fact.effectiveTradingDay);
+    if (bucket === undefined) settlements.set(fact.effectiveTradingDay, [fact]);
+    else bucket.push(fact);
+  }
+
+  const days: AccountDay[] = [];
+  for (const day of [...live.keys()].sort()) {
+    const row = live.get(day);
+    if (row === undefined) continue;
+    const tradingDay = day as TradingDay;
+    days.push({
+      accountId,
+      plan,
+      prior: priorFrom(states, accountId, tradingDay),
+      mark: renderMark(row),
+      settlements: byOrdinal(settlements.get(day) ?? []),
+      external,
+      openedOn,
+    });
+  }
+  return days;
 }
 
 /**
@@ -1675,11 +2125,27 @@ async function priorState(
   accountId: string,
   tradingDay: TradingDay,
 ): Promise<AccountDay['prior']> {
-  const rows = await tx.rowsWhere('ruleStates', { accountId });
+  const rows = (await tx.rowsWhere('ruleStates', { accountId })).map((value) =>
+    asRow(value, 'ruleStates'),
+  );
+  return priorFrom(rows, accountId, tradingDay);
+}
+
+/**
+ * The same walk over rows ALREADY IN HAND, which is what the history reader has.
+ *
+ * `priorState` reads and this decides, and the split is the only thing that
+ * makes the history walk a walk: it resolves a prior for every day of a life off
+ * ONE read of `rule_states` rather than one read per day.
+ */
+function priorFrom(
+  rows: readonly Record<string, unknown>[],
+  accountId: string,
+  tradingDay: TradingDay,
+): AccountDay['prior'] {
   let latest: Record<string, unknown> | null = null;
   let latestDay = '';
-  for (const value of rows) {
-    const row = asRow(value, 'ruleStates');
+  for (const row of rows) {
     const day = text(row, 'tradingDay', 'ruleStates');
     if (day >= tradingDay) continue;
     if (latest === null || day > latestDay) {
