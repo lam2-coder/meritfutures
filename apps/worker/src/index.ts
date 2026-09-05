@@ -36,17 +36,30 @@
 // bump to pg-boss is therefore a red boot and a new migration rather than a
 // silent in-place upgrade of a schema inside the ledger's restore boundary.
 //
-// NOTHING HERE IMPORTS IT YET, AND THE REASON HAS MOVED FROM A MANIFEST TO A
-// GRANT. `apps/worker/package.json` declares `@merit/db`, `@merit/ledger` and
-// `@merit/rules-engine`, and under `node-linker=isolated` an undeclared import
-// does not resolve at all, so a line is still owed. **BUT THE LINE IS NO LONGER
-// THE BLOCKER**: `0026_roles_and_grants.sql` grants `USAGE` and default
-// privileges `IN SCHEMA public` and nowhere else, so `merit_app` holds neither
-// `USAGE` nor `CREATE` on `pgboss` and every one of `JobQueue`'s five methods
-// throws for this deployable today. `0079` left that grant out on purpose and
-// `probe_pgboss_job_store.sql` REJECTION 5 asserts the absence. ADR-326 rules
-// what the grant must be; the migration that acts on the ruling is owed by a row
-// whose fence holds `packages/db/**`.
+// THE MANIFEST LINE IS HERE AND THE GRANT IS HERE, AND WHAT IS LEFT IS AN
+// IMPORTER. `apps/worker/package.json` declares `@merit/queue` since ADR-327,
+// and `0082_pgboss_app_grants.sql` grants `merit_app` `USAGE` on `pgboss` plus
+// the fifteen table privileges pg-boss was MEASURED to need, so a call now
+// reaches a schema the role can see. **THIS PARAGRAPH READ "NOTHING HERE IMPORTS
+// IT YET, AND THE REASON HAS MOVED FROM A MANIFEST TO A GRANT ... every one of
+// `JobQueue`'s five methods throws for this deployable today", AND `0082` MADE
+// THE SECOND HALF FALSE.**
+//
+// WHAT IS STILL MISSING IS NAMED RATHER THAN DEFERRED, because a deferral with
+// no named blocker is not a finding (ADR-326 section 3.2). No module under
+// `src/` imports `@merit/queue`, so the capability is declared and unexercised.
+// The next row owes the ONE-DOOR module `@merit/ledger` got at `src/sweeps/
+// ledger.ts` and `@merit/db` got at `src/db.ts` (ADR-165): one file that names
+// the package, one `JobTransaction` from `packages/db`'s `sqlExecutor
+// ('job-enqueue')`, and one queue name. ADR-327 section 5 says why that file is
+// not here: this row's fence held the manifest and the barrel and no other
+// module of this deployable.
+//
+// AND `0082` DOES NOT GRANT `CREATE`, WHICH IS A RULING AND NOT AN OMISSION.
+// `pgboss.create_queue` runs `CREATE TABLE pgboss.%I` only for a PARTITIONED
+// queue and `declareQueue` asks for none, so the application role keeps the "no
+// DDL" property `0026_roles_and_grants.sql:64` gives it on `public`, on a schema
+// that sits inside the PITR boundary protecting the ledger.
 //
 // THIS SENTENCE READ "AND NOTHING ELSE" AFTER `@merit/rules-engine` AND
 // `@merit/db` UNTIL ADR-305 SECTION 7 SLICE 6 ADDED `@merit/ledger`, WHICH IS
@@ -78,20 +91,21 @@
 // `JobTransaction` its `enqueue` requires. ADR-102 produced one and
 // `enqueueProvisioningOp` calls it.
 //
-// **THE MANIFEST LINE THIS HEADER HAS ASKED FOR SINCE SESSION 147 IS STILL NOT
-// HERE, AND THE SENTENCE THAT SAID IT WAS "OWED BY A DIFFERENT SESSION THAN
-// THIS ONE" IS RETIRED BECAUSE A DEFERRAL WITH NO NAMED BLOCKER IS NOT A
-// FINDING.** ADR-305 section 7 slice 8 is the row that holds the manifest, and
-// it measured the blocker under the line rather than adding it: `@merit/queue`
-// resolves to a `JobQueue` whose every method runs against the `pgboss` schema,
-// and the role this deployable connects as cannot reach that schema at all (see
-// the grant paragraph in this file's header, and `src/schedule.ts`). A manifest
-// line whose one call throws `permission denied for schema pgboss` buys a
-// resolvable import and no job. **SO THE LINE WAITS ON THE GRANT AND THE GRANT
-// WAITS ON A MIGRATION**, which is a smaller and more specific gap than the one
-// this comment used to name. So the saga is written against PORTS, exactly as
-// `runNightlyBatch` is, and `src/provisioning/ports.ts` says what each port's
-// implementation is and what blocks two of them.
+// **THE MANIFEST LINE THIS HEADER HAS ASKED FOR SINCE SESSION 147 IS HERE.**
+// It read "STILL NOT HERE" through two rewrites: ADR-326 measured the blocker
+// under it rather than adding it, because `@merit/queue` resolves to a
+// `JobQueue` whose every method runs against the `pgboss` schema and the role
+// this deployable connects as could not reach that schema at all, so the line
+// would have bought a resolvable import and a call that threw `permission denied
+// for schema pgboss`. **`0082_pgboss_app_grants.sql` REMOVED THAT BLOCKER AND
+// ADR-327 ADDED THE LINE.**
+//
+// THE SAGA IS STILL WRITTEN AGAINST PORTS, and that has not changed with the
+// manifest: `ProvisioningJobQueue` is a port, `enqueueProvisioningOp` calls it,
+// and no adapter over `pgBossQueue` exists yet because no module here imports
+// the package. `src/provisioning/ports.ts` says what each port's implementation
+// is and what blocks two of them, and `src/schedule.ts` carries the blocker per
+// job rather than as a generality.
 //
 // **WHAT IS REAL IS THE PIPELINE, THE DIGEST, THE MACHINE, THE COMPENSATION AND
 // THE EXIT; WHAT IS NOT IS THE WIRING**, and the difference is visible in the
