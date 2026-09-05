@@ -109,8 +109,9 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
-import { closeClient, poolSqlExecutor, systemDb, transaction } from '@merit/db';
+import { closeClient, isNull, poolSqlExecutor, systemDb, transaction } from '@merit/db';
 import type {
+  FilterTerm,
   PoolSqlExecutorReason,
   SqlExecutor,
   SystemDb,
@@ -193,6 +194,73 @@ export const LIVE_DB: WorkerDb = {
  */
 export function closeWorkerDb(): Promise<void> {
   return closeClient();
+}
+
+// =============================================================================
+// THE ONE FILTER TERM, WHICH IS NOT A DOOR EITHER AND HAS TO SAY WHY
+// =============================================================================
+// **IT IS HERE FOR THE SAME REASON THE EXECUTOR BELOW IS: ADR-165's PATTERN IS
+// ONE FILE PER PACKAGE, AND A TERM IS ONLY A TERM IF `packages/db` MINTED IT.**
+// `scoped-db.ts` keeps a module-private `WeakSet` of every term it minted and
+// `isFilterTerm` reads IDENTITY rather than shape, on the stated ground that "a
+// `jsonb` column holding an object that looks like a term is a VALUE, and a
+// shape check would read it as a range". So a caller cannot hand-roll one, and
+// an adapter that needs `column IS NULL` needs the constructor rather than a
+// copy of its output.
+//
+// **WHAT NEEDED IT WAS `src/recon/adapter.ts` (ADR-345) AND THE NEED IS THE
+// DEFINITION OF "LIVE" RATHER THAN A CONVENIENCE.**
+// `daily_marks_live_per_account_day_uq` is `(account_id, trading_day) WHERE
+// superseded_by IS NULL`, so a reconciliation sweep that read every mark and
+// filtered in this process would re-derive that index's own predicate by hand
+// and would pull every superseded correction across the boundary to do it.
+// `apps/worker/src/recon/ports.ts` argued that before an adapter existed, and
+// `ADR-157` admits `IS NULL` ON THE READ PATH BY NAME, so this is the granted
+// shape rather than a widening of anything.
+//
+// -----------------------------------------------------------------------------
+// WHY IT IS NOT A SECOND DOOR IN ADR-165 CLAUSE 2's SENSE
+// -----------------------------------------------------------------------------
+// **THE CLAUSE COUNTS DOORS ONTO TABLES AND THIS REACHES NO TABLE AND NAMES NO
+// COLUMN.** `isNull()` takes NOTHING and returns a frozen two-word object. It
+// carries no key vocabulary, no scope predicate, no reason and no connection;
+// it cannot be handed to `transaction()`, and the only way it reaches a database
+// at all is as one value of a filter a caller composed through a door that was
+// already open. `atMost` and `atLeast` are deliberately NOT re-exported: this
+// deployable has one caller needing one term, and a vocabulary re-exported ahead
+// of a caller is a word somebody uses.
+//
+// **AND IT WIDENS NOTHING A CALLER COULD NOT ALREADY REACH.** A term REMOVES
+// rows from a read the handle already serves, which is `scoped-db.ts`'s own
+// argument for why a conjunction is safe on this boundary and a disjunction is
+// not: "a conjunction can only REMOVE rows from the read the caller already
+// holds at this authority, and a disjunction can add them back." An adapter
+// without this constructor reads MORE rows, not fewer.
+//
+// **IT IS ALSO REFUSED ON EVERY WRITE, BY `packages/db` AND NOT BY THIS FILE.**
+// `addressPredicate` throws on a term in an address, on every write path and
+// every addressed read, because a term cannot name one row. So there is no
+// composition of what this exports that reaches an UPDATE or a DELETE.
+// =============================================================================
+
+/**
+ * `column IS NULL`, minted by the accessor. `ADR-157`'s read-path term.
+ *
+ * A FRESH TERM PER CALL, WHICH IS THE ACCESSOR'S RULE AND NOT THIS FILE'S
+ * PREFERENCE. `isNull`'s own docstring: "A FRESH OBJECT PER CALL rather than a
+ * shared constant, because membership of `TERMS` is what makes a term a term
+ * and a frozen singleton would work equally well right up until somebody
+ * exported it." A `const` here would be exactly that export, so this is a
+ * function that delegates and never a value that is held.
+ *
+ * TYPED AS `FilterTerm` AND NOT NARROWED HERE. The caller that needs one member
+ * of the union narrows it against the discriminant and refuses the others, which
+ * is `src/recon/adapter.ts`'s `reconIsNull`: a narrowing performed at the
+ * acquisition point would put this file in the business of knowing which member
+ * each caller wants.
+ */
+export function columnIsNull(): FilterTerm {
+  return isNull();
 }
 
 // =============================================================================

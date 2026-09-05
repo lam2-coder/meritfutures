@@ -83,6 +83,17 @@
 // system write path, so the row below stays `unscheduled` and the disposition
 // case that derives it from the tree stays green for the reason it always had.
 //
+// **ADR-345 WROTE `./recon/adapter.ts` AND THE COUNT ABOVE IS NOW EIGHT, WHICH
+// IS KEPT BESIDE ITS CORRECTION per `RI-14` rather than retyped.**
+// `UNWIRED_RECON_SWEEP_IO` is still a value and is no longer the ONLY inhabitant
+// of `ReconSweepIo`, so the reconciliation sweep is runnable against a real
+// database. **THE CALLER CENSUS DID NOT MOVE AND NEITHER DID THE ROW'S
+// DISPOSITION**: nothing under `src/` calls `runReconciliationSweep`, the
+// adapter is an io value rather than a caller, and that row's own `why` carries
+// the three blockers that are not an adapter. **WIRING AND SCHEDULING ARE TWO
+// DECISIONS AND THIS FILE IS WHERE THE SECOND ONE IS RECORDED**, which is the
+// whole reason the disposition is derived from a census rather than typed.
+//
 // **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
 // is the reason this row does not simply write eleven adapters. `ADR-305`
 // section 5: past `approved` the only arrow is `transferring`, `packages/rail`
@@ -259,9 +270,21 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'per-identity ledger reconciliation',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_RECON_SWEEP_IO` is the only `ReconSweepIo` in the tree. Its row is S1 because a ' +
-      'per-identity error hides behind a global zero (GS-231), and an S1 switch watching a job ' +
-      'nobody wired is the state this list exists to make legible.',
+      'THE FIRST CLAUSE OF THIS ROW READ "`UNWIRED_RECON_SWEEP_IO` is the only `ReconSweepIo` in ' +
+      'the tree" AND ADR-345 MADE IT FALSE, and it is kept beside its correction per RI-14. ' +
+      '`./recon/adapter.ts` is a second inhabitant, so the sweep is RUNNABLE against a real ' +
+      'database and this row stays unscheduled for reasons that are not the adapter. ' +
+      'THE BLOCK HAS NO RELEASE: the sweep sets `accounts.recon_blocked` on a mismatch and ' +
+      '`0014_marks.sql` reserves the clearing for a HUMAN, and nothing in this tree clears it in ' +
+      'code or in a route, so a clock today is a control that can stop eligibility and no ' +
+      'control that can restore it. THE RUN NEEDS A `batch_run_id` NOBODY IS MINTING: OVERVIEW ' +
+      'section 5.2 puts this stage INSIDE the nightly batch and `runReconciliationSweep` refuses ' +
+      'a non-uuid rather than generating one, so the caller is `batch/`s and not this file`s. ' +
+      'AND THE SWITCH WOULD BE SATISFIED BY THE WRONG CHECK: the row above is INV-M20-10`s ' +
+      'per-identity WALLET assertion, S1 because a per-identity error hides behind a global zero ' +
+      '(GS-231), and this sweep compares a rule state against a vendor mark per ACCOUNT-DAY. ' +
+      'That registration mismatch is reported in ADR-345 as an open question and is not ' +
+      'repaired here.',
   },
   {
     module: './sweeps/expiry.ts',
