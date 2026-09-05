@@ -50,10 +50,29 @@ BEGIN;
 -- satisfies it: the arithmetic is not what any case here is measuring.
 --
 -- NO `ledger_accounts` ROW IS WRITTEN HERE AND THAT IS NOT AN OMISSION. The
--- identity's seven scoped accounts, `trader_wallet` among them, are provisioned
+-- identity's THREE scoped accounts, `trader_wallet` among them, are provisioned
 -- by the `identities_provision_ledger_accounts` trigger on the INSERT above;
 -- writing one by hand raises `ledger_accounts_identity_code_uq`, which is how
 -- this comment came to exist.
+--
+-- THIS LINE READ "seven scoped accounts" UNTIL 2026-09-05 AND SEVEN IS THE SIZE
+-- OF A DIFFERENT SET (ADR-351 section 5). ADR-027 rules SEVEN ledger codes and
+-- 0009's `ledger_accounts_code_is_declared` states them; only THREE of the seven
+-- are per-identity, and those three are what this trigger opens. 0054:127-131
+-- inserts `trader_withdrawable`, `trader_wallet` and `promotional_credit`, its
+-- backfill at 0054:163-168 carries the same three, and the comment two lines
+-- above that INSERT says so in terms: "The three per-identity classes of
+-- ADR-027's seven". So the sentence took its number from the right ruling and
+-- the wrong set, which is the failure mode a count copied out of an ADR has.
+-- THE ORIGINAL WORDING IS KEPT HERE RATHER THAN OVERWRITTEN (RI-14): a reader
+-- who has seen "seven" cited elsewhere needs to find out here that it was wrong
+-- rather than find no trace of it.
+--
+-- 0054 IS NOT EDITED AND WOULD NOT BE IF IT WERE THE FILE AT FAULT. A merged
+-- migration is permanent under constitution E2 and a false sentence inside one
+-- is recorded in DELTA_MANIFEST, never repaired in place. This file is a live
+-- check whose comments are read as instructions by the next session, which is
+-- the whole of why the two are treated differently.
 INSERT INTO identities (id, status) VALUES
   ('aa000000-0000-0000-0000-000000000322', 'active');
 INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
