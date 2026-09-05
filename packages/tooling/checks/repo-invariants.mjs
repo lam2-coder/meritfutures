@@ -9063,6 +9063,17 @@ const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
  * THE BACKLOG: migrations that landed with no record, each with the file and
  * the ruling its own header cites.
  *
+ * IT IS EXPORTED, AND THAT IS A SEAM THE EMPTINESS FORCED RATHER THAN A
+ * CONVENIENCE. `packages/db/test/migration-landing-record.test.ts` carries a
+ * case per leg, and leg 3's two cases used a LIVE register entry (`0073`) as
+ * their fixture. With the register empty there is no live entry left to seed
+ * from, so leg 3 would have become untestable and its cases would have been
+ * deleted -- coverage lost to a repair, which is the worst of the options. The
+ * suite now seeds an entry into this Map and removes it in a `finally`, so leg
+ * 3 is asserted exactly as before against a register that holds nothing. THE
+ * CHECK'S BEHAVIOUR IS UNCHANGED: nothing here reads the export and no caller
+ * writes to it outside that suite.
+ *
  * IT IS EMPTY, AS OF 2026-09-05, AND THE EMPTINESS IS THE POINT RATHER THAN A
  * REASON TO DELETE IT. Every `nnnn_*.sql` under packages/db/migrations now has
  * a landing record, so leg 1 is UNCONDITIONAL from here: a merged migration
@@ -9113,7 +9124,7 @@ const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
  * two halves of that entry disagreed and this one, the machine-readable half,
  * was right. No merged record is amended; ADR-335 reports it.
  */
-const LANDING_RECORD_BACKLOG = new Map([]);
+export const LANDING_RECORD_BACKLOG = new Map([]);
 
 /**
  * Every landing record `packages/db/DELTA_MANIFEST.md` carries, by migration
