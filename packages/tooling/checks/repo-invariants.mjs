@@ -8956,6 +8956,51 @@ const ri36 = {
 // CAUGHT, by leg 1: a row that types the wrong number absorbs nothing, so the
 // file it meant to absorb is reported as having no record.
 //
+// LEG 4 IS THE OTHER REGISTRY IN THE SAME FILE, AND IT CLOSES THIS CHECK'S OWN
+// INSTRUCTION. Leg 1's finding text tells a session to "write the section,
+// claim its number in section 16's section-number table, and MEASURE it", and
+// until this leg nothing could tell whether the middle clause was done. Section
+// 16 is a SECTION-NUMBER ALLOCATION TABLE written after three sections were
+// numbered `14` in one day, its own rule is "claim the next free number here in
+// the commit that writes the section", and its own closing paragraph said in
+// terms that "nothing reads this table". EIGHT OF ITS ROWS RECORD THE SAME
+// OMISSION AND NOT ONE OF THEM COULD REPORT IT: `18` and `20` record THEMSELVES
+// as having been written as a heading and never as a row, and `21`, `25`, `31`,
+// `35`, `45` and `48` each NAME another session's missing row and decline to
+// write it. The drift grew to EIGHT unclaimed numbers while they did.
+//
+// WHAT THE TABLE CLAIMS IS A SET OF NUMBERS, AND THAT IS NOT WHAT A ROW COUNT
+// OR A LANDING-RECORD COUNT MEASURES. Its key column is a section number, one
+// row keys an inclusive RANGE (`1 to 13`), a lettered heading takes no number
+// at all by the table's own written rule, and a number claimed more than once
+// is left claimed more than once. So the comparison is: THE SET OF NUMBERS ON
+// `## <n>.` HEADINGS AGAINST THE SET OF NUMBERS THE TABLE'S KEY COLUMN CLAIMS.
+// A naive one-row-per-landing-heading reader is wrong in BOTH directions: it
+// would demand rows for `4a`, `4b` and `4c`, and demand three obligations of
+// `## 14.` where the table records one number claimed three times, while
+// missing that sections 15, 16 and 22 take numbers and record no landing at
+// all.
+//
+// IT RUNS IN BOTH DIRECTIONS, on legs 1 and 2's idiom. A heading with no claim
+// is the drift that has recurred eight times. A claim with no heading is what a
+// renumbered or abandoned section leaves behind, and the reservation objection
+// does not reach it here because this table's own rule puts the claim in the
+// commit that writes the section. Together they turn a MIS-KEYED row into two
+// findings that name each other rather than one that names neither.
+//
+// THE KEY COLUMN IS READ AS A SET, AND THAT IS THE WRITTEN RULE BY WHICH THE
+// RECORDED COLLISION IS TOLERATED RATHER THAN A SPECIAL CASE FOR ONE ROW.
+// Section 16 rules its own collisions in terms -- "Neither is renumbered, and
+// that is a ruling rather than an omission ... The collision is left in place
+// and the table allocates forward" -- because renumbering breaks every citation
+// of whichever one moves. Two rows carrying one number therefore claim ONE
+// number: `21` is claimed by `0038`'s session and again by `ADR-068`'s, and it
+// is one member. The same sentence runs over the headings, where `## 14.` heads
+// three sections and `## 21.` heads two. THE COST IS STATED RATHER THAN HIDDEN:
+// this leg can no more report a FUTURE duplicate row than the recorded one, and
+// it does not quietly absorb that job. Duplicate rows in an allocation table
+// are `OI-11`, which is open, names its own blocker, and is section 16's row.
+//
 // FIVE THINGS IT DOES NOT DO.
 //   1. IT NEVER READS A SECTION'S CONTENT. Whether a landing section carries an
 //      install verification, a probe transcript or a counterfactual is the E2
@@ -8990,6 +9035,29 @@ const MIGRATION_FILE = /^(\d{4})_[a-z0-9_]+\.sql$/;
  * heading's CLAIM: numbers before it are recorded, numbers after it are prose.
  */
 const LANDING_VERB = /\bland(?:s)?\b/;
+
+/** The sub-heading that opens section 16's section-number allocation table. */
+const SECTION_NUMBER_TABLE_HEADING = /^### Section numbers\s*$/;
+
+/**
+ * A `## <n>.` heading that TAKES a section number.
+ *
+ * NUMERIC ONLY, AND THE LETTERS ARE EXCLUDED BY THE TABLE'S OWN WRITTEN RULE
+ * rather than by this reader's taste: "`4a` is a section and not a number ...
+ * A lettered section deliberately claims no number, so the sequence this table
+ * allocates is undisturbed by either, and adding rows for them would make the
+ * table's own key ambiguous between a number and a name." `4a`, `4b` and `4c`
+ * head six sections between them and none of them is owed a row.
+ */
+const SECTION_HEADING = /^## (\d+)\./;
+
+/**
+ * A row of the section-number table, keyed by one number or by an inclusive
+ * RANGE. The `1 to 13` row claims thirteen numbers in one row, which is why a
+ * reader counting ROWS against headings answers the wrong question in one
+ * direction and a reader counting landing records answers it in the other.
+ */
+const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
 
 /**
  * THE BACKLOG: migrations that landed with no record, each with the file and
@@ -9042,16 +9110,33 @@ const LANDING_RECORD_BACKLOG = new Map([
 
 /**
  * Every landing record `packages/db/DELTA_MANIFEST.md` carries, by migration
- * number, with the site that carries it.
+ * number, with the site that carries it; and, for leg 4, every SECTION NUMBER
+ * the file's headings take against every section number its own allocation
+ * table claims.
  *
  * @param {string} root
- * @returns {{ records: Map<string, string[]>, rows: number, headings: number }}
+ * @returns {{
+ *   records: Map<string, string[]>,
+ *   rows: number,
+ *   headings: number,
+ *   sections: Map<number, string[]>,
+ *   claims: Map<number, string[]>,
+ *   claimRows: number,
+ *   sawTable: boolean,
+ * }}
  */
 function landingRecords(root) {
   /** @type {Map<string, string[]>} */
   const records = new Map();
   let rows = 0;
   let headings = 0;
+  /** Numeric `## <n>.` headings, by the number they take. @type {Map<number, string[]>} */
+  const sections = new Map();
+  /** Section numbers section 16's table claims, by number. @type {Map<number, string[]>} */
+  const claims = new Map();
+  let claimRows = 0;
+  let sawTable = false;
+  let inClaimTable = false;
   /** @param {string} number @param {string} where */
   const note = (number, where) => {
     const seen = records.get(number) ?? [];
@@ -9063,7 +9148,38 @@ function landingRecords(root) {
   const lines = readFileSync(join(root, MANIFEST_DOC), 'utf8').split('\n');
   lines.forEach((text, index) => {
     const at = `${MANIFEST_DOC}:${index + 1}`;
+    // LEG 4's TABLE REGION, and it ends at the next heading of EITHER depth.
+    // Section 16 carries two tables under two `###` sub-headings, and a reader
+    // that ran to the next `## ` would take the trailing prose of section 16
+    // and then stop, which is harmless today and is the kind of scope that
+    // widens on its own the next time somebody writes a table.
+    if (text.startsWith('### ') || text.startsWith('## ')) {
+      if (SECTION_NUMBER_TABLE_HEADING.test(text)) {
+        sawTable = true;
+        inClaimTable = true;
+      } else {
+        inClaimTable = false;
+      }
+    } else if (inClaimTable) {
+      const claim = SECTION_NUMBER_ROW.exec(text);
+      if (claim !== null) {
+        claimRows += 1;
+        const from = Number(claim[1]);
+        const to = claim[2] === undefined ? from : Number(claim[2]);
+        for (let n = from; n <= to; n += 1) {
+          claims.set(n, [...(claims.get(n) ?? []), at]);
+        }
+      }
+    }
     if (text.startsWith('## ')) {
+      const numbered = SECTION_HEADING.exec(text);
+      if (numbered !== null) {
+        const number = Number(numbered[1]);
+        sections.set(number, [
+          ...(sections.get(number) ?? []),
+          `${at}, "${text.slice(3).trim().slice(0, 72)}"`,
+        ]);
+      }
       inSequence = MIGRATION_SEQUENCE_HEADING.test(text);
       // THE CLAIM IS THE PART OF THE HEADING BEFORE THE WORD `land`, AND THAT
       // IS A NARROWING THE SUITE FORCED RATHER THAN A FLOURISH. Section 39's
@@ -9090,13 +9206,15 @@ function landingRecords(root) {
     note(row[1] ?? '', `${at}, a row of the migration sequence in section 1`);
   });
 
-  return { records, rows, headings };
+  return { records, rows, headings, sections, claims, claimRows, sawTable };
 }
 
 /** @type {Invariant} */
 const ri37 = {
   id: 'RI-37',
-  title: 'Every migration on disk has a landing record in the delta manifest',
+  title:
+    'Every migration has a landing record in the delta manifest, and every ' +
+    'section number the manifest uses is claimed in its own allocation table',
   covers:
     'ADR-334. EVERY `nnnn_*.sql` UNDER `packages/db/migrations` AGAINST ' +
     '`packages/db/DELTA_MANIFEST.md`, IN BOTH DIRECTIONS. `0080` (ADR-322) ' +
@@ -9134,6 +9252,25 @@ const ri37 = {
     'leg 3 doing its work rather than an allowlist being trimmed. ' +
     'A migration outside it with no record is a finding on the commit ' +
     'that adds it, so the backlog cannot grow without an edit to this file. ' +
+    'LEG 4 IS THE OTHER REGISTRY IN THE SAME FILE AND IT CLOSES THIS CHECK`s ' +
+    'OWN INSTRUCTION (ADR-337): leg 1 tells a session to claim the section`s ' +
+    'number in section 16`s section-number table and nothing could tell ' +
+    'whether it did. THE COMPARISON IS THE SET OF NUMBERS ON `## <n>.` ' +
+    'HEADINGS AGAINST THE SET THE TABLE`s KEY COLUMN CLAIMS, in BOTH ' +
+    'directions, which is neither a row count nor a landing-record count: one ' +
+    'row keys an inclusive RANGE (`1 to 13`), sections 15, 16 and 22 take ' +
+    'numbers and record no landing, and `## 14.` heads three sections on one ' +
+    'claimed number. A LETTERED HEADING TAKES NO NUMBER, which is the table`s ' +
+    'own written rule -- `4a`, `4b` and `4c` head six sections between them ' +
+    'and none is owed a row -- so they are excluded rather than reported. ' +
+    'THE KEY COLUMN IS READ AS A SET, and that is the written rule by which ' +
+    'the RECORDED collision is tolerated rather than a special case for one ' +
+    'row: section 16 rules that a collision "is left in place and the table ' +
+    'allocates forward" because renumbering breaks every citation of whichever ' +
+    'one moves, so the two rows claiming `21` claim ONE number. THE COST IS ' +
+    'STATED: this leg can no more report a FUTURE duplicate row than the ' +
+    'recorded one, and it does not absorb that job, which is `OI-11`s and is ' +
+    'open with its own blocker named. ' +
     'FIVE THINGS IT DOES NOT DO. It never reads a section`s CONTENT: whether a ' +
     'record carries an install verification, object counts read from the ' +
     'catalogue, a probe transcript and the counterfactual that probe was ' +
@@ -9171,7 +9308,7 @@ const ri37 = {
       );
     }
 
-    const { records, rows, headings } = landingRecords(root);
+    const { records, rows, headings, sections, claims, claimRows, sawTable } = landingRecords(root);
     if (rows === 0) {
       throw new Error(
         `RI-37 parsed no migration-sequence row out of section 1 of ${MANIFEST_DOC}. That ` +
@@ -9184,6 +9321,33 @@ const ri37 = {
         `RI-37 parsed no \`## <n>.\` landing section out of ${MANIFEST_DOC}. That is the ` +
           'shape every section from 13 onward uses, so zero means the heading reader has ' +
           'moved rather than that no migration has ever been recorded',
+      );
+    }
+
+    // LEG 4's SENTINELS, and they are RULE 1 rather than rule 2 on the three
+    // above's precedent. A manifest with no section-number table, or one whose
+    // table parses to zero rows, would make leg 4 report EVERY numbered
+    // heading in the file as unclaimed -- forty-seven findings naming the
+    // wrong defect, which is the loud-and-wrong direction this project can
+    // least afford. Both are the reader having stopped reading.
+    //
+    // SILENCE IS NOT AVAILABLE HERE THE WAY IT IS FOR A MISSING FILE. The
+    // manifest exists by the time this line runs, and a manifest that carries
+    // landing sections and no allocation table is a manifest that lost its
+    // table, not a tree that never had one.
+    if (!sawTable) {
+      throw new Error(
+        `RI-37 found no \`### Section numbers\` table in ${MANIFEST_DOC}, which carries ` +
+          `${sections.size} numbered section(s). That table is the allocation register leg ` +
+          '4 compares against, so a missing one would report every heading in the file as ' +
+          'unclaimed and name the wrong defect',
+      );
+    }
+    if (claimRows === 0) {
+      throw new Error(
+        `RI-37 parsed no row out of ${MANIFEST_DOC}'s \`### Section numbers\` table, which ` +
+          'it found. Zero rows means the row reader has moved rather than that the table ' +
+          'claims nothing, and leg 4 would then report every numbered heading as unclaimed',
       );
     }
 
@@ -9238,6 +9402,30 @@ const ri37 = {
           'shrink, so the row comes out in the same commit as the section that closes ' +
           'it. An exemption left standing behind a repair is how an allowlist stops ' +
           'being read',
+      );
+    }
+
+    // LEG 4, BOTH DIRECTIONS, over the SET of numbers rather than over rows.
+    for (const [number, sites] of [...sections].sort((a, b) => a[0] - b[0])) {
+      if (claims.has(number)) continue;
+      findings.push(
+        `${MANIFEST_DOC} heads section \`${number}\` at ${sites.join('; ')} and its own ` +
+          'section-number table in section 16 carries no row claiming `' +
+          `${number}\`. That table exists because three sections were numbered \`14\` in ` +
+          'one day, and its rule is to claim the next free number in the commit that ' +
+          'writes the section. A number taken by a heading and never entered is invisible ' +
+          'to the next session reading the table for the maximum, which is how the ' +
+          'collision it was written to end happens again',
+      );
+    }
+    for (const [number, sites] of [...claims].sort((a, b) => a[0] - b[0])) {
+      if (sections.has(number)) continue;
+      findings.push(
+        `${MANIFEST_DOC}'s section-number table claims \`${number}\` at ${sites.join('; ')} ` +
+          `and no \`## ${number}.\` heading in that file takes it. This table's own rule ` +
+          'puts the claim in the commit that writes the section, so a claim standing alone ' +
+          'is what a renumbered or abandoned section leaves behind rather than a ' +
+          'reservation in flight',
       );
     }
 
