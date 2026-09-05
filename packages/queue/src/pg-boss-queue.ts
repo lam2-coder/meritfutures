@@ -93,6 +93,16 @@ export interface PgBossQueueOptions {
  *   the polling fetch, maintenance and completion. It is NOT the enqueue path.
  *   Every `enqueue` rides on the transaction its caller passes in, and this
  *   executor is never substituted for it.
+ *
+ *   IT MUST NOT BE ONE OPEN TRANSACTION, AND THAT IS A MEASUREMENT (ADR-331).
+ *   Most of what the library runs on this handle is wrapped in its own
+ *   `locked()` helper, which renders `BEGIN ... COMMIT` as one multi-statement
+ *   string. Handed a caller's open transaction, the first such plan COMMITS it,
+ *   which is ADR-006's consequence lost one statement into construction; and
+ *   `pg` resolves a multi-statement string to one result PER STATEMENT, so an
+ *   executor that reads `.rows` off that array hands back `undefined` and the
+ *   supervise pass dies on it. What this parameter wants is a pool: one
+ *   connection per statement, which is what the vendor's own driver is.
  */
 export function pgBossQueue(executor: JobTransaction, options: PgBossQueueOptions = {}): JobQueue {
   const boss = new PgBoss({

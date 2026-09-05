@@ -4077,6 +4077,20 @@ export function firmTx(source: StatementSource, conn: PoolClient): FirmTx {
  * Drizzle would mean splitting the vendor's generated SQL on `$n` and rebuilding
  * it as template chunks, and a text transform over somebody else's SQL breaks
  * the first time a dollar-quoted string or a literal `$1` goes through it.
+ *
+ * ONE STATEMENT OR MANY, AND THE MANY USED TO COME BACK EMPTY (ADR-331).
+ * `pg` resolves a MULTI-STATEMENT string to a `Result[]`, one element per
+ * statement, and `.rows` on an array is `undefined`. This function used to read
+ * that property and hand back `{ rows: undefined }`, which is not the type it
+ * declares and is a wrong answer rather than a throw. Measured on this tree:
+ * pg-boss's own `locked()` plan renders six statements, `pg` returns an array of
+ * six, and the rows the caller wanted sit in element four with empty arrays
+ * either side. Flattening in order is what recovers them, and it is what the
+ * vendor does: `unwrapSQLResult` in `pg-boss/dist/tools.js`, applied by every
+ * adapter that library ships, because an adapter that normalises to `{ rows }`
+ * is the side that destroyed the array and therefore the only side that can
+ * flatten it. This file may not name that vendor, so the semantics are
+ * reproduced here and `packages/queue/test/surface.test.ts` holds them to it.
  */
 function sqlExecutorOn(conn: PoolClient, reason: SqlExecutorReason): SqlExecutor {
   // The vocabulary is closed by the TYPE. This reads it so the parameter is not
@@ -4086,8 +4100,13 @@ function sqlExecutorOn(conn: PoolClient, reason: SqlExecutorReason): SqlExecutor
   }
   return {
     async executeSql(text: string, values?: unknown[]): Promise<{ rows: unknown[] }> {
-      const result = await conn.query(text, values);
-      return { rows: result.rows as unknown[] };
+      // `pg`'s own two answers, and there is no third: the extended protocol a
+      // parameterised call takes cannot carry a second statement at all.
+      const result = (await conn.query(text, values)) as unknown as
+        { rows: unknown[] } | { rows: unknown[] }[];
+      return Array.isArray(result)
+        ? { rows: result.flatMap((one) => one.rows) }
+        : { rows: result.rows };
     },
   };
 }

@@ -29,14 +29,32 @@
 // producer of `SqlExecutor`, which is structurally the `JobTransaction` this
 // package's `enqueue` declares, so an enqueue riding the caller's transaction
 // is buildable and `apps/worker`'s `enqueueProvisioningOp` calls a port shaped
-// for it (ADR-102). The CONSTRUCTOR half is supplied and MEASURED UNUSABLE:
-// `sqlExecutorOn` returns `{ rows: result.rows }`, every one of pg-boss's
-// `locked()` plans is a multi-statement string, and `pg` resolves those to a
-// `Result[]` whose `.rows` is `undefined`, so a supervisor built on it throws
-// inside its monitor phase. ADR-327 section 9 finding 1 measured that and it
-// does not touch `enqueue`, whose one admitted `SqlExecutorReason` is
-// `job-enqueue`. `client()` stays unexported and ADR-084 section 9 rules it
+// for it (ADR-102). `client()` stays unexported and ADR-084 section 9 rules it
 // permanently so, so there is still no second pool here.
+//
+// **THIS PARAGRAPH READ "The CONSTRUCTOR half is supplied and MEASURED
+// UNUSABLE: `sqlExecutorOn` returns `{ rows: result.rows }`, every one of
+// pg-boss's `locked()` plans is a multi-statement string, and `pg` resolves
+// those to a `Result[]` whose `.rows` is `undefined`, so a supervisor built on
+// it throws inside its monitor phase", AND ADR-331 REPAIRED THE EXECUTOR IT
+// NAMES.** It is kept beside its correction rather than deleted, per RI-14. The
+// executor now flattens the array in statement order, which is what pg-boss's
+// own adapters do, and a supervise pass measured against PostgreSQL 16.13 as
+// `merit_app` completed both its monitor and its maintain phase with zero
+// errors where the same pass used to abort on `undefined.filter`.
+//
+// WHAT THE CONSTRUCTOR HALF IS STILL MISSING IS A LIFETIME AND NOT A SHAPE, and
+// ADR-331 measured that too rather than reasoning about it. `sqlExecutorOn` is
+// bound to ONE OPEN TRANSACTION, and every plan the vendor wraps in `locked()`
+// carries its own `BEGIN` and `COMMIT`. Run one on a caller's transaction and
+// the `COMMIT` commits THAT transaction: the in-transaction test comparing
+// `now()` against the statement clock reads true before that plan and false
+// after it, so ADR-006's whole consequence is gone one statement into
+// construction. The executor that constructs the queue therefore has to be
+// POOL-shaped, one connection per statement, which is what the vendor's own
+// driver is. That door is not published by `packages/db` and the reason it
+// would need is not a member of `SqlExecutorReason`; ADR-331 refuses to mint
+// either as a means and leaves both owed to the row whose subject they are.
 //
 // **THIS HEADING READ "IT HOLDS NO CONNECTION, AND THE THING IT NEEDS DOES NOT
 // EXIST YET", AND UNDER IT: "`@merit/db` CANNOT SUPPLY EITHER ONE TODAY ... its
