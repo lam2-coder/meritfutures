@@ -19,6 +19,15 @@
 // names the PSP handler, which is a wording debt this session records rather
 // than takes: that file is outside this fence.
 //
+// HALF OF THAT MOVED IN ADR-340 AND THE SENTENCE IS AMENDED RATHER THAN CUT
+// (`RI-14`). The parser installer now lives in `registry.ts` as
+// `installRawBodyParser`, because `compose` is its only production caller;
+// `routes/webhooks-psp.ts` re-exports that one definition under the old name,
+// so "a second copy would be a second thing to keep true" still holds and this
+// file's import still resolves. `rawBodyOf` did not move. THIS ROUTE NOW
+// DECLARES `rawBody: true` and a live process reaches this receiver's own 404
+// rather than the `500 internal_error` every webhook row answered before.
+//
 // -----------------------------------------------------------------------------
 // THE ANCHOR THIS CONTRACT ROW NAMES DOES NOT EXIST IN THE DATABASE
 // -----------------------------------------------------------------------------
@@ -475,6 +484,9 @@ export default defineRoutes({
       method: 'POST',
       path: KYC_WEBHOOK_PATH,
       handler: kycWebhookHandler(productionDeps),
+      // THE BYTES, OR THIS RECEIVER CANNOT VERIFY ANYTHING. API_CONTRACT
+      // section 10 wants the HMAC verified BEFORE parsing. ADR-340.
+      rawBody: true,
     },
   ],
 });
