@@ -30,9 +30,11 @@
 //      on testing a repair somebody reverted.
 //
 //   3. THE SEEDS, one per leg. Leg 2 (a record for a migration that is not on
-//      disk), leg 3 in both of its directions (a register entry whose gap has
-//      been closed, which is what makes the register shrink-only), the scoping
-//      of the section-1 table leg, and all three sentinels.
+//      disk); leg 3's one direction (a register entry whose gap has been
+//      closed, which is what makes the register shrink-only) AND the direction
+//      it deliberately does not take, asserted inert with the half that
+//      compensates for it executed beside it; the scoping of the section-1
+//      table leg in both directions; and all three sentinels.
 //
 // EVERY FIXTURE COPIES THE REAL MIGRATION DIRECTORY, because the whole subject
 // is a real history: a synthetic two-file estate would let a reconstruction
@@ -259,14 +261,27 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
     expect(found[0]).toContain('The register may only shrink');
   });
 
-  // LEG 3, THE OTHER DIRECTION. An entry naming a file that is gone is the same
-  // furniture and is caught before it can absorb a number somebody reuses.
-  test('a backlog entry naming a migration that is gone is a finding', () => {
-    const found = findings(estate(liveManifest(), ['0073_operator_directory.sql']));
+  // LEG 3 RUNS IN ONE DIRECTION, AND THIS IS THE ONE IT DOES NOT TAKE. An
+  // entry naming a migration the tree does not carry is INERT rather than a
+  // finding: reporting it would make the register a claim about ONE migration
+  // set rather than a property of the check, and it would fire over every
+  // entry on any tree carrying a smaller set. Constitution E2 makes a merged
+  // migration permanent, so the state it would guard is already forbidden.
+  test('a register entry naming a migration this tree does not carry is inert', () => {
+    expect(findings(estate(liveManifest(), ['0073_operator_directory.sql']))).toEqual([]);
+  });
+
+  // AND THE COMPENSATING HALF, EXECUTED RATHER THAN CLAIMED. A row that types
+  // the wrong number absorbs nothing, so leg 1 reports the file it meant to
+  // absorb. `0073` is on the register; give the register nothing to absorb by
+  // leaving `0073` on disk and taking the register's help away from the
+  // MIGRATION NEXT TO IT, which is not on the register at all: `0076` has a
+  // landing section, so removing that section is the same shape as a mis-key.
+  test('a migration the register does not absorb is reported by leg 1', () => {
+    const found = findings(estate(withoutSection(liveManifest(), '34')));
     expect(found).toHaveLength(1);
-    expect(found[0]).toContain('backlog register holds `0073`');
-    expect(found[0]).toContain('carries no such file');
-    expect(found[0]).toContain('delete the row');
+    expect(found[0]).toContain('0076_firm_parameter_write_control.sql is on disk');
+    expect(found[0]).toContain('carries no landing record for `0076`');
   });
 
   // THE SCOPING OF THE SECTION-1 LEG, AND IT IS LOAD BEARING RATHER THAN TIDY.

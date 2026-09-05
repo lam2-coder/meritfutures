@@ -8947,6 +8947,15 @@ const ri36 = {
 // NOT in it and has no record is a finding on the commit that adds it, so the
 // backlog cannot grow without somebody writing a line into this file.
 //
+// LEG 3 RUNS IN ONE DIRECTION AND THE OTHER IS DELIBERATELY NOT TAKEN. An entry
+// naming a migration this tree does not carry is INERT. Reporting it would make
+// the register a claim about ONE migration set rather than a property of the
+// check, and it would fire over every entry on any tree carrying a smaller set;
+// constitution E2 makes a merged migration permanent, so the state it would
+// guard is one the constitution already forbids. A MIS-KEYED ROW IS STILL
+// CAUGHT, by leg 1: a row that types the wrong number absorbs nothing, so the
+// file it meant to absorb is reported as having no record.
+//
 // FIVE THINGS IT DOES NOT DO.
 //   1. IT NEVER READS A SECTION'S CONTENT. Whether a landing section carries an
 //      install verification, a probe transcript or a counterfactual is the E2
@@ -9104,7 +9113,12 @@ const ri37 = {
     'exemption list on `CI-06/gate-inventory`s rule: an entry that no longer ' +
     'names a real gap is ITSELF a finding, so a session writing one of those ' +
     'sections must delete its row in the same commit and the register can only ' +
-    'shrink. It holds the TWENTY migrations that have no record on this tree, ' +
+    'shrink. IT RUNS IN ONE DIRECTION: an entry naming a migration this tree ' +
+    'does not carry is INERT, because reporting it would make the register a ' +
+    'claim about one migration set rather than a property of the check and ' +
+    'constitution E2 already forbids deleting a merged migration; a mis-keyed ' +
+    'row is caught by leg 1 instead, since the number it failed to absorb is ' +
+    'then reported as unrecorded. It holds the TWENTY migrations that have no record on this tree, ' +
     'SIXTEEN of them money path, each with its file and the ADR its own header ' +
     'cites. A migration outside it with no record is a finding on the commit ' +
     'that adds it, so the backlog cannot grow without an edit to this file. ' +
@@ -9193,14 +9207,17 @@ const ri37 = {
 
     // LEG 3. The register shrinks, and a stale entry is a finding.
     for (const [number, why] of LANDING_RECORD_BACKLOG) {
-      if (!onDisk.has(number)) {
-        findings.push(
-          `RI-37's backlog register holds \`${number}\` (${why}) and ${MIGRATIONS_DIR} ` +
-            'carries no such file. A register entry naming nothing real is furniture: ' +
-            'delete the row',
-        );
-        continue;
-      }
+      // AN ENTRY NAMING A MIGRATION THIS TREE DOES NOT CARRY IS INERT, AND
+      // THAT IS ONE DIRECTION DELIBERATELY NOT TAKEN. Reporting it would make
+      // the register a claim about ONE migration set rather than a property of
+      // the check, and it would fire over every entry on any tree carrying a
+      // smaller set -- which is exactly what the synthetic estate in
+      // `packages/tooling/test/repo-invariants.test.ts` is. Constitution E2
+      // makes a merged migration permanent, so the state it would guard is one
+      // the constitution already forbids. AND A MIS-KEYED ROW IS STILL CAUGHT,
+      // by leg 1 rather than here: a row that types the wrong number absorbs
+      // nothing, so the file it meant to absorb is reported as unrecorded.
+      if (!onDisk.has(number)) continue;
       const sites = records.get(number);
       if (sites === undefined) continue;
       findings.push(
