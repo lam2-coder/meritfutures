@@ -797,8 +797,10 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **25** | session 148, `0047` ([ADR-087](../../docs/decisions/ADR-087.md)) | **allocated.** `0047` lands. **SECTION 24 IS CLAIMED BY A HEADING AND HAS NO ROW HERE**, which is the fourth time (`18`, `20` and `24` were each written as a heading and never as a row), and it is named rather than added because `24` is session 135's to claim. **This is the first section in the file to record a repair that does NOT close the item it was written for**: `OI-29` goes to PARTLY CLOSED and `OI-29b` opens above |
 | **31** | session 403, `0066` ([ADR-213](../../docs/decisions/ADR-213.md)) | **allocated.** `0066` lands. **Sections 26 and 28 to 30 are claimed by headings and have no row here**, and `27` has no section at all, which is the same omission the `18`, `20` and `24` rows above each record. They are NAMED and not filled in on their authors' behalf, on this table's standing rule that a row written for somebody else is a claim nobody made. **30 is the true maximum, so 31 is the next free number rather than the row count.** |
 | **36** | session 512, `0078` ([ADR-321](../../docs/decisions/ADR-321.md)) | **allocated.** `0078` lands, and it is the first section in this file recording a migration that CREATES NOTHING and still moves the registry: one column on a table `0012` created, and the registry gains a key while `CREATE TABLE` count does not move. **35 is the maximum and 36 is the next free number.** |
-| **37** | session 518, `0082` ([ADR-327](../../docs/decisions/ADR-327.md)) | **allocated.** `0082` lands, and it is the first section in this file recording a migration that grants a PRIVILEGE rather than creating or altering an object. **`0080` and `0081` are on disk with no section here at all**, which is the same omission the `18`, `20`, `24`, `26 to 30` and `32 to 34` rows above each record, and they are NAMED and not filled in on their authors' behalf. **37 is the true maximum.** |
+| **37** | session 518, `0082` ([ADR-327](../../docs/decisions/ADR-327.md)) | **allocated.** `0082` lands, and it is the first section in this file recording a migration that grants a PRIVILEGE rather than creating or altering an object. **`0080` and `0081` are on disk with no section here at all**, which is the same omission the `18`, `20`, `24`, `26 to 30` and `32 to 34` rows above each record, and they are NAMED and not filled in on their authors' behalf. **37 is the true maximum.** **AMENDED IN PLACE ON 2026-09-05 RATHER THAN JOINED BY A SECOND ROW** ([ADR-065](../../docs/decisions/ADR-065.md) T3), because the sentence above is now FALSE and leaving a false sentence standing in an allocation table is the defect [ADR-328](../../docs/decisions/ADR-328.md) exists for: **`0080` and `0081` now hold sections 38 and 39**, written by [ADR-334](../../docs/decisions/ADR-334.md) in session 525 and MEASURED rather than reconstructed, and **39 is the maximum**. The clause about not filling a row in on an author's behalf is upheld rather than traded: those two rows were written in the same commit as the sections they claim. **`RI-37` NOW MAKES THIS CLASS OF ABSENCE A FAILURE**, so no session after this one can name it in a row and move on |
 | **35** | session 509, `0079` ([ADR-318](../../docs/decisions/ADR-318.md)) | **allocated.** `0079` lands. **Sections 32, 33 and 34 are claimed by headings and have no row here**, which is the same omission the `18`, `20`, `24` and `26 to 30` rows above each record. They are NAMED and not filled in on their authors' behalf, on this table's standing rule that a row written for somebody else is a claim nobody made. **34 is the true maximum, so 35 is the next free number rather than the row count.** |
+| **38** | session 525, `0080` ([ADR-322](../../docs/decisions/ADR-322.md)), written by [ADR-334](../../docs/decisions/ADR-334.md) | **allocated.** `0080` lands, **and this is the first section in this file recording a migration that merged WITHOUT one.** `0080` merged on 2026-09-05 and four later rows reported the absence rather than repairing it: [ADR-323](../../docs/decisions/ADR-323.md) landmine 1, [ADR-327](../../docs/decisions/ADR-327.md), [ADR-330](../../docs/decisions/ADR-330.md) and [ADR-329](../../docs/decisions/ADR-329.md) section 9 finding 5. **THE SECTION NUMBER IS LANDING ORDER AND NOT MIGRATION ORDER**, which 35, 36 and 37 already prove by being `0079`, `0078` and `0082`; **37 is the maximum, so 38 is the next free number** rather than a slot between 35 and 37. **A LETTERED SECTION WAS CONSIDERED AND REFUSED**: `4a` is the escape hatch for a section that belongs in the MIDDLE, and a record written today belongs at the end of a sequence ordered by when records were written |
+| **39** | session 525, `0081` ([ADR-323](../../docs/decisions/ADR-323.md)), written by [ADR-334](../../docs/decisions/ADR-334.md) | **allocated.** `0081` lands, on the row above's reasoning and in the same commit. **38 is the maximum this table has ever held and 39 is the next free number.** The two are consecutive because the migrations are consecutive and their rulings are one ruling on two tables, which [ADR-322](../../docs/decisions/ADR-322.md) landmine 1 says in its own words. **NEITHER ROW IS WRITTEN ON SOMEBODY ELSE'S BEHALF**, which is this table's standing rule: the sections beside them are written in the same commit, MEASURED against a live PostgreSQL 16.13 rather than reconstructed from the two ADRs, and `RI-37` is what makes the next such omission a failure instead of a fifth sentence |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -2413,3 +2415,129 @@ Against **PostgreSQL 16.13**, `0001`..`0082` applied forward-only from empty und
 **A GRANT IS THE ONE KIND OF MIGRATION WHOSE CORRECTNESS CANNOT BE READ OFF ITS OWN DIFF.** Every other file in this directory states a constraint whose truth is in the statement: a `CHECK` either admits a row or does not, and the probe that watches it needs one row. A grant states a CAPABILITY, and whether the capability is the right size is a fact about a library's whole statement set under a configuration nobody wrote down in this repository. **`0079` was right to refuse it and [ADR-326](../../docs/decisions/ADR-326.md) was right to refuse to guess it.** What made it decidable was running the thing, and then revoking each term to see the run break; **reading pg-boss's source would have produced a plausible list, and the plausible list would have been wrong by one privilege in the direction nobody checks** (too wide), because a reader stops when the paths they thought of are covered and a revoke loop stops when the database says so.
 
 **AND THE MEASUREMENT EXPIRES ON A VERSION RATHER THAN ON A DATE.** It is exact for **pg-boss@12.28.0** at schema version `38`, under `migrate: false`, `useListenNotify: false` and the library defaults for everything else. `0079`'s version pin already makes a catalog bump a red boot; this section is the reason a bump also needs the grant re-measured rather than carried forward, and the enumeration is what turns a new table in that upgrade into a `permission denied` somebody has to rule on.
+
+---
+
+## 38. `0080` lands, and its record is written four rows after the migration merged (2026-09-05)
+
+**Session 513, [ADR-322](../../docs/decisions/ADR-322.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `322` and `0080`. THE SECTION IS DATED TODAY AND THE MIGRATION IS NOT**, which is the whole reason this section exists: `0080` merged with no record here, four rows passed reporting the absence, and none of them held this file. [ADR-323](../../docs/decisions/ADR-323.md) landmine 1 named it, [ADR-327](../../docs/decisions/ADR-327.md) and [ADR-330](../../docs/decisions/ADR-330.md) each carried it forward, and [ADR-329](../../docs/decisions/ADR-329.md) section 9 finding 5 was still writing *"`0080` and `0081` still carry no `DELTA_MANIFEST` section"*. [ADR-334](../../docs/decisions/ADR-334.md) is the row that writes them and `RI-37` is what makes the next omission a failure rather than a fifth sentence.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION AND NONE IS COPIED OUT OF [ADR-322](../../docs/decisions/ADR-322.md).** Two of them disagree with that entry and the disagreement is reported rather than reconciled; see the note under the counts.
+
+[`0011:71`](migrations/0011_wallet.sql) declares `wallet_entries.provenance` `NOT NULL` over three values that file's own header calls kinds of **credit**, [`0011:52`](migrations/0011_wallet.sql) makes a debit row representable, and [`EVENTS.md:291`](../../docs/architecture/EVENTS.md) rules that *"`wallet.debited` has no `provenance` and that asymmetry is correct"*. So the honest row was unwritable and the mislabelled one was writable. `0080` moves the schema and edits nothing: `0011` and `0038` are untouched on disk and are superseded **by addition from outside** (constitution `E2`).
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0080` applied forward-only into an empty database under `ON_ERROR_STOP=1`, counts read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean.** Re-applying `0080` alone is refused at `constraint "wallet_entries_provenance_follows_direction" for relation "wallet_entries" already exists`, and re-applying `0001` at `type "identity_status" already exists`, so the file is not idempotent by rerun |
+| `public` object counts, `0079` then `0080` | **118 tables, 414 indexes, 516 -> 517 checks, 32 triggers.** ONE object is created and it is a CHECK |
+| `public` foreign keys and unique constraints | **176 and 17, both unchanged** |
+| `attnotnull` on `wallet_entries.provenance` | **`true` at `0079`, `false` at `0080`.** The only column in the set this file moves |
+| `wallet_entries_provenance_check` after `0080` | **still installed**, `CHECK ((provenance = ANY (ARRAY['payout','refund_wallet_funded','correction'])))`. `0080` composes with it rather than replacing it, so the three-member vocabulary is written down in exactly one place and it is `0011` |
+| `wallet_entries_provenance_follows_direction`, read at `pg_constraint` | the total `CASE`: `WHEN 'credit' THEN (provenance IS NOT NULL)`, `WHEN 'debit' THEN ((provenance IS NULL) OR (provenance = 'correction'))`, `ELSE false`. **Every branch returns a real boolean**, which is what stops a `NULL`-valued CHECK admitting the row it exists to refuse |
+| the comments this file writes | a 692-character constraint comment and a **333-character column comment**, and the column comment is `provenance`'s **first**: `0011` gave it none, measured at `0079` |
+| [`probe_wallet_debit_provenance.sql`](../../scripts/db/probe_wallet_debit_provenance.sql) | **4 acceptances and 5 rejections, all executed, 10 `NOTICE` lines, exit 0** |
+| the same probe against `0001`..`0079` | dies at `ACCEPTANCE 1` with *"a wallet debit carrying no provenance was refused (null value in column "provenance" of relation "wallet_entries" violates not-null constraint)"*, **exit 3** |
+| `wallet_entries` on the freshly applied schema | **0 rows.** The constraint lands on an empty table in every environment |
+
+**THE PROBE TRANSCRIPT, OFF THE RUNNER, AT `0001`..`0080`:**
+
+```
+NOTICE:  ACCEPTANCE 1: a debit with no provenance is writable
+NOTICE:  ACCEPTANCE 2: a credit with provenance payout is writable
+NOTICE:  ACCEPTANCE 3: a credit with provenance refund_wallet_funded is writable
+NOTICE:  ACCEPTANCE 4: 0038's ADJ-C3 still holds; a reversing adjustment writes a wallet DEBIT with provenance=correction and both deferred triggers pass
+NOTICE:  REJECTION 1: a debit labelled payout is refused
+NOTICE:  REJECTION 2: a debit labelled refund_wallet_funded is refused
+NOTICE:  REJECTION 3: a credit with no provenance is refused
+NOTICE:  REJECTION 4: provenance=deposit is refused on a credit
+NOTICE:  REJECTION 4: provenance=deposit is refused on a debit
+NOTICE:  REJECTION 5: the vocabulary is 0011's, the direction rule is 0080's, and the column is nullable
+```
+
+### One figure disagrees with [ADR-322](../../docs/decisions/ADR-322.md), and the cause was measured rather than argued
+
+[ADR-322](../../docs/decisions/ADR-322.md) section 4 reports **412** indexes at `0001`..`0079` and **412** at `0001`..`0080`. This section measures **414** at both. **The DELTA both records is identical, `+1` CHECK and nothing else**, and the absolute figure differs by two.
+
+**THE CAUSE IS `0078` AND IT IS EXECUTED HERE RATHER THAN INFERRED.** [ADR-322](../../docs/decisions/ADR-322.md) finding 5 records `0077` and `0078` as reserved-unwritten rows, so the database it measured did not carry `0078`; section 36 above records `0078` moving `public` indexes **412 to 414**. Applying `0001`..`0080` on this tree **with `0078` removed** returns **118 tables, 412 indexes, 517 checks, 174 foreign keys, 16 unique constraints, 32 triggers**, which is [ADR-322](../../docs/decisions/ADR-322.md)'s figure exactly. **So neither measurement is wrong and the disagreement is about which migrations were on the measuring base**, which is what an absolute object count is a fact about. It is recorded here because a reader comparing the two numbers should not have to rediscover it, and because it is the ordinary hazard of a sibling branch measuring a shared schema.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-322` | `wallet_entries` | `provenance` loses `NOT NULL`; `wallet_entries_provenance_follows_direction` requires it on a credit and admits `NULL` or `correction` on a debit; the constraint comment and the column's first comment | 0080 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed**, on `0051`, `0064`, `0065`, `0066`, `0067`, `0075`, `0076`, `0078` and `0082`'s reasoning: no approved module document proposes this as a delta. [M20](../../docs/plans/M20-wallet.md)'s `SD-M20-01` states the vocabulary and says nothing about nullability, so it stays true unchanged, and `INV-M20-04` becomes a property of the DDL rather than an aspiration. **`0011` AND `0038` ARE NOT EDITED**, which is constitution `E2` and the shape of every section above.
+
+### The part a reader should carry forward, and it is not the CHECK
+
+**`correction` IS ADMISSIBLE ON A DEBIT BECAUSE A MERGED TRIGGER REQUIRES IT, AND THAT IS THE FINDING THAT DECIDED THE SHAPE.** `assert_adjustment_wallet_entry_matches` ([`0038:548`](migrations/0038_account_adjustments.sql)) counts wallet rows `WHERE w.direction = NEW.direction AND w.provenance = 'correction'` and raises `ADJ-C3` unless there is exactly one, and `account_adjustments_debit_is_a_reversal` ([`0038:221`](migrations/0038_account_adjustments.sql)) makes that direction reachable. **The tidy biconditional, `(provenance IS NOT NULL) = (direction = 'credit')`, would have made `ADJ-C3` unsatisfiable for every reversal**, and no reading of `0011` alone would have found it: `0011`'s own header calls the list a credit vocabulary and that description was already out of date when it was quoted. `ACCEPTANCE 4` of the probe is the case that would have caught it, and it earns its length by forcing `0038`'s two `DEFERRABLE INITIALLY DEFERRED` triggers to run with `SET CONSTRAINTS ALL IMMEDIATE` inside a transaction that ends in `ROLLBACK`.
+
+**AND THE READ PATHS STILL REFUSE THE NULL THIS FILE MADE LEGAL.** [`wallet.ts:479`](../../apps/api/src/routes/wallet.ts) and [`wallet-withdrawals.ts:574`](../../apps/api/src/routes/wallet-withdrawals.ts) narrow `provenance` with a helper that refuses a null string, so **the first null-provenance debit ever written makes `GET /wallet/entries` throw for that trader and every trader after them on the same page.** Nothing is broken today because `wallet_entries` is empty in every environment, which this section measured. The narrowing has to land in the same commit as the first insert, and that commit is [ADR-305](../../docs/decisions/ADR-305.md) slice 7's rather than this file's.
+
+---
+
+## 39. `0081` lands, and the record that was owed with it is written in the same commit as `0080`'s (2026-09-05)
+
+**Session 514, [ADR-323](../../docs/decisions/ADR-323.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `323` and `0081`.** Section 38's opening applies here word for word: the migration merged, four later rows reported that it had no record, and [ADR-334](../../docs/decisions/ADR-334.md) is the row that writes one. **The two sections are consecutive because the two migrations are consecutive and their rulings are the same ruling one table over**, which [ADR-322](../../docs/decisions/ADR-322.md) landmine 1 said in its own words: *"the same defect class as this one, one table over"*.
+
+**EVERY FIGURE BELOW WAS MEASURED FOR THIS SECTION AND NONE IS COPIED OUT OF [ADR-323](../../docs/decisions/ADR-323.md).** The one that disagrees is the same index count as section 38's and it has the same measured cause.
+
+[`0006:124`](migrations/0006_commerce.sql) declares `psp text NOT NULL CHECK (psp IN ('psp_a','psp_b'))` and [`0006:125`](migrations/0006_commerce.sql) declares `psp_reference text NOT NULL`; `SD-M3-06` later added `payment_method` with a `'wallet'` member to the same table and relaxed neither. So a wallet-funded purchase could not be written without naming a processor that was never called, and the row that lied about which processor took the money was the only writable one.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `0001`..`0081` applied forward-only into an empty database under `ON_ERROR_STOP=1`, counts read from the catalogue:
+
+| Query | Result |
+|---|---|
+| the set applies forward-only from empty | **clean.** Re-applying `0081` alone is refused at `constraint "purchases_processor_columns_follow_method" for relation "purchases" already exists` |
+| `public` object counts, `0080` then `0081` | **118 tables, 414 indexes, 517 -> 518 checks, 32 triggers.** ONE object is created and it is a CHECK |
+| `public` foreign keys and unique constraints | **176 and 17, both unchanged** |
+| `attnotnull` on `purchases.psp` and `.psp_reference` | **`true` at `0080`, `false` at `0081`**, both |
+| `purchases_psp_check` after `0081` | **still installed**, `CHECK ((psp = ANY (ARRAY['psp_a','psp_b'])))`. It admits `NULL` because `NULL IN (...)` is `NULL`, so the processor vocabulary is still stated exactly once and it is `0006` |
+| `purchases_processor_columns_follow_method`, read at `pg_constraint` | the total `CASE` on `payment_method`: `'psp'` and `'mixed'` each require both columns present, `'wallet'` requires both absent, `ELSE false`. **Every branch is `IS NULL` or `IS NOT NULL`**, so no branch can return `NULL` and no row is admitted by vacuity |
+| `purchases_psp_reference_uq`, read at `pg_index` | `indisunique = true`, **`indnullsnotdistinct = false`**, `indpred` **null**, definition `CREATE UNIQUE INDEX purchases_psp_reference_uq ON public.purchases USING btree (psp, psp_reference)`. The anchor is whole, unique and NULLS DISTINCT, and `0081` did not drop, recreate or narrow it |
+| the comments this file writes | a 672-character constraint comment, **first** comments on `psp` (412) and `psp_reference` (334), and a **736-character `COMMENT ON INDEX`** which is the anchor's **first comment of any kind**: `0006` named it the idempotency anchor in a `--` comment in the migration and left the object itself undocumented, measured at `0080` |
+| [`probe_purchase_processor_columns.sql`](../../scripts/db/probe_purchase_processor_columns.sql) | **4 acceptances and 8 rejections, all executed, 12 `NOTICE` lines, exit 0**, every rejection matched **by constraint NAME** through `GET STACKED DIAGNOSTICS` |
+| the same probe against `0001`..`0080` | dies at `ACCEPTANCE 1` with *"a wallet-funded purchase naming no processor was refused (null value in column "psp" of relation "purchases" violates not-null constraint)"*, **exit 3** |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) over the whole applied schema | **holds, and fires in both directions.** Neither file declares a non-integer numeric column |
+| `purchases` on the freshly applied schema | **0 rows** |
+
+**THE PROBE TRANSCRIPT, OFF THE RUNNER, AT `0001`..`0081`:**
+
+```
+NOTICE:  ACCEPTANCE 1: a wallet purchase naming no processor is writable
+NOTICE:  ACCEPTANCE 2: a SECOND wallet purchase is writable; NULLs stay distinct in the anchor
+NOTICE:  ACCEPTANCE 3: an ordinary psp purchase naming psp_a is writable
+NOTICE:  ACCEPTANCE 4: a mixed purchase naming psp_b is writable
+NOTICE:  REJECTION 1: a wallet purchase naming psp_a is refused by purchases_processor_columns_follow_method
+NOTICE:  REJECTION 2: a wallet purchase with a reference and no processor is refused by purchases_processor_columns_follow_method
+NOTICE:  REJECTION 3: a psp purchase naming no processor is refused by purchases_processor_columns_follow_method
+NOTICE:  REJECTION 4: a psp purchase with no reference is refused by purchases_processor_columns_follow_method
+NOTICE:  REJECTION 5: a mixed purchase naming no processor is refused by purchases_processor_columns_follow_method
+NOTICE:  REJECTION 6: a duplicate processor reference is refused by purchases_psp_reference_uq
+NOTICE:  REJECTION 7: a processor outside the vocabulary is refused by purchases_psp_check
+NOTICE:  REJECTION 8: the vocabulary is 0006's, the method rule is 0081's, the anchor is unique, whole and NULLS DISTINCT, and both columns are nullable
+```
+
+### The same index disagreement, and the same measured cause
+
+[ADR-323](../../docs/decisions/ADR-323.md) section 4 reports **412** indexes at `0001`..`0080` and **412** at `0001`..`0081`. This section measures **414** at both, and the delta both record is identical: `+1` CHECK, no table, no index, no trigger, no type and no enum label. **The cause is `0078`, executed in section 38's own note**: [ADR-323](../../docs/decisions/ADR-323.md) finding 6 records `0077` and `0078` as reserved-unwritten rows, so its base carried neither, and this tree carries `0078`. **The tables, checks and triggers all agree exactly**, which is what a reader comparing the two should take from it: the figure that moved is the one `0078` moves.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-323` | `purchases` | `psp` and `psp_reference` both lose `NOT NULL`; `purchases_processor_columns_follow_method` requires both under `'psp'` and `'mixed'` and refuses both under `'wallet'`; the constraint comment, both column comments and the anchor index's first comment | 0081 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed.** `SD-M3-06` is the row that already exists: it put `payment_method` on this table so that *"without an explicit method the wallet path is indistinguishable from a PSP purchase whose webhook never arrived"*, and what lands here is that delta's own consequence made enforceable. **`0006` IS NOT EDITED**, its CHECK on `psp` and its unique index are both left installed and unaltered, and it is superseded by addition from outside it (constitution `E2`).
+
+### The part a reader should carry forward, and it is not the CHECK
+
+**THE IDEMPOTENCY ANCHOR IS NOW A UNIQUE INDEX OVER TWO NULLABLE COLUMNS, AND WHAT KEEPS IT CORRECT IS A POSTGRESQL DEFAULT NOBODY WROTE DOWN.** A btree unique index treats `NULL`s as DISTINCT unless it is built `NULLS NOT DISTINCT`, so `(NULL, NULL)` collides with nothing, including with another wallet row. That is right rather than tolerated, because the anchor defeats a duplicate **webhook** and a wallet purchase reached no processor, so there is no delivery to deduplicate. **The failure mode of getting it wrong is silent and total**: a `NULLS NOT DISTINCT` rebuild would permit exactly ONE wallet-funded purchase in the entire table and fail on the second. `ACCEPTANCE 2` writes a second wallet purchase and requires it to commit, `REJECTION 6` writes the same `(psp, psp_reference)` pair twice and requires the anchor **by name**, and `REJECTION 8` reads `indnullsnotdistinct`, `indisunique` and `indpred` out of the catalogue. **`0081` bought an assertion instead of a partial index**, and the `COMMENT ON INDEX` this section measured is where the rule is stated at the object.
+
+**AND THE SECOND `psp_reference` REPAIR IS STILL OWED WHILE THIS MIGRATION LOOKS LIKE IT DELIVERED IT.** [STATE](../../docs/STATE.md) session 220 records that stamping the processor reference **after** the provider call needs a nullable column and a migration. The column is nullable now and the repair is not delivered, because under `'psp'` the `CASE` requires the reference at `INSERT`. **A session that reads only the column type will conclude otherwise**, which is why it is written in the migration, in [ADR-323](../../docs/decisions/ADR-323.md) finding 8, and here.
