@@ -937,10 +937,17 @@ describe('the eligibility blocker states causes that are LIVE, and each is deriv
     expect(adapter).not.toContain("new BatchPortUnwired('loadAccountDay'");
     expect(adapter).toContain('resolveExternalGates');
 
-    // THE PORTS THAT DO STILL REFUSE ARE NAMED, so "the fold completes" is not
-    // read as "the adapter is whole". Neither is on `runNightlyBatch`'s path.
-    expect(adapter).toContain("new BatchPortUnwired('accountDaysFrom'");
-    expect(adapter).toContain("new BatchPortUnwired('storedRuleStates'");
+    // **THE TWO PORTS THIS CASE NAMED AS STILL REFUSING NO LONGER DO** (ADR-346),
+    // and this is the second time this case has gone red by a port landing
+    // rather than by drifting. They are asserted in the other direction on the
+    // same reason `loadAccountDay` is one line up: a `BatchPortUnwired` arm
+    // restored to either is a named failure. WHAT DID NOT MOVE is the sentence
+    // this case exists to protect. Neither read is on `runNightlyBatch`'s path,
+    // so "the fold completes" and "the table is still empty" are both still the
+    // reason's, and the endpoint's 503 is untouched by ADR-346.
+    expect(adapter).not.toContain("new BatchPortUnwired('accountDaysFrom'");
+    expect(adapter).not.toContain("new BatchPortUnwired('storedRuleStates'");
+    expect(adapter).toContain("new BatchPortUnwired('raiseDivergence'");
 
     const blocker = await eligibilityBlocker();
     expect(blocker).not.toContain('rejects `loadAccountDay` by name');
