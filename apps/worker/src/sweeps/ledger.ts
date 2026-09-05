@@ -1,13 +1,34 @@
 // =============================================================================
 // apps/worker/src/sweeps/ledger.ts
 // =============================================================================
-// `ExpiryLedgerPort` OVER `@merit/ledger`, AND THE TRANSACTION IS RECOVERED BY
-// IDENTITY RATHER THAN READ OFF A MEMBER THE PORT DOES NOT HAVE.
+// THIS DEPLOYABLE'S LEDGER DOOR. TWO PORTS OVER `@merit/ledger`, AND EACH
+// TRANSACTION IS RECOVERED BY IDENTITY RATHER THAN READ OFF A MEMBER THE PORT
+// DOES NOT HAVE.
 //
-// ADR-305 section 7 slice 6. `postLt01` had a declaration, a caller in
-// `expiry.ts` and a rejector in `UNWIRED_EXPIRY_SWEEP_IO`, and no
+// ADR-305 section 7 slice 6 wrote the first half. `postLt01` had a declaration,
+// a caller in `expiry.ts` and a rejector in `UNWIRED_EXPIRY_SWEEP_IO`, and no
 // implementation anywhere; this file is the implementation and it is the whole
 // of it.
+//
+// SLICE 7 (ADR-325) ADDED THE SECOND HALF, `ApprovalLedgerPort` OVER `LT-06`,
+// AND IT LANDED HERE RATHER THAN IN `src/withdrawals/` FOR A REASON WORTH
+// STATING WHERE THE CONSEQUENCE LIVES. `apps/worker/package.json`'s own
+// `//dependencies.@merit/ledger` key says the grant reaches EXACTLY ONE FILE and
+// names it, and `apps/api/test/ledger-posting-authority.test.ts` asserts the
+// specifier occurs at exactly `apps/worker/src/sweeps/ledger.ts` and that
+// `postTransaction(` is called from exactly that path. A second importer would
+// turn both assertions red BY CHOICE rather than by succeeding, and the one-door
+// pattern ADR-165 set is one door PER DEPLOYABLE and not one per module: a
+// reviewer asking where `apps/worker` posts a ledger entry gets ONE answer with
+// a path in it, and two files would be two answers.
+//
+// THE FILE'S NAME IS NOW NARROWER THAN ITS CONTENTS AND THAT IS REPORTED RATHER
+// THAN REPAIRED. The withdrawal approval driver is not a `sweeps/` job; it lives
+// at `src/withdrawals/approval-sweep.ts` and only its ledger adapter is here.
+// Moving this file to `src/ledger.ts`, beside `src/db.ts` whose shape it copies,
+// is the honest name and it is a RENAME of a money-path file that slice 6 landed
+// four days ago, plus a rewrite of two assertions in a suite this row would then
+// be editing for a reason that is not a finding. It is named as owed.
 //
 // -----------------------------------------------------------------------------
 // THIS IS THE ONE FILE IN THIS DEPLOYABLE THAT NAMES `@merit/ledger`
@@ -108,9 +129,10 @@
 // this paragraph.
 // =============================================================================
 
-import { lt01, postTransaction, readChart } from '@merit/ledger';
+import { lt01, postTransaction, readChart, walletWithdrawalApprovalPosting } from '@merit/ledger';
 import type { LedgerTx } from '@merit/ledger';
 
+import type { ApprovalFacts, ApprovalLedgerPort, ApprovalTx } from '../withdrawals/ports.ts';
 import type { ExpiryLedgerPort, ExpiryTx, Lt01Values } from './ports.ts';
 
 /**
@@ -199,5 +221,112 @@ export const EXPIRY_LEDGER: ExpiryLedgerPort = {
     const ledger = OPENED.get(tx);
     if (ledger === undefined) throw new ExpiryLedgerHandleUnknown();
     await postTransaction(ledger, await readChart(ledger), lt01(values));
+  },
+};
+
+// =============================================================================
+// `ApprovalLedgerPort`, WHICH IS THE SAME MECHANISM ON A DIFFERENT POSTING
+// =============================================================================
+// ADR-325, ADR-305 section 7 slice 7. `LT-06` extinguishes a trader's wallet
+// claim and turns it into a firm obligation, and the driver that posts it is
+// `src/withdrawals/approval-sweep.ts`.
+//
+// A SECOND MAP AND NOT A SECOND ENTRY IN THE FIRST, because the two ports take
+// two different handle shapes: `ExpiryTx` has three members and `ApprovalTx` has
+// five, and a single map keyed on the wider shape would let a handle recorded
+// for the expiry sweep serve an approval posting. THE REFUSAL IS THE POINT OF
+// THE LOOKUP and a map that recognised more handles than its own wiring opened
+// would be a weaker refusal wearing the same mechanism.
+// -----------------------------------------------------------------------------
+
+/**
+ * Every transaction the approval wiring opened and handed to the driver.
+ *
+ * IDENTITY AND NOT SHAPE, which is {@link OPENED}'s reason and holds harder
+ * here: `LT-06` is the posting that extinguishes a wallet claim, and a shape
+ * check would read a fake as a live handle onto the trader database.
+ */
+const OPENED_APPROVALS = new WeakMap<ApprovalTx, LedgerTx>();
+
+/**
+ * Record the transaction this wiring just opened, and hand it straight back.
+ *
+ * THE CALLER IS THE WIRING AND THERE IS NOT ONE YET. Slice 9 opens ONE
+ * transaction through `WorkerDb.batch`, passes it through here, and gives the
+ * result to `WithdrawalApprovalSweepIo.transact`'s callback as the `ApprovalTx`
+ * it already satisfies. The argument is `ApprovalTx & LedgerTx` because
+ * `SystemTx` satisfies both structurally and nothing narrower can serve the
+ * posting.
+ *
+ * IT RETURNS ITS ARGUMENT so the recording cannot be forgotten at a call site
+ * that meant to do it, which is {@link recordExpiryTransaction}'s reason and
+ * `mintTerm`'s in `packages/db/src/scoped-db.ts`.
+ */
+export function recordApprovalTransaction<T extends ApprovalTx & LedgerTx>(tx: T): T {
+  OPENED_APPROVALS.set(tx, tx);
+  return tx;
+}
+
+/**
+ * Raised when `postLt06` is given a handle this file never recorded.
+ *
+ * IT NAMES THE WIRING RATHER THAN THE CALLER, on
+ * {@link ExpiryLedgerHandleUnknown}'s reason: the driver passed on the handle it
+ * was given, and what is missing is the `recordApprovalTransaction` the wiring
+ * owed. The value this one would otherwise have to invent is whether a trader's
+ * wallet claim was extinguished.
+ */
+export class ApprovalLedgerHandleUnknown extends Error {
+  constructor() {
+    super(
+      'ApprovalLedgerPort.postLt06 was given a transaction this deployment did not open. The ' +
+        'LT-06 posting is written through the SAME transaction as the approval (ADR-006), so ' +
+        'the handle is recovered by identity through `recordApprovalTransaction` and a handle ' +
+        'that was never recorded is a handle whose authority this adapter cannot know. It ' +
+        "refuses rather than extinguishing a trader's wallet claim through an object a caller " +
+        'happened to pass.',
+    );
+    this.name = 'ApprovalLedgerHandleUnknown';
+  }
+}
+
+/**
+ * The `LT-06` posting, on the transaction the approval was written through.
+ *
+ * THREE CALLS AND NOTHING MORE. This file names no ledger account, writes no
+ * transfer and contains no ledger arithmetic:
+ * `walletWithdrawalApprovalPosting` holds the single transfer, is the ONE
+ * definition of `LT-06` in this repository, and `LT-09` is still built on it
+ * through `reversalPosting`, so the two cannot disagree (ADR-314). A second
+ * transcription of `debit trader_wallet / credit withdrawals_in_flight` here is
+ * ADR-092 section 5's two-statements-of-one-fact hazard arriving on the money
+ * path, and `LT-06` being a SINGLE transfer is exactly what makes it the one a
+ * session would be tempted to inline.
+ *
+ * IT RETURNS THE TRANSACTION ID AND `postLt01` RETURNS NOTHING, WHICH IS A
+ * DIFFERENCE IN WHAT THE TWO JOBS OWE RATHER THAN AN INCONSISTENCY. The expiry
+ * sweep appends no wallet row and has nothing to do with the id; this driver
+ * appends the debit, `wallet_entries.ledger_transaction_id` is `uuid NOT NULL
+ * REFERENCES ledger_transactions(id)` (`0011:83`), and `APPROVAL_TABLES`
+ * excludes both ledger keys deliberately, so the id can be neither invented nor
+ * read back. ADR-316 section 3.3 declared this port `Promise<void>` and ADR-325
+ * section 3 records the finding.
+ *
+ * `readChart` IS READ THROUGH THE SAME HANDLE, so the chart a posting resolves
+ * against is the chart visible inside that transaction and not one read beside
+ * it. It is not cached across calls, because a cached chart would outlive the
+ * transaction it was read in and `LEDGER-C1` is checked against the account
+ * uuids it resolves.
+ */
+export const APPROVAL_LEDGER: ApprovalLedgerPort = {
+  async postLt06(tx: ApprovalTx, facts: ApprovalFacts): Promise<string> {
+    const ledger = OPENED_APPROVALS.get(tx);
+    if (ledger === undefined) throw new ApprovalLedgerHandleUnknown();
+    const posted = await postTransaction(
+      ledger,
+      await readChart(ledger),
+      walletWithdrawalApprovalPosting(facts),
+    );
+    return posted.transactionId;
   },
 };

@@ -254,6 +254,13 @@ export interface WithdrawalRequestBody {
  * There is no deposit member (`INV-WALLET-NO-DEPOSITS`) and no
  * `promotional_credit` member (`0011` header item 3, `OQ-FREEZE-01`), and
  * neither may be added here without the migration that adds it there.
+ *
+ * THE LIST IS NOT WIDENED BY `0080` AND THE NULLABILITY IS NOT A MEMBER.
+ * ADR-322 dropped the column's `NOT NULL` and added
+ * `wallet_entries_provenance_follows_direction`, whose credit branch is
+ * `provenance IS NOT NULL`. A CREDIT still carries one of exactly these three,
+ * which is what this constant and the FIFO composition below are for, and the
+ * change is entirely on the debit side. See {@link walletProvenanceOf}.
  */
 export const WALLET_PROVENANCES = ['payout', 'refund_wallet_funded', 'correction'] as const;
 
@@ -553,9 +560,61 @@ export interface WalletEntryRow {
   readonly id: bigint;
   readonly direction: WalletDirection;
   readonly amountCents: bigint;
-  readonly provenance: WalletProvenance;
+  /**
+   * `null` ON A DEBIT, WHICH IS THE ORDINARY CASE AFTER `0080`.
+   *
+   * ADR-322 dropped the column's `NOT NULL` and ruled that provenance is a
+   * property of a CREDIT. Only the credit arm of {@link unspentLots} reads it,
+   * which is why the FIFO composition is unaffected: a debit CONSUMES lots and
+   * never opens one.
+   */
+  readonly provenance: WalletProvenance | null;
   readonly balanceAfterCents: bigint;
   readonly occurredAt: Date;
+}
+
+/**
+ * `provenance`, read against `0080`'s CHECK rather than against `0011`'s alone.
+ *
+ * THIS FUNCTION EXISTS BECAUSE THE NARROWING USED TO RUN BEFORE THE DIRECTION
+ * BRANCH AND `0080` MADE THAT THROW. The line it replaces was
+ * `provenance: member(row, 'provenance', 'walletEntries', WALLET_PROVENANCES)`,
+ * evaluated UNCONDITIONALLY, and `member` calls `text`, which raises on anything
+ * that is not a string. ADR-322 dropped the column's `NOT NULL` for a debit, so
+ * the first `wallet_entries` DEBIT this application writes carries `NULL` there
+ * and the old line would have raised `WithdrawalRowError` on every read of a
+ * statement containing one, which includes the composition this route computes
+ * before it will let a trader withdraw at all. The union lands in the same
+ * commit as that first insert (ADR-325).
+ *
+ * IT IS `wallet.ts`'s FUNCTION RESTATED AND THAT IS THIS FILE'S OWN PRECEDENT.
+ * `KYC_STATES` is declared here rather than imported from `accounts.ts` under a
+ * docblock that gives the reason: a route module importing another route module
+ * is an edge the registry does not have and the directory listing cannot
+ * express. `WALLET_PROVENANCES`, `WALLET_DIRECTIONS` and `toWalletEntryRow`
+ * already stand twice for that reason and this is the fourth line of the same
+ * pair.
+ *
+ * `debit + 'payout' | 'refund_wallet_funded'` IS ADMITTED HERE AND REFUSED BY
+ * THE CHECK, so the row cannot exist to be read. That looseness is `wallet.ts`'s
+ * too and is reported in the same terms there.
+ */
+export function walletProvenanceOf(
+  row: Record<string, unknown>,
+  direction: WalletDirection,
+): WalletProvenance | null {
+  const value = row['provenance'];
+  if (value === null || value === undefined) {
+    if (direction === 'credit')
+      throw new WithdrawalRowError(
+        '`wallet_entries.provenance` is NULL on a credit, which ' +
+          '`wallet_entries_provenance_follows_direction` (`0080`) refuses: every credit records ' +
+          'its provenance class (`INV-M20-04`), and a lot with no class makes every rule in M20 ' +
+          'section 3.4 unevaluable',
+      );
+    return null;
+  }
+  return member(row, 'provenance', 'walletEntries', WALLET_PROVENANCES);
 }
 
 /** One accessor row, narrowed. Exported so the suite names it directly. */
@@ -567,11 +626,15 @@ export function toWalletEntryRow(value: unknown): WalletEntryRow {
       `\`wallet_entries.amount_cents\` is ${amountCents.toString()}, and the column is ` +
         '`CHECK (amount_cents > 0)`. Direction carries the sign',
     );
+  // THE DIRECTION IS READ FIRST AND THE PROVENANCE IS READ AGAINST IT. It used
+  // to be read unconditionally, one line below this one, which `0080` turned
+  // into a throw on every honest debit. See {@link walletProvenanceOf}.
+  const direction = member(row, 'direction', 'walletEntries', WALLET_DIRECTIONS);
   return {
     id: big(row, 'id', 'walletEntries'),
-    direction: member(row, 'direction', 'walletEntries', WALLET_DIRECTIONS),
+    direction,
     amountCents,
-    provenance: member(row, 'provenance', 'walletEntries', WALLET_PROVENANCES),
+    provenance: walletProvenanceOf(row, direction),
     balanceAfterCents: big(row, 'balanceAfterCents', 'walletEntries'),
     occurredAt: instant(row, 'occurredAt', 'walletEntries'),
   };
@@ -755,6 +818,17 @@ export function unspentLots(rows: readonly WalletEntryRow[]): readonly Lot[] {
   let head = 0;
   for (const row of ordered) {
     if (row.direction === 'credit') {
+      // ONE NARROWING, AT THE ONE PLACE A LOT NEEDS A CLASS. `WalletEntryRow`
+      // is exported and a backend may construct one without going through
+      // `toWalletEntryRow`, so this arm cannot take the row's word for it; and
+      // a lot whose class is unknown makes every rule in M20 section 3.4
+      // unevaluable, which is the fail-closed direction on the door that pays.
+      if (row.provenance === null)
+        throw new WithdrawalRowError(
+          'a `wallet_entries` CREDIT carries no `provenance`, which ' +
+            '`wallet_entries_provenance_follows_direction` (`0080`) refuses. A composition is ' +
+            'what value is MADE of, so a lot with no class cannot enter one',
+        );
       lots.push({
         provenance: row.provenance,
         occurredAt: row.occurredAt,

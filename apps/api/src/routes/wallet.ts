@@ -202,6 +202,13 @@ export interface WalletResponse {
  * There is no deposit member (`INV-WALLET-NO-DEPOSITS`) and no
  * `promotional_credit` member (`0011` header item 3, `OQ-FREEZE-01`), and
  * neither may be added here without the migration that adds it there.
+ *
+ * THE LIST IS NOT WIDENED BY `0080` AND THE NULLABILITY IS NOT A MEMBER.
+ * ADR-322 dropped the column's `NOT NULL` and added
+ * `wallet_entries_provenance_follows_direction`, whose credit branch is
+ * `provenance IS NOT NULL`. So a CREDIT still carries one of exactly these
+ * three, which is what this constant is for, and the change is entirely on the
+ * debit side. See {@link walletProvenanceOf}.
  */
 export const WALLET_PROVENANCES = ['payout', 'refund_wallet_funded', 'correction'] as const;
 
@@ -267,7 +274,15 @@ export interface WalletEntryRow {
   readonly id: bigint;
   readonly direction: WalletDirection;
   readonly amountCents: bigint;
-  readonly provenance: WalletProvenance;
+  /**
+   * `null` ON A DEBIT, WHICH IS THE ORDINARY CASE AFTER `0080`.
+   *
+   * ADR-322 dropped the column's `NOT NULL` and ruled that provenance is a
+   * property of a CREDIT. `wallet_entries_provenance_follows_direction` admits
+   * `debit + NULL` and `debit + 'correction'` and refuses `credit + NULL`, so
+   * this is nullable and {@link walletProvenanceOf} is where the branch lives.
+   */
+  readonly provenance: WalletProvenance | null;
   readonly cause: string;
   readonly referenceId: string;
   readonly ledgerTransactionId: string;
@@ -456,6 +471,78 @@ function member<T extends string>(
   return value as T;
 }
 
+/**
+ * `provenance`, read against `0080`'s CHECK rather than against `0011`'s alone.
+ *
+ * THIS FUNCTION EXISTS BECAUSE THE NARROWING USED TO RUN BEFORE THE DIRECTION
+ * BRANCH AND `0080` MADE THAT THROW. The line it replaces was
+ * `provenance: member(row, 'provenance', WALLET_PROVENANCES)`, evaluated
+ * UNCONDITIONALLY, and `member` calls `text`, which raises on anything that is
+ * not a string. ADR-322 dropped the column's `NOT NULL` for a debit, so the
+ * first `wallet_entries` DEBIT this application writes carries `NULL` there and
+ * the old line would have raised `WalletRowError` on the trader's own statement
+ * screen. The union lands in the same commit as that first insert (ADR-325).
+ *
+ * WHAT IT READS AND WHAT IT DOES NOT, stated so the gap is a decision somebody
+ * recorded rather than a looseness somebody discovers:
+ *
+ *   credit + one of the three   admitted
+ *   credit + NULL               REFUSED here, as the CHECK refuses it
+ *   debit  + NULL               admitted, and it is the ordinary debit
+ *   debit  + 'correction'       admitted, and `0038`'s ADJ-C3 REQUIRES it on
+ *                               the wallet debit a reversing adjustment writes
+ *   debit  + 'payout' | 'refund_wallet_funded'   ADMITTED HERE and refused by
+ *                               the CHECK, so the row cannot exist to be read
+ *
+ * **THE LAST LINE IS THE ONE PLACE THIS READER IS LOOSER THAN ITS SCHEMA AND IT
+ * IS REPORTED RATHER THAN TIGHTENED.** The tightening buys nothing that is not
+ * bought twice already: `0080` refuses the row at the database so it cannot be
+ * stored, and {@link projectEntry} drops a debit's provenance entirely so no
+ * client can see one whatever the row said. What it would cost is a rewrite of
+ * every debit fixture in `apps/api/test/wallet.test.ts` and
+ * `apps/api/test/wallet-withdrawals.test.ts`, whose `entryRow` helpers default
+ * `provenance` to `payout` and override `direction` alone, in files this row's
+ * fence names for the union and the stale docblock only. It is named as owed.
+ */
+export function walletProvenanceOf(
+  row: Record<string, unknown>,
+  direction: WalletDirection,
+): WalletProvenance | null {
+  const value = row['provenance'];
+  if (value === null || value === undefined) {
+    if (direction === 'credit')
+      throw new WalletRowError(
+        '`wallet_entries.provenance` is NULL on a credit, which ' +
+          '`wallet_entries_provenance_follows_direction` (`0080`) refuses: every credit records ' +
+          'its provenance class (`INV-M20-04`), and section 6.2 types `WalletCredit.provenance` ' +
+          'as a closed union with no null in it',
+      );
+    return null;
+  }
+  return member(row, 'provenance', WALLET_PROVENANCES);
+}
+
+/**
+ * The credit arm's `provenance`, which the response shape requires and the row
+ * type permits to be absent.
+ *
+ * ONE NARROWING, AT THE ONE PLACE THE CONTRACT DEMANDS IT.
+ * {@link WalletEntryRow} is exported and a backend may construct one without
+ * going through {@link toWalletEntryRow}, so the union's credit arm cannot take
+ * the row's word for it. It is not a second statement of
+ * {@link walletProvenanceOf}'s refusal: that one guards the ACCESSOR's rows and
+ * this one guards the PORT's.
+ */
+function creditProvenanceOf(row: WalletEntryRow): WalletProvenance {
+  if (row.provenance === null)
+    throw new WalletRowError(
+      '`WalletCredit.provenance` is a closed union and this credit row carries none. `0080`' +
+        "'s `wallet_entries_provenance_follows_direction` refuses `credit + NULL`, so a row " +
+        'shaped like this one did not come out of `wallet_entries`',
+    );
+  return row.provenance;
+}
+
 /** One accessor row, narrowed. Exported so the suite names it directly. */
 export function toWalletEntryRow(value: unknown): WalletEntryRow {
   const row = asRow(value);
@@ -472,11 +559,15 @@ export function toWalletEntryRow(value: unknown): WalletEntryRow {
         'column is `CHECK (balance_after_cents >= 0)`. No response here may carry a negative ' +
         'wallet figure',
     );
+  // THE DIRECTION IS READ FIRST AND THE PROVENANCE IS READ AGAINST IT. It used
+  // to be read unconditionally, one line below this one, which `0080` turned
+  // into a throw on every honest debit. See {@link walletProvenanceOf}.
+  const direction = member(row, 'direction', WALLET_DIRECTIONS);
   return {
     id: big(row, 'id'),
-    direction: member(row, 'direction', WALLET_DIRECTIONS),
+    direction,
     amountCents,
-    provenance: member(row, 'provenance', WALLET_PROVENANCES),
+    provenance: walletProvenanceOf(row, direction),
     cause: text(row, 'cause'),
     referenceId: text(row, 'referenceId'),
     ledgerTransactionId: text(row, 'ledgerTransactionId'),
@@ -703,8 +794,28 @@ export function isAfter(row: WalletEntryRow, cursor: WalletCursor): boolean {
  * THE UNION IS BUILT BY BRANCHING AND NOT BY A SPREAD WITH AN OPTIONAL FIELD.
  * ADR-158 clause 2: "a single optional field would have collapsed the two", and
  * a client reading a debit labelled `payout` would render a credit class on a
- * withdrawal. The `provenance` a debit row carries is read off the row and
- * DISCARDED here, which is the one place that discard is visible.
+ * withdrawal.
+ *
+ * **THIS DOCBLOCK USED TO END "The `provenance` a debit row carries is read off
+ * the row and DISCARDED here, which is the one place that discard is visible",
+ * AND AFTER `0080` A DEBIT CARRIES NONE TO DISCARD.** That sentence was true of
+ * `0011`'s schema, in which the column was `NOT NULL` over a three-member list
+ * its own heading called the CREDIT list, so every debit was written carrying a
+ * class that did not describe it and this branch was where the mislabel stopped.
+ * ADR-322 moved the schema instead: a debit's `provenance` is now `NULL`, the
+ * branch below reads a `null` and drops nothing, and `walletProvenanceOf` is
+ * where the direction rule is now enforced. **THE BRANCH IS UNCHANGED AND ONLY
+ * ITS REASON MOVED**: it is no longer the place a wrong value is discarded, it
+ * is the place the union's own shape is honoured, which is what ADR-158 clause 2
+ * asked of it in the first place. The correction is kept beside the sentence it
+ * corrects rather than replacing it silently (`RI-14`).
+ *
+ * **THE ONE VALUE A DEBIT MAY STILL CARRY IS DROPPED HERE AND THAT IS
+ * DELIBERATE.** `0038`'s ADJ-C3 requires `provenance = 'correction'` on the
+ * wallet debit a reversing adjustment writes, and `WalletDebit` declares no
+ * `provenance` field, so section 6.2's shape does not carry it to a client. What
+ * a debit MEANS is `cause` and `reference_id`, both of which are on
+ * {@link WalletEntryBase} and both of which this projection carries.
  */
 export function projectEntry(row: WalletEntryRow): WalletEntry {
   const base: WalletEntryBase = {
@@ -717,7 +828,7 @@ export function projectEntry(row: WalletEntryRow): WalletEntry {
     occurred_at: row.occurredAt,
   };
   return row.direction === 'credit'
-    ? { ...base, direction: 'credit', provenance: row.provenance }
+    ? { ...base, direction: 'credit', provenance: creditProvenanceOf(row) }
     : { ...base, direction: 'debit' };
 }
 
