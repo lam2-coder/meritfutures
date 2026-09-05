@@ -414,6 +414,25 @@ function cleanTree(): string {
       '',
       '## 14. `0079` and `0082` land, and a heading may name two (2026-09-05)',
       '',
+      // ADR-337. THE STUB GAINS SECTION 16's SECTION-NUMBER TABLE, on the same
+      // fidelity argument one leg over. `RI-37` leg 4 binds every `## <n>.`
+      // heading in this file to a row of that table and back, and REFUSES to
+      // report on a manifest that carries landing sections and no such table,
+      // because a missing one would name every heading in the file as
+      // unclaimed. The three numbers this stub heads are claimed here, so the
+      // clean-tree case asserts leg 4 as well: a fifth section added to this
+      // fixture without a row turns it red.
+      '## 16. Allocation: `OI-nn` identifiers and section numbers',
+      '',
+      '### Section numbers',
+      '',
+      '| Section | Claimed by | State |',
+      '|---|---|---|',
+      '| 1 | the fold | allocated |',
+      '| 13 | the fold | allocated |',
+      '| 14 | the fold | allocated |',
+      '| 16 | this table | allocated |',
+      '',
     ].join('\n'),
   );
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
