@@ -54,26 +54,33 @@
 //    `columnCatalogue()` that answers exactly this question, and OQ-P1-04's
 //    ruling is one parser called twice rather than two expressions of one parse.
 //    IT CAN NOW BE IMPORTED, AND THE BLOCKER THIS PARAGRAPH NAMED IS SPENT.
-//    `gates.mjs:9129` reads `export const GATES = [`, and `:9335` opens the
-//    guard `const invokedDirectly = ...` closed at `:9338` by
+//    `gates.mjs:9247` reads `export const GATES = [`, and `:9453` opens the
+//    guard `const invokedDirectly = ...` closed at `:9456` by
 //    `if (invokedDirectly) process.exit(main());`, under a comment reading
 //    "Importable by the suite that reads this report, runnable by CI-06". That
 //    guard landed in `55824c62` on 2026-08-30 for ADR-294, three sessions after
-//    this header was written, and the same file also exports `EXIT` at `:9213`
-//    and `runGates` at `:9238`. So the duplication below is now a DEFERRAL WITH
+//    this header was written, and the same file also exports `EXIT` at `:9331`
+//    and `runGates` at `:9356`. So the duplication below is now a DEFERRAL WITH
 //    NO BLOCKER rather than a blocked repair, and its remedy clause at the foot
 //    of this paragraph is available and unclaimed.
 //
-//    ALL FIVE OF THOSE NUMBERS MOVED BY ELEVEN ON 2026-09-05 AND THEY READ
-//    `:9118`, `:9324`, `:9327`, `:9202` and `:9227` UNTIL THAT DAY. ADR-351
-//    raised one entry in `gates.mjs`'s `RETIRED_REGISTER` and wrote out why,
-//    which added eleven lines above every one of them. Nothing about this file
-//    or that one changed otherwise, and `RI-15` is what reported the drift the
-//    same run it was created in. THE STANDING COST IS RECORDED RATHER THAN
-//    SOLVED: five pointers into one file's line numbers is a citation that any
-//    edit to a comment nine thousand lines up will break, and `RI-15` catching
-//    it every time is the control that makes that cost affordable rather than
-//    an argument that the pointers are safe.
+//    ALL FIVE OF THOSE NUMBERS MOVED TWICE ON 2026-09-05 AND THIS PARAGRAPH IS
+//    THE RECORD OF BOTH MOVES. They read `:9118`, `:9324`, `:9327`, `:9202` and
+//    `:9227` that morning. ADR-351 raised one entry in `gates.mjs`'s
+//    `RETIRED_REGISTER` and wrote out why, which added eleven lines above every
+//    one of them and took them to `:9129`, `:9335`, `:9338`, `:9213` and
+//    `:9238`; `RI-15` reported all five in the same run that created the drift.
+//    THEN THE TWO REPOINTS COLLIDED AT A MERGE. `main` had moved the same five
+//    pointers for its own reasons and landed on `:9118`, `:9324`, `:9445`,
+//    `:9320` and `:9345`, so BOTH SIDES OF THE CONFLICT WERE WRONG ABOUT THE
+//    MERGED FILE and neither could be taken. The values above are re-derived
+//    against the merged `gates.mjs` by grepping for each declaration, which is
+//    the only resolution a conflict between two sets of line numbers has.
+//    THE STANDING COST IS RECORDED RATHER THAN SOLVED: five pointers into one
+//    file's line numbers is a citation that any edit to a comment nine thousand
+//    lines up will break, TWO CONCURRENT BRANCHES WILL BREAK DIFFERENTLY, and
+//    `RI-15` catching it every time is the control that makes that cost
+//    affordable rather than an argument that the pointers are safe.
 //
 //    **THIS PARAGRAPH READ "IT CANNOT BE IMPORTED: `gates.mjs` ends in
 //    `process.exit(main())` at module scope with no direct-invocation guard, so

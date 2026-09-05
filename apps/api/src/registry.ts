@@ -77,6 +77,32 @@
 // check and must never become one; that is the whole distinction ADR-083 rests
 // on, 403 being what a check returns and 404 being what an absent route
 // returns.
+//
+// -----------------------------------------------------------------------------
+// A ROUTE MAY DECLARE THAT ITS BODY IS BYTES, AND THE SCOPE OF THAT IS ONE
+// ENCAPSULATION CONTEXT AND NEVER THE PROCESS
+// -----------------------------------------------------------------------------
+// ADR-109 clause 6 ruled this shape and ADR-340 built it: `RouteDefinition`
+// carries `rawBody`, and `compose` registers every route that declares it
+// inside a SINGLE CHILD CONTEXT carrying the buffer content-type parser. The
+// three webhook receivers need the bytes because API_CONTRACT section 10 wants
+// the HMAC verified BEFORE parsing, and a body this process already parsed
+// cannot be verified: re-serialising it digests a different document.
+//
+// REGISTERING THE PARSER ON THE ROOT INSTANCE IS REFUSED, AND THE REFUSAL IS
+// MEASURED RATHER THAN STYLISTIC. A Fastify content-type parser is per
+// encapsulation context, so a root `application/json` parser is inherited by
+// every route composed after it: `POST /checkout` would receive a `Buffer`
+// where its handler reads fields off an object, and it would do so silently at
+// the forty-odd other routes at once. `raw-body-scope.test.ts` watches exactly
+// that boundary from both sides.
+//
+// THE PARSER IS ADDED AFTER THE CONTEXT'S INHERITED JSON PARSER IS REMOVED, and
+// that line is not defensive tidiness. Fastify's `existingParser` treats a
+// non-default `application/json` parser as already present and throws
+// `FST_ERR_CTP_ALREADY_PRESENT`, so a context that inherited a raw parser from
+// a caller that installed one on the root (which three suites do) would fail at
+// boot rather than at composition. Measured against fastify 5.12.1.
 // =============================================================================
 
 import { readdir } from 'node:fs/promises';
@@ -108,6 +134,18 @@ export const HTTP_METHODS = ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'] as const;
 /** One of {@link HTTP_METHODS}. */
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
+/**
+ * The verbs a request body, and therefore a content-type parser, applies to.
+ *
+ * `GET` and `DELETE` are absent because Fastify never reaches a parser for
+ * them, so `rawBody` on one would be a flag the report carries and the request
+ * path ignores.
+ */
+export const BODY_METHODS = ['POST', 'PATCH', 'PUT'] as const;
+
+/** One of {@link BODY_METHODS}. */
+export type BodyMethod = (typeof BODY_METHODS)[number];
+
 /** A handler is a function over the request. The framework is the adapter. */
 export type RouteHandler = (
   request: FastifyRequest,
@@ -127,6 +165,14 @@ export interface RouteDefinition {
   readonly method: HttpMethod;
   readonly path: string;
   readonly handler: RouteHandler;
+  /**
+   * Hand this route's `application/json` body to the handler AS BYTES.
+   *
+   * `true` puts the route in `compose`'s raw context. Absent is the default and
+   * means the framework parses, which is what every route but the three webhook
+   * receivers wants. See this file's header and ADR-340.
+   */
+  readonly rawBody?: boolean;
 }
 
 /**
@@ -176,6 +222,17 @@ export function defineRoutes(module: RouteModule): RouteModule {
         `route module \`${module.name}\` declares method \`${String(route.method)}\` for ` +
           `\`${route.path}\`, which is not one of ${HTTP_METHODS.join(' | ')}`,
       );
+    // A RAW BODY ON A METHOD THAT CARRIES NO BODY IS A DECLARATION NOTHING CAN
+    // HONOUR. Fastify runs a content-type parser only when there is a body to
+    // parse, so `rawBody` on a `GET` would read as a served-raw route in the
+    // report and behave as an ordinary one at request time. Rule 2 again: the
+    // shape that means nothing is refused rather than composed.
+    if (route.rawBody === true && !BODY_METHODS.includes(route.method as BodyMethod))
+      throw new RouteRegistryError(
+        `route module \`${module.name}\` declares \`${route.method} ${route.path}\` with ` +
+          `\`rawBody\`, and only ${BODY_METHODS.join(' | ')} carry a body a content-type ` +
+          'parser is given. On any other verb the flag would be reported and never honoured',
+      );
     // Throws on a path that is not a contract path, or that carries BASE_PATH.
     classifyPath(route.path);
     const key = `${route.method} ${route.path}`;
@@ -205,6 +262,16 @@ export interface CompositionReport {
    * The route was never registered, so the router has nothing to answer with.
    */
   readonly withheld: readonly string[];
+  /**
+   * `METHOD /path`, registered INSIDE the raw-body context. A subset of
+   * {@link registered}.
+   *
+   * IT IS A LIST SO THE SCOPE CAN BE ASSERTED ON RATHER THAN REASONED ABOUT.
+   * The danger this mechanism carries is a raw parser reaching a route that
+   * wanted an object, and the only cheap control against it is a test that
+   * reads this list and finds exactly the routes that asked. ADR-340.
+   */
+  readonly raw: readonly string[];
 }
 
 /**
@@ -233,6 +300,8 @@ export function compose(
   const byEndpoint = new Map<string, string>();
   const registered: string[] = [];
   const withheld: string[] = [];
+  const raw: string[] = [];
+  const rawRoutes: RouteDefinition[] = [];
 
   for (const module of modules) {
     // Re-validated rather than trusted. `discoverRouteModules` calls this
@@ -265,17 +334,77 @@ export function compose(
         withheld.push(endpoint);
         continue;
       }
-      app.route({ method: route.method, url: `${BASE_PATH}${route.path}`, handler: route.handler });
+      // A RAW ROUTE IS HELD BACK AND REGISTERED BELOW, INSIDE ITS OWN CONTEXT.
+      // It still lands in `registered` here and in declaration order, because
+      // `registered` answers "does this surface serve it" and the answer does
+      // not change with where the body comes from.
+      if (route.rawBody === true) {
+        rawRoutes.push(route);
+        raw.push(endpoint);
+      } else {
+        app.route({
+          method: route.method,
+          url: `${BASE_PATH}${route.path}`,
+          handler: route.handler,
+        });
+      }
       registered.push(endpoint);
     }
   }
+
+  // THE CONTEXT IS CREATED ONLY IF SOMETHING ASKED FOR IT. A `register` on
+  // every composition would put an empty plugin in front of every deployment
+  // and every test, which is a behaviour change bought for nothing.
+  //
+  // THE ROUTES GO IN AT BOOT RATHER THAN HERE, and that is Fastify's shape
+  // rather than a choice: a plugin body runs on `ready()`, which `listen` and
+  // `inject` both await. `compose` still refuses every collision synchronously
+  // above, so nothing this registry checks moves into the boot.
+  if (rawRoutes.length > 0)
+    void app.register(async (scope: FastifyInstance) => {
+      installRawBodyParser(scope);
+      for (const route of rawRoutes)
+        scope.route({
+          method: route.method,
+          url: `${BASE_PATH}${route.path}`,
+          handler: route.handler,
+        });
+    });
 
   return {
     surface,
     modules: modules.map((m) => m.name),
     registered,
     withheld,
+    raw,
   };
+}
+
+/**
+ * Hand `application/json` through as bytes, on THIS instance and its children.
+ *
+ * ONE FUNCTION, AND IT LIVES HERE BECAUSE `compose` IS ITS ONLY PRODUCTION
+ * CALLER. It stood in `routes/webhooks-psp.ts` from session 219 until ADR-340,
+ * where it was exported so the suite could install it and a wiring session
+ * could find it by name; that is what this row did, and the sentence that said
+ * so is kept beside its correction in that file rather than deleted.
+ *
+ * THE REMOVE IS LOAD-BEARING. Fastify's `existingParser` reports a non-default
+ * `application/json` parser as already present and `add` throws
+ * `FST_ERR_CTP_ALREADY_PRESENT`, so an instance whose parent already carries a
+ * raw parser (three suites install one on the root) would fail at boot. The
+ * remove is scoped to the same context as the add, so it takes nothing away
+ * from the parent.
+ */
+export function installRawBodyParser(app: FastifyInstance): void {
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'buffer' },
+    (_request: FastifyRequest, body: Buffer, done: (err: Error | null, body?: Buffer) => void) => {
+      done(null, body);
+    },
+  );
 }
 
 /**
