@@ -793,6 +793,106 @@ export const ABSENCE_ARTIFACTS = [
       return exportsItsGates && guarded ? 'present' : 'absent';
     },
   },
+  {
+    key: 'event-sink-caller',
+    names:
+      'an INSTALL of the event producer: a call to `makeEventSink` or a use of ' +
+      '`TRANSACTION_EVENT_WRITER` in a value position, under any `src/`, past the module that ' +
+      'declares both. ADR-348. `apps/api/src/events.ts` composed the writer and wired nothing, ' +
+      'so `UNWIRED_EVENT_SINK` is not merely the default sink, it is the only sink any ' +
+      'deployment can reach',
+    needles: [],
+    sweptBy:
+      'nothing, on `worker-queue-door-caller`s reason. The two exported names reach exactly ' +
+      'seven lines in the shipped scope: six are the declaring module`s own header and ' +
+      'declarations, and the seventh is `apps/worker/src/batch/adapter.ts`s ' +
+      '`EVENT_SINK_BLOCKER`, which names the writer in order to say this deployable cannot ' +
+      'reach it. A needle on either name would sweep the declaration that this register ' +
+      'already binds and one true sentence about a different artifact, which is the ' +
+      'noise-registering shape ADR-328 forbids',
+    probe: (root) => {
+      const files = shippedSources(root);
+      if (files.length === 0) {
+        throw new Error(
+          'RI-35 found no source file under any `apps/*/src` or `packages/*/src`, so the ' +
+            'event-sink caller probe measured nothing',
+        );
+      }
+      // THE DECLARING MODULE IS EXCLUDED AND NOTHING ELSE IS, on
+      // `worker-queue-door-caller`s rule: `makeEventSink` is declared there and
+      // `TRANSACTION_EVENT_WRITER` is declared there, so a probe over the whole
+      // tree would report the producer installing itself.
+      //
+      // TWO SHAPES AND NOT ONE, BECAUSE THE INSTALL HAS TWO HALVES AND EITHER
+      // ALONE IS THE ARRIVAL. `makeEventSink({ writer: TRANSACTION_EVENT_WRITER,
+      // clock })` is the composition this file`s own refusal message names, and a
+      // deployment that reached for `TRANSACTION_EVENT_WRITER` and wrapped it
+      // itself would be an install this probe must not miss. So a CALL of the
+      // factory, and the writer in an argument or member position.
+      //
+      // IT IS A CALL AND NEVER THE MENTION, which is ADR-338s repair applied
+      // ahead of the case rather than after it. `stripComments` removes the
+      // declaring headers elsewhere in the tree, and the one surviving prose
+      // occurrence -- `EVENT_SINK_BLOCKER` at `apps/worker/src/batch/adapter.ts`
+      // -- writes the name BACKTICKED inside a string, so it is followed by a
+      // backtick and matches neither shape. Measured on the commit that added
+      // this artifact: `absent`, with that line present.
+      const producer = 'apps/api/src/events.ts';
+      for (const rel of files) {
+        if (rel === producer) continue;
+        const installed = stripComments(readFileSync(join(root, rel), 'utf8'))
+          .split('\n')
+          .some(
+            (line) =>
+              (/\bmakeEventSink\s*\(/.test(line) && !/function\s+makeEventSink/.test(line)) ||
+              /\bTRANSACTION_EVENT_WRITER\s*[.,)]/.test(line),
+          );
+        if (installed) return 'present';
+      }
+      return 'absent';
+    },
+  },
+  {
+    key: 'api-event-emit',
+    names:
+      'an emit call under `apps/api/src`: the deployable that HOLDS the producer reaching a ' +
+      'sink. ADR-348 rules it cannot succeed -- `src/db.ts` opens five doors and none of them ' +
+      'yields the `SystemTx` `TRANSACTION_EVENT_WRITER` demands by brand -- so an emit that ' +
+      'arrived here would be a transition recorded nowhere, which is the half-emitted stream ' +
+      'that reads as a complete one',
+    needles: [],
+    sweptBy:
+      'nothing. It is `event-sink-caller`s NARROWER sibling and is registered separately for ' +
+      'a reason that is a real failure mode rather than tidiness: `routes/payouts.ts` claims ' +
+      'an absence scoped to `apps/api/src`, and the estate-wide artifact would turn that true ' +
+      'sentence red the day `apps/worker` wired a sink it had nothing to do with. A needle on ' +
+      '`emit` would additionally reach every port declaration in `apps/worker/src`, which is ' +
+      'four files about a fourth artifact',
+    probe: (root) => {
+      const dir = 'apps/api/src';
+      /** @type {string[]} */
+      const files = [];
+      walk(root, dir, files);
+      const sources = files.filter((rel) => SWEPT.test(rel));
+      if (sources.length === 0) {
+        throw new Error(
+          `RI-35 found no source file under \`${dir}\`, so the api-emit probe measured nothing`,
+        );
+      }
+      // A CALL AND NEVER A DECLARATION. `events.ts` declares `emit` twice as a
+      // METHOD -- on `EventSink` and on the object `makeEventSink` returns -- and
+      // neither is written `.emit(`, so the producer`s own file needs no
+      // exclusion here and is deliberately not given one: an emit added INSIDE
+      // the producer would be as much an arrival as an emit added in a route.
+      for (const rel of sources) {
+        const emits = stripComments(readFileSync(join(root, rel), 'utf8'))
+          .split('\n')
+          .some((line) => /\.emit\s*\(/.test(line));
+        if (emits) return 'present';
+      }
+      return 'absent';
+    },
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -1054,6 +1154,35 @@ export const ABSENCE_CLAIMS = [
       'longer exists, so a probe over the tree that does exist can neither confirm nor ' +
       'falsify it, and `RI-15` and `RI-16` exclude dated records for the same reason',
     why: 'the one line `.sql` costs, named in `SWEPT_SCRIPTS` before it was registered here',
+  },
+
+  // --- the event producer with no install, ADR-348 --------------------------
+  // **THESE ARE THE FIRST TWO CLAIMS IN THIS REGISTER WHOSE ARTIFACT IS A
+  // CORRECTNESS GAP RATHER THAN AN UNFINISHED WIRE**, and the difference is
+  // worth stating where the entries are. `STATE_MACHINES:12` universal rule 1
+  // admits no transition without an event write in the same transaction, so an
+  // estate with no installed sink is an estate where every transition violates
+  // a rule the corpus states. The other live claims here say a wire is owed.
+  // These two say a rule is unmet, and the day either flips to `present` the red
+  // is a session claiming to have met it: leg 2 then makes somebody read the
+  // sentence rather than the diff.
+  {
+    site: 'apps/api/src/events.ts',
+    claim: '`makeEventSink` is called by NO file',
+    disposition: 'live',
+    artifact: 'event-sink-caller',
+    why:
+      'the producer`s own header states the absence it exists inside, and ADR-348 found the ' +
+      'placement that would end it is not either deployable`s to take',
+  },
+  {
+    site: 'apps/api/src/routes/payouts.ts',
+    claim: 'Nothing in `apps/api/src` writes an event, and inventing a sink in a route',
+    disposition: 'live',
+    artifact: 'api-event-emit',
+    why:
+      'the route names the three catalogue rows it owes and refuses to invent a sink for ' +
+      'them, which is the correct refusal and is bound here rather than trusted',
   },
 ];
 
