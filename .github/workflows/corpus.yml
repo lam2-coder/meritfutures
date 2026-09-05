@@ -809,17 +809,25 @@ jobs:
       # body that installs a working job store from one that installs a broken
       # one. This probe does, against the applied schema.
       #
-      # THREE SUCCESSES BEFORE THE FIRST REJECTION, on DELTA_MANIFEST section
-      # 13's discipline: the migration exists to make enqueueing POSSIBLE, and a
-      # schema that refused every write would satisfy every rejection in the file
-      # and still be useless. Two of the three execute `pgboss.create_queue`,
-      # which is the function doing the DDL pg-boss would otherwise have run at
-      # boot, inside the PITR boundary that protects the ledger.
+      # FIVE SUCCESSES BEFORE THE FIRST REJECTION, on DELTA_MANIFEST section
+      # 13's discipline: `0079` exists to make enqueueing POSSIBLE and `0082`
+      # exists to make it possible FOR THE APPLICATION ROLE, and a schema that
+      # refused every write, or a grant that reached nothing, would satisfy every
+      # rejection in the file and still be useless. Two of the five execute
+      # `pgboss.create_queue`, which is the function doing the DDL pg-boss would
+      # otherwise have run at boot, inside the PITR boundary that protects the
+      # ledger.
       #
-      # REJECTION 5 ASSERTS A DELIBERATE ABSENCE: `0079` grants nothing, so
-      # `merit_app` cannot reach the schema at all. The day a slice grants it,
-      # this case goes red and the ruling has to be written down.
-      - name: Probe the pg-boss job store (0079)
+      # REJECTION 5 ASSERTED A DELIBERATE ABSENCE AND NOW ASSERTS A CEILING.
+      # `0079` granted nothing, and that case said in its own words that the day
+      # somebody made the ruling it would go red. `0082` is that diff and ADR-327
+      # is that ruling, so the case is rewritten rather than deleted: SUCCESS 5
+      # reads the catalogue and asserts the granted set EQUALS the fifteen
+      # privileges ADR-327 ruled, in both directions, and REJECTION 5 asserts the
+      # role cannot do the things outside it. REJECTION 6 executes the
+      # correction: a PARTITIONED queue is the only arm of `create_queue` that
+      # runs DDL, and `merit_app` is refused it for want of CREATE.
+      - name: Probe the pg-boss job store and its grant (0079, 0082)
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_pgboss_job_store.sql

@@ -267,10 +267,23 @@ test('the worker runs one job and records that every other one is unscheduled', 
   // derived from something a rename or a merge can move.
   //
   // HALF ONE: THE FACT THE OLD STRING DENIED, read at the migration directory.
-  const store = readdirSync(join(ROOT, 'packages/db/migrations')).filter((file) =>
-    /pgboss/i.test(file),
-  );
-  expect(store, 'no migration installs the pg-boss job store').toHaveLength(1);
+  //
+  // **AND IT READ THE FILENAME UNTIL ADR-327, WHICH IS THE SAME DEFECT ONE TURN
+  // SMALLER.** The filter was `/pgboss/i` over the LISTING with a length of
+  // exactly one, so `0082_pgboss_app_grants.sql` turned it red by landing beside
+  // `0079`: a case about whether a schema is INSTALLED was reading how a file is
+  // NAMED. It reads the statement now, so a third `pgboss` file changes nothing
+  // and a superseded install changes everything.
+  const dir = join(ROOT, 'packages/db/migrations');
+  const store = readdirSync(dir)
+    .filter((file) => file.endsWith('.sql'))
+    .sort()
+    .filter((file) =>
+      /^CREATE SCHEMA IF NOT EXISTS pgboss\b/m.test(readFileSync(join(dir, file), 'utf8')),
+    );
+  expect(store, 'no migration installs the pg-boss job store').toEqual([
+    '0079_pgboss_job_store.sql',
+  ]);
   // ASSERTED OUTSIDE THE PARAGRAPH THAT RETIRES THE CLAIM, because `RI-14` keeps
   // a corrected sentence beside its correction and the barrel therefore QUOTES
   // the old wording on purpose. Splitting at the retirement marker is what makes

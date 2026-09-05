@@ -99,15 +99,30 @@ test('1.1 the job store is installed, and the sentence that said it was not is g
   // class at a different site one row before this one: a refusal quoting an
   // obstruction that had been discharged, pinned by assertions that matched the
   // WORDS rather than the FACTS. So the fact is read first and the words second.
-  const migrations = readdirSync(join(ROOT, 'packages/db/migrations')).filter((f) =>
-    f.endsWith('.sql'),
+  //
+  // **AND IT READ THE FILENAME UNTIL ADR-327, WHICH IS THE SAME DEFECT ONE TURN
+  // SMALLER.** The filter was `/pgboss/i` over the DIRECTORY LISTING with a
+  // length of exactly one, so `0082_pgboss_app_grants.sql` turned it red by
+  // landing beside `0079`: a case about whether a schema is INSTALLED was
+  // reading how a file is NAMED. It reads the statement now, so a third pgboss
+  // file changes nothing and a superseded install changes everything.
+  const dir = join(ROOT, 'packages/db/migrations');
+  const migrations = readdirSync(dir).filter((f) => f.endsWith('.sql'));
+  expect(
+    migrations.length,
+    'the migration walk found nothing; the case cannot run',
+  ).toBeGreaterThan(50);
+  const bodies = new Map(
+    migrations.sort().map((f) => [f, readFileSync(join(dir, f), 'utf8')] as const),
   );
-  const store = migrations.filter((f) => /pgboss/i.test(f));
+  const store = [...bodies]
+    .filter(([, body]) => /^CREATE SCHEMA IF NOT EXISTS pgboss\b/m.test(body))
+    .map(([name]) => name);
   expect(
     store,
     'no migration in packages/db/migrations installs the pg-boss job store. If 0079 was ' +
       'superseded, this case and the barrel paragraph it guards both move with it',
-  ).toHaveLength(1);
+  ).toEqual(['0079_pgboss_job_store.sql']);
 
   for (const retired of [
     'The job store is still not installed',
@@ -299,41 +314,98 @@ test('4.3 the withdrawal driver has its own row and its own dead-man switch', ()
 });
 
 // =============================================================================
-// 5. The manifest line, and why it is still absent
+// 5. The manifest line, and the door that is still owed under it
 // =============================================================================
 
-test('5.1 the worker declares no @merit/queue, and the barrel names the blocker under it', () => {
-  // **THE SENTENCE THIS REPLACES SAID THE LINE WAS "OWED BY A DIFFERENT SESSION
-  // THAN THIS ONE", WHICH IS A DEFERRAL AND NOT A FINDING**: it is true on every
-  // tree, before and after the work, so nothing can ever make it false. ADR-326
-  // measured a blocker under it instead, and this case pins both halves.
+test('5.1 the worker declares @merit/queue, and no module of it imports the package', () => {
+  // **BOTH CASES IN THIS SECTION WENT RED BY ADR-327 SUCCEEDING, AND BOTH ARE
+  // REWRITTEN RATHER THAN DELETED.** 5.1 asserted the manifest did NOT declare
+  // `@merit/queue` and named the blocker under it; the blocker is gone and the
+  // line is here, so the case now asserts the line AND the half that is still
+  // missing. A case that only asserted the line would go green on a manifest
+  // entry nothing uses, which is exactly the state this deployable is in.
   const manifest = JSON.parse(MANIFEST) as { dependencies?: Record<string, string> };
   const deps = Object.keys(manifest.dependencies ?? {}).sort();
   expect(
     deps,
-    'apps/worker now declares @merit/queue. The grant that makes the pgboss schema reachable ' +
-      'has to land with it, and this case plus the barrel paragraph it guards move together',
-  ).not.toContain('@merit/queue');
+    'apps/worker no longer declares @merit/queue. Under node-linker=isolated an undeclared ' +
+      'import does not resolve at all, so removing this line makes every queue door in this ' +
+      'deployable unwritable again (ADR-327)',
+  ).toContain('@merit/queue');
 
+  // THE RETIRED SENTENCE, ASSERTED IN THE DIRECTION THAT KEEPS THE HISTORY
+  // READABLE: the paragraph marking it as retired is present, and the claim does
+  // not stand on its own above it.
   expect(BARREL).not.toContain('IT IS OWED BY A DIFFERENT SESSION THAN THIS ONE');
-  expect(BARREL).toContain('permission denied for schema pgboss');
+  const retired = BARREL.indexOf('THIS PARAGRAPH READ "NOTHING HERE IMPORTS');
+  expect(
+    retired,
+    'the paragraph retiring the grant blocker is gone from the barrel',
+  ).toBeGreaterThan(-1);
+  expect(
+    BARREL.slice(0, retired),
+    'the barrel states the grant blocker as a live claim again, and 0082 is on disk',
+  ).not.toContain('every one of `JobQueue`');
 
-  // AND THE MANIFEST SENTENCE IN THE HEADER IS NO LONGER A TYPED LIST. It went
-  // stale twice, once when @merit/db landed and once when @merit/ledger did.
-  for (const dep of deps) expect(BARREL, `the barrel does not name ${dep}`).toContain(dep);
+  // AND THE DOOR. `@merit/ledger` reaches exactly `src/sweeps/ledger.ts` and
+  // `@merit/db` exactly `src/db.ts`, on ADR-165's ONE-DOOR pattern. A third
+  // capability with no door is a manifest line nobody can point at, so it is
+  // asserted rather than described: the day somebody writes the door, this case
+  // and the barrel paragraph it guards move together.
+  const modules = workerModules();
+  expect(modules.length, 'the module walk found nothing; the case cannot run').toBeGreaterThan(10);
+  const importers = modules.filter((module) =>
+    /from\s+'@merit\/queue'/.test(stripComments(sourceOf(module))),
+  );
+  expect(
+    importers,
+    'a module of apps/worker now imports @merit/queue. That is the ONE-DOOR file ADR-327 ' +
+      'said the next row owes: name it in package.json beside @merit/db and @merit/ledger, ' +
+      'and repair the barrel paragraph that says no module imports the package',
+  ).toEqual([]);
 });
 
-test('5.2 the grant 0079 left out is still left out, so the blocker is real', () => {
-  // READ AT THE MIGRATION RATHER THAN AT THE COMMENT THAT DESCRIBES IT. If a
-  // later migration grants USAGE on pgboss, the barrel's blocker paragraph and
-  // ADR-326 section 3 both stop being true and this case says so first.
+test('5.2 the grant 0079 left out is in, it is exactly what was ruled, and it is not CREATE', () => {
+  // READ AT THE MIGRATIONS RATHER THAN AT THE COMMENT THAT DESCRIBES THEM. This
+  // case asserted that NO migration granted on the pgboss schema, and it was the
+  // assertion that made the barrel's blocker paragraph falsifiable. `0082` made
+  // it red, so it is rewritten to the other side of the same fact: the grant is
+  // here, and the one privilege ADR-326 section 3.3 refused is still refused.
+  //
+  // IT READS THE STATEMENT LINES AND NOT THE FILE. Every GRANT and REVOKE in
+  // that directory starts at column zero and every comment line starts with
+  // `--`, and `0082`'s header discusses CREATE at length in prose. A whole-file
+  // regex would read the argument for refusing the privilege as the privilege.
   const dir = join(ROOT, 'packages/db/migrations');
-  const granted = readdirSync(dir)
-    .filter((f) => f.endsWith('.sql'))
-    .filter((f) => /GRANT[^;]*\bON SCHEMA pgboss\b/i.test(readFileSync(join(dir, f), 'utf8')));
+  const statements = new Map<string, string>();
+  for (const f of readdirSync(dir).sort()) {
+    if (!f.endsWith('.sql')) continue;
+    statements.set(
+      f,
+      readFileSync(join(dir, f), 'utf8')
+        .split('\n')
+        .filter((line) => /^(GRANT|REVOKE)\b/i.test(line))
+        .join('\n'),
+    );
+  }
+  expect(statements.size).toBeGreaterThan(50);
+
+  const granted = [...statements]
+    .filter(([, body]) => /^GRANT[^;]*\bUSAGE ON SCHEMA pgboss\b/im.test(body))
+    .map(([name]) => name);
   expect(
     granted,
-    'a migration now grants on the pgboss schema. ADR-326 ruled what that grant must be and ' +
-      'must not be, and the barrel paragraph naming the blocker is due for its own repair',
-  ).toHaveLength(0);
+    'no migration grants USAGE ON SCHEMA pgboss any more. The barrel says the blocker is ' +
+      'gone and the manifest line stands on that; if the grant was superseded, both move',
+  ).toEqual(['0082_pgboss_app_grants.sql']);
+
+  const create = [...statements]
+    .filter(([, body]) => /^GRANT[^;]*\bCREATE\b[^;]*\bON SCHEMA pgboss\b/im.test(body))
+    .map(([name]) => name);
+  expect(
+    create,
+    'a migration grants CREATE on the pgboss schema. ADR-326 section 3.3 refuses it: that is ' +
+      "DDL inside the ledger's PITR boundary, held by the role 0026:64 revokes it from on " +
+      'public, and pgboss.create_queue needs it only for a partitioned queue nothing declares',
+  ).toEqual([]);
 });
