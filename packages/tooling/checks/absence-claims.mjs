@@ -793,6 +793,31 @@ export const ABSENCE_ARTIFACTS = [
       return exportsItsGates && guarded ? 'present' : 'absent';
     },
   },
+  {
+    key: 'live-elevation-factor',
+    names:
+      'an `elevate` arm in `databaseAuthBackend` (`apps/api/src/auth-backend.ts`) that is NOT ' +
+      '`blocked(...)`. It is what a session would need to satisfy `C-27` on any sensitive ' +
+      'action, the external withdrawal among them, and while it is absent every caller of ' +
+      '`POST /wallet/withdrawals` is answered 403 by the factor gate before the handler runs',
+    needles: [],
+    sweptBy:
+      'nothing, and the reason is the inverse of `api-queue-manifest`s. That artifact is the ' +
+      'PRESENCE of a specifier, so its sites carry a token a sweep can look for. This one is ' +
+      'the ABSENCE of a call wrapper around a property, and the only token available is ' +
+      '`elevate`, which names every blocked arm beside it and the route field and the ' +
+      'contract row. ADR-328s rule is that a needle which mostly names other things ' +
+      'registers noise, so this entry carries none and its one claim site is named outright',
+    probe: (root) => {
+      // THE WRAPPER AND NOT THE WORD. `elevate` occurs in this file at the arm,
+      // at the row reader and in prose; what the claim is about is whether the
+      // arm is still handed to `blocked`, which is the one shape that makes the
+      // method reject every call. A probe reading the word would call the
+      // artifact present on a comment.
+      const body = requireFile(root, 'apps/api/src/auth-backend.ts');
+      return /elevate:\s*blocked\(/.test(body) ? 'absent' : 'present';
+    },
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -879,6 +904,27 @@ export const ABSENCE_CLAIMS = [
     disposition: 'retired',
     artifact: 'db-pool-sql-executor',
     why: 'ADR-332 published `poolSqlExecutor` and left this register entry owed by name',
+  },
+
+  // --- live: the tripwire ADR-342 owes its own finding E -------------------
+  // **THE HAZARD IS THAT THIS ONE ARMS ITSELF AS A SIDE EFFECT OF SOMEBODY
+  // ELSE'S ROW.** ADR-342 refused to install `useWithdrawalBackend` partly
+  // because `C-27` admits no elevated session, so the door cannot be exercised
+  // and an install would be observable to nobody until an unrelated auth slice
+  // landed a WebAuthn ceremony or an SMS sender. That is a claim about the tree
+  // stated in a route module, and the whole of this register exists because
+  // such claims outlive the tree that made them true. Registered so the day the
+  // factor lands, leg 2 turns RED at the sentence rather than at nothing.
+  {
+    site: 'apps/api/src/routes/wallet-withdrawals.ts',
+    claim: 'No session can be elevated: databaseAuthBackend in src/auth-backend.ts',
+    disposition: 'live',
+    artifact: 'live-elevation-factor',
+    why:
+      'ADR-342 finding E rests on it, and so does the refusal to install the port. The day ' +
+      'an elevation arm lands, this sentence is false AND the withdrawal door becomes ' +
+      'reachable in the same commit, which is exactly the arming ADR-342 argued would carry ' +
+      'no signal. This entry is the signal',
   },
 
   // --- live: the door exists, and what it deliberately does NOT reach -------
