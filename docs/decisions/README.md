@@ -332,6 +332,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-318](ADR-318.md) | the queue has no schema, so the migration is a transcript. `0079` quotes pg-boss's own `getConstructionPlans('pgboss')` byte for byte at a pinned version, a catalog bump to that library is a schema change and is now asserted as one, and the schema ships with NO GRANT because making it usable by `merit_app` means granting CREATE inside the ledger's restore boundary  (2026-09-04, status: proposed) |
 | [ADR-319](ADR-319.md) | an operator close in no session takes the last day that CLOSED, an operator close outside coverage takes no day at all, and three of the constraint's four statuses are not served by either (2026-09-04, status: proposed) |
 | [ADR-320](ADR-320.md) | the handle it did not open. `LT-01`'s adapter, recovered by identity, and six turned cases where the row named three (2026-09-04, status: proposed) |
+| [ADR-322](ADR-322.md) | a debit consumes a composition rather than having one, so the SCHEMA is what was wrong. `wallet_entries.provenance` becomes nullable and direction-conditional in `0080`, `EVENTS.md` stands unamended, and the one member a debit may still carry is `correction`, because a merged constraint trigger REQUIRES it  (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
