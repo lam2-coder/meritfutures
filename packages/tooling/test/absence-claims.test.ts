@@ -939,3 +939,95 @@ describe('the widened scope: what it reads, and what it still refuses to read', 
     expect(artifact('queue-door').probe(root)).toBe('absent');
   });
 });
+
+// =============================================================================
+// ADR-338. THE TWO WAYS THE DOOR-CALLER PROBE WAS WRONG, EACH WATCHED
+// =============================================================================
+// The `worker-queue-door-caller` artifact was written by ADR-333 to fail on
+// GOOD NEWS: the day somebody wired the saga to the queue door it flips to
+// `present` and leg 2 turns red at the sentence that is now lying. ADR-338 is
+// that day, and wiring it found the probe wrong in BOTH directions at once.
+//
+//   FALSE NEGATIVE. It looked for `LIVE_QUEUE.` and `workerQueue(`, which are a
+//   property access and a factory DECLARATION's call. The wiring took neither
+//   shape: an adapter takes the door as an ARGUMENT, `provisioningJobQueue(
+//   LIVE_QUEUE)`, which is `postgresBatchPorts(io.db)`'s arrangement one
+//   capability over and the ordinary way a door reaches an adapter here.
+//
+//   FALSE POSITIVE. It read RAW text. `queue-adapter.ts`'s header names
+//   `workerQueue(` in order to explain what it does not do, so with the WIRING
+//   DELETED BY HAND the probe still reported `present` and `RI-35` still passed
+//   at 35 of 35. That is an absence check going green over an emptied file,
+//   which `strip-comments.mjs`'s own header calls the worst direction a defect
+//   can fail in, arriving inside the check written to prevent it.
+//
+// Both were repaired in ADR-338's diff and both are watched here. The cases run
+// the SHIPPED probe rather than a copy, on this file's own rule.
+// =============================================================================
+
+describe('ADR-338: the door-caller probe reads code, and reads an argument position', () => {
+  test('a door handed to a factory is a CALLER, which is the shape the wiring took', () => {
+    const root = bareTree();
+    write(root, 'apps/worker/src/queue.ts', 'export const LIVE_QUEUE = workerQueue(x);\n');
+    write(
+      root,
+      'apps/worker/src/provisioning/queue-adapter.ts',
+      "import { LIVE_QUEUE } from '../queue.ts';\n" +
+        'export const LIVE_PROVISIONING_QUEUE = provisioningJobQueue(LIVE_QUEUE);\n',
+    );
+    expect(artifact('worker-queue-door-caller').probe(root)).toBe('present');
+  });
+
+  test('a sentence ABOUT the door is not a caller, even when it quotes the call shape', () => {
+    // THE SEEDED VIOLATION IS THE REAL HEADER. `queue-adapter.ts` explains that a
+    // bare re-export would be invisible to this probe, and in doing so writes
+    // `workerQueue(` and `LIVE_QUEUE.` into a comment. Unstripped, the probe
+    // reads its own explanation as the thing explained.
+    const root = bareTree();
+    write(root, 'apps/worker/src/queue.ts', 'export const LIVE_QUEUE = 1;\n');
+    write(
+      root,
+      'apps/worker/src/provisioning/queue-adapter.ts',
+      '// This probe looks for a property access on `LIVE_QUEUE.enqueue` or a\n' +
+        '// call to `workerQueue(executor)`, and this file performs neither.\n' +
+        '/* A block comment naming LIVE_QUEUE, LIVE_QUEUE) and workerQueue( too. */\n' +
+        'export const NOTHING = 0;\n',
+    );
+    expect(artifact('worker-queue-door-caller').probe(root)).toBe('absent');
+  });
+
+  test('the declaring module alone is still not a caller, so the door cannot call itself', () => {
+    // ADR-333's own exclusion, re-asserted because ADR-338 widened the shapes
+    // this probe accepts and a widened matcher over an unchanged exclusion is
+    // how a door starts reporting itself wired.
+    const root = bareTree();
+    write(
+      root,
+      'apps/worker/src/queue.ts',
+      'export function workerQueue(x) {\n  return x;\n}\n' +
+        'export const LIVE_QUEUE = workerQueue(queueExecutor());\n' +
+        'export const AGAIN = LIVE_QUEUE.declareQueue;\n',
+    );
+    expect(artifact('worker-queue-door-caller').probe(root)).toBe('absent');
+  });
+
+  test('the saga-caller probe reads code too, and its own comment quotes what it hunts', () => {
+    // The same repair one artifact over, and it was NOT hypothetical: the probe's
+    // own explanatory comment writes `runProvisioningSaga(`, and so do
+    // `schedule.ts`'s registry row and three headers under `apps/worker/src`.
+    // It reported `absent` only because the `function` guard happened to catch
+    // the forms it met.
+    const root = bareTree();
+    write(
+      root,
+      'apps/worker/src/schedule.ts',
+      '// Nothing here calls `runProvisioningSaga()`, and the blocker is the\n' +
+        '// platform adapter rather than a clock.\n' +
+        'export const UNSCHEDULED = 1;\n',
+    );
+    expect(artifact('provisioning-saga-caller').probe(root)).toBe('absent');
+
+    write(root, 'apps/worker/src/job.ts', 'await runProvisioningSaga(io, subject, ops, at);\n');
+    expect(artifact('provisioning-saga-caller').probe(root)).toBe('present');
+  });
+});

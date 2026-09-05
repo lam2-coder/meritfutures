@@ -65,13 +65,34 @@
 // `repo-invariants.mjs`, so the `CHECKS` literal at the foot of that file can
 // import this one in any order without a `ReferenceError`.
 //
-// NO COMMENT STRIPPER IS WRITTEN OR IMPORTED. `RI-30` bans a second one, and
-// this check would be wrong with one anyway: the claims it reads LIVE IN
-// COMMENTS, so a stripped file is a file with the subject removed.
+// **THIS PARAGRAPH READ "NO COMMENT STRIPPER IS WRITTEN OR IMPORTED. `RI-30`
+// bans a second one, and this check would be wrong with one anyway: the claims
+// it reads LIVE IN COMMENTS, so a stripped file is a file with the subject
+// removed", AND ADR-338 FOUND THE HALF THAT IS WRONG.** It is kept beside its
+// correction rather than deleted, per `RI-14`.
+//
+// **NONE IS WRITTEN, WHICH IS `RI-30`'s ACTUAL RULE, AND THE SHARED ONE IS NOW
+// IMPORTED.** `RI-30` bans a second STRIPPER and requires that every file which
+// parses source import the one in `strip-comments.mjs`; this file parses source
+// in two of its probes, so it was on the wrong side of that rule rather than
+// exempt from it.
+//
+// **THE SENTENCE'S REASON IS TRUE OF CLAIM LOOKUP AND FALSE OF A PROBE, AND THE
+// DIFFERENCE WAS MEASURED RATHER THAN ARGUED.** Claim lookup still reads RAW
+// text and must: a claim is a quoted line of a comment. But the two CALLER
+// probes hunt a call shape in code, and unstripped they find the shape inside
+// prose. ADR-338 seeded exactly that: `queue-adapter.ts`'s own header names
+// `workerQueue(` in order to explain what it does NOT do, the door-caller probe
+// counted the mention, and with the wiring DELETED BY HAND the probe still
+// reported `present` and `RI-35` still passed. **An absence check that goes
+// green over an emptied file is `strip-comments.mjs`'s own worst direction**,
+// and it had arrived inside the check written to prevent it.
 // =============================================================================
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { stripComments } from './strip-comments.mjs';
 
 /**
  * What a probe reports about the artifact a claim names.
@@ -600,14 +621,31 @@ export const ABSENCE_ARTIFACTS = [
       // counting the name would report the door wired off the sentence saying it
       // is not. So the shapes are a property access and a factory call, and the
       // declaring module is excluded because it is both.
+      //
+      // **A THIRD SHAPE WAS ADDED BY ADR-338 AND IT IS THE ONE THE WIRING
+      // ACTUALLY TOOK, WHICH IS A FINDING AGAINST THIS PROBE RATHER THAN A
+      // PREFERENCE.** The two shapes above see a door that is CALLED and miss a
+      // door that is HANDED TO SOMETHING -- `provisioningJobQueue(LIVE_QUEUE)`,
+      // which is `postgresBatchPorts(io.db)`s arrangement one capability over
+      // and the likeliest way an adapter takes a door in this estate. Written as
+      // it stood, this probe would have reported `absent` over the very row that
+      // wired the saga`s queue port, holding a `live` claim true past its own
+      // falsification, which is the defect RI-35 exists to prevent arriving
+      // INSIDE RI-35. So an argument position counts: the name followed by `,`
+      // or `)`.
+      //
+      // IT IS STILL A CALL AND NEVER THE MENTION. Every prose occurrence of the
+      // name in this tree is backticked, so `LIVE_QUEUE` in a sentence is
+      // followed by a backtick and matches none of the three; the three shapes
+      // are `LIVE_QUEUE.`, `LIVE_QUEUE,`, `LIVE_QUEUE)` and `workerQueue(`.
       const door = 'apps/worker/src/queue.ts';
       for (const rel of files) {
         if (rel === door) continue;
-        const called = readFileSync(join(root, rel), 'utf8')
+        const called = stripComments(readFileSync(join(root, rel), 'utf8'))
           .split('\n')
           .some(
             (line) =>
-              /\bLIVE_QUEUE\s*\./.test(line) ||
+              /\bLIVE_QUEUE\s*[.,)]/.test(line) ||
               (/\bworkerQueue\s*\(/.test(line) && !/function\s+workerQueue/.test(line)),
           );
         if (called) return 'present';
@@ -634,8 +672,17 @@ export const ABSENCE_ARTIFACTS = [
       // A CALL AND NEVER THE DECLARATION. `export async function
       // runProvisioningSaga(` is the entry point itself, and a probe counting it
       // would report every job in this deployable as already called.
+      //
+      // **AND NEVER THE MENTION EITHER, WHICH IS ADR-338's REPAIR AND NOT A
+      // TIDY-UP.** This probe read RAW text, and the line directly above quotes
+      // the very shape it hunts: `runProvisioningSaga(` appears in this comment,
+      // and it appears in `schedule.ts`'s registry row and in three headers under
+      // `apps/worker/src/`. It reported `absent` only because the guard on the
+      // word `function` happened to catch the one form it met; a header writing
+      // "nothing calls `runProvisioningSaga()`" would have flipped it to
+      // `present` and retired a true claim. Stripped, it reads code.
       for (const rel of files) {
-        const called = readFileSync(join(root, rel), 'utf8')
+        const called = stripComments(readFileSync(join(root, rel), 'utf8'))
           .split('\n')
           .some(
             (line) =>
@@ -854,9 +901,35 @@ export const ABSENCE_CLAIMS = [
   {
     site: 'apps/worker/src/index.ts',
     claim: '`enqueueProvisioningOp` calls it, and **no adapter over `LIVE_QUEUE` has a',
-    disposition: 'live',
+    disposition: 'retired',
     artifact: 'worker-queue-door-caller',
-    why: 'ADR-333 wrote the door and wired nothing; the day the saga is wired this goes red',
+    why:
+      'THE DAY CAME. This row read `live` and said "the day the saga is wired this goes red"; ' +
+      'ADR-338 wrote `apps/worker/src/provisioning/queue-adapter.ts`, the probe flipped to ' +
+      '`present`, and leg 2 went red at this sentence rather than at a count. The clause is kept ' +
+      'whole under RI-14 with its correction beneath it, and this row now holds the correction ' +
+      'to the tree: an adapter that went away again turns leg 3 red at the same line',
+  },
+  {
+    site: 'apps/worker/src/queue.ts',
+    claim: 'THIS PARAGRAPH READ "NOTHING HERE IS WIRED AND NOTHING IS SCHEDULED. No',
+    disposition: 'retired',
+    artifact: 'worker-queue-door-caller',
+    why:
+      'the door said of itself that nothing called it, one file away from the barrel that said ' +
+      'the same thing, which is occurrence 3`s shape exactly. ADR-338 falsified both and both ' +
+      'are registered, so neither can be retired without the other going red',
+  },
+  {
+    site: 'apps/worker/src/schedule.ts',
+    claim: 'THIS ITEM READ "THE ROLE THIS DEPLOYABLE CONNECTS AS CANNOT REACH THE',
+    disposition: 'retired',
+    artifact: 'pgboss-app-grant-migration',
+    why:
+      'A SITE THIS REGISTER HAD NEVER MET, found by ADR-338 while wiring the door rather than ' +
+      'by a check. `0082` (ADR-327) falsified it on the day it merged and this file was not one ' +
+      'of the four occurrences anybody repaired; the item`s CONCLUSION survives on its two ' +
+      'neighbours, which is why nothing above it moved and only the reason is corrected',
   },
   {
     site: 'apps/api/src/routes/internal.ts',

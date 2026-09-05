@@ -7,7 +7,14 @@
 // carries M02's `platform: 'rithmic' | 'simulator'` for the same reason: this
 // module never branches on which one it is holding.
 //
-// FIVE FILES AND ONE OF THEM DOES I/O.
+// EIGHT FILES AND TWO OF THEM DO I/O.
+//
+// **THIS LINE READ "FIVE FILES AND ONE OF THEM DOES I/O" WHILE THE LIST UNDER IT
+// ENUMERATED SEVEN**, and ADR-338 found it while adding the eighth. Corrected by
+// counting the entries below rather than by trusting the word, and recorded
+// rather than quietly fixed: a hand-written count in a barrel header is the
+// third one in this deployable to be wrong, and `src/index.ts`'s own
+// `WORKER_MODULES_BEHIND_A_LEG` docblock carries the same repair.
 //
 //   vocabulary.ts    the seven operations and six statuses `0007` and `0001`
 //                    close, bound to those migrations by the suite
@@ -21,6 +28,9 @@
 //   ports.ts         the I/O boundary, and what ADR-102's accessor cannot
 //                    serve today
 //   saga.ts          the pipeline
+//   queue-adapter.ts the ONE live port of the four, over `src/queue.ts`'s door
+//                    (ADR-338). It is the second file here that does I/O and the
+//                    only one that names a module outside this directory
 
 export {
   PROVISIONING_OPERATIONS,
@@ -90,6 +100,16 @@ export type {
   ProvisioningSqlExecutor,
   ProvisioningTx,
 } from './ports.ts';
+
+// ADR-338. THE LIVE PORT IS A LEG'S CARGO AND `src/queue.ts` IS NOT, WHICH IS
+// `test/queue.test.ts`'s stated distinction: that file exports the CAPABILITY
+// and this one exports an ADAPTER OVER A PORT, which is `./sweeps/ledger.ts`'s
+// class and is re-exported for the reason `APPROVAL_LEDGER` is.
+export {
+  LIVE_PROVISIONING_QUEUE,
+  declareProvisioningQueue,
+  provisioningJobQueue,
+} from './queue-adapter.ts';
 
 export {
   PROVISIONING_QUEUE_NAME,
