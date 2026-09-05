@@ -333,6 +333,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-319](ADR-319.md) | an operator close in no session takes the last day that CLOSED, an operator close outside coverage takes no day at all, and three of the constraint's four statuses are not served by either (2026-09-04, status: proposed) |
 | [ADR-320](ADR-320.md) | the handle it did not open. `LT-01`'s adapter, recovered by identity, and six turned cases where the row named three (2026-09-04, status: proposed) |
 | [ADR-321](ADR-321.md) | a commission is not the firm's, and now it is not anonymous either. `0078` adds the one column three sibling tables already carry, a composite foreign key makes the denormalized affiliate unable to disagree with its parent, and the registration follows the column rather than the other way round (2026-09-05, status: proposed) |
+| [ADR-322](ADR-322.md) | a debit consumes a composition rather than having one, so the SCHEMA is what was wrong. `wallet_entries.provenance` becomes nullable and direction-conditional in `0080`, `EVENTS.md` stands unamended, and the one member a debit may still carry is `correction`, because a merged constraint trigger REQUIRES it  (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
