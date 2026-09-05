@@ -273,10 +273,36 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'THE DECISIONS BEHIND THE PORT ARE BUILT AND TESTED WITHOUT IT. `resolveOperatorSession` is ' +
     "`lookup`'s verdict without its query and `operatorFromAssertion` is the directory join, " +
     'both total, both pure, both exercised in `test/operator-identity.test.ts`. WIRING THE PORT ' +
-    'OUT OF THEM IS REFUSED AND ADR-237 SECTION 8 SAYS WHY: nothing can write an ' +
+    'OUT OF THEM IS REFUSED AND ADR-237 SECTION 8 SAID WHY: nothing can write an ' +
     '`operator_sessions` row, so every operator would be told 401 on a door that is not shut ' +
     'against them, and a live-looking route in front of an arm that cannot answer is worse than ' +
     "an honest 503 (`usePayoutBackend`'s rule). " +
+    'THAT OBJECTION IS SPENT AND THE REFUSAL IS NOT (ADR-343). ADR-343 clause 1 made an unwired ' +
+    'session source resolve to `unknown`, so a deployment with NOTHING installed already answers ' +
+    '401 to every caller, cookie or not, and wiring the port would therefore change NOTHING a ' +
+    'caller can see: the misreport ADR-237 refused is now the answer either way. ' +
+    'AND THE PORT IS NOT BLOCKED BY A DOOR, WHICH THIS ENTRY IMPLIED AND ADR-343 MEASURED FALSE. ' +
+    '`operators` and `operatorSessions` are both scope class `firm` (`packages/db/src/scope.ts`), ' +
+    'so `ApiDb.firm()` reaches BOTH TODAY, `AdminSessionSource.lookup` reads only those two ' +
+    'relations, and `resolveOperatorSession` is already its verdict. NO NEW DOOR IS NEEDED AND ' +
+    'ADR-171 CLAUSE 1 HAS NOTHING TO REFUSE HERE; the operator-console door is owed by ' +
+    '`setAdminReadSource` alone, whose `AdminSourceTx` spans `owned` keys the firm door refuses ' +
+    'by construction. ' +
+    'SO THIS PORT IS DECLINED RATHER THAN BLOCKED, ON THREE GROUNDS THAT ARE NOT THE OLD ONE. ' +
+    '(1) An install nothing can exercise is an install nothing falsifies: wired against an empty ' +
+    'table, its first real exercise is the day somebody lands the identity provider, at which ' +
+    'point a console that can freeze accounts, revoke certificates and correct ledgers opens as a ' +
+    'SIDE EFFECT of an unrelated slice, carrying no signal that it did. ' +
+    '(2) It buys no observable change and costs a transaction against two tables on EVERY ' +
+    '`/admin/*` request including the ones answering 401 to a caller holding nothing, so an ' +
+    'anonymous prober gets to schedule database work; `start.ts:206` and `:245` say in their own ' +
+    'words that the rate limit `INV-M11-05` requires "EXISTS NOWHERE IN THIS TREE", so nothing ' +
+    'bounds that. ' +
+    '(3) It would move the triple to `wired: 11` and report as progress a port whose table cannot ' +
+    'be filled. ' +
+    'WHAT IS STILL OWED IS THE PURCHASE AND A CALLER. `refusingAssertionVerifier` and ' +
+    '`operatorFromAssertion` have ZERO callers outside their own suite, and the caller is a login ' +
+    'route minting an `operator_sessions` row, which needs a verified assertion first. ' +
     'FIVE OTHER PORTS STILL REDUCE TO THIS ONE, four through `principal(request)` ' +
     '(`useAdminWriteBackend`, `useAdminPayoutBackend`, `useAdminWalletBackend` and ' +
     '`useCertificateRevokeBackend`) and a fifth through a door (`setAdminReadSource`, ADR-171 ' +
