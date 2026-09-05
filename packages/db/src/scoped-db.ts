@@ -4236,21 +4236,8 @@ function poolFromClient(): Pool {
   return candidate as Pool;
 }
 
-/**
- * PostgreSQL's own transaction status for the backend behind `conn`, or
- * `undefined` if `pg` has stopped reporting it.
- *
- * `'I'` idle, `'T'` in a transaction, `'E'` in a FAILED transaction. The server
- * sends it on every `ReadyForQuery` and `pg` records the last one on the client.
- * It is not on the published type, so it is READ DEFENSIVELY and PROVED rather
- * than cast, which is the shape `poolFromClient` above already takes for
- * Drizzle's `$client`: the caller destroys the connection when this cannot be
- * read, so a driver that stops answering fails CLOSED and then loudly.
- */
-function transactionStatusOf(conn: PoolClient): string | undefined {
-  const status = (conn as unknown as { readonly _txStatus?: unknown })._txStatus;
-  return typeof status === 'string' ? status : undefined;
-}
+/** PostgreSQL's `ReadyForQuery` status: idle, in a transaction, or in a failed one. */
+const BACKEND_IS_IDLE = 'I';
 
 /**
  * A SQL executor on the POOL, for the one caller that must outlive every
@@ -4317,7 +4304,9 @@ function transactionStatusOf(conn: PoolClient): string | undefined {
  *    a queue defect, it is this door poisoning the accessor it lives in.
  *
  *    So the connection is released with DESTROY whenever the backend is not
- *    idle. A statement that opens a transaction and does not close it burns its
+ *    idle, which `pg`'s own `getTransactionStatus()` answers from the backend's
+ *    last `ReadyForQuery` rather than from anything this file guesses. A
+ *    statement that opens a transaction and does not close it burns its
  *    connection instead of pooling it, and nothing it left behind -- the
  *    transaction, a `SET`, a temp table -- can be found by anybody else.
  *
@@ -4347,14 +4336,19 @@ export function poolSqlExecutor(reason: PoolSqlExecutorReason): SqlExecutor {
         conn.release(true);
         throw cause;
       }
-      const status = transactionStatusOf(conn);
-      conn.release(status !== 'I');
-      if (status === undefined) {
+      // `getTransactionStatus()` is `pg`'s own published reader of the backend's
+      // last `ReadyForQuery`: `'I'` idle, `'T'` in a transaction, `'E'` in a
+      // failed one, `null` before the first. A completed statement has always
+      // produced one, so `null` here means the driver stopped answering, and the
+      // connection is destroyed FIRST and the failure raised after, which is the
+      // safe order: fail closed, then loudly.
+      const status = conn.getTransactionStatus();
+      conn.release(status !== BACKEND_IS_IDLE);
+      if (status === null) {
         throw new Error(
-          'pg no longer reports the connection`s transaction status, so this door cannot tell ' +
-            'a clean connection from one left inside a transaction. The connection was ' +
-            'destroyed rather than pooled, and packages/db has to follow the driver: ' +
-            'ADR-332 leg 4.',
+          'pg reported no transaction status after a completed statement, so this door cannot ' +
+            'tell a clean connection from one left inside a transaction. The connection was ' +
+            'destroyed rather than pooled. packages/db has to follow the driver: ADR-332 leg 4.',
         );
       }
       return oneResultFrom(answer);
