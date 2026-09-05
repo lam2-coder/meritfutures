@@ -235,10 +235,16 @@
 // -----------------------------------------------------------------------------
 // FIVE THINGS THIS FILE CANNOT DO, REPORTED RATHER THAN REACHED AROUND
 // -----------------------------------------------------------------------------
-//   1. `purchases.psp` AND `purchases.psp_reference` ARE BOTH `NOT NULL`, so a
-//      wallet row is unwritable without naming a processor that was never
-//      called. `PurchaseInsert` types both `| null` and the wallet path writes
-//      null. A superseding migration is owed; see that interface.
+//   1. RULED AND CLOSED BY ADR-323, `0081_purchase_processor_columns.sql`,
+//      WHICH IS `proposed` AND UNSIGNED. It read: `purchases.psp` and
+//      `purchases.psp_reference` are both `NOT NULL`, so a wallet row is
+//      unwritable without naming a processor that was never called. `0081`
+//      relaxes both and installs
+//      `purchases_processor_columns_follow_method`, so the row the wallet arm
+//      already writes (`psp: null, pspReference: null`) is now the ONLY legal
+//      shape for `payment_method = 'wallet'` and the mislabelled alternative is
+//      refused. Nothing in this file changed; what changed is that the schema
+//      now agrees with it. See `PurchaseInsert`.
 //
 //   2. `wallet_entries.provenance` HAS NO MEMBER THAT DESCRIBES A DEBIT, which
 //      is ADR-158 finding 3 and is already recorded there as unrepaired.
@@ -739,30 +745,37 @@ export interface PurchaseInsert {
   /** `purchases.affiliate_id`. Null when attribution resolved to none OR voided. */
   readonly affiliateId: string | null;
   /**
-   * `purchases.psp`, or `null` ON THE WALLET PATH, AND THE COLUMN IS `NOT NULL`.
+   * `purchases.psp`, or `null` ON THE WALLET PATH, WHERE THE COLUMN IS NOW
+   * NULLABLE AND MUST BE NULL.
    *
-   * THIS IS A REPORTED SCHEMA DEFECT AND NOT A LOOSENED TYPE. `0006_commerce.sql`
-   * declares `psp text NOT NULL CHECK (psp IN ('psp_a','psp_b'))` and
-   * `psp_reference text NOT NULL`. `SD-M3-06` added `payment_method`,
-   * `wallet_debit_cents` and `wallet_ledger_transaction_id` to this same table
-   * and RELAXED NEITHER, and the only two `ALTER TABLE purchases` in the tree
-   * (`0007`, `0011`) add foreign keys. So a `payment_method = 'wallet'` row is
+   * THIS TYPE WAS WRITTEN AGAINST A SCHEMA THAT REFUSED IT, AND THE SCHEMA IS
+   * WHAT MOVED. `0006_commerce.sql` declared `psp text NOT NULL CHECK (psp IN
+   * ('psp_a','psp_b'))` and `psp_reference text NOT NULL`; `SD-M3-06` added
+   * `payment_method`, `wallet_debit_cents` and `wallet_ledger_transaction_id` to
+   * the same table and RELAXED NEITHER, so a `payment_method = 'wallet'` row was
    * UNWRITABLE without naming a processor that was never called and a reference
    * that references nothing.
    *
-   * The alternative is to write `'psp_a'` and a minted string onto a row that
+   * The alternative was to write `'psp_a'` and a minted string onto a row that
    * reached no processor, which is the state `FM-M3-01` pages on wearing a
    * wallet purchase's clothes and is exactly what `SD-M3-06` exists to make
    * unrepresentable: *"without an explicit method the wallet path is
    * indistinguishable from a PSP purchase whose webhook never arrived"*.
    *
-   * So the type carries the truth and the write fails closed. The repair is a
-   * superseding migration relaxing both columns under a CHECK tied to
-   * `payment_method`, and P5 section 7 forbids this slice a migration number.
-   * This is ADR-158 clause 2's move on a second table.
+   * ADR-323 ruled that reading and `0081_purchase_processor_columns.sql` is the
+   * superseding migration, `proposed` and UNSIGNED: both columns become
+   * nullable and `purchases_processor_columns_follow_method` requires them BOTH
+   * NULL under `'wallet'` and BOTH PRESENT under `'psp'` and `'mixed'`. So this
+   * `| null` is no longer a type that fails closed against the database; it is
+   * the shape the database now requires on this path, and writing `'psp_a'`
+   * here would be refused. This was ADR-158 clause 2's move on a second table.
    */
   readonly psp: PspId | null;
-  /** `purchases.psp_reference`, `NOT NULL`. Null on the wallet path; see `psp`. */
+  /**
+   * `purchases.psp_reference`. Null on the wallet path and REQUIRED on the other
+   * two, by `purchases_processor_columns_follow_method` rather than by a column
+   * constraint since `0081`; see `psp`.
+   */
   readonly pspReference: string | null;
   readonly ip: string | null;
   /** SD-M3-05. Recorded at checkout, never reconstructed. */
