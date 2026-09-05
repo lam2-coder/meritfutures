@@ -100,26 +100,30 @@
 //    this repository accepts -- would put a wrong tenancy answer behind a door
 //    that RETURNS ROWS.
 //
-//    ADR-253 LEFT A SEVENTH CLASS OPEN AND ADR-304 CLOSES IT: NO SEVENTH CLASS,
-//    AND THE TABLE IS ONE COLUMN AWAY. `affiliate_creatives`, `affiliate_clicks`
-//    and `affiliate_statements` each declare `affiliate_id uuid NOT NULL
-//    REFERENCES affiliates(id)` and each is registered `derived` via
-//    `affiliates` on it with no ruling at all; this is the only table on the
-//    rail that declares none. Migration `0078` is RESERVED for that column in
-//    docs/decisions/ALLOCATION.md and is NOT WRITTEN. The sentence this comment
-//    carried, that ADR-253 `has now ruled that NOTHING CAN`, was true of the
-//    vocabulary and false of the schema, and it is corrected here rather than
-//    removed.
+//    ADR-253 LEFT A SEVENTH CLASS OPEN, ADR-304 CLOSED IT WITH NO SEVENTH CLASS
+//    AND ONE COLUMN, AND `0078` HAS SINCE WRITTEN THAT COLUMN (ADR-321).
+//    `affiliate_creatives`, `affiliate_clicks` and `affiliate_statements` each
+//    declare `affiliate_id uuid NOT NULL REFERENCES affiliates(id)` and each is
+//    registered `derived` via `affiliates` on it with no ruling at all; this
+//    table was the only one on the rail declaring none, and it now declares it
+//    and is registered on the same rule. So the THREE MONEY FIGURES have a
+//    scoped door and wait on an adapter alone. This comment read `Migration
+//    0078 is RESERVED for that column in docs/decisions/ALLOCATION.md and is
+//    NOT WRITTEN`, and that clause is retired by the file existing (ADR-324);
+//    before it, the sentence carried here was that ADR-253 `has now ruled that
+//    NOTHING CAN`, which was true of the vocabulary and false of the schema.
+//    Both are corrected here rather than removed.
 //
-//    AND THE SECOND OBSTRUCTION IS NOT A SCOPE QUESTION AT ALL. `attributions`
-//    is `pair`, so it is excluded from `ScopedTableKey` AND from `FirmTableKey`
-//    and `scopePredicate` throws on it: `conversions_30d` therefore has no
-//    scoped door and would still have none after `0078`. No class reaches it,
+//    AND THE SECOND OBSTRUCTION IS NOT A SCOPE QUESTION AT ALL, WHICH IS WHY IT
+//    IS THE ONE THAT SURVIVED `0078`. `attributions` is `pair`, so it is
+//    excluded from `ScopedTableKey` AND from `FirmTableKey` and `scopePredicate`
+//    throws on it: `conversions_30d` therefore has no scoped door and has none
+//    after `0078`, exactly as this comment predicted. No class reaches it,
 //    because ADR-106's exclusion is a ruling about what a ROW read returns and a
 //    count returns no row. What serves it is a NAMED DOOR returning one integer
 //    (ADR-262, ADR-265), which needs no registry change and no DDL. The port
-//    fails closed and its message names BOTH obstructions, which is the honest
-//    shape available.
+//    fails closed and its message names the discharged obstruction and the
+//    remaining one, which is the honest shape available.
 //
 // 2. `POST /affiliate/links` HAS NO TABLE, `affiliate_clicks` IS NOT IT, AND
 //    ADR-253 RULES THAT NO TABLE IS OWED.
@@ -503,41 +507,60 @@ const AFFILIATES_READABLE =
   'adapter has been written for it yet.';
 
 /**
- * THE HEADER'S FINDING 1, IN THE PLACE A CALLER WILL ACTUALLY MEET IT, AND IT
- * WAS WRONG IN TWO PLACES UNTIL ADR-304.
+ * THE HEADER'S FINDING 1, IN THE PLACE A CALLER WILL ACTUALLY MEET IT. IT WAS
+ * WRONG IN TWO PLACES UNTIL ADR-304, AND FOUR OF ITS CLAUSES WENT STALE ON THE
+ * DAY `0078` LANDED. ADR-324.
  *
  * IT SAID THE TABLE IS `a seventh class away, and ADR-253 declines to write one
  * to make a registration compile`. ADR-253 was right that no member of the
  * closed six fits and right to leave the class to a row of its own; that row is
- * `304` and its ruling is that no seventh class should exist. The table is a
+ * `304` and its ruling is that no seventh class should exist. The table was a
  * COLUMN away. A refusal is the one place a later session reads to find out
  * what to build, so a refusal sending that session to write a scope class is
  * worse than one saying nothing at all.
  *
- * AND IT NAMED ONE OBSTRUCTION WHERE THIS METHOD HAS TWO. `conversions_30d` is
- * counted over `attributions`, which is `pair` and is refused by BOTH narrow
- * doors under ADR-106, and no scope class reaches it: that exclusion is a
- * ruling about what a ROW read returns and a count returns no row. The sentence
- * quoting what was corrected is kept above rather than deleted, per RI-14.
+ * AND THEN IT SAID THE COLUMN WAS STILL MISSING AFTER IT ARRIVED. `0078`
+ * (ADR-321, on ADR-304) added `affiliate_id`, `schema.ts` declares it and
+ * `scope.ts` registers the table `derived` via `affiliates` on it, and this
+ * constant went on serving four retired clauses: `UNREGISTERED`, `undeclared`,
+ * `one COLUMN away` and `0078 ... is NOT WRITTEN`. NOTHING WENT RED, because
+ * the assertions on it matched THOSE WORDS rather than the tree those words
+ * were about. `affiliate-stats-obstructions.test.ts` derives them now: it reads
+ * `scope.ts`, `schema.ts` and the migration directory and requires this message
+ * to agree with what it finds, so the next time the tree moves under a clause
+ * here the case fails instead of the sentence quietly becoming false.
+ *
+ * IT NAMED ONE OBSTRUCTION WHERE THIS METHOD HAD TWO, AND THE SECOND IS THE
+ * ONE THAT SURVIVES. `conversions_30d` is counted over `attributions`, which is
+ * `pair` and is refused by BOTH narrow doors under ADR-106, and no scope class
+ * reaches it: that exclusion is a ruling about what a ROW read returns and a
+ * count returns no row. `0078` did not touch it and no migration can.
+ *
+ * THE SENTENCES QUOTING WHAT WAS CORRECTED ARE KEPT HERE RATHER THAN DELETED,
+ * per RI-14. THE METHOD IS STILL UNWIRED AND THIS ENTRY DID NOT WIRE IT.
  */
 const COMMISSIONS_UNREACHABLE =
-  'It has TWO obstructions and neither is an adapter. FIRST, its three money figures are sums ' +
-  'over `affiliate_commissions`, which is UNREGISTERED in `packages/db/src/scope.ts` and ' +
-  'undeclared in `packages/db/src/schema.ts`. No member of the closed six fits (ADR-253): the ' +
-  'row declares no column against `identities(id)`, which leaves `owned`, `pair` and `either` ' +
-  'nothing to name; all three of its edges refuse `derived`; and `firm` is available, passes ' +
-  'every mechanical check in this repository, and is FALSE, because a commission is what Merit ' +
-  'owes a named affiliate. ADR-304 rules that this is NOT a seventh scope class away either: it ' +
-  'is one COLUMN away, `affiliate_id uuid NOT NULL REFERENCES affiliates(id)`, which ' +
-  '`affiliate_creatives`, `affiliate_clicks` and `affiliate_statements` each carry and are each ' +
-  'registered `derived` via `affiliates` on. Migration `0078` is RESERVED for it in ' +
-  'docs/decisions/ALLOCATION.md and is NOT WRITTEN. SECOND, `conversions_30d` is a count over ' +
+  'ONE obstruction, and it is not an adapter. IT HAD TWO AND THE FIRST IS DISCHARGED: its ' +
+  'three money figures are sums over `affiliate_commissions`, which is DECLARED in ' +
+  '`packages/db/src/schema.ts` and REGISTERED `derived` via `affiliates` on `affiliate_id` in ' +
+  '`packages/db/src/scope.ts`, so those three sums have a scoped door and wait on an adapter ' +
+  'alone. What closed it was the COLUMN and not a class: `affiliate_id uuid NOT NULL ' +
+  'REFERENCES affiliates(id)`, which `affiliate_creatives`, `affiliate_clicks` and ' +
+  '`affiliate_statements` each already carried and are each registered `derived` via ' +
+  '`affiliates` on, arrived in migration `0078`, which is WRITTEN (ADR-321, on ADR-304 which ' +
+  'reserved it and refused the seventh scope class). THE CLASS QUESTION IS SETTLED AND THE ' +
+  'ANSWER IS `derived` RATHER THAN `firm`, which is worth reading because `firm` is available, ' +
+  'passes every mechanical check in this repository, and is FALSE, because a commission is ' +
+  'what Merit owes a named affiliate. WHAT STILL REFUSES IS `conversions_30d`, a count over ' +
   '`attributions`, which is scope class `pair`: excluded from `ScopedTableKey` AND from ' +
-  '`FirmTableKey`, so `scopePredicate` throws on it, and NO scope class fixes that. What serves ' +
-  'that count is a NAMED DOOR returning one integer, which is the construction ADR-262 and ' +
-  'ADR-265 already use, on an `owned` row and on a `firm` row respectively, and which ' +
-  'needs no registry change at all. So this method waits on a migration, a registration, a ' +
-  'counting door and then an adapter, in that order, and on no further ruling.';
+  '`FirmTableKey`, so `scopePredicate` throws on it, and NO scope class fixes that, because ' +
+  'the exclusion ADR-106 wrote is a ruling about what a ROW read returns and a count returns ' +
+  'no row. No migration reaches it either, so `0078` neither helped it nor could have. What ' +
+  'serves that count is a NAMED DOOR returning one integer, which is the construction ADR-262 ' +
+  'and ADR-265 already use, on an `owned` row and on a `firm` row respectively, and which ' +
+  'needs no registry change and no DDL at all. So this method waited on a migration, a ' +
+  'registration, a counting door and then an adapter, in that order; THE FIRST TWO HAVE ' +
+  'LANDED, and what is left is the counting door and then the adapter, and no further ruling.';
 
 /**
  * THE SENTENCE THIS CONSTANT CARRIED WAS RETIRED AND WAS STILL BEING SERVED.

@@ -1156,46 +1156,69 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'both null, so calling the setter here would install what is already installed. That is not ' +
     'a wiring.',
   useAffiliateDeps:
-    'ONE obstruction, and this entry has named THREE and then TWO. `affiliate_commissions` is ' +
-    'UNREGISTERED in `packages/db/src/scope.ts` and UNDECLARED in `packages/db/src/schema.ts`, ' +
-    'AND THE SENTENCE THAT SIZED THAT OBSTRUCTION IS FALSE (ADR-304, 2026-08-30). IT READ: ' +
+    'ONE obstruction, and this entry has named THREE, then TWO, then a DIFFERENT ONE. THE ' +
+    'OBSTRUCTION THIS ENTRY LED WITH FOR TWO WAVES IS DISCHARGED AND THE ONE BEHIND IT IS NOT ' +
+    '(ADR-321 wrote the column, ADR-324 repaired what was still being said about it). ' +
+    'THE RETIRED CLAUSES ARE QUOTED RATHER THAN DELETED, on RI-14`s rule and on the rule this ' +
+    'entry has now been the subject of twice. THEY READ: `affiliate_commissions` is ' +
+    '"UNREGISTERED in packages/db/src/scope.ts and UNDECLARED in packages/db/src/schema.ts", ' +
+    'it is "ONE COLUMN away rather than a class away", the column "IS RESERVED AND NOT ' +
+    'WRITTEN", and a session dispatched here "would be taking a number the ruling gates on a ' +
+    'read that has not happened". ALL FOUR WERE TRUE WHEN WRITTEN AND ALL FOUR WERE FALSE THE ' +
+    'DAY `0078_affiliate_commission_owner.sql` MERGED, and nothing in this repository went ' +
+    'red, because what was asserted anywhere was the WORDS. ' +
+    'AND THE SENTENCE UNDER THEM IS OLDER AND WAS ALSO FALSE (ADR-304, 2026-08-30). IT READ: ' +
     '"ADR-253 rules that it is not one registration away but a SEVENTH SCOPE CLASS away". ' +
     'ADR-304 met ADR-253 section 6`s open question and REFUSED THE SEVENTH CLASS in those ' +
-    'terms: the vocabulary is not what is missing, and what is missing is ' +
+    'terms: the vocabulary was not what was missing, and what was missing was ' +
     '`affiliate_id uuid NOT NULL REFERENCES affiliates(id)`, which `affiliate_creatives`, ' +
     '`affiliate_clicks` and `affiliate_statements` each declare and on which all three are ' +
-    'registered `derived` via `affiliates` WITH NO RULING AT ALL. So the table is ONE COLUMN ' +
-    'away rather than a class away, and it is the only table on that rail declaring none. ' +
-    'THE SENTENCE IS QUOTED RATHER THAN DELETED BECAUSE THE CLAUSES UNDER IT STILL HOLD, and ' +
-    'they are what a seventh class was proposed to route around rather than what it refuted: ' +
-    'this table`s only path to an identity runs through `attributions`, which is `pair`, so a ' +
-    '`derived` rule compiles and throws; the row declares no column against `identities(id)`, ' +
-    'so `owned`, `pair` and `either` have nothing to name; and `firm` is available, is ' +
-    'accepted by every mechanical check in this repository, and is FALSE, because a commission ' +
-    'is what Merit owes a named affiliate. ' +
-    'THE COLUMN IS RESERVED AND NOT WRITTEN AND THAT RESERVATION IS NOT THIS FILE`s TO SPEND: ' +
-    'ALLOCATION`s migration table carries `0078` to ADR-304 as "RESERVED, NOT WRITTEN, AND NO ' +
-    'FILE EXISTS", and `packages/db/test/affiliate-commissions-is-a-column-away.test.ts` ' +
-    'asserts that absence rather than this entry claiming it. ' +
-    'AND WHAT THE MIGRATION WAITS ON IS A FOUNDER ACT RATHER THAN ENGINEERING, WHICH IS THE ' +
-    'PART A DISPATCHER READS THIS ENTRY FOR. ADR-304 section 10 puts its second judgement to ' +
-    'the founder -- whether a denormalized tenancy column on a money table is acceptable at ' +
-    'all -- and rules that a founder who would rather the derivation stayed the single source ' +
-    'of truth "should say so before `0078` is dispatched rather than after". A session ' +
-    'dispatched at this entry today would be taking a number the ruling gates on a read that ' +
-    'has not happened. THE SECOND OBSTRUCTION IS DISCHARGED AS A REGISTRY QUESTION AND IS NOT ' +
+    'registered `derived` via `affiliates` WITH NO RULING AT ALL. ' +
+    'WHAT IS TRUE NOW, RE-DERIVED ON THIS TREE RATHER THAN INHERITED: `0078` declares that ' +
+    'exact edge on `affiliate_commissions`, `schema.ts` declares `affiliateId`, and `scope.ts` ' +
+    'registers the table `derived` via `affiliates` on `affiliate_id` as a `hop`, which makes ' +
+    'it the FOURTH table on that rail registered on the THIRD`s rule and with no new class. So ' +
+    'the three money figures of `AffiliateStats` -- `earned_cents_lifetime`, `payable_cents` ' +
+    'and `paid_cents_lifetime` -- have a scoped door and wait on an ADAPTER, which is the same ' +
+    'position five of the six methods are in. THE CLASS QUESTION IS SETTLED AND THE ANSWER IS ' +
+    '`derived` AND NOT `firm`, and the clause saying why is kept because the mistake is still ' +
+    'available: `firm` compiles, is accepted by every mechanical check in this repository, and ' +
+    'is FALSE, because a commission is what Merit owes a named affiliate. ' +
+    'WHAT REFUSES NOW IS THE FOURTH FIELD, AND NO MIGRATION AND NO SCOPE CLASS REACHES IT. ' +
+    '`conversions_30d` is a count over `attributions`, which is `pair`: excluded from ' +
+    '`ScopedTableKey` AND from `FirmTableKey`, so `scopePredicate` throws on it, and ADR-106`s ' +
+    'exclusion is a ruling about what a ROW read returns while a count returns no row. What ' +
+    'serves it is a NAMED DOOR returning one integer, which is ADR-262`s and ADR-265`s ' +
+    'construction and needs no registry change and no DDL. THIS PORT THEREFORE WAITS ON A ' +
+    'COUNTING DOOR AND THEN AN ADAPTER, IN THAT ORDER, and on no further ruling. ' +
+    'THE FOUNDER GATE THIS ENTRY CARRIED IS DISCHARGED AS A DISPATCH CONDITION AND NOT AS A ' +
+    'READ. ADR-304 put its second judgement to the founder -- whether a denormalized tenancy ' +
+    'column on a money table is acceptable at all -- in its APPROVAL block rather than in its ' +
+    'section 10, which this entry cited wrongly, and ruled that a founder preferring the ' +
+    'derivation "should say so before `0078` is dispatched rather than after". `0078` HAS BEEN ' +
+    'DISPATCHED AND HAS MERGED, so there is no number left for a session to take here and the ' +
+    'warning is spent. WHAT IS OWED INSTEAD IS AN `E2` READ: ADR-321 is `proposed` and ' +
+    'UNSIGNED, and merging is not signing. ' +
+    'THE CITATION FOR THE FACTS MOVED WITH THEM: ' +
+    '`packages/db/test/affiliate-commissions-is-a-column-away.test.ts` asserted the column`s ' +
+    'ABSENCE and now asserts what `0078` did about it, table by table, against the migration ' +
+    'set; `docs/decisions/ALLOCATION.md` carries `0078` as TAKEN AND SPENT rather than as ' +
+    '"RESERVED, NOT WRITTEN, AND NO FILE EXISTS"; and what a caller is SERVED is asserted, ' +
+    'derived rather than quoted, in `apps/api/test/affiliate-stats-obstructions.test.ts`. ' +
+    'THE SECOND OBSTRUCTION IS DISCHARGED AS A REGISTRY QUESTION AND IS NOT ' +
     'DELETED: it read that no table records an ISSUED link, and ADR-253 section 3 rules that ' +
     'none is owed, because `affiliate_clicks_token_uq` is UNIQUE and one issued link is clicked ' +
     'many times, so an issued handle and a click token cannot be one column, and every attribute ' +
     'a link would carry is already on `affiliate_clicks` at click grain. `issueLink` therefore ' +
     'waits on an ADAPTER and a BASE URL rather than on DDL, which is the same position ' +
     '`affiliate`, `requiredDisclosure`, `submitCreative` and `statements` are in. FIVE of the ' +
-    'six methods are an adapter somebody can write and ONE is not. THE REPAIR REGISTERED HERE ' +
-    'LAST WAVE IS TAKEN: `STATEMENTS_UNREACHABLE` served a caller the retired sentence that ' +
+    'six methods are an adapter somebody can write and ONE is not, AND THE ONE IS STILL `stats`, ' +
+    'for a reason that is now the counting door alone. THE REPAIR REGISTERED HERE ' +
+    'TWO WAVES AGO IS TAKEN: `STATEMENTS_UNREACHABLE` served a caller the retired sentence that ' +
     '`affiliate_statements` is not in `schema.ts`, and ADR-253 section 5 repairs it at the ' +
     'constant and at the module header, which carried the same sentence a second time and which ' +
     'no entry had named. NOTE: this port already holds `productionAffiliateDeps` at module scope ' +
-    '(`affiliate.ts:478`), so calling the setter here would install what is already installed. ' +
+    '(`affiliate.ts:613`), so calling the setter here would install what is already installed. ' +
     'That is not a wiring.',
   setInternalOpsSource:
     'FOUR METHODS, AND ADR-242 RULES THEM ONE AT A TIME BECAUSE ONE REASON COVERED WHICHEVER OF ' +
