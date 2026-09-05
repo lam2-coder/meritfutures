@@ -957,21 +957,29 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // predicted this edit. That row's fence carries `apps/worker/test/**`, so
     // this file is inside it and the line is assigned rather than reached for.
     './sweeps/ledger.ts',
+    // ADR-305 section 7 slice 7, session 516, AND THE FIFTH TIME THE PARAGRAPH
+    // ABOVE HAS PREDICTED THIS EDIT. The `LT-06` withdrawal-approval driver and
+    // its port. That row's fence carries `apps/worker/test/**`, so this file is
+    // inside it and the two lines are assigned rather than reached for.
+    './withdrawals/approval-sweep.ts',
+    './withdrawals/ports.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  // 27 SINCE SESSION 511, WHICH ADDED `./sweeps/ledger.ts`. It was 26 from
-  // session 431, which added `./batch/adapter.ts`, 25 from session 395, which
-  // added `./batch/state-writer.ts`, and 24 from session 387, which added
-  // `./recon/ports.ts` and `./recon/sweep.ts`. The number is here rather than
+  // 29 SINCE SESSION 516, WHICH ADDED `./withdrawals/approval-sweep.ts` AND
+  // `./withdrawals/ports.ts`. It was 27 from session 511, which added
+  // `./sweeps/ledger.ts`, 26 from session 431, which added `./batch/adapter.ts`,
+  // 25 from session 395, which added `./batch/state-writer.ts`, and 24 from
+  // session 387, which added `./recon/ports.ts` and `./recon/sweep.ts`. The
+  // number is here rather than
   // derived so that a leg DISAPPEARING is a failure and not a smaller list
   // nobody counted.
   //
-  // **IT COUNTS 27 OF THE BARREL'S 28 LEGS AND THE MISSING ONE IS A PROPERTY OF
+  // **IT COUNTS 29 OF THE BARREL'S 30 LEGS AND THE MISSING ONE IS A PROPERTY OF
   // THE REGEX ABOVE, STATED SO THE NEXT READER DOES NOT CALL IT A DROPPED LEG.**
   // The pattern requires a DIRECTORY segment, and session 431 also added
   // `./job.ts`, which sits at the top of `src/` because it is the deployable's
   // one job rather than one module of a subsystem. `test/digests.test.ts` case
   // 9.1 counts that leg, over `WORKER_BARREL_LEGS` itself and with no path shape
   // in its regex, so the leg is guarded; it is guarded there and not here.
-  expect(new Set(legs).size).toBe(27);
+  expect(new Set(legs).size).toBe(29);
 });

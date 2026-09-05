@@ -1,8 +1,19 @@
 // =============================================================================
 // apps/worker/test/event-sink.test.ts
 // =============================================================================
-// THE SEVEN CALL SITES, THE SEVEN NAMES, AND THE TWO FENCES BETWEEN THEM AND A
-// ROW. This deployable holds every `emit` call in the workspace and it holds no
+// THE NINE CALL SITES, THE NINE NAMES, AND THE TWO FENCES BETWEEN THEM AND A
+// ROW.
+//
+// **IT READ SEVEN AND SEVEN UNTIL SESSION 516 AND THE CASES BELOW WENT RED BY
+// SUCCEEDING, NOT BY DRIFTING** (ADR-325, ADR-305 section 7 slice 7). The `LT-06`
+// withdrawal-approval driver landed at `src/withdrawals/approval-sweep.ts` with
+// two emits and two registry names, `wallet.withdrawal_approved` and
+// `wallet.debited`. Every case is REWRITTEN and none is deleted or loosened:
+// section 1 keeps its exact per-file map, section 2 keeps its type-level
+// exhaustiveness and gains the fourth port's name union, and section 4's split
+// is still DERIVED from the producer's own file rather than named here. Both new
+// names land on the REFUSED side, so the finding this file exists for got
+// larger rather than smaller. This deployable holds every `emit` call in the workspace and it holds no
 // producer; `apps/api` holds the only producer and no door that can carry the
 // write. Neither half is a defect on its own and the pair is what makes the
 // sink unwirable from here, so this file makes both halves mechanical rather
@@ -63,6 +74,7 @@ import { expect, test } from 'vitest';
 import { BREAKER_STATE_CHANGED } from '../src/breaker/ports.ts';
 import type { DetectorEventName } from '../src/detectors/ports.ts';
 import type { ExpiryEventName } from '../src/sweeps/ports.ts';
+import type { ApprovalEventName } from '../src/withdrawals/ports.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '..', 'src');
@@ -96,7 +108,7 @@ function withoutComments(text: string): string {
 }
 
 // -----------------------------------------------------------------------------
-// 1. The seven call sites, counted rather than carried
+// 1. The nine call sites, counted rather than carried
 // -----------------------------------------------------------------------------
 // THE COUNT IS DERIVED AT RUN TIME AND THE MAP IS WRITTEN OUT, which is the
 // split ADR-034's remedy allows: the total is generated so it cannot drift, and
@@ -104,7 +116,7 @@ function withoutComments(text: string): string {
 // the thing a reader wants stated. A fourth file gaining an emit fails the map
 // rather than passing silently under a total nobody read.
 
-test('every `emit` in this workspace is in this deployable, and there are seven', () => {
+test('every `emit` in this workspace is in this deployable, and there are nine', () => {
   const byFile = new Map<string, number>();
   for (const path of sources()) {
     const hits = withoutComments(readFileSync(path, 'utf8')).match(/io\.events\.emit\(/g);
@@ -115,12 +127,20 @@ test('every `emit` in this workspace is in this deployable, and there are seven'
     'breaker/evaluate.ts': 1,
     'detectors/runner.ts': 3,
     'sweeps/expiry.ts': 3,
+    // ADR-325. THE APPROVAL AND THE DEBIT ARE TWO EMITS AND NOT ONE, because
+    // they are two rows of the registry: `wallet.withdrawal_approved` reports
+    // the transition and carries the composition, and `wallet.debited` reports
+    // the wallet's own statement and carries the ledger transaction. EVENTS 6.1
+    // rules that a debit has no provenance and that the composition it destroys
+    // is reported by the other row, so collapsing the two would put a plural
+    // answer on the row the registry says has none.
+    'withdrawals/approval-sweep.ts': 2,
   });
-  expect([...byFile.values()].reduce((a, b) => a + b, 0)).toBe(7);
+  expect([...byFile.values()].reduce((a, b) => a + b, 0)).toBe(9);
 });
 
 // -----------------------------------------------------------------------------
-// 2. The seven names, exhaustive at the type level
+// 2. The nine names, exhaustive at the type level
 // -----------------------------------------------------------------------------
 // THE RECORD IS KEYED BY THE UNION OF THE THREE PORTS' NAME TYPES, so a name
 // added to any of them is a COMPILE ERROR here rather than a case that keeps
@@ -128,7 +148,11 @@ test('every `emit` in this workspace is in this deployable, and there are seven'
 // hand-written array cannot have, and it is why the list is a `Record` and not
 // an array with a length assertion beside it.
 
-type EmittedName = ExpiryEventName | DetectorEventName | typeof BREAKER_STATE_CHANGED;
+type EmittedName =
+  | ExpiryEventName
+  | DetectorEventName
+  | ApprovalEventName
+  | typeof BREAKER_STATE_CHANGED;
 
 /**
  * Each name, against the module that SPELLS IT as a literal.
@@ -147,11 +171,17 @@ const EMITTED: Readonly<Record<EmittedName, string>> = {
   'detector.run_degraded': 'detectors/runner.ts',
   'flag.raised': 'detectors/runner.ts',
   'breaker.state_changed': 'breaker/ports.ts',
+  // ADR-325. BOTH ARE SPELLED IN THE PORT AND NOT AT THE CALL SITE, which is the
+  // breaker's row's shape one line up: `ApprovalEventName` is declared in
+  // `withdrawals/ports.ts` and `approval-sweep.ts` reaches the names through the
+  // event builders it exports.
+  'wallet.withdrawal_approved': 'withdrawals/ports.ts',
+  'wallet.debited': 'withdrawals/ports.ts',
 };
 
-test('seven distinct names, and each is spelled as a literal in its own module', () => {
+test('nine distinct names, and each is spelled as a literal in its own module', () => {
   const names = Object.keys(EMITTED);
-  expect(new Set(names).size).toBe(7);
+  expect(new Set(names).size).toBe(9);
 
   for (const [name, module] of Object.entries(EMITTED)) {
     const text = withoutComments(readFileSync(join(SRC, module), 'utf8'));
@@ -182,7 +212,7 @@ test('no relative specifier under src resolves outside apps/worker', () => {
 });
 
 // -----------------------------------------------------------------------------
-// 4. The producer's catalogue, read as text, holds five of the seven
+// 4. The producer's catalogue, read as text, holds five of the nine
 // -----------------------------------------------------------------------------
 // `RI-04` FORBIDS THE IMPORT, so the catalogue is parsed out of the file. THE
 // PARSE IS ASSERTED BEFORE IT IS USED, because a parse that quietly returns
@@ -206,7 +236,7 @@ function catalogueNames(): string[] {
   return names;
 }
 
-test('the producer one deployable over would accept five of these seven names', () => {
+test('the producer one deployable over would accept five of these nine names', () => {
   const catalogue = catalogueNames();
   // The parse, checked before anything rests on it.
   expect(catalogue).toHaveLength(10);
@@ -233,13 +263,29 @@ test('the producer one deployable over would accept five of these seven names', 
     'wallet.withdrawal_halt_released',
   ]);
 
-  // THE TWO THAT WOULD STILL THROW AT THE NAME, AND THEY ARE ONE KIND OF GAP.
-  // Neither has a row in EVENTS at all: `detector.run_degraded`'s payload is
-  // M07 section 5's and `breaker.state_changed`'s is M06's, both registered by
-  // sessions 300 and 320. Each needs an amendment to a frozen document and an
-  // ADR before any producer may carry it, and neither repair is inside this
-  // deployable.
-  expect(refused).toEqual(['breaker.state_changed', 'detector.run_degraded']);
+  // THE FOUR THAT WOULD STILL THROW AT THE NAME, AND THEY ARE TWO KINDS OF GAP.
+  //
+  // `detector.run_degraded` and `breaker.state_changed` HAVE NO ROW IN EVENTS AT
+  // ALL: the first's payload is M07 section 5's and the second's is M06's, both
+  // registered by sessions 300 and 320. Each needs an amendment to a frozen
+  // document and an ADR before any producer may carry it, and neither repair is
+  // inside this deployable.
+  //
+  // `wallet.withdrawal_approved` AND `wallet.debited` ARE THE OTHER KIND AND THE
+  // DIFFERENCE MATTERS (ADR-325). BOTH ARE ALREADY ROWS OF EVENTS, at 6.2 and
+  // 6.1, so nothing frozen has to move for them: what is missing is a
+  // transcription into `apps/api/src/events.ts`, exactly as `flag.raised` and
+  // `detector.run_completed` were missing until sessions 382 and 205 transcribed
+  // theirs. AND BOTH ROWS NAME `apps/api` AS THE PRODUCER, WHICH ADR-316 SECTION
+  // 8 FINDING 1 FINDS IS WRONG: ADR-305 section 4 holds that the approval edge
+  // cannot be driven from that deployable at all. So the transcription and the
+  // producer cell are owed to one row together, and this list is what says so.
+  expect(refused).toEqual([
+    'breaker.state_changed',
+    'detector.run_degraded',
+    'wallet.debited',
+    'wallet.withdrawal_approved',
+  ]);
 });
 
 // -----------------------------------------------------------------------------

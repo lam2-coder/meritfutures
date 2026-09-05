@@ -402,11 +402,99 @@ export type {
 // DECLARED BECAUSE THE MODULE EXISTS AND THE BARREL'S OWN SWEEP IS TOTAL, NOT
 // BECAUSE ANYTHING INSTALLS IT: `recordExpiryTransaction` has no caller under
 // `src/`, so `EXPIRY_LEDGER` refuses every handle it could be given today.
+// **AND SLICE 7 PUT A SECOND PORT BEHIND THE SAME DOOR (ADR-325).**
+// `ApprovalLedgerPort` is `LT-06`, and its adapter is in `sweeps/ledger.ts`
+// rather than beside the driver because the manifest's own
+// `//dependencies.@merit/ledger` key grants the capability to EXACTLY ONE FILE
+// and `apps/api/test/ledger-posting-authority.test.ts` asserts which. One door
+// per DEPLOYABLE, which is what ADR-165 set for `@merit/db` at `src/db.ts`.
+// `recordApprovalTransaction` has no caller under `src/` either, so
+// `APPROVAL_LEDGER` refuses every handle it could be given today.
 export {
+  APPROVAL_LEDGER,
+  ApprovalLedgerHandleUnknown,
   EXPIRY_LEDGER,
   ExpiryLedgerHandleUnknown,
+  recordApprovalTransaction,
   recordExpiryTransaction,
 } from './sweeps/ledger.ts';
+
+// -----------------------------------------------------------------------------
+// THE `LT-06` WITHDRAWAL-APPROVAL DRIVER (session 516, ADR-325)
+// -----------------------------------------------------------------------------
+// ADR-305 section 7 slice 7, ruled by ADR-316. `requested --> approved` and
+// `cooling --> approved`, the transition and the posting TOGETHER in one
+// transaction at `systemDb('nightly-batch')`, with `INV-M20-01`'s per-identity
+// lock around each one and the wallet debit inside it.
+//
+// **IT IS THE FIRST WRITER OF A `wallet_entries` ROW IN THIS APPLICATION**, so
+// `balance_after_cents >= 0` (`0011:90`) is exercised by a write for the first
+// time, and the first `wallet_entries` DEBIT carries NO provenance, which `0080`
+// made writable (ADR-322).
+//
+// **NOTHING SCHEDULES IT AND NOTHING WIRES IT.**
+// `UNWIRED_WITHDRAWAL_APPROVAL_IO` is the only `WithdrawalApprovalSweepIo` in
+// this tree and it refuses every call. Slice 8 is the clock and slice 9 is the
+// installation, and slice 9 MUST NOT BE DISPATCHED BEFORE A PAYMENT RAIL
+// EXISTS: past `approved` the only arrow is `transferring`, `packages/rail`
+// opens no socket, and `0072`'s `WD-C2` refuses `approved --> cancelled` at the
+// database, so a wired deployment would extinguish a wallet claim into a state
+// with no exit and no cancel. That is strictly worse for a trader than the 503
+// they get today. ADR-305 section 5 is the measurement.
+export {
+  APPROVABLE_STATUSES,
+  APPROVAL_GUARDS,
+  IDENTITY_STATUSES,
+  KYC_STATES,
+  MACHINE_APPROVAL_HOLDS,
+  WALLET_DIRECTIONS,
+  WITHDRAWAL_DEBIT_CAUSE,
+  ApprovalRowError,
+  currentKycState,
+  decideMachineApproval,
+  positionOf,
+  runWithdrawalApprovals,
+  toApprovalCandidateRow,
+  toApprovalDestinationRow,
+  toApprovalIdentityRow,
+  toApprovalWalletEntryRow,
+  walletDebitedEvent,
+  withdrawalApprovalsClean,
+  withdrawalApprovedEvent,
+} from './withdrawals/approval-sweep.ts';
+export type {
+  ApprovalCandidateRow,
+  ApprovalDestinationRow,
+  ApprovalGuard,
+  ApprovalIdentityRow,
+  ApprovalOutcome,
+  ApprovalWalletEntryRow,
+  IdentityApprovalOutcome,
+  IdentityStatus,
+  KycState,
+  MachineApprovalDecision,
+  MachineApprovalHold,
+  MachineApprovalValues,
+  WithdrawalApprovalReport,
+} from './withdrawals/approval-sweep.ts';
+
+export {
+  APPROVAL_TABLES,
+  UNWIRED_WITHDRAWAL_APPROVAL_IO,
+  WithdrawalApprovalUnwired,
+} from './withdrawals/ports.ts';
+export type {
+  ApprovalEvent,
+  ApprovalEventName,
+  ApprovalEventPort,
+  ApprovalFacts,
+  ApprovalFilter,
+  ApprovalLedgerPort,
+  ApprovalTable,
+  ApprovalTx,
+  ApprovalValues,
+  WithdrawalApprovalSweepIo,
+} from './withdrawals/ports.ts';
 
 // -----------------------------------------------------------------------------
 // THE STREAMING INGEST (session 299, `P6-f`)
@@ -1254,6 +1342,8 @@ export const WORKER_BARREL_LEGS = [
   './sweeps/expiry.ts',
   './sweeps/ledger.ts',
   './sweeps/ports.ts',
+  './withdrawals/approval-sweep.ts',
+  './withdrawals/ports.ts',
 ] as const;
 
 /**

@@ -1205,9 +1205,30 @@ describe('ADR-315: this job holds no ledger handle and the exclusion stays true 
     // naming the package is caught in `ledger-posting-authority.test.ts`, which
     // walks `src/` for it; this half is here because it is THIS suite's port
     // that the adapter had to satisfy without touching.
-    expect(source('../src/sweeps/ledger.ts')).toContain(
-      "import { lt01, postTransaction, readChart } from '@merit/ledger';",
+    //
+    // **IT WENT RED BY SUCCEEDING AND IS REWRITTEN RATHER THAN LOOSENED**
+    // (ADR-325). It read the whole import line as one string,
+    // `"import { lt01, postTransaction, readChart } from '@merit/ledger';"`,
+    // and ADR-305 section 7 slice 7 put a SECOND port behind the same door:
+    // `walletWithdrawalApprovalPosting` is `LT-06`'s builder and the withdrawal
+    // approval driver's adapter lives in this file for the reason the manifest's
+    // own `//dependencies.@merit/ledger` key states, that the grant reaches
+    // exactly one file.
+    //
+    // THE REPLACEMENT IS STRICTER AND NOT LOOSER: the old form asserted a set of
+    // three by pinning a line, and a fourth name would have failed it. This one
+    // pins the EXACT SET, so a name added silently fails and a name REMOVED
+    // fails too, which the old string could not have caught either.
+    const valueImport = /^import \{ ([^}]*) \} from '@merit\/ledger';$/m.exec(
+      source('../src/sweeps/ledger.ts'),
     );
+    expect(valueImport).not.toBeNull();
+    expect((valueImport?.[1] ?? '').split(', ')).toEqual([
+      'lt01',
+      'postTransaction',
+      'readChart',
+      'walletWithdrawalApprovalPosting',
+    ]);
   });
 
   // THE CORRECTED SHAPE, PINNED SO THAT A FILE SAYING TWO THINGS AGAIN IS RED.
