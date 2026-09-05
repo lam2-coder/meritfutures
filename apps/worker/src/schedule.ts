@@ -73,6 +73,17 @@
 // scheduler that starts a process to throw, so the blocker is the adapter and
 // the clock is downstream of it.
 //
+// **AND IT IS TRUE OF EVERY PORT EXCEPT TWO SINCE ADR-350, WHICH IS THE SAME
+// AMENDMENT A SECOND TIME AND IS KEPT BESIDE THE FIRST.**
+// `./batch/statistics-adapter.ts` implements `StatisticsPorts` over the one
+// door, so the statistics run is the second job on this list whose ports have a
+// live inhabitant. **IT IS THE FIRST ONE WHOSE ADAPTER IS PARTIAL ON PURPOSE**:
+// three of its nine methods refuse, and two of the three refuse because a
+// published statistic would otherwise be computed over a fact this estate cannot
+// produce. `runStatisticsRun` reads every fact set per window, so a refusal ends
+// the run rather than shrinking it, which is `FM-M12-02` holding by construction.
+// **THE CALLER CENSUS DID NOT MOVE**: `runStatisticsRun` still has none.
+//
 // **THE OPENING CLAUSE IS NOW TRUE OF EVERY PORT EXCEPT ONE AND IT IS KEPT
 // WHOLE, per `RI-14`.** ADR-338 wrote `./provisioning/queue-adapter.ts`, so
 // `ProvisioningJobQueue` has a live inhabitant and the provisioning saga is
@@ -164,7 +175,23 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'NO LIVE PORTS AND NO CALLER, and its own CRON_INVENTORY row already says so in its own ' +
       'words. Its two preconditions are the batch and the self-audit, and the second of those ' +
       'is unscheduled one row up, so scheduling this one first would publish off an unaudited ' +
-      'fold. ADR-122.',
+      'fold. ADR-122. ' +
+      'THE FIRST CLAUSE IS HALF FALSE NOW AND IS KEPT BESIDE ITS CORRECTION per RI-14. ADR-350 ' +
+      'wrote `./batch/statistics-adapter.ts`, so `StatisticsPorts` has an inhabitant that ' +
+      'reaches the real tables: four of the six read ports and the write port are SERVED. ' +
+      'WHAT KEEPS THIS ROW UNSCHEDULED IS FOUR THINGS AND THE ADAPTER IS NONE OF THEM. ' +
+      'ONE, there is still NO CALLER: no `src/` file calls `runStatisticsRun`. ' +
+      'TWO, the self-audit precondition above is unchanged, so `selfAuditGreen` can never be ' +
+      'established and every run would halt at `waiting` with `inputs_not_vouched`. ' +
+      'THREE, `statistic_definitions` has NO ROWS in this repository, no seed and no migration ' +
+      'that inserts one, so a run over a freshly migrated database halts at ' +
+      '`no_effective_definitions`. ' +
+      'FOUR, three ports REFUSE and two of those refuse because Merit cannot yet produce the ' +
+      "FACT the definition asks for: ST-02's denominator needs the plan's maximum plausible " +
+      'time-to-first-payout, which no column, plan rule or config row carries, and ST-06 needs ' +
+      'the trading day a rail settlement counts for, which no column carries and no document ' +
+      'rules. A clock in front of this job today is a process that pages every night and ' +
+      'publishes nothing, which is the ADR-239 defect in its other direction.',
   },
   {
     module: './breaker/evaluate.ts',
