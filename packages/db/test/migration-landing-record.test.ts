@@ -85,7 +85,50 @@ function estate(manifest: string | null, without: readonly string[] = []): strin
 }
 
 /**
- * The live manifest with one `## <n>.` section and everything under it removed.
+ * A row of section 16's section-number table, by the number in its key cell.
+ * The key may be bold, which most rows written since 2026-08-16 are.
+ */
+const claimRow = (number: string): RegExp =>
+  // MULTILINE, so the same pattern serves a per-line `test` and a whole-document
+  // `replace`. Without it `^` anchors to the start of the file and a `replace`
+  // over the manifest silently changes nothing, which the "changed nothing"
+  // assertions beside every use of it exist to catch.
+  new RegExp(String.raw`^\|\s*\*{0,2}${number}\*{0,2}\s*\|`, 'm');
+
+/**
+ * The live manifest with one number's CLAIM removed from section 16's
+ * section-number table, and nothing else touched.
+ *
+ * THE REMOVAL IS ASSERTED, on `withoutSection`'s rule one function down, and
+ * the row count is asserted too: a number this table claims TWICE is one the
+ * check reads as one member, so removing "the" row for it would be removing
+ * one of two and testing nothing. `21` is that number today and no case here
+ * takes it by accident.
+ */
+function withoutClaim(body: string, number: string): string {
+  const lines = body.split('\n');
+  const hits = lines
+    .map((text, index) => ({ text, index }))
+    .filter(({ text }) => claimRow(number).test(text));
+  expect(
+    hits.length,
+    `\`${number}\` is claimed by ${hits.length} row(s) and this helper takes exactly 1`,
+  ).toBe(1);
+  const out = lines.filter((_, index) => index !== hits[0]?.index).join('\n');
+  expect(out, `removing the claim on ${number} changed nothing`).not.toBe(body);
+  return out;
+}
+
+/**
+ * The live manifest with one `## <n>.` section, everything under it, AND its
+ * row in section 16's section-number table removed.
+ *
+ * THE CLAIM COMES OUT WITH THE SECTION AND THAT IS A FAITHFUL RECONSTRUCTION
+ * RATHER THAN A CONVENIENCE. Leg 4 runs in both directions, so a manifest with
+ * the heading gone and the row standing is not the tree as it stood before the
+ * section was written; it is a tree carrying an orphan claim, which is its own
+ * finding. Every section these cases remove had its row written in the same
+ * commit as the section, which is that table's own rule.
  *
  * THE REMOVAL IS ASSERTED RATHER THAN ATTEMPTED, on `data-model-nullability`'s
  * rule: a reconstruction that quietly changed nothing would test the REPAIRED
@@ -111,7 +154,29 @@ function withoutSection(body: string, number: string): string {
   }
   const out = [...lines.slice(0, from), ...lines.slice(to)].join('\n');
   expect(out, `removing section ${number} changed nothing`).not.toBe(body);
-  return out;
+  return withoutClaim(out, number);
+}
+
+/**
+ * The live manifest with extra `## <n>.` sections appended AND each of their
+ * numbers claimed in section 16's section-number table.
+ *
+ * THE SECOND HALF EXISTS BECAUSE OF LEG 4. A seed that appends a numbered
+ * heading and claims nothing is a seed testing two things at once, and its
+ * finding count stops being the number it was written to assert.
+ */
+function withSections(body: string, sections: readonly (readonly [number, string])[]): string {
+  let out = body;
+  for (const [number] of sections) {
+    const before = out;
+    out = out.replace(
+      /(\n### Section numbers\n[\s\S]*?\n\|---\|---\|---\|\n)/,
+      `$1| ${number} | seeded by this case | allocated |\n`,
+    );
+    expect(out, `claiming section ${number} changed nothing`).not.toBe(before);
+  }
+  const appended = sections.map(([number, heading]) => `## ${number}. ${heading}`).join('\n\n');
+  return `${out}\n${appended}\n`;
 }
 
 /**
@@ -147,8 +212,8 @@ const MIGRATION_NUMBERS_WITH_NO_SECTION = [
   '0074',
 ] as const;
 
-/** The smallest manifest the check accepts: one section-1 row, one heading. */
-const MINIMAL_MANIFEST = [
+/** The body of the smallest manifest the check accepts, without section 16. */
+const MINIMAL_BODY = [
   '## 1. The migration sequence',
   '',
   '| # | File | Money path | Contents |',
@@ -158,6 +223,36 @@ const MINIMAL_MANIFEST = [
   '## 13. `0028` lands, and this is the heading shape (2026-08-15)',
   '',
 ].join('\n');
+
+/**
+ * The smallest manifest the check accepts: one section-1 row, one landing
+ * heading, and section 16's section-number table claiming every number the
+ * body heads.
+ *
+ * IT BECAME A FUNCTION WHEN LEG 4 LANDED. The check now compares the file's
+ * numbered headings against that table in BOTH directions, and it THROWS on a
+ * manifest carrying landing sections and no such table, because a missing
+ * table would otherwise report every heading in the file as unclaimed and name
+ * the wrong defect. So a seed that adds a section names its number here and
+ * every seed's finding count stays equal to what the seed is about.
+ *
+ * SECTION 16 GOES LAST so a seeded section appended after this body does not
+ * land inside the table region, which ends at the next heading of either
+ * depth.
+ */
+const minimalManifest = (body = '', claims: readonly number[] = []): string =>
+  [
+    MINIMAL_BODY,
+    body,
+    '## 16. Allocation: `OI-nn` identifiers and section numbers',
+    '',
+    '### Section numbers',
+    '',
+    '| Section | Claimed by | State |',
+    '|---|---|---|',
+    ...[1, 13, 16, ...claims].map((n) => `| ${n} | a seed | allocated |`),
+    '',
+  ].join('\n');
 
 // -----------------------------------------------------------------------------
 // 1. THE LIVE TREE, and the reader watched discriminating
@@ -183,10 +278,20 @@ describe('RI-37 holds on this repository', () => {
   // list. ADR-335 wrote six sections and deleted six rows in one commit, and
   // ADR-336 wrote three and deleted three in one commit.
   test('the backlog register holds eleven migrations the manifest does not record', () => {
-    const closed = MIGRATION_NUMBERS_WITH_NO_SECTION.map(
-      (number) => `## 9${number}. \`${number}\` lands, seeded by this case (2026-09-05)`,
-    ).join('\n\n');
-    const found = findings(estate(`${liveManifest()}\n${closed}\n`));
+    const found = findings(
+      estate(
+        withSections(
+          liveManifest(),
+          MIGRATION_NUMBERS_WITH_NO_SECTION.map(
+            (number) =>
+              [
+                Number(`9${number}`),
+                `\`${number}\` lands, seeded by this case (2026-09-05)`,
+              ] as const,
+          ),
+        ),
+      ),
+    );
     expect(found).toHaveLength(MIGRATION_NUMBERS_WITH_NO_SECTION.length);
     expect(found).toHaveLength(11);
     for (const number of MIGRATION_NUMBERS_WITH_NO_SECTION) {
@@ -374,7 +479,7 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
   // only for the missing-record shape would never see it.
   test('a landing section for a migration that is not on disk is a finding', () => {
     const found = findings(
-      estate(`${MINIMAL_MANIFEST}\n## 99. \`9999\` lands, and no such file exists (2026-09-05)\n`),
+      estate(minimalManifest('## 99. `9999` lands, and no such file exists (2026-09-05)\n', [99])),
     );
     expect(found.join('\n')).toContain('records `9999` as landed');
     expect(found.join('\n')).toContain('carries no such file');
@@ -386,7 +491,9 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
   // exemption left standing behind a repair.
   test('a backlog entry whose gap has been closed is itself a finding', () => {
     const found = findings(
-      estate(`${liveManifest()}\n## 99. \`0073\` lands, seeded by this case (2026-09-05)\n`),
+      estate(
+        withSections(liveManifest(), [[99, '`0073` lands, seeded by this case (2026-09-05)']]),
+      ),
     );
     expect(found).toHaveLength(1);
     expect(found[0]).toContain('backlog register holds `0073`');
@@ -425,9 +532,12 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
   test('a four-digit table row OUTSIDE section 1 is not a landing record', () => {
     const found = findings(
       estate(
-        `${MINIMAL_MANIFEST}\n## 14. A section that is not the migration sequence (2026-08-16)\n\n` +
-          '| # | File | Money path | Contents |\n|---|---|---|---|\n' +
-          '| 0002 | `identity` | yes | a table of the same shape, one section over |\n',
+        minimalManifest(
+          '## 14. A section that is not the migration sequence (2026-08-16)\n\n' +
+            '| # | File | Money path | Contents |\n|---|---|---|---|\n' +
+            '| 0002 | `identity` | yes | a table of the same shape, one section over |\n',
+          [14],
+        ),
       ),
     );
     expect(found.join('\n')).toContain('0002_identity.sql is on disk');
@@ -437,13 +547,222 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
   // AND THE ROW INSIDE SECTION 1 IS READ, so the case above is about SCOPE and
   // not about the row parser having stopped matching.
   test('the same row INSIDE section 1 is a landing record', () => {
-    const manifest = MINIMAL_MANIFEST.replace(
+    const manifest = minimalManifest().replace(
       '| 0001 | `extensions_and_enums` | yes | a row of the migration sequence |',
       '| 0001 | `extensions_and_enums` | yes | a row |\n| 0002 | `identity` | yes | a row |',
     );
     const found = findings(estate(manifest));
     expect(found.join('\n')).not.toContain('for `0001`');
     expect(found.join('\n')).not.toContain('for `0002`');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 3b. LEG 4: the headings against section 16's own section-number table
+// -----------------------------------------------------------------------------
+// ADR-337. Section 16 is a SECTION-NUMBER ALLOCATION TABLE, written after three
+// sections were numbered `14` in one day, and until leg 4 nothing compared it to
+// the headings it allocates. Eight of its rows record that same omission and not
+// one could report it, and the drift grew to eight unclaimed numbers while they
+// did: sections 24, 26, 28 to 30 and 32 to 34.
+//
+// THE EIGHT ROWS THAT CLOSED IT ARE RECONSTRUCTED AWAY ONE AT A TIME, which is
+// section 2b's and 2c's pair on a different registry: remove the CLAIM and the
+// check must report that number, and the counterfactual is the same manifest
+// with the SECTION removed as well, on which no claim is owed.
+//
+// THE COUNTERFACTUAL HERE IS NOT "GREEN" AND SAYING SO WOULD BE FALSE. Removing
+// section 24 also removes `0046`'s only landing record, so leg 1 speaks. What
+// the counterfactual asserts is that LEG 4 falls silent, which is the property
+// under test, and it separates the two legs at the same time.
+const LEG_4_ROWS = [
+  ['24', '0046'],
+  ['26', '0048'],
+  ['28', '0051'],
+  ['29', '0064'],
+  ['30', '0065'],
+  ['32', '0067'],
+  ['33', '0075'],
+  ['34', '0076'],
+] as const;
+
+const UNCLAIMED = 'carries no row claiming';
+const UNTAKEN = 'section-number table claims';
+
+describe('RI-37 leg 4 goes red on each of the eight claims ADR-337 wrote', () => {
+  for (const [section, migration] of LEG_4_ROWS) {
+    test(`without the claim on section ${section} the check reports it`, () => {
+      const found = findings(estate(withoutClaim(liveManifest(), section)));
+      expect(found).toHaveLength(1);
+      expect(found[0]).toContain(`heads section \`${section}\``);
+      expect(found[0]).toContain(UNCLAIMED);
+      expect(found[0]).toContain(`\`${section}\``);
+    });
+
+    test(`COUNTERFACTUAL: without the claim AND without section ${section}, leg 4 is silent`, () => {
+      const found = findings(estate(withoutSection(liveManifest(), section)));
+      expect(found.filter((f) => f.includes(UNCLAIMED))).toEqual([]);
+      // AND THE OTHER LEG SPEAKS, which is what makes the counterfactual a
+      // separation of the two rather than a manifest nobody checked.
+      expect(found.join('\n')).toContain(`carries no landing record for \`${migration}\``);
+    });
+  }
+
+  // ALL EIGHT AT ONCE IS THE TREE THIS ROW WAS DISPATCHED AGAINST, and the
+  // count is the assertion: exactly eight, which is what the runner printed on
+  // `dc9a7b4a` before the rows were written.
+  test('THE TREE AS DISPATCHED: none of the eight claims, exactly eight findings', () => {
+    let body = liveManifest();
+    for (const [section] of LEG_4_ROWS) body = withoutClaim(body, section);
+    const found = findings(estate(body));
+    expect(found).toHaveLength(8);
+    for (const [section] of LEG_4_ROWS) {
+      expect(found.join('\n')).toContain(`heads section \`${section}\``);
+    }
+  });
+
+  // `27` IS THE ROW THIS TABLE DOES NOT OWE, and it is asserted rather than
+  // left to be inferred from a green run. It heads no section, so nothing
+  // claims it and leg 4 is silent about it in both directions. The `45` and
+  // `48` rows each wrote "26 to 30", which would have made this nine.
+  test('`27` heads no section and is owed no row', () => {
+    expect(liveManifest()).not.toContain('\n## 27.');
+    expect(findings(REPO_ROOT).join('\n')).not.toContain('`27`');
+  });
+});
+
+describe('RI-37 leg 4 runs in both directions', () => {
+  // A CLAIM WITH NO HEADING is what a renumbered or abandoned section leaves
+  // behind. The reservation objection does not reach it, because this table's
+  // own rule puts the claim in the commit that writes the section.
+  test('a claim on a number no heading takes is a finding', () => {
+    // FILTERED TO LEG 4 ON PURPOSE. The minimal manifest records `0001` and
+    // `0028` and nothing else, so leg 1 speaks for every other migration on
+    // disk; the seed is about the orphan claim and the assertion says so.
+    const found = findings(estate(minimalManifest('', [77]))).filter((f) => f.includes(UNTAKEN));
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('claims `77`');
+    expect(found[0]).toContain('renumbered or abandoned section leaves behind');
+  });
+
+  // AND A MIS-KEYED ROW IS THE CASE THAT PAYS FOR THE SECOND DIRECTION. One
+  // direction alone reports half of it and names neither number; both report
+  // two findings that point at each other.
+  test('a row typed with the wrong number is TWO findings that name each other', () => {
+    const body = liveManifest().replace(claimRow('34'), '| **99** |');
+    expect(body, 're-keying the `34` row changed nothing').not.toBe(liveManifest());
+    const found = findings(estate(body));
+    expect(found).toHaveLength(2);
+    expect(found.join('\n')).toContain('heads section `34`');
+    expect(found.join('\n')).toContain('claims `99`');
+  });
+});
+
+describe('RI-37 leg 4 reads the key column as a SET, which is how the ruled collision survives', () => {
+  // THE TRAP THIS ROW WAS DISPATCHED WITH. Section 16 carries TWO rows claiming
+  // `21` and rules in terms that neither is renumbered, because renumbering
+  // breaks every citation of whichever one moves. The check must tolerate that
+  // recorded collision, and it does so by reading the key column as a set
+  // rather than by knowing about `21`.
+  test('the live manifest claims `21` twice and heads `## 21.` twice, and holds', () => {
+    const rows = liveManifest()
+      .split('\n')
+      .filter((line) => claimRow('21').test(line));
+    expect(rows).toHaveLength(2);
+    expect(
+      liveManifest()
+        .split('\n')
+        .filter((line) => line.startsWith('## 21.')),
+    ).toHaveLength(2);
+    expect(findings(REPO_ROOT)).toEqual([]);
+  });
+
+  // MULTIPLICITY IS NOT READ, EXECUTED. Taking one of the two `21` rows away
+  // leaves the number claimed and the check green, which is the rule and not a
+  // special case: a future duplicate is tolerated the same way.
+  test('taking ONE of the two `21` rows away leaves the check green', () => {
+    const body = liveManifest().replace(claimRow('21'), '| **21 REMOVED BY THIS CASE**x |');
+    expect(body, 'blanking one `21` row changed nothing').not.toBe(liveManifest());
+    expect(
+      body.split('\n').filter((line) => claimRow('21').test(line)),
+      'exactly one `21` row must remain',
+    ).toHaveLength(1);
+    expect(findings(estate(body))).toEqual([]);
+  });
+
+  // AND THE TOLERANCE IS NOT A HOLE. Take BOTH rows away and the number is
+  // unclaimed, reported ONCE for the two headings that take it, because the
+  // heading side is a set too.
+  test('taking BOTH `21` rows away is exactly one finding', () => {
+    const body = liveManifest()
+      .split('\n')
+      .filter((line) => !claimRow('21').test(line))
+      .join('\n');
+    const found = findings(estate(body));
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('heads section `21`');
+  });
+
+  // THE SAME SENTENCE FROM THE HEADING SIDE. `## 14.` heads THREE sections on
+  // ONE claimed number, which the `14` row records as "CLAIMED THREE TIMES".
+  // Removing that one row is one finding and not three.
+  test('`## 14.` heads three sections on one row, and losing it is one finding', () => {
+    expect(
+      liveManifest()
+        .split('\n')
+        .filter((line) => line.startsWith('## 14.')),
+    ).toHaveLength(3);
+    const found = findings(estate(withoutClaim(liveManifest(), '14')));
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('heads section `14`');
+  });
+});
+
+describe('RI-37 leg 4 excludes a lettered heading by the table`s own rule', () => {
+  // `4a` IS A SECTION AND NOT A NUMBER, which section 16 states in terms: "A
+  // lettered section deliberately claims no number ... adding rows for them
+  // would make the table's own key ambiguous between a number and a name."
+  // `4a`, `4b` and `4c` head six sections between them and none is owed a row.
+  test('the live manifest heads six lettered sections and owes no row for any', () => {
+    const lettered = liveManifest()
+      .split('\n')
+      .filter((line) => /^## \d+[a-z]+\./.test(line));
+    expect(lettered).toHaveLength(6);
+    expect(findings(REPO_ROOT)).toEqual([]);
+  });
+
+  test('a NEW lettered section with no row is not a finding', () => {
+    const found = findings(
+      estate(`${liveManifest()}\n## 4d. A lettered section, seeded by this case (2026-09-05)\n`),
+    );
+    expect(found).toEqual([]);
+  });
+
+  // AND THE DISCRIMINATOR, because an exclusion and a dead reader look the
+  // same on a green run. The same seed with a NUMBER instead of a letter is a
+  // finding, so the exemption is about the letter.
+  test('the same section with a NUMBER instead of a letter IS a finding', () => {
+    const found = findings(
+      estate(`${liveManifest()}\n## 49. A numbered section, seeded by this case (2026-09-05)\n`),
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('heads section `49`');
+  });
+});
+
+describe('RI-37 leg 4 expands the range row', () => {
+  // `1 to 13` IS ONE ROW CLAIMING THIRTEEN NUMBERS, which is why a reader
+  // counting ROWS against headings answers the wrong question. Narrow it to a
+  // single `1` and the twelve numbers it stops covering are reported.
+  test('narrowing `1 to 13` to `1` reports sections 2 to 13', () => {
+    const body = liveManifest().replace(claimRow('1 to 13'), '| 1 |');
+    expect(body, 'narrowing the range row changed nothing').not.toBe(liveManifest());
+    const found = findings(estate(body));
+    expect(found).toHaveLength(12);
+    for (let n = 2; n <= 13; n += 1) {
+      expect(found.join('\n')).toContain(`heads section \`${n}\``);
+    }
+    expect(found.join('\n')).not.toContain('heads section `1`,');
   });
 });
 
@@ -481,13 +800,31 @@ describe('RI-37 refuses to report on a tree it did not read', () => {
     ).toThrow(/no `## <n>.` landing section/);
   });
 
+  // LEG 4's TWO SENTINELS, and they are the same argument as the three above.
+  // A manifest with landing sections and no allocation table, or a table this
+  // reader can no longer parse a row out of, would report every numbered
+  // heading in the file as unclaimed. That is loud AND wrong, which is the
+  // direction this project can least afford.
+  test('a manifest with no section-number table THROWS rather than reporting every heading', () => {
+    expect(() => findings(estate(MINIMAL_BODY))).toThrow(/no `### Section numbers` table/);
+  });
+
+  test('a section-number table this reader parses no row out of THROWS', () => {
+    const emptied = minimalManifest()
+      .split('\n')
+      .filter((line) => !/^\| \d+ \| a seed \|/.test(line))
+      .join('\n');
+    expect(emptied, 'emptying the seeded table changed nothing').not.toBe(minimalManifest());
+    expect(() => findings(estate(emptied))).toThrow(/parsed no row out of/);
+  });
+
   test('a migrations directory with no `nnnn_*.sql` THROWS', () => {
     const root = mkdtempSync(join(tmpdir(), 'merit-landing-record-nosql-'));
     seeded.push(root);
     mkdirSync(join(root, MIGRATIONS), { recursive: true });
     writeFileSync(join(root, MIGRATIONS, 'README.md'), 'not a migration\n');
     mkdirSync(join(root, 'packages/db'), { recursive: true });
-    writeFileSync(join(root, MANIFEST), MINIMAL_MANIFEST);
+    writeFileSync(join(root, MANIFEST), minimalManifest());
     expect(() => findings(root)).toThrow(/found no `nnnn_\*\.sql`/);
   });
 });
