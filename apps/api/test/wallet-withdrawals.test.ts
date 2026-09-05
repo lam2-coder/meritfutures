@@ -57,6 +57,7 @@ import {
 import {
   SESSION_COOKIE,
   UNWIRED_AUTH_BACKEND,
+  authorize,
   resetAuthBackend,
   useAuthBackend,
   type AuthBackend,
@@ -69,6 +70,7 @@ import {
   CREATED_STATUSES,
   DESTINATION_COOLING_WINDOW_MS,
   IDENTITY_RESTRICTED,
+  INSTALL_BLOCKING_FINDINGS,
   INSUFFICIENT_FUNDS,
   KYC_REQUIRED,
   MINIMUM_WITHDRAWAL_CENTS,
@@ -88,6 +90,7 @@ import {
   centsToJson,
   composeWithdrawal,
   coolingDecision,
+  currentWithdrawalBackend,
   databaseWithdrawalBackend,
   decideWithdrawal,
   currentKycState,
@@ -1892,6 +1895,119 @@ describe('the terminal edge, and the two thirds of it that are not built', () =>
       "NEW.status = 'cancelled' AND OLD.status NOT IN ('requested', 'cooling')",
     );
     expect(wdc2).toContain('ADD COLUMN cancelled_at timestamptz NULL');
+  });
+});
+
+describe('why the complete adapter is not installed, RUN rather than read (ADR-342)', () => {
+  it('names three findings and every source resolves to a real file', () => {
+    // THE FIRST WAY THIS KIND OF ENTRY ROTS IS A POINTER AT A FILE THAT MOVED,
+    // which is `TERMINAL_EDGE_FINDINGS`' own first case one section above and
+    // the reason both entries carry `sources` at all.
+    expect(INSTALL_BLOCKING_FINDINGS.map((finding) => finding.id)).toStrictEqual(['D', 'E', 'F']);
+    for (const finding of INSTALL_BLOCKING_FINDINGS) {
+      expect(finding.claim.length, `${finding.id} has too short a claim`).toBeGreaterThan(120);
+      expect(finding.ruled.length, `${finding.id} has no disposition`).toBeGreaterThan(80);
+      for (const source of finding.sources)
+        expect(existsSync(join(REPO, source)), `${finding.id} cites a missing ${source}`).toBe(
+          true,
+        );
+    }
+  });
+
+  it('RUNS finding D: the approval sweep has a driver and no IO adapter', () => {
+    // THE HALF THAT IS DISCHARGED IS ASSERTED FIRST, because the claim this
+    // port carried for four corrections was that the driver did not exist, and
+    // a test that only watched the blocker would let that sentence come back.
+    const sweep = readFileSync(
+      join(REPO, 'apps', 'worker', 'src', 'withdrawals', 'approval-sweep.ts'),
+      'utf8',
+    );
+    expect(sweep).toContain('export async function runWithdrawalApprovals');
+
+    // AND THE BLOCKER, which is the IO and not the decision. A second value of
+    // this type appearing anywhere outside the port's own fail-closed default
+    // is the adapter landing, and this goes red on the day it does.
+    const declarations = [join(REPO, 'apps'), join(REPO, 'packages')]
+      .flatMap(sourceFiles)
+      .filter((path) => !path.includes('/test/') && !path.endsWith('.test.ts'))
+      .filter((path) => /:\s*WithdrawalApprovalSweepIo\s*=/.test(readFileSync(path, 'utf8')));
+
+    expect(declarations.map((path) => path.slice(REPO.length + 1))).toStrictEqual([
+      'apps/worker/src/withdrawals/ports.ts',
+    ]);
+
+    // AND THE CLOCK, which is the second half of the same absence. The job is
+    // registered and carries `unscheduled`, so nothing runs the driver even
+    // once an IO adapter exists.
+    const schedule = readFileSync(join(REPO, 'apps', 'worker', 'src', 'schedule.ts'), 'utf8');
+    const row = /\{[^{}]*runWithdrawalApprovals[^{}]*\}/s.exec(schedule)?.[0];
+    expect(row, 'no schedule row names `runWithdrawalApprovals`').toBeDefined();
+    expect(row).toContain("disposition: 'unscheduled'");
+  });
+
+  it('RUNS the correction inside finding D: the `LT-06` builder and the manifest line exist', () => {
+    // `wiring.test.ts`'s entry recorded `F1` as "@merit/ledger publishes no
+    // LT-06 builder" and `F2` as a manifest line the worker was owed. BOTH ARE
+    // DISCHARGED and this case is what stops either sentence returning: it
+    // asserts the positive, so a session restating the absence lands red.
+    const index = readFileSync(join(REPO, 'packages', 'ledger', 'src', 'index.ts'), 'utf8');
+    expect(index).toContain('walletWithdrawalApprovalPosting');
+
+    const manifest: unknown = JSON.parse(
+      readFileSync(join(REPO, 'apps', 'worker', 'package.json'), 'utf8'),
+    );
+    const dependencies = (manifest as { dependencies?: Record<string, string> }).dependencies ?? {};
+    expect(Object.keys(dependencies)).toContain('@merit/ledger');
+
+    // AND THE POSTING SITE, which is what makes the two above load bearing
+    // rather than merely present.
+    const adapter = readFileSync(
+      join(REPO, 'apps', 'worker', 'src', 'sweeps', 'ledger.ts'),
+      'utf8',
+    );
+    expect(adapter).toContain('walletWithdrawalApprovalPosting(facts)');
+  });
+
+  it('RUNS finding E: C-27 refuses every caller before this file s handler runs', () => {
+    // THE DECLARATION, which is the endpoint's own and is data rather than
+    // prose, on both rows.
+    for (const spec of WITHDRAWAL_ENDPOINTS)
+      expect(spec.required, `${spec.method} ${spec.path}`).toBe('passkey or dual_channel');
+
+    // THE GATE, EXECUTED. A session that carries a factor but is not elevated
+    // is FORBIDDEN, and one that is elevated is allowed, so this is the pair
+    // rather than a refusal that would pass against a gate refusing everything.
+    const base = { identityId: 'i-1', userId: 'u-1' } as unknown as AuthSession;
+    const plain = { ...base, elevatedAt: null, elevatedByFactor: null } as AuthSession;
+    const elevated = {
+      ...base,
+      elevatedAt: '2026-09-05T00:00:00.000Z',
+      elevatedByFactor: 'passkey',
+    } as AuthSession;
+
+    expect(authorize(plain, 'passkey or dual_channel').outcome).toBe('forbidden');
+    expect(authorize(elevated, 'passkey or dual_channel').outcome).toBe('allowed');
+
+    // AND WHY NO SESSION CAN BE THE SECOND ONE IN A DEPLOYMENT: the installed
+    // auth adapter declares `elevate` blocked, on both arms. The day either
+    // arm lands, this goes red and finding E is due its re-read, which is the
+    // trap the finding exists to set.
+    const authBackend = readFileSync(join(REPO, 'apps', 'api', 'src', 'auth-backend.ts'), 'utf8');
+    expect(authBackend).toMatch(/elevate:\s*blocked\(/);
+  });
+
+  it('RUNS the refusal itself: `start.ts` installs no withdrawal backend', () => {
+    // THE ASSERTION THIS ROW WAS DISPATCHED TO CHANGE AND DID NOT, kept as a
+    // control rather than as a sentence in an ADR. `wiring.test.ts` counts the
+    // ports; this case names the one port and the reason, beside the findings
+    // that hold it, so a later install has to walk past both.
+    const start = readFileSync(join(REPO, 'apps', 'api', 'src', 'start.ts'), 'utf8');
+    expect(start).not.toContain('useWithdrawalBackend');
+
+    // AND THE PORT IS FAIL CLOSED WITH NOTHING INSTALLED, which is what makes
+    // the line above a refusal rather than an omission.
+    resetWithdrawalBackend();
+    expect(currentWithdrawalBackend()).toBe(UNWIRED_WITHDRAWAL_BACKEND);
   });
 });
 
