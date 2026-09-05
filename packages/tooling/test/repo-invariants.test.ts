@@ -29,6 +29,7 @@ import {
 } from '../checks/repo-invariants.mjs';
 import { ri11 } from '../checks/ui-server-endpoints.mjs';
 import { SUBJECTS } from '../checks/response-shape-copies.mjs';
+import { ABSENCE_CLAIMS } from '../checks/absence-claims.mjs';
 
 // =============================================================================
 // EACH INVARIANT IS WATCHED FAILING BEFORE IT IS TRUSTED
@@ -651,9 +652,78 @@ function cleanTree(): string {
       'export const read = stripComments;\n',
   );
 
+  absenceClaimEstate(root);
+
   execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
   write(root, '.gitignore', '.env\n.env.*\n!.env.example\n');
   return root;
+}
+
+/**
+ * RI-35's estate, which the fixture must carry for the same reason RI-30's does.
+ *
+ * That check's probes THROW rather than fall silent on a tree they cannot read,
+ * on ADR-294's rule that a check which cannot run is not a check that passed. So
+ * a fixture missing a manifest, the migration set or the `@merit/db` barrel
+ * makes RI-35 ERROR on every case in this file, which is the guard working and
+ * the fixture wrong: the trap RI-14's three files, RI-20's two, RI-22's three
+ * and RI-30's estate each set while they were being written.
+ *
+ * THE CLAIM SITES ARE DERIVED FROM THE REGISTER AND THE ARTIFACTS ARE NOT. The
+ * sites are the register's own data, so materialising them from it keeps this
+ * helper true when a claim is added. What makes each artifact PRESENT or ABSENT
+ * is a SECOND implementation of what the probes read, on this file's own rule
+ * for RI-22's mint: a fixture that keeps a copy of the mechanism under test goes
+ * stale in step with it and cannot fail.
+ *
+ * EVERY ARTIFACT IS PUT IN THE STATE THE REGISTER'S DISPOSITIONS DEMAND. The
+ * seven `retired` claims need their artifact PRESENT, so the migration set
+ * carries the three migrations, `apps/worker` declares `@merit/queue` and the
+ * `@merit/db` barrel exports both halves; the eight `live` ones need theirs
+ * ABSENT, so no `src/` file imports the queue, `apps/api` and `packages/db`
+ * declare it in no manifest, and nothing calls `runProvisioningSaga`.
+ */
+function absenceClaimEstate(root: string): void {
+  write(root, 'apps/api/package.json', '{ "name": "@merit/api", "private": true }\n');
+  write(root, 'packages/db/package.json', '{ "name": "@merit/db", "private": true }\n');
+  write(
+    root,
+    'apps/worker/package.json',
+    '{ "name": "@merit/worker", "private": true,\n' +
+      '  "dependencies": { "@merit/queue": "workspace:*" } }\n',
+  );
+  appendTo(root, 'packages/db/src/index.ts', 'export {\n  transaction,\n  type SqlExecutor,\n};\n');
+  write(
+    root,
+    'packages/db/migrations/0078_affiliate_commission_owner.sql',
+    'ALTER TABLE affiliate_commissions ADD COLUMN affiliate_id uuid NOT NULL;\n',
+  );
+  write(
+    root,
+    'packages/db/migrations/0079_pgboss_job_store.sql',
+    'CREATE SCHEMA IF NOT EXISTS pgboss;\n',
+  );
+  write(
+    root,
+    'packages/db/migrations/0082_pgboss_app_grants.sql',
+    'GRANT USAGE ON SCHEMA pgboss TO merit_app;\n',
+  );
+
+  /** Every registered claim, grouped by the site that carries it. */
+  const bySite = new Map<string, string[]>();
+  for (const claim of ABSENCE_CLAIMS) {
+    const seen = bySite.get(claim.site) ?? [];
+    seen.push(claim.claim);
+    bySite.set(claim.site, seen);
+  }
+  // APPENDED AND NEVER WRITTEN. `packages/db/src/scoped-db.ts` already carries
+  // RI-16's citation fixture, and overwriting it would be one check's fixture
+  // quietly deleting another's -- which is the note above `appendTo`'s use for
+  // API_CONTRACT.md, arriving a second time.
+  for (const [site, claims] of bySite) {
+    mkdirSync(join(root, site, '..'), { recursive: true });
+    appendTo(root, site, `${claims.map((claim) => `// ${claim}`).join('\n')}\n`);
+  }
 }
 
 const check = (id: string) => {

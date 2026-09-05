@@ -16,7 +16,7 @@
 // intention. `test/surface.test.ts` asserts the containment by reading the tree.
 //
 // -----------------------------------------------------------------------------
-// IT HOLDS NO CONNECTION, AND THE THING IT NEEDS DOES NOT EXIST YET
+// IT HOLDS NO CONNECTION, AND WHAT SUPPLIES ONE EXISTS
 // -----------------------------------------------------------------------------
 // `pgBossQueue(executor)` takes its connection as an argument and `enqueue`
 // takes the caller's transaction as its first parameter, so this package opens
@@ -24,15 +24,36 @@
 // because "a transaction is per-connection, so a second driver is a second pool
 // and that consequence stops being implementable."
 //
-// `@merit/db` CANNOT SUPPLY EITHER ONE TODAY, and that is ADR-086 section 6's
-// finding rather than a gap this package worked around. Its public surface is
-// `scopedDb`, `systemDb`, `scopePredicate`, the scope registry, the schema and
-// `closeClient`; `client()` is deliberately unexported and ADR-084 section 9
-// rules it permanently so; and NOTHING on that surface runs a transaction or
-// yields a SQL executor. So there is no second pool here and there is also no
-// first one: what lands is the interface, its adapter and the suite that proves
-// the enqueue joins the transaction it is given. The wiring waits on one export
-// from a package this session's fence does not hold.
+// `@merit/db` SUPPLIES BOTH HALVES TODAY, AND THE HALVES ARE NOT IN THE SAME
+// STATE. `transaction()` is exported from that package's barrel and is the only
+// producer of `SqlExecutor`, which is structurally the `JobTransaction` this
+// package's `enqueue` declares, so an enqueue riding the caller's transaction
+// is buildable and `apps/worker`'s `enqueueProvisioningOp` calls a port shaped
+// for it (ADR-102). The CONSTRUCTOR half is supplied and MEASURED UNUSABLE:
+// `sqlExecutorOn` returns `{ rows: result.rows }`, every one of pg-boss's
+// `locked()` plans is a multi-statement string, and `pg` resolves those to a
+// `Result[]` whose `.rows` is `undefined`, so a supervisor built on it throws
+// inside its monitor phase. ADR-327 section 9 finding 1 measured that and it
+// does not touch `enqueue`, whose one admitted `SqlExecutorReason` is
+// `job-enqueue`. `client()` stays unexported and ADR-084 section 9 rules it
+// permanently so, so there is still no second pool here.
+//
+// **THIS HEADING READ "IT HOLDS NO CONNECTION, AND THE THING IT NEEDS DOES NOT
+// EXIST YET", AND UNDER IT: "`@merit/db` CANNOT SUPPLY EITHER ONE TODAY ... its
+// public surface is `scopedDb`, `systemDb`, `scopePredicate`, the scope
+// registry, the schema and `closeClient` ... and NOTHING on that surface runs a
+// transaction or yields a SQL executor."** ADR-102 falsified every clause of it
+// and nothing went red. It is the FIFTH site of the defect ADR-324, ADR-326 and
+// ADR-327 each repaired once by hand, and it is kept beside its correction
+// rather than deleted, per RI-14. `RI-35` binds it: the sentence is registered
+// as retired against the two exports that falsified it, so a tree where they
+// went away turns the correction red instead of leaving it to be believed.
+//
+// WHAT IS STILL ABSENT IS THE DOOR AND NOT THE SUPPLY.
+// NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`. It is in `apps/worker`'s
+// manifest since ADR-327 and reaches no `src/` file there, so what ships from
+// here is the interface, its adapter and the suite that proves the enqueue
+// joins the transaction it is given. `RI-35` holds that sentence to the tree.
 
 export { JOB_QUEUE_METHODS } from './job-queue.ts';
 export type {
