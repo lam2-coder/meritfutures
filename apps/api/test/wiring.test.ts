@@ -1067,12 +1067,21 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'OPERATOR ROUTE AND IT IS BEHIND THE SSO PURCHASE: every admin mutation resolves its ' +
     'principal through `setAdminSessionSource`, `operators` still has no writer, the table is ' +
     'STILL EMPTY and the door STILL THROWS. This port is not wired and nothing here wires it. ' +
-    '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1539`) ABOUT THE SAME ' +
+    '`databaseAuthBackend` STILL REFUSES `readMe` (`src/auth-backend.ts:1576`) ABOUT THE SAME ' +
     'NUMBER AND IS ONE FINDING WITH THIS ONE AGAIN: ADR-252 found the two had STOPPED being one ' +
     'finding, because this port needed a catalogue admission and that one did not; ADR-265 built ' +
     'a named door instead of taking the admission, so the construction half is gone from both ' +
     'and the empty table is all that is left of either. THE DIFFERENCE BETWEEN THEM WAS THE ' +
-    'DOOR AND THERE IS ONE DOOR. THE PORT IS NOT WIRED AND `effectiveAccountCap` IS CALLED ' +
+    'DOOR AND THERE IS ONE DOOR. ' +
+    'ADR-341 NARROWED WHAT "ONE FINDING" MEANS AND DID NOT DISSOLVE IT: the two ports are one ' +
+    'finding ABOUT THE CAP, and they are not one finding about their endpoints, because ' +
+    '`readMe` carries two further blockers this cap has nothing to do with (`Me.kyc.placement` ' +
+    'and `Me.accounts_count`, both run by `test/me-blockers.test.ts`). SO CLOSING THE CAP ' +
+    'CLOSES THIS CLAUSE HERE AND DOES NOT OPEN `GET /me`. ADR-341 also found what `0076` ' +
+    'already required of the cap row and neither entry had said: two distinct `owner` operators ' +
+    'on a `dual_control_approvals` row plus an `admin_actions` row, so the cap arrives at deploy ' +
+    'time through that control rather than in any migration. ' +
+    'THE PORT IS NOT WIRED AND `effectiveAccountCap` IS CALLED ' +
     'NOWHERE IN `apps/api`: `grep -rn effectiveAccountCap apps/api/src` returns 4 lines and ' +
     'every one of them is prose. ' +
     'THE CROSS-IDENTITY READ THIS ENTRY CARRIED SECOND IS DISCHARGED AND IS DELETED RATHER ' +
