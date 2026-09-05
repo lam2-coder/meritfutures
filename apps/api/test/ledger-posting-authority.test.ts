@@ -197,6 +197,18 @@ test('no migration is taken by this entry: none names ADR-270', () => {
 //      identity through `recordExpiryTransaction`, which HAS NO CALLER. So the
 //      map is empty in every deployment and the third call site refuses every
 //      handle it could be given. The `API_START` assertions are untouched.
+//
+//      **THE `recordExpiryTransaction` CLAUSE WENT FALSE ON 2026-09-05 AND IS
+//      KEPT BESIDE ITS CORRECTION, per `RI-14`.** ADR-344 wrote
+//      `apps/worker/src/sweeps/expiry-adapter.ts`, which calls the recorder
+//      inside `WorkerDb.batch`'s callback, so the recorder now has EXACTLY ONE
+//      caller and the case below pins the list at that one file rather than at
+//      the empty list. **THE PROPERTY THIS CASE IS NAMED FOR SURVIVES INTACT
+//      AND THE REASON MOVED ONE STEP OUT**: nothing calls `expirySweepIo`, so
+//      no `ExpirySweepIo` is constructed in any deployment, so no transaction
+//      is ever recorded, so the map is still empty and the third call site
+//      still refuses every handle it could be given. That is asserted below
+//      rather than argued, because it is the load-bearing half now.
 
 test('exactly two deployables may name the posting library, and the worker grant reaches one file', () => {
   // ADR-305 SECTION 7 SLICE 6 CROSSED THE BOUNDARY THIS CASE USED TO ASSERT,
@@ -336,9 +348,13 @@ test('no deployment of Merit can post a ledger entry: three call sites, all unwi
   // worker's is unreachable for a reason one level further in, and it is the
   // adapter's own mechanism rather than an omission. `postLt01` recovers its
   // `LedgerTx` by the IDENTITY of the `ExpiryTx` it is given (ADR-315), and the
-  // only thing that records one is `recordExpiryTransaction`. NOTHING CALLS IT,
-  // so the map is empty in every deployment of this code and every handle the
-  // adapter could be given is refused.
+  // only thing that records one is `recordExpiryTransaction`.
+  //
+  // **`NOTHING CALLS IT` WAS TRUE UNTIL ADR-344 AND IS KEPT BESIDE ITS
+  // CORRECTION per `RI-14`.** `sweeps/expiry-adapter.ts` calls the recorder
+  // inside `WorkerDb.batch`'s callback, and the list below is EXACT rather than
+  // widened to a `toContain`: a SECOND recorder is a decision somebody takes
+  // here, exactly as the empty list made the first one one.
   const recorders = walk('apps', 'worker', 'src')
     .filter((path) =>
       readFileSync(path, 'utf8')
@@ -349,7 +365,32 @@ test('no deployment of Merit can post a ledger entry: three call sites, all unwi
     )
     .map((path) => path.slice(ROOT.length + 1))
     .sort();
-  expect(recorders).toEqual([]);
+  expect(recorders).toEqual(['apps/worker/src/sweeps/expiry-adapter.ts']);
+
+  // AND THE PROPERTY THE EMPTY LIST USED TO CARRY, ASSERTED WHERE IT MOVED TO.
+  // A recorder with a caller only records when something CONSTRUCTS the io and
+  // opens a transaction through it. Nothing does: `expirySweepIo` has no caller
+  // under any `src/` in this workspace, because this deployable has no event
+  // sink to pass it and the factory takes one as a REQUIRED argument. So the
+  // `WeakMap` is empty in every deployment of this code and every handle
+  // `postLt01` could be given is still refused, which is what case 3's name
+  // claims. Comments are stripped, on the same reasoning as the two scans
+  // above: this repository's headers name the factory in prose constantly.
+  const constructors = walk('apps', 'worker', 'src')
+    .filter((path) =>
+      readFileSync(path, 'utf8')
+        .split('\n')
+        .some(
+          (line) =>
+            line.includes('expirySweepIo(') &&
+            !line.trimStart().startsWith('*') &&
+            !line.trimStart().startsWith('//') &&
+            !line.includes('export function expirySweepIo('),
+        ),
+    )
+    .map((path) => path.slice(ROOT.length + 1))
+    .sort();
+  expect(constructors).toEqual([]);
   // And the default `ExpirySweepIo` still refuses rather than serving.
   expect(read('apps', 'worker', 'src', 'sweeps', 'ports.ts')).toContain(
     "ledger: { postLt01: () => Promise.reject(new ExpirySweepUnwired('ledger.postLt01')) },",
