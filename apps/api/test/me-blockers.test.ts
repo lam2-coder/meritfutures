@@ -111,7 +111,7 @@ const session = (): AuthSession => ({
   identityId: ALICE,
   userId: ALICE,
   authFactor: 'email_otp',
-  elevated: false,
+  elevatedAt: null,
   elevatedByFactor: null,
 });
 
