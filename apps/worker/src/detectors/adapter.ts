@@ -104,8 +104,8 @@
 
 import { randomUUID } from 'node:crypto';
 
+import { atLeast, atMost, isNull } from '../db.ts';
 import type { WorkerDb } from '../db.ts';
-import { WORKER_TERMS } from '../db.ts';
 import { canaryNonce } from './canary.ts';
 import type { CanaryNonce } from './canary.ts';
 import { DETECTOR_READ_TABLES, DETECTOR_WRITE_TABLES } from './ports.ts';
@@ -335,11 +335,14 @@ export function postgresDetectorRunnerIo(
 ): DetectorRunnerIo {
   return {
     transact: postgresDetectorTransact(db),
-    // THE ACCESSOR'S OWN CONSTRUCTORS, PASSED THROUGH AND NOT WRAPPED. A term is
-    // a term only if `packages/db` minted it (`isFilterTerm` reads identity
-    // rather than shape), so there is nothing this file could usefully add and a
-    // wrapper would be a second place the null-bound refusal could drift from.
-    terms: WORKER_TERMS,
+    // THE ACCESSOR'S OWN CONSTRUCTORS, REACHED BY NAME THROUGH THE ONE DOOR AND
+    // NOT WRAPPED, which is `sweeps/expiry-adapter.ts`'s idiom one directory
+    // over. A term is a term only if `packages/db` minted it (`isFilterTerm`
+    // reads WeakSet membership rather than shape), so a wrapper that rebuilt,
+    // spread or froze a copy of the returned object would hand back something
+    // the accessor refuses, and the refusal would arrive at the first live scan
+    // rather than at this line.
+    terms: { atMost, atLeast, isNull },
     events,
     // THE PROCESS CLOCK, AND IT IS THE ONLY ONE A RUN GETS. `started_at`,
     // `finished_at` and every `sla_due_at` derive from it, so a fixture pins the

@@ -109,17 +109,17 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
-// ADR-157'S THREE TERMS ARE ON A LINE OF THEIR OWN, AND THE SPLIT IS A CONTROL
-// RATHER THAN A STYLE. `test/expiry.test.ts` proves the sweep files do not
+// **THE ACCESSOR IS IMPORTED ON TWO LINES AND THE SPLIT IS A CONTROL RATHER THAN
+// A STYLE** (ADR-349). `test/expiry.test.ts` proves the two sweep files do not
 // import the accessor by first proving THIS file does, and its positive control
-// matches `from '@merit/db'` on the SAME LINE as the `import`. Folding all seven
-// names into one statement puts the specifier past `printWidth`, prettier wraps
-// it, and the control silently stops finding the one file it is calibrated on.
-// Found by watching that case go red (ADR-349).
+// is `/^\s*(?:import|export)\b[^\n]*from '@merit\/db'/m`, which needs the
+// specifier on the SAME LINE as the keyword. Seven names in one statement is 105
+// characters against a `printWidth` of 100, prettier wraps it, and **the control
+// silently stops finding the one file it is calibrated on.** Found by watching
+// that case go red when `atLeast` was added below.
 import { atLeast, atMost, isNull } from '@merit/db';
 import { closeClient, poolSqlExecutor, systemDb, transaction } from '@merit/db';
 import type {
-  FilterTerm,
   PoolSqlExecutorReason,
   SqlExecutor,
   SystemDb,
@@ -203,68 +203,6 @@ export const LIVE_DB: WorkerDb = {
 export function closeWorkerDb(): Promise<void> {
   return closeClient();
 }
-
-// =============================================================================
-// ADR-157'S THREE READ TERMS, WHICH ARE NOT A DOOR AND HAVE TO SAY WHY
-// =============================================================================
-// **THEY ARE HERE FOR THE POOL EXECUTOR'S REASON AND NOT FOR THE DOOR'S**
-// (ADR-349). `test/db.test.ts` pins the importers of the accessor at exactly
-// this one file, and a term is only a term if `packages/db` minted it:
-// `isFilterTerm` reads WeakSet membership rather than shape, so a hand-rolled
-// `{term: 'at-least', value}` is a jsonb VALUE to the accessor and never a
-// range. An adapter that wanted to hand a detector `ADR-157`'s constructors
-// therefore had exactly two ways to get them, and one of them was to import the
-// accessor in a second file.
-//
-// -----------------------------------------------------------------------------
-// WHY THIS IS NOT ADR-165 CLAUSE 2's SECOND DOOR
-// -----------------------------------------------------------------------------
-// **THE CLAUSE COUNTS DOORS ONTO TABLES AND THESE REACH NO TABLE**, which is
-// the section below's own sentence about `queueExecutor`. A term is a frozen
-// three-field object. It names no `TableKey`, it carries no scope predicate, it
-// has no `rows` and no `insert`, and `transaction()` has no overload that takes
-// one. What it does is narrow a filter the CALLER already had the authority to
-// compose, and the authority to compose that filter is `batch(fn)` above.
-//
-// **AND IT IS STRICTLY SMALLER THAN THE POOL EXECUTOR, WHICH IS SAID HERE
-// RATHER THAN LEFT FOR A REVIEWER.** `queueExecutor()` hands out arbitrary SQL
-// on the money database; this hands out three functions that build a value.
-// The only capability a caller gains is the ability to say `<=`, `>=` and
-// `IS NULL` on a read it could already make with `=`.
-//
-// -----------------------------------------------------------------------------
-// THERE IS NO `isNotNull` AND ITS ABSENCE IS UPSTREAM
-// -----------------------------------------------------------------------------
-// `ADR-157` refuses it by name and this file mints nothing, so the vocabulary
-// here is EXACTLY the accessor's three and cannot become four without the
-// accessor growing a fourth first. `detectors/ports.ts` reaches the same
-// conclusion from the other end: `D-18` needs `footprint_present IS FALSE`,
-// which is an EQUALITY on `false` and needs no term at all.
-// =============================================================================
-
-/**
- * `ADR-157`'s three READ-PATH term constructors, re-exported as one value.
- *
- * A VALUE RATHER THAN THREE RE-EXPORTS, so an adapter takes the whole
- * vocabulary or none of it and a port declaring the three (`DetectorTerms`,
- * `ReconTerms`, `DigestTerms`) is satisfied structurally with no adapter
- * naming the members one at a time.
- *
- * **THE FUNCTIONS ARE THE ACCESSOR'S OWN AND ARE NOT WRAPPED.** A wrapper here
- * would be a second place `NonNullable<unknown>`'s run-time half could drift
- * from, and `refuseNullBound` is already the one place that check lives.
- */
-export interface WorkerTerms {
-  /** `column <= value`, inclusive. */
-  atMost(value: NonNullable<unknown>): FilterTerm;
-  /** `column >= value`, inclusive. */
-  atLeast(value: NonNullable<unknown>): FilterTerm;
-  /** `column IS NULL`. */
-  isNull(): FilterTerm;
-}
-
-/** The three, as one value an adapter passes through to a port. */
-export const WORKER_TERMS: WorkerTerms = { atMost, atLeast, isNull };
 
 // =============================================================================
 // THE POOL-SHAPED EXECUTOR, WHICH IS NOT A FOURTH DOOR AND HAS TO SAY WHY
@@ -356,3 +294,71 @@ export const WORKER_SUPERVISOR_REASON: PoolSqlExecutorReason = 'job-supervisor' 
 export function queueExecutor(): SqlExecutor {
   return poolSqlExecutor(WORKER_SUPERVISOR_REASON);
 }
+
+// =============================================================================
+// ADR-157's TWO READ-PATH TERM CONSTRUCTORS, WHICH ARE NOT A THIRD DOOR EITHER
+// =============================================================================
+// **THEY ARE HERE FOR THE SAME REASON `queueExecutor()` IS, AND THE ARGUMENT
+// ABOVE IS RE-RUN RATHER THAN CITED.** ADR-165's pattern is ONE FILE PER
+// PACKAGE, so a term constructor reaching this deployable at all has to arrive
+// through this file; the alternative is `apps/worker/src/sweeps/expiry-adapter.ts`
+// importing `@merit/db` and `test/db.test.ts` section 3 becoming a two-element
+// list, which is the assertion ADR-333 already declined to loosen.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS NOT ADR-165 CLAUSE 2's SECOND DOOR
+// -----------------------------------------------------------------------------
+// **THE CLAUSE COUNTS DOORS ONTO TABLES AND A TERM REACHES NO TABLE.** These two
+// functions take a value and return a value. They have no `rows`, no `insert`,
+// no `updateAt`, no key vocabulary and no scope predicate, and there is no
+// argument position anywhere in the accessor where a term becomes a scope: a
+// term is a NARROWING that goes on a column inside a `where` a keyed accessor
+// composes, and the accessor is what decides which rows a narrowed predicate can
+// reach. `poolSqlExecutor` at least hands out a method that runs a statement;
+// this hands out two that mint an object.
+//
+// **AND THE HONEST DIRECTION IS THE OTHER ONE: A TERM IS THE THING THAT MAKES A
+// READ NARROWER.** `atMost` turns `WHERE hold_expires_at = $1`, which is
+// unwritable against an instant, into `WHERE hold_expires_at <= $1`. Withholding
+// it does not make this deployable's reads safer; it makes the hourly sweep
+// unable to express its own scan and pushes the next session towards
+// `sqlExecutor`, which is the door ADR-331 section 4 clause 3 prices as
+// arbitrary, unscoped and outside any transaction.
+//
+// -----------------------------------------------------------------------------
+// THEY ARE RE-EXPORTED AND NOT WRAPPED, AND THE WRAPPER IS WHAT WOULD BREAK THEM
+// -----------------------------------------------------------------------------
+// **`packages/db` RECOGNISES A TERM BY IDENTITY AND NOT BY SHAPE.** `mintTerm`
+// puts every term it builds in a module-scoped `WeakSet` and `isFilterTerm`
+// reads that set, precisely so a caller cannot hand-roll one: a `jsonb` column
+// holding an object that looks like a term is a VALUE, and a shape check would
+// read it as a range. A wrapper here that rebuilt the returned object, spread it
+// or froze a copy of it would hand back something the accessor refuses, and the
+// refusal would arrive at the first live scan rather than at this line. So the
+// two names are passed through untouched.
+//
+// **THIS PARAGRAPH READ "THERE IS NO `atLeast` AND NO `isNotNull`, AND NEITHER
+// OMISSION IS TIDINESS" AND ADR-349 MADE THE FIRST HALF FALSE.** It is kept
+// whole beside its correction, per `RI-14`. What it said was that `atLeast` had
+// no caller in this deployable, that `atMost` already excludes a null clock
+// because `NULL <= x` is NULL and never matches, and that **a third name here is
+// a decision for the row that needs it**. **THIS IS THAT ROW, AND THE RULE THE
+// PARAGRAPH STATED IS FOLLOWED RATHER THAN OVERTURNED.**
+//
+// `atLeast` HAS TWO CALLERS NOW AND NEITHER IS A CLOCK SWEEP. `DetectorTerms`
+// (`src/detectors/ports.ts`) declares all three and `readDefinition` reaches
+// `isNull()` while `D-01`'s window reaches `atLeast`, which `ADR-157` section 5
+// granted `P7` by name as its two second window; `digests/alarm.ts` reaches it
+// for a history bound. A detector composes a LOWER bound because it is reading
+// forward from an instant, which is the direction `atMost` cannot express, so
+// the sentence above was right about the sweep and was never a claim about the
+// deployable's whole future.
+//
+// **`isNotNull` IS STILL ABSENT AND ITS ABSENCE IS UPSTREAM RATHER THAN LOCAL.**
+// `ADR-157` refuses it by name, this file mints nothing, and the detector set
+// needs no such term: `D-18` wants `footprint_present IS FALSE` rather than
+// `IS NOT TRUE` (`M07:141`, and the difference is a supplier outage versus a
+// flood of flags against real customers), which is an EQUALITY on `false`.
+// =============================================================================
+
+export { atLeast, atMost, isNull };

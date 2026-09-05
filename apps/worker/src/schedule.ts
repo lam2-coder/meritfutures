@@ -83,24 +83,36 @@
 // system write path, so the row below stays `unscheduled` and the disposition
 // case that derives it from the tree stays green for the reason it always had.
 //
-// **"NINE `UNWIRED_*_IO` VALUES STAND AS THE ONLY INHABITANT OF THEIR OWN PORT
-// TYPE" IS NOW FALSE OF ONE OF THE NINE, AND IT IS KEPT WHOLE PER `RI-14`.**
-// ADR-349 wrote `./detectors/adapter.ts`, so `DetectorRunnerIo` has a second
-// inhabitant and `UNWIRED_DETECTOR_RUNNER_IO` is no longer the only one. **THE
-// COUNT OF `UNWIRED_*_IO` VALUES DID NOT MOVE**, derived over `apps/worker/src`
-// at the time of writing and still nine, and neither did the caller census:
-// nothing in this deployable calls `runDetectors`.
+// **AND ADR-344 TOOK THE SECOND BITE OUT OF THE SAME CLAUSE, WHICH IS ALSO KEPT
+// WHOLE per `RI-14`.** `./sweeps/expiry-adapter.ts` builds an `ExpirySweepIo`
+// over this deployable's own doors, so `UNWIRED_EXPIRY_SWEEP_IO` is no longer
+// THE ONLY inhabitant of its port type and the count of ports with no
+// implementation anywhere is EIGHT rather than nine. **THE `UNWIRED_*_IO`
+// VALUES THEMSELVES DID NOT MOVE AND NEITHER DID THE CALLER CENSUS**: nine of
+// them are still exported and still the DEFAULT, refusing is still the correct
+// outcome for a deployment that installs nothing, and `runExpirySweep` still
+// has no caller under any `src/`. The expiry row's own `why` carries the
+// measurement and the fifth port it cannot serve.
 //
-// **AND THE ROW BELOW STAYS `unscheduled` FOR A REASON THAT IS NOT THE ADAPTER,
-// WHICH IS WHY THE OPENING CLAUSE SURVIVES BEING FALSIFIED.** That adapter
-// serves four of five ports. The fifth is the EVENT SINK, and this deployable
-// can reach no sink at all: `test/event-sink.test.ts` establishes the shape of
-// that gap across three ports at once, and two of the detector runner's three
-// event names would be refused by the producer one deployable over even if the
-// import were legal. `runner.ts` emits inside the write transaction and emits
-// unconditionally, so the composed value writes NO `detector_runs` row. That is
-// this row's second blocker; the empty `detector_definitions` table is its
-// third. The row's `why` enumerates all three.
+// **AND ADR-349 TOOK THE THIRD BITE, ON THE DETECTOR RUNNER.**
+// `./detectors/adapter.ts` builds a `DetectorRunnerIo` over the same doors, so
+// `UNWIRED_DETECTOR_RUNNER_IO` is no longer THE ONLY inhabitant of its port type
+// either, and the count of ports with no implementation anywhere is **SEVEN**
+// rather than eight, derived over `apps/worker/src` after the merge that carried
+// both rows. **THE NINE `UNWIRED_*_IO` VALUES STILL DID NOT MOVE** and the
+// caller census did not either: nothing under any `src/` calls `runDetectors`.
+//
+// **AND THE DETECTOR ROW STAYS `unscheduled` FOR A REASON THAT IS NOT THE
+// ADAPTER, WHICH IS WHY THE OPENING CLAUSE SURVIVES BEING FALSIFIED A THIRD
+// TIME.** That adapter serves FOUR of `DetectorRunnerIo`'s five members. The
+// fifth is the EVENT SINK and this deployable can reach no sink at all:
+// `test/event-sink.test.ts` establishes the shape of that gap across three ports
+// at once, and two of the detector runner's three event names would be refused
+// by the producer one deployable over even if the import were legal. `runner.ts`
+// emits inside the write transaction and emits UNCONDITIONALLY, so the composed
+// value writes NO `detector_runs` row. That is the second blocker; the empty
+// `detector_definitions` table is the third. The row's `why` enumerates all
+// three.
 //
 // **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
 // is the reason this row does not simply write eleven adapters. `ADR-305`
@@ -303,7 +315,27 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     why:
       '`UNWIRED_EXPIRY_SWEEP_IO` is the only `ExpirySweepIo` in the tree. THREE `*_expires_at` ' +
       'COLUMNS NAME THIS JOB AS THEIR RELEASER in the coverage table, so it is the one entry ' +
-      'here whose absence CI-06l can see the shape of, and it is still unscheduled.',
+      'here whose absence CI-06l can see the shape of, and it is still unscheduled. ' +
+      'THE FIRST SENTENCE IS FALSE NOW AND IS KEPT BESIDE ITS CORRECTION per RI-14. ADR-344 ' +
+      'wrote `./sweeps/expiry-adapter.ts`, so `expirySweepIo` builds an `ExpirySweepIo` over ' +
+      'this deployable`s own doors: `transact` over `WorkerDb.batch`, `terms` over the ' +
+      'accessor`s two read-path constructors, `ledger` over `EXPIRY_LEDGER` and `now` over the ' +
+      'process clock. FOUR PORTS OF FIVE. THE LAST SENTENCE IS UNCHANGED AND THE FIFTH PORT IS ' +
+      'WHY: this deployable has no event sink and cannot reach one. The only producer in this ' +
+      'repository is `apps/api/src/events.ts`; RI-04 refuses a deployable depending on a ' +
+      'deployable, `node-linker=isolated` means an undeclared specifier resolves at neither run ' +
+      'time nor build time, and `test/event-sink.test.ts` case 3 asserts no relative specifier ' +
+      'under this `src/` escapes the app. AND THE FENCE RUNS THE WRONG WAY ROUND THE HANDLE: ' +
+      'that producer`s own header measures `SystemTx` as the one handle in this workspace that ' +
+      'can write `events`, and `apps/api` opens only `scoped` and `firm` doors, so the producer ' +
+      'has no handle and the handle has no producer. `expirySweepIo` therefore takes the sink ' +
+      'as a REQUIRED argument with no default, and nothing in this tree can be passed for it, ' +
+      'so the blocker is a call that does not compile rather than a sentence. A REFUSING ' +
+      'DEFAULT WAS REFUSED: every leg of this sweep emits inside its own release transaction, ' +
+      'so a live io over a rejecting sink is an hourly job that releases nothing while the S1 ' +
+      'dead-man switch, which fires on the JOB`S ABSENCE, reports it present. That is ADR-239`s ' +
+      'defect with a clock in front of it, and it is strictly worse for a trader than the ' +
+      'unswept estate the switch alarms on today.',
   },
   {
     module: './withdrawals/approval-sweep.ts',
