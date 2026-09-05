@@ -346,3 +346,52 @@ describe('the executor contract is the vendor`s, read from the installed pg-boss
     }
   });
 });
+
+// =============================================================================
+// THE PARAGRAPH THIS PACKAGE RETIRED, BOUND TO THE THING THAT RETIRED IT
+// =============================================================================
+// ADR-332. `src/index.ts` quotes ADR-331's refusal to publish a pool-shaped
+// executor and says the row that published it is this one. Under `RI-14` a
+// retired sentence is kept beside its correction, and under `RI-35` leg 3 a
+// retired claim is only legitimate WHILE THE TREE FALSIFIES IT: an artifact that
+// went away again leaves a correction asserting something untrue in the other
+// direction.
+//
+// THE PRINCIPLED HOME FOR THIS IS `RI-35`'s REGISTER AND IT IS OUTSIDE ADR-332's
+// FENCE, WHICH IS SAID HERE RATHER THAN LEFT FOR A READER TO NOTICE. The entry a
+// later row owes is an artifact keyed on `packages/db` exporting
+// `poolSqlExecutor`, with a `retired` claim at `packages/queue/src/index.ts`
+// anchored on the quotation below -- the same shape `db-transaction-and-sql-executor`
+// already has for ADR-102's pair. `RI-35` did not go red here, because that
+// sentence was never registered and no absence marker in its written vocabulary
+// reaches it, so the register could not be amended under this row's grant.
+// ADR-328's own header names this shape as the one that does not scale: one
+// hand-built derivation for one site. It is built anyway, because the
+// alternative is a correction nothing holds to the tree at all.
+describe('the correction packages/queue publishes is held to the door that justifies it', () => {
+  test('the retired refusal stands only while `packages/db` exports the pool executor', () => {
+    const quote =
+      'That door is not published by `packages/db` and the\n// reason it would need is not a member of `SqlExecutorReason`';
+    const barrel = readFileSync(join(ROOT, 'packages/queue/src/index.ts'), 'utf8');
+    expect(
+      barrel.includes(quote),
+      'packages/queue/src/index.ts no longer quotes ADR-331`s refusal; move this case with it',
+    ).toBe(true);
+
+    const db = readFileSync(join(ROOT, 'packages/db/src/index.ts'), 'utf8');
+    expect(
+      /^\s*poolSqlExecutor,\s*$/m.test(db),
+      'the paragraph above is quoted as HISTORY and `@merit/db` no longer exports ' +
+        '`poolSqlExecutor`, so the refusal it retires is true again and the correction is not',
+    ).toBe(true);
+
+    // THE ADAPTER NAMES IT TOO, and that site is bound here rather than left to
+    // rot on its own: `pg-boss-queue.ts` is the file a session writing the one
+    // door opens first, so a name it carries has to be a name that exists.
+    const adapter = readFileSync(join(ROOT, 'packages/queue/src/pg-boss-queue.ts'), 'utf8');
+    expect(
+      adapter.includes("`@merit/db`'s `poolSqlExecutor('job-supervisor')` IS THAT VALUE"),
+      'the adapter no longer names the executor its `@param` requires; move this case with it',
+    ).toBe(true);
+  });
+});

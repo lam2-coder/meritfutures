@@ -103,6 +103,12 @@ export interface PgBossQueueOptions {
  *   executor that reads `.rows` off that array hands back `undefined` and the
  *   supervise pass dies on it. What this parameter wants is a pool: one
  *   connection per statement, which is what the vendor's own driver is.
+ *
+ *   `@merit/db`'s `poolSqlExecutor('job-supervisor')` IS THAT VALUE (ADR-332),
+ *   and it is named here because this is the file a session writing the queue's
+ *   one door opens first. This package still declares no dependency on that one
+ *   and takes no import: the two shapes meet structurally, which is the same
+ *   arrangement `enqueue` already has with `transaction()`'s executor.
  */
 export function pgBossQueue(executor: JobTransaction, options: PgBossQueueOptions = {}): JobQueue {
   const boss = new PgBoss({
