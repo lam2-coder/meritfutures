@@ -57,7 +57,7 @@
 // THE DECISION IS THIS DEPLOYABLE'S OWN AND `decideApproval` DOES NOT MOVE
 // -----------------------------------------------------------------------------
 // ADR-316 section 6 REFUSES the move and states the duplication cost in full.
-// `decideApproval` stays at `apps/api/src/routes/wallet-withdrawals.ts:1802`,
+// `decideApproval` stays at `apps/api/src/routes/wallet-withdrawals.ts:1908`,
 // two live gates read that file for it, and `DUAL_CONTROL_THRESHOLD_CENTS` is
 // `admin-wallet.ts`'s constant which this deployable has no operator to spend.
 //
@@ -160,9 +160,9 @@ export type ApprovalGuard = (typeof APPROVAL_GUARDS)[number];
  * needs a term the route that posts nothing does not.
  *
  * THE ARRAY IS IN EVALUATION ORDER AND `apps/api`'s IS NOT, which is reported
- * rather than repaired. `APPROVAL_HOLDS` at `wallet-withdrawals.ts:1676` lists
+ * rather than repaired. `APPROVAL_HOLDS` at `wallet-withdrawals.ts:1782` lists
  * `provenance_missing` and `destination_cooling` BEFORE `halted`, while
- * `decideApproval` at `wallet-withdrawals.ts:1802` evaluates `halted` BEFORE
+ * `decideApproval` at `wallet-withdrawals.ts:1908` evaluates `halted` BEFORE
  * `provenance_missing`.
  * The order that decides what a trader is told is the evaluation order, so that
  * is the one this array states and the one the census reads out of both function

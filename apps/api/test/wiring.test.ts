@@ -1457,7 +1457,39 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'line 1506 was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, ' +
     'which is the same drift in its quietest form. THOSE TWO NUMBERS ARE WRITTEN OUT OF ' +
     'CITATION GRAMMAR ON PURPOSE: a `file:line` pointer is a claim about THIS tree, so a ' +
-    'pointer quoted as HISTORY must not wear the shape that says follow me (ADR-212).',
+    'pointer quoted as HISTORY must not wear the shape that says follow me (ADR-212). ' +
+    'AND ADR-342 IS THE TENTH CORRECTION, THE THIRD THAT MAKES THIS ENTRY SMALLER, AND THE ' +
+    'FIRST WRITTEN BY A ROW DISPATCHED TO INSTALL THIS PORT RATHER THAN TO EXPLAIN IT. FOUR ' +
+    'SENTENCES ABOVE ARE NOW FALSE AND ARE KEPT WHERE THEY WERE MADE. (1) IT READ that NO ' +
+    'DOOR DRIVES `requested --> approved` EITHER. `runWithdrawalApprovals` ' +
+    '(`apps/worker/src/withdrawals/approval-sweep.ts`) performs that arrow AND ' +
+    '`cooling --> approved`, with the `LT-06` posting in the same transaction at a system ' +
+    'authority. (2) `F1` READ that `@merit/ledger` PUBLISHES NO `LT-06` BUILDER. ' +
+    '`packages/ledger/src/index.ts` exports `walletWithdrawalApprovalPosting` and ' +
+    '`apps/worker/src/sweeps/ledger.ts` calls `postTransaction` with it. (3) IT READ that ' +
+    'THE MANIFEST LINE IS STILL OWED and that slice 6 owes the worker its `@merit/ledger` ' +
+    'dependency. `apps/worker/package.json` declares it. (4) IT READ that the driver is a ' +
+    'move OUT of this deployable rather than a wiring inside it, so this entry was NO LONGER ' +
+    'WAITING ON A SLICE THAT COULD ARRIVE HERE. The move happened and the slice arrived, one ' +
+    'deployable over. ' +
+    'WHAT REFUSES NOW IS SMALLER THAN ANY OF THAT AND IS STILL NOT AN ADAPTER FOR THIS PORT. ' +
+    '`UNWIRED_WITHDRAWAL_APPROVAL_IO` is the only `WithdrawalApprovalSweepIo` in the tree, ' +
+    "the approval job carries `disposition: 'unscheduled'`, and `apps/worker/src/index.ts` " +
+    'states the condition in its own words: the installation MUST NOT BE DISPATCHED BEFORE A ' +
+    'PAYMENT RAIL EXISTS, because past `approved` there is no exit and `0072`s `WD-C2` ' +
+    'refuses `approved --> cancelled` at the database. The rail is FOUNDER-OWED and is ' +
+    'unchanged. ' +
+    'AND ADR-342 ADDS THE ONE BLOCKER THIS ENTRY NEVER NAMED, WHICH IS THIS DEPLOYABLES OWN. ' +
+    '`C-27` refuses every caller of both rows BEFORE the handler body runs, and ' +
+    '`databaseAuthBackend` declares `elevate` BLOCKED on both arms, so no session in a ' +
+    'deployment can be elevated and the 503 this port produces is itself unreachable. AN ' +
+    'INSTALL WOULD THEREFORE CHANGE NO OBSERVABLE RESPONSE AND WOULD ARM ITSELF SILENTLY on ' +
+    'the day an unrelated row lands a WebAuthn ceremony or an SMS sender, which is an ' +
+    'argument against installing rather than a reason it is harmless. ' +
+    'THE THREE LIVE BLOCKERS ARE NO LONGER PROSE: `INSTALL_BLOCKING_FINDINGS` in ' +
+    '`routes/wallet-withdrawals.ts` carries them with their sources and ' +
+    '`wallet-withdrawals.test.ts` RUNS each one, so the day any of them is discharged that ' +
+    'suite goes RED rather than this paragraph going quietly stale.',
 };
 
 // -----------------------------------------------------------------------------
