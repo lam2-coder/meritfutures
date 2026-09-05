@@ -835,7 +835,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'CLAUSE HAS NAMED IT**: a driver-side decoder has to know `packages/db`s property names, ' +
     '`RI-01` forbids the engine from knowing them and that package`s own manifest says it ' +
     'never may, and `apps/api` and `apps/worker` cannot import each other, so `toSizeRow` ' +
-    '(`apps/worker/src/batch/adapter.ts:1296`) fits this port exactly and is unreachable from ' +
+    '(`apps/worker/src/batch/adapter.ts:1417`) fits this port exactly and is unreachable from ' +
     'it. ADR-239 slice A`s argument PUT `gates-codec.ts` in the engine and the same argument ' +
     'read in the other direction KEEPS this one out. **AND THE ONE `FM-16` IN THIS AREA IS THE ' +
     'CAP SCHEDULE RATHER THAN THE ROW, WHICH IS THE FINDING ADR-283 COULD NOT SEE FROM WHERE ' +
@@ -853,7 +853,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'value: `EligibleFoldUnwired` states it in its own message and `setAdminReadSource`s entry ' +
     'above carries it. ADR-286 section 7 item 1 is CLOSED. ' +
     'AND THE TREE STILL STATES THE RULES BLOB`s DECODING ' +
-    'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1109`) and ' +
+    'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1230`) and ' +
     '`decodeRules` (`apps/site/src/catalog/adapter.ts:549`) COLLAPSE ONTO THE ENGINE`s, which ' +
     'row 283`s fence put out of bounds; link 7 holds that census at exactly three, holds the ' +
     'cap-schedule census at ONE beside it, and asserts the repaired cap-schedule property so a ' +
