@@ -350,6 +350,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-336](ADR-336.md) | three of the fourteen migrations `RI-37` still registers as having no landing record get one, `0068`, `0070` and `0072` measured against PostgreSQL 16.13 rather than reconstructed from their ADRs, the backlog register shrinks from fourteen entries to eleven in the same commit, and two sentences inside two merged migration headers are found false on today's tree without either file being edited (2026-09-05, status: proposed) |
 | [ADR-337](ADR-337.md) | the section-number allocation table that exists to stop collisions had drifted from the headings it allocates, eight numbers were taken by a heading and claimed by no row, `RI-37` gains a fourth leg that binds the two rather than a new invariant number, and the leg lands RED on all eight one commit before the repair (2026-09-05, status: proposed) |
 | [ADR-338](ADR-338.md) | the saga's queue port gets its first live implementation over the door ADR-333 wired to nothing, the enqueue half is taken and the drain is refused with the argument for refusing it, and the invariant written to fail on good news is found unable to see the wiring and able to see a sentence about it (2026-09-05, status: proposed) |
+| [ADR-343](ADR-343.md) | the operator console's authentication boundary is a purchase this repository cannot make, so the verifier is refused and the unauthenticated crash path in front of it is closed instead, closing ADR-190 item 2 where ADR-192 left it open (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
