@@ -627,6 +627,32 @@ describe('the raw executor is a named door and not a property', () => {
     );
   });
 
+  test('the POOL producer`s member is refused HERE, which is the direction that matters', () => {
+    // ADR-332. The vocabulary now has two members and the transaction-bound
+    // producer admits ONE of them. The type already refuses the other --
+    // `sqlExecutor` takes `TransactionSqlExecutorReason`, an `Extract` of a
+    // single member -- and this is the runtime half, past a cast.
+    //
+    // IT IS THE DIRECTION ADR-331 REFUSED TO MINT THE MEMBER WITHOUT. Its
+    // section 4 clause 2: a member minted on a transaction-bound producer
+    // "would hand the next session a door that names the right intention and
+    // does the wrong thing". `'job-supervisor'` names an executor that must
+    // OUTLIVE every transaction, because every plan pg-boss wraps in `locked()`
+    // carries its own `COMMIT` and would commit the caller's. A handle that
+    // answered to that word would be the measured defect wearing the right name.
+    const { source } = recording();
+    const { conn } = recordingConn();
+    for (const handle of [
+      scopedTx(source, conn, IDENTITY),
+      systemTx(source, conn, 'nightly-batch'),
+      firmTx(source, conn),
+    ]) {
+      expect(() => handle.sqlExecutor('job-supervisor' as never)).toThrow(
+        /not a reason to run raw SQL/,
+      );
+    }
+  });
+
   test('all three authorities produce an executor, and it is the same shape', () => {
     const { source } = recording();
     const { conn } = recordingConn();

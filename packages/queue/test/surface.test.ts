@@ -312,19 +312,37 @@ describe('the executor contract is the vendor`s, read from the installed pg-boss
     expect(body.slice(0, body.indexOf('\n}'))).toContain('flatMap(i => i.rows)');
   });
 
-  test('`packages/db`s executor carries both of `pg`s answers', () => {
+  test('`packages/db`s executor carries both of `pg`s answers, in ONE place, for BOTH producers', () => {
     // THE MERIT HALF, BOUND TO THE TWO ABOVE SO THE THREE FAIL TOGETHER. Read
     // rather than imported, for the reason `write-accessor.test.ts` states from
     // the other direction: neither package declares a dependency on the other,
     // and structural typing is what binds them.
+    //
+    // ADR-332 GAVE `packages/db` A SECOND PRODUCER OF THIS SHAPE and this case
+    // moved with it rather than being left asserting one of the two. The
+    // transaction-bound `sqlExecutorOn` and the pool-bound `poolSqlExecutor`
+    // answer the SAME vendor contract, so a tree where one flattens and the
+    // other does not is the ADR-331 defect surviving on the half nobody looked
+    // at. The normalisation is therefore ONE function and this case asserts that
+    // both producers route through it, which is a stronger property than the
+    // branch being present twice.
     const executor = readFileSync(join(ROOT, 'packages/db/src/scoped-db.ts'), 'utf8');
-    const open = executor.indexOf('function sqlExecutorOn(');
-    expect(open, 'packages/db no longer declares sqlExecutorOn').toBeGreaterThan(-1);
+    const open = executor.indexOf('function oneResultFrom(');
+    expect(open, 'packages/db no longer declares oneResultFrom').toBeGreaterThan(-1);
     const declaration = executor.slice(open, executor.indexOf('\n}', open));
     expect(
       declaration,
-      'sqlExecutorOn does not branch on the array `pg` returns for a multi-statement plan',
+      'oneResultFrom does not branch on the array `pg` returns for a multi-statement plan',
     ).toContain('Array.isArray(result)');
     expect(declaration).toContain('flatMap((one) => one.rows)');
+
+    for (const producer of ['function sqlExecutorOn(', 'export function poolSqlExecutor(']) {
+      const at = executor.indexOf(producer);
+      expect(at, `packages/db no longer declares ${producer}`).toBeGreaterThan(-1);
+      expect(
+        executor.slice(at, executor.indexOf('\n}\n', at)),
+        `${producer} does not normalise through oneResultFrom`,
+      ).toContain('oneResultFrom(');
+    }
   });
 });

@@ -3443,13 +3443,47 @@ describe('what ADR-157 REFUSED to widen, watched rather than only written down',
   const accessorSource = (): string =>
     readFileSync(fileURLToPath(new URL('../src/scoped-db.ts', import.meta.url)), 'utf8');
 
-  test('`SqlExecutorReason` is still exactly one member, so the raw-SQL door did not move', () => {
+  test('`SqlExecutorReason` is two members and each PRODUCER admits exactly one of them', () => {
     // P5 section 11 rule 10 and P7 section 11 rule 10 both foreclose adding a
-    // member here, and both say the reach-around is one line. This is that rule
-    // made mechanical rather than remembered.
-    const declared = /export type SqlExecutorReason =([^;]+);/.exec(accessorSource())?.[1] ?? '';
+    // member here for a request handler, and both say the reach-around is one
+    // line. This is that rule made mechanical rather than remembered.
+    //
+    // THE CASE ASSERTED ONE MEMBER UNTIL ADR-332 AND NOW ASSERTS A PARTITION,
+    // which is a stronger property rather than a weaker one. A second member
+    // was minted for the executor that CONSTRUCTS the queue, which ADR-331
+    // section 5 measured cannot be the transaction-bound one: every plan pg-boss
+    // wraps in `locked()` carries its own `BEGIN` and `COMMIT`, so one of them
+    // run on a caller's open transaction commits it. What keeps the vocabulary
+    // closed is that neither producer can name the other's word: the transaction
+    // method takes `TransactionSqlExecutorReason` and the pool door takes
+    // `PoolSqlExecutorReason`, each an `Extract` of ONE member, so the widening
+    // bought each producer nothing at all.
+    const source = accessorSource();
+    const declared = /export type SqlExecutorReason =([^;]+);/.exec(source)?.[1] ?? '';
     const members = [...declared.matchAll(/'([a-z-]+)'/g)].map((m) => m[1] as string);
-    expect(members).toEqual(['job-enqueue']);
+    expect(members.slice().sort()).toEqual(['job-enqueue', 'job-supervisor']);
+
+    const producer = (name: string): string[] => {
+      const line = new RegExp(`export type ${name} = Extract<SqlExecutorReason,([^>]+)>;`).exec(
+        source,
+      );
+      expect(line, `${name} is not declared as an Extract of the vocabulary`).not.toBeNull();
+      return [...(line?.[1] ?? '').matchAll(/'([a-z-]+)'/g)].map((m) => m[1] as string);
+    };
+    const transactionBound = producer('TransactionSqlExecutorReason');
+    const poolBound = producer('PoolSqlExecutorReason');
+    expect(transactionBound).toEqual(['job-enqueue']);
+    expect(poolBound).toEqual(['job-supervisor']);
+
+    // EVERY MEMBER BELONGS TO EXACTLY ONE PRODUCER. A third member minted for
+    // nobody, or a member both producers admit, is what "still closed" would
+    // stop meaning, and neither is visible from the two assertions above alone.
+    expect([...transactionBound, ...poolBound].sort()).toEqual(members.slice().sort());
+
+    // AND THE TWO SIGNATURES SPEND THEM. A partition nothing reads is a pair of
+    // type aliases.
+    expect(source).toContain('sqlExecutor(reason: TransactionSqlExecutorReason): SqlExecutor;');
+    expect(source).toContain('export function poolSqlExecutor(reason: PoolSqlExecutorReason)');
   });
 
   test('`SystemReason` is still exactly two members, so a request handler is still neither', () => {

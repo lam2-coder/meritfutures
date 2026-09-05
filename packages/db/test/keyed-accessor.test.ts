@@ -675,16 +675,28 @@ describe('there is no unaddressed write left at any authority', () => {
     expect(Object.keys(firmDb()).sort()).toEqual(['__brand', 'rows']);
   });
 
-  test('`sqlExecutor` is still one member wide, because the construction removed the need to widen it', () => {
+  test('`sqlExecutor` on a TRANSACTION is still one member wide, whatever the vocabulary holds', () => {
     // ADR-112 RULING 5, WATCHED. The three needs ADR-109 clause 2 names are
-    // served by an address, so the raw-SQL vocabulary does not move. A session
-    // that widens it will find this test rather than a paragraph.
+    // served by an address, so the raw-SQL door a keyed handle can reach does
+    // not move. A session that widens it will find this test rather than a
+    // paragraph.
+    //
+    // THE INSTRUMENT MOVED WITH ADR-332 AND THE PROPERTY DID NOT. The vocabulary
+    // gained a second member for the POOL-shaped producer that constructs the
+    // queue, so counting the union would now pass for a reason this case never
+    // cared about. What it cared about is what a caller holding a transaction
+    // handle may write, and that is `TransactionSqlExecutorReason`, which is an
+    // `Extract` of one member and is the parameter type on the method.
     const source = readFileSync(
       fileURLToPath(new URL('../src/scoped-db.ts', import.meta.url)),
       'utf8',
     );
-    const declared = /export type SqlExecutorReason =([^;]+);/.exec(source)?.[1] ?? '';
+    const declared =
+      /export type TransactionSqlExecutorReason = Extract<SqlExecutorReason,([^>]+)>;/.exec(
+        source,
+      )?.[1] ?? '';
     expect([...declared.matchAll(/'([a-z-]+)'/g)].map((m) => m[1])).toEqual(['job-enqueue']);
+    expect(source).toContain('sqlExecutor(reason: TransactionSqlExecutorReason): SqlExecutor;');
   });
 });
 
