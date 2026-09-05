@@ -109,9 +109,8 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
-import { closeClient, isNull, poolSqlExecutor, systemDb, transaction } from '@merit/db';
+import { atMost, closeClient, isNull, poolSqlExecutor, systemDb, transaction } from '@merit/db';
 import type {
-  FilterTerm,
   PoolSqlExecutorReason,
   SqlExecutor,
   SystemDb,
@@ -194,73 +193,6 @@ export const LIVE_DB: WorkerDb = {
  */
 export function closeWorkerDb(): Promise<void> {
   return closeClient();
-}
-
-// =============================================================================
-// THE ONE FILTER TERM, WHICH IS NOT A DOOR EITHER AND HAS TO SAY WHY
-// =============================================================================
-// **IT IS HERE FOR THE SAME REASON THE EXECUTOR BELOW IS: ADR-165's PATTERN IS
-// ONE FILE PER PACKAGE, AND A TERM IS ONLY A TERM IF `packages/db` MINTED IT.**
-// `scoped-db.ts` keeps a module-private `WeakSet` of every term it minted and
-// `isFilterTerm` reads IDENTITY rather than shape, on the stated ground that "a
-// `jsonb` column holding an object that looks like a term is a VALUE, and a
-// shape check would read it as a range". So a caller cannot hand-roll one, and
-// an adapter that needs `column IS NULL` needs the constructor rather than a
-// copy of its output.
-//
-// **WHAT NEEDED IT WAS `src/recon/adapter.ts` (ADR-345) AND THE NEED IS THE
-// DEFINITION OF "LIVE" RATHER THAN A CONVENIENCE.**
-// `daily_marks_live_per_account_day_uq` is `(account_id, trading_day) WHERE
-// superseded_by IS NULL`, so a reconciliation sweep that read every mark and
-// filtered in this process would re-derive that index's own predicate by hand
-// and would pull every superseded correction across the boundary to do it.
-// `apps/worker/src/recon/ports.ts` argued that before an adapter existed, and
-// `ADR-157` admits `IS NULL` ON THE READ PATH BY NAME, so this is the granted
-// shape rather than a widening of anything.
-//
-// -----------------------------------------------------------------------------
-// WHY IT IS NOT A SECOND DOOR IN ADR-165 CLAUSE 2's SENSE
-// -----------------------------------------------------------------------------
-// **THE CLAUSE COUNTS DOORS ONTO TABLES AND THIS REACHES NO TABLE AND NAMES NO
-// COLUMN.** `isNull()` takes NOTHING and returns a frozen two-word object. It
-// carries no key vocabulary, no scope predicate, no reason and no connection;
-// it cannot be handed to `transaction()`, and the only way it reaches a database
-// at all is as one value of a filter a caller composed through a door that was
-// already open. `atMost` and `atLeast` are deliberately NOT re-exported: this
-// deployable has one caller needing one term, and a vocabulary re-exported ahead
-// of a caller is a word somebody uses.
-//
-// **AND IT WIDENS NOTHING A CALLER COULD NOT ALREADY REACH.** A term REMOVES
-// rows from a read the handle already serves, which is `scoped-db.ts`'s own
-// argument for why a conjunction is safe on this boundary and a disjunction is
-// not: "a conjunction can only REMOVE rows from the read the caller already
-// holds at this authority, and a disjunction can add them back." An adapter
-// without this constructor reads MORE rows, not fewer.
-//
-// **IT IS ALSO REFUSED ON EVERY WRITE, BY `packages/db` AND NOT BY THIS FILE.**
-// `addressPredicate` throws on a term in an address, on every write path and
-// every addressed read, because a term cannot name one row. So there is no
-// composition of what this exports that reaches an UPDATE or a DELETE.
-// =============================================================================
-
-/**
- * `column IS NULL`, minted by the accessor. `ADR-157`'s read-path term.
- *
- * A FRESH TERM PER CALL, WHICH IS THE ACCESSOR'S RULE AND NOT THIS FILE'S
- * PREFERENCE. `isNull`'s own docstring: "A FRESH OBJECT PER CALL rather than a
- * shared constant, because membership of `TERMS` is what makes a term a term
- * and a frozen singleton would work equally well right up until somebody
- * exported it." A `const` here would be exactly that export, so this is a
- * function that delegates and never a value that is held.
- *
- * TYPED AS `FilterTerm` AND NOT NARROWED HERE. The caller that needs one member
- * of the union narrows it against the discriminant and refuses the others, which
- * is `src/recon/adapter.ts`'s `reconIsNull`: a narrowing performed at the
- * acquisition point would put this file in the business of knowing which member
- * each caller wants.
- */
-export function columnIsNull(): FilterTerm {
-  return isNull();
 }
 
 // =============================================================================
@@ -353,3 +285,55 @@ export const WORKER_SUPERVISOR_REASON: PoolSqlExecutorReason = 'job-supervisor' 
 export function queueExecutor(): SqlExecutor {
   return poolSqlExecutor(WORKER_SUPERVISOR_REASON);
 }
+
+// =============================================================================
+// ADR-157's TWO READ-PATH TERM CONSTRUCTORS, WHICH ARE NOT A THIRD DOOR EITHER
+// =============================================================================
+// **THEY ARE HERE FOR THE SAME REASON `queueExecutor()` IS, AND THE ARGUMENT
+// ABOVE IS RE-RUN RATHER THAN CITED.** ADR-165's pattern is ONE FILE PER
+// PACKAGE, so a term constructor reaching this deployable at all has to arrive
+// through this file; the alternative is `apps/worker/src/sweeps/expiry-adapter.ts`
+// importing `@merit/db` and `test/db.test.ts` section 3 becoming a two-element
+// list, which is the assertion ADR-333 already declined to loosen.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS NOT ADR-165 CLAUSE 2's SECOND DOOR
+// -----------------------------------------------------------------------------
+// **THE CLAUSE COUNTS DOORS ONTO TABLES AND A TERM REACHES NO TABLE.** These two
+// functions take a value and return a value. They have no `rows`, no `insert`,
+// no `updateAt`, no key vocabulary and no scope predicate, and there is no
+// argument position anywhere in the accessor where a term becomes a scope: a
+// term is a NARROWING that goes on a column inside a `where` a keyed accessor
+// composes, and the accessor is what decides which rows a narrowed predicate can
+// reach. `poolSqlExecutor` at least hands out a method that runs a statement;
+// this hands out two that mint an object.
+//
+// **AND THE HONEST DIRECTION IS THE OTHER ONE: A TERM IS THE THING THAT MAKES A
+// READ NARROWER.** `atMost` turns `WHERE hold_expires_at = $1`, which is
+// unwritable against an instant, into `WHERE hold_expires_at <= $1`. Withholding
+// it does not make this deployable's reads safer; it makes the hourly sweep
+// unable to express its own scan and pushes the next session towards
+// `sqlExecutor`, which is the door ADR-331 section 4 clause 3 prices as
+// arbitrary, unscoped and outside any transaction.
+//
+// -----------------------------------------------------------------------------
+// THEY ARE RE-EXPORTED AND NOT WRAPPED, AND THE WRAPPER IS WHAT WOULD BREAK THEM
+// -----------------------------------------------------------------------------
+// **`packages/db` RECOGNISES A TERM BY IDENTITY AND NOT BY SHAPE.** `mintTerm`
+// puts every term it builds in a module-scoped `WeakSet` and `isFilterTerm`
+// reads that set, precisely so a caller cannot hand-roll one: a `jsonb` column
+// holding an object that looks like a term is a VALUE, and a shape check would
+// read it as a range. A wrapper here that rebuilt the returned object, spread it
+// or froze a copy of it would hand back something the accessor refuses, and the
+// refusal would arrive at the first live scan rather than at this line. So the
+// two names are passed through untouched.
+//
+// **THERE IS NO `atLeast` AND NO `isNotNull`, AND NEITHER OMISSION IS TIDINESS.**
+// ADR-157 refuses `isNotNull` by name, and `atLeast` has no caller in this
+// deployable: `atMost` already excludes a null clock, because `NULL <= x` is
+// NULL and never matches. A third name here is a decision for the row that needs
+// it, which is `WORKER_SUPERVISOR_REASON`'s rule one section up applied to a
+// vocabulary instead of to a word.
+// =============================================================================
+
+export { atMost, isNull };

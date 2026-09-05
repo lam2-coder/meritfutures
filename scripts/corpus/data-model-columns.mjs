@@ -55,12 +55,12 @@
 //    ruling is one parser called twice rather than two expressions of one parse.
 //    IT CAN NOW BE IMPORTED, AND THE BLOCKER THIS PARAGRAPH NAMED IS SPENT.
 //    `gates.mjs:9118` reads `export const GATES = [`, and `:9324` opens the
-//    guard `const invokedDirectly = ...` closed at `:9327` by
+//    guard `const invokedDirectly = ...` closed at `:9445` by
 //    `if (invokedDirectly) process.exit(main());`, under a comment reading
 //    "Importable by the suite that reads this report, runnable by CI-06". That
 //    guard landed in `55824c62` on 2026-08-30 for ADR-294, three sessions after
-//    this header was written, and the same file also exports `EXIT` at `:9202`
-//    and `runGates` at `:9227`. So the duplication below is now a DEFERRAL WITH
+//    this header was written, and the same file also exports `EXIT` at `:9320`
+//    and `runGates` at `:9345`. So the duplication below is now a DEFERRAL WITH
 //    NO BLOCKER rather than a blocked repair, and its remedy clause at the foot
 //    of this paragraph is available and unclaimed.
 //

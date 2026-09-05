@@ -83,16 +83,41 @@
 // system write path, so the row below stays `unscheduled` and the disposition
 // case that derives it from the tree stays green for the reason it always had.
 //
-// **ADR-345 WROTE `./recon/adapter.ts` AND THE COUNT ABOVE IS NOW EIGHT, WHICH
-// IS KEPT BESIDE ITS CORRECTION per `RI-14` rather than retyped.**
-// `UNWIRED_RECON_SWEEP_IO` is still a value and is no longer the ONLY inhabitant
-// of `ReconSweepIo`, so the reconciliation sweep is runnable against a real
-// database. **THE CALLER CENSUS DID NOT MOVE AND NEITHER DID THE ROW'S
-// DISPOSITION**: nothing under `src/` calls `runReconciliationSweep`, the
-// adapter is an io value rather than a caller, and that row's own `why` carries
-// the three blockers that are not an adapter. **WIRING AND SCHEDULING ARE TWO
-// DECISIONS AND THIS FILE IS WHERE THE SECOND ONE IS RECORDED**, which is the
-// whole reason the disposition is derived from a census rather than typed.
+// **AND ADR-344 TOOK THE SECOND BITE OUT OF THE SAME CLAUSE, WHICH IS ALSO KEPT
+// WHOLE per `RI-14`.** `./sweeps/expiry-adapter.ts` builds an `ExpirySweepIo`
+// over this deployable's own doors, so `UNWIRED_EXPIRY_SWEEP_IO` is no longer
+// THE ONLY inhabitant of its port type and the count of ports with no
+// implementation anywhere is EIGHT rather than nine. **THE `UNWIRED_*_IO`
+// VALUES THEMSELVES DID NOT MOVE AND NEITHER DID THE CALLER CENSUS**: nine of
+// them are still exported and still the DEFAULT, refusing is still the correct
+// outcome for a deployment that installs nothing, and `runExpirySweep` still
+// has no caller under any `src/`. The expiry row's own `why` carries the
+// measurement and the fifth port it cannot serve.
+//
+// **AND ADR-345 TOOK THE THIRD BITE, WHICH IS WHY THE PARAGRAPH ABOVE'S "EIGHT"
+// IS ALREADY STALE AND IS KEPT ANYWAY per `RI-14`.** `./recon/adapter.ts` builds
+// a `ReconSweepIo` over this deployable's one door, so `UNWIRED_RECON_SWEEP_IO`
+// is no longer THE ONLY inhabitant of its port type either. **THE TWO ROWS
+// LANDED IN THE SAME WAVE AND EACH COUNTED NINE DOWN TO EIGHT WITHOUT SEEING THE
+// OTHER**, which is this file's own lesson about hand-typed counts arriving one
+// register over. **DERIVED AT THIS MERGE RATHER THAN SUBTRACTED**: of the nine
+// `UNWIRED_*_IO` values, a census for a function or a value under `src/` whose
+// type is the same port finds one for `ExpirySweepIo` and one for
+// `ReconSweepIo` and none for the other seven. **THE VALUES THEMSELVES DID NOT
+// MOVE AND NEITHER DID THE CALLER CENSUS**: all nine are still exported, still
+// the DEFAULT, and refusing is still the correct outcome for a deployment that
+// installs nothing; nothing under `src/` calls `runReconciliationSweep`, and the
+// recon row's own `why` carries the three blockers that are not an adapter.
+// **WIRING AND SCHEDULING ARE TWO DECISIONS AND THIS FILE IS WHERE THE SECOND
+// ONE IS RECORDED**, which is the whole reason the disposition is derived from a
+// census rather than typed.
+//
+// **AND THE CENSUS ABOVE IS A CENSUS OF CONSTRUCTORS, WHICH IS SAID BECAUSE IT
+// IS NOT THE SAME QUESTION.** `UNWIRED_RULE_STATE_WRITER_IO` is counted among
+// the seven and `batch/adapter.ts` composes a `RuleStateWriterIo` INLINE at its
+// `writeRuleState` leg, so that one has an inhabitant no grep for a returned
+// type will find. Reported here rather than repaired: the number this file cares
+// about is which JOBS have no live io, and that one is a leg of a job that runs.
 //
 // **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
 // is the reason this row does not simply write eleven adapters. `ADR-305`
@@ -294,7 +319,27 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     why:
       '`UNWIRED_EXPIRY_SWEEP_IO` is the only `ExpirySweepIo` in the tree. THREE `*_expires_at` ' +
       'COLUMNS NAME THIS JOB AS THEIR RELEASER in the coverage table, so it is the one entry ' +
-      'here whose absence CI-06l can see the shape of, and it is still unscheduled.',
+      'here whose absence CI-06l can see the shape of, and it is still unscheduled. ' +
+      'THE FIRST SENTENCE IS FALSE NOW AND IS KEPT BESIDE ITS CORRECTION per RI-14. ADR-344 ' +
+      'wrote `./sweeps/expiry-adapter.ts`, so `expirySweepIo` builds an `ExpirySweepIo` over ' +
+      'this deployable`s own doors: `transact` over `WorkerDb.batch`, `terms` over the ' +
+      'accessor`s two read-path constructors, `ledger` over `EXPIRY_LEDGER` and `now` over the ' +
+      'process clock. FOUR PORTS OF FIVE. THE LAST SENTENCE IS UNCHANGED AND THE FIFTH PORT IS ' +
+      'WHY: this deployable has no event sink and cannot reach one. The only producer in this ' +
+      'repository is `apps/api/src/events.ts`; RI-04 refuses a deployable depending on a ' +
+      'deployable, `node-linker=isolated` means an undeclared specifier resolves at neither run ' +
+      'time nor build time, and `test/event-sink.test.ts` case 3 asserts no relative specifier ' +
+      'under this `src/` escapes the app. AND THE FENCE RUNS THE WRONG WAY ROUND THE HANDLE: ' +
+      'that producer`s own header measures `SystemTx` as the one handle in this workspace that ' +
+      'can write `events`, and `apps/api` opens only `scoped` and `firm` doors, so the producer ' +
+      'has no handle and the handle has no producer. `expirySweepIo` therefore takes the sink ' +
+      'as a REQUIRED argument with no default, and nothing in this tree can be passed for it, ' +
+      'so the blocker is a call that does not compile rather than a sentence. A REFUSING ' +
+      'DEFAULT WAS REFUSED: every leg of this sweep emits inside its own release transaction, ' +
+      'so a live io over a rejecting sink is an hourly job that releases nothing while the S1 ' +
+      'dead-man switch, which fires on the JOB`S ABSENCE, reports it present. That is ADR-239`s ' +
+      'defect with a clock in front of it, and it is strictly worse for a trader than the ' +
+      'unswept estate the switch alarms on today.',
   },
   {
     module: './withdrawals/approval-sweep.ts',

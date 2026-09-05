@@ -938,7 +938,125 @@ const sessionLabel = (file) => {
   return `${m[1]} - Session ${Number(m[2])}`;
 };
 
+// -----------------------------------------------------------------------------
+// ADR-339. THE LETTERED SEQUENCE OF `packages/db/DELTA_MANIFEST.md`, DERIVED
+// FROM THAT FILE'S OWN HEADINGS RATHER THAN TYPED BESIDE THEM.
+// -----------------------------------------------------------------------------
+// `## 4c.` HEADS FOUR SECTIONS. The manifest's section 16 is a section-number
+// allocation table written after three sections were numbered `14` in one day,
+// and beside its numeric table sits a lettered escape hatch: `4a` was inserted
+// between 4 and 5 so a section could belong in the middle without disturbing
+// what cites 5. A LETTERED SECTION TAKES NO ROW IN THAT TABLE, by the file's own
+// written rule, because "adding rows for them would make the table's own key
+// ambiguous between a number and a name". So the letters' entire register was a
+// SENTENCE, and the sentence said `4c` recorded one fold when it records four.
+//
+// THE COLLISION WAS BUILT BY THREE UNION MERGES ON ONE DAY, which is the shape
+// no branch can see: `4b` and the first `4c` landed 2026-08-17 and 2026-08-20,
+// and the other three `4c`s arrived in commits whose subjects read "Merge
+// origin/main: union the M06 delta table and the manifest". Each fold branch
+// appended a differently-worded section under the same heading, so git had
+// nothing to conflict on. That is `OI-06`'s cause and section `14`'s cause, a
+// third time, in the sequence that exists because of the first two.
+//
+// IT IS NOT RENUMBERED AND NOTHING HERE DEMANDS THAT A KEY BE TAKEN ONCE. The
+// file rules its own collisions in terms: "Neither is renumbered ... The
+// collision is left in place and the table allocates forward", because
+// renumbering breaks every citation of whichever one moves. A uniqueness check
+// over the letters would therefore be RED ON LANDING over a state this document
+// ruled correct, which is what ADR-337 section 8.2 found when it read the
+// uniqueness gate the numeric half had specified and could not write. THE
+// TOLERANCE EXTENDS TO THE LETTERS. What does not extend is the record that pays
+// for it: on the numeric side a tolerated collision is written into rows a human
+// wrote and cited with its subject attached, `section 14 (0029)` and `section 21
+// (0038)`, and on the lettered side four sections shared a key and the
+// multiplicity was typed once, wrongly, for sixteen days.
+//
+// SO THIS IS A SPAN AND NOT A CHECK, AND THAT IS ADR-034's RULING RATHER THAN A
+// PREFERENCE: "no document states a quantity a script can derive, unless the
+// number sits in a generated span the script rewrites". The paragraph stated two
+// derivable quantities in prose. `OI-24` names this exact remedy for this exact
+// class -- "the count becomes a `<!--gen:-->` span under `CI-06g`, computed from
+// the delta table it describes, and then no session touches it again" -- and
+// `m06_delta_count` below is that remedy already taken once. A CHECK WOULD
+// REPORT THE DRIFT; A SPAN MAKES IT UNREPRESENTABLE, and where both are
+// available the corpus has ruled for the second.
+//
+// THREE THINGS IT DOES NOT DO, stated because the third is the reason a reader
+// might have wanted a gate instead.
+//   1. IT DOES NOT PREVENT OR REPORT A NEW COLLISION. Two branches each
+//      appending `4d` merge to a register that says `4d` twice, regenerate
+//      clean, and pass. Uniqueness is refused above, so nothing here can, and
+//      the honest position is that the lettered sequence cannot be protected
+//      from the collision it suffered.
+//   2. IT DOES NOT READ A SECTION'S CONTENT, on `RI-37`'s own limit one registry
+//      over. It transcribes the heading and asserts nothing about what is under
+//      it.
+//   3. IT SELF-HEALS SILENTLY. A session that appends a letter and runs
+//      `generate` gets a correct register and is told nothing, where a session
+//      that writes a NUMBERED section must claim its number in a row a human
+//      types. That asymmetry is the file's own ruling and not an oversight: "A
+//      lettered section deliberately claims no number", so there is no claim to
+//      make deliberate and the only thing owed is an accurate record.
+//
+// THROWS ON ZERO, on `RI-37`'s rule-1 sentinel idiom and `adr_registry`'s. Every
+// lettered heading vanishing means the heading reader has moved, and an empty
+// register regenerating quietly over a file that carries six of them is the
+// loud-and-wrong direction. Sections are append-only, so zero is unreachable on
+// a tree that has any.
+//
+// @param {string} body The manifest, whole.
+// @returns {string} The register, as a table span body.
+export function letteredSections(body) {
+  /** @type {Map<string, string[]>} */
+  const taken = new Map();
+  // A FENCED BLOCK IS A QUOTED TRANSCRIPT AND NOT A HEADING, which is `spansIn`'s
+  // rule above and `CI-06t`'s and `CI-06v`'s. It changes nothing today, measured
+  // rather than assumed: this file carries 38 fenced blocks and ZERO `## ` lines
+  // inside them. It is here because a runner transcript quoting a heading is
+  // exactly what the sections of this file are made of, and a register poisoned
+  // by a quotation regenerates quietly. `RI-37`'s own heading reader does NOT
+  // mask fences and is not changed from here.
+  let fenced = false;
+  for (const line of body.split('\n')) {
+    if (line.startsWith('```')) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    const heading = /^## (\d+)([a-z]+)\.[ \t]*(.*)$/.exec(line);
+    if (heading === null) continue;
+    const key = `${heading[1]}${heading[2]}`;
+    taken.set(key, [...(taken.get(key) ?? []), (heading[3] ?? '').trim()]);
+  }
+  if (taken.size === 0) {
+    throw new Error(
+      'lettered_sections found no `## <n><letter>.` heading in packages/db/DELTA_MANIFEST.md. ' +
+        'That file carries the lettered escape hatch its own section 16 allocates, so zero ' +
+        'means the heading reader has moved rather than that the hatch was never taken, and a ' +
+        'register that regenerated empty would erase the four-way `4c` collision it exists to ' +
+        'record',
+    );
+  }
+  const rows = [...taken]
+    .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10) || a[0].localeCompare(b[0]))
+    .map(([key, subjects]) => `| \`${key}\` | ${subjects.length} | ${subjects.join('; ')} |`);
+  return (
+    '\n| Lettered section | Times taken | What each one records, read from its own heading |\n' +
+    `|---|---|---|\n${rows.join('\n')}\n`
+  );
+}
+
 const SPAN_QUERIES = {
+  // ADR-339. The lettered half of the manifest's section 16, which had no
+  // register at all until this span: the letters take no row in the
+  // section-number table by that table's own rule, so what stood in their place
+  // was a sentence carrying a count and a maximum. The count was wrong by three
+  // for sixteen days and the maximum is the instruction the last three sessions
+  // each read to decide whether to take a letter. The argument, the tolerance
+  // ruling and the three things this does not do are above the function.
+  lettered_sections: () => letteredSections(read('packages/db/DELTA_MANIFEST.md')),
+
   // OI-25. Eleven keys built from FIXTURE_STATUSES and FIXTURE_BLOCKERS below,
   // so a term added there gets its query on the same commit. The argument is in
   // the script's own header and in ADR-133; this is the whole of the wiring.

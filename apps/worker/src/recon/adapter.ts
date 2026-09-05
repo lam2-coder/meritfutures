@@ -32,6 +32,15 @@
 // deployable's `src/` names `@merit/db` and this file is not it; every
 // capability it holds arrives through `../db.ts`.
 //
+// **THE TERM CONSTRUCTOR ARRIVES THROUGH THAT SAME FILE AND THIS ROW DID NOT PUT
+// IT THERE.** `src/db.ts` re-exports `atMost` and `isNull` from `packages/db`
+// and argues at length why a term is not a door: it reaches no table, it has no
+// key vocabulary and no scope predicate, and there is no argument position in
+// the accessor where a term becomes a scope. This file uses one of the two, and
+// {@link reconIsNull} narrows it against its own discriminant rather than
+// wrapping it, because that file's rule is that a term is passed through
+// UNTOUCHED or the accessor stops recognising it.
+//
 // -----------------------------------------------------------------------------
 // 2. `ADR-102`'s `WHERE`-LESS WRITE PATH IS NOT THIS PORT'S BLOCKER, AND THE
 //    DIFFERENCE IS THE METHOD NAME
@@ -128,7 +137,7 @@
 //      `schedule.ts`'s and `ADR-345` records it as an open question.
 // =============================================================================
 
-import { columnIsNull } from '../db.ts';
+import { isNull } from '../db.ts';
 import type { WorkerDb } from '../db.ts';
 import type {
   ReconFilter,
@@ -269,22 +278,28 @@ function filterValue(key: string, where: ReconFilter, column: string): unknown {
  * `ADR-157`'s `IS NULL`, minted by `packages/db` and narrowed to the one member
  * this port declares.
  *
- * **`columnIsNull()` RETURNS THE WHOLE `FilterTerm` UNION AND `ReconFilterTerm`
- * IS ONE MEMBER OF IT, SO SOMETHING HAS TO NARROW.** The choices are a cast and
- * a check, and this is a check: the discriminant is read, a term that is not
+ * **`isNull()` RETURNS THE WHOLE `FilterTerm` UNION AND `ReconFilterTerm` IS ONE
+ * MEMBER OF IT, SO SOMETHING HAS TO NARROW.** The choices are a cast and a
+ * check, and this is a check: the discriminant is read, a term that is not
  * `is-null` is a THROW, and `tsc` narrows the union on the same line. A cast
  * would have compiled identically today and would have quietly become an
  * `at-most` with an undefined bound on the day somebody reordered that
  * vocabulary.
  *
- * **THE TERM IS MINTED PER CALL AND NEVER CACHED.** `packages/db` keeps a
+ * **THE TERM ITSELF IS PASSED THROUGH UNTOUCHED, WHICH IS `src/db.ts`'s OWN
+ * RULE AND IS WHY THIS IS A GUARD RATHER THAN A WRAPPER.** `packages/db` keeps a
  * module-private `WeakSet` of the terms it minted and `isFilterTerm` reads
- * IDENTITY rather than shape, so a shared constant here would work until
- * somebody froze or cloned it. `isNull`'s own docstring states the same rule
- * from the other side.
+ * IDENTITY rather than shape, so a function here that rebuilt the object, spread
+ * it or froze a copy would hand back something the accessor refuses, and the
+ * refusal would arrive at the first live scan. The value returned below is the
+ * one `packages/db` minted, and nothing is done to it but read one field.
+ *
+ * **AND IT IS MINTED PER CALL AND NEVER CACHED**, for the same reason: a shared
+ * constant would work right up until somebody exported it, which is `isNull`'s
+ * own docstring stating the rule from the other side.
  */
 function reconIsNull(): ReconFilterTerm {
-  const term = columnIsNull();
+  const term = isNull();
   if (term.term !== 'is-null') {
     throw new ReconAdapterError(
       'dailyMarks',

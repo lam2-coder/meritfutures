@@ -39,13 +39,25 @@
 //                                       AND it applies even when the parser is
 //                                       registered after the route
 //
-// `RouteDefinition` is `{ method, path, handler }` and `compose` passes exactly
-// those three to `app.route`, so a route module cannot declare that it is
-// served raw. `registry.ts` and `server.ts` are outside this session's fence,
-// so the permanent seam is ADR-109 ruling 4 and what stands here is
-// `installRawWebhookBodyParser`, which the suite installs and which a wiring
-// session moves into `compose`. Until then this route answers 500 rather than
-// verifying a document the provider did not sign.
+// THIS PARAGRAPH READ: "`RouteDefinition` is `{ method, path, handler }` and
+// `compose` passes exactly those three to `app.route`, so a route module cannot
+// declare that it is served raw. `registry.ts` and `server.ts` are outside this
+// session's fence, so the permanent seam is ADR-109 ruling 4 and what stands
+// here is `installRawWebhookBodyParser`, which the suite installs and which a
+// wiring session moves into `compose`. Until then this route answers 500 rather
+// than verifying a document the provider did not sign."
+//
+// THAT WIRING SESSION WAS ADR-340 AND IT IS DONE. `RouteDefinition` carries
+// `rawBody`, this module's route declares it, and `compose` registers it inside
+// a child context carrying the buffer parser. A LIVE PROCESS ANSWERED
+// `500 internal_error` ON ALL THREE WEBHOOK ROWS UNTIL THAT ROW, with
+// `RawBodyUnavailableError` in the log, so no webhook receiver's own answer was
+// reachable over HTTP at all; it is now. The correction is written beside the
+// paragraph it corrects rather than in place of it, per `RI-14`.
+//
+// THE CLAUSE NUMBER ABOVE IS ALSO WRONG AND IS KEPT SO THE REPAIR IS VISIBLE.
+// ADR-109's raw-body ruling is CLAUSE 6; clause 4 is the unowned replay being a
+// second type. `RI-15`/`RI-16` citation-repair rights, exercised by ADR-340.
 //
 // -----------------------------------------------------------------------------
 // THERE IS NO UPDATE STATEMENT IN THIS MODULE AND THAT IS THE DEDUPE WORKING
@@ -76,10 +88,29 @@
 // -----------------------------------------------------------------------------
 // `packages/psp` ships a port and TWO FAKES (ADR-105). There is no adapter for
 // a real provider and shipping one is a procurement decision nobody has taken,
-// so `productionAdapters` resolves nothing and a live deployment answers
-// `503 service_unavailable`, which is section 2's code for a dependency that is
-// not there. The route is REGISTERED, because the contract row exists and a
-// missing route would answer 404 and look like a contract Merit never wrote.
+// so `productionDeps.adapters` resolves nothing. The route is REGISTERED,
+// because the contract row exists and a missing route would answer 404 and look
+// like a contract Merit never wrote.
+//
+// THIS PARAGRAPH SAID THE LIVE ANSWER WAS "`503 service_unavailable`, which is
+// section 2's code for a dependency that is not there", AND IT IS 404. It also
+// named `productionAdapters`, which is not a symbol in this file. Both are
+// corrected here and kept beside the correction (`RI-14`). The measurement was
+// impossible until ADR-340: every webhook row answered `500 internal_error`
+// because `compose` installed no raw-body parser, so no receiver's own answer
+// was reachable over HTTP and this sentence could not be checked against a
+// process. With the parser registered, `POST /api/v1/webhooks/psp/psp_a` on a
+// live `MERIT_API_SURFACE=public` process answers `404 not_found`.
+//
+// THE 404 IS THE RECEIVER'S AND NOT THE ROUTER'S, AND THE DIFFERENCE IS THE
+// WHOLE OF WHY THIS IS A CORRECTION AND NOT A DEFECT. `receivePspWebhook` step
+// 1 resolves the `:provider` path parameter BEFORE it consults `store` or
+// `applier`, and an unknown provider names no resource, so the 404 is reached
+// and the 503 in step 2 is not. `PSP_IDS` is closed by a CHECK constraint, so
+// with no adapter every provider name is unknown. This is `webhooks-kyc.ts`'s
+// answer for `webhooks-kyc.ts`'s reason, and it is `webhooks-rise.ts` that
+// answers 503, because that row carries no `:provider` and so names no resource
+// that could be absent.
 // =============================================================================
 
 import { createHash } from 'node:crypto';
@@ -93,7 +124,7 @@ import type {
   WebhookHeaders,
   WebhookRefusal,
 } from '@merit/psp';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
@@ -399,8 +430,10 @@ export class RawBodyUnavailableError extends Error {
       `the PSP webhook handler was given \`${received}\` where the raw request bytes belong. ` +
         'API_CONTRACT section 10 requires the HMAC verified BEFORE parsing, and a body this ' +
         'process already parsed cannot be verified: re-serialising it would digest a different ' +
-        'document and refuse every legitimate webhook. Register the buffer content-type parser ' +
-        '(`installRawWebhookBodyParser`) on the instance this route is composed onto. ADR-109.',
+        'document and refuse every legitimate webhook. Declare `rawBody: true` on this route in ' +
+        'its route module, so `compose` registers it inside the context carrying the buffer ' +
+        'content-type parser (`installRawBodyParser`, historically ' +
+        '`installRawWebhookBodyParser`). ADR-340, ADR-109 clause 6.',
     );
     this.name = 'RawBodyUnavailableError';
   }
@@ -427,30 +460,40 @@ export function rawBodyOf(body: unknown): Uint8Array {
 /**
  * Hand this route's content type through as bytes.
  *
- * ONE LINE, AND IT IS NOT IN `server.ts` FOR A REASON RATHER THAN A FENCE. A
- * Fastify content-type parser is per encapsulation context, so registering this
- * on the root instance takes JSON parsing away from every route that lands
- * later. ADR-109 ruling 4 is that `compose` should register raw routes inside
- * their own context; until then this is exported so the suite can install it
- * and a wiring session can find it by name.
+ * THIS DOCBLOCK READ: "ONE LINE, AND IT IS NOT IN `server.ts` FOR A REASON
+ * RATHER THAN A FENCE. A Fastify content-type parser is per encapsulation
+ * context, so registering this on the root instance takes JSON parsing away
+ * from every route that lands later. ADR-109 ruling 4 is that `compose` should
+ * register raw routes inside their own context; until then this is exported so
+ * the suite can install it and a wiring session can find it by name."
+ *
+ * ADR-340 IS THAT SESSION. The function moved to `registry.ts`, beside the only
+ * production caller it now has, and the argument above survives the move
+ * unchanged: it is why `compose` registers raw routes in a CHILD context and
+ * never on the root. What is re-exported here is that one definition and not a
+ * copy, because a second copy would be a second thing to keep true.
+ *
+ * THE OLD NAME IS KEPT AND THE ALIAS IS DELIBERATE. Three suites import this
+ * symbol by this name to build an app without going through `compose`, and
+ * renaming their call sites is churn in files concurrent rows hold. The name in
+ * `registry.ts` drops `Webhook` because `rawBody` is a property of a route and
+ * not of a domain.
  */
-export function installRawWebhookBodyParser(app: FastifyInstance): void {
-  app.addContentTypeParser(
-    'application/json',
-    { parseAs: 'buffer' },
-    (_request: FastifyRequest, body: Buffer, done: (err: Error | null, body?: Buffer) => void) => {
-      done(null, body);
-    },
-  );
-}
+export { installRawBodyParser as installRawWebhookBodyParser } from '../registry.ts';
 
 /**
  * The deployment's dependencies, which today resolve nothing.
  *
  * `packages/psp` holds a port and two FAKES. A fake must never serve a real
- * provider, so this resolves `null` and the route answers 503. Stated as code
- * rather than as a comment, because a comment saying "not wired yet" beside a
- * handler that would happily run a fake is how a fake ships.
+ * provider, so this resolves `null`. Stated as code rather than as a comment,
+ * because a comment saying "not wired yet" beside a handler that would happily
+ * run a fake is how a fake ships.
+ *
+ * THIS DOCBLOCK SAID "the route answers 503" AND THE MEASURED ANSWER IS 404.
+ * `receivePspWebhook` resolves the `:provider` before it looks at `store` or
+ * `applier`, so `adapters: () => null` makes every provider name unknown and
+ * step 1's `not_found` is reached first. See this file's header for the
+ * measurement and why it could not be taken before ADR-340.
  */
 export const productionDeps: PspWebhookDeps = {
   adapters: () => null,
@@ -485,6 +528,9 @@ export default defineRoutes({
       method: 'POST',
       path: PSP_WEBHOOK_PATH,
       handler: pspWebhookHandler(productionDeps),
+      // THE BYTES, OR THIS RECEIVER CANNOT VERIFY ANYTHING. API_CONTRACT
+      // section 10 wants the HMAC verified BEFORE parsing. ADR-340.
+      rawBody: true,
     },
   ],
 });

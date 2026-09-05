@@ -963,19 +963,28 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // inside it and the two lines are assigned rather than reached for.
     './withdrawals/approval-sweep.ts',
     './withdrawals/ports.ts',
-    // ADR-345, row 345, AND THE SIXTH TIME THE PARAGRAPH SEVENTY LINES UP HAS
-    // PREDICTED THIS EDIT. The reconciliation sweep's adapter over `WorkerDb`.
-    // Its two neighbours `./recon/ports.ts` and `./recon/sweep.ts` are matched
-    // by the regex above and were never enumerated here, which is session 387's
-    // choice and not a gap this row repairs; this line is added because the
-    // paragraph above states why two lists that must agree is the stronger
-    // check, and adding one costs a line.
+    // ADR-344, session 530, AND THE SIXTH TIME THE PARAGRAPH ABOVE HAS
+    // PREDICTED THIS EDIT. The hourly expiry sweep's adapter: four of that
+    // job's five ports over this deployable's own doors, with the event sink
+    // taken as a required argument because nothing in this repository can be
+    // passed for it. That row's fence carries `apps/worker/test/**`, so this
+    // file is inside it and the line is assigned rather than reached for.
+    './sweeps/expiry-adapter.ts',
+    // ADR-345, session 536, AND THE SEVENTH TIME, ARRIVING IN THE SAME WAVE AS
+    // THE SIXTH. The reconciliation sweep's adapter over `WorkerDb`. Both rows
+    // wrote the line above their own and both typed 30; the count below is
+    // derived at this merge instead. Its two neighbours `./recon/ports.ts` and
+    // `./recon/sweep.ts` are matched by the regex above and were never
+    // enumerated here, which is session 387's choice and not a gap this row
+    // repairs.
     './recon/adapter.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  // 30 SINCE ADR-345, WHICH ADDED `./recon/adapter.ts`: the reconciliation
-  // sweep's adapter, which makes that job runnable and deliberately does not
-  // schedule it. It was 29 from session 516, which added
+  // 31 SINCE ADR-344 AND ADR-345 LANDED IN ONE WAVE, adding
+  // `./sweeps/expiry-adapter.ts` and `./recon/adapter.ts`. **EACH ROW TYPED 30
+  // AND NEITHER COULD SEE THE OTHER**, which is this literal's whole purpose
+  // arriving twice at once: the merge that keeps both legs is the merge that has
+  // to count them. It was 29 from session 516, which added
   // `./withdrawals/approval-sweep.ts` AND
   // `./withdrawals/ports.ts`, 27 from session 511, which added
   // `./sweeps/ledger.ts`, 26 from session 431, which added `./batch/adapter.ts`,
@@ -998,5 +1007,5 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
   // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
   // path shape in its regex. They are guarded there and not here.
-  expect(new Set(legs).size).toBe(30);
+  expect(new Set(legs).size).toBe(31);
 });
