@@ -119,6 +119,13 @@
 // for schema pgboss`. **`0082_pgboss_app_grants.sql` REMOVED THAT BLOCKER AND
 // ADR-327 ADDED THE LINE.**
 //
+// **THE NEXT TWO PARAGRAPHS ARE HISTORY AS OF ADR-338 AND THEIR CORRECTION
+// FOLLOWS THEM.** They are kept whole and unedited rather than rewritten,
+// because `RI-14` keeps what was corrected beside its correction and because the
+// register's `worker-queue-door-caller` row anchors on a line inside them: an
+// edit to that line would move the anchor in the same commit that falsifies the
+// claim, which is the one way to retire a sentence without leaving a record.
+//
 // THE SAGA IS STILL WRITTEN AGAINST PORTS, and that has not changed with the
 // manifest OR with the door: `ProvisioningJobQueue` is a port,
 // `enqueueProvisioningOp` calls it, and **no adapter over `LIVE_QUEUE` has a
@@ -137,10 +144,39 @@
 // **The row that writes a door is not the row that wires a job** (ADR-165
 // clause 5, ADR-326 section 4).
 //
+// **AND ADR-338 IS THAT ROW, SO THE CLAUSE ABOVE IS FALSE AND THE PREDICTION
+// UNDER IT CAME TRUE AT ITS OWN LINE.** `src/provisioning/queue-adapter.ts`
+// carries `LIVE_PROVISIONING_QUEUE`, the first `ProvisioningJobQueue` under any
+// `src/` in this workspace: before it, the only value of that type anywhere was
+// `fakeQueue()` inside `test/provisioning.test.ts`. The
+// `worker-queue-door-caller` probe flipped to `present`, `RI-35` went red at the
+// clause above rather than at a count somebody would have had to notice, and the
+// register moves that row to `retired` in the same commit, so a tree that loses
+// the adapter again turns leg 3 red at the same line.
+//
+// **WHAT IS WIRED IS ONE PORT OF FOUR AND THE OTHER THREE ARE NAMED RATHER THAN
+// DEFERRED.** `runProvisioningSaga` takes a queue, a platform, an advance port
+// and a read port. `PlatformProvisioningPort`'s implementation is
+// `packages/rithmic`'s and does not exist; `ProvisioningAdvancePort` and
+// `ProvisioningReadPort` are BLOCKED by ADR-102's `WHERE`-less system write path
+// and say so on their own declarations. So the saga still has no caller, `RI-35`
+// still binds that at `provisioning-saga-caller`, and `schedule.ts` still
+// registers the job `unscheduled`.
+//
+// **AND NOTHING IS ENQUEUED, WHICH IS WHAT STOPS THE JOB STORE GROWING.** No
+// module under any `src/` calls the adapter or the saga, so zero rows are
+// written; nothing here may drain one either, because the door withholds
+// `consume` and `start` on ADR-241's one-shot ruling. That is a fact about the
+// tree and not a control, and it expires the moment a caller lands: the row that
+// gives the saga a caller owes a drain, or owes the argument for running without
+// one (ADR-338 section 4).
+//
 // **WHAT IS REAL IS THE PIPELINE, THE DIGEST, THE MACHINE, THE COMPENSATION AND
 // THE EXIT; WHAT IS NOT IS THE WIRING**, and the difference is visible in the
 // type rather than left to a reader. That is this file's own standard for the
-// batch above and it is applied to the saga unchanged.
+// batch above and it is applied to the saga unchanged. **"THE WIRING" IS NOW
+// NARROWER THAN THE SENTENCE AND THE SENTENCE IS KEPT**: the queue half is wired
+// and the platform, advance and read halves are not.
 
 export {
   PROVISIONING_OPERATIONS,
@@ -202,6 +238,17 @@ export {
   enqueueProvisioningOp,
   entitleAfterSetpoint,
   runProvisioningSaga,
+} from './provisioning/index.ts';
+
+// ADR-338. THE SAGA's QUEUE PORT, LIVE. It rides the `./provisioning/index.ts`
+// leg rather than getting one of its own, because that barrel is this
+// directory's single specifier here and a second one would make the
+// `WORKER_BARREL_LEGS` list disagree with itself about how `provisioning`
+// reaches this file.
+export {
+  LIVE_PROVISIONING_QUEUE,
+  declareProvisioningQueue,
+  provisioningJobQueue,
 } from './provisioning/index.ts';
 export type {
   EnqueuedIntent,
@@ -1435,10 +1482,19 @@ export const WORKER_BARREL_LEGS = [
 /**
  * Modules that reach this barrel THROUGH a leg rather than as one.
  *
- * `provisioning/index.ts` is itself a barrel over these six, which is why it is
- * the only `provisioning` specifier above. They are listed rather than left out
- * so that the sweep in the suite is TOTAL: a module that is neither a leg, nor
- * behind one, nor deliberately absent is a module nobody has decided about.
+ * `provisioning/index.ts` is itself a barrel over these EIGHT, which is why it
+ * is the only `provisioning` specifier above. They are listed rather than left
+ * out so that the sweep in the suite is TOTAL: a module that is neither a leg,
+ * nor behind one, nor deliberately absent is a module nobody has decided about.
+ *
+ * **THIS SENTENCE READ "these six" AND THE LIST HELD SEVEN, WHICH IS A COUNT
+ * NOTHING DERIVES.** Found by ADR-338 while adding the eighth, and corrected by
+ * counting the entries below rather than by trusting the word. It is recorded
+ * rather than merely fixed because it is the third hand-written count in this
+ * deployable's barrel to be wrong (`ADR-241` found "FIVE ... enumerated SIX" in
+ * this same file), and the repair that does not need a fourth session is a
+ * derivation: `test/digests.test.ts` reads the list, so the LIST cannot drift
+ * from the tree, and only the numeral in this prose can.
  */
 export const WORKER_MODULES_BEHIND_A_LEG: Readonly<Record<string, string>> = {
   './provisioning/admission.ts': 're-exported through ./provisioning/index.ts',
@@ -1446,6 +1502,7 @@ export const WORKER_MODULES_BEHIND_A_LEG: Readonly<Record<string, string>> = {
   './provisioning/machine.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/payload.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/ports.ts': 're-exported through ./provisioning/index.ts',
+  './provisioning/queue-adapter.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/saga.ts': 're-exported through ./provisioning/index.ts',
   './provisioning/vocabulary.ts': 're-exported through ./provisioning/index.ts',
 };

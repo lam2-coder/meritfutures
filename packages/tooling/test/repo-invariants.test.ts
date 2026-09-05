@@ -774,6 +774,17 @@ function absenceClaimEstate(root: string): void {
   // be REAL here: the claim lines the loop below appends to this same file are
   // comments, and `importedAnywhere` reads the import and never the mention.
   write(root, 'apps/worker/src/queue.ts', "import { pgBossQueue } from '@merit/queue';\n");
+  // ADR-338. `worker-queue-door-caller`'s two claims are `retired`, so the
+  // fixture needs a CALLER of the door past the module that declares it, exactly
+  // as this repository now has one. The probe strips comments before it reads, so
+  // this has to be real code and not a sentence about one; and it must not name
+  // `runProvisioningSaga`, whose own artifact is `live` and must stay ABSENT.
+  write(
+    root,
+    'apps/worker/src/provisioning/queue-adapter.ts',
+    "import { LIVE_QUEUE } from '../queue.ts';\n" +
+      'export const LIVE_PROVISIONING_QUEUE = provisioningJobQueue(LIVE_QUEUE);\n',
+  );
   write(
     root,
     'packages/db/migrations/0078_affiliate_commission_owner.sql',
