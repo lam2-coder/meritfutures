@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { PUBLIC_LOOKUP_ADDRESS } from '@merit/db';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
+
+import { resetCertificateRateLimiter } from '../src/certificate-rate-limit.ts';
+import { admitEveryRequest } from './support/certificate-rate-limit.ts';
 
 import { BASE_PATH, buildServer, discoverRouteModules } from '../src/index.ts';
 import {
@@ -113,8 +116,20 @@ const LINKS: CertificateLinks = {
   image_url: 'about:blank#image',
 };
 
+// THE LIMIT IS NOT WHAT THIS FILE ASSERTS AND IT SAYS SO RATHER THAN INHERITING
+// IT. ADR-347 put a fail-closed rate limiter ahead of both public certificate
+// rows, so every case below would answer 503 under the port's own default. The
+// stub `admitEveryRequest` installs counts nothing, which keeps a per-file
+// request budget from coupling cases that assert something else;
+// `certificate-rate-limit.test.ts` is where the real limiter is driven over its
+// threshold, held under it, and stripped of its configuration.
+beforeEach(() => {
+  admitEveryRequest();
+});
+
 afterEach(() => {
   resetCertificateImageSource();
+  resetCertificateRateLimiter();
 });
 
 // -----------------------------------------------------------------------------

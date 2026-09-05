@@ -8529,12 +8529,23 @@ const RETIRED_REGISTER = new Map([
   [
     'packages/db/DELTA_MANIFEST.md',
     {
-      sites: 7,
+      sites: 10,
       why:
-        'the two supersession sections, which name the retired constraint in order to retire it ' +
-        'and quote verbatim the PostgreSQL error that names it. Dated in practice and NOT ' +
+        'the three supersession sections, which name the retired constraint in order to retire ' +
+        'it and quote verbatim the PostgreSQL error that names it. Dated in practice and NOT ' +
         'exempted as a class: the manifest is a live specification of the schema delta, and a ' +
-        'reader asking what the database does today does land in it',
+        'reader asking what the database does today does land in it. ' +
+        'THIS NUMBER WAS RAISED ONCE, FROM 7 TO 10, ON 2026-09-05 BY ADR-351, AND IT IS THE ' +
+        'ONLY RAISE ANY ENTRY IN THIS REGISTER HAS TAKEN. A register that only shrinks and is ' +
+        'pinned in both directions makes a THIRD supersession section unwritable, and the ' +
+        'section in question is a landing record RI-37 requires for a merged migration whose ' +
+        'whole content is a supersession. The three new sites are the same three kinds the ' +
+        'seven already registered are: the sentence that states what the migration dropped, the ' +
+        'verbatim psql refusal on re-application, and the delta row. The alternative was a ' +
+        'landing record for a supersession that may not say what it superseded, which is ' +
+        'weakening the record rather than the gate and is worse than either. A RAISE IS A ' +
+        'RULING AND IT LEAVES ITS ADR NUMBER HERE; a raise that arrives without one is the ' +
+        'thing this register exists to make somebody stop and justify',
     },
   ],
   [

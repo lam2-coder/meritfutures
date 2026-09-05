@@ -57,6 +57,10 @@
 
 import { databaseAuthBackend } from './auth-backend.ts';
 import { databaseCertificateImageSource } from './certificate-image-source.ts';
+import {
+  environmentCertificateRateLimiter,
+  useCertificateRateLimiter,
+} from './certificate-rate-limit.ts';
 import { LIVE_DB } from './db.ts';
 import { main } from './index.ts';
 import { databaseAccountReads, useAccountReadsBackend } from './routes/account-reads.ts';
@@ -161,13 +165,34 @@ setEconomicCalendarSource(databaseEconomicCalendar(LIVE_DB));
 // `RI-22` EXECUTES it on every CI-01 pass and measures the draws rather than
 // reading the source.
 //
-// TWO OF THE THREE CONTROLS THIS ROUTE RESTS ON NOW EXIST AND THE THIRD DOES
-// NOT. The entropy is real and asserted; the `certificate_verifications` write
-// below is real; the rate limit per IP and per ASN that `INV-M11-05` requires in
-// its own words and `API_CONTRACT:1473` rows as data EXISTS NOWHERE IN THIS
-// TREE. ADR-235 section 5 rules it owed rather than discharged, because no
-// arithmetic about the code space discharges a clause of the invariant that
-// names a limit.
+// THIS PARAGRAPH READ "TWO OF THE THREE CONTROLS THIS ROUTE RESTS ON NOW EXIST
+// AND THE THIRD DOES NOT ... the rate limit per IP and per ASN that
+// `INV-M11-05` requires in its own words and `API_CONTRACT:1473` rows as data
+// EXISTS NOWHERE IN THIS TREE", and ADR-347 landed the part of it that is real,
+// so it is amended in place rather than deleted. TWO CORRECTIONS, BOTH
+// MEASURED. The first is the citation: section 11's `GET /verify/:code` row is
+// at `API_CONTRACT:1506` on this tree and `:1473` lands in section 9's ops
+// table, which is the drift `RI-15` and `RI-16` exist for and this file holds
+// repair rights over. The second is the claim itself.
+//
+// THE THIRD CONTROL NOW EXISTS IN ONE OF ITS TWO DIMENSIONS AND THE OTHER IS
+// STILL OWED. `src/certificate-rate-limit.ts` holds a PER-IP limit over this
+// row, installed below, whose numbers are the deployment's and whose absence is
+// a `503` rather than an unmetered route (ADR-226). THE PER-ASN DIMENSION
+// EXISTS NOWHERE IN THIS TREE and ADR-347 records it owed with its blocker
+// named: an ASN is not observable from a socket, no data source in this
+// workspace maps an address to one, `certificate_verifications` has no column
+// for it, and the egress that would reach a public resolver is refused. ADR-235
+// section 5 still rules the clause owed rather than discharged for that half,
+// because no arithmetic about the code space discharges a clause of the
+// invariant that names a limit.
+//
+// AND WHAT THE PER-IP HALF IS WORTH IS WRITTEN WHERE IT IS PAID. `request.ip`
+// is the immediate peer, because `server.ts:170` configures no `trustProxy`, so
+// the dimension is a real per-caller limit exactly while this origin is reached
+// directly and becomes a global one with a per-IP name the day it is not.
+// SECURITY C-07 rows this control as "edge and app" and only the app half is in
+// this repository.
 //
 // AND THE COLUMN IS STILL UNBOUNDED. `certificates.code` is `text NOT NULL`
 // with no length or alphabet CHECK, so what defends this route is that the mint
@@ -201,10 +226,20 @@ useVerifySource(databaseVerifySource(LIVE_DB));
 // PAID. ADR-249 section 2.2 accepted in writing that render-on-fetch is compute
 // an attacker can drive, and ADR-256's approval block says the acceptance "was
 // cheap while the render did not exist". THIS LINE IS WHERE IT STOPS BEING
-// CHEAP: a PNG encode now sits on an unauthenticated public path, `FM-M11-05`'s
-// cache is owed and unbuilt, and the rate limit per IP and per ASN that
-// `INV-M11-05` requires in its own words EXISTS NOWHERE IN THIS TREE. ADR-261
-// ships UNSIGNED and this is the sentence a founder is asked to read.
+// CHEAP: a PNG encode sits on an unauthenticated public path. ADR-261 ships
+// UNSIGNED and this is the sentence a founder is asked to read.
+//
+// THE REST OF THAT SENTENCE READ "`FM-M11-05`'s cache is owed and unbuilt, and
+// the rate limit per IP and per ASN that `INV-M11-05` requires in its own words
+// EXISTS NOWHERE IN THIS TREE", AND ONE HALF OF IT IS NO LONGER TRUE. ADR-347
+// built the limit this row's own section 11 line names, PER IP AND PER `code`,
+// installed below and refusing `429` with `Retry-After` when either is spent;
+// its numbers are the deployment's and an absent one answers `503` for every
+// code alike. WHAT IS STILL OWED IS `FM-M11-05`'s CACHE, unbuilt, so every
+// admitted fetch is still a full encode; ADR-347 declined it deliberately rather
+// than by omission, because a cache keyed `(code, row_version)` puts a timing
+// difference between two VALID codes and is a different control with its own
+// ruling to take.
 //
 // THE LIST ROW IS NOT WIRED BY THIS LINE AND MUST NOT BE READ AS RELEASED BY
 // IT. `useCertificateBackend` waits on an origin AND on a guard that makes
@@ -239,13 +274,44 @@ useCertificateImageSource(databaseCertificateImageSource(LIVE_DB));
 // there is no key beside it: the card carries no signature at all.
 //
 // AND THE COST THIS LINE ADDS TO THE ONE ABOVE, NAMED WHERE IT IS PAID. The
-// image row is a PNG encode on an unauthenticated path with no rate limit and no
-// cache; this row is what puts its address in front of every trader who opens
-// their certificates page, so the traffic ADR-261's founder block accepted in
-// principle is the traffic this line invites. `INV-M11-05`'s limit per IP and
-// per ASN still EXISTS NOWHERE IN THIS TREE and `FM-M11-05`'s cache is still
-// owed. ADR-266 ships UNSIGNED and this is the sentence a founder is asked to
+// image row is a PNG encode on an unauthenticated path; this row is what puts
+// its address in front of every trader who opens their certificates page, so the
+// traffic ADR-261's founder block accepted in principle is the traffic this line
+// invites. ADR-266 ships UNSIGNED and this is the sentence a founder is asked to
 // read beside the one above it.
+//
+// THIS PARAGRAPH READ "with no rate limit and no cache ... `INV-M11-05`'s limit
+// per IP and per ASN still EXISTS NOWHERE IN THIS TREE and `FM-M11-05`'s cache
+// is still owed", AND IT IS AMENDED RATHER THAN DELETED. The image row now
+// carries a per-IP and per-`code` limit (ADR-347, installed below); the PER-ASN
+// dimension `INV-M11-05` names for the VERIFY row and `FM-M11-05`'s cache are
+// both still owed, each with its blocker written in the entry.
+//
+// AND THIS ROW IS NOT ITSELF RATE LIMITED, WHICH IS THE CONTRACT'S CHOICE
+// RATHER THAN AN OMISSION. `GET /certificates` is `Auth: session`, scoped to the
+// caller's identity, so section 11 answers it under "Authenticated reads,
+// 120/minute/identity" and NOT under either public certificate row. That limit
+// is a fourth thing this tree does not have, it is owed by whatever slice takes
+// the authenticated surface, and ADR-347's fence stops at the two public rows.
 useCertificateBackend(databaseCertificateBackend(LIVE_DB));
+
+// `INV-M11-05`'s rate limit, over the two PUBLIC certificate rows above.
+// ADR-347.
+//
+// IT IS NOT A DATABASE PORT AND IT IS INSTALLED HERE ANYWAY, which is worth one
+// sentence because every other line in this file installs a door. What this one
+// installs is a COUNTER plus the deployment's numbers, and it belongs here for
+// the reason this file's header already gives: `index.ts` is the package's
+// `exports` target and importing it must have no effect, so a module-level
+// default that counted on import would give every suite that imports a route a
+// limiter it did not ask for. A process that never ran this file holds
+// `UNWIRED_CERTIFICATE_RATE_LIMITER` and answers 503 on both public rows,
+// exactly as it does for auth.
+//
+// AND IT IS THE LAST LINE RATHER THAN THE FIRST FOR NO ORDERING REASON AT ALL.
+// Nothing above reads the limiter and the limiter reads nothing above it; this
+// file's header rules the conflict shape for concurrent slices as an APPEND, and
+// this is one.
+useCertificateRateLimiter(environmentCertificateRateLimiter());
 
 await main();

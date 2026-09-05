@@ -720,8 +720,11 @@ function rgb(hex: string): readonly number[] {
  * COLOUR TYPE 3 AT BIT DEPTH 8, which is one byte per pixel against a four
  * entry palette. The alternative, truecolour, triples the bytes handed to
  * `deflate` for an artefact carrying four colours; ADR-249 section 2.2 accepted
- * a render cost on an unauthenticated public path WITH THE RATE LIMIT STILL
- * OWED, so the cheap encoding is the one that respects that acceptance.
+ * a render cost on an unauthenticated public path, and this sentence read "WITH
+ * THE RATE LIMIT STILL OWED" until ADR-347 landed one. The limit is now the
+ * bound on HOW MANY encodes an attacker can drive and this choice is still the
+ * bound on WHAT EACH ONE COSTS, so the cheap encoding is the one that respects
+ * the acceptance rather than the one the limit made unnecessary.
  *
  * EVERY SCANLINE CARRIES FILTER TYPE 0. A predictor would compress better and
  * would be a second algorithm to get wrong; the deflate is doing the work.

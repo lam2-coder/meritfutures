@@ -239,11 +239,15 @@ export function toCardInput(row: VerifyRow, copy: CertificateCardCopy): Certific
  * WHAT IS STILL OWED AND IS NOT BUILT HERE: `FM-M11-05`'s CACHE. This adapter
  * renders on every fetch, which is ADR-249 section 2.2's ruling and its accepted
  * cost; `renderCertificateCard` returns the derived `version` that a cache keyed
- * on `(code, version)` needs, and nothing reads it yet. THE RATE LIMIT
- * `INV-M11-05` REQUIRES ALSO EXISTS NOWHERE IN THIS TREE, and ADR-256's founder
- * block is explicit that wiring this port before it exists puts a PNG encode on
- * an unauthenticated path. `start.ts` carries that statement at the line that
- * installs this.
+ * on `(code, version)` needs, and nothing reads it yet.
+ *
+ * THIS PARAGRAPH ALSO SAID "THE RATE LIMIT `INV-M11-05` REQUIRES ALSO EXISTS
+ * NOWHERE IN THIS TREE", AND THAT HALF IS AMENDED RATHER THAN DELETED. ADR-347
+ * built it: `src/certificate-rate-limit.ts`, per IP and per `code` on this row,
+ * decided in `imageHandler` BEFORE this adapter is reached, so the render an
+ * attacker can drive is now bounded by numbers the deployment sets. ADR-256's
+ * founder block remains the right sentence about the cache, which is the part
+ * still unbuilt, and `start.ts` carries both at the line that installs this.
  */
 export function databaseCertificateImageSource(
   db: ApiDb,
