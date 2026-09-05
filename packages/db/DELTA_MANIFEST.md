@@ -750,28 +750,57 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 > finding**, which is [ADR-074](../../docs/decisions/ADR-074.md) section 7's own distinction
 > and the reason the ten members that were never the manifest's namespace are not filed here
 > to satisfy a gate.
+>
+> **AND THE `State` COLUMN IS SUPERSEDED TOO, AS OF 2026-09-05, WHICH THIS BANNER DID NOT SAY
+> FOR TWO YEARS OF SESSIONS AND SHOULD HAVE** ([ADR-351](../../docs/decisions/ADR-351.md)
+> section 4). Superseding the ALLOCATOR and saying nothing about the other two columns is why
+> **nine of these rows still read `Open` against items that had closed**: `OI-01`, `OI-03`,
+> `OI-04`, `OI-09`, `OI-11`, `OI-12`, `OI-13`, `OI-24` and `OI-27`. A reader who correctly
+> stopped reading this table for a NUMBER went on reading it for a STATE, which is the most
+> decayable of the three columns and the one nothing was checking.
+>
+> **THE FAILURE WAS SCOPE AND NOT VOLUME.** The banner was obeyed: no session has taken a
+> number here since [session 141](../../docs/sessions/2026-08-23-session-141.md). It simply
+> superseded one column of three.
+>
+> **THE REPAIR IS NOT A REWRITE.** Every one of the nine keeps the words it was written with,
+> and each gains its live disposition BESIDE them, on `RI-14`'s rule that corrected text
+> stays beside its correction. **Each disposition names the artifact that closed the item and
+> was verified against that artifact**, never against
+> [ALLOCATION](../../docs/decisions/ALLOCATION.md): a pointer to a second register is what let
+> nine cells drift while both registers passed every gate. Where a row and its closure
+> disagree in substance, as `OI-04`'s two-against-three does, the disagreement is written down
+> and left for a reader rather than resolved here.
+>
+> **READ A `State` CELL HERE AS THE STATE ON THE DAY THE ROW WAS WRITTEN, plus whatever
+> disposition follows it.** It is a dated record and not a live register, and a tenth item can
+> go stale in this table tomorrow without any gate reporting it: nothing mechanical reconciles
+> these cells against anything. `OI-06` went stale in the OTHER direction, closed here and in
+> [`0051:8`](migrations/0051_payout_destinations.sql) while
+> [ALLOCATION](../../docs/decisions/ALLOCATION.md) still read `Open`, which is the same defect
+> seen from the far side.
 
 **The next free number is read from [ALLOCATION](../../docs/decisions/ALLOCATION.md), never from this table.**
 
 | `OI-nn` | Claimed by | State |
 |---|---|---|
-| `OI-01` | the schema-delta fold | **allocated.** `liability_snapshots`' two shapes. Open, founder ruling |
+| `OI-01` | the schema-delta fold | **allocated.** `liability_snapshots`' two shapes. Open, founder ruling. **CLOSED 2026-08-16 by [ADR-128](../../docs/decisions/ADR-128.md) and [`0049_reserve_coverage_snapshots.sql:10`](migrations/0049_reserve_coverage_snapshots.sql), whose own header says it closes `OI-01`; `liability_snapshots` and `reserve_coverage_snapshots` both stand on the applied schema, read at `information_schema.tables`.** The words before this sentence are the row as it was written and are kept (`RI-14`) |
 | `OI-02` | the schema-delta fold | **allocated.** `published_statistics` and the missing measure. Closed by [ADR-032](../../docs/decisions/ADR-032.md) |
-| `OI-03` | the schema-delta fold | **allocated.** `0026`'s append-only revoke list against DATA_MODEL. Open |
-| `OI-04` | the schema-delta fold | **allocated.** Two legitimate updates on append-only tables. Open |
+| `OI-03` | the schema-delta fold | **allocated.** `0026`'s append-only revoke list against DATA_MODEL. Open. **CLOSED by [ADR-128](../../docs/decisions/ADR-128.md) and [`assert_append_only_grants.mjs`](../../scripts/db/assert_append_only_grants.mjs), which needed no migration number. Verified by running it: green on the fully applied schema, and red on each of three separately seeded grants, naming the table each time.** The words before this sentence are kept as written |
+| `OI-04` | the schema-delta fold | **allocated.** Two legitimate updates on append-only tables. Open. **CLOSED by [ADR-128](../../docs/decisions/ADR-128.md) and [`0048`](migrations/0048_audited_writes_on_append_only_tables.sql). AND THE ROW SAYS TWO WHERE THE CATALOGUE HOLDS THREE**: `pg_proc.prosecdef` on the applied schema returns `rewrite_rule_state`, `supersede_daily_mark` and `suppress_identity_link`. Section 25 already records that this row is imprecise in two other places. The count is left standing beside its correction rather than edited |
 | `OI-05` | the schema-delta fold | **allocated.** The plan-version immutability defect. Closed by [ADR-035](../../docs/decisions/ADR-035.md) and `0028` |
 | **`OI-06`** | **CLAIMED TWICE, 2026-08-16, and left that way.** FOLD-01's session and S-E's session | **allocated twice.** `OI-06 (payout destinations)` is **open**; `OI-06 (calendar prior image)` is **closed** by [ADR-045](../../docs/decisions/ADR-045.md) and `0033` |
 | `OI-07` | FOLD-01 session 3 | **allocated.** `0029` had no committed probe. Closed 2026-08-16 |
 | `OI-08` | FOLD-01 session 3 | **allocated.** The positional NO-FLOATS block. Closed 2026-08-16 |
-| **`OI-09`** | this session | **allocated.** `CI-06n` accepts a link in prose where its own title says a row. Open, and section 17 records how it was found |
+| **`OI-09`** | this session | **allocated.** `CI-06n` accepts a link in prose where its own title says a row. Open, and section 17 records how it was found. **CLOSED 2026-08-27 by [ADR-132](../../docs/decisions/ADR-132.md) and the parser it narrows. Verified at the runner rather than at the ruling: `CI-06n` passes with its own note reading `0 entry link(s) outside any row`.** |
 | `OI-10` | the review desk, 2026-08-16 | **allocated.** Keep-both merges duplicated four passages in STATE and no gate could see it. Deduplicated; the gate that would catch it is unwritten. **This row was missing from this table**, claimed in [STATE](../../docs/STATE.md) and never brought back here, which is the drift the table exists to end |
-| **`OI-11`** | `0035`'s session | **allocated, open.** **A duplicate row in an allocation table is invisible to every gate.** `allocated()` accumulates claims into a `Set`, so the two adjacent rows both claiming `0034` produced one member and twelve gates passed. The check is cheap and blocked on a cleanup: the ADR table claims `039` to `046` twice each and the migration table claims `0033` twice, so it fails on arrival. See [ALLOCATION](../../docs/decisions/ALLOCATION.md) |
-| **`OI-12`** | `0035`'s session | **allocated, open.** **A calendar `INSERT` moves no watermark.** `0033` guards every way a day can change; a day backfilled inside an existing coverage window changes the day sequence retroactively with no revision row, and every stamped `rule_states` row still claims a watermark that looks current. ADR-045 owns `trading_calendar`'s guards and ADR-047 does not rule it |
-| **`OI-13`** | `0035`'s session | **allocated, open.** **B.4 step 4's audited rewrite has no grant.** `0026` revoked `UPDATE` on `rule_states` from `merit_app` and `PUBLIC` and no `SECURITY DEFINER` function performs it. Pre-existing and identical for `engine_version`; `calendar_revision_id` makes a second caller for a path that has none |
+| **`OI-11`** | `0035`'s session | **allocated, open.** **A duplicate row in an allocation table is invisible to every gate.** `allocated()` accumulates claims into a `Set`, so the two adjacent rows both claiming `0034` produced one member and twelve gates passed. The check is cheap and blocked on a cleanup: the ADR table claims `039` to `046` twice each and the migration table claims `0033` twice, so it fails on arrival. See [ALLOCATION](../../docs/decisions/ALLOCATION.md). **CLOSED by `CI-06w`, and the blocker this row named is spent. Verified at the runner: `CI-06w` passes, its note reading `338 ADR number(s) over 338 claim(s)` and `82 migration number(s) over 82 claim(s)`, so the duplicate rows it says would make it fail on arrival are gone.** `RI-37` leg 4 states the residue it does NOT absorb, which is a future duplicate row in the section-number table below |
+| **`OI-12`** | `0035`'s session | **allocated, open.** **A calendar `INSERT` moves no watermark.** `0033` guards every way a day can change; a day backfilled inside an existing coverage window changes the day sequence retroactively with no revision row, and every stamped `rule_states` row still claims a watermark that looks current. ADR-045 owns `trading_calendar`'s guards and ADR-047 does not rule it. **CLOSED by [ADR-128](../../docs/decisions/ADR-128.md) and `CALENDAR-C3`, named as this item's remedy at [`0048:36`](migrations/0048_audited_writes_on_append_only_tables.sql).** |
+| **`OI-13`** | `0035`'s session | **allocated, open.** **B.4 step 4's audited rewrite has no grant.** `0026` revoked `UPDATE` on `rule_states` from `merit_app` and `PUBLIC` and no `SECURITY DEFINER` function performs it. Pre-existing and identical for `engine_version`; `calendar_revision_id` makes a second caller for a path that has none. **CLOSED by [ADR-128](../../docs/decisions/ADR-128.md) and `rewrite_rule_state`, named as this item's remedy at [`0048:35`](migrations/0048_audited_writes_on_append_only_tables.sql) and present on the applied schema as one of three `SECURITY DEFINER` functions.** |
 | **`OI-15`** | `0043`'s session | **CLOSED 2026-08-27 by [session 246](../../docs/sessions/2026-08-27-session-246.md), and the class under it is now a runnable check.** The record carries the two columns, the `CHECK` and the fourth index, read from the migration. **[`data-model-columns.mjs`](../../scripts/corpus/data-model-columns.mjs) is the reconciliation this row said no gate could do** ([ADR-134](../../docs/decisions/ADR-134.md)); it is landed and **deliberately unregistered**, because it found three SIBLING records missing a column each and all three were outside that session's fence. **Originally: allocated, open.** **[The `admin_actions` design record](../../docs/architecture/data-model/admin_actions.md) does not carry `SD-M6-11`'s two columns, its `CHECK` or its fourth index.** The migration is the truth and the record trails it by one session, which is `OI-01`'s shape on a smaller surface. **No gate sees this**: `CI-06i` reconciles the TABLE set in both directions and nothing in the runner reconciles COLUMNS, so a design record can contradict its own DDL indefinitely and every gate passes. Recorded here rather than left as prose because `docs/architecture/data-model/` was not in the writing session's fence and four sibling sessions were in flight against `M06` |
 | **`OI-14`** | `0035`'s session | **allocated. CLOSED 2026-08-27 by [session 241](../../docs/sessions/2026-08-27-session-241.md), on an EXECUTED refusal rather than on a diff.** **The replay job must refuse an empty in-scope set.** If the engine never populates `calendar_revision_id`, every row reads as out of scope after the first correction, the audit compares nothing, and an audit that has stopped looking reports exactly like one that found nothing (FM-17). No per-row constraint can tell "not yet written" from "pristine calendar" without fabricating, so it belongs to the job. **The job is [`runReplayAudit`](../../apps/worker/src/batch/replay.ts) and it throws `ReplayAuditRefusal` on `report.storedRows > 0 && report.inScope === 0`**, asserted by `it('REFUSES a run that compared nothing while rows exist (OI-14)')` in [`replay.test.ts`](../../apps/worker/test/replay.test.ts), which pins the MESSAGE and not only the class because three guards throw that class. **The guard was FALSIFIED before the row was closed**: neutered alone it turns that case red and leaves the empty-book case green, and neutering the empty-book guard instead swaps the two. **It was NOT [#315](https://github.com/lam2-coder/meritfutures/pull/315) that satisfied this row and the dispatch that closed it said otherwise.** #315 and [ADR-123](../../docs/decisions/ADR-123.md) added the `accountsAudited === 0` guard, which is ADR-073 section 5's EMPTY BOOK and a different failure; this row's guard predates it and ADR-123 section 4 says in its own words that it does not close this row. **A third scale escapes both guards and is not this row's**: an account named by `accountsWithStoredState()` with no rows and no days returns a clean report, pinned as a hole in the same file and owed a ruling against ADR-123 section 7 |
-| **`OI-24`** | `ADR-068`'s session, [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2` | **allocated, open, and DELIBERATELY NOT REPAIRED.** [M06](../../docs/plans/M06-admin-ops-console.md) section 2 opens *"Six deltas, each from a failure mode below"* and the table now carries **seven**. **Session 89 already corrected this line once**, from *"Five deltas"*, and `SD-M6-10` makes it wrong again three sessions later. **Four concurrent sessions are each about to move it**, which is the proof that the count cannot be hand-maintained rather than an argument that it can be maintained harder. **The remedy is named and is [ADR-034](../../docs/decisions/ADR-034.md)'s own**: the count becomes a `<!--gen:-->` span under `CI-06g`, computed from the delta table it describes, and then no session touches it again. **Not implemented here**: [`gates.mjs`](../../scripts/corpus/gates.mjs) is held by three concurrent sessions and this one already carries four forced fence extensions. **For the review desk.** |
-| **`OI-27`** | session 120, `0045` | **allocated, open, and it is a LIVE INSTANCE of the thing [ADR-074](../../docs/decisions/ADR-074.md) is about.** This session read the `OI` table in THIS FILE, which stops at `OI-24`, and allocated `OI-25`. **`OI-25` and `OI-26` were already taken**: allocated in [WAVE-04 section 6](../../docs/plans/WAVE-04-fixture-backlog-and-gate-inventory.md) and recorded in [STATE](../../docs/STATE.md), which is **one identifier series with two definition sites** and neither one names the other. The near-miss is worth more than the renumber: `CI-06/identifier-series` is being written against `ADR-074` in a sibling session as this lands, and **this is exactly the collision it would have caught**, found by a founder read rather than by a gate. Renumbered to `OI-27`. **Second finding, same cause, and DELIBERATELY NOT REPAIRED**: `## 21.` is claimed TWICE in this file, at the `0038` section and again at the `0042` section, and the section-number table in section 16 carries **both** rows. `22` remains the maximum, so section `23` below is correctly numbered. **The table that exists to end section-number drift is carrying the drift.** It belongs to [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2`, is outside this session's fence, and a money-path session does not repair another session's numbering **CLOSED 2026-08-23 by [session 141](../../docs/sessions/2026-08-23-session-141.md)**: `OI` is allocated in [ALLOCATION](../../docs/decisions/ALLOCATION.md) and this table points at it. **Two more double claims were found while building that table and neither had ever been counted**: sessions 105 and 106 each took `OI-19` and `OI-20` on 2026-08-20, and WAVE-04 renumbered session 106's pair to `OI-25` and `OI-26` while [STATE](../../docs/STATE.md), being append-only, still carries the old numbers |
+| **`OI-24`** | `ADR-068`'s session, [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2` | **allocated, open, and DELIBERATELY NOT REPAIRED.** [M06](../../docs/plans/M06-admin-ops-console.md) section 2 opens *"Six deltas, each from a failure mode below"* and the table now carries **seven**. **Session 89 already corrected this line once**, from *"Five deltas"*, and `SD-M6-10` makes it wrong again three sessions later. **Four concurrent sessions are each about to move it**, which is the proof that the count cannot be hand-maintained rather than an argument that it can be maintained harder. **The remedy is named and is [ADR-034](../../docs/decisions/ADR-034.md)'s own**: the count becomes a `<!--gen:-->` span under `CI-06g`, computed from the delta table it describes, and then no session touches it again. **Not implemented here**: [`gates.mjs`](../../scripts/corpus/gates.mjs) is held by three concurrent sessions and this one already carries four forced fence extensions. **For the review desk.**. **CLOSED 2026-08-27 by [ADR-130](../../docs/decisions/ADR-130.md), on the remedy this row named from the day it was opened: [M06 section 2](../../docs/plans/M06-admin-ops-console.md) carries an `m06_delta_count` generated span, read at line 65 of that file.** |
+| **`OI-27`** | session 120, `0045` | **allocated, open, and it is a LIVE INSTANCE of the thing [ADR-074](../../docs/decisions/ADR-074.md) is about.** This session read the `OI` table in THIS FILE, which stops at `OI-24`, and allocated `OI-25`. **`OI-25` and `OI-26` were already taken**: allocated in [WAVE-04 section 6](../../docs/plans/WAVE-04-fixture-backlog-and-gate-inventory.md) and recorded in [STATE](../../docs/STATE.md), which is **one identifier series with two definition sites** and neither one names the other. The near-miss is worth more than the renumber: `CI-06/identifier-series` is being written against `ADR-074` in a sibling session as this lands, and **this is exactly the collision it would have caught**, found by a founder read rather than by a gate. Renumbered to `OI-27`. **Second finding, same cause, and DELIBERATELY NOT REPAIRED**: `## 21.` is claimed TWICE in this file, at the `0038` section and again at the `0042` section, and the section-number table in section 16 carries **both** rows. `22` remains the maximum, so section `23` below is correctly numbered. **The table that exists to end section-number drift is carrying the drift.** It belongs to [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2`, is outside this session's fence, and a money-path session does not repair another session's numbering **CLOSED 2026-08-23 by [session 141](../../docs/sessions/2026-08-23-session-141.md)**: `OI` is allocated in [ALLOCATION](../../docs/decisions/ALLOCATION.md) and this table points at it. **Two more double claims were found while building that table and neither had ever been counted**: sessions 105 and 106 each took `OI-19` and `OI-20` on 2026-08-20, and WAVE-04 renumbered session 106's pair to `OI-25` and `OI-26` while [STATE](../../docs/STATE.md), being append-only, still carries the old numbers. **CLOSED 2026-08-23 by the `OI-nn` table in [ALLOCATION](../../docs/decisions/ALLOCATION.md), which exists and carries the series.** |
 | **`OI-28`** | session 120, `0045` | **allocated. CLOSED 2026-08-23 by [ADR-082](../../docs/decisions/ADR-082.md), and amended in place here on 2026-08-27 rather than joined by a second row** ([ADR-065](../../docs/decisions/ADR-065.md) T3). **The ADR this row said was owed was WRITTEN, and it widened the third token's DEFINITION instead of the token list**: `rail clock` reads *"a third party's own clock, quoted and never computed by Merit: a payment rail's, a calibration vendor's, any counterparty whose day Merit reads and never derives"*, `UNIT_TOKENS` still holds exactly three members, and the same `date` columns resolved to the same tokens before and after, so nothing was re-classified. **A fourth token was refused on a structural argument and the refusal is a control**: `CI-06m/widened-definition-is-not-a-fourth-token` in [`falsify.mjs`](../../scripts/corpus/falsify.mjs) seeds `**Unit: vendor clock**` onto a row declaring `rail clock` and watches the gate refuse it. **`simulation_runs.calibration_observed_at` was correctly declared on the day it landed** and the design record now cites the ruling. ADR-082 named this exact row as the amendment it could not reach; [session 267](../../docs/sessions/2026-08-27-session-267.md) is the session that held the file, and it arrived only because a dispatch re-read the stale row as live work ([ADR-156](../../docs/decisions/ADR-156.md) section 2). **Originally:**  `simulation_runs.calibration_observed_at` is a `date`, so `CI-06m` requires it to declare one of exactly three closed unit tokens, and **none of the three names what this column is**. `wall clock` is refuted by its own definition, *"Merit's own clock, answered only by `now()`"*: this column is never `now()`, and writing `now()` into it is precisely the defect it exists to prevent. `trading day` is *"answered only by TradingCalendar"* and a calibration vendor does not observe on the exchange session boundary. `rail clock` is **declared**, because its operative half, *"quoted and never computed by Merit"*, is exactly true and [`affiliate_commissions.chargeback_window_ends_on`](../../docs/architecture/data-model/affiliate_commissions.md) already carries it for the same reason. **The noun is still wrong: a calibration vendor is not a rail.** Widening `UNIT_TOKENS` amends [ADR-042](../../docs/decisions/ADR-042.md)'s closed set and is **not** done from a money-path session, so the candidate ADR is named as owed. Argued in the open at [`simulation_runs`](../../docs/architecture/data-model/simulation_runs.md) rather than picked quietly, because picking the nearest-looking token is how three rows passed `CI-06m` by accident |
 | **`OI-29`** | session 120, `0045` | **allocated, PARTLY CLOSED by [`0047`](migrations/0047_publish_decision_is_sound.sql) under [ADR-087](../../docs/decisions/ADR-087.md) (session 148), and amended in place rather than joined by a second row.** `plan_versions_publish_decision_recorded` makes the link to a simulation run EXIST and a `CHECK` cannot make it SOUND. **Two of the three states named below are now unwritable**: a publish decided on a run that is not `complete` is refused by `OI-29 check A`, and a publish decided on a run anchored to any plan version other than the row being published is refused by `OI-29 check B`, which is stronger than the state it closes because same-plan-different-version is the identical defect. **THE THIRD DOES NOT CLOSE AND IT IS RE-FILED AS `OI-29b`**: a publish decided on a run over a since-edited draft, whose `rules_digest` no longer matches. `0047` is a TRIGGER, and [`0004:183`](migrations/0004_catalog.sql)'s cost stands unhedged: it can be disabled and it fires per row. The alternative lost on a fact rather than a preference, that no application publish path exists in `apps/` at all. **RESTATED 2026-08-27 by [ADR-156](../../docs/decisions/ADR-156.md) section 5, and the restatement narrows what the two closed states are worth: BOTH ARE ASSERTED AT THE WRITE AND NOTHING PRESERVES THEM.** Both triggers fire on the publish decision and nowhere else, and the two columns they read, `simulation_runs.status` and `.plan_version_id`, carry no trigger, no `REVOKE` and no immutability guard, `merit_app` holding `UPDATE` on both. **Measured on the full migration set under `SET LOCAL ROLE merit_app`, inside a rolled-back transaction, with [`probe_publish_decision_is_sound.sql`](../../scripts/db/probe_publish_decision_is_sound.sql) run green first so the control under test was the installed one**: a publish written with both checks satisfied survives `UPDATE simulation_runs SET status = 'failed'`, survives that run going back to `queued` with `completed_at` nulled, which removes the completion time `0047`'s header reasons from, and survives the run being re-anchored to another plan's version. **The asymmetry is the mechanism**: [`0028`](migrations/0028_supersede_plan_version_immutability.sql) refuses every write to the citing row, including a column it counts as movable, while `0045` leaves the cited row free by design, so the only unpinned half of the link is the half both checks read. **The `DELETE` is refused**, by `plan_versions_decided_on_simulation_run_id_fkey`, so the citation is permanent and only the content of the thing cited is free. **No migration number is claimed and this row does not close.** The preservation condition is named in ADR-156 section 5 and left unnumbered; the naive guard is refuted by `SUCCESS 1` of the probe, whose next statement after a sound publish is the legitimate `NULL` to citing-row anchor move |
 | **`OI-29b`** | session 148, `0047`, [ADR-087](../../docs/decisions/ADR-087.md) | **allocated, open, and NARROWED rather than new.** `OI-29`'s staleness state, which `0047` could not reach. **`simulation_runs.rules_digest` HAS NO PRODUCER**: `grep -rn 'rules_digest\|rulesDigest' --include='*.ts' --include='*.mjs' packages/ apps/ scripts/` returns nothing, and [ADR-081](../../docs/decisions/ADR-081.md)'s claim to have landed *"the digest half `OI-29` needs"* does not survive reading [`hash.ts:557`](../../packages/rules-engine/src/hash.ts), whose `HASHED_COLUMNS` is nineteen **`rule_states`** columns. What ADR-081 landed is a pure SHA-256 and a framing discipline, reusable and pointed at another subject. **`pgcrypto` IS installed** ([`0001:22`](migrations/0001_extensions_and_enums.sql)) so `digest(rules::text,'sha256')` runs today, and the refusal to install it is therefore a RULING: `jsonb::text` sorts keys but **is not canonical over numbers**, measured, so `{"a":1.0}` and `{"a":1}` digest differently and the comparison would REFUSE A LEGITIMATE PUBLISH. No temporal proxy exists either: `plan_versions` carries no `updated_at`. **Check B narrows what survives**: after `0047` the staleness case reaches only a run whose `plan_version_id` IS NULL, which [`0045:66`](migrations/0045_simulation_runs.sql) makes nullable on purpose. **Closing that last branch would break `SUCCESS 4` and case `0028 A` of [`probe_simulation_decision_record.sql`](../../scripts/db/probe_simulation_decision_record.sql)**, both of which assert a NULL-anchored publish WRITABLE, so it is a change to what `0045` ruled and needs its own ADR. `SUCCESS 3` of [`probe_publish_decision_is_sound.sql`](../../scripts/db/probe_publish_decision_is_sound.sql) asserts the hole so the day somebody closes it the probe says what they broke |
@@ -814,6 +843,17 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **46** | session 527, `0068` ([ADR-228](../../docs/decisions/ADR-228.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0068` lands, and it is the first of three consecutive sections closing the withdrawal-approval run that `RI-37`'s backlog register held. **45 is the maximum this table has ever held and 46 is the next free number.** **SECTION NUMBERS ARE LANDING ORDER**, which 35, 36 and 37 prove by being `0079`, `0078` and `0082`. **Within the three the order is MIGRATION order, and the reason is NOT [ADR-335](../../docs/decisions/ADR-335.md)'s**: these three supersede nothing and share no constraint name. They are a CITATION chain, each file naming the one before it in its own text, so a reader taking them out of order reads a reference to a file that has not been introduced |
 | **47** | session 527, `0070` ([ADR-232](../../docs/decisions/ADR-232.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0070` lands, **and the section records that this migration is the floor under [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) and [`probe_payout_hold.sql`](../../scripts/db/probe_payout_hold.sql)**, which is section 45's finding measured from the other side. It also records that every control the file was written for is unreachable from the only writer of its edge |
 | **48** | session 527, `0072` ([ADR-234](../../docs/decisions/ADR-234.md)), written by [ADR-336](../../docs/decisions/ADR-336.md) | **allocated.** `0072` lands, **and the section records that the conditional in the migration's own header has since been met**: the `LT-06` driver it says does not exist is wired today. **NONE OF THESE THREE ROWS IS WRITTEN ON SOMEBODY ELSE'S BEHALF**, which is this table's standing rule: each is written in the same commit as the section it claims and as the deletion of that migration's row from `RI-37`'s backlog register. **The rows this table still owes are unchanged and are NOT filled in here**: 24, 26 to 30 and 32 to 34 are claimed by headings and have no row, and nothing compares this table to the headings |
+| **49** | session 542, `0037` ([ADR-053](../../docs/decisions/ADR-053.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0037` lands, **and it is the first section in this file whose migration moves not one object count**: the supersession renames a `CHECK`, so one leaves and one arrives and all seven catalogue totals hold |
+| **50** | session 542, `0059` ([ADR-193](../../docs/decisions/ADR-193.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0059` lands. It is the one migration of the eleven that appeared in this file **zero times in any form**, re-derived rather than inherited from [ADR-334](../../docs/decisions/ADR-334.md) |
+| **51** | session 542, `0063` ([ADR-200](../../docs/decisions/ADR-200.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0063` lands, **and the section records a money-path guard that no reader under `scripts/db/` watches**, established by removing the file and again by dropping the trigger |
+| **52** | session 542, `0039` (`ADR-066` via [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0039` lands, **and the section separates the counterfactual that proves the TABLE from the one that proves the REVOKE**: a removed table fails a declared-versus-installed check for the same reason a wrongly granted one does |
+| **53** | session 542, `0040` ([ADR-066](../../docs/decisions/ADR-066.md) via [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0040` lands, and twenty-two CHECK constraints arrive in one file, the densest constraint delta of the eleven |
+| **54** | session 542, `0041` (`SD-M16-08` via [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0041` lands. One index is the whole object delta, nothing under `scripts/db/` watches it, **and it is the one file of the four uncovered ones with no guard to watch being live** |
+| **55** | session 542, `0043` ([ADR-069](../../docs/decisions/ADR-069.md) via [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0043` lands, and it is the only one of the eleven whose removal takes TWO readers down at once, neither of them written to test it |
+| **56** | session 542, `0044` (`ADR-070` via [FOLD-05](../../docs/plans/FOLD-05-plan-config-and-designer.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0044` lands, **and the section records the widest coverage gap in the set**: the idempotency index its own header calls the only thing between a retried settlement and a doubled credit goes unwatched by all twenty-seven readers under `scripts/db/`, measured three ways |
+| **57** | session 542, `0050` ([ADR-164](../../docs/decisions/ADR-164.md) via [P6](../../docs/plans/P6-live-tier.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0050` lands, and the fifth role it creates is a cluster object that no object count in this file can see. The `SELECT`-grant perturbation produces two findings on one table, the second being that neither declared set then describes it |
+| **58** | session 542, `0073` ([ADR-237](../../docs/decisions/ADR-237.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0073` lands. The removal counterfactual is unavailable because `0074` has a foreign key onto `operators(actor)`, so coverage is established at the constraint instead, which is `0052`'s shape one migration set later |
+| **59** | session 542, `0074` ([ADR-252](../../docs/decisions/ADR-252.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0074` lands, **and `RI-37`'s backlog register reaches ZERO with it.** The section separates what that closes, every merged migration having a record, from what it does not, four of the eleven being watched by nothing |
 | **24** | session 135, `0046` ([ADR-079](../../docs/decisions/ADR-079.md)), TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0046` lands, and the constraint it replaces was pointed at the wrong column all along. **Named as owed by the `25` row on 2026-08-23 and again by the `45` and `48` rows on 2026-09-05**, and written here on the amended rule above rather than on session 135's behalf |
 | **26** | [ADR-128](../../docs/decisions/ADR-128.md)'s session 240, `0048` and `0049`, TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0048` and `0049` land. **One number for two migrations, which is the `14` row's shape and not a defect**: a section records a landing and a landing may be two files |
 | **28** | session 293, `0051` ([ADR-169](../../docs/decisions/ADR-169.md)), TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0051` lands and `OI-06 (payout destinations)` closes. **`27` IS NOT ADDED BESIDE IT, AND THAT IS THE DIFFERENCE BETWEEN NAMING A GAP AND MEASURING ONE.** `27` heads no section in this file at all, so nothing claims it and this table owes it no row. The `31` row states that precisely and the `45` and `48` rows compressed it to *"26 to 30"*, which is why **eight** rows land here rather than nine |
@@ -3106,3 +3146,440 @@ Applying every migration on disk **with `0072` removed** and running all 22 prob
 **SO THE SENTENCE IS NOT STALE, IT IS DISCHARGED, AND THAT IS THE WHOLE ARGUMENT FOR WRITING A CONTROL BEFORE THE ROW IT CONTROLS.** `0072` was merged on 2026-08-29 against a schema no door drove; the door landed afterwards and the arrow it would have opened was already refused. Section 34 recorded the same shape one migration set earlier under the heading *"the control arrives before the row it controls"*. **The reader who should carry this is the one who finds a migration whose header says its own hazard is theoretical**: that is a claim about a tree, and the tree moves.
 
 ---
+
+## 49. `0037` lands, and the supersession is a RENAME, so the count that would show it does not move (2026-09-05)
+
+**Session 542, [ADR-053](../../docs/decisions/ADR-053.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `053` and `0037`. THE SECTION IS DATED TODAY AND THE MIGRATION IS NOT.** [ADR-334](../../docs/decisions/ADR-334.md) shipped `RI-37` with a shrink-only register of merged migrations carrying no landing record; [ADR-335](../../docs/decisions/ADR-335.md) closed the chart-of-accounts run and [ADR-336](../../docs/decisions/ADR-336.md) the withdrawal-approval run. [ADR-351](../../docs/decisions/ADR-351.md) is the row that closes what those two left, and this is the first of its eleven sections.
+
+**EVERY FIGURE BELOW WAS READ OFF A DATABASE THIS SESSION BUILT AND NONE IS COPIED OUT OF [ADR-053](../../docs/decisions/ADR-053.md).** A landing record transcribed from its own ruling is a second copy of the ruling and is not a record of what landed.
+
+`0037` supersedes one `CHECK`. [`0015:208`](migrations/0015_rule_states.sql) declared `rule_states_high_water_bounds_balance` as the bare `high_water_balance_cents >= balance_cents`; [`0037:124`](migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) drops that name and [`0037:143`](migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) adds `rule_states_high_water_bounds_balance_unlocked` in its place.
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, `packages/db/migrations/*.sql` applied forward-only into an empty database under `ON_ERROR_STOP=1` and stopped at `0036`, then at `0037`. Counts read from `pg_tables`, `pg_indexes`, `pg_constraint`, `pg_trigger` and `pg_proc`.
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0036` then `0037` | **102 tables, 354 indexes, 404 CHECK constraints, 144 foreign keys, 11 unique constraints, 10 non-internal triggers, 93 functions.** **NOT ONE OF THE SEVEN MOVES**, because one constraint leaves and one arrives in the same file |
+| the predicate, read back at `pg_get_constraintdef` | `CHECK ((floor_locked OR (high_water_balance_cents >= balance_cents)))`, and the old name resolves to nothing |
+| re-applying `0037` against `0001`..`0037` | **refused** at `constraint "rule_states_high_water_bounds_balance" of relation "rule_states" does not exist`. The `DROP` carries no `IF EXISTS`, so the refusal lands on the first statement rather than on the `ADD` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0037` | **holds**, exit 0 |
+
+**THE ZERO ROW IS THE ONE A READER SHOULD NOT SKIP.** A session auditing this estate by diffing object counts either side of a migration would conclude `0037` did nothing. What it did was change what a column may hold on every funded account in the system, and no count this catalogue keeps can see a predicate.
+
+### The probe that covers it, and it is watched in BOTH directions
+
+[`probe_rule_states_high_water_bound.sql`](../../scripts/db/probe_rule_states_high_water_bound.sql) is load-bearing twice over, and both counterfactuals were run rather than reasoned:
+
+- **Remove the file from the set.** Every other migration on disk applies, and the probe dies at [line 118](../../scripts/db/probe_rule_states_high_water_bound.sql), `PROBE FAILED: GS-016 day two is unwritable, the high-water bound has been re-tightened`. That is the DEFECT half: without `0037` a locked account making a new closing high cannot be written.
+- **Drop `rule_states_high_water_bounds_balance_unlocked` from the fully applied schema.** The probe dies at [line 185](../../scripts/db/probe_rule_states_high_water_bound.sql), `PROBE FAILED: an unlocked state row with hwb below balance was admitted`. That is the GUARD half: the arm `0037` kept is still enforced and is still watched by name.
+
+**Two counterfactuals rather than one, because a single removal proves only that the file is needed and not that its remaining arm still bites.** No other section in this file has had both available; `0037` does because it is a rename rather than a deletion, and the name it installed is still on the schema for a perturbation to reach.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-053` | `rule_states` | `rule_states_high_water_bounds_balance` dropped and `rule_states_high_water_bounds_balance_unlocked` added, `floor_locked OR high_water_balance_cents >= balance_cents`, with its column and constraint comments | 0037 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed, and none is owed.** No module document proposes this: it is a defect in a merged file, found after the fold. **[`0015`](migrations/0015_rule_states.sql) IS NOT EDITED.** It is superseded from outside, which is constitution `E2` and which `0037`'s own header states before its DDL.
+
+### The part a reader should carry forward
+
+**A SUPERSESSION UNDER A NEW NAME IS LEGIBLE AND A SUPERSESSION UNDER THE OLD NAME IS NOT.** [ADR-335](../../docs/decisions/ADR-335.md) recorded the opposite case: `ledger_accounts_kind_matches_code` was dropped and re-added under its own name four times, and the consequence is that **no database this repository can build holds the predicate `0052` installed**. `0037` renamed, so both predicates are still distinguishable and the probe can name the one it is testing in a `GET STACKED DIAGNOSTICS` clause. The cost of renaming is one stale citation anywhere the old name was written down; the cost of not renaming is that the record of what a constraint used to be survives only in prose.
+
+---
+
+## 50. `0059` lands, and the second half of a promise made ten migrations earlier is finally enforceable (2026-09-05)
+
+**Session 542, [ADR-193](../../docs/decisions/ADR-193.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `193` and `0059`.** Section 49's opening applies. `0059` is the second of the eleven and it is the one [ADR-334](../../docs/decisions/ADR-334.md) reported as appearing in this file **zero times in any form**; that was re-derived here before anything was written, `grep -c '0059' packages/db/DELTA_MANIFEST.md` returning **0**, and it was the only one of the eleven for which that was true.
+
+**EVERY FIGURE BELOW IS A `psql` RUN AGAINST A DATABASE BUILT FOR THIS SECTION.** [ADR-193](../../docs/decisions/ADR-193.md) is read for what it ruled and not for what it measured.
+
+[`0009:103-104`](migrations/0009_ledger.sql) promised two rules and its row-level `CHECK` could carry one. `0059` carries the second: a reversal may not chain onto another reversal.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0057` then `0059` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints; triggers 23 to 24 and functions 109 to 110.** TWO objects arrive and both are the same control |
+| the trigger, read back at `pg_get_triggerdef` | `BEFORE INSERT OR UPDATE ON public.ledger_transactions FOR EACH ROW WHEN ((new.reversal_of IS NOT NULL)) EXECUTE FUNCTION assert_reversal_does_not_chain()`. **The `WHEN` clause is the arm and the function re-checks it anyway** ([`0059:178-180`](migrations/0059_reversal_chain.sql)) |
+| re-applying `0059` against `0001`..`0059` | **refused** at `function "assert_reversal_does_not_chain" already exists with same argument types` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0059` | **holds**, exit 0 |
+
+### The probe that covers it, established by removing the file
+
+Applying every migration on disk **with `0059` removed** reaches the end cleanly, and [`probe_ledger_constraints.sql`](../../scripts/db/probe_ledger_constraints.sql) dies inside `LEDGER-C3` at [line 612](../../scripts/db/probe_ledger_constraints.sql):
+
+```
+ERROR:  PROBE FAILED: LEDGER-C3 admitted a reversal of a reversal. 0009:103-104
+says a reversal may not chain onto another reversal and its CHECK can only say
+reversal_of <> id.
+```
+
+**This is the cleanest counterfactual of the eleven**: the set still installs without the file, so the failure is the probe reporting a missing control rather than a schema that would not build. Of the readers under `scripts/db/`, that one and only that one moves; [`probe_wallet_debit_provenance.sql`](../../scripts/db/probe_wallet_debit_provenance.sql) also names `reversal_of` and stays green with `0059` removed, which was checked rather than assumed.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-193` | `ledger_transactions` | `assert_reversal_does_not_chain()` and the `ledger_transactions_reversal_does_not_chain` trigger, `BEFORE INSERT OR UPDATE ... WHEN (new.reversal_of IS NOT NULL)` | 0059 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed.** `SD-M5-05` is cited in the file as the delta that built the ledger; the chain rule is a sentence `0009` already wrote and could not enforce. **[`0009`](migrations/0009_ledger.sql) IS NOT EDITED**, and the sentence in it that promises two rules is still there, still promising two, which is the condition constitution `E2` leaves behind and which this section exists to explain.
+
+### The part a reader should carry forward, and it is about `FOR UPDATE`
+
+**THE GUARD TAKES A ROW LOCK ON THE TRANSACTION BEING REVERSED** ([`0059:183-185`](migrations/0059_reversal_chain.sql)), and that is what makes it an enforcement rather than a check. Two concurrent reversals of the same original would each read the other as unlinked without it, and both would commit. **A row-level `CHECK` could never have taken that lock**, which is the deeper reason the second clause of `0009`'s comment waited for a trigger rather than for a longer predicate.
+
+---
+
+## 51. `0063` lands, and it is the only guard in this cluster that nothing under `scripts/db/` watches (2026-09-05)
+
+**Session 542, [ADR-200](../../docs/decisions/ADR-200.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) rows `200` and `0063`.** Section 49's opening applies. **AUTH is a money path** and this file's own header opens `E2 READ: MONEY PATH`, which was read off the file rather than taken from the dispatch.
+
+Two merged sentences claimed a control the schema did not carry. [`0002:328-330`](migrations/0002_identity.sql) says OTP single use is *"enforced by the database rather than by the handler"* and backs it with `otp_challenges_unconsumed_uq`, a unique index on `(id) WHERE consumed_at IS NULL`. **A partial unique index on the primary key refuses nothing**, because the primary key already refuses it. `0063` is the control those sentences describe.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0059` then `0063` | **114 tables, 397 indexes, 482 CHECK constraints, 167 foreign keys, 12 unique constraints; triggers 24 to 25 and functions 110 to 111.** No index is added and none is dropped: the index `0002` cited is still there and still refuses nothing |
+| the trigger, read back at `pg_get_triggerdef` | `BEFORE UPDATE ON public.otp_challenges FOR EACH ROW WHEN ((old.consumed_at IS NOT NULL)) EXECUTE FUNCTION assert_otp_consumption_is_write_once()` |
+| re-applying `0063` against `0001`..`0063` | **refused at the TRIGGER and not at the function**: `trigger "otp_challenges_consumption_is_write_once" for relation "otp_challenges" already exists`. [`0063:100`](migrations/0063_otp_challenge_consumption.sql) is a `CREATE OR REPLACE FUNCTION`, so that statement is idempotent by rerun and the file is not |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0063` | **holds**, exit 0 |
+
+### NOTHING UNDER `scripts/db/` GOES RED WITHOUT IT, and that was measured twice
+
+Applying every migration on disk **with `0063` removed** reaches the end, and **all of the readers under `scripts/db/` exit 0**. Dropping the trigger from the fully applied schema gives the same answer. [`probe_phone_identity.sql`](../../scripts/db/probe_phone_identity.sql) names `otp_challenges` and is the file a reader would expect to cover this; it is green in both directions, which was executed rather than inferred from the grep.
+
+**THE GUARD IS LIVE AND WAS WATCHED BEING LIVE**, on the applied schema, in three executed cases:
+
+| Statement against a consumed challenge | Result |
+|---|---|
+| move `consumed_at` forward | **refused.** `otp_challenges.consumed_at is write once: challenge ... was consumed at ... and this statement would set it to ...` |
+| set `consumed_at` back to `NULL` | **refused**, same message with `<NULL>` in the second position |
+| update `attempts` and leave `consumed_at` alone | **accepted**, `UPDATE 1` |
+
+The third case is the one worth keeping: the trigger is narrow, and a row that has been consumed is not frozen, only its consumption is.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-200` | `otp_challenges` | `assert_otp_consumption_is_write_once()` and the `otp_challenges_consumption_is_write_once` trigger, `BEFORE UPDATE ... WHEN (old.consumed_at IS NOT NULL)` | 0063 | **landed** |
+
+**No `SD-nn` and no `U-nn` is claimed.** The delta is a defect in a merged file's claim about itself. **[`0002`](migrations/0002_identity.sql) IS NOT EDITED and its two sentences are still false about the index they cite.** They are true about the schema as a whole from `0063` onward, which is a different thing, and this row is the only place that distinction is written down.
+
+### The part a reader should carry forward, and it is the coverage gap
+
+**A MONEY-PATH GUARD WITH NO COMMITTED READER IS A GUARD THAT CAN BE DROPPED BY A LATER MIGRATION AND REPORTED GREEN.** `0059` in the section above is covered at a named line of one probe; `0063` is covered by nothing this repository runs against a database. The three refusals above are this session's, taken by hand, and they are gone the moment this section is read rather than run. **Closing it is a probe block rather than a migration**, and it is named here as owed rather than written, on the rule this row inherited: `scripts/db/**` shows a one-file diff for a citation repair and nothing else.
+
+---
+
+## 52. `0039` lands, and the counterfactual that proves the table is not the counterfactual that proves the control (2026-09-05)
+
+**Session 542, `ADR-066` via [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0039`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Fourth of eleven. **`0039` is NON-MONEY by its own header** and its header argues at length that it is the most consequential non-money table in the corpus, because `D-04` clusters a trader's entries against a scheduled release and **firing on a wrong window manufactures evidence against a trader who did nothing**.
+
+**EVERY FIGURE HERE WAS READ OFF A DATABASE THIS SESSION BUILT.** Nothing is taken from `ADR-066` or from [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md).
+
+### What was verified, and every case was executed
+
+Against **PostgreSQL 16.13**, applied forward-only from empty under `ON_ERROR_STOP=1`, stopping at `0038` and then at `0039`:
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0038` then `0039` | tables **103 to 105**, indexes **361 to 368**, CHECK constraints **416 to 426**, foreign keys **151 to 152**, unique constraints 11, triggers 13, functions 96, **and views 0 to 1** |
+| **the view is the first in this schema**, read at `pg_views` | `economic_calendar_current`, and it is still the only one on the fully applied set |
+| where the ten CHECKs sit, read at `pg_constraint` | `economic_calendar` **6**, `economic_calendar_loads` **4**. The two tables account for the whole delta |
+| the grants, read at `information_schema.role_table_grants` | `merit_app` holds **`INSERT, SELECT`** on both and nothing else. `merit_analytics` holds **nothing on either**, which is the default [`0039:315`](migrations/0039_economic_calendar.sql) states rather than an omission |
+| re-applying `0039` against `0001`..`0039` | **refused** at `relation "economic_calendar_loads" already exists` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0039` | **holds**, exit 0 |
+
+### TWO COUNTERFACTUALS THAT ANSWER TWO DIFFERENT QUESTIONS
+
+**Removing the file** from the set leaves everything else installable, and [`assert_append_only_grants.mjs`](../../scripts/db/assert_append_only_grants.mjs) reports **two** findings, one per table, each reading *"DATA_MODEL section 1 declares it append-only and `merit_app` still holds `UPDATE` or `DELETE` on it, or no longer holds `INSERT`"*.
+
+**That is the weaker of the two and it is worth naming why.** A table absent from the schema fails a declared-versus-installed comparison for the same reason a table with the wrong grants does, so the removal proves only that something named `economic_calendar` is owed. **The sharp counterfactual is the perturbation:** on the fully applied set, `GRANT UPDATE ON economic_calendar TO merit_app` and the same assertion goes red with **one** finding naming that table alone. The `REVOKE` at [`0039:310`](migrations/0039_economic_calendar.sql) is what is load-bearing, and only the second test shows it.
+
+**EVERY OTHER READER UNDER `scripts/db/` STAYS GREEN IN BOTH DIRECTIONS**, all twenty-seven checked.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-066` via [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md) | `economic_calendar_loads`, `economic_calendar` | Both tables, seven indexes, the `economic_calendar_current` view, and the `REVOKE UPDATE, DELETE` that makes both append-only | 0039 | **landed** |
+
+**`0032`'s revoke list is superseded rather than edited**, which the file states before the statement and which is constitution `E2` applied to a `GRANT` rather than to a constraint.
+
+### The part a reader should carry forward
+
+**AN APPEND-ONLY GUARANTEE IS A GRANT AND A GRANT IS NOT AN OBJECT.** Nothing in the seven catalogue totals above moves when a `REVOKE` is dropped from a migration, and the word *"append-only"* in a table comment stays true-looking forever. The only thing that reads it is a check comparing a document's declared set against `information_schema`, which is why [ADR-128](../../docs/decisions/ADR-128.md) built one and why this section's second counterfactual, rather than its first, is the one that means something.
+
+---
+
+## 53. `0040` lands, and twenty-two CHECK constraints arrive in one file to make a delivery record unfalsifiable (2026-09-05)
+
+**Session 542, [ADR-066](../../docs/decisions/ADR-066.md) via [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md), `SD-M6-07`, [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0040`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Fifth of eleven, **NON-MONEY** by its own header, which argues that what it carries is the delivery of a control: the `C8` weekly risk ritual's input was a human remembering to look, against a constitution that lists liability blindness first.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0039` then `0040` | tables **105 to 107**, indexes **368 to 375**, CHECK constraints **426 to 448**, foreign keys **152 to 153**, functions **96 to 97**; uniques, triggers and views unmoved |
+| **twenty-two CHECKs from one file**, and where they sit | `report_deliveries` **16**, `report_schedules` **6**. It is the densest constraint delta of the eleven by a factor of two |
+| the function, read at `pg_proc` | `report_recipients_are_wellformed(text[])`, declared at [`0040:123`](migrations/0040_report_schedules.sql) so that a `CHECK` can call it. **It is not a trigger** and the trigger count does not move |
+| the grants | `report_deliveries` is `INSERT, SELECT` to `merit_app` and `report_schedules` is full `SELECT, INSERT, UPDATE, DELETE`. **One file, two tables, two different dispositions**, which is correct: a schedule is configuration and a delivery is a record of an act |
+| re-applying `0040` against `0001`..`0040` | **refused** at `function "report_recipients_are_wellformed" already exists with same argument types`, which is the FIRST statement in the file |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0040` | **holds**, exit 0 |
+
+### The counterfactual, and it is the same pair section 52 describes
+
+**Removal:** `assert_append_only_grants.mjs` reports one finding naming `report_deliveries`. **Perturbation on the fully applied set:** `GRANT UPDATE ON report_deliveries TO merit_app` and the same assertion reports the same one finding. **`report_schedules` appears in neither**, because it is not declared append-only and is not supposed to be; the reader that would catch a wrong grant on IT is not in this tree. Twenty-six other readers stay green in both directions.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `SD-M6-07` | `report_schedules`, `report_deliveries` | Both tables with twenty-two CHECK constraints between them, `report_recipients_are_wellformed(text[])`, five indexes, and the `REVOKE UPDATE, DELETE` on the deliveries table at [`0040:446`](migrations/0040_report_schedules.sql) | 0040 | **landed** |
+
+### The part a reader should carry forward
+
+**SIXTEEN CHECKS ON ONE TABLE IS AN ARGUMENT ABOUT WHERE A CONTROL LIVES, MADE IN DDL.** A delivery record exists to be evidence that a report went out, and evidence a handler can write inconsistently is not evidence. **The cost is stated rather than hidden**: sixteen constraints on one table is sixteen ways a legitimate future write is refused, and each one of them was ruled once and is now permanent under constitution `E2`. `0040` accepted that cost and no later migration has yet had to pay it.
+
+---
+
+## 54. `0041` lands, and one index is the entire object delta (2026-09-05)
+
+**Session 542, `SD-M16-08`, `ADR-066` via [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0041`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Sixth of eleven. **NON-MONEY PATH by its own header**, which spends a paragraph on the adjacency rather than taking an `E2` header: the column sits on `contact_channels`, and `0034` carries an `E2` header for work on that same surface because AUTH is a money path.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0040` then `0041` | **indexes 375 to 376 and NOTHING ELSE MOVES.** Tables 107, CHECK constraints 448, foreign keys 153, uniques 11, triggers 13, functions 97, views 1 |
+| the index, read at `pg_indexes` | `contact_channels_complained_idx ON public.contact_channels USING btree (identity_id, kind) WHERE (complained_at IS NOT NULL)`. **Partial**, so it is the size of the complained set rather than of the table |
+| **the column carries no `CHECK`**, read at `pg_constraint` | `contact_channels` holds five CHECK constraints and **not one of them names `complained_at`**. The nullable `timestamptz` and the partial index are the whole of what landed |
+| re-applying `0041` against `0001`..`0041` | **refused** at `column "complained_at" of relation "contact_channels" already exists` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0041` | **holds**, exit 0 |
+
+### NOTHING COVERS IT, AND THERE IS NOTHING TO EXECUTE
+
+Applying every migration on disk **with `0041` removed** reaches the end and **all twenty-seven readers under `scripts/db/` exit 0**. Dropping `complained_at` and its index from the fully applied schema gives the same answer. [`probe_reversible_contact_addresses.sql`](../../scripts/db/probe_reversible_contact_addresses.sql) and [`probe_phone_identity.sql`](../../scripts/db/probe_phone_identity.sql) both read `contact_channels` and both stay green either way, which was run rather than inferred from the grep that found them.
+
+**AND UNLIKE THE OTHER THREE UNCOVERED FILES IN THIS SET, THERE IS NO GUARD HERE TO WATCH BEING LIVE.** `0063`, `0044` and `0074` each installed something that refuses a statement, and each was watched refusing one. `0041` installed a column and an index. **Its control is a send path consulting the column**, and the file's own header names the one misreading that would make it dangerous: a path that consults `complained_at` before a `SECURITY`-class message locks a trader out of OTP login for having once reported a newsletter. **No database object can refuse that**, and nothing in this schema will ever report it.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `SD-M16-08` | `contact_channels` | `complained_at timestamptz` and the partial index `contact_channels_complained_idx`, with the column comment | 0041 | **landed** |
+
+### The part a reader should carry forward
+
+**THE SMALLEST OBJECT DELTA IN THIS SET SITS ON THE MOST DANGEROUS SURFACE IN IT.** One index. The file's header is four times the length of its DDL and the ratio is correct: what needed writing down was the class of send path that must never read this column, and that is a fact about application code stored in a migration because there was nowhere better. **A reader auditing risk by diff size would rank this file last.**
+
+---
+
+## 55. `0043` lands, and the column that carries the audit's meaning is watched by two probes that were written for other reasons (2026-09-05)
+
+**Session 542, [ADR-069](../../docs/decisions/ADR-069.md) via [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md), `SD-M6-11`, [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0043`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Seventh of eleven. **NON-MONEY PATH by its own header**, which states the adjacency precisely: `admin_actions` is the audit surface every mutating admin endpoint writes to, **including payout release, payout enforce and wallet correct**, and nothing here changes what any of them may do.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0042` then `0043` | indexes **383 to 384**, CHECK constraints **455 to 457**, foreign keys **157 to 158**; tables 109, uniques 12, triggers 16, functions 100, views 1 |
+| the two CHECKs, read at `pg_constraint` | `admin_actions_initiative_check`, `initiative = ANY (ARRAY['enforcement', 'trader_request', 'operational'])`; and `admin_actions_on_behalf_matches_initiative`, **`(on_behalf_of_identity_id IS NOT NULL) = (initiative = 'trader_request')`** |
+| the index | `admin_actions_on_behalf_idx (on_behalf_of_identity_id, created_at DESC) WHERE (on_behalf_of_identity_id IS NOT NULL)`, partial |
+| re-applying `0043` against `0001`..`0043` | **refused** at `column "initiative" of relation "admin_actions" already exists` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0043` | **holds**, exit 0 |
+
+### THE COUNTERFACTUAL, AND IT IS THE ONLY ONE OF THE ELEVEN THAT TAKES TWO READERS DOWN AT ONCE
+
+Applying every migration on disk **with `0043` removed** reaches the end, and two files die:
+
+```
+probe_audited_writes.sql:153            ERROR:  column "initiative" of relation "admin_actions" does not exist
+probe_rule_state_phase_vocabulary.sql:215  ERROR:  column "initiative" of relation "admin_actions" does not exist
+```
+
+**NEITHER PROBE WAS WRITTEN TO TEST `0043`.** [`probe_rule_state_phase_vocabulary.sql`](../../scripts/db/probe_rule_state_phase_vocabulary.sql) tests a phase vocabulary and reaches this column only because writing a `rule_states` row through the audited path requires an `admin_actions` row, and an `admin_actions` row now requires an `initiative`. **The coverage is incidental and it is real**, and the distinction is worth keeping: an incidental reader catches a dropped column and would not catch a widened `CHECK`. The remaining twenty-five readers stay green.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `SD-M6-11` | `admin_actions` | `initiative` with its three-value `CHECK`, `on_behalf_of_identity_id` with its foreign key onto `identities`, the biconditional tying the two together, and the partial index | 0043 | **landed** |
+
+### The part a reader should carry forward, and it is the biconditional
+
+**`(on_behalf_of_identity_id IS NOT NULL) = (initiative = 'trader_request')` IS TWO RULES IN ONE EXPRESSION AND BOTH DIRECTIONS BITE.** An operational action may not name a trader it was taken for, and a trader-requested action MUST. The second half is the one a reviewer skims past: it makes *"who asked for this"* unforgeable-by-omission on exactly the class of admin act a trader later disputes. **A `NOT NULL` on the column would have been the obvious design and would have been wrong in both directions at once.**
+
+---
+
+## 56. `0044` lands, and the index its own header calls the only thing standing between a retry and a doubled credit is watched by nothing (2026-09-05)
+
+**Session 542, `ADR-070` via [FOLD-05](../../docs/plans/FOLD-05-plan-config-and-designer.md), `SD-M18-04` and `SD-M20-05`, [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0044`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Eighth of eleven and **`E2 READ: MONEY PATH` by its own header**, which names two things needing the founder's line-by-line read and states of the first: *"the only thing standing between a retried settlement and a doubled credit. A fee-back grant is issued BY a payout, so the write happens on the settlement path, which is the path that retries."*
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0043` then `0044` | tables **109 to 110**, indexes **384 to 389**, CHECK constraints **457 to 460**, foreign keys **158 to 162**; uniques 12, triggers 16, functions 100, views 1 |
+| the idempotency index, read at `pg_indexes` | `promotional_credit_grants_fee_back_settlement_uq ON promotional_credit_grants USING btree (source_payout_request_id) WHERE source_payout_request_id IS NOT NULL`. **UNIQUE and PARTIAL**, so a grant with no payout behind it is unconstrained and a grant with one may exist at most once |
+| the locked flag, read at `pg_constraint` | `plan_versions_fee_back_repeats_locked`, `CHECK ((fee_back_repeats = false))`. A `CHECK` pinning a boolean to one value, which is a parameter frozen in DDL rather than in config |
+| re-applying `0044` against `0001`..`0044` | **refused** at `column "source_payout_request_id" of relation "promotional_credit_grants" already exists` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0044` | **holds**, exit 0. `plan_size_unlocks.unlocked_size_cents` is `bigint` with `CHECK (unlocked_size_cents > 0)` |
+
+### NOTHING UNDER `scripts/db/` GOES RED WITHOUT IT, MEASURED THREE WAYS
+
+Applying every migration on disk **with `0044` removed** reaches the end and **all twenty-seven readers exit 0**. Dropping the idempotency index alone from the fully applied schema: all twenty-seven exit 0. Dropping `plan_size_unlocks`, `promotional_credit_grants.source_payout_request_id` and `plan_versions_fee_back_repeats_locked` together: **all twenty-seven exit 0.**
+
+**THE GUARDS ARE LIVE AND WERE WATCHED BEING LIVE**, on the fully applied schema:
+
+| Statement | Result |
+|---|---|
+| two `promotional_credit_grants` rows naming one `source_payout_request_id` | **refused**, `duplicate key value violates unique constraint "promotional_credit_grants_fee_back_settlement_uq"` |
+| a `plan_versions` row with `fee_back_repeats = true` | **refused** by `plan_versions_fee_back_repeats_locked` |
+| the same row with `fee_back_repeats = false` | **accepted** |
+
+**THIS IS THE WIDEST GAP IN THE SET AND IT IS WORTH SAYING PLAINLY.** The index is a money-path control on the settlement path, its own header says so, and the only thing that has ever exercised it against a running database is the three statements above, taken by hand while writing this section. [`plan-size-unlocks.test.ts`](../../packages/db/test/plan-size-unlocks.test.ts) exists and covers a different property by reading DDL text, which its own header explains was deliberate because the integration stage needs a database it cannot get. **A probe block is owed here and is not written in this row**, whose fence is `scripts/db`-zero.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `SD-M20-05` | `promotional_credit_grants` | `source_payout_request_id` with its foreign key onto `payout_requests` and the partial unique index at [`0044:199`](migrations/0044_fee_back_and_ladder_unlock.sql) | 0044 | **landed** |
+| `SD-M17-03` | `plan_versions` | `fee_back_repeats` pinned `false` by `plan_versions_fee_back_repeats_locked` | 0044 | **landed** |
+| `SD-M18-04` | `plan_size_unlocks` | The table, three indexes, three foreign keys and `plan_size_unlocks_revocation_is_explained` | 0044 | **landed** |
+
+### The part a reader should carry forward
+
+**A PARTIAL UNIQUE INDEX IS AN IDEMPOTENCY KEY WEARING A DIFFERENT HAT, AND IT ONLY WORKS IF THE WRITER SUPPLIES THE COLUMN.** A settlement retry that writes a fee-back grant with `source_payout_request_id` left `NULL` falls outside the index predicate entirely and doubles the credit with no refusal. **The DDL cannot make that column mandatory** without breaking every grant that has no payout behind it, so the control is jointly held by the schema and by one writer. That division is exactly the sort a probe would pin, and there is no probe.
+
+---
+
+## 57. `0050` lands, and the object it adds is not an object this catalogue counts (2026-09-05)
+
+**Session 542, [ADR-164](../../docs/decisions/ADR-164.md) via [P6](../../docs/plans/P6-live-tier.md), `SD-M2-07`, [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0050`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Ninth of eleven and **`E2 READ: MONEY PATH` by its own header**, which is careful about why: the file stores no money and no balance, and it is on the money path because **it decides which role can reach which table**.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0049` then `0050` | tables **112 to 113**, indexes **395 to 396**, CHECK constraints **477 to 479**, foreign keys **165 to 166**; uniques 12, triggers 20, functions 106, views 1 |
+| **the fifth role is invisible to all seven of those totals** | `merit_live` is a cluster object. Read at `pg_roles`, the five are `merit_analytics`, `merit_app`, `merit_dispatcher`, `merit_live` and `merit_migrator`, **all `NOLOGIN`** |
+| what `merit_live` can reach, read at `information_schema.role_table_grants` | **exactly two tables.** `live_account_state` with `INSERT, SELECT, UPDATE`, and `platform_account_refs` with `SELECT`. Nothing else in the schema |
+| **the `DELETE` is absent**, which is [`0050:275`](migrations/0050_live_cache_and_role.sql) | `REVOKE DELETE ON live_account_state FROM merit_live` holds: the role that writes the cache cannot erase it |
+| re-applying `0050` against `0001`..`0050` | **refused** at `relation "live_account_state" already exists` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0050` | **holds**, exit 0, and `intraday_movement_cents` is integer cents |
+
+### The counterfactual, and the perturbation produces TWO findings where the removal produces one
+
+**Removal:** [`assert_append_only_grants.mjs`](../../scripts/db/assert_append_only_grants.mjs) reports one finding, *"DATA_MODEL section 1 declares it unreachable by `merit_app` and the database still grants `merit_app` a verb on it."*
+
+**Perturbation on the fully applied set,** `GRANT SELECT ON live_account_state TO merit_app`: **two** findings on one table. The second is the interesting one:
+
+```
+live_account_state: merit_app holds neither UPDATE nor DELETE on it, so its rows are
+immutable to the application, but it holds SELECT and not INSERT -- so it is neither
+append-only nor unreachable and NEITHER declared set describes it.
+```
+
+**THE CHECK HAS A THIRD ANSWER AND IT IS THE ONE THAT MATTERS HERE.** A table can fail by being in the wrong declared set, and it can fail by being in **no** declared set, which is the state a single stray `GRANT` puts this one in. [`0050:233`](migrations/0050_live_cache_and_role.sql)'s `REVOKE ALL ... FROM merit_app, PUBLIC` is what keeps it out of that state, and only the perturbation shows it. The other twenty-six readers stay green in both directions.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-164` | `live_account_state` | The table, its index, two CHECK constraints and one foreign key | 0050 | **landed** |
+| `ADR-164` | (no table) | `CREATE ROLE merit_live NOLOGIN` at [`0050:113`](migrations/0050_live_cache_and_role.sql), its schema `USAGE`, and the grant and revoke set that gives it two tables and no `DELETE` | 0050 | **landed, and counted by nothing** |
+
+### The part a reader should carry forward
+
+**FOUR APPROVED DOCUMENTS DESCRIBED A PERMISSION OVER AN OBJECT THAT DID NOT EXIST**, which is this file's own account of why it was written. What it left behind is a control whose entire content is a grant set, and **a grant set has no row in any object-count table in this manifest**. Sections 38 and 39 record migrations whose deltas are one CHECK each and both are visible as a number moving; this one moved a number for its table and moved nothing at all for the thing it was written to do. **The only artifact that can report a regression here is a check that reads `information_schema` against a document**, and there is exactly one.
+
+---
+
+## 58. `0073` lands, and the removal counterfactual is unavailable because a later migration built on it (2026-09-05)
+
+**Session 542, [ADR-237](../../docs/decisions/ADR-237.md), `SD-M6-10`, [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0073`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Tenth of eleven. **`0073:4` opens `NOT THE MONEY PATH BY FILE, AND IT SITS UNDER EVERY MONEY-PATH ADMIN ROUTE`**, and that phrasing is why [ADR-334](../../docs/decisions/ADR-334.md)'s money-path figure for the twenty was one high: the file carries no `E2 READ: MONEY PATH` header and a substring search for `MONEY PATH` finds it anyway.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0072` then `0073` | tables **115 to 117**, indexes **401 to 408**, CHECK constraints **504 to 514**, foreign keys **168 to 170**, **unique constraints 12 to 14**; triggers 29, functions 114, views 1 |
+| where the ten CHECKs sit | `operators` **7**, `operator_sessions` **3** |
+| the two uniques | `operators_actor_key` and `operator_sessions_token_hash_key`. **This is the only one of the eleven that moves the unique-constraint total** |
+| the constraint that does the work, read at `pg_constraint` | `admin_actions_actor_is_an_operator`, `FOREIGN KEY (actor) REFERENCES operators(actor) ON UPDATE RESTRICT ON DELETE RESTRICT`, added at [`0073:274`](migrations/0073_operator_directory.sql) |
+| re-applying `0073` against `0001`..`0073` | **refused** at `relation "operators" already exists` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0073` | **holds**, exit 0 |
+
+### THE SET DOES NOT BUILD WITHOUT IT, so the counterfactual moved to the constraint
+
+Applying every migration on disk **with `0073` removed** dies at [`0074:146`](migrations/0074_firm_parameters.sql), `relation "operators" does not exist`: `firm_parameters.approved_by` is a foreign key onto `operators(actor)`. **So the ordinary measurement of what a migration contributes is unavailable here**, exactly as [ADR-335](../../docs/decisions/ADR-335.md) found for `0052`, and for the same structural reason: a later file depends on this one by name with no conditional.
+
+Dropping `admin_actions_actor_is_an_operator` from the fully applied schema instead, [`probe_audited_writes.sql`](../../scripts/db/probe_audited_writes.sql) dies at [line 944](../../scripts/db/probe_audited_writes.sql):
+
+```
+ERROR:  REJECTION 15 FAILED: an audit row named an actor in no directory
+```
+
+**The other twenty-six readers stay green.** [`probe_rule_state_phase_vocabulary.sql`](../../scripts/db/probe_rule_state_phase_vocabulary.sql) also writes an `operators` row and was checked rather than assumed; it needs the table and not the constraint, so it survives the drop.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `SD-M6-10` | `operators`, `operator_sessions` | Both tables, ten CHECK constraints, two unique constraints, seven indexes, and the session table's foreign key | 0073 | **landed** |
+| `ADR-237` | `admin_actions` | `admin_actions_actor_is_an_operator`, which gives `admin_actions.actor` a referent | 0073 | **landed** |
+
+### The part a reader should carry forward
+
+**`0017` DECLARED "NO UNEXPLAINED ADMIN ACTION, EVER" AND RESTED IT ON `reason text NOT NULL`, WHICH ANY STRING SATISFIES.** The constraint's own comment says so. **An action whose ACTOR resolves to no row is unexplained in the way that matters most**, and it took fifty-six migrations for anything to refuse one. The reader who should carry this is the one about to satisfy an invariant with a `NOT NULL` on a free-text column: the column will be populated forever and the invariant will never once be enforced.
+
+---
+
+## 59. `0074` lands, the register that opened at twenty reaches zero, and the last file in it is watched by nothing (2026-09-05)
+
+**Session 542, [ADR-252](../../docs/decisions/ADR-252.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `0074`, written by [ADR-351](../../docs/decisions/ADR-351.md).** Eleventh of eleven and **`E2 READ: MONEY PATH` by its own header**: the file gives the base account cap a row, and the cap is **the first decision `POST /checkout` makes on both of its paths**. A number deciding who may buy an account is a number deciding how much of the firm's tail risk one buyer may accumulate.
+
+**WITH THIS SECTION `LANDING_RECORD_BACKLOG` HOLDS NOTHING.** `RI-37` leg 1 is unconditional from the commit that carries this: a merged migration with no landing record is a finding, with no register left to absorb it.
+
+### What was verified, and every case was executed
+
+| Query | Result |
+|---|---|
+| `public` object counts, `0073` then `0074` | tables **117 to 118**, indexes **408 to 410**, CHECK constraints **514 to 516**, foreign keys **170 to 171**; uniques 14, triggers 29, functions 114, views 1 |
+| what is present at `0074` and what is NOT, read at `pg_constraint` and `pg_indexes` on a database stopped at `0074` | **Two CHECKs**, `firm_parameters_vocabulary_is_closed` and `firm_parameters_base_account_cap_is_positive`. **One foreign key**, `approved_by` onto `operators(actor)`. **Two indexes**, the primary key on `(parameter, effective_from)` and `firm_parameters_current_idx`. `firm_parameters_id_uq`, `firm_parameters_approval_is_spent_once`, the dual-control foreign key and all three triggers arrive at `0076` and are NOT this file's |
+| the vocabulary, read back verbatim | `CHECK ((parameter = 'base_account_cap'::text))`. **A one-value closed vocabulary in DDL**, so a second parameter needs a superseding migration rather than an insert |
+| re-applying `0074` against `0001`..`0074` | **refused** at `relation "firm_parameters" already exists` |
+| [`assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql) at `0001`..`0074` | **holds**, exit 0. `integer_value` is `integer`, and the cap is a count of accounts rather than money |
+
+### NOTHING UNDER `scripts/db/` GOES RED WITHOUT IT, AND REMOVAL IS UNAVAILABLE
+
+Applying every migration on disk **with `0074` removed** dies at [`0076:162`](migrations/0076_firm_parameter_write_control.sql), an `ALTER TABLE firm_parameters`. Dropping `firm_parameters_vocabulary_is_closed` from the fully applied schema instead: **all twenty-seven readers exit 0.** No file under `scripts/db/` names `firm_parameters` at all, which was checked by grep and then confirmed by execution, because a grep proves what is written and only the run proves what is watched.
+
+**BOTH CHECKS ARE LIVE AND WERE WATCHED BEING LIVE**, on the fully applied schema:
+
+| Statement | Result |
+|---|---|
+| a parameter outside the vocabulary | **refused** by `firm_parameters_vocabulary_is_closed` |
+| `base_account_cap` at `0` | **refused** by `firm_parameters_base_account_cap_is_positive` |
+| `base_account_cap` at `3` | **accepted** |
+
+**These ran under `session_replication_role = replica`**, which suspends triggers and foreign keys and leaves `CHECK` constraints evaluating. That is stated because `0076`'s three triggers and two foreign keys sit between an ordinary insert and these two constraints, and a reader reproducing this without it will be refused by a dual-control assertion and conclude the wrong thing about what bit.
+
+### The delta
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| `ADR-252` | `firm_parameters` | The table, its primary key on `(parameter, effective_from)`, `firm_parameters_current_idx`, the closed-vocabulary and positive-cap CHECKs, and the foreign key onto `operators(actor)` | 0074 | **landed** |
+
+### The part a reader should carry forward, and it is what closing this register does not mean
+
+**EVERY MIGRATION IN THIS ESTATE NOW HAS A LANDING RECORD AND THAT IS A STATEMENT ABOUT SECTIONS, NOT ABOUT TRUTH.** `RI-37` reads no content: it cannot tell a section measured against a database from one reconstructed out of an ADR, which is the distinction [ADR-334](../../docs/decisions/ADR-334.md) refused to blur when it opened the register rather than writing twenty sections in one diff.
+
+**AND THE COVERAGE PICTURE THE ELEVEN LEAVE BEHIND IS THE REAL RESIDUE.** Four of them are watched by nothing this repository runs against a database, and two of those four, this file and `0063`, open with `E2 READ: MONEY PATH`. **A closed register and an unwatched money-path constraint are not in tension**, because the register was never about coverage; it was about whether anybody had written down what a merged file did. That is now done for all of them, and the four probes it revealed are owed and named in [ADR-351](../../docs/decisions/ADR-351.md) section 9.
