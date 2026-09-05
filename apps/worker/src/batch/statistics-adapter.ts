@@ -563,10 +563,17 @@ function toDefinitionRow(value: unknown): DefinitionRow {
  */
 function effectiveSet(rows: readonly DefinitionRow[], asOf: TradingDay): readonly DefinitionRow[] {
   const effective = rows.filter((row) => row.effectiveFrom <= asOf);
-  const retired = new Set(
-    effective.map((row) => row.supersededBy).filter((id): id is string => id !== null),
+  // **THE POINTER RUNS FORWARD AND THE FIRST VERSION OF THIS READ IT
+  // BACKWARDS.** `superseded_by` holds the id of the row that REPLACED this one
+  // (`statistic_definitions_live_uq` is `UNIQUE (stat_code) WHERE superseded_by
+  // IS NULL`, so the live row is the one pointing at nothing). Collecting the
+  // pointed-AT ids and calling them retired retires the SUCCESSOR and keeps the
+  // predecessor, which publishes every figure under the method it replaced. The
+  // suite watched that red before this line was written.
+  const effectiveIds = new Set(effective.map((row) => row.id));
+  const live = effective.filter(
+    (row) => row.supersededBy === null || !effectiveIds.has(row.supersededBy),
   );
-  const live = effective.filter((row) => !retired.has(row.id));
 
   const byCode = new Map<string, DefinitionRow[]>();
   for (const row of live) {
@@ -770,10 +777,18 @@ function readPort(db: WorkerDb): StatisticsReadPort {
             );
 
           const entries = await tx.rowsWhere('walletEntries', { referenceId: payoutRequestId });
+          // **`provenance` IS READ AS NULLABLE AND THE COLUMN IS WHY.** `0080`
+          // made it `NULL` ON A DEBIT ONLY, so a wallet debit referencing this
+          // same payout carries no provenance at all, and a reader that
+          // demanded text here would throw on a row it merely meant to skip.
+          // The direction and the provenance are BOTH tested because either one
+          // alone admits a row the recognition point is not: a refund credit
+          // carries the wrong provenance and a debit carries the wrong
+          // direction.
           const credits = entries.filter((entry) => {
             const walletRow = asRow(entry, 'walletEntries');
             return (
-              text(walletRow, 'provenance', 'walletEntries') === WALLET_PAYOUT_PROVENANCE &&
+              textOrNull(walletRow, 'provenance', 'walletEntries') === WALLET_PAYOUT_PROVENANCE &&
               text(walletRow, 'direction', 'walletEntries') === WALLET_CREDIT_DIRECTION
             );
           });
