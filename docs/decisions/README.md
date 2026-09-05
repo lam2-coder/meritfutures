@@ -351,6 +351,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-337](ADR-337.md) | the section-number allocation table that exists to stop collisions had drifted from the headings it allocates, eight numbers were taken by a heading and claimed by no row, `RI-37` gains a fourth leg that binds the two rather than a new invariant number, and the leg lands RED on all eight one commit before the repair (2026-09-05, status: proposed) |
 | [ADR-338](ADR-338.md) | the saga's queue port gets its first live implementation over the door ADR-333 wired to nothing, the enqueue half is taken and the drain is refused with the argument for refusing it, and the invariant written to fail on good news is found unable to see the wiring and able to see a sentence about it (2026-09-05, status: proposed) |
 | [ADR-339](ADR-339.md) | the letter that heads four sections gets a derived register and NOT a gate, because every gate the lettered sequence could carry is refused by a rule this file already wrote, and the one thing that actually failed was a count in prose (2026-09-05, status: proposed) |
+| [ADR-347](ADR-347.md) | `INV-M11-05`'s rate limit is built in the two dimensions that are real, per-ASN is refused with its blocker named rather than faked, an absent limit is a refusal, and the dispatch's own description of the exposed surface is wrong in both directions (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
