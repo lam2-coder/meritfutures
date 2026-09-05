@@ -338,6 +338,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-324](ADR-324.md) | a shipped refusal outlived its reason and nothing went red. `COMMISSIONS_UNREACHABLE` says what is true after `0078`, the obstruction `0078` could not touch survives at full strength, and the assertions that were meant to keep it honest are DERIVED FROM THE TREE instead of matched against its own words (2026-09-05, status: proposed) |
 | [ADR-325](ADR-325.md) | the approval that nobody drives, driven. `LT-06` posts in the transaction that approves, the ruled port could not write the row it was ruled to write, and a short position is a HOLD and never a cancellation  (2026-09-05, status: proposed) |
 | [ADR-326](ADR-326.md) | the jobs this deployable built get a register, the three counts that disagreed are reconciled by deriving them, and the manifest line slice 8 owes is blocked by a grant rather than by a session  (2026-09-05, status: proposed) |
+| [ADR-327](ADR-327.md) | the schema the application role could not see. The privilege set is measured rather than reasoned, `CREATE` is refused and nothing needed it, and the sentence saying otherwise is superseded in a file nobody may edit  (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
