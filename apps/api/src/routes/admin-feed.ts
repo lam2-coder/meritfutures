@@ -132,25 +132,37 @@
 // WHAT AN UNWIRED DEPLOYMENT ACTUALLY ANSWERS, MEASURED RATHER THAN INHERITED
 // -----------------------------------------------------------------------------
 // `WAVE-06` section 4.1 states that every operator route "answers 503 today".
-// **IT IS 500, AND THE MEASUREMENT IS IN ADR-184 SECTION 7.** `adminHandler`
-// resolves `currentReadSource()` BEFORE it calls `spec.handle`
-// (`admin-reads.ts:856`), that throws an `AdminReadError` carrying no
-// `statusCode`, and `server.ts`'s error handler maps an absent status to 500.
+// **IT WAS 500, AND THE MEASUREMENT IS IN ADR-184 SECTION 7. IT IS 401 NOW**
+// (ADR-343). This paragraph is amended in place rather than replaced (RI-14) and
+// what it said was: "`adminHandler` resolves `currentReadSource()` BEFORE it
+// calls `spec.handle` (`admin-reads.ts:856`), that throws an `AdminReadError`
+// carrying no `statusCode`, and `server.ts`'s error handler maps an absent
+// status to 500." The mechanism is described correctly and TWO THINGS UNDER IT
+// HAVE MOVED. The citation drifted: `currentReadSource` has not been at
+// `admin-reads.ts:856` for several sessions and the resolution now happens
+// through `adminReadSourceOrNull` inside `adminHandler`. And the 500 that
+// mattered on this route was never the read source's; it was the SESSION
+// source's, one port earlier, reached by any caller who sent a cookie.
 //
-// **THAT 500 IS THE DESIGN AND NOT A DEFECT TO ROUTE AROUND.** `STATUS_CODE`
-// (`server.ts:98`) is closed over API_CONTRACT section 2's canonical table,
-// which carries NO 503 and no `service_unavailable`, and the handler's own
-// comment says an unmapped status "is reported as an `internal_error` with the
-// real status in the log, which is a defect somebody can find" rather than
-// silently acquiring an invented code. So this module invents none either: a
-// 503 here would need a new canonical code, which is a wider amendment than
-// `W6-e` holds.
+// **"THAT 500 IS THE DESIGN AND NOT A DEFECT TO ROUTE AROUND" WAS TRUE OF THE
+// READ PORT AND FALSE OF THE OTHER ONE, AND ITS SUPPORTING CLAUSE IS SPENT.**
+// The clause read: "`STATUS_CODE` (`server.ts:98`) is closed over API_CONTRACT
+// section 2's canonical table, which carries NO 503 and no `service_unavailable`
+// ... a 503 here would need a new canonical code, which is a wider amendment
+// than `W6-e` holds." **NO CANONICAL CODE WAS EVER NEEDED**, which ADR-192
+// finding 9 established and four sibling modules had already been doing:
+// `service_unavailable` is a HANDLER code, built at the call site, and
+// `server.ts` is deliberately untouched (ADR-192 clause 4). So the amendment was
+// never wide; it was one function. What `W6-e` correctly declined to do was
+// RULE on it, and ADR-190 item 2 registered it instead.
 //
-// THE CONSEQUENCE FOR THIS MODULE IS STATED RATHER THAN LEFT TO BE FOUND. Where
-// a read source IS wired the parse runs first and an unscoped query is refused
-// 400 with no read attempted, which is the order below. Where NONE is wired the
-// 500 arrives before this module's handler is entered at all, so the request
-// half is enforced for every deployment that has a source and for no other.
+// THE CONSEQUENCE FOR THIS MODULE IS STATED RATHER THAN LEFT TO BE FOUND, AND IT
+// IS SMALLER THAN IT WAS. An unwired deployment answers this route 401 before
+// the parse, so the request half is still enforced only where a session source
+// is installed. Where one IS installed and a read source is not, the refusal is
+// a 503 behind the authorization rather than a 500 in front of it. Where both
+// are wired the parse runs first and an unscoped query is refused 400 with no
+// read attempted, which is the order below.
 // Coupling every section 8 route to one port's wiring is `admin-reads.ts`'s
 // shape and not this file's, and ADR-184 section 7 reports it.
 //
