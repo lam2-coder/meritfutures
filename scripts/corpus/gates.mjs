@@ -1842,6 +1842,26 @@ const ci06h = {
           'NULL, that INV-WALLET-NO-DEPOSITS survived the relaxation, or that ' +
           "0038's ADJ-C3 reversal is still satisfiable (0080)",
       ],
+      // ADR-323, 0081. Pinned in the commit that wires it.
+      //
+      // THE PIN CARRIES TWO ASSERTIONS NOTHING ELSE IN THIS REPOSITORY MAKES.
+      // ACCEPTANCE 1 is the only one that a wallet-funded purchase naming no
+      // processor is writable, which is the whole of what 0081 buys and the row
+      // checkout.ts's wallet arm has to write. ACCEPTANCE 2 is the only one that
+      // purchases_psp_reference_uq still treats NULLs as DISTINCT: ADR-323
+      // refused a partial index on that ground, so a later NULLS NOT DISTINCT
+      // rebuild would cap Merit at one wallet-funded purchase for all time and
+      // this step is the only thing that would say so.
+      [
+        'probe_purchase_processor_columns.sql',
+        "ADR-323's purchase processor columns are no longer probed, so nothing " +
+          'asserts that a wallet purchase naming no processor is writable, that ' +
+          'a second one is writable and the webhook anchor therefore still ' +
+          'treats NULLs as distinct, that a wallet purchase naming a processor ' +
+          'is refused, that a psp or mixed purchase naming none is refused, ' +
+          "that 0006's closed processor vocabulary survived the relaxation, or " +
+          'that the anchor still refuses a duplicate reference (0081)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);

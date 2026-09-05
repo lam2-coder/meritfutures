@@ -871,3 +871,31 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_wallet_debit_provenance.sql
+
+      # ADR-323, `0081`. THE WALLET PURCHASE THAT COULD NOT BE WRITTEN.
+      #
+      # `0006` made `purchases.psp` and `purchases.psp_reference` NOT NULL when
+      # a card was the only way to pay, and `SD-M3-06` added
+      # `payment_method = 'wallet'` to the same table without relaxing either.
+      # So the honest wallet purchase raised not_null_violation and a wallet
+      # purchase naming `psp_a` and a minted reference committed, which is the
+      # wrong way round and which an inventory of refusals scores as a working
+      # schema. It is `0080`'s defect one table over.
+      #
+      # ACCEPTANCE 1 IS THE CASE THIS FILE EXISTS FOR. Every rejection here
+      # passes against columns that refuse every null, which is exactly the
+      # pre-`0081` schema; what separates `0081` from a wall is that the wallet
+      # purchase is now writable. Watched failing against `0001`..`0080` before
+      # the migration was written.
+      #
+      # ACCEPTANCE 2 AND REJECTION 6 ARE THE ANCHOR. The webhook idempotency
+      # index is keyed on the two columns this migration relaxed, and ADR-323
+      # refused a partial index on the grounds that NULL distinctness already
+      # says the right thing. ACCEPTANCE 2 writes a second wallet purchase and
+      # REJECTION 6 writes a duplicate card reference, so a `NULLS NOT DISTINCT`
+      # rebuild and a lost `UNIQUE` are each caught by a row rather than by
+      # a reading of the index definition.
+      - name: Probe ADR-323's purchase processor columns (0081)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_purchase_processor_columns.sql

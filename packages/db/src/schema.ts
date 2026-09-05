@@ -518,8 +518,14 @@ export const purchases = pgTable('purchases', {
   currency: char('currency', { length: 3 }).notNull().default('USD'),
   couponId: uuid('coupon_id'),
   affiliateId: uuid('affiliate_id'),
-  psp: text('psp').notNull(),
-  pspReference: text('psp_reference').notNull(),
+  // NULLABLE SINCE 0081 (ADR-323), AND NOT NULLABLE IN GENERAL. A wallet-funded
+  // purchase called no processor, so it names none; a `psp` or `mixed` purchase
+  // must name one, and `purchases_processor_columns_follow_method` is where that
+  // is now said. The nullability the fold compares is the DDL's, and the DDL's
+  // is unconditional; the condition lives in a CHECK, which this transcription
+  // does not carry for any table.
+  psp: text('psp'),
+  pspReference: text('psp_reference'),
   midReference: text('mid_reference'),
   status: purchaseStatus('status').notNull().default('pending'),
   paidAt: timestamp('paid_at', { withTimezone: true }),

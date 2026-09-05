@@ -2838,6 +2838,16 @@ describe('the transcription states the DDL type and nullability, not only the co
     // `wallet_entries_provenance_follows_direction` is what keeps a CREDIT
     // required to carry its class, and a CHECK is not what this fold reads.
     ['wallet_entries', ['provenance']],
+    // 0081_purchase_processor_columns.sql, ADR-323. THE FOURTH CARRIER, and it
+    // is the third one over in as many rows: `0006` made both columns NOT NULL
+    // when `psp` was the only way to pay, and `SD-M3-06` added the wallet method
+    // without relaxing either, so a wallet purchase could not be written without
+    // naming a processor that was never called. As with `wallet_entries` above,
+    // the relaxation alone would be a widening;
+    // `purchases_processor_columns_follow_method` is what keeps a `psp` or
+    // `mixed` purchase required to name one, and a CHECK is not what this fold
+    // reads.
+    ['purchases', ['psp', 'psp_reference']],
   ];
 
   test('ALTER COLUMN DROP NOT NULL is FOLDED, and the column it names comes out nullable', () => {
@@ -2954,6 +2964,15 @@ describe('the transcription states the DDL type and nullability, not only the co
   // and the carrier row above. Had it been a `SET NOT NULL` or a `DEFAULT`, the
   // count would have gone red in exactly the same way and the answer would have
   // been a ruling rather than an increment.
+  //
+  // AND THE SIXTH LANDED THE SAME WAY, one row later. `0081` (ADR-323) relaxes
+  // BOTH of `purchases.psp` and `purchases.psp_reference` in ONE statement with
+  // two clauses, which is `0032`'s shape rather than a new one, so the count
+  // below moves by one and not by two: this census counts STATEMENTS, and
+  // `droppedNotNulls` reads every top-level clause of each. Two relaxations in
+  // two rows is a pattern rather than two accidents, and both had the same
+  // cause: a NOT NULL written when only one kind of row existed, left in place
+  // by the delta that added the second kind.
   test('the migration set carries exactly the ALTER COLUMN statements this fold was ruled against', () => {
     const carriers = new Set<string>();
     let statements = 0;
@@ -2978,7 +2997,7 @@ describe('the transcription states the DDL type and nullability, not only the co
         ...new Set([...ALTER_COLUMN_TABLES.map(([t]) => t), ...RETYPED_COLUMNS.map(([t]) => t)]),
       ].sort(),
     );
-    expect(statements, 'the ALTER COLUMN statement count this fold was ruled against').toBe(5);
+    expect(statements, 'the ALTER COLUMN statement count this fold was ruled against').toBe(6);
   });
 
   // THE SAME CENSUS FOR ADR-278's MEMBER, AND FOR ADR-216's OWN REASON. The
