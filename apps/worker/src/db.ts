@@ -109,7 +109,7 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
-import { closeClient, poolSqlExecutor, systemDb, transaction } from '@merit/db';
+import { atMost, closeClient, isNull, poolSqlExecutor, systemDb, transaction } from '@merit/db';
 import type {
   PoolSqlExecutorReason,
   SqlExecutor,
@@ -285,3 +285,55 @@ export const WORKER_SUPERVISOR_REASON: PoolSqlExecutorReason = 'job-supervisor' 
 export function queueExecutor(): SqlExecutor {
   return poolSqlExecutor(WORKER_SUPERVISOR_REASON);
 }
+
+// =============================================================================
+// ADR-157's TWO READ-PATH TERM CONSTRUCTORS, WHICH ARE NOT A THIRD DOOR EITHER
+// =============================================================================
+// **THEY ARE HERE FOR THE SAME REASON `queueExecutor()` IS, AND THE ARGUMENT
+// ABOVE IS RE-RUN RATHER THAN CITED.** ADR-165's pattern is ONE FILE PER
+// PACKAGE, so a term constructor reaching this deployable at all has to arrive
+// through this file; the alternative is `apps/worker/src/sweeps/expiry-adapter.ts`
+// importing `@merit/db` and `test/db.test.ts` section 3 becoming a two-element
+// list, which is the assertion ADR-333 already declined to loosen.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS NOT ADR-165 CLAUSE 2's SECOND DOOR
+// -----------------------------------------------------------------------------
+// **THE CLAUSE COUNTS DOORS ONTO TABLES AND A TERM REACHES NO TABLE.** These two
+// functions take a value and return a value. They have no `rows`, no `insert`,
+// no `updateAt`, no key vocabulary and no scope predicate, and there is no
+// argument position anywhere in the accessor where a term becomes a scope: a
+// term is a NARROWING that goes on a column inside a `where` a keyed accessor
+// composes, and the accessor is what decides which rows a narrowed predicate can
+// reach. `poolSqlExecutor` at least hands out a method that runs a statement;
+// this hands out two that mint an object.
+//
+// **AND THE HONEST DIRECTION IS THE OTHER ONE: A TERM IS THE THING THAT MAKES A
+// READ NARROWER.** `atMost` turns `WHERE hold_expires_at = $1`, which is
+// unwritable against an instant, into `WHERE hold_expires_at <= $1`. Withholding
+// it does not make this deployable's reads safer; it makes the hourly sweep
+// unable to express its own scan and pushes the next session towards
+// `sqlExecutor`, which is the door ADR-331 section 4 clause 3 prices as
+// arbitrary, unscoped and outside any transaction.
+//
+// -----------------------------------------------------------------------------
+// THEY ARE RE-EXPORTED AND NOT WRAPPED, AND THE WRAPPER IS WHAT WOULD BREAK THEM
+// -----------------------------------------------------------------------------
+// **`packages/db` RECOGNISES A TERM BY IDENTITY AND NOT BY SHAPE.** `mintTerm`
+// puts every term it builds in a module-scoped `WeakSet` and `isFilterTerm`
+// reads that set, precisely so a caller cannot hand-roll one: a `jsonb` column
+// holding an object that looks like a term is a VALUE, and a shape check would
+// read it as a range. A wrapper here that rebuilt the returned object, spread it
+// or froze a copy of it would hand back something the accessor refuses, and the
+// refusal would arrive at the first live scan rather than at this line. So the
+// two names are passed through untouched.
+//
+// **THERE IS NO `atLeast` AND NO `isNotNull`, AND NEITHER OMISSION IS TIDINESS.**
+// ADR-157 refuses `isNotNull` by name, and `atLeast` has no caller in this
+// deployable: `atMost` already excludes a null clock, because `NULL <= x` is
+// NULL and never matches. A third name here is a decision for the row that needs
+// it, which is `WORKER_SUPERVISOR_REASON`'s rule one section up applied to a
+// vocabulary instead of to a word.
+// =============================================================================
+
+export { atMost, isNull };

@@ -963,16 +963,28 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // inside it and the two lines are assigned rather than reached for.
     './withdrawals/approval-sweep.ts',
     './withdrawals/ports.ts',
-    // ADR-350, session 530, AND THE SIXTH TIME THE PARAGRAPH ABOVE HAS PREDICTED
-    // THIS EDIT. M12's statistics run gets its `StatisticsPorts` value, which is
+    // ADR-344, session 530, AND THE SIXTH TIME THE PARAGRAPH ABOVE HAS
+    // PREDICTED THIS EDIT. The hourly expiry sweep's adapter: four of that
+    // job's five ports over this deployable's own doors, with the event sink
+    // taken as a required argument because nothing in this repository can be
+    // passed for it. That row's fence carries `apps/worker/test/**`, so this
+    // file is inside it and the line is assigned rather than reached for.
+    './sweeps/expiry-adapter.ts',
+    // ADR-350, session 535, AND THE SEVENTH TIME THE PARAGRAPH ABOVE HAS
+    // PREDICTED THIS EDIT, WHICH IS THE SECOND TIME IT HAS DONE SO FOR THE SAME
+    // MERGE. M12's statistics run gets its `StatisticsPorts` value, which is
     // `./batch/adapter.ts`'s shape one statistic over. That row's fence carries
     // `apps/worker/**` and its suites, so this file is inside it and the line is
     // assigned rather than reached for.
     './batch/statistics-adapter.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  // 30 SINCE SESSION 530, WHICH ADDED `./batch/statistics-adapter.ts`. It was
-  // 29 from session 516, which added `./withdrawals/approval-sweep.ts` AND
+  // 31 SINCE SESSION 535, WHICH ADDED `./batch/statistics-adapter.ts` ON TOP OF
+  // SESSION 530's `./sweeps/expiry-adapter.ts`. **TWO CONCURRENT ROWS EACH ADDED
+  // A LEG AND EACH TYPED 30**, which is exactly what this literal exists to
+  // catch: a keep-both merge of the two enumerations type-checks and leaves the
+  // total one short. It was 29 from session 516, which added
+  // `./withdrawals/approval-sweep.ts` AND
   // `./withdrawals/ports.ts`, 27 from session 511, which added
   // `./sweeps/ledger.ts`, 26 from session 431, which added `./batch/adapter.ts`,
   // 25 from session 395, which added `./batch/state-writer.ts`, and 24 from
@@ -994,5 +1006,5 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
   // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
   // path shape in its regex. They are guarded there and not here.
-  expect(new Set(legs).size).toBe(30);
+  expect(new Set(legs).size).toBe(31);
 });

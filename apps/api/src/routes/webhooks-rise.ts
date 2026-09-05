@@ -84,17 +84,36 @@
 // names no resource, so its resolver answers `not_found` before any dependency
 // is consulted. This row names no resource to be absent.
 //
-// WHAT A LIVE DEPLOYMENT ANSWERS TODAY IS 500, AND THAT IS MEASURED RATHER THAN
-// REASONED. `MERIT_API_SURFACE=public PORT=8899 node --experimental-strip-types
-// apps/api/src/start.ts`, then a POST to each of the three webhook rows:
-// `/webhooks/rise`, `/webhooks/psp/psp_a` and `/webhooks/kyc/acme` all answer
-// `500 internal_error`, and the log carries `RawBodyUnavailableError` for all
-// three. `installRawWebhookBodyParser` is not registered by `compose`, so
-// `rawBodyOf` refuses the parsed object BEFORE any of the three receivers is
-// entered and no receiver's own answer is reachable over HTTP yet. ADR-109
-// ruling 4 is the seam that ends that for all three at once, and it is outside
-// this fence. The 503 above is the receiver's answer and the suite reaches it
-// with the parser installed, which is `webhooks-psp.test.ts`'s own arrangement.
+// THIS PARAGRAPH READ: "WHAT A LIVE DEPLOYMENT ANSWERS TODAY IS 500, AND THAT
+// IS MEASURED RATHER THAN REASONED. `MERIT_API_SURFACE=public PORT=8899 node
+// --experimental-strip-types apps/api/src/start.ts`, then a POST to each of the
+// three webhook rows: `/webhooks/rise`, `/webhooks/psp/psp_a` and
+// `/webhooks/kyc/acme` all answer `500 internal_error`, and the log carries
+// `RawBodyUnavailableError` for all three. `installRawWebhookBodyParser` is not
+// registered by `compose`, so `rawBodyOf` refuses the parsed object BEFORE any
+// of the three receivers is entered and no receiver's own answer is reachable
+// over HTTP yet. ADR-109 ruling 4 is the seam that ends that for all three at
+// once, and it is outside this fence. The 503 above is the receiver's answer
+// and the suite reaches it with the parser installed, which is
+// `webhooks-psp.test.ts`'s own arrangement."
+//
+// IT WAS TRUE WHEN IT WAS WRITTEN AND ADR-340 ENDED IT. That session reran the
+// same command on the same three paths and reproduced all three `500`s and all
+// nine `RawBodyUnavailableError` log lines BEFORE its first edit, then built
+// the seam: `RouteDefinition` carries `rawBody`, this route declares it, and
+// `compose` registers it inside a child context carrying the buffer parser. THE
+// SAME LIVE PROCESS NOW ANSWERS 503 HERE, 404 ON THE PSP ROW AND 404 ON THE KYC
+// ROW, which are the three receivers' own answers. The 503 above is this row's
+// and the paragraph predicting it holds. The PSP row's own header predicted 503
+// for itself and is WRONG: its resolver reads `:provider` before it reads its
+// dependencies, so it answers 404 for the reason the KYC row does. ADR-340
+// corrected that sentence in the file that carries it. The paragraph is
+// kept beside its correction rather than cut, per `RI-14`.
+//
+// THE CLAUSE NUMBER ABOVE IS WRONG IN BOTH PLACES IT APPEARS IN THIS FILE AND
+// IS KEPT SO THE REPAIR IS VISIBLE. ADR-109's raw-body ruling is CLAUSE 6, not
+// ruling 4; clause 4 is the unowned replay being a second type. `RI-15`/`RI-16`
+// citation-repair rights, exercised by ADR-340.
 //
 // The route is REGISTERED either way, because the contract row exists and an
 // unregistered route answers a 404 that is the ROUTER's and looks identical to a
@@ -478,6 +497,9 @@ export default defineRoutes({
       method: 'POST',
       path: RISE_WEBHOOK_PATH,
       handler: riseWebhookHandler(productionDeps),
+      // THE BYTES, OR THIS RECEIVER CANNOT VERIFY ANYTHING. API_CONTRACT
+      // section 10 wants the HMAC verified BEFORE parsing. ADR-340.
+      rawBody: true,
     },
   ],
 });
