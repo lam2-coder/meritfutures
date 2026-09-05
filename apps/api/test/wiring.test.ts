@@ -106,11 +106,23 @@ const HERE = import.meta.dirname;
 const ROUTES = join(HERE, '..', 'src', 'routes');
 const SRC = join(HERE, '..', 'src');
 
-/** Every `export function useX(` / `setX(` in a route module. The founder's grep. */
-const DECLARES = /^export function ((?:use|set)[A-Za-z]+)\(/gm;
+/**
+ * Every `export function useX(` / `setX(` in this deployable's source. The
+ * founder's grep.
+ *
+ * THE THIRD CHARACTER CLASS IS `[A-Z]` AND IT USED TO BE `[A-Za-z]`, which
+ * mattered the moment the scan below stopped being routes-only. A port setter is
+ * `use` or `set` followed by the NAME OF A THING, so it capitalises; the loose
+ * form also matches ordinary vocabulary that begins with those three letters,
+ * and `auth-backend.ts` exports exactly one, `userAgentFamily`. Measured before
+ * the change: over `src/routes` the two forms match the IDENTICAL set, so
+ * nothing real is dropped and the only thing narrowed away is a false positive
+ * this file would otherwise have to carry a `BLOCKED` excuse for.
+ */
+const DECLARES = /^export function ((?:use|set)[A-Z][A-Za-z]*)\(/gm;
 
-/** Every top-level `useX(` / `setX(` call in `start.ts`. */
-const CALLS = /^((?:use|set)[A-Za-z]+)\(/gm;
+/** Every top-level `useX(` / `setX(` call in `start.ts`. Same shape, same reason. */
+const CALLS = /^((?:use|set)[A-Z][A-Za-z]*)\(/gm;
 
 /** Every `export function databaseX(` / `export const databaseX =` in this deployable. */
 const FACTORIES = /^export (?:function|const) (database[A-Za-z]+)\b/gm;
@@ -129,10 +141,32 @@ function matches(source: string, pattern: RegExp): readonly string[] {
   return [...source.matchAll(pattern)].map((match) => match[1] ?? '');
 }
 
-/** Which route module declares each port. */
+/**
+ * Which module declares each port.
+ *
+ * `src/routes` AND `src` BOTH, AND THE SECOND JOINED ON A PORT THAT IS NOT A
+ * ROUTE'S. This scan read `src/routes` alone until ADR-347, on the true
+ * observation that a backend port belongs to the module whose routes refuse
+ * without it. `useCertificateRateLimiter` belongs to TWO route modules at once
+ * (`GET /verify/:code` and `GET /certificates/:code/image.png` are limited
+ * separately by API_CONTRACT section 11 and by one counter), so declaring it in
+ * either would have made the other import a port it half owns.
+ *
+ * THE GATE READS MORE OF THE TREE AND NOT LESS. Its stated regression is a
+ * setter `start.ts` calls that NOTHING declares, which a rename leaves behind;
+ * widening the scan keeps that assertion and extends the opposite one, that a
+ * declared port is wired or is blocked with a reason, to the sibling modules
+ * too. `tsFiles` filters to `.ts` and does not recurse, so `src/routes` is
+ * reached by the second term rather than twice.
+ */
 const declaredIn = new Map<string, string>();
-for (const name of tsFiles(ROUTES))
-  for (const port of matches(read(join(ROUTES, name)), DECLARES)) declaredIn.set(port, name);
+for (const [dir, label] of [
+  [ROUTES, 'routes'],
+  [SRC, 'src'],
+] as const)
+  for (const name of tsFiles(dir))
+    for (const port of matches(read(join(dir, name)), DECLARES))
+      declaredIn.set(port, label === 'routes' ? name : `../${name}`);
 
 const startSource = read(join(SRC, 'start.ts'));
 const wired = new Set(matches(startSource, CALLS));
@@ -1547,9 +1581,18 @@ test('every database adapter written in this deployable is installed or accounte
 test('the wired count is reported, so a regression is a number and not a paragraph', () => {
   // The measurement this file was written to keep honest. It is an assertion
   // rather than a log line because a log line nobody reads is not a control.
+  //
+  // THE NUMBERS MOVED BY ONE AND ONE ON 2026-09-05 AND NEITHER MOVE IS A
+  // WIDENING. ADR-347 declared `useCertificateRateLimiter` in
+  // `src/certificate-rate-limit.ts` and installed it in `start.ts`, so `declared`
+  // is 25 and `wired` is 11; `blocked` does not move, because nothing was
+  // excused. The scan that found it also stopped matching `userAgentFamily`,
+  // which the widened directory list would otherwise have added as a
+  // twenty-sixth: see `DECLARES` above for the measurement that made the
+  // narrowing safe.
   expect({
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 24, wired: 10, blocked: 14 });
+  }).toStrictEqual({ declared: 25, wired: 11, blocked: 14 });
 });

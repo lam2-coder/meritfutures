@@ -48,6 +48,9 @@
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
+import { resetCertificateRateLimiter } from '../src/certificate-rate-limit.ts';
+import { admitEveryRequest } from './support/certificate-rate-limit.ts';
+
 import { BASE_PATH, buildServer, discoverRouteModules } from '../src/index.ts';
 import { defineRoutes } from '../src/registry.ts';
 import {
@@ -295,12 +298,21 @@ beforeEach(() => {
     ...UNWIRED_AUTH_BACKEND,
     sessionByToken: (token) => Promise.resolve(token === TOKEN_A ? SESSION_A : null),
   });
+  // THE LIMIT IS NOT WHAT THIS FILE ASSERTS AND IT SAYS SO RATHER THAN
+  // INHERITING IT. ADR-347 put a fail-closed rate limiter ahead of both public
+  // certificate rows, so the image cases below would answer 503 under the port's
+  // own default. The stub counts nothing, which keeps a per-file request budget
+  // from coupling cases that assert something else;
+  // `certificate-rate-limit.test.ts` is where the real limiter is driven over
+  // its threshold, held under it, and stripped of its configuration.
+  admitEveryRequest();
 });
 
 afterEach(() => {
   resetAuthBackend();
   resetCertificateBackend();
   resetCertificateImageSource();
+  resetCertificateRateLimiter();
 });
 
 // -----------------------------------------------------------------------------
@@ -366,9 +378,17 @@ describe('the module declares section 6.3 and nothing else', () => {
   // vocabulary is `['pass', 'payout']` by equality rather than by containment,
   // so a third member added anywhere turns this red, and `0020:107` writes the
   // same two words as `kind text NOT NULL CHECK (kind IN ('pass', 'payout'))`.
-  // `certificates.ts:504` narrows every row through
+  // `certificates.ts:583` narrows every row through
   // `member(row['kind'], CERTIFICATE_KINDS, 'kind')`, so a stored row carrying a
-  // per-trade kind could not be built into a card at all.
+  // per-trade kind could not be built into a card at all. THAT POINTER READ LINE
+  // 504 AND WAS SEVENTY-TWO LINES OUT BEFORE THIS SESSION TOUCHED THE FILE, green
+  // the whole time because that line happened to land on prose and RI-15 asks for
+  // a NAME only where one binds ahead of the citation. ADR-347's seven import
+  // lines moved it onto a bare closing brace and the vacancy rule reported it,
+  // which is the check catching a drift it could not see until the line under the
+  // pointer changed shape. THE OLD NUMBER IS WRITTEN OUT OF CITATION GRAMMAR ON
+  // PURPOSE (ADR-212, and `wiring.test.ts` does the same with two of its own): a
+  // pointer quoted as HISTORY must not wear the shape that says follow me.
   //
   // THE ROW'S SECOND SENTENCE IS NOT ASSERTED HERE AND CANNOT BE. It governs
   // what the card renders "if the deferred kind is later enabled", and it binds
