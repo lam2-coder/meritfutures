@@ -317,13 +317,17 @@ test('4.3 the withdrawal driver has its own row and its own dead-man switch', ()
 // 5. The manifest line, and the door that is still owed under it
 // =============================================================================
 
-test('5.1 the worker declares @merit/queue, and no module of it imports the package', () => {
-  // **BOTH CASES IN THIS SECTION WENT RED BY ADR-327 SUCCEEDING, AND BOTH ARE
-  // REWRITTEN RATHER THAN DELETED.** 5.1 asserted the manifest did NOT declare
-  // `@merit/queue` and named the blocker under it; the blocker is gone and the
-  // line is here, so the case now asserts the line AND the half that is still
-  // missing. A case that only asserted the line would go green on a manifest
-  // entry nothing uses, which is exactly the state this deployable is in.
+test('5.1 the worker declares @merit/queue, and exactly one module of it imports the package', () => {
+  // **THIS CASE HAS NOW GONE RED BY A ROW SUCCEEDING TWICE, AND IT IS REWRITTEN
+  // BOTH TIMES RATHER THAN DELETED.** It first asserted the manifest did NOT
+  // declare `@merit/queue` and named the blocker under it; ADR-327 landed the
+  // line, so it was rewritten to assert the line AND the still-absent importer.
+  // **ADR-333 WROTE THE IMPORTER, SO THE SECOND HALF WENT RED BY SUCCEEDING.**
+  // It is rewritten to the other side of the same fact and NOT loosened: the
+  // line and the NAMED importer are asserted together, so neither half can drift
+  // alone. A case that only asserted the line would go green on a manifest entry
+  // nothing uses, which is the state this deployable was in for two rows; a case
+  // that only counted importers would go green on a second door.
   const manifest = JSON.parse(MANIFEST) as { dependencies?: Record<string, string> };
   const deps = Object.keys(manifest.dependencies ?? {}).sort();
   expect(
@@ -333,9 +337,9 @@ test('5.1 the worker declares @merit/queue, and no module of it imports the pack
       'deployable unwritable again (ADR-327)',
   ).toContain('@merit/queue');
 
-  // THE RETIRED SENTENCE, ASSERTED IN THE DIRECTION THAT KEEPS THE HISTORY
-  // READABLE: the paragraph marking it as retired is present, and the claim does
-  // not stand on its own above it.
+  // THE RETIRED SENTENCES, ASSERTED IN THE DIRECTION THAT KEEPS THE HISTORY
+  // READABLE: the paragraph marking each as retired is present, and the claim
+  // does not stand on its own above it.
   expect(BARREL).not.toContain('IT IS OWED BY A DIFFERENT SESSION THAN THIS ONE');
   const retired = BARREL.indexOf('THIS PARAGRAPH READ "NOTHING HERE IMPORTS');
   expect(
@@ -347,11 +351,26 @@ test('5.1 the worker declares @merit/queue, and no module of it imports the pack
     'the barrel states the grant blocker as a live claim again, and 0082 is on disk',
   ).not.toContain('every one of `JobQueue`');
 
-  // AND THE DOOR. `@merit/ledger` reaches exactly `src/sweeps/ledger.ts` and
-  // `@merit/db` exactly `src/db.ts`, on ADR-165's ONE-DOOR pattern. A third
-  // capability with no door is a manifest line nobody can point at, so it is
-  // asserted rather than described: the day somebody writes the door, this case
-  // and the barrel paragraph it guards move together.
+  const importerRetired = BARREL.indexOf('THIS PARAGRAPH READ "WHAT IS STILL MISSING');
+  expect(
+    importerRetired,
+    'the paragraph retiring the ABSENT-IMPORTER claim is gone from the barrel, and ' +
+      'apps/worker/src/queue.ts is on disk. RI-14: what was corrected is kept where a reader ' +
+      'meets it',
+  ).toBeGreaterThan(-1);
+  expect(
+    BARREL.slice(0, importerRetired),
+    'the barrel states the absent importer as a live claim again, above the paragraph that ' +
+      'retires it',
+  ).not.toContain('so the capability is declared and unexercised');
+
+  // AND THE DOOR, WHICH IS THE HALF THAT WENT RED BY SUCCEEDING. `@merit/ledger`
+  // reaches exactly `src/sweeps/ledger.ts` and `@merit/db` exactly `src/db.ts`,
+  // on ADR-165's ONE-DOOR pattern; `@merit/queue` now reaches exactly
+  // `src/queue.ts`. **THE MANIFEST LINE AND THE NAMED FILE ARE ASSERTED IN ONE
+  // CASE ON PURPOSE**: the manifest's own `//dependencies.@merit/queue` key names
+  // the file, so a capability granted to a whole deployable and spent by one
+  // module is two facts that must move together or the comment starts lying.
   const modules = workerModules();
   expect(modules.length, 'the module walk found nothing; the case cannot run').toBeGreaterThan(10);
   const importers = modules.filter((module) =>
@@ -359,10 +378,15 @@ test('5.1 the worker declares @merit/queue, and no module of it imports the pack
   );
   expect(
     importers,
-    'a module of apps/worker now imports @merit/queue. That is the ONE-DOOR file ADR-327 ' +
-      'said the next row owes: name it in package.json beside @merit/db and @merit/ledger, ' +
-      'and repair the barrel paragraph that says no module imports the package',
-  ).toEqual([]);
+    'apps/worker no longer reaches @merit/queue through exactly ./queue.ts. A SECOND importer ' +
+      'is the diff ADR-165s one-door pattern forecloses and ADR-333 asserts; NONE means the ' +
+      'door was deleted and the manifest line buys nothing again',
+  ).toEqual(['./queue.ts']);
+  expect(
+    MANIFEST,
+    'the manifest comment no longer names the file the capability is spent in, so a reader ' +
+      'asking "where does apps/worker construct a queue" gets no path',
+  ).toContain('src/queue.ts');
 });
 
 test('5.2 the grant 0079 left out is in, it is exactly what was ruled, and it is not CREATE', () => {
