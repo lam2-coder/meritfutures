@@ -84,11 +84,30 @@
 // as retired against the two exports that falsified it, so a tree where they
 // went away turns the correction red instead of leaving it to be believed.
 //
-// WHAT IS STILL ABSENT IS THE IMPORTER, AND SINCE ADR-332 IT IS THE ONLY THING.
-// NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`. It is in `apps/worker`'s
-// manifest since ADR-327 and reaches no `src/` file there, so what ships from
-// here is the interface, its adapter and the suite that proves the enqueue
-// joins the transaction it is given. `RI-35` holds that sentence to the tree.
+// THE IMPORTER EXISTS, AND SINCE ADR-333 IT IS `apps/worker/src/queue.ts`. That
+// deployable's ONE DOOR constructs `pgBossQueue` over `@merit/db`'s
+// `poolSqlExecutor('job-supervisor')` and republishes TWO of `JobQueue`'s five
+// methods: `declareQueue` and `enqueue`. `start`, `stop` and `consume` are
+// withheld there, because a supervise pass emits its failures on an emitter this
+// package does not expose and because that deployable is a one-shot job
+// (ADR-241). So what ships from here is the interface, its adapter, the suite
+// that proves the enqueue joins the transaction it is given, and now one caller.
+//
+// **THIS PARAGRAPH READ "WHAT IS STILL ABSENT IS THE IMPORTER, AND SINCE ADR-332
+// IT IS THE ONLY THING. NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`. It
+// is in `apps/worker`'s manifest since ADR-327 and reaches no `src/` file
+// there", AND ADR-333 WROTE THAT MODULE.** It is kept beside its correction
+// rather than deleted, per `RI-14`, and `RI-35` still holds it: the claim was
+// registered `live` against the `queue-door` artifact and moved to `retired` in
+// the same commit that falsified it, so an importer that went away again turns
+// this correction red rather than leaving it to be believed.
+//
+// WHAT IS STILL ABSENT IS A CONSUMER, AND IT IS A DIFFERENT ROW'S. Nothing in
+// this workspace calls `consume` or `start`, so no job enqueued through the door
+// is ever fetched and no maintenance pass ever runs. The blocker is not a
+// manifest and not a grant this time: it is that a caller of `start()` cannot
+// observe what the supervisor fails at, which is section 10 item 3 of ADR-331
+// and item 2 of ADR-332, unrepaired here and named again.
 //
 // **THIS HEADING READ "WHAT IS STILL ABSENT IS THE DOOR AND NOT THE SUPPLY",
 // WHICH ADR-332 MADE AMBIGUOUS RATHER THAN FALSE**, and the ambiguity is worth

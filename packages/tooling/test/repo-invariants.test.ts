@@ -676,12 +676,27 @@ function cleanTree(): string {
  * for RI-22's mint: a fixture that keeps a copy of the mechanism under test goes
  * stale in step with it and cannot fail.
  *
- * EVERY ARTIFACT IS PUT IN THE STATE THE REGISTER'S DISPOSITIONS DEMAND. The
- * seven `retired` claims need their artifact PRESENT, so the migration set
- * carries the three migrations, `apps/worker` declares `@merit/queue` and the
- * `@merit/db` barrel exports both halves; the eight `live` ones need theirs
- * ABSENT, so no `src/` file imports the queue, `apps/api` and `packages/db`
- * declare it in no manifest, and nothing calls `runProvisioningSaga`.
+ * EVERY ARTIFACT IS PUT IN THE STATE THE REGISTER'S DISPOSITIONS DEMAND. A
+ * `retired` claim needs its artifact PRESENT and a `live` one needs it ABSENT,
+ * so the migration set carries the three migrations, `apps/worker` declares
+ * `@merit/queue` and the `@merit/db` barrel exports every half a probe reads;
+ * while `apps/api` and `packages/db` declare the queue in no manifest and
+ * nothing calls `runProvisioningSaga`.
+ *
+ * **ADR-333 FLIPPED `queue-door` AND THIS HELPER HAD TO FLIP WITH IT**, which is
+ * the fixture doing its job rather than a maintenance cost. That artifact's three
+ * claims were `live` and are `retired`, so a fixture where NO `src/` file imports
+ * the queue now fails leg 3 instead of passing leg 2: `apps/worker/src/queue.ts`
+ * carries a real import here, exactly as it does in this repository. Two probes
+ * arrived with the same row and each reads a file this fixture had never needed:
+ * `job-queue-failure-channel` reads `packages/queue/src/job-queue.ts`, which is
+ * written with the FIVE methods and no emitter because its claims are `live`;
+ * and `db-pool-sql-executor` reads the accessor's barrel and `scoped-db.ts`,
+ * both of which must name `poolSqlExecutor` because its claim is `retired`.
+ * Each of those probes THROWS on a file it cannot open, so the omission was an
+ * ERROR on every case in this file rather than a silent pass, which is the trap
+ * RI-14's three files, RI-20's two, RI-22's three and RI-30's estate each set
+ * while they were being written.
  */
 function absenceClaimEstate(root: string): void {
   write(root, 'apps/api/package.json', '{ "name": "@merit/api", "private": true }\n');
@@ -692,7 +707,30 @@ function absenceClaimEstate(root: string): void {
     '{ "name": "@merit/worker", "private": true,\n' +
       '  "dependencies": { "@merit/queue": "workspace:*" } }\n',
   );
-  appendTo(root, 'packages/db/src/index.ts', 'export {\n  transaction,\n  type SqlExecutor,\n};\n');
+  appendTo(
+    root,
+    'packages/db/src/index.ts',
+    'export {\n  poolSqlExecutor,\n  transaction,\n  type SqlExecutor,\n};\n',
+  );
+  // ADR-333. `db-pool-sql-executor` reads BOTH halves, so the fixture carries
+  // both: a barrel line alone is not an export.
+  appendTo(
+    root,
+    'packages/db/src/scoped-db.ts',
+    'export function poolSqlExecutor(reason) {\n  return reason;\n}\n',
+  );
+  // ADR-333. `job-queue-failure-channel`'s two claims are `live`, so the
+  // interface here carries the FIVE methods ADR-006 fixed and no emitter.
+  write(
+    root,
+    'packages/queue/src/job-queue.ts',
+    "export const JOB_QUEUE_METHODS = [\n  'declareQueue',\n  'enqueue',\n  'consume',\n" +
+      "  'start',\n  'stop',\n] as const;\n",
+  );
+  // ADR-333. `queue-door`'s three claims are `retired`, so the importer has to
+  // be REAL here: the claim lines the loop below appends to this same file are
+  // comments, and `importedAnywhere` reads the import and never the mention.
+  write(root, 'apps/worker/src/queue.ts', "import { pgBossQueue } from '@merit/queue';\n");
   write(
     root,
     'packages/db/migrations/0078_affiliate_commission_owner.sql',

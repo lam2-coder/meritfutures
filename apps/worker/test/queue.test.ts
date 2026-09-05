@@ -83,7 +83,16 @@ const asPosix = (file: string): string => relative(APP, file).split('\\').join('
  * would read that sentence as a violation of the property it describes.
  */
 function importersOf(specifier: string): string[] {
-  const pattern = new RegExp(`from\\s+'${specifier.replace('/', '\\/')}'`);
+  // THE STATEMENT AND NOT THE STRING, and the difference was MEASURED here
+  // rather than anticipated. The first draft matched `from '@merit/db'`
+  // anywhere in the file and reported SEVEN importers of the accessor: six of
+  // them are `ports.ts` headers quoting the import form in order to say the
+  // file does not use it. That is ADR-165 section 9's finding met a second
+  // time, and the instrument is `test/db.test.ts`'s: an `import` or an
+  // `export ... from` at the head of a line.
+  const pattern = new RegExp(
+    `(?:^|\\n)\\s*(?:import|export)[\\s\\S]*?from\\s+'${specifier.replace('/', '\\/')}'`,
+  );
   return sourceFiles()
     .filter((file) => pattern.test(readFileSync(file, 'utf8')))
     .map(asPosix);
