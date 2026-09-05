@@ -339,6 +339,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-325](ADR-325.md) | the approval that nobody drives, driven. `LT-06` posts in the transaction that approves, the ruled port could not write the row it was ruled to write, and a short position is a HOLD and never a cancellation  (2026-09-05, status: proposed) |
 | [ADR-326](ADR-326.md) | the jobs this deployable built get a register, the three counts that disagreed are reconciled by deriving them, and the manifest line slice 8 owes is blocked by a grant rather than by a session  (2026-09-05, status: proposed) |
 | [ADR-327](ADR-327.md) | the schema the application role could not see. The privilege set is measured rather than reasoned, `CREATE` is refused and nothing needed it, and the sentence saying otherwise is superseded in a file nobody may edit  (2026-09-05, status: proposed) |
+| [ADR-328](ADR-328.md) | a sentence that outlived the tree, four times, each repaired by hand. `RI-35` binds an absence claim to the artifact it names and asserts the artifact is still absent, the four occurrences are reconstructed and watched going red, and the fifth site found while sizing the row is repaired with a derivation (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
