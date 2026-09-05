@@ -236,6 +236,17 @@ const matches =
  * exists to prove is sufficient. `terms` and `events` are fakes because
  * `packages/db`'s constructors and `P5-n`'s sink are not this row's; `ledger` is
  * the REAL `EXPIRY_LEDGER` and nothing about it is faked.
+ *
+ * **THE `terms` HALF OF THAT REASON WENT FALSE ON 2026-09-05 AND IS KEPT BESIDE
+ * ITS CORRECTION, per `RI-14`.** ADR-344 wrote `src/sweeps/expiry-adapter.ts`,
+ * so the accessor's own two constructors reach this deployable through
+ * `src/db.ts` and `terms` is no longer a port nobody can serve. **THIS FAKE IS
+ * NOT REPLACED BY IT AND THAT IS DELIBERATE**: what this suite asserts is the
+ * LEDGER HANDLE, and a minted term here would buy nothing while coupling these
+ * cases to a second module. `test/expiry-adapter.test.ts` is where the real
+ * adapter is driven with the real terms, and its section 2 asserts the property
+ * a hand-rolled term cannot have. `events` is still a fake for the reason it
+ * always was, and it is the only port left with no live inhabitant anywhere.
  */
 function wiredIo(options: {
   readonly payoutRequests?: readonly Row[];

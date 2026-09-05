@@ -468,6 +468,29 @@ export type {
 // THE THREE LEGS, THE LOCK, THE KEY DISCIPLINE AND THE REPORT; WHAT IS NOT IS
 // THE WIRING, and the difference is visible in the type rather than left to a
 // reader.
+//
+// **THE ADAPTER HALF OF THAT SENTENCE IS TAKEN NOW AND THE SCHEDULE HALF IS
+// NOT, and the sentence is kept whole beside its correction per `RI-14`.**
+// ADR-344 wrote `./sweeps/expiry-adapter.ts`, which is the leg immediately
+// below: `expirySweepIo(db, events, now)` serves `transact` over
+// `WorkerDb.batch`, `terms` over the accessor's own two read-path
+// constructors, `ledger` over `EXPIRY_LEDGER` and `now` over the process
+// clock. **FOUR PORTS OF FIVE, AND THE FIFTH IS A REQUIRED ARGUMENT RATHER
+// THAN A REFUSING DEFAULT.** Every leg of this sweep emits inside its own
+// release transaction, so an `events` port that rejected would be an hourly
+// job that releases nothing while a dead-man switch watching for the job's
+// ABSENCE reports it present, which is `ADR-239`'s defect with a clock in
+// front of it. The only event producer in this repository is
+// `apps/api/src/events.ts`, `RI-04` and `node-linker=isolated` put it out of
+// reach of this deployable, and the producer's own header measures that
+// `SystemTx` is the one handle in this workspace that can write `events` while
+// `apps/api` opens no system door. So the handle and the producer are each in
+// the deployable the other cannot import, no `ExpirySweepIo` is constructed,
+// and `runExpirySweep` stays `unscheduled` in `schedule.ts` for a blocker that
+// is now a call that does not compile rather than a sentence.
+export { EXPIRY_TERMS, expirySweepIo } from './sweeps/expiry-adapter.ts';
+export type { SweepTx } from './sweeps/expiry-adapter.ts';
+
 export {
   EXPIRY_CLOCKS,
   FREEZE_EXPIRING_LEAD_HOURS,
@@ -518,6 +541,18 @@ export type {
 // DECLARED BECAUSE THE MODULE EXISTS AND THE BARREL'S OWN SWEEP IS TOTAL, NOT
 // BECAUSE ANYTHING INSTALLS IT: `recordExpiryTransaction` has no caller under
 // `src/`, so `EXPIRY_LEDGER` refuses every handle it could be given today.
+// **THE `terms` HALF OF THAT SENTENCE AND THE `recordExpiryTransaction` CLAUSE
+// ARE BOTH FALSE NOW AND ARE KEPT BESIDE THEIR CORRECTION, per `RI-14`.**
+// ADR-344 wrote `./sweeps/expiry-adapter.ts`, the leg above this one:
+// `src/db.ts` re-exports the accessor's two read-path term constructors, so
+// `terms` is served; `expirySweepIo` calls `recordExpiryTransaction` inside
+// `WorkerDb.batch`'s callback, so `EXPIRY_LEDGER` now recognises the handle it
+// is given rather than refusing every one. **WHAT IS STILL TRUE IS THE HALF
+// THAT KEEPS THE JOB OFF A CLOCK**: `events` still needs the sink `P5-n` has
+// not written, the only producer in this repository is `apps/api/src/events.ts`
+// and `RI-04` plus `node-linker=isolated` put it out of reach, so
+// `expirySweepIo` takes the sink as a REQUIRED argument, nothing in this tree
+// can be passed for it, and no `ExpirySweepIo` is constructed here or anywhere.
 // **AND SLICE 7 PUT A SECOND PORT BEHIND THE SAME DOOR (ADR-325).**
 // `ApprovalLedgerPort` is `LT-06`, and its adapter is in `sweeps/ledger.ts`
 // rather than beside the driver because the manifest's own
@@ -1472,6 +1507,7 @@ export const WORKER_BARREL_LEGS = [
   './recon/ports.ts',
   './recon/sweep.ts',
   './schedule.ts',
+  './sweeps/expiry-adapter.ts',
   './sweeps/expiry.ts',
   './sweeps/ledger.ts',
   './sweeps/ports.ts',
