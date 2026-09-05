@@ -794,10 +794,12 @@ export const ABSENCE_CLAIMS = [
   // --- ADR-330: what the sweep saw the day it learned to read `scripts/` -----
   {
     site: 'scripts/corpus/data-model-columns.mjs',
-    claim: 'IT CANNOT BE IMPORTED: `gates.mjs` ends in `process.exit(main())` at module',
-    disposition: 'live',
+    claim: '**THIS PARAGRAPH READ "IT CANNOT BE IMPORTED: `gates.mjs` ends in',
+    disposition: 'retired',
     artifact: 'gates-importable',
-    why: 'OCCURRENCE 7, reported by leg 6 the moment the sweep reached `scripts/`. ADR-329',
+    why:
+      'OCCURRENCE 7, reported by leg 6 the moment the sweep reached `scripts/`, and the ' +
+      'first of the seven that a check found rather than a reader. ADR-329 finding 6, ADR-330',
   },
   {
     site: 'scripts/db/assert_pgboss_schema_matches_library.mjs',

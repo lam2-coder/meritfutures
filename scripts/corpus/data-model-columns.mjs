@@ -53,10 +53,39 @@
 // 2. IT PARSES THE MIGRATIONS A SECOND TIME. `gates.mjs` already holds a
 //    `columnCatalogue()` that answers exactly this question, and OQ-P1-04's
 //    ruling is one parser called twice rather than two expressions of one parse.
-//    IT CANNOT BE IMPORTED: `gates.mjs` ends in `process.exit(main())` at module
-//    scope with no direct-invocation guard, so importing it runs every gate and
-//    exits the process. Adding that guard is a behavioural edit to a file two
-//    other sessions are live in, which is a merge hazard this file is not worth.
+//    IT CAN NOW BE IMPORTED, AND THE BLOCKER THIS PARAGRAPH NAMED IS SPENT.
+//    `gates.mjs:9118` reads `export const GATES = [`, and `:9324` opens the
+//    guard `const invokedDirectly = ...` closed at `:9327` by
+//    `if (invokedDirectly) process.exit(main());`, under a comment reading
+//    "Importable by the suite that reads this report, runnable by CI-06". That
+//    guard landed in `55824c62` on 2026-08-30 for ADR-294, three sessions after
+//    this header was written, and the same file also exports `EXIT` at `:9202`
+//    and `runGates` at `:9227`. So the duplication below is now a DEFERRAL WITH
+//    NO BLOCKER rather than a blocked repair, and its remedy clause at the foot
+//    of this paragraph is available and unclaimed.
+//
+//    **THIS PARAGRAPH READ "IT CANNOT BE IMPORTED: `gates.mjs` ends in
+//    `process.exit(main())` at module scope with no direct-invocation guard, so
+//    importing it runs every gate and exits the process. Adding that guard is a
+//    behavioural edit to a file two other sessions are live in, which is a merge
+//    hazard this file is not worth."** It was TRUE when it was written and
+//    `55824c62` falsified it while nothing went red, which is the defect
+//    ADR-324, ADR-326, ADR-327 and ADR-328 are each an occurrence of. ADR-329
+//    finding 6 found it here; ADR-330 widened `RI-35`'s leg-6 sweep to read
+//    `scripts/` and the check reported this line by discovery. The retired
+//    sentence is kept beside its correction under `RI-14` rather than deleted,
+//    and it is bound to that guard by `RI-35`, so the day somebody removes the
+//    guard this quote goes red instead of quietly becoming true again.
+//
+//    THE REPAIR IS THE DERIVATION AND NOT THE WORDING, AND THE PARSERS ARE NOT
+//    TOUCHED. This paragraph's duplication argument rested on the false clause
+//    only for its BLOCKER, not for its ruling: `OQ-P1-04` still says one parser
+//    called twice, and `RI-36` has since added a third reader of this same
+//    migration set (ADR-329 section 3.1). Deciding what to do about that is a
+//    row with its own fence, named as owed in ADR-330 and deliberately not
+//    started here, because collapsing three readers into one is a change to what
+//    `CI-06i`, this file and `RI-36` each assert and not a comment repair.
+//
 //    THE DUPLICATION FAILS IN THE SAFE DIRECTION: a catalogue that parses
 //    NARROWER than gates.mjs's reports a column the record has as absent from
 //    the schema, which is a loud false finding somebody investigates, never a
