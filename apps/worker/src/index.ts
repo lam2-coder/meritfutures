@@ -15,25 +15,46 @@
 //
 // The queue is pg-boss inside the same Postgres (ADR-006), so the job store
 // participates in the same transactions and the same PITR as the money data.
-// THE INTERFACE NOW EXISTS AND THE JOB STORE DOES NOT (ADR-086, session 147).
-// `@merit/queue` publishes `JobQueue` and `pgBossQueue`, whose `enqueue` takes
-// the caller's open transaction as its first argument; what has not landed is
-// the migration that installs pg-boss's schema, and `pgBossQueue` is configured
-// `migrate: false` precisely so that gap fails loudly rather than being closed
-// by a library running DDL on the money database at boot.
+// THE INTERFACE EXISTS AND SO DOES THE JOB STORE. `@merit/queue` publishes
+// `JobQueue` and `pgBossQueue`, whose `enqueue` takes the caller's open
+// transaction as its first argument, and `0079_pgboss_job_store.sql` installed
+// pg-boss's schema as a numbered migration on 2026-09-03 (ADR-318).
 //
-// NOTHING HERE IMPORTS IT YET, and the reason is a manifest rather than a
-// design. `apps/worker/package.json` declares `@merit/rules-engine` AND
-// `@merit/db` (ADR-165, session 292) and nothing else; adding `@merit/queue` to
-// it is outside session 147's fence, and under `node-linker=isolated` an
-// undeclared import does not resolve at all. So the wiring is one manifest line
-// and one call, in the session that brings the first job with it.
+// **THIS PARAGRAPH READ "THE INTERFACE NOW EXISTS AND THE JOB STORE DOES NOT
+// (ADR-086, session 147)" AND `0079` MADE IT FALSE**, and it is kept beside its
+// correction rather than deleted because the shape of the error is the point:
+// nothing derived the claim from `packages/db/migrations`, so a merged migration
+// left a false sentence in a file with every gate green. `test/schedule.test.ts`
+// now reads the migration directory and fails on the retired wording.
 //
-// THIS SENTENCE READ "AND NOTHING ELSE" UNTIL 2026-08-27 AND ADR-165 MADE IT
-// FALSE. That entry's section 10 finding 2 named both occurrences in this file,
-// reported them rather than reaching into a file it was fenced out of, and said
-// "whoever holds it next repairs the sentence in the same commit". This is that
-// commit.
+// `pgBossQueue` STAYS `migrate: false` AND THE MIGRATION IS THE REASON IT STILL
+// SHOULD. The setting was chosen so the missing store failed loudly rather than
+// being closed by a library running DDL on the money database at boot; with the
+// store installed the same setting now does the OTHER half of the same job,
+// because `Contractor.check()` under `migrate: false` refuses any
+// `pgboss.version` other than the one the library was compiled with. A catalog
+// bump to pg-boss is therefore a red boot and a new migration rather than a
+// silent in-place upgrade of a schema inside the ledger's restore boundary.
+//
+// NOTHING HERE IMPORTS IT YET, AND THE REASON HAS MOVED FROM A MANIFEST TO A
+// GRANT. `apps/worker/package.json` declares `@merit/db`, `@merit/ledger` and
+// `@merit/rules-engine`, and under `node-linker=isolated` an undeclared import
+// does not resolve at all, so a line is still owed. **BUT THE LINE IS NO LONGER
+// THE BLOCKER**: `0026_roles_and_grants.sql` grants `USAGE` and default
+// privileges `IN SCHEMA public` and nowhere else, so `merit_app` holds neither
+// `USAGE` nor `CREATE` on `pgboss` and every one of `JobQueue`'s five methods
+// throws for this deployable today. `0079` left that grant out on purpose and
+// `probe_pgboss_job_store.sql` REJECTION 5 asserts the absence. ADR-326 rules
+// what the grant must be; the migration that acts on the ruling is owed by a row
+// whose fence holds `packages/db/**`.
+//
+// THIS SENTENCE READ "AND NOTHING ELSE" AFTER `@merit/rules-engine` AND
+// `@merit/db` UNTIL ADR-305 SECTION 7 SLICE 6 ADDED `@merit/ledger`, WHICH IS
+// THE SECOND TIME THIS CLAUSE HAS GONE STALE. ADR-165 section 10 finding 2
+// named the first occurrence, reported it rather than reaching into a file it
+// was fenced out of, and said "whoever holds it next repairs the sentence in the
+// same commit". The list is now read out of the manifest by the suite rather
+// than counted here, which is the repair that does not need a third session.
 //
 // THE FIRST JOB IS THE NIGHTLY BATCH, and it is here as a function rather than
 // as a scheduled worker. `runNightlyBatch` takes its ports as an argument and
@@ -57,14 +78,18 @@
 // `JobTransaction` its `enqueue` requires. ADR-102 produced one and
 // `enqueueProvisioningOp` calls it.
 //
-// **THE MANIFEST LINE THIS HEADER HAS ASKED FOR SINCE SESSION 147 IS STILL
-// OWED FOR `@merit/queue`, AND IT IS OWED BY A DIFFERENT SESSION THAN THIS
-// ONE.** The paragraph above still stands FOR THE QUEUE: `@merit/queue` is not
-// in `apps/worker/package.json`, `node-linker=isolated` makes an undeclared
-// import unresolvable, and P3 wave 3's `P3-l` fence holds `src/provisioning/**`,
-// this file and `test/provisioning.test.ts` and holds neither the manifest nor
-// `pnpm-lock.yaml`. **IT NO LONGER STANDS FOR THE ACCESSOR**, which ADR-165
-// admitted; the second half of finding 2 is repaired here with the first. So the saga is written against PORTS, exactly as
+// **THE MANIFEST LINE THIS HEADER HAS ASKED FOR SINCE SESSION 147 IS STILL NOT
+// HERE, AND THE SENTENCE THAT SAID IT WAS "OWED BY A DIFFERENT SESSION THAN
+// THIS ONE" IS RETIRED BECAUSE A DEFERRAL WITH NO NAMED BLOCKER IS NOT A
+// FINDING.** ADR-305 section 7 slice 8 is the row that holds the manifest, and
+// it measured the blocker under the line rather than adding it: `@merit/queue`
+// resolves to a `JobQueue` whose every method runs against the `pgboss` schema,
+// and the role this deployable connects as cannot reach that schema at all (see
+// the grant paragraph in this file's header, and `src/schedule.ts`). A manifest
+// line whose one call throws `permission denied for schema pgboss` buys a
+// resolvable import and no job. **SO THE LINE WAITS ON THE GRANT AND THE GRANT
+// WAITS ON A MIGRATION**, which is a smaller and more specific gap than the one
+// this comment used to name. So the saga is written against PORTS, exactly as
 // `runNightlyBatch` is, and `src/provisioning/ports.ts` says what each port's
 // implementation is and what blocks two of them.
 //
@@ -1272,6 +1297,22 @@ export type {
   ReconWriteTable,
 } from './recon/ports.ts';
 
+// -----------------------------------------------------------------------------
+// THE JOB REGISTRATION (ADR-305 section 7 slice 8, ADR-326)
+// -----------------------------------------------------------------------------
+// WHICH JOBS THIS DEPLOYABLE HAS BUILT, WHICH ONE HAS A CLOCK, AND FOR EVERY
+// OTHER ONE THE BLOCKER THAT KEEPS IT OFF ONE. It is a leg rather than a module
+// the suite imports by path, because the docblock over `./job.ts` below now
+// points at it instead of counting, and a pointer into a module this barrel does
+// not carry would be one import short of the thing it names.
+export {
+  SCHEDULED_JOB_ENTRY_POINTS,
+  UNSCHEDULED_CRON_ROWS,
+  UNSCHEDULED_JOB_ENTRY_POINTS,
+  WORKER_JOB_ENTRY_POINTS,
+} from './schedule.ts';
+export type { JobDisposition, WorkerJobEntryPoint } from './schedule.ts';
+
 // =============================================================================
 // THE BARREL'S OWN LEGS, AS DATA, BECAUSE A TYPE CHECKER CANNOT SEE AN EXPORT
 // THAT IS SIMPLY GONE
@@ -1339,6 +1380,7 @@ export const WORKER_BARREL_LEGS = [
   './provisioning/index.ts',
   './recon/ports.ts',
   './recon/sweep.ts',
+  './schedule.ts',
   './sweeps/expiry.ts',
   './sweeps/ledger.ts',
   './sweeps/ports.ts',
@@ -1413,12 +1455,29 @@ export const SERVICE = 'worker' as const;
  * `CRON_INVENTORY`, and `test/entrypoint.test.ts` watches a real process exit
  * rather than reasoning about one.
  *
- * WHAT IS STILL ABSENT IS NAMED RATHER THAN IMPLIED. The job store is still not
- * installed: pg-boss's schema is not in `packages/db/migrations`, so there is
- * nothing to enqueue into, and the five other jobs this deployable has built
- * (detector runs, the expiry sweep, the two digest producers, the breaker
- * evaluation and the statistics run) are still unscheduled, each with its own
- * row in `CRON_INVENTORY` saying so.
+ * WHAT IS STILL ABSENT IS NAMED RATHER THAN IMPLIED, AND IT IS NAMED IN DATA
+ * BECAUSE THE LAST TWO ATTEMPTS AT NAMING IT IN PROSE BOTH WENT STALE WITH
+ * EVERY GATE GREEN.
+ *
+ * **THIS PARAGRAPH READ "The job store is still not installed: pg-boss's schema
+ * is not in `packages/db/migrations`, so there is nothing to enqueue into, and
+ * the five other jobs this deployable has built (detector runs, the expiry
+ * sweep, the two digest producers, the breaker evaluation and the statistics
+ * run) are still unscheduled, each with its own row in `CRON_INVENTORY` saying
+ * so."** Every clause of it is now false or was never right. `0079` installed
+ * the schema and merged. The list said FIVE and enumerated SIX. The inventory it
+ * cited carried the marker on fewer rows than either number. And `ADR-325` built
+ * a further job after the sentence was written. **NOTHING WENT RED FOR ANY OF
+ * IT**, because a hand-maintained count in a comment is asserted by nothing, and
+ * that is the same defect `ADR-324` repaired at a different site one row ago.
+ *
+ * **THE REPAIR IS THAT THE LIST IS {@link WORKER_JOB_ENTRY_POINTS} AND THE
+ * COUNT IS DERIVED FROM IT.** Every job entry point under `src/` carries its
+ * `CRON_INVENTORY` row, its disposition and, when it has none, the blocker that
+ * keeps it off a clock. `test/schedule.test.ts` reads the tree for job entry
+ * points, reads `packages/db/migrations` for the store, and reads the inventory
+ * for its markers, and fails when any of the three disagrees with the data.
+ * `ADR-305` section 7 slice 8 and `ADR-326`.
  */
 export {
   BATCH_CONCURRENCY,

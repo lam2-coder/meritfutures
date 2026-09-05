@@ -257,7 +257,48 @@ test('the worker posting ADR-172 finding 16 reported is an ADAPTER now, and it i
 });
 
 test('the worker runs one job and records that every other one is unscheduled', () => {
-  expect(WORKER_INDEX).toContain('The job store is still not\n * installed');
+  // **THIS CASE PINNED A SENTENCE AND THE SENTENCE WENT FALSE UNDERNEATH IT.**
+  // It read `expect(WORKER_INDEX).toContain('The job store is still not\n *
+  // installed')`, which asserts a string in a COMMENT and not a fact about the
+  // tree: `0079_pgboss_job_store.sql` merged on 2026-09-03 and this case stayed
+  // green over a claim that had become false. That is `ADR-324`'s finding one
+  // row earlier, met again here, and it is what `ADR-326` was dispatched to
+  // repair. **REWRITTEN AND NOT DELETED**, and rewritten so that each half is
+  // derived from something a rename or a merge can move.
+  //
+  // HALF ONE: THE FACT THE OLD STRING DENIED, read at the migration directory.
+  const store = readdirSync(join(ROOT, 'packages/db/migrations')).filter((file) =>
+    /pgboss/i.test(file),
+  );
+  expect(store, 'no migration installs the pg-boss job store').toHaveLength(1);
+  // ASSERTED OUTSIDE THE PARAGRAPH THAT RETIRES THE CLAIM, because `RI-14` keeps
+  // a corrected sentence beside its correction and the barrel therefore QUOTES
+  // the old wording on purpose. Splitting at the retirement marker is what makes
+  // "the claim is gone" and "the record of it is kept" both assertable.
+  const [beforeRetirement] = WORKER_INDEX.split('THIS PARAGRAPH READ');
+  expect(
+    WORKER_INDEX,
+    'the barrel no longer records what it corrected, which RI-14 requires',
+  ).toContain('THIS PARAGRAPH READ');
+  expect(
+    beforeRetirement,
+    'the worker barrel still asserts the job store is not installed, and it is',
+  ).not.toContain('The job store is still not');
+
+  // HALF TWO: THE TITLE'S OWN CLAIM, read at the registry rather than at prose.
+  // `apps/worker/src/schedule.ts` carries every job entry point this deployable
+  // has built with its disposition, and exactly one CRON_INVENTORY row is
+  // scheduled. A second job getting a clock turns this red, which is what the
+  // sentence this case used to quote could never do.
+  const registry = read('apps', 'worker', 'src', 'schedule.ts');
+  const scheduled = [
+    ...registry.matchAll(/cronRow: '([^']+)',\n\s*disposition: 'scheduled',/g),
+  ].map((match) => match[1]);
+  expect(scheduled.length, 'the registry parsed to no scheduled job at all').toBeGreaterThan(0);
+  expect([...new Set(scheduled)]).toEqual(['nightly batch']);
+  // AND THE REST ARE RECORDED RATHER THAN SILENT, which is ADR-305 slice 8's
+  // stop condition: a job left off a clock is a decision somebody wrote down.
+  expect(registry.split("disposition: 'unscheduled'").length - 1).toBeGreaterThan(scheduled.length);
 });
 
 test('no deployment of Merit can post a ledger entry: three call sites, all unwired', () => {

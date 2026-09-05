@@ -168,12 +168,25 @@ describe('link 1: CLOSED. The worker deployable runs its job and fails loudly wh
     // reasons rather than callers. `admin-source/eligible-next-7d.ts` names it
     // in the `awaiting` field of its `no_folded_state` refusal, because what an
     // operator reading that refusal has to do is get this batch run.
+    //
+    // **AND THERE ARE SIX NOW. THE SIXTH IS THE THIRD STRING LITERAL AND IT IS
+    // A REGISTRY ENTRY RATHER THAN A REASON** (`ADR-305` section 7 slice 8,
+    // `ADR-326`). `apps/worker/src/schedule.ts` records which jobs this
+    // deployable has built and which of them has a clock, keyed on the exported
+    // entry point, so it NAMES `runNightlyBatch` and imports nothing. It is
+    // added to the list rather than filtered out for the same reason the two
+    // `apps/api` entries are kept: this sweep counts files that NAME the batch,
+    // and a filter that grows an entry per session stops being readable long
+    // before the list does. That it is not a CALLER is asserted where a caller
+    // can be seen, `apps/worker/test/schedule.test.ts` case 3.1, which ties
+    // every entry point's disposition to a caller census over the same tree.
     expect(namers).toEqual([
       'apps/api/src/admin-source/eligible-next-7d.ts',
       'apps/api/src/routes/account-reads.ts',
       'apps/worker/src/batch/nightly.ts',
       'apps/worker/src/index.ts',
       'apps/worker/src/job.ts',
+      'apps/worker/src/schedule.ts',
     ]);
 
     // **AND NOTHING BETWEEN THE FOLD AND THE PROCESS SWALLOWS A FAILURE**, which

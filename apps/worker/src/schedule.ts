@@ -1,0 +1,282 @@
+// =============================================================================
+// apps/worker/src/schedule.ts
+// =============================================================================
+// **THE WORKER'S JOB REGISTRATION. WHICH JOBS THIS DEPLOYABLE HAS BUILT, WHICH
+// ONE HAS A CLOCK, AND FOR EVERY OTHER ONE THE BLOCKER THAT KEEPS IT OFF ONE.**
+//
+// `ADR-305` section 7 slice 8, ruled by `ADR-326`. That entry's stop condition
+// is that the jobs this deployable has built are "each scheduled, or each left
+// unscheduled ON THE RECORD", and this file is the record. A job left
+// unscheduled is a legitimate outcome; a job left unscheduled in silence is
+// `ADR-239`'s defect, which is a process that looks healthy to a supervisor
+// because it exits 0 having done nothing.
+//
+// -----------------------------------------------------------------------------
+// WHY THE LIST IS DATA AND NOT A SENTENCE, WHICH IS THIS ROW'S OWN OPENING
+// -----------------------------------------------------------------------------
+// The docblock over the `./job.ts` leg of `index.ts` carried a hand-typed count
+// of the jobs "still unscheduled". It named five and enumerated six, the
+// inventory it cited marked three, and `ADR-325` then built a seventh the
+// sentence predated. Nothing went red, because nothing derived the number from
+// the tree. `test/schedule.test.ts` derives it from this array in both
+// directions, so the next job is a row somebody adds or a suite that fails.
+//
+// -----------------------------------------------------------------------------
+// THE CLOCK IS EXTERNAL AND `pg-boss` IS NOT IT. THREE REASONS, EACH MEASURED
+// -----------------------------------------------------------------------------
+// 1. **`JobQueue` HAS NO `schedule` METHOD AND CANNOT GROW ONE FROM HERE.**
+//    `packages/queue/src/job-queue.ts` declares five methods, `JOB_QUEUE_METHODS`
+//    lists them as data, and `EveryJobQueueMethodIsListed` makes a sixth a
+//    COMPILE error until the list moves with it. `packages/queue/**` is outside
+//    `ADR-326`'s fence, so a cron primitive is a later row's to admit.
+// 2. **A CRON INSIDE THE PROCESS NEEDS A LONG-LIVED PROCESS, WHICH `ADR-241`
+//    REFUSED IN TERMS.** `CRON_INVENTORY`'s nightly-batch row: "a long-lived
+//    process has no exit code to fail with: the only status it ever leaves is
+//    the status of its last moment", and that page's whole grammar is the
+//    ABSENCE of a completion signal by an expected-by time, which presumes
+//    discrete runs with discrete completions.
+// 3. **THE ROLE THIS DEPLOYABLE CONNECTS AS CANNOT REACH THE STORE.**
+//    `0026_roles_and_grants.sql` grants `USAGE` and default privileges
+//    `IN SCHEMA public` and nowhere else, so `merit_app` holds neither `USAGE`
+//    nor `CREATE` on `pgboss`. `0079` states that as a deliberate omission and
+//    `probe_pgboss_job_store.sql` REJECTION 5 asserts the absence, naming
+//    `ADR-305` slice 8 as the row that owes the ruling. `ADR-326` rules it and
+//    the migration that acts on the ruling is owed by a row whose fence holds
+//    `packages/db/**`, which `ADR-326`'s does not.
+//
+// SO A SCHEDULED JOB HERE MEANS: an external scheduler starts a process, the
+// process runs the job once, prints its completion line and exits, and the exit
+// code is the only signal. That is `ADR-241`'s shape and this file adds no
+// second one.
+//
+// -----------------------------------------------------------------------------
+// WHY ONE JOB IS SCHEDULED AND ELEVEN ENTRY POINTS ARE NOT, AND IT IS ONE REASON
+// -----------------------------------------------------------------------------
+// **EVERY JOB BELOW EXCEPT THE NIGHTLY BATCH IS WRITTEN AGAINST PORTS THAT NO
+// `src/` FILE IMPLEMENTS.** Nine `UNWIRED_*_IO` values stand as the only
+// inhabitant of their own port type, and a census of callers under every `src/`
+// tree in this workspace returns a caller for `runNightlyBatch` and for nothing
+// else on this list. A schedule in front of a job with no live adapter is a
+// scheduler that starts a process to throw, so the blocker is the adapter and
+// the clock is downstream of it.
+//
+// **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
+// is the reason this row does not simply write eleven adapters. `ADR-305`
+// section 5: past `approved` the only arrow is `transferring`, `packages/rail`
+// opens no socket, and `0072`'s `WD-C2` refuses `approved --> cancelled` at the
+// database. A live clock in front of `runWithdrawalApprovals` posts `LT-06`,
+// extinguishes a trader's wallet claim and leaves the money in a state with no
+// exit and no cancel. **THAT IS SLICE 9's HARM ARRIVING UNDER SLICE 8's NAME**,
+// so the driver gets a `CRON_INVENTORY` row with a dead-man switch and does not
+// get a live schedule, and the switch fires today precisely because the job is
+// not running.
+// =============================================================================
+
+/** Whether a job runs on a clock in a deployment, or does not. */
+export type JobDisposition = 'scheduled' | 'unscheduled';
+
+/**
+ * One job entry point this deployable has built.
+ *
+ * KEYED ON THE ENTRY POINT AND NOT ON THE JOB, which is the distinction the
+ * sentence this file replaces got wrong. Two entry points may answer to one
+ * `CRON_INVENTORY` row: the nightly batch has its fold and its process wrapper,
+ * and the digest work has a producer and the alarm that reads what the producer
+ * failed to deliver. Counting rows and counting entry points give different
+ * numbers, both are right about different questions, and the sentence that
+ * named five and listed six was counting neither consistently.
+ */
+export interface WorkerJobEntryPoint {
+  /** The module, by the specifier the barrel re-exports it under. */
+  readonly module: string;
+  /** The exported name. `test/schedule.test.ts` asserts the module exports it. */
+  readonly entryPoint: string;
+  /**
+   * The `CRON_INVENTORY` scheduled-table row this job answers to, lower case
+   * and without its parenthetical, which is that document's own normal form for
+   * a job name (`gates.mjs`'s `normJob`).
+   */
+  readonly cronRow: string;
+  readonly disposition: JobDisposition;
+  /** For a scheduled job, how it starts. For an unscheduled one, the blocker. */
+  readonly why: string;
+}
+
+/**
+ * Every job entry point under `apps/worker/src`, with its disposition.
+ *
+ * SORTED BY MODULE. `test/schedule.test.ts` asserts, in both directions, that
+ * every entry here names a module and an export the tree still carries, and that
+ * every `export async function run*`, `start*` or `main` under `apps/worker/src`
+ * appears here. A new job is a row somebody writes or a suite that goes red.
+ */
+export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
+  {
+    module: './batch/nightly.ts',
+    entryPoint: 'runNightlyBatch',
+    cronRow: 'nightly batch',
+    disposition: 'scheduled',
+    why:
+      'THE ONE JOB WITH A LIVE ADAPTER AND THE ONLY ENTRY POINT ON THIS LIST WITH A CALLER. ' +
+      '`postgresBatchPorts(io.db)` implements `BatchPorts` over `systemDb`, `main` calls it and ' +
+      '`src/start.ts` calls `main`. ADR-241 ruled the schedule EXTERNAL: the platform scheduler ' +
+      'starts one process per run and a failed fold leaves a non-zero exit status.',
+  },
+  {
+    module: './batch/replay.ts',
+    entryPoint: 'runReplayAudit',
+    cronRow: 'replay self-audit',
+    disposition: 'unscheduled',
+    why:
+      'NO LIVE PORTS AND NO CALLER. The audit takes its reads and its writes as an argument and ' +
+      'no `src/` file supplies one, so a clock in front of it would start a process with nothing ' +
+      'to hand it. ADR-119 is why it is its own job rather than a leg of the batch.',
+  },
+  {
+    module: './batch/statistics.ts',
+    entryPoint: 'runStatisticsRun',
+    cronRow: 'statistics run',
+    disposition: 'unscheduled',
+    why:
+      'NO LIVE PORTS AND NO CALLER, and its own CRON_INVENTORY row already says so in its own ' +
+      'words. Its two preconditions are the batch and the self-audit, and the second of those ' +
+      'is unscheduled one row up, so scheduling this one first would publish off an unaudited ' +
+      'fold. ADR-122.',
+  },
+  {
+    module: './breaker/evaluate.ts',
+    entryPoint: 'evaluateBreaker',
+    cronRow: 'plan breaker evaluation',
+    disposition: 'unscheduled',
+    why:
+      '`UNWIRED_BREAKER_IO` is the only `BreakerIo` in the tree. AND IT WOULD DECLINE EVEN WIRED: ' +
+      "`OQ-M6-02`'s minimum sample is the founder's and is unanswered, so the evaluator raises " +
+      '`BreakerDeclined` rather than inventing a floor. Two blockers, and the second is not an ' +
+      'adapter.',
+  },
+  {
+    module: './detectors/runner.ts',
+    entryPoint: 'runDetectors',
+    cronRow: 'detector runs',
+    disposition: 'unscheduled',
+    why:
+      '`UNWIRED_DETECTOR_RUNNER_IO` is the only `DetectorRunnerIo` in the tree. Its row already ' +
+      'carries the marker and both halves of its dead-man switch are live and correct today: a ' +
+      'run that is absent is a job nobody scheduled.',
+  },
+  {
+    module: './digests/alarm.ts',
+    entryPoint: 'findUndeliveredWindows',
+    cronRow: 'scheduled digest delivery',
+    disposition: 'unscheduled',
+    why:
+      'THE SECOND OF THE TWO DIGEST ENTRY POINTS, and the half the replaced sentence was ' +
+      'counting as one with the first. `UNWIRED_DIGEST_ALARM_IO` is the only `DigestAlarmIo` in ' +
+      'the tree. It reads what the producer failed to deliver, so it is exactly as unscheduled ' +
+      'as the producer and not more so.',
+  },
+  {
+    module: './digests/produce.ts',
+    entryPoint: 'runDigestDeliveries',
+    cronRow: 'scheduled digest delivery',
+    disposition: 'unscheduled',
+    why:
+      '`UNWIRED_DIGEST_IO` is the only `DigestIo` in the tree. Its row asserts the query rather ' +
+      'than the job, so the switch is correct with nothing running: an enabled schedule whose ' +
+      'window has closed with no delivered row is the finding.',
+  },
+  {
+    module: './job.ts',
+    entryPoint: 'main',
+    cronRow: 'nightly batch',
+    disposition: 'scheduled',
+    why:
+      "THE PROCESS WRAPPER FOR THE FOLD ABOVE AND NOT A SECOND JOB. It resolves the run's three " +
+      'inputs, awaits `runNightlyBatch` without wrapping it, and prints the completion line the ' +
+      "dead-man switch reads. It is listed rather than folded into the fold's row because the " +
+      'derivation in the suite reads exported names and would otherwise report it as unaccounted.',
+  },
+  {
+    module: './live/ingest.ts',
+    entryPoint: 'startLiveIngest',
+    cronRow: 'live feed expectation sweep',
+    disposition: 'unscheduled',
+    why:
+      'A CONTINUOUS CONSUMER RATHER THAN A DISCRETE RUN, which is the one job here that would ' +
+      'not fit the inventory grammar even fully wired. `UNWIRED_LIVE_INGEST_IO` is the only ' +
+      '`LiveIngestIo` in the tree, and the SWEEP its row is named for is blocked on a grant ' +
+      "rather than an adapter: `0050`'s `REVOKE ALL` means `merit_app` cannot read the live " +
+      'cache at all, so the expectation needs a table both roles reach.',
+  },
+  {
+    module: './provisioning/saga.ts',
+    entryPoint: 'runProvisioningSaga',
+    cronRow: 'provisioning csv push',
+    disposition: 'unscheduled',
+    why:
+      'NO LIVE PORTS AND NO CALLER, and this is the one job whose wiring would ALSO need the ' +
+      'job store: `enqueueProvisioningOp` puts the row and the job on one transaction through a ' +
+      '`ProvisioningJobQueue`. The `JobQueue` that `@merit/queue` publishes satisfies that port ' +
+      'structurally, and the header above measures the store as unreachable by the role this ' +
+      'deployable connects as.',
+  },
+  {
+    module: './recon/sweep.ts',
+    entryPoint: 'runReconciliationSweep',
+    cronRow: 'per-identity ledger reconciliation',
+    disposition: 'unscheduled',
+    why:
+      '`UNWIRED_RECON_SWEEP_IO` is the only `ReconSweepIo` in the tree. Its row is S1 because a ' +
+      'per-identity error hides behind a global zero (GS-231), and an S1 switch watching a job ' +
+      'nobody wired is the state this list exists to make legible.',
+  },
+  {
+    module: './sweeps/expiry.ts',
+    entryPoint: 'runExpirySweep',
+    cronRow: 'freeze expiry sweep',
+    disposition: 'unscheduled',
+    why:
+      '`UNWIRED_EXPIRY_SWEEP_IO` is the only `ExpirySweepIo` in the tree. THREE `*_expires_at` ' +
+      'COLUMNS NAME THIS JOB AS THEIR RELEASER in the coverage table, so it is the one entry ' +
+      'here whose absence CI-06l can see the shape of, and it is still unscheduled.',
+  },
+  {
+    module: './withdrawals/approval-sweep.ts',
+    entryPoint: 'runWithdrawalApprovals',
+    cronRow: 'withdrawal approval sweep',
+    disposition: 'unscheduled',
+    why:
+      'THE ONE ENTRY HERE WHOSE BLOCKER IS NOT AN ADAPTER, AND IT MUST STAY UNSCHEDULED UNTIL A ' +
+      'PAYMENT RAIL EXISTS. `UNWIRED_WITHDRAWAL_APPROVAL_IO` is the only ' +
+      '`WithdrawalApprovalSweepIo` in the tree, and writing one is not the whole of it: ADR-305 ' +
+      'section 5 measures that a run posts `LT-06`, extinguishes the wallet claim and leaves an ' +
+      'approved withdrawal with no exit and no cancel. The rail is FOUNDER-OWED and is not a ' +
+      'slice.',
+  },
+];
+
+/**
+ * The jobs a deployment actually runs on a clock.
+ *
+ * DERIVED AND NOT LISTED, so the two halves cannot disagree. A row whose
+ * disposition changes moves between this and {@link UNSCHEDULED_JOB_ENTRY_POINTS}
+ * without anybody editing a second place.
+ */
+export const SCHEDULED_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] =
+  WORKER_JOB_ENTRY_POINTS.filter((job) => job.disposition === 'scheduled');
+
+/** The jobs this deployable has built and left off a clock, each with its blocker. */
+export const UNSCHEDULED_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] =
+  WORKER_JOB_ENTRY_POINTS.filter((job) => job.disposition === 'unscheduled');
+
+/**
+ * The `CRON_INVENTORY` rows whose job this deployable has built and not wired.
+ *
+ * THIS IS THE NUMBER THE INVENTORY'S `NOT YET WIRED OR SCHEDULED` MARKERS HAVE
+ * TO MATCH, and `test/schedule.test.ts` asserts the two against each other in
+ * both directions. Distinct rows and not entry points, because the marker sits
+ * on a ROW and two entry points can share one.
+ */
+export const UNSCHEDULED_CRON_ROWS: readonly string[] = [
+  ...new Set(UNSCHEDULED_JOB_ENTRY_POINTS.map((job) => job.cronRow)),
+].sort();

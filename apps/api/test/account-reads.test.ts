@@ -909,10 +909,21 @@ describe('the eligibility blocker states causes that are LIVE, and each is deriv
           path !== 'apps/api/src/admin-source/eligible-next-7d.ts',
       )
       .sort();
+    //
+    // **THE FOURTH ENTRY IS THE JOB REGISTRY AND IT IS A THIRD STRING LITERAL**
+    // (`ADR-305` section 7 slice 8, `ADR-326`). `apps/worker/src/schedule.ts`
+    // records every job entry point this deployable has built and which one has
+    // a clock, keyed on the exported NAME, so it names the batch and imports
+    // nothing. It joins the list rather than the exclusion filter above,
+    // because that filter already carries two entries and a filter that gains
+    // one per session is an allowlist nobody can read. That it is not a caller
+    // is asserted where a caller can be seen: `apps/worker/test/schedule.test.ts`
+    // case 3.1 ties each disposition to a caller census over that same tree.
     expect(namers).toEqual([
       'apps/worker/src/batch/nightly.ts',
       'apps/worker/src/index.ts',
       'apps/worker/src/job.ts',
+      'apps/worker/src/schedule.ts',
     ]);
 
     // **AND THE ADAPTER NO LONGER REFUSES THE LOAD, WHICH IS THE CLAUSE ADR-260

@@ -974,12 +974,18 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // derived so that a leg DISAPPEARING is a failure and not a smaller list
   // nobody counted.
   //
-  // **IT COUNTS 29 OF THE BARREL'S 30 LEGS AND THE MISSING ONE IS A PROPERTY OF
-  // THE REGEX ABOVE, STATED SO THE NEXT READER DOES NOT CALL IT A DROPPED LEG.**
-  // The pattern requires a DIRECTORY segment, and session 431 also added
-  // `./job.ts`, which sits at the top of `src/` because it is the deployable's
-  // one job rather than one module of a subsystem. `test/digests.test.ts` case
-  // 9.1 counts that leg, over `WORKER_BARREL_LEGS` itself and with no path shape
-  // in its regex, so the leg is guarded; it is guarded there and not here.
+  // **THIS COUNT IS OVER LEGS WITH A DIRECTORY SEGMENT AND NOT OVER THE BARREL,
+  // STATED SO THE NEXT READER DOES NOT CALL THE DIFFERENCE A DROPPED LEG.** The
+  // pattern above requires one, and TWO legs sit at the top of `src/` and are
+  // therefore invisible to it: `./job.ts` (session 431), because it is the
+  // deployable's one job rather than one module of a subsystem, and
+  // `./schedule.ts` (ADR-305 section 7 slice 8, session 517), which registers
+  // every job entry point this deployable has built and is deployable-level for
+  // the same reason. **THIS PARAGRAPH READ "IT COUNTS 29 OF THE BARREL'S 30
+  // LEGS" AND THE SECOND NUMBER WENT STALE THE MOMENT A LEG LANDED**, which is
+  // exactly the failure ADR-326 was dispatched over, so the total is now named
+  // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
+  // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
+  // path shape in its regex. They are guarded there and not here.
   expect(new Set(legs).size).toBe(29);
 });
