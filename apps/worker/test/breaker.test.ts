@@ -965,8 +965,9 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     './withdrawals/ports.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
-  // 29 SINCE SESSION 516, WHICH ADDED `./withdrawals/approval-sweep.ts` AND
-  // `./withdrawals/ports.ts`. It was 27 from session 511, which added
+  // 30 SINCE ADR-349, WHICH ADDED `./detectors/adapter.ts`. It was 29 from
+  // session 516, which added `./withdrawals/approval-sweep.ts` AND
+  // `./withdrawals/ports.ts`, 27 from session 511, which added
   // `./sweeps/ledger.ts`, 26 from session 431, which added `./batch/adapter.ts`,
   // 25 from session 395, which added `./batch/state-writer.ts`, and 24 from
   // session 387, which added `./recon/ports.ts` and `./recon/sweep.ts`. The
@@ -987,5 +988,5 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
   // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
   // path shape in its regex. They are guarded there and not here.
-  expect(new Set(legs).size).toBe(29);
+  expect(new Set(legs).size).toBe(30);
 });

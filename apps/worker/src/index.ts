@@ -829,6 +829,33 @@ export type {
 } from './detectors/runner.ts';
 
 // -----------------------------------------------------------------------------
+// THE DETECTOR RUNNER'S ADAPTER (ADR-349)
+// -----------------------------------------------------------------------------
+// APPENDED, and it is one leg rather than a widening of the two above it.
+// `postgresDetectorRunnerIo` serves FOUR of `DetectorRunnerIo`'s five members
+// over `src/db.ts`'s one door; the fifth is `events` and this deployable can
+// reach no sink at all, which `test/event-sink.test.ts` establishes across three
+// ports at once and ADR-349 re-derives for this one.
+//
+// **THE JOB IS STILL UNSCHEDULED AND THE ROW IN `./schedule.ts` NOW NAMES THREE
+// BLOCKERS INSTEAD OF ONE.** `runner.ts` emits inside the write transaction and
+// emits unconditionally, so a deployment holding the composed value writes NO
+// `detector_runs` row; `detector_definitions` is a JSON seed with no loader, so
+// every detector would be `DetectorUnregistered` besides; and eleven of the
+// eighteen seeded rows state no number, so a loaded registry still declines.
+// Exactly one of those three is an adapter and this file is it.
+export {
+  DETECTOR_TABLES_AGREE_WITH_THE_ACCESSOR,
+  DetectorAdapterUnwired,
+  DetectorTableRefused,
+  UNWIRED_DETECTOR_EVENT_SINK,
+  postgresDetectorNonce,
+  postgresDetectorRunnerIo,
+  postgresDetectorTransact,
+} from './detectors/adapter.ts';
+export type { WorkerDetectorTx } from './detectors/adapter.ts';
+
+// -----------------------------------------------------------------------------
 // P7-f's THREE FILL DETECTORS (session 309)
 // -----------------------------------------------------------------------------
 // APPENDED. `P7` section 9 rows this file as the phase's largest collision --
@@ -1454,6 +1481,7 @@ export const WORKER_BARREL_LEGS = [
   './batch/state-writer.ts',
   './breaker/evaluate.ts',
   './breaker/ports.ts',
+  './detectors/adapter.ts',
   './detectors/canary.ts',
   './detectors/fills.ts',
   './detectors/graph.ts',

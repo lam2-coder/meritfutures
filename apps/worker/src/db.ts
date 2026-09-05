@@ -109,8 +109,17 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
+// ADR-157'S THREE TERMS ARE ON A LINE OF THEIR OWN, AND THE SPLIT IS A CONTROL
+// RATHER THAN A STYLE. `test/expiry.test.ts` proves the sweep files do not
+// import the accessor by first proving THIS file does, and its positive control
+// matches `from '@merit/db'` on the SAME LINE as the `import`. Folding all seven
+// names into one statement puts the specifier past `printWidth`, prettier wraps
+// it, and the control silently stops finding the one file it is calibrated on.
+// Found by watching that case go red (ADR-349).
+import { atLeast, atMost, isNull } from '@merit/db';
 import { closeClient, poolSqlExecutor, systemDb, transaction } from '@merit/db';
 import type {
+  FilterTerm,
   PoolSqlExecutorReason,
   SqlExecutor,
   SystemDb,
@@ -194,6 +203,68 @@ export const LIVE_DB: WorkerDb = {
 export function closeWorkerDb(): Promise<void> {
   return closeClient();
 }
+
+// =============================================================================
+// ADR-157'S THREE READ TERMS, WHICH ARE NOT A DOOR AND HAVE TO SAY WHY
+// =============================================================================
+// **THEY ARE HERE FOR THE POOL EXECUTOR'S REASON AND NOT FOR THE DOOR'S**
+// (ADR-349). `test/db.test.ts` pins the importers of the accessor at exactly
+// this one file, and a term is only a term if `packages/db` minted it:
+// `isFilterTerm` reads WeakSet membership rather than shape, so a hand-rolled
+// `{term: 'at-least', value}` is a jsonb VALUE to the accessor and never a
+// range. An adapter that wanted to hand a detector `ADR-157`'s constructors
+// therefore had exactly two ways to get them, and one of them was to import the
+// accessor in a second file.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS NOT ADR-165 CLAUSE 2's SECOND DOOR
+// -----------------------------------------------------------------------------
+// **THE CLAUSE COUNTS DOORS ONTO TABLES AND THESE REACH NO TABLE**, which is
+// the section below's own sentence about `queueExecutor`. A term is a frozen
+// three-field object. It names no `TableKey`, it carries no scope predicate, it
+// has no `rows` and no `insert`, and `transaction()` has no overload that takes
+// one. What it does is narrow a filter the CALLER already had the authority to
+// compose, and the authority to compose that filter is `batch(fn)` above.
+//
+// **AND IT IS STRICTLY SMALLER THAN THE POOL EXECUTOR, WHICH IS SAID HERE
+// RATHER THAN LEFT FOR A REVIEWER.** `queueExecutor()` hands out arbitrary SQL
+// on the money database; this hands out three functions that build a value.
+// The only capability a caller gains is the ability to say `<=`, `>=` and
+// `IS NULL` on a read it could already make with `=`.
+//
+// -----------------------------------------------------------------------------
+// THERE IS NO `isNotNull` AND ITS ABSENCE IS UPSTREAM
+// -----------------------------------------------------------------------------
+// `ADR-157` refuses it by name and this file mints nothing, so the vocabulary
+// here is EXACTLY the accessor's three and cannot become four without the
+// accessor growing a fourth first. `detectors/ports.ts` reaches the same
+// conclusion from the other end: `D-18` needs `footprint_present IS FALSE`,
+// which is an EQUALITY on `false` and needs no term at all.
+// =============================================================================
+
+/**
+ * `ADR-157`'s three READ-PATH term constructors, re-exported as one value.
+ *
+ * A VALUE RATHER THAN THREE RE-EXPORTS, so an adapter takes the whole
+ * vocabulary or none of it and a port declaring the three (`DetectorTerms`,
+ * `ReconTerms`, `DigestTerms`) is satisfied structurally with no adapter
+ * naming the members one at a time.
+ *
+ * **THE FUNCTIONS ARE THE ACCESSOR'S OWN AND ARE NOT WRAPPED.** A wrapper here
+ * would be a second place `NonNullable<unknown>`'s run-time half could drift
+ * from, and `refuseNullBound` is already the one place that check lives.
+ */
+export interface WorkerTerms {
+  /** `column <= value`, inclusive. */
+  atMost(value: NonNullable<unknown>): FilterTerm;
+  /** `column >= value`, inclusive. */
+  atLeast(value: NonNullable<unknown>): FilterTerm;
+  /** `column IS NULL`. */
+  isNull(): FilterTerm;
+}
+
+/** The three, as one value an adapter passes through to a port. */
+export const WORKER_TERMS: WorkerTerms = { atMost, atLeast, isNull };
 
 // =============================================================================
 // THE POOL-SHAPED EXECUTOR, WHICH IS NOT A FOURTH DOOR AND HAS TO SAY WHY

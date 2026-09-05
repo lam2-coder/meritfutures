@@ -83,6 +83,25 @@
 // system write path, so the row below stays `unscheduled` and the disposition
 // case that derives it from the tree stays green for the reason it always had.
 //
+// **"NINE `UNWIRED_*_IO` VALUES STAND AS THE ONLY INHABITANT OF THEIR OWN PORT
+// TYPE" IS NOW FALSE OF ONE OF THE NINE, AND IT IS KEPT WHOLE PER `RI-14`.**
+// ADR-349 wrote `./detectors/adapter.ts`, so `DetectorRunnerIo` has a second
+// inhabitant and `UNWIRED_DETECTOR_RUNNER_IO` is no longer the only one. **THE
+// COUNT OF `UNWIRED_*_IO` VALUES DID NOT MOVE**, derived over `apps/worker/src`
+// at the time of writing and still nine, and neither did the caller census:
+// nothing in this deployable calls `runDetectors`.
+//
+// **AND THE ROW BELOW STAYS `unscheduled` FOR A REASON THAT IS NOT THE ADAPTER,
+// WHICH IS WHY THE OPENING CLAUSE SURVIVES BEING FALSIFIED.** That adapter
+// serves four of five ports. The fifth is the EVENT SINK, and this deployable
+// can reach no sink at all: `test/event-sink.test.ts` establishes the shape of
+// that gap across three ports at once, and two of the detector runner's three
+// event names would be refused by the producer one deployable over even if the
+// import were legal. `runner.ts` emits inside the write transaction and emits
+// unconditionally, so the composed value writes NO `detector_runs` row. That is
+// this row's second blocker; the empty `detector_definitions` table is its
+// third. The row's `why` enumerates all three.
+//
 // **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
 // is the reason this row does not simply write eleven adapters. `ADR-305`
 // section 5: past `approved` the only arrow is `transferring`, `packages/rail`
@@ -183,9 +202,22 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'detector runs',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_DETECTOR_RUNNER_IO` is the only `DetectorRunnerIo` in the tree. Its row already ' +
-      'carries the marker and both halves of its dead-man switch are live and correct today: a ' +
-      'run that is absent is a job nobody scheduled.',
+      'THIS ROW READ "`UNWIRED_DETECTOR_RUNNER_IO` is the only `DetectorRunnerIo` in the tree" ' +
+      'AND ADR-349 WROTE THE SECOND ONE, so the sentence is kept beside its correction (RI-14) ' +
+      'and the disposition does not move, because THE ADAPTER WAS NEVER THE ONLY BLOCKER AND ' +
+      'THERE ARE THREE. (1) `postgresDetectorRunnerIo` serves four of `DetectorRunnerIo`s five ' +
+      'members; the fifth is `events` and no sink is reachable from this deployable at all ' +
+      '(RI-04, node-linker=isolated), while two of the runners three event names would be ' +
+      'refused by the producer even if one were. `runner.ts` emits INSIDE the write transaction ' +
+      'and emits UNCONDITIONALLY, so a deployment holding the composed value writes no ' +
+      '`detector_runs` row and every outcome comes back `unrecorded`. (2) `detector_definitions` ' +
+      'has no producer: `packages/db/src/seed/detectors/` is a JSON file and no `.ts` under any ' +
+      '`src/` reads it, so `readDefinition` finds nothing and every detector is ' +
+      '`DetectorUnregistered`. (3) Eleven of the eighteen seeded rows state no number at all ' +
+      '(`OQ-M7-02` is the founders and unanswered), so a loaded registry still gets ' +
+      '`DetectorDeclined`. Only the first is an adapter, and its row already carries the marker ' +
+      'and both halves of its dead-man switch are live and correct today: a run that is absent ' +
+      'is a job nobody scheduled.',
   },
   {
     module: './digests/alarm.ts',
