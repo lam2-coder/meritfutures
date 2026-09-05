@@ -364,13 +364,18 @@ describe('RI-36 reads a record the way a record is written', () => {
   });
 
   // A TABLE-LEVEL `PRIMARY KEY (a, b)` MAKES ITS COLUMNS NOT NULL AND THE
-  // COLUMN DEFINITIONS DO NOT SAY SO. Sixteen tables in this set are keyed that
-  // way; a reader that dropped the clause would call every one of those key
+  // COLUMN DEFINITIONS DO NOT SAY SO. Seventeen tables in this set are keyed
+  // that way; a reader that dropped the clause would call every one of those key
   // columns nullable and every `pk` cell above them a finding.
   test('a table-level PRIMARY KEY makes its columns NOT NULL', () => {
     const { tables } = foldColumnNullability(REPO_ROOT);
     expect(tables.get('firm_parameters')?.get('parameter')?.notNull).toBe(true);
     expect(tables.get('firm_parameters')?.get('effective_from')?.notNull).toBe(true);
+    // AND THE `CONSTRAINT <name> PRIMARY KEY (...)` SPELLING, which is the
+    // seventeenth carrier and the one a reader anchored on the bare keyword
+    // would miss. `0051:213` names its key.
+    expect(tables.get('payout_destinations')?.get('identity_id')?.notNull).toBe(true);
+    expect(tables.get('payout_destinations')?.get('destination_ref')?.notNull).toBe(true);
   });
 
   test('a `CHECK (x IS NOT NULL)` inside a column definition is not its nullability', () => {

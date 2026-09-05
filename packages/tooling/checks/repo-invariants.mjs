@@ -8500,10 +8500,10 @@ export function foldColumnNullability(root) {
         if (def === '') continue;
         if (TABLE_LEVEL_CLAUSE.test(def)) {
           // A TABLE-LEVEL `PRIMARY KEY (a, b)` MAKES ITS COLUMNS NOT NULL AND
-          // THE COLUMN DEFINITIONS DO NOT SAY SO. Sixteen tables in this set
-          // are keyed that way, `wallet_spend_limits` and `firm_parameters`
-          // among them, and a reader that dropped the clause would call every
-          // one of those key columns nullable.
+          // THE COLUMN DEFINITIONS DO NOT SAY SO. Seventeen tables in this set
+          // are keyed that way, `wallet_spend_limits`, `payout_destinations`
+          // and `firm_parameters` among them, and a reader that dropped the
+          // clause would call every one of those key columns nullable.
           const key = /^(?:CONSTRAINT\s+[a-z_][a-z0-9_]*\s+)?PRIMARY\s+KEY\s*\(([^)]*)\)/i.exec(
             def,
           );
