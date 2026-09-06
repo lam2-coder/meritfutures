@@ -2659,12 +2659,25 @@ function flattenReasons(text) {
 function citedIdentifier(flat, upto) {
   // THE TWO BACKTICKS IMMEDIATELY BEFORE THE CITATION, NEVER A PAIRING WALKED
   // FROM THE START OF THE FILE. The first draft did the latter and it was armed
-  // for 215 lines and disarmed for the rest: `wiring.test.ts:215` writes "the
-  // engine`s own `RuleState`", using a backtick as an APOSTROPHE, and one stray
-  // backtick inverts every pairing after it. The check went quiet on all three
-  // copies of the seeded historical defect and reported PASS, which is a check
-  // that cannot fail hiding inside a check that can. Read locally and a stray
-  // backtick costs one binding rather than every binding below it.
+  // for the head of the file and disarmed for the rest:
+  // `apps/api/test/wiring.test.ts` uses a lone backtick as an APOSTROPHE, and
+  // one stray backtick inverts every pairing after it. The check went quiet on
+  // all three copies of the seeded historical defect and reported PASS, which is
+  // a check that cannot fail hiding inside a check that can. Read locally and a
+  // stray backtick costs one binding rather than every binding below it.
+  //
+  // THIS SENTENCE CARRIED A POINTER INTO THAT FILE AND IT CARRIES NONE NOW
+  // (ADR-377). The retired figure is line 215, and it was TRUE THE DAY IT WAS
+  // WRITTEN: the commit that introduced this check, where the file was 424 lines
+  // and the apostrophe sat on that line. The file is 3,593 lines now, the clause
+  // the pointer named has been rewritten away, and the apostrophe it was about
+  // is on dozens of other lines. NOTHING IN THIS REPOSITORY COULD REPORT THE
+  // DRIFT AND THE REASONS ARE TWO, NOT ONE: `citedReasonFiles` puts this whole
+  // package outside RI-15's own scope, and `IDENTIFIER_GLUE` binds no name
+  // across the words this sentence wrote between the name and the pointer, so
+  // both legs were off at once. The claim is about the FILE rather than about a
+  // line, it is now written that way, and that is the only form of it that
+  // cannot drift.
   const close = flat.lastIndexOf('`', upto - 1);
   if (close < 0) return null;
   const open = flat.lastIndexOf('`', close - 1);

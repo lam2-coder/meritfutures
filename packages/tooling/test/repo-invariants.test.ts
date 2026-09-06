@@ -1654,11 +1654,17 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
 
   test('RI-15 stays armed after a backtick used as an APOSTROPHE, which its first draft did not', () => {
     // THE BUG THAT WAS REAL, AND IT WAS SILENT. The first version paired
-    // backticks from the start of the file. `wiring.test.ts:215` writes "the
-    // engine`s own `RuleState`", using a backtick as an apostrophe, and ONE
-    // stray backtick inverts every pairing after it: the check found no name
-    // beside any of the three seeded pointers below it and reported PASS. A
-    // check that cannot fail, hiding inside a check that can.
+    // backticks from the start of the file. `apps/api/test/wiring.test.ts` uses
+    // a lone backtick as an apostrophe, and ONE stray backtick inverts every
+    // pairing after it: the check found no name beside any of the three seeded
+    // pointers below it and reported PASS. A check that cannot fail, hiding
+    // inside a check that can.
+    //
+    // THE POINTER THIS COMMENT CARRIED IS RETIRED AND THE FIGURE IS NAMED
+    // RATHER THAN REPRODUCED (ADR-377): it read line 215, it was true at the
+    // commit that introduced RI-15, and the file has grown past it. The claim is
+    // about the FILE, the file still writes the apostrophe, and the line number
+    // was the only part of the sentence that could go stale.
     const root = cleanTree();
     write(
       root,

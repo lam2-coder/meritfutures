@@ -75,11 +75,11 @@
 // STILL REFUSE AND NEITHER IS ON THAT PATH; THEY ARE THE REPLAY AUDIT'S, WHICH
 // IS UNSCHEDULED", AND `ADR-346` MADE THE FIRST HALF FALSE.** It is kept beside
 // its correction rather than deleted, per `RI-14`. The second half is still
-// true and is now the ONLY thing keeping the audit off a clock: neither read is
-// on `runNightlyBatch`'s path, so nothing above changed when they landed, and
-// `apps/worker/src/schedule.ts` still carries `runReplayAudit` as `unscheduled`
-// because a divergence has nowhere to go. Scheduling it is not this row's and
-// the divergence section below says what it is waiting on.
+// true: neither read is on `runNightlyBatch`'s path, so nothing above changed
+// when they landed. **AND IT IS NOT THE ONLY THING KEEPING THE AUDIT OFF A
+// CLOCK; THAT CLAUSE IS RETIRED TOO.** `ADR-370` section 4.3 enumerates FOUR,
+// the third being this file's own `accountsWithStoredState` at `:802`, and
+// `schedule.ts`'s row carries all four. Scheduling is still not this file's.
 //
 // **AND THE RESOLVER REFUSES PER ACCOUNT RATHER THAN NEVER.** `resolveExternalGates`
 // throws an `ExternalGatesRefusal` naming the leg, and the loudest case is the

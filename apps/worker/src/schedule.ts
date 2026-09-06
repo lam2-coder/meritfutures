@@ -419,9 +419,9 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       '`EVENT_CATALOGUE` (`apps/api/src/events.ts:382`) nor EVENTS.md, so a scheduled run`s ' +
       'completion would be invisible to an S1 switch that gates payout eligibility and M12 ' +
       'publication both. ' +
-      'AND THE INVENTORY CARRIES THE RETIRED HALF TOO AND THIS FENCE DOES NOT HOLD IT: that ' +
-      'row still records this job as having no `src/` file that supplies its ports. Reported ' +
-      'here and not repaired there.',
+      'AND THE CLAUSE THAT STOOD HERE REPORTED THE INVENTORY UNREPAIRED AND OUTSIDE THE FENCE, ' +
+      'which ADR-376 ENDED by holding that page: that row now records the discharge in this ' +
+      'row`s own shape. WHAT EXPIRED IS THE REPORT AND NOT THE VERDICT. Case 8.1 holds it.',
   },
   {
     module: './batch/statistics.ts',
