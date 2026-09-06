@@ -955,7 +955,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'snake_case is asking `packages/db` to stop mapping. **AND THE PAYOUT PATH IS ON THE ' +
     'DRIVER SIDE OF THAT SPLIT, SO IT NEEDS NO RENAME FROM ANYBODY**: this deployable already ' +
     'reads `plan_version_sizes` off this door under the driver spelling, at ' +
-    '`readSize` (`apps/api/src/routes/catalog.ts:1211`), which is a THIRD size-row reader ' +
+    '`readSize` (`apps/api/src/routes/catalog.ts:1213`), which is a THIRD size-row reader ' +
     'ADR-283`s count did not reach because it returns a LOCAL row type rather than the ' +
     'engine`s. **SO THE RESIDUE IS A HOME AND NOT A RULING, AND THAT IS THE FIRST TIME THIS ' +
     'CLAUSE HAS NAMED IT**: a driver-side decoder has to know `packages/db`s property names, ' +
