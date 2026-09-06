@@ -516,6 +516,36 @@ export const ABSENCE_ARTIFACTS = [
     },
   },
   {
+    key: 'job-queue-pull',
+    names:
+      'a PULL on `JobQueue`: a method that takes a job off a queue without staying up to do ' +
+      'it. ADR-355 ruled the provisioning drain OWED and this is the interface slice that ' +
+      'has to land before one can be written',
+    needles: [],
+    sweptBy:
+      'nothing of its own, and the reason is that `queue-door`s fourth needle already reaches ' +
+      'its one claim site: that sentence names the vendor in the `pg-boss` spelling. A fifth ' +
+      'needle here would register the same line twice. **THE PROBE IS THE POINT RATHER THAN ' +
+      'THE SWEEP**: this entry exists so that the day `packages/queue` publishes a pull, ' +
+      'RI-35 goes RED at the sentence saying none exists, which is the same instrument ' +
+      '`apps/worker/test/queue.test.ts` case 6.1 carries one layer down. Both fail on GOOD ' +
+      'NEWS, and two independent controls on one fact is deliberate here because the fact is ' +
+      'the trigger for a ruling somebody has to re-read rather than a wire somebody notices',
+    probe: (root) => {
+      // THE LIST IS READ AND NOT RESTATED, which is `packages/queue`s own rule for
+      // `JOB_QUEUE_METHODS`: an interface is erased at runtime, so the data is the authority.
+      // A written copy of the five here would be the drift ADR-034 exists to end.
+      const body = requireFile(root, 'packages/queue/src/job-queue.ts');
+      const block = /JOB_QUEUE_METHODS\s*=\s*\[([\s\S]*?)\]/.exec(body)?.[1] ?? '';
+      const declared = [...block.matchAll(/'([a-zA-Z]+)'/g)].map((match) => match[1] ?? '');
+      return declared.some((method) =>
+        ['fetch', 'complete', 'fail', 'poll', 'drain', 'claim'].includes(method),
+      )
+        ? 'present'
+        : 'absent';
+    },
+  },
+  {
     key: 'worker-queue-manifest',
     names: '`apps/worker/package.json` declaring a dependency on `@merit/queue`',
     needles: [],
@@ -918,6 +948,57 @@ export const ABSENCE_ARTIFACTS = [
       return 'absent';
     },
   },
+  {
+    key: 'digest-transport',
+    names:
+      'a VALUE of type `DigestTransport` under any `src/`, past the module that declares it. ' +
+      'ADR-354. `apps/worker/src/digests/produce.ts` renders a digest and hands it to ' +
+      '`io.transport.send`, and no channel adapter exists in this workspace for either of the ' +
+      'two channels `0040` admits, so `UNWIRED_DIGEST_IO` and `postgresDigestIo` both refuse ' +
+      'that member and no deployment can deliver a digest at all',
+    needles: [],
+    sweptBy:
+      'nothing, on `event-sink-caller`s reason. The type name reaches four lines in the shipped ' +
+      'scope with comments stripped: the interface declaration and the `DigestIo` member ' +
+      'declaration, both in the module this probe already excludes, and two type-only re-export ' +
+      'entries in `apps/worker/src/index.ts` that assert nothing about this tree. A needle on ' +
+      'the name would sweep the declaration this register already binds and two barrel lines ' +
+      'about no artifact, which is the noise-registering shape ADR-328 forbids',
+    probe: (root) => {
+      const files = shippedSources(root);
+      if (files.length === 0) {
+        throw new Error(
+          'RI-35 found no source file under any `apps/*/src` or `packages/*/src`, so the ' +
+            'digest transport probe measured nothing',
+        );
+      }
+      // THE SHAPE AND NEVER THE WORD, and the shape is a VALUE POSITION. The
+      // claim is not that the name is unmentioned, it is that nothing in this
+      // workspace INHABITS the type: the producer would call any inhabitant the
+      // wiring handed it. So the probe reads a type ANNOTATION or a `satisfies`
+      // clause, which is how every other port inhabitant in this deployable is
+      // written (`UNWIRED_DIGEST_IO: DigestIo`, `postgresReconSweepIo(...):
+      // ReconSweepIo`), and it reads them with comments STRIPPED so that
+      // `adapter.ts`s header, which names the type in order to say this
+      // workspace has no inhabitant of it, cannot make its own claim false.
+      //
+      // THE DECLARING MODULE IS EXCLUDED AND NOTHING ELSE IS. `digests/ports.ts`
+      // declares the interface AND declares `transport: DigestTransport` as a
+      // member of `DigestIo`, and that second line is a `: DigestTransport` in a
+      // TYPE position rather than a value: a probe over the whole tree would
+      // report the port declaring itself inhabited. Measured on the commit that
+      // added this artifact: `absent`, with both of those lines present.
+      const declaring = 'apps/worker/src/digests/ports.ts';
+      for (const rel of files) {
+        if (rel === declaring) continue;
+        const inhabited = stripComments(readFileSync(join(root, rel), 'utf8'))
+          .split('\n')
+          .some((line) => /:\s*DigestTransport\b|satisfies\s+DigestTransport\b/.test(line));
+        if (inhabited) return 'present';
+      }
+      return 'absent';
+    },
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -997,6 +1078,13 @@ export const ABSENCE_CLAIMS = [
     disposition: 'retired',
     artifact: 'queue-door',
     why: 'the package published an interface and an adapter, and `apps/worker` has now taken it',
+  },
+  {
+    site: 'apps/worker/src/queue.ts',
+    claim: 'NO PULL IS PUBLISHED ON `JobQueue`, WHICH IS WHY NO DRAIN LANDED WITH THE',
+    disposition: 'live',
+    artifact: 'job-queue-pull',
+    why: 'ADR-355 ruled the drain owed and could not write one: the interface publishes no pull',
   },
   {
     site: 'packages/queue/src/index.ts',
@@ -1229,6 +1317,26 @@ export const ABSENCE_CLAIMS = [
     why:
       'the route names the three catalogue rows it owes and refuses to invent a sink for ' +
       'them, which is the correct refusal and is bound here rather than trusted',
+  },
+  {
+    site: 'apps/worker/src/digests/adapter.ts',
+    claim: 'HAS NO INHABITANT ANYWHERE IN THIS WORKSPACE',
+    disposition: 'live',
+    artifact: 'digest-transport',
+    why:
+      'the adapter serves four of `DigestIo`s six and this is the sentence carrying the first ' +
+      'of the two it refuses, so the day a channel adapter lands the file that says it cannot ' +
+      'be delivered is the file that goes red',
+  },
+  {
+    site: 'apps/worker/src/schedule.ts',
+    claim: 'HAS NO INHABITANT ANYWHERE IN THIS WORKSPACE',
+    disposition: 'live',
+    artifact: 'digest-transport',
+    why:
+      'the delivery row`s disposition rests on this clause as its first of three blockers, and ' +
+      'ADR-342 landmine 1 is exactly this: four BLOCKED reasons were discharged by rows in ' +
+      'other deployables and nothing noticed',
   },
 ];
 

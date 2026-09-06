@@ -159,7 +159,23 @@
 // and a read port. `PlatformProvisioningPort`'s implementation is
 // `packages/rithmic`'s and does not exist; `ProvisioningAdvancePort` and
 // `ProvisioningReadPort` are BLOCKED by ADR-102's `WHERE`-less system write path
-// and say so on their own declarations. So the saga still has no caller, `RI-35`
+// and say so on their own declarations.
+//
+// **THE SECOND SENTENCE ABOVE IS FALSE AND IS KEPT BESIDE ITS CORRECTION per
+// `RI-14` (ADR-355 section 7). `runProvisioningSaga` TAKES NEITHER OF THE LAST
+// TWO.** It takes one `SagaIo`, whose four members are `tx: ProvisioningTx`,
+// `queue: ProvisioningJobQueue`, `platform: PlatformProvisioningPort` and
+// `rows: readonly unknown[]` -- and the fourth is DATA rather than a port, so it
+// has no implementation because it is not the kind of thing that has one. A
+// grep for `ProvisioningAdvancePort` and `ProvisioningReadPort` across `apps/`
+// and `packages/` returns FOURTEEN lines and every one is inert: two
+// declarations, four barrel type re-exports and eight comments. **No function
+// in this workspace takes either as a parameter and no value of either type is
+// constructed anywhere, in `src/` or in a suite.** The conclusion does not move,
+// which is exactly why it went uncaught: the saga has no caller either way. What
+// it costs is that a session dispatched to build `ProvisioningAdvancePort` would
+// have been building a port nothing consumes, against a sentence saying the saga
+// consumed it. `test/queue.test.ts` binds the absence so it cannot drift back. So the saga still has no caller, `RI-35`
 // still binds that at `provisioning-saga-caller`, and `schedule.ts` still
 // registers the job `unscheduled`.
 //
@@ -1187,6 +1203,27 @@ export type {
   LossRatioPolicy,
   PolicyNumber,
 } from './breaker/ports.ts';
+// THE ADAPTER, WHICH SERVES FOUR OF `BreakerIo`'s FIVE MEMBERS (ADR-352).
+//
+// **`postgresBreakerIo` IS `async` AND NO OTHER IO FACTORY IN THIS BARREL IS.**
+// `tradingDayOf` is synchronous and `anchorLastClosedDay` is not, so the day is
+// anchored once before the value exists and the same instant becomes `now()`.
+//
+// `UNWIRED_BREAKER_EVENT_SINK` IS THE FIFTH MEMBER AND IT REFUSES. The refusal
+// is the export rather than an omission, because a deployment has to be able to
+// name what it is holding: no event writer is reachable from `apps/worker`
+// (`RI-04`, `node-linker=isolated`) and `EVENT_CATALOGUE`'s ten names carry no
+// `breaker.` name for `ADR-159` clause 1 to admit.
+export {
+  BREAKER_TABLES_AGREE_WITH_THE_ACCESSOR,
+  BreakerAdapterUnwired,
+  BreakerCalendarRefused,
+  BreakerTableRefused,
+  UNWIRED_BREAKER_EVENT_SINK,
+  postgresBreakerIo,
+  postgresBreakerTransact,
+} from './breaker/adapter.ts';
+export type { WorkerBreakerTx } from './breaker/adapter.ts';
 export {
   BreakerRowError,
   UNCALIBRATED_CUSUM,
@@ -1318,6 +1355,24 @@ export type {
   DigestAlarmReport,
   WindowFold as DigestWindowFold,
 } from './digests/alarm.ts';
+// ADR-353. THE ALARM'S `DigestAlarmIo` OVER THIS DEPLOYABLE'S OWN DOORS, AND IT
+// IS THE FIRST ADAPTER IN THIS DEPLOYABLE THAT SERVES ITS WHOLE PORT: three
+// members, all three served, nothing defaulted to a refusal. It is a SEPARATE
+// leg from the producer's, which is row 354's and is not this one: a file
+// serving both is a file whose success on the alarm half reads as evidence about
+// the delivery half.
+//
+// **THE JOB IS STILL `unscheduled` AND THE BLOCKER IS NO LONGER AN ADAPTER.**
+// Nothing in this repository ever writes a `report_schedules` row, so the alarm's
+// subject set is empty and a clock in front of it reports zero undelivered
+// windows over zero schedules. `schedule.ts`'s row carries the measurement.
+export {
+  DIGEST_ALARM_TERMS,
+  digestAlarmReadTx,
+  postgresDigestAlarmRead,
+  postgresDigestAlarmIo,
+} from './digests/alarm-adapter.ts';
+export type { WorkerDigestTx } from './digests/alarm-adapter.ts';
 export {
   artifactDigest,
   decideOutcome,
@@ -1336,6 +1391,43 @@ export type {
   OutcomeDecision,
   ProducerSchedule,
 } from './digests/produce.ts';
+
+// **THE DELIVERY PRODUCER'S ADAPTER, AND IT SERVES FOUR OF `DigestIo`'s SIX.**
+// `./digests/adapter.ts` builds `transact` over this deployable's one door,
+// `terms` over the accessor's `atLeast`, and takes the clock and the trading day
+// as arguments. `content` and `transport` REFUSE, and the blockers are DATA
+// rather than a paragraph: `DIGEST_TRANSPORT_BLOCKERS` and
+// `DIGEST_CONTENT_BLOCKERS` carry each one with the source it was read from, and
+// `test/digests-adapter.test.ts` RUNS them, so a blocker that dissolves turns
+// the suite red instead of leaving a stale sentence behind.
+//
+// **THE TRANSPORT'S TWO CHANNELS HAVE DIFFERENT BLOCKERS AND THE DIFFERENCE IS
+// THE RULING.** `sftp` is UNREACHABLE: `OQ-F3-04` is open and it is the
+// founder's, because `M06` section 3.6 and `ADR-066` section 3 both call SFTP a
+// SECOND CREDENTIAL SURFACE. `email` is UNWRITTEN, and what it waits on is a
+// vendor ruling rather than an adapter: a working sender exists one deployable
+// away and `ADR-229`'s own argument for it is that the credential scopes to
+// sending from ONE server.
+//
+// **CONSTRUCTING THE VALUE ARMS NOTHING AND A CLOCK WOULD**, which is why
+// `schedule.ts` keeps the delivery row `unscheduled` with this file present.
+// `deliverOne` CATCHES a refusing port and writes `failed`, and `0040` revokes
+// `UPDATE` and `DELETE` on `report_deliveries`, so a scheduled run would write
+// one permanent `failed` row per schedule per window for a transport that never
+// existed.
+export {
+  DIGEST_CONTENT_BLOCKERS,
+  DIGEST_READ_FILTERS,
+  DIGEST_TERMS,
+  DIGEST_TRANSPORT_BLOCKERS,
+  DigestAdapterError,
+  DigestRunRefusal,
+  digestTxOver,
+  postgresDigestIo,
+  resolveDigestTradingDay,
+  tradingDayAnchoredAt,
+} from './digests/adapter.ts';
+export type { DigestBlocker, DigestDbTx } from './digests/adapter.ts';
 
 // -----------------------------------------------------------------------------
 // M10's LIFECYCLE MESSAGING (session 328, P7-m)
@@ -1565,6 +1657,7 @@ export const WORKER_BARREL_LEGS = [
   './batch/state-hash.ts',
   './batch/state-writer.ts',
   './batch/statistics-adapter.ts',
+  './breaker/adapter.ts',
   './breaker/evaluate.ts',
   './breaker/ports.ts',
   './detectors/adapter.ts',
@@ -1574,6 +1667,8 @@ export const WORKER_BARREL_LEGS = [
   './detectors/identity.ts',
   './detectors/ports.ts',
   './detectors/runner.ts',
+  './digests/alarm-adapter.ts',
+  './digests/adapter.ts',
   './digests/alarm.ts',
   './digests/ports.ts',
   './digests/produce.ts',

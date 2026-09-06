@@ -142,6 +142,34 @@
 // ONE IS RECORDED**, which is the whole reason the disposition is derived from a
 // census rather than typed.
 //
+// **AND ADR-353 TOOK THE FOURTH BITE, AND IN TAKING IT FOUND THAT "THE OTHER
+// SEVEN" WAS ALREADY WRONG BY ONE BEFORE THIS ROW TOUCHED IT.** Both paragraphs
+// above are kept whole per `RI-14`. `./digests/alarm-adapter.ts` builds a
+// `DigestAlarmIo` over this deployable's own doors, and it is the FIRST ADAPTER
+// IN THIS DEPLOYABLE THAT SERVES ITS WHOLE PORT: three members, all three
+// served, nothing taken as an argument nothing can be passed for and nothing
+// defaulted to a refusal.
+//
+// **DERIVED AT THE MOMENT THIS PARAGRAPH WAS WRITTEN AND NOT SUBTRACTED FROM
+// SEVEN.** Of the nine `UNWIRED_*_IO` values, a census for a function or a value
+// under `apps/worker/src` whose declared type is the same port finds one for
+// `ExpirySweepIo`, one for `ReconSweepIo`, one for `DetectorRunnerIo` and now
+// one for `DigestAlarmIo`, and none for `DigestIo`, `BreakerIo`, `LiveIngestIo`,
+// `RuleStateWriterIo` or `WithdrawalApprovalSweepIo`. **THE COUNT IS FIVE, AND
+// IT WAS SIX BEFORE THIS ROW RATHER THAN THE SEVEN THE PARAGRAPH ABOVE STATES**:
+// ADR-345 and ADR-349 each landed in the same wave, each counted its own row on
+// top of ADR-344's, and neither could see the other, so the merged prose
+// enumerates two implementations where the tree already held three. That is the
+// same hand-typed-count defect this file was written about, occurring in the
+// file that was written about it, which is why the number above is stated with
+// its census beside it.
+//
+// **THE VALUES THEMSELVES DID NOT MOVE AND NEITHER DID THE CALLER CENSUS**: all
+// nine are still exported, still the DEFAULT, and refusing is still the correct
+// outcome for a deployment that installs nothing; nothing under `src/` calls
+// `findUndeliveredWindows`, and the alarm row's own `why` carries the blocker
+// that is not an adapter.
+//
 // **AND THE CENSUS ABOVE IS A CENSUS OF CONSTRUCTORS, WHICH IS SAID BECAUSE IT
 // IS NOT THE SAME QUESTION.** `UNWIRED_RULE_STATE_WRITER_IO` is counted among
 // the seven and `batch/adapter.ts` composes a `RuleStateWriterIo` INLINE at its
@@ -276,10 +304,30 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'plan breaker evaluation',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_BREAKER_IO` is the only `BreakerIo` in the tree. AND IT WOULD DECLINE EVEN WIRED: ' +
-      "`OQ-M6-02`'s minimum sample is the founder's and is unanswered, so the evaluator raises " +
-      '`BreakerDeclined` rather than inventing a floor. Two blockers, and the second is not an ' +
-      'adapter.',
+      'THIS ROW READ "`UNWIRED_BREAKER_IO` is the only `BreakerIo` in the tree" AND ADR-352 ' +
+      'WROTE THE SECOND ONE, so the sentence is kept beside its correction (RI-14) and the ' +
+      'disposition does not move, BECAUSE THE ADAPTER WAS NEVER THE ONLY BLOCKER AND THERE ARE ' +
+      'THREE. The row already said so in its own second clause and that clause is unchanged and ' +
+      'is now blocker two. ' +
+      'ONE, `postgresBreakerIo` serves FOUR of `BreakerIo`s five members; the fifth is `events` ' +
+      'and no sink is reachable from this deployable at all (RI-04, node-linker=isolated), while ' +
+      'the name `breaker.state_changed` is in none of `EVENT_CATALOGUE`s ten and would be refused ' +
+      'by the producer under ADR-159 clause 1 even if one were. AND THE COST IS THE WHOLE RUN ' +
+      'RATHER THAN ONE PLAN: `evaluate.ts` holds ONE transaction for every plan (ADR-006) and ' +
+      'catches nothing, and the FIRST evaluation emits for every active plan because `from_state` ' +
+      'is null there, so a deployment holding the composed value writes no `plan_breaker_state` ' +
+      'row at all on its first night. ' +
+      "TWO, `OQ-M6-02`'s minimum sample is the founder's and is unanswered, so the evaluator " +
+      'raises `BreakerDeclined` rather than inventing a floor, and it raises it BEFORE it opens a ' +
+      'transaction or reads the clock. ' +
+      'THREE, AND IT IS NEW AND IS NOT RULED ANYWHERE: `0016` keys `plan_breaker_state` PRIMARY ' +
+      'KEY (plan_id, evaluated_on), `BreakerTx` publishes a plain insert with no upsert, and ' +
+      'CRON_INVENTORY schedules this job DAILY while `evaluated_on` would carry the LAST CLOSED ' +
+      'trading day. Those two cadences disagree on every non-session day, where a second run ' +
+      'recomputes a DIFFERENT window against the SAME key and Postgres refuses it. What ' +
+      '`evaluated_on` means is a founder ruling and ADR-352 section 5 records it as an open ' +
+      'question rather than deciding it. A clock in front of this job today is a process that ' +
+      'pages every weekend and writes nothing.',
   },
   {
     module: './detectors/runner.ts',
@@ -311,8 +359,29 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     disposition: 'unscheduled',
     why:
       'THE SECOND OF THE TWO DIGEST ENTRY POINTS, and the half the replaced sentence was ' +
-      'counting as one with the first. `UNWIRED_DIGEST_ALARM_IO` is the only `DigestAlarmIo` in ' +
-      'the tree. It reads what the producer failed to deliver, so it is exactly as unscheduled ' +
+      'counting as one with the first. THIS ROW READ "`UNWIRED_DIGEST_ALARM_IO` is the only ' +
+      '`DigestAlarmIo` in the tree" AND ADR-353 WROTE THE SECOND ONE, so the sentence is kept ' +
+      'beside its correction (RI-14) and the disposition does not move, because THE ADAPTER WAS ' +
+      'NEVER THE ONLY BLOCKER AND IT WAS NOT THE BINDING ONE. `postgresDigestAlarmIo` serves ALL ' +
+      'THREE members of `DigestAlarmIo` and nothing in it refuses, which is the first time that ' +
+      'is true of an adapter in this deployable. **THE BLOCKER IS THAT THE SUBJECT SET IS ' +
+      'EMPTY.** Re-derived at the moment of writing: NOTHING IN THIS REPOSITORY EVER WRITES A ' +
+      '`report_schedules` ROW, in any `src/` tree, any migration or any seed, and both readers ' +
+      'filter `enabled: true`. So a clock in front of this today evaluates zero schedules and ' +
+      'publishes `admin.report_windows_undelivered` as zero, and M06 section 3.6 already calls ' +
+      'that metric "zero, always": the number a scheduled run would report is the number a ' +
+      'healthy estate reports, and no field of `DigestAlarmReport` except `schedulesEvaluated` ' +
+      'tells the two apart. THAT IS THE ADR-239 DEFECT WITH A CLOCK IN FRONT OF IT AND IT IS ' +
+      'WORSE THAN SILENCE, because a green metric is read as evidence. SECOND, A RAISED FINDING ' +
+      'REACHES NOBODY: `DigestAlarmReport` and `DigestAlarmFinding` have no consumer under any ' +
+      '`src/`, both metric names appear in no `src/` file outside `alarm.ts`s own comments, ' +
+      'alarm.ts emits no event and no sink is reachable from this deployable (RI-04), and this ' +
+      'row IS the dead-man switch rather than a job one watches, so there is no completion ' +
+      'signal whose absence would page. THIRD, WHETHER A FINDING SHOULD FAIL THE PROCESS IS A ' +
+      'NUMBER NOBODY HAS STATED: the inventory row is S2 and S1 in effect for the two MUST ' +
+      'digests, `cadence_unanchored` is a finding that is not a failure, and no document maps ' +
+      'kinds to an exit code, so ADR-353 records it as an open question rather than inventing ' +
+      'one. It still reads what the producer failed to deliver, so it is exactly as unscheduled ' +
       'as the producer and not more so.',
   },
   {
@@ -321,9 +390,38 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'scheduled digest delivery',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_DIGEST_IO` is the only `DigestIo` in the tree. Its row asserts the query rather ' +
-      'than the job, so the switch is correct with nothing running: an enabled schedule whose ' +
-      'window has closed with no delivered row is the finding.',
+      'THIS ROW READ "`UNWIRED_DIGEST_IO` is the only `DigestIo` in the tree" AND ADR-354 WROTE ' +
+      'THE SECOND ONE, so the sentence is kept beside its correction (RI-14) and the disposition ' +
+      'does not move, because THE ADAPTER WAS NEVER THE ONLY BLOCKER AND THERE ARE THREE. ' +
+      '`./digests/adapter.ts` serves FOUR of `DigestIo`s six over this deployable`s own door and ' +
+      'clock. (1) **`transport` HAS NO INHABITANT ANYWHERE IN THIS WORKSPACE AND ITS TWO ' +
+      'CHANNELS BLOCK DIFFERENTLY**: `sftp` is UNREACHABLE because `OQ-F3-04` is an OPEN founder ' +
+      'question and M06 section 3.6 and ADR-066 section 3 both call it a SECOND CREDENTIAL ' +
+      'SURFACE; `email` is UNWRITTEN and waits on a VENDOR ruling rather than an adapter, ' +
+      'because the one working sender in this workspace is `apps/api`s and ADR-229s argument for ' +
+      'it is that the credential scopes to sending from ONE server. (2) **`content` REFUSES ON ' +
+      'BOTH READS AND NEITHER IS AN ADAPTER**: `lossRatioCusum` needs a `BreakerEvaluationReport` ' +
+      'and the breaker row two entries up carries the same two blockers, the second being ' +
+      '`OQ-M6-02`s unanswered minimum sample; `flagQueue` is `readFlagQueue` in `apps/api` and ' +
+      'RI-04 forbids the import. (3) **THE WINDOW ANCHOR IS UNSTATED AND A CRON INTERVAL IS AN ' +
+      'ANCHOR**: `DIGEST_WINDOW_ANCHOR` ships `weekdayOfWeeklyWindow` and `hourOfWindowClose` ' +
+      '`unstated` with their citations, `produce.ts` says `due_at` is the CALLER`s "because the ' +
+      'anchor is unstated and whatever schedules this job is what knows when it fired", and this ' +
+      'file is that caller. Setting an interval here would invent the number that file refuses ' +
+      'to invent, and `report_deliveries_window_attempt_uq` would then key the whole delivery ' +
+      'history on a window nobody agreed to. **THAT THIRD BLOCKER SURVIVES THE TRANSPORT ' +
+      'LANDING.** ' +
+      '**AND A CLOCK TODAY WOULD WRITE PERMANENT ROWS FOR A TRANSPORT THAT NEVER EXISTED**, ' +
+      'which is the composed value`s own hazard stated where the decision is taken: `deliverOne` ' +
+      'CATCHES a refusing port and writes `outcome: failed` rather than crashing, and `0040` ' +
+      'REVOKES UPDATE and DELETE on `report_deliveries`, so a scheduled run appends one ' +
+      'uncorrectable `failed` row per enabled schedule per window at climbing `attempt` ' +
+      'ordinals. A `failed` written by a producer that had NO transport is indistinguishable in ' +
+      'that table from one written by a transport that was wired and broke, which is ' +
+      '`DigestUnwired`s own indistinguishability with the sign flipped. ' +
+      'THE ROW`S ORIGINAL CLAUSE STANDS UNCHANGED AND IS WHY NONE OF THIS IS URGENT: the cron ' +
+      'row asserts the QUERY rather than the job, so the switch is correct with nothing running, ' +
+      'and an enabled schedule whose window has closed with no delivered row is the finding.',
   },
   {
     module: './job.ts',
@@ -366,9 +464,23 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'UNSCHEDULED: there is NO CALLER, and three of the saga`s four ports have no ' +
       'implementation, the platform one because `packages/rithmic` implements nothing and the ' +
       'advance and read ones because ADR-102`s system write path renders no WHERE clause. ' +
+      'NAMING THE ADVANCE AND READ PORTS AS THE SAGA`S IS FALSE AND IS KEPT BESIDE ITS ' +
+      'CORRECTION per RI-14 (ADR-355 section 7): `SagaIo`s four members are `tx`, `queue`, ' +
+      '`platform` and `rows`, the last being DATA rather than a port, and neither ' +
+      '`ProvisioningAdvancePort` nor `ProvisioningReadPort` is taken by any function in this ' +
+      'workspace or constructed anywhere. THE COUNT AND THE CONCLUSION DO NOT MOVE. ' +
       'AND NOTHING DRAINS THE QUEUE: this deployable`s door withholds `consume` and `start` on ' +
       'ADR-241`s one-shot ruling, so the row that gives this job a caller owes a drain or owes ' +
-      'the argument for running without one.',
+      'the argument for running without one. ' +
+      'ADR-355 IS THAT ROW AND IT RULED THE DRAIN OWED, which settles the disjunction above ' +
+      'rather than falsifying it, so the clause is kept whole per RI-14. THE SHAPE IS A ONE-SHOT ' +
+      'PULL and it does NOT narrow ADR-241: a bounded claim-settle-report-exit is a discrete run ' +
+      'with a discrete completion, which is what ADR-241 ruled FOR and what CRON_INVENTORY`s ' +
+      '"two consecutive cycles missed" is the only shape that can satisfy. `consume` and `start` ' +
+      'STAY WITHHELD, permanently, because those are the process that stays up. ' +
+      'THE DRAIN IS STILL NOT BUILT AND THIS ROW STAYS `unscheduled`: `JobQueue` publishes five ' +
+      'methods and none is a pull, so the first slice is a SIXTH method and ADR-165 clause 5 ' +
+      'makes that `packages/queue`s row and not this deployable`s. It is owed and it is not taken.',
   },
   {
     module: './recon/sweep.ts',
