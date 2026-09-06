@@ -87,10 +87,14 @@ export default defineConfig({
     { name: 'portal', testDir: './apps/portal/e2e' },
     // The operator console. ADR-182 rules its framework, `W6-d` rendered its
     // first document and `W6-i` is this entry. `apps/admin/package.json` takes
-    // NO `@playwright/test` line and this slice did not ask for one: `e2e/
-    // pass.ts:17` is the only file in this repository that imports the package
-    // and no spec under `apps/*/e2e` names it, so the other two UI manifests'
-    // declaration is not what makes the pass resolve.
+    // NO `@playwright/test` line, and `e2e/pass.ts:17` is the only SPEC-SIDE
+    // import of the package: no spec under `apps/*/e2e` names it, so the other
+    // two UI manifests' declaration is not what makes the pass resolve.
+    //
+    // **THE CLAUSE THAT CLOSED THIS BLOCK IS RETIRED AND WAS FALSE (`RI-14`,
+    // ADR-385): it counted this file's own import out. `defineConfig` comes
+    // from the same package at `playwright.config.ts:53`.** The path above also
+    // wrapped a line, which ADR-380 section 6 measured; it is written whole now.
     { name: 'admin', testDir: './apps/admin/e2e' },
   ],
 });

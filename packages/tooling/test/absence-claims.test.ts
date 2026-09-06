@@ -1031,3 +1031,211 @@ describe('ADR-338: the door-caller probe reads code, and reads an argument posit
     expect(artifact('provisioning-saga-caller').probe(root)).toBe('present');
   });
 });
+
+// =============================================================================
+// ADR-384. THE FIRST `docs/` SITE, AND THE LINE SPLIT IT DID NOT NEED
+// =============================================================================
+// `CRON_INVENTORY.md`'s replay self-audit row carries an S1 dead-man switch over
+// a job nothing runs, and says so in its own words. Three rows queued a LINE
+// SPLIT of that row before the registration, on ADR-375 section 7 obstacle 4:
+// both halves of the sentence sit on one markdown table row, so a claim bound to
+// that line binds the retired ports half with the live caller half.
+//
+// LEG 1 BINDS A SUBSTRING AND STORES NO LINE NUMBER, so the anchor selects the
+// live half alone and the split buys the register nothing. These cases hold that
+// property open, because it is the whole reason the entry could land: a leg 1
+// rewritten to anchor on a WHOLE LINE would silently re-arm the obstacle.
+// =============================================================================
+
+describe('ADR-384: the replay self-audit`s caller half, bound at a runbook row', () => {
+  const ROW =
+    '| **Replay self-audit** | after the batch | 07:00 CT | `replay.audit_completed` absent | ' +
+    '**S1.** THE RETIRED HALF IS NAMED RATHER THAN RE-QUOTED, and the `calls it` half is ' +
+    'unchanged, nothing under any `src/` calls `runReplayAudit`, and wiring and scheduling ' +
+    'are two decisions |';
+
+  const register = {
+    artifacts: only(['replay-audit-src-caller']),
+    claims: [
+      {
+        site: 'docs/ops/runbooks/CRON_INVENTORY.md',
+        claim: 'nothing under any `src/` calls `runReplayAudit`',
+        disposition: 'live' as const,
+        artifact: 'replay-audit-src-caller',
+        why: 'the runbook row, as it stands on the tree that registered it',
+      },
+    ],
+  };
+
+  /** The row, plus whatever `src/` the case wants the probe to read. */
+  function runbookTree(src?: { rel: string; body: string }): string {
+    const root = bareTree();
+    write(root, 'docs/ops/runbooks/CRON_INVENTORY.md', `${ROW}\n`);
+    if (src) write(root, src.rel, src.body);
+    return root;
+  }
+
+  // THE CASE THE REGISTRATION EXISTS FOR, AND IT FAILS ON GOOD NEWS. The day the
+  // audit is wired, the runbook sentence telling an operator the switch has no
+  // subject is the line this goes red at.
+  test('RED: a `src/` file calls the audit and the runbook still says nothing does', () => {
+    const root = runbookTree({
+      rel: 'apps/worker/src/job.ts',
+      body: 'const report = await runReplayAudit(ports, config);\n',
+    });
+    const findings = checkAbsenceClaims(root, register);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('docs/ops/runbooks/CRON_INVENTORY.md');
+    expect(findings[0]).toContain('EXISTS');
+  });
+
+  test('GREEN: the counterfactual is the same tree with no caller in it', () => {
+    expect(checkAbsenceClaims(runbookTree(), register)).toEqual([]);
+  });
+
+  // ADR-338'S LESSON, ASSERTED AT THIS PROBE RATHER THAN INHERITED FROM THE ONE
+  // IT WAS LEARNED AT. Three headers under `apps/worker/src/` name this function
+  // in order to say nothing runs it. A probe over raw text reads one of those
+  // sentences as the wiring and retires a claim that is still true.
+  test('GREEN: a comment naming the call shape is not a caller', () => {
+    const root = runbookTree({
+      rel: 'apps/worker/src/index.ts',
+      body: '// STILL NOT SCHEDULED. Nothing calls `runReplayAudit(ports, config)`: no cron.\n',
+    });
+    expect(checkAbsenceClaims(root, register)).toEqual([]);
+  });
+
+  test('GREEN: the declaration is not a call, so the entry point does not wire itself', () => {
+    const root = runbookTree({
+      rel: 'apps/worker/src/batch/replay.ts',
+      body: 'export async function runReplayAudit(ports: BatchPorts): Promise<void> {}\n',
+    });
+    expect(checkAbsenceClaims(root, register)).toEqual([]);
+  });
+
+  // ADR-338'S OTHER HALF. A job can be wired by being HANDED to something rather
+  // than called, and a call-only probe reports `absent` over the row that wired
+  // it. This is the shape the door probe was found blind to one register entry
+  // over, asserted here before it costs anything.
+  test('RED: the audit handed to a registry as a value is a wiring', () => {
+    const root = runbookTree({
+      rel: 'apps/worker/src/start.ts',
+      body: 'const JOBS = [runNightlyBatch, runReplayAudit];\n',
+    });
+    expect(checkAbsenceClaims(root, register)).toHaveLength(1);
+  });
+
+  // AND THE ONE LINE THAT SHAPE MUST NOT READ AS A WIRING. `index.ts:456` is a
+  // barrel member: the bare name and a comma, inside an export block. It is
+  // excluded by SHAPE and not by filename, so a wiring written into the barrel
+  // itself is still seen.
+  test('GREEN: a barrel re-exporting the name has not wired anything', () => {
+    const root = runbookTree({
+      rel: 'apps/worker/src/index.ts',
+      body: 'export {\n  auditAccount,\n  runReplayAudit,\n} from ./batch/replay.ts;\n',
+    });
+    expect(checkAbsenceClaims(root, register)).toEqual([]);
+  });
+
+  // THE PROPERTY THE THREE QUEUED ROWS DID NOT HAVE. The anchor is a SUBSTRING,
+  // so one table row carrying a live clause and a retired one is bindable
+  // without being split: the register selects the half it means. A leg 1 that
+  // compared whole lines would fail this case and re-arm obstacle 4.
+  test('the anchor binds one clause of a row that carries two, unsplit', () => {
+    const root = bareTree();
+    write(root, 'docs/ops/runbooks/CRON_INVENTORY.md', `${ROW}\n`);
+    const line = ROW.split('\n')[0] ?? '';
+    expect(line).toContain('THE RETIRED HALF IS NAMED RATHER THAN RE-QUOTED');
+    expect(line).toContain(register.claims[0]?.claim);
+    expect(checkAbsenceClaims(root, register)).toEqual([]);
+  });
+
+  // THE SWEEP IS NOT LIFTED, AND THIS IS THE CASE THAT SAYS SO. A `docs/` file
+  // carrying a registered needle AND an absence word is invisible to leg 6,
+  // which is what keeps this entry one decision rather than a widening that
+  // would reach every dated record in the corpus.
+  test('leg 6 still reads no `docs/` file, needle and absence word both present', () => {
+    const root = bareTree();
+    write(
+      root,
+      'docs/decisions/ADR-001.md',
+      'On 2026-01-01 there was no module importing `@merit/queue`, which does not exist.\n',
+    );
+    write(
+      root,
+      'packages/queue/src/index.ts',
+      'NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`\n',
+    );
+    const findings = checkAbsenceClaims(root, {
+      artifacts: only(['queue-door']),
+      claims: [
+        {
+          site: 'packages/queue/src/index.ts',
+          claim: 'NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`',
+          disposition: 'live' as const,
+          artifact: 'queue-door',
+          why: 'the door`s own sentence, on a tree with no importer',
+        },
+      ],
+    });
+    expect(findings).toEqual([]);
+
+    // THE SAME SENTENCE, MOVED INTO THE SWEPT SCOPE. Without this half the case
+    // asserts silence, and a sweep that had stopped working would pass it.
+    write(root, 'packages/queue/src/loud.ts', 'const why = `no module imports @merit/queue`;\n');
+    const swept = checkAbsenceClaims(root, {
+      artifacts: only(['queue-door']),
+      claims: [
+        {
+          site: 'packages/queue/src/index.ts',
+          claim: 'NO MODULE IN THIS WORKSPACE IMPORTS `@merit/queue`',
+          disposition: 'live' as const,
+          artifact: 'queue-door',
+          why: 'the door`s own sentence, on a tree with no importer',
+        },
+      ],
+    });
+    expect(swept).toHaveLength(1);
+    expect(swept[0]).toContain('packages/queue/src/loud.ts:1');
+  });
+});
+
+// =============================================================================
+// ADR-384. THE SHIPPED ENTRY, AND THE RULE THAT ADMITTED IT
+// =============================================================================
+
+describe('ADR-384: the one `docs/` site the register admits', () => {
+  const DOCS_SITES = ABSENCE_CLAIMS.filter((c) => c.site.startsWith('docs/'));
+
+  test('the runbook row is registered live against the caller probe', () => {
+    expect(DOCS_SITES.map((c) => c.site)).toEqual(['docs/ops/runbooks/CRON_INVENTORY.md']);
+    expect(DOCS_SITES[0]?.disposition).toBe('live');
+    expect(DOCS_SITES[0]?.artifact).toBe('replay-audit-src-caller');
+  });
+
+  // THE RULE IS "A LIVE RUNBOOK, NEVER A DATED RECORD", and it is asserted here
+  // rather than left in a comment. A row binding an ADR, a session log or a
+  // review would demand a repair that rewrites a measurement made on its own
+  // day, which is `RI-16`'s exclusion 1 arriving inside this register.
+  test('no dated record is a claim site', () => {
+    for (const dir of ['docs/decisions/', 'docs/sessions/', 'docs/reviews/']) {
+      expect({ dir, sites: ABSENCE_CLAIMS.filter((c) => c.site.startsWith(dir)).length }).toEqual({
+        dir,
+        sites: 0,
+      });
+    }
+  });
+
+  // THE ANCHOR IS UNIQUE IN THE FILE IT NAMES, which is leg 1's own demand read
+  // at the shipped site. Zero would mean the runbook was reworded without the
+  // register; two would mean the disposition is about a line nobody chose.
+  test('the anchor occurs exactly once in the runbook, on the row it is about', () => {
+    const lines = readFileSync(join(REPO_ROOT, 'docs/ops/runbooks/CRON_INVENTORY.md'), 'utf8')
+      .split('\n')
+      .map((line, index) => ({ line, at: index + 1 }))
+      .filter(({ line }) => line.includes('nothing under any `src/` calls `runReplayAudit`'));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.line).toContain('**Replay self-audit**');
+    expect(lines[0]?.line).toContain('`RI-35` registers the caller clause below');
+  });
+});

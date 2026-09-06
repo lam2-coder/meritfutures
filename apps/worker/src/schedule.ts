@@ -258,10 +258,10 @@
 // see: `SagaIo` takes a `ProvisioningTx` and a `PlatformProvisioningPort`, and
 // neither has an inhabitant under any `src/` in this workspace. **A FOURTH ROW
 // FAILS IN A FOURTH WAY WITHOUT FALSIFYING THE CLAIM AND IS SAID HERE SO IT IS
-// NOT COUNTED TWICE**: `ExpirySweepIo` HAS a constructor and the constructor
-// CANNOT BE CALLED, because `expirySweepIo` (`sweeps/expiry-adapter.ts:193`)
-// takes the sink as a required argument with no default and nothing in this tree
-// can be passed for it.
+// NOT COUNTED TWICE**: `ExpirySweepIo` HAS a constructor and NOTHING CALLS IT.
+// `expirySweepIo` (`sweeps/expiry-adapter.ts:193`) takes the sink as a required
+// argument with no default. **THE CLAUSE THAT FOLLOWED IS RETIRED, NAMED NOT
+// QUOTED (`RI-14`, ADR-385): the call is unwritten, not untypable.**
 //
 // **AND ONE ROW BELOW HAD ITS BLOCKER EXPIRE WITHOUT ANYBODY WRITING IT AN
 // ADAPTER, WHICH IS THE OPPOSITE DIRECTION AND IS THIS ROW`S MOST VALUABLE
