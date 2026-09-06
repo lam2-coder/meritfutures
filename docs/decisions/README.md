@@ -391,6 +391,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-377](ADR-377.md) | a citation that carries only a path and a line cannot be made checkable on this corpus, the fifty dead pointers are repaired and the FORM is left alone, and the pointer that died inside the checker itself was true the day it was written and blind for three independent reasons (2026-09-06, status: proposed) |
 | [ADR-378](ADR-378.md) | a repair that left its own report standing, one paragraph still calling one of four blockers the only one, and the census hole whose shape is an ASYMMETRY between two readings of one name (2026-09-06, status: proposed) |
 | [ADR-379](ADR-379.md) | the two rows' leavings, where the coverage gap one of them named is repaired and the four-shape claim the other made about its own guards is measured and FALSE FOR ONE (2026-09-06, status: proposed) |
+| [ADR-382](ADR-382.md) | the expiry constructor is refused a THIRD time and the refusal becomes a STANDING BAR, because the premise four registers gave for it is false and the verdict it was offered for is not (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
