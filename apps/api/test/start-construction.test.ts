@@ -175,6 +175,16 @@ function resolveName(file: string, name: string): Resolution {
  * The factories a run of `start.ts` constructs, taken from the installs that
  * run BEFORE `main()` binds the port, which is the set whose failure could
  * produce the half-install ADR-356 ruled worse.
+ *
+ * TWO CLAUSES STOP THE WALK AND THE SECOND WAS MISSING UNTIL ADR-379, WHICH
+ * MEASURED IT RATHER THAN READ IT. `main()` ends the set because an install
+ * below it lands on a server already serving. A top-level `throw` ends it too,
+ * because module evaluation aborts there and nothing below it is constructed at
+ * all. Without that clause this function returned every factory on a tree whose
+ * run constructs a prefix of them, which is its own docstring being false about
+ * its own answer. IT IS INERT ON THIS TREE -- `start.ts` holds no throw, and
+ * `start-program.test.ts` forbids one outright -- and it is exercised anyway by
+ * the fixture case below, because a clause defended by no case is a claim.
  */
 function factoriesInstalledBeforeMain(tree: ts.SourceFile): readonly string[] {
   const calleeOf = (statement: ts.Statement): ts.CallExpression | undefined => {
@@ -188,6 +198,7 @@ function factoriesInstalledBeforeMain(tree: ts.SourceFile): readonly string[] {
   };
   const found: string[] = [];
   for (const statement of tree.statements) {
+    if (ts.isThrowStatement(statement)) break;
     const call = calleeOf(statement);
     if (call === undefined) continue;
     const name = (call.expression as ts.Identifier).text;
@@ -250,14 +261,26 @@ const construction = walkConstruction(FACTORIES, START);
 // cannot be installed without a person editing this line and thereby being asked
 // whether the new factory can throw while it is being built.
 //
-// AND THIS IS WHERE ADR-372 SECTION 5's FOUR SHAPES ARE CAUGHT BY THIS FILE TOO,
-// on a mechanism different from the one `start-program.test.ts` uses. Each of the
+// AND THIS IS WHERE ADR-372 SECTION 5's FOUR SHAPES MEET THIS FILE, on a
+// mechanism different from the one `start-program.test.ts` uses. Each of the
 // four hides an install from a RUN while a line pattern still counts it: a block
 // comment, a call after `main()`, dead code after a top-level `throw`, and a call
-// inside a template literal. All four remove a name from the list below, because
-// this reader is a syntax tree (so a comment and a template literal hold no call
-// at all), it stops at `main()`, and it would see a `throw` only as the straight
-// line case in `start-program.test.ts` going red first.
+// inside a template literal. Three of them remove a name from the list below,
+// because this reader is a syntax tree (so a comment and a template literal hold
+// no call at all) and it stops at `main()`.
+//
+// THE THIRD WAS CLAIMED AND IS NOW MEASURED, AND THE CLAIM WAS FALSE HERE
+// (ADR-379 section 4). ADR-374 section 5's row for dead code after a top-level
+// `throw` said the walk also stopped and the name vanished. It did not: the
+// reader broke at `main()` alone, so a `throw` seeded above the last install
+// left ALL FOUR CASES IN THIS FILE GREEN while a run of `start.ts` constructed
+// nothing at all. The superseded row is NAMED and not reproduced (`RI-14`); the
+// reader now breaks at a top-level `throw` as well, which is where its two
+// siblings already broke, and the fixture case below is what holds it there.
+// THE SHAPE ITSELF WAS NEVER LOOSE: `start-program.test.ts` forbids a top-level
+// `throw` outright and `wiring.test.ts` drops the port from `wired`, and both
+// were watched RED on that seed. What was wrong was this file's account of its
+// own mechanism, which is a claim about a control and is worth the same care.
 const EXPECTED_FACTORIES: readonly string[] = [
   'databaseAccountReads',
   'databaseAccountsBackend',
@@ -462,4 +485,42 @@ test('`app.listen` is reached only inside `main`, which is the premise under ADR
       'top-level statement of `start.ts`. A bind anywhere else runs before the installs and ' +
       'serves the window they exist to close',
   ).toStrictEqual(['index.ts::main']);
+});
+
+test('an install below a top-level `throw` is not a factory a run constructs', () => {
+  // THE CLAUSE ADDED IN ADR-379, EXERCISED RATHER THAN ASSERTED. It is inert on
+  // this tree, so nothing about `start.ts` can hold it: only a fixture whose
+  // ANSWER CHANGES when the clause goes can, which is the rule both sibling
+  // files in this slice already follow for their own reachability clause.
+  //
+  // AND THE DIRECTION MATTERS. Without the clause this reader reported the
+  // factory below the `throw` as constructed, so it over-reported what a run
+  // builds and its own docstring was false about its own answer. That is the
+  // direction in which a guard goes quiet: everything it names is still there,
+  // every list it asserts is still empty, and nothing says the run stopped.
+  const before = 'useAlphaBackend(alphaFactory());\n';
+  const after = 'useOmegaBackend(omegaFactory());\n';
+  const main = 'await main();\n';
+
+  expect(
+    factoriesInstalledBeforeMain(parseText(before + after + main)),
+    'the reader no longer collects the factories of consecutive top-level installs, so every ' +
+      'assertion in this file is being made about a set it did not read',
+  ).toStrictEqual(['alphaFactory', 'omegaFactory']);
+
+  expect(
+    factoriesInstalledBeforeMain(parseText(before + "throw new Error('x');\n" + after + main)),
+    'a factory installed BELOW a top-level `throw` is still reported as constructed. Module ' +
+      'evaluation aborts at the throw, so a run constructs nothing past it, and this reader is ' +
+      'over-reporting what a deployment builds',
+  ).toStrictEqual(['alphaFactory']);
+
+  // AND THE `throw` DOES NOT MERELY SHORTEN THE LIST BY ONE, WHICH A CLAUSE
+  // PLACED ONE STATEMENT LATE WOULD ALSO DO. A throw above everything leaves
+  // nothing.
+  expect(
+    factoriesInstalledBeforeMain(parseText("throw new Error('x');\n" + before + after + main)),
+    'a top-level `throw` above every install still leaves factories in the list, so the reader ' +
+      'stops somewhere other than at the statement that ends module evaluation',
+  ).toStrictEqual([]);
 });
