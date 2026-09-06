@@ -691,7 +691,22 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'so a live io over a rejecting sink is an hourly job that releases nothing while the S1 ' +
       'dead-man switch, which fires on the JOB`S ABSENCE, reports it present. That is ADR-239`s ' +
       'defect with a clock in front of it, and it is strictly worse for a trader than the ' +
-      'unswept estate the switch alarms on today.',
+      'unswept estate the switch alarms on today. AND THE CLAUSE ABOUT WHAT CAN BE PASSED IS ' +
+      'FALSE, KEPT ABOVE BESIDE THIS CORRECTION per RI-14 and ruled on by ADR-382. ' +
+      '`UNWIRED_EXPIRY_SWEEP_IO` composes a refusing `ExpiryEventPort` INLINE, so a value of ' +
+      'that type does exist here, it is passable, and the one-line default built from it ' +
+      'COMPILES. So the blocker is a call nobody has written rather than one that cannot be ' +
+      'written, and what stands between this tree and a constructible sweep is the arity pin ' +
+      'at `test/expiry-adapter.test.ts:294` and the caller census in section 5 of that file, ' +
+      'NOT either port census: `test/schedule.test.ts` cases 6.1 and 7.2 stay GREEN on that ' +
+      'edit, measured. THE VERDICT IS UNCHANGED AND ITS GROUND IS NARROWER: the refusal stands ' +
+      'on what the sweep would DO, not on what cannot be typed. Two of its three clocks ' +
+      'RELEASE, every release rolls back on a rejecting sink, and each leg catches and reports ' +
+      '`failed` rather than throwing, so the run completes and the switch above sees a job. ' +
+      'The one control that reads the ESTATE rather than the job is the nightly hold and ' +
+      'freeze expiry assertion, S1 and unsuppressible, and CRON_INVENTORY carries no BUILT ' +
+      'marker for it. ADR-382 rules the bar STANDING until either that assertion exists or ' +
+      '`P5-n` writes a real producer.',
   },
   {
     module: './withdrawals/approval-sweep.ts',

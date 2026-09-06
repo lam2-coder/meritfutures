@@ -560,13 +560,23 @@ test('6.1 the unwired defaults and the ports with no constructor are both derive
   expect(bare).toContain('RuleStateWriterIo');
   expect(stripComments(sourceOf('./batch/adapter.ts'))).toContain('writeRuleStateVia(');
 
-  // **AND A TWELFTH PORT HAS NO VALUE AT ALL, NOT EVEN A REFUSING ONE.** It is
-  // absent from `ports` above because there is no default to find, and that is
+  // **AND A TWELFTH PORT IS ABSENT FROM BOTH READINGS ABOVE.** It is absent from
+  // `ports` because there is no `export const` default to find, and that is
   // deliberate: the expiry row records that a refusing default was REFUSED,
   // because every leg of that sweep emits inside its own release transaction, so
   // a live io over a rejecting sink is an hourly job that releases nothing while
   // the S1 switch reports it present. This case fails the day somebody adds the
-  // convenience default, which is the direction the harm runs.
+  // convenience default under a name, which is one of the directions the harm
+  // runs.
+  //
+  // **THE CLAUSE THAT STOOD HERE SAID THIS PORT HAD NO VALUE AT ALL, NOT EVEN A
+  // REFUSING ONE, AND THAT IS FALSE.** It is kept named rather than reproduced
+  // per `RI-14`: `ExpiryEventPort` has exactly one value under `apps/worker/src`,
+  // composed INLINE inside `UNWIRED_EXPIRY_SWEEP_IO`, where neither census can
+  // see it. **THE TWO ASSERTIONS BELOW WERE NEVER WRONG AND STAY EXACTLY AS THEY
+  // WERE**, because both ask about `export const` declarations; what expired is
+  // the sentence a reader takes away from them. Case `9.1` holds the real fact
+  // and ADR-382 rules on what it changes.
   expect([...ports.values()]).not.toContain('ExpiryEventPort');
   expect(constructorsOf('ExpiryEventPort')).toEqual([]);
 });
@@ -884,4 +894,39 @@ test('8.3 the two censuses key off the SAME name and read it in opposite directi
     'the constructor census no longer counts a renamed refusal, so its exclusion has stopped ' +
       'being a NAME and ADR-370 section 9 is owed a re-read in the other direction',
   ).toBe(true);
+});
+
+test('9.1 the twelfth port has one value, composed inline, and both censuses are blind to it', () => {
+  // **WHAT EXPIRED IS A CLAIM ABOUT COVERAGE AND NOT THE VERDICT IT WAS OFFERED
+  // FOR.** Case `6.1` above closes on the twelfth port, and the clause it closes
+  // on reports that port as having no value in this tree of any kind, refusing
+  // ones included. That clause is retired here and NAMED rather than reproduced
+  // per `RI-14`: `ExpiryEventPort` has exactly ONE value under `apps/worker/src`
+  // and it refuses. `6.1`'s two ASSERTIONS were never wrong, because both ask
+  // about `export const` declarations and this value is not one; what was wrong
+  // is the sentence a reader takes away from them.
+  //
+  // **AND IT IS THE `RuleStateWriterIo` CAVEAT AT A SECOND SITE, WHICH `6.1`
+  // STATES THREE ASSERTIONS ABOVE THE CLAUSE THAT FORGETS IT.** A value composed
+  // INLINE at a call site has no name for `unwiredPorts` to match and no return
+  // type for `constructorsOf` to read, so it is invisible to both. ADR-370
+  // section 9 predicted exactly this and called it hypothetical: *a second
+  // inline composition would be counted as absent*. Here it is, and it is the
+  // one port every refusal in this file is written about.
+  const sink = /events:\s*\{\s*emit:/;
+  const ports = stripComments(sourceOf('./sweeps/ports.ts'));
+
+  // ONE: the value exists, it is a member of the io's own unwired default, and
+  // it refuses rather than returning.
+  expect(
+    sink.test(ports),
+    'UNWIRED_EXPIRY_SWEEP_IO no longer composes its own sink inline, so the shape this case ' +
+      'measures has moved and the refusal`s stated ground is owed a re-read',
+  ).toBe(true);
+  expect(ports).toContain("new ExpirySweepUnwired('events.emit')");
+
+  // TWO: and NEITHER census can see it, which is why four registers could call
+  // the port uninhabited while reading the file that inhabits it.
+  expect([...unwiredPorts().values()]).not.toContain('ExpiryEventPort');
+  expect(constructorsOf('ExpiryEventPort')).toEqual([]);
 });
