@@ -1282,20 +1282,50 @@ test('a pack whose digest is not a SHA-256 is refused, because it authenticates 
 // 6. An unfinished deployment reports itself as one
 // -----------------------------------------------------------------------------
 
-test('an unwired source is a 500 and never a 404 or a 401', async () => {
+test('an unwired read source is a 503 to an operator, and never a 404 or a 401', async () => {
+  // THIS CASE READ "an unwired source is a 500 and never a 404 or a 401"
+  // (RI-14, ADR-343 clause 2). Both of its `never`s survive and the status
+  // moves: 404 would describe an unfinished deployment as a fact about the
+  // estate, and 401 would tell an operator who IS authenticated that they are
+  // not. What it could not say, while `AdminReadError` carried this fact and the
+  // twelve data refusals together, was "try again shortly" to the one caller
+  // entitled to hear it. The class no longer carries it, so the answer can.
   setAdminSessionSource(sessionOf(operator('owner')));
   setAdminReadSource(null);
   const res = await get('operator', ADDRESSES.liability, COOKIE);
-  expect(res.statusCode).toBe(500);
-  expect(JSON.parse(res.body)).toMatchObject({ code: 'internal_error' });
+  expect(res.statusCode).toBe(503);
+  expect(JSON.parse(res.body)).toMatchObject({
+    code: 'service_unavailable',
+    title: 'Service unavailable',
+  });
 });
 
-test('an unwired session source is a 500 for a caller who presented a token', async () => {
+test('an unwired session source is a 401 whether or not a token was presented', async () => {
+  // THIS CASE READ "an unwired session source is a 500 for a caller who
+  // presented a token" AND ASSERTED THE DEFECT (RI-14, ADR-343 clause 1). Its
+  // second leg is unchanged and is now the whole point: the two legs agree, so a
+  // cookie buys a caller who has authenticated nothing exactly nothing.
   setAdminSessionSource(null);
   setAdminReadSource(sourceOf());
-  expect((await get('operator', ADDRESSES.liability, COOKIE)).statusCode).toBe(500);
+  expect((await get('operator', ADDRESSES.liability, COOKIE)).statusCode).toBe(401);
   // And still 401 for one who did not, because there is nothing to look up.
   expect((await get('operator', ADDRESSES.liability)).statusCode).toBe(401);
+});
+
+test('a cookie cannot make the unwired admin surface throw, on any route', async () => {
+  // THE SEED THIS SESSION WAS DISPATCHED TO FIND, AS A STANDING CONTROL.
+  // The defect was not that the surface refused; it is meant to refuse. It was
+  // that ANY caller could choose which refusal by sending a header, and one of
+  // the choices was a throw the process logs as an error. A future slice that
+  // reintroduces a throw on the unwired path fails here on every route rather
+  // than on whichever one somebody happens to inject.
+  setAdminSessionSource(null);
+  setAdminReadSource(null);
+  for (const spec of ADMIN_READ_ENDPOINTS) {
+    const path = spec.path.replaceAll(/:[A-Za-z]+/g, 'x'.repeat(8));
+    const res = await get('operator', path, COOKIE);
+    expect(res.statusCode, `${spec.path} with a cookie`).toBeLessThan(500);
+  }
 });
 
 // -----------------------------------------------------------------------------
@@ -1380,12 +1410,20 @@ const ANSWER_TABLE: readonly {
     code: 'unauthenticated',
   },
   {
+    // THIS ROW READ 500 / `internal_error` UNTIL ADR-343 CLAUSE 1, and the old
+    // value is kept here rather than overwritten silently (RI-14). It was the
+    // one row in this table an UNAUTHENTICATED caller could reach by choosing
+    // to, because the only difference between it and row A is a `Cookie:`
+    // header, and it made the admin surface throw and log. Both rows now answer
+    // the same thing, which is what ADR-192 clause 2 already ruled for the
+    // thirteen: a deployment that cannot authenticate anyone has authenticated
+    // nobody.
     state: 'B. no session source composed, and the caller sent a cookie',
     session: NOTHING,
     read: NOTHING,
     cookie: true,
-    status: 500,
-    code: 'internal_error',
+    status: 401,
+    code: 'unauthenticated',
   },
   {
     state: 'C. a session source composed, and it does not know the token',
@@ -1412,12 +1450,19 @@ const ANSWER_TABLE: readonly {
     code: 'forbidden',
   },
   {
+    // THIS ROW READ 500 / `internal_error` UNTIL ADR-343 CLAUSE 2 (RI-14). The
+    // caller here has ALREADY been admitted by `authorizeAdmin`, so they are an
+    // authenticated operator holding a role this endpoint declares, and telling
+    // them their console's read port is uncomposed discloses nothing to anybody
+    // who was not entitled to know it. That is the thirteen's shape exactly:
+    // ADR-192 clause 1 gives the honest 503 to a refusal carrying one fact, and
+    // clause 2 puts it BEHIND the 401 rather than in front of it.
     state: 'F. an admitted operator, and NO READ SOURCE composed',
     session: { kind: 'operator', principal: { actorId: 'actor-1', role: 'owner' } },
     read: NOTHING,
     cookie: true,
-    status: 500,
-    code: 'internal_error',
+    status: 503,
+    code: 'service_unavailable',
   },
   {
     state: 'G. everything composed, and the handler itself threw',
@@ -1459,43 +1504,79 @@ test('ADR-190 ruling 1: the eight states of one operator route, each measured', 
     setAdminReadSource(null);
     setAdminSessionSource(null);
   }
-  // NOT 503, AND THIS IS THE ASSERTION THE THREE DOCUMENTS WOULD HAVE FAILED.
-  expect(ANSWER_TABLE.map((row) => row.status)).not.toContain(503);
+  // THIS ASSERTION READ `expect(ANSWER_TABLE.map(row => row.status)).not.toContain(503)`
+  // AND IT IS REPLACED RATHER THAN DELETED (RI-14, ADR-343 clause 2). It was
+  // ADR-190's, it was right on ADR-190's ground, and the ground moved: a 503 is
+  // now sent, by state F, to a caller who has authenticated. What the three
+  // documents got wrong was never that 503 is an illegal number on this surface;
+  // it was that every route answered one BEFORE anybody authenticated. So the
+  // property worth holding is the ORDERED one, and it is stated as such: no row
+  // that answers 503 may be reachable without an admitted operator session.
+  for (const row of ANSWER_TABLE)
+    if (row.status === 503)
+      expect(
+        row.session !== NOTHING && row.session.kind === 'operator',
+        `${row.state} answers 503 without an operator session`,
+      ).toBe(true);
 });
 
-test('ADR-190 ruling 2: the three 500 states are one document, on purpose', async () => {
-  // A DEPLOYMENT THAT COMPOSED NO SESSION SOURCE, ONE THAT COMPOSED NO READ
-  // SOURCE, AND A HANDLER THAT THREW ARE THE SAME BYTES. That is the cost the
-  // ruling accepts and it is asserted rather than left to be discovered: a
-  // response that distinguished them would tell an unauthenticated caller which
-  // ports this deployment did not compose.
-  const five_hundreds = ANSWER_TABLE.filter((row) => row.status === 500);
-  expect(five_hundreds).toHaveLength(3);
+test('ADR-343 clause 1: every state an unauthenticated caller can reach is one document', async () => {
+  // THIS CASE READ "the three 500 states are one document, on purpose" AND ITS
+  // PREMISE IS SPENT RATHER THAN WRONG (RI-14, ADR-343). ADR-190 ruling 2
+  // asserted that a deployment which composed no session source, one which
+  // composed no read source, and a handler that threw were the same bytes,
+  // "because a response that distinguished them would tell an unauthenticated
+  // caller which ports this deployment did not compose". THE REASON IS RIGHT AND
+  // IT NAMES THE WRONG SET. Two of those three states were never reachable by an
+  // unauthenticated caller at all (a composed read source needs an admitted
+  // operator to reach), and the one that was, state B, is the one the old
+  // grouping used to make indistinguishable from a genuine crash.
+  //
+  // SO THE PROPERTY IS RESTATED OVER THE SET IT WAS ALWAYS ABOUT: the states a
+  // caller who has authenticated NOTHING can reach. There are three of them and
+  // they are A, B and C, which respectively mean "this deployment installed no
+  // session source", "it installed none and you sent a cookie" and "it installed
+  // one and does not know your token". An operator surface that let those three
+  // be told apart would be a live, unauthenticated readout of deployment state,
+  // which is the exact fact ADR-192 finding 7 refused to put on the wire.
+  const anonymousReachable = ANSWER_TABLE.filter(
+    (row) => row.session === NOTHING || row.session.kind === 'unknown',
+  );
+  expect(anonymousReachable.map((row) => row.state.slice(0, 1))).toStrictEqual(['A', 'B', 'C']);
   const bodies: string[] = [];
-  for (const row of five_hundreds) {
+  for (const row of anonymousReachable) {
     setAdminSessionSource(row.session === NOTHING ? null : sessionOf(row.session));
-    if (row.read === NOTHING) setAdminReadSource(null);
-    else
-      setAdminReadSource(sourceOf({ readLiability: () => Promise.reject(new Error('handler')) }));
-    const res = await get('operator', ADDRESSES.liability, COOKIE);
+    setAdminReadSource(row.read === NOTHING ? null : sourceOf());
+    const res = await get('operator', ADDRESSES.liability, row.cookie ? COOKIE : {});
     // The request id differs per request and is the only field that may.
     bodies.push(res.body.replaceAll(/"instance":"[^"]*"/g, '"instance":"<id>"'));
     setAdminReadSource(null);
     setAdminSessionSource(null);
   }
   expect(new Set(bodies).size).toBe(1);
+  // AND THE ONE DOCUMENT IS THE 401, not a 500 the three happen to share.
+  expect(JSON.parse(bodies[0] ?? '{}')).toMatchObject({ code: 'unauthenticated', status: 401 });
 });
 
-test('ADR-190: every route THIS module registers answers the same two, never 503', async () => {
+test('ADR-343: every route THIS module registers answers 401 unwired, cookie or not', async () => {
   // OVER THE MODULE'S OWN ROUTES RATHER THAN OVER ONE ADDRESS, because the
   // false sentence was universally quantified and a single-endpoint measurement
   // is what let it stand for two waves.
+  //
+  // THE SECOND ASSERTION READ `.toBe(500)` AND IT IS CORRECTED RATHER THAN
+  // REMOVED (RI-14, ADR-343 clause 1). It held the state this session was
+  // dispatched to find: on a tree where nothing is wired, presenting any cookie
+  // at all turned this module's answer from a refusal into a throw, on every one
+  // of its routes, for a caller holding no credential. The route count is NOT
+  // pinned here, on ADR-190 section 5's ground, which ADR-192 section 8 restates:
+  // a slice that wires a port moves a route between answers and a pinned number
+  // would go red for the right thing happening.
   for (const spec of ADMIN_READ_ENDPOINTS) {
     const path = spec.path.replaceAll(/:[A-Za-z]+/g, 'x'.repeat(8));
     const anonymous = await get('operator', path);
     expect(anonymous.statusCode, `${spec.path} anonymous`).toBe(401);
     const withCookie = await get('operator', path, COOKIE);
-    expect(withCookie.statusCode, `${spec.path} with a cookie`).toBe(500);
+    expect(withCookie.statusCode, `${spec.path} with a cookie`).toBe(401);
   }
 });
 

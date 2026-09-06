@@ -569,6 +569,50 @@ describe('no operator route discloses its deployment state to an anonymous calle
     expect(admin.length).toBeGreaterThan(0);
     expect(admin.filter((row) => !row.endsWith(' -> 401'))).toEqual([]);
   });
+
+  // ---------------------------------------------------------------------------
+  // ADR-343: THE SAME SWEEP, WITH A COOKIE, AND THIS IS THE LEG THAT WAS MISSING
+  // ---------------------------------------------------------------------------
+  // The sweep above injects NO credential of any kind, which is what ADR-192
+  // clause 5 asked for and is exactly half of the surface. A caller who sends a
+  // cookie has still authenticated nothing: the value is opaque, no deployment
+  // in this tree can recognise one, and every module must therefore answer that
+  // caller the same way it answers a caller who sent nothing.
+  //
+  // TEN OF THE TWENTY-THREE DID NOT. `admin-reads.ts`'s seven, `admin-breaker.ts`'s
+  // two and `admin-feed.ts`'s one answered 401 to the sweep above and 500 to this
+  // one, because `adminHandler` read the cookie first and only THEN consulted a
+  // session source that was not installed and threw. ADR-192 finding 1 measured
+  // that pair ("10 routes answer 401 then 500") and ruled on the thirteen; the
+  // ten kept the throw and no sweep held them to anything, which is how it
+  // survived. THIS IS THAT SWEEP.
+  //
+  // IT PINS NO COUNT, on the same ground as the case above.
+  it('answers the same 401 with a cookie as without, disclosing nothing for one', async () => {
+    const modules = await discoverRouteModules();
+    const { app, report } = buildServer({ surface: 'operator', modules });
+    await app.ready();
+    const answers: string[] = [];
+    for (const endpoint of report.registered) {
+      const [method = '', declared = ''] = endpoint.split(' ');
+      if (!declared.startsWith('/admin/')) continue;
+      const url = `${BASE_PATH}${declared.replace(/:[A-Za-z0-9_]+/g, ACCOUNT_ID)}`;
+      const carries = method !== 'GET' && method !== 'DELETE' && method !== 'HEAD';
+      const response = await app.inject({
+        method: method as 'GET',
+        url,
+        headers: { cookie: 'merit_admin_session=not-a-real-session' },
+        ...(carries ? { payload: {} } : {}),
+      });
+      answers.push(`${endpoint} -> ${response.statusCode}`);
+    }
+    await app.close();
+    expect(answers.length).toBeGreaterThan(0);
+    // A 500 HERE IS THE DEFECT AND A 503 HERE IS THE DISCLOSURE. Asserting the
+    // answer IS 401 catches both, which is the reason ADR-192 section 8's seed D
+    // gives for asserting the value rather than asserting the absence of one.
+    expect(answers.filter((row) => !row.endsWith(' -> 401'))).toEqual([]);
+  });
 });
 
 // -----------------------------------------------------------------------------

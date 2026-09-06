@@ -109,7 +109,16 @@
 // body and a stop, not a widening here.
 // =============================================================================
 
-import { atMost, closeClient, isNull, poolSqlExecutor, systemDb, transaction } from '@merit/db';
+// **THE ACCESSOR IS IMPORTED ON TWO LINES AND THE SPLIT IS A CONTROL RATHER THAN
+// A STYLE** (ADR-349). `test/expiry.test.ts` proves the two sweep files do not
+// import the accessor by first proving THIS file does, and its positive control
+// is `/^\s*(?:import|export)\b[^\n]*from '@merit\/db'/m`, which needs the
+// specifier on the SAME LINE as the keyword. Seven names in one statement is 105
+// characters against a `printWidth` of 100, prettier wraps it, and **the control
+// silently stops finding the one file it is calibrated on.** Found by watching
+// that case go red when `atLeast` was added below.
+import { atLeast, atMost, isNull } from '@merit/db';
+import { closeClient, poolSqlExecutor, systemDb, transaction } from '@merit/db';
 import type {
   PoolSqlExecutorReason,
   SqlExecutor,
@@ -328,12 +337,28 @@ export function queueExecutor(): SqlExecutor {
 // refusal would arrive at the first live scan rather than at this line. So the
 // two names are passed through untouched.
 //
-// **THERE IS NO `atLeast` AND NO `isNotNull`, AND NEITHER OMISSION IS TIDINESS.**
-// ADR-157 refuses `isNotNull` by name, and `atLeast` has no caller in this
-// deployable: `atMost` already excludes a null clock, because `NULL <= x` is
-// NULL and never matches. A third name here is a decision for the row that needs
-// it, which is `WORKER_SUPERVISOR_REASON`'s rule one section up applied to a
-// vocabulary instead of to a word.
+// **THIS PARAGRAPH READ "THERE IS NO `atLeast` AND NO `isNotNull`, AND NEITHER
+// OMISSION IS TIDINESS" AND ADR-349 MADE THE FIRST HALF FALSE.** It is kept
+// whole beside its correction, per `RI-14`. What it said was that `atLeast` had
+// no caller in this deployable, that `atMost` already excludes a null clock
+// because `NULL <= x` is NULL and never matches, and that **a third name here is
+// a decision for the row that needs it**. **THIS IS THAT ROW, AND THE RULE THE
+// PARAGRAPH STATED IS FOLLOWED RATHER THAN OVERTURNED.**
+//
+// `atLeast` HAS TWO CALLERS NOW AND NEITHER IS A CLOCK SWEEP. `DetectorTerms`
+// (`src/detectors/ports.ts`) declares all three and `readDefinition` reaches
+// `isNull()` while `D-01`'s window reaches `atLeast`, which `ADR-157` section 5
+// granted `P7` by name as its two second window; `digests/alarm.ts` reaches it
+// for a history bound. A detector composes a LOWER bound because it is reading
+// forward from an instant, which is the direction `atMost` cannot express, so
+// the sentence above was right about the sweep and was never a claim about the
+// deployable's whole future.
+//
+// **`isNotNull` IS STILL ABSENT AND ITS ABSENCE IS UPSTREAM RATHER THAN LOCAL.**
+// `ADR-157` refuses it by name, this file mints nothing, and the detector set
+// needs no such term: `D-18` wants `footprint_present IS FALSE` rather than
+// `IS NOT TRUE` (`M07:141`, and the difference is a supplier outage versus a
+// flood of flags against real customers), which is an EQUALITY on `false`.
 // =============================================================================
 
-export { atMost, isNull };
+export { atLeast, atMost, isNull };
