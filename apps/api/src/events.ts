@@ -40,12 +40,50 @@
 // scoped insert STAMPS the tenancy column from the handle and an `either` row has
 // two of them and may carry neither; `FirmTx.insert` is generic over
 // `FirmTableKey`; so `SystemTx` is the ONE handle in this workspace that can
-// write this table, and the writer refuses any other by brand. `apps/api`'s own
-// two doors are `scoped` and `firm` and it opens no system door on purpose
-// (ADR-165), so THIS DEPLOYABLE HOLDS NO TRANSACTION THAT CAN CARRY AN EVENT.
-// That is the finding this slice reports and it is not a reason to widen
-// anything: see `EventInsertTx` below, where it is stated where a caller meets
-// it.
+// write this table, and the writer refuses any other by brand.
+//
+// **THAT SENTENCE CONTINUED "`apps/api`'s own two doors are `scoped` and `firm`"
+// AND THE COUNT HAD DRIFTED BY THREE, WHICH ADR-348 REPAIRS IN PLACE RATHER THAN
+// DELETING** (`RI-14`). Two was ADR-165 section 6's figure and was true on
+// 2026-08-27; `src/db.ts` declares FIVE doors today and `db.test.ts`'s first
+// case is named for the count. The three that arrived after ADR-165 are
+// `resolution` (ADR-126), `establishment` (ADR-196) and `publicLookup`
+// (ADR-231), and **not one of them moves the conclusion**, which is why the
+// stale figure went six sessions without being caught: `ResolutionDb` and
+// `PublicLookupDb` are not transactional at all, and `EstablishmentTx` carries
+// ONE VERB and no `insert`. So the correct sentence is the wider one --
+// `apps/api` opens FIVE doors, none of them a system door, on purpose (ADR-165)
+// -- and THIS DEPLOYABLE HOLDS NO TRANSACTION THAT CAN CARRY AN EVENT stands
+// on all five rather than on two. That is the finding this slice reports and it
+// is not a reason to widen anything: see `EventInsertTx` below, where it is
+// stated where a caller meets it. `apps/api/test/event-placement.test.ts`
+// derives the five from `src/db.ts` and refuses each of their brands at
+// `TRANSACTION_EVENT_WRITER`, so a sixth door lands red rather than lands
+// quietly.
+//
+// AND THE ADAPTER STILL HAS NO CALLER, WHICH IS ADR-348's SUBJECT AND IS BOUND
+// FROM THIS COMMIT RATHER THAN ONLY STATED. `makeEventSink` is called by NO file
+// under `apps/*/src` or `packages/*/src`, and every call to it in this tree is
+// in a suite. So `UNWIRED_EVENT_SINK` is not merely the DEFAULT sink, it is the
+// only sink any deployment could reach, and EVENTS' universal rule 1 is
+// unsatisfied by every transition this estate performs rather than by some of
+// them. `RI-35` registers that absence as `event-sink-caller` and turns RED at
+// this sentence the day it stops being true, which is the leg that fails on
+// good news and is the reason the sentence is worth writing at all.
+//
+// WHERE THE CALLER COULD LIVE WAS ESTABLISHED BEFORE ANY WIRING WAS ATTEMPTED,
+// AND THE ANSWER IS NOWHERE IN THIS TREE TODAY. The two halves are one
+// deployable apart and neither half is a defect on its own: `apps/worker` holds
+// every `emit` call site in the workspace and the ONE handle that can carry the
+// write, and it cannot reach this producer in either spelling -- an `@merit/api`
+// manifest line is refused by `RI-04` and a relative `../../api/src/events.ts`
+// by `apps/worker/test/event-sink.test.ts` under `node-linker=isolated`. This
+// deployable holds the producer and no such handle. **A THIRD ADDRESS IS LEGAL
+// AND IS NOT THIS SESSION'S TO TAKE**: a `packages/*` library, which is exactly
+// what ADR-104 ruled for `packages/ledger` when two deployables had to post and
+// `RI-04` forbade an app depending on an app. Moving this file there is a
+// relocation, not a wiring, and ADR-348 registers it as founder-owed rather
+// than performing it.
 //
 // AND WRITING THE FIRST REAL ROW FOUND A SECOND THING NO SUITE COULD, WHICH
 // ADR-198 HAS NOW RULED. Session 366 wrote against a live PostgreSQL with all 58
