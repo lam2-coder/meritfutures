@@ -61,33 +61,96 @@ const sourceOf = (module: string): string =>
   readFileSync(join(WORKER_SRC, module.replace(/^\.\//, '')), 'utf8');
 
 /**
- * The rows of `CRON_INVENTORY`'s scheduled table, first cell and whole line.
+ * A job name, comparable across the table and the notes that answer it.
+ *
+ * ONE SPELLING OF THE KEY, used by every reader in this file, because the table
+ * and the severity notes are now two sections that have to agree and a second
+ * normalizer is how they would stop agreeing. It is `normJob` from `gates.mjs`,
+ * which is the key `CI-06l` already matches jobs by.
+ */
+const normalizeJob = (cell: string): string =>
+  cell
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*`]/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+/**
+ * The rows of `CRON_INVENTORY`'s scheduled table: first cell, whole line, and
+ * the severity note filed under the same job name.
  *
  * THE SECTION IS BOUNDED THE WAY `gates.mjs` BOUNDS IT, for the reason that
  * runner states: unbounded, the scan runs on into the coverage table and starts
  * reading rows that answer a different question.
+ *
+ * **ADR-392 CUT COLUMN FIVE OUT OF THE TABLE.** The severity, the runbook to
+ * open and every marker about whether a job is built or wired moved to a peer
+ * `## Severity if absent, by job` section. So `line` is now the four
+ * operational columns and nothing else, and a reader asserting what the page
+ * SAYS about a job reads `note`. The two are separate fields rather than one
+ * concatenation on purpose: an assertion that means "the dead-man alert names
+ * this column" must not pass because the phrase turned up in a paragraph of
+ * severity prose.
  */
-function scheduledRows(): readonly { readonly job: string; readonly line: string }[] {
+function scheduledRows(): readonly {
+  readonly job: string;
+  readonly line: string;
+  readonly note: string;
+}[] {
   const start = CRON.indexOf('## Scheduled work');
   expect(start, 'CRON_INVENTORY no longer has a "## Scheduled work" section').toBeGreaterThan(-1);
   const after = CRON.slice(start + '## Scheduled work'.length);
   const end = after.search(/\n## /);
-  const rows: { job: string; line: string }[] = [];
+  const notes = severityNotes();
+  const rows: { job: string; line: string; note: string }[] = [];
   for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
     if (!line.trim().startsWith('|')) continue;
     const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|');
     if (cells.every((c) => /^:?-+:?$/.test(c.trim()))) continue;
-    const job = (cells[0] ?? '')
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/[*`]/g, '')
-      .replace(/\([^)]*\)/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
+    const job = normalizeJob(cells[0] ?? '');
     if (job === 'job') continue; // the header row
-    rows.push({ job, line });
+    rows.push({ job, line, note: notes.get(job) ?? '' });
   }
   return rows;
+}
+
+/**
+ * The `### <job>` notes of `CRON_INVENTORY`'s severity section, by job name.
+ *
+ * **THE SECTION IS A PEER `##` AND NOT A `###` INSIDE THE TABLE'S**, which is
+ * ADR-389 seed E and is load-bearing rather than stylistic: `cronRows` bounds
+ * itself with `/\n## /`, a `###` heading does not match that, and a note line
+ * opening with a pipe would then be read as a scheduled job. `CI-06l` asks
+ * whether a coverage row's job is in the scheduled set, so a phantom row
+ * manufactured out of note prose can satisfy a coverage row whose real job is
+ * gone. Reading the notes from a peer section is what keeps that impossible.
+ */
+function severityNotes(): ReadonlyMap<string, string> {
+  const heading = '## Severity if absent, by job';
+  const start = CRON.indexOf(heading);
+  expect(start, `CRON_INVENTORY no longer has a "${heading}" section`).toBeGreaterThan(-1);
+  const after = CRON.slice(start + heading.length);
+  const end = after.search(/\n## /);
+  const notes = new Map<string, string>();
+  let job = '';
+  let body: string[] = [];
+  const flush = (): void => {
+    if (job !== '') notes.set(job, body.join('\n').trim());
+  };
+  for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
+    const heading3 = /^### (.+)$/.exec(line);
+    if (heading3) {
+      flush();
+      job = normalizeJob(heading3[1] ?? '');
+      body = [];
+      continue;
+    }
+    if (job !== '') body.push(line);
+  }
+  flush();
+  return notes;
 }
 
 // =============================================================================
@@ -277,7 +340,7 @@ test('4.2 the inventory marks exactly the rows whose job is built and unwired', 
   // smaller number nobody counted.
   const marked = new Set(
     scheduledRows()
-      .filter((row) => row.line.includes('NOT YET WIRED OR SCHEDULED'))
+      .filter((row) => row.note.includes('NOT YET WIRED OR SCHEDULED'))
       .map((row) => row.job),
   );
   const expected = new Set(UNSCHEDULED_CRON_ROWS);
@@ -305,12 +368,108 @@ test('4.3 the withdrawal driver has its own row and its own dead-man switch', ()
   expect(row, 'the withdrawal approval sweep has no row in CRON_INVENTORY').toBeDefined();
   const line = row?.line ?? '';
   // The switch is a QUERY over the estate, which is this page's idiom for a job
-  // whose success signal cannot be trusted to prove the work happened.
+  // whose success signal cannot be trusted to prove the work happened. That is
+  // the dead-man alert column, so it is asserted of the ROW.
   expect(line).toContain('wallet_withdrawals');
-  expect(line).toContain('NOT YET WIRED OR SCHEDULED');
+  // The marker and the blocker are severity prose, so they are asserted of the
+  // NOTE. Before ADR-392 all three sat on one line and one `toContain` could not
+  // tell which column had answered it.
+  const note = row?.note ?? '';
+  expect(note).toContain('NOT YET WIRED OR SCHEDULED');
   // And the blocker is the rail rather than an adapter, which is what separates
   // this row from every other unwired row on the page.
-  expect(line).toContain('packages/rail');
+  expect(note).toContain('packages/rail');
+});
+
+test('4.4 every scheduled row has a severity note and every note has a row', () => {
+  // **THIS IS ADR-389 SEED A, MADE A CONTROL.** That row built this restructure,
+  // emptied the body of one `### <job>` note with the heading left standing, and
+  // watched 33 of 33 gates and 35 of 35 invariants stay GREEN. **NOTHING BOUND A
+  // NOTE TO ITS JOB.** The fifth column used to be a table cell, so the table's
+  // own shape made a job and its severity one thing that could not come apart;
+  // splitting them into two sections spent that guarantee, and this case is what
+  // buys it back.
+  //
+  // Both directions, because each one fails differently. A row with no note is a
+  // job whose severity nobody can look up at 03:00, which is the whole failure
+  // this page exists for. A note with no row is worse in the other direction: it
+  // reads as coverage for a job that is no longer scheduled, and `CI-06l`'s
+  // assertion 4 is the gate that would otherwise have caught the job going away.
+  const rows = scheduledRows();
+  const notes = severityNotes();
+  expect(rows.length, 'the scheduled table parsed to nothing').toBeGreaterThan(10);
+
+  for (const row of rows)
+    expect(
+      notes.has(row.job),
+      `the scheduled table has a row for "${row.job}" and there is no "### " note under ` +
+        '"## Severity if absent, by job" that normalizes to it. A job with no severity is a row ' +
+        'that tells an operator when to worry and never says how much',
+    ).toBe(true);
+
+  const scheduled = new Set(rows.map((row) => row.job));
+  for (const job of notes.keys())
+    expect(
+      scheduled.has(job),
+      `"${job}" has a severity note and no row of the scheduled table normalizes to it. A note ` +
+        'outliving its row is how this page keeps looking complete about a job nobody runs',
+    ).toBe(true);
+
+  // **AND THE BODY, NOT ONLY THE HEADING**, which is exactly what seed A emptied.
+  // The threshold is deliberately low: this is a check against a note being
+  // gutted, not a word count anybody has to satisfy.
+  for (const [job, note] of notes)
+    expect(note.trim().length, `the severity note for "${job}" is empty`).toBeGreaterThan(1);
+});
+
+test('4.5 the severity notes are a peer section, so no note line can be read as a job', () => {
+  // **ADR-389 SEED E, AND IT IS THE REASON THE NOTES ARE A `##` AND NOT A `###`
+  // INSIDE `## Scheduled work`.** `cronRows` in `gates.mjs` bounds its scan with
+  // `after.search(/\n## /)`, and `\n### ` does not match that pattern: the fourth
+  // character is a `#` where the regex wants a space. So under the subsection
+  // form the scan runs straight through the notes, and ANY note line opening
+  // with a pipe is parsed as a row of the scheduled table.
+  //
+  // That is not cosmetic. The `scheduled` set only ever grows, and `CI-06l`'s
+  // assertion 4 asks whether a coverage row's job is IN it, so a phantom job
+  // manufactured out of a paragraph can SATISFY a coverage row whose real
+  // scheduled row has been renamed away. Seed E measured exactly that: a rename
+  // that is RED at 32 of 33 goes GREEN at 33 of 33 with one pipe-leading note
+  // line spelling the lost job. **A stray pipe in prose could disarm the gate
+  // over the table.**
+  const heading = '## Severity if absent, by job';
+  expect(
+    CRON.includes(`\n${heading}\n`),
+    'the severity notes are not a peer `##` section any more. If they became a `###` inside ' +
+      '"## Scheduled work", `cronRows` no longer stops before them and a pipe-leading note line ' +
+      'becomes a phantom scheduled job (ADR-389 seed E)',
+  ).toBe(true);
+
+  // **THE SCHEDULED SCAN MUST END BEFORE THE NOTES BEGIN**, bounded exactly the
+  // way `cronRows` bounds it. That is the property the heading level buys, and
+  // it is what is asserted rather than the heading level itself, because it
+  // stays true if a section is ever inserted between the two and false the
+  // moment the notes go back under `## Scheduled work`.
+  const work = CRON.indexOf('## Scheduled work');
+  const severity = CRON.indexOf(heading);
+  expect(severity).toBeGreaterThan(work);
+  const body = CRON.slice(work + '## Scheduled work'.length);
+  const closes = body.search(/\n## /);
+  expect(closes, 'nothing closes "## Scheduled work"').toBeGreaterThan(-1);
+  expect(
+    work + '## Scheduled work'.length + closes,
+    'the severity notes are INSIDE the scheduled section, so `cronRows` reads them as rows',
+  ).toBeLessThan(severity);
+
+  // And belt-and-braces: no note line opens with a pipe today either, so the
+  // page does not depend on the heading level alone to stay safe.
+  const after = CRON.slice(severity + heading.length);
+  const end = after.search(/\n## /);
+  for (const line of (end === -1 ? after : after.slice(0, end)).split('\n'))
+    expect(
+      line.trim().startsWith('|'),
+      `a severity note line opens with a pipe: ${line.slice(0, 60)}`,
+    ).toBe(false);
 });
 
 // =============================================================================
@@ -677,7 +836,10 @@ test('6.3 exactly one of the detector runner`s three event names is outside the 
 test('7.1 the inventory records the replay row`s discharged half without moving its verdict', () => {
   const row = scheduledRows().find((entry) => entry.job === 'replay self-audit');
   expect(row, 'CRON_INVENTORY has no replay self-audit row').toBeDefined();
-  const line = row?.line ?? '';
+
+  // The dead-man alert is column four and stayed in the table across ADR-392, so
+  // the signal name is asserted of the ROW and the prose about it of the note.
+  expect(row?.line ?? '').toContain('replay.audit_completed');
 
   // **THE FACT FIRST AND THE WORDS SECOND**, which is `1.1`'s order and the
   // reason ADR-324 gave for it. A constructor under this `src/` returns the
@@ -695,21 +857,26 @@ test('7.1 the inventory records the replay row`s discharged half without moving 
   // **AND THE PAGE RECORDS IT, IN THE SHAPE THE STATISTICS ROW ALREADY USED.**
   // The discharge names the row that ended the clause rather than asserting it
   // bare, so a reader who met the retired half can find out what replaced it.
-  expect(line).toContain('DISCHARGED SINCE');
-  expect(line).toContain('ADR-346');
+  //
+  // **EVERY CLAIM BELOW IS SEVERITY PROSE AND SINCE ADR-392 IT LIVES IN THE
+  // NOTE**, not on the table row. What moved is where the sentence is written;
+  // what is asserted about it has not moved at all.
+  const note = row?.note ?? '';
+  expect(note).toContain('DISCHARGED SINCE');
+  expect(note).toContain('ADR-346');
 
   // **THE VERDICT DOES NOT MOVE, WHICH IS THE HALF A HURRIED REPAIR WOULD TAKE
   // WITH IT.** `4.2` holds the marker against the registry in both directions;
   // these three are the rest of what an expired SUPPORT must leave standing, and
   // the last of them is the reason a scheduled run would be worse than this one.
-  expect(line).toContain('NOT YET WIRED OR SCHEDULED');
-  expect(line).toContain('**S1.**');
-  expect(line).toContain('replay.audit_completed');
+  expect(note).toContain('NOT YET WIRED OR SCHEDULED');
+  expect(note).toContain('**S1.**');
+  expect(note).toContain('replay.audit_completed');
 
   // **AND THE HALF THAT HOLDS IS STILL STATED.** `3.1` derives the caller census
   // for every entry point in both directions; what this asserts is that the page
   // has not quietly dropped the surviving half while repairing the retired one.
-  expect(line).toMatch(/calls it/);
+  expect(note).toMatch(/calls it/);
 });
 
 test('7.2 the two rows the header read as uninhabited each have a refusing default', () => {
@@ -779,16 +946,19 @@ test('7.2 the two rows the header read as uninhabited each have a refusing defau
 // safe reading and into the unsafe one at once. Nothing is repaired by it.
 
 test('8.1 the registry`s report on the inventory tracks what the inventory says', () => {
-  const line = scheduledRows().find((entry) => entry.job === 'replay self-audit')?.line ?? '';
+  const replay = scheduledRows().find((entry) => entry.job === 'replay self-audit');
   const audit = WORKER_JOB_ENTRY_POINTS.find((entry) => entry.entryPoint === 'runReplayAudit');
   const why = audit?.why ?? '';
-  expect(line, 'CRON_INVENTORY has no replay self-audit row').not.toBe('');
+  expect(replay?.line ?? '', 'CRON_INVENTORY has no replay self-audit row').not.toBe('');
   expect(why, 'runReplayAudit is no longer registered').not.toBe('');
 
   // **THE FACT FIRST**, which is `7.1`'s order read from the other side. `7.1`
   // asserts the page carries the discharge; this asserts that BECAUSE it does,
-  // the registry may not still report it owed there.
-  expect(line).toContain('DISCHARGED SINCE');
+  // the registry may not still report it owed there. The discharge is severity
+  // prose and ADR-392 moved that to the job's note, so the note is what carries
+  // it; a row with no note reads as the empty string and this goes RED, which is
+  // the direction a lost note has to fail in.
+  expect(replay?.note ?? '').toContain('DISCHARGED SINCE');
 
   // **AND THE REPORT SECOND.** The retired clause is NAMED and not re-quoted,
   // per ADR-367, so what is asserted is the state it claimed: that the page
@@ -804,7 +974,7 @@ test('8.1 the registry`s report on the inventory tracks what the inventory says'
   // **RED ON HARM IN THE OTHER DIRECTION TOO.** If the page ever loses the
   // discharge, `7.1` goes red first; this case then has nothing to say, which is
   // why the page is read here rather than trusted from `7.1`.
-  expect(line).toContain('ADR-346');
+  expect(replay?.note ?? '').toContain('ADR-346');
 });
 
 test('8.2 the adapter`s replay paragraph counts the blockers the register counts', () => {
