@@ -60,7 +60,7 @@ import {
   PAYOUT_IN_FLIGHT_STATUSES,
 } from '@merit/rules-engine';
 
-import { BatchPortUnwired, BatchRowError, postgresBatchPorts } from '../src/batch/adapter.ts';
+import { BatchRowError, postgresBatchPorts } from '../src/batch/adapter.ts';
 import type { BatchTx } from '../src/batch/adapter.ts';
 import { resolveAccountDay } from '../src/batch/adapter.ts';
 import { foldAccountDay } from '../src/batch/nightly.ts';
@@ -526,20 +526,23 @@ describe('5. `loadAccountDay` answers a WHOLE `AccountDay` and refuses no field'
     expect(fold.row.contextGates.noPayoutInFlight.pass).toBe(true);
   });
 
-  test('5.5 `accountDaysFrom` still refuses, and its reason no longer names the gates', async () => {
-    // **THE SPLIT `ADR-258` MADE IS WHAT KEEPS THIS HONEST.** Had the two ports
-    // shared one blocker constant, discharging `external` would have left this
-    // port refusing with a reason that is now false. It refuses on the walk,
-    // which nobody has written.
+  test('5.5 `accountDaysFrom` no longer refuses, and both retired reasons are GONE', async () => {
+    // **THIS CASE READ "`accountDaysFrom` STILL REFUSES" AND `ADR-346` WROTE THE
+    // WALK IT WAS WAITING FOR.** It is asserted in the other direction rather
+    // than deleted, which is `5.3`'s own move one case up: the port is named as
+    // one that must NOT refuse, so an unwired arm restored to it is a named
+    // failure. The two retired blocker constants are swept for by NAME as well,
+    // because the file's rule for a retired reason is deletion rather than
+    // rewording and a constant left behind reads as live to every grep.
     const ports = postgresBatchPorts(dbOf(world()));
-    const error = await ports.read.accountDaysFrom(ACCOUNT_A).catch((e: unknown) => e);
-    const message = error instanceof Error ? error.message : String(error);
 
-    expect(error).toBeInstanceOf(BatchPortUnwired);
-    expect(message).toContain('INV-04');
-    expect(message).toContain('no session has written that walk');
-    expect(message).not.toContain('AccountDay.external');
-    expect(message).not.toContain('ADR-248');
+    await expect(ports.read.accountDaysFrom(ACCOUNT_A)).resolves.toHaveLength(1);
+    await expect(ports.read.storedRuleStates(ACCOUNT_A)).resolves.toEqual([]);
+
+    const source = readFileSync(new URL('../src/batch/adapter.ts', import.meta.url), 'utf8');
+    expect(source).not.toContain('ACCOUNT_DAYS_FROM_BLOCKER');
+    expect(source).not.toContain('DECODER_BLOCKER');
+    expect(source).not.toContain('no session has written that walk');
   });
 });
 

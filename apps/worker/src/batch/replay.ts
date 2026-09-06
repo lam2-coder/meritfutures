@@ -151,9 +151,31 @@
 //   3. NOTHING SCHEDULES THIS. There is no cron and no caller in `index.ts`.
 //      `CRON_INVENTORY.md` expects a `replay.audit_completed` signal that this
 //      file does not emit and that the EVENTS.md catalogue does not define.
-//   4. A GREEN AUDIT TODAY COVERS LESS THAN IT APPEARS TO, because the engine
-//      does not yet implement every rule group. The counts on the report are
-//      what makes that visible rather than reassuring.
+//      TWO OF THE THREE ABOVE ARE UNCHANGED BY ADR-346 AND THE READS UNDER THEM
+//      ARE NOT: `postgresBatchPorts` now serves `storedRuleStates` and
+//      `accountDaysFrom`, so the audit RUNS against a database. It still may not
+//      halt, which is item 1, and it still has no clock, which is this item.
+//   4. A GREEN AUDIT TODAY COVERS LESS THAN IT APPEARS TO. **THIS ITEM SAID THE
+//      REASON WAS THAT "the engine does not yet implement every rule group", AND
+//      THAT IS WRONG IN A WAY THAT MATTERS** (ADR-346 section 6). It is kept
+//      beside its correction per RI-14, because a reader told the gap is about
+//      unimplemented rules will expect it to close on its own, and it will not.
+//      `rules.ts:180-206` records R-01, R-05, R-11 and R-20 as discharged
+//      OUTSIDE the engine BY DESIGN: two by the calendar and the ingest path,
+//      one by the caller's live-mark predicate and one by the platform setpoint.
+//      A replay folds the engine, so implementing more engine rules would not
+//      shrink that list by one.
+//      AND R-11 IS THE ONE A REPLAY IS STRUCTURALLY BLIND TO. The caller's
+//      live-mark predicate is applied by whatever supplies `accountDaysFrom`,
+//      BEFORE the engine sees anything, so this audit folds marks selected by
+//      the very rule it would have to check: supersede the wrong mark and the
+//      batch folded it, storage holds the result, and the replay reproduces it
+//      byte for byte. `replay-adapter.test.ts` case 5.2 is two green reports
+//      over two books that differ by fifteen thousand cents.
+//      THE COUNTS ON THE REPORT MAKE THE DAYS VISIBLE AND NOT THE RULES. There
+//      is no rule-coverage number on `ReplayAuditReport` at all, which ADR-346
+//      section 11 registers as a finding rather than repairs, because deriving
+//      one belongs to `packages/rules-engine`.
 // =============================================================================
 
 import {

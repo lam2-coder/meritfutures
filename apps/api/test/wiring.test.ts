@@ -307,10 +307,36 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'THE DECISIONS BEHIND THE PORT ARE BUILT AND TESTED WITHOUT IT. `resolveOperatorSession` is ' +
     "`lookup`'s verdict without its query and `operatorFromAssertion` is the directory join, " +
     'both total, both pure, both exercised in `test/operator-identity.test.ts`. WIRING THE PORT ' +
-    'OUT OF THEM IS REFUSED AND ADR-237 SECTION 8 SAYS WHY: nothing can write an ' +
+    'OUT OF THEM IS REFUSED AND ADR-237 SECTION 8 SAID WHY: nothing can write an ' +
     '`operator_sessions` row, so every operator would be told 401 on a door that is not shut ' +
     'against them, and a live-looking route in front of an arm that cannot answer is worse than ' +
     "an honest 503 (`usePayoutBackend`'s rule). " +
+    'THAT OBJECTION IS SPENT AND THE REFUSAL IS NOT (ADR-343). ADR-343 clause 1 made an unwired ' +
+    'session source resolve to `unknown`, so a deployment with NOTHING installed already answers ' +
+    '401 to every caller, cookie or not, and wiring the port would therefore change NOTHING a ' +
+    'caller can see: the misreport ADR-237 refused is now the answer either way. ' +
+    'AND THE PORT IS NOT BLOCKED BY A DOOR, WHICH THIS ENTRY IMPLIED AND ADR-343 MEASURED FALSE. ' +
+    '`operators` and `operatorSessions` are both scope class `firm` (`packages/db/src/scope.ts`), ' +
+    'so `ApiDb.firm()` reaches BOTH TODAY, `AdminSessionSource.lookup` reads only those two ' +
+    'relations, and `resolveOperatorSession` is already its verdict. NO NEW DOOR IS NEEDED AND ' +
+    'ADR-171 CLAUSE 1 HAS NOTHING TO REFUSE HERE; the operator-console door is owed by ' +
+    '`setAdminReadSource` alone, whose `AdminSourceTx` spans `owned` keys the firm door refuses ' +
+    'by construction. ' +
+    'SO THIS PORT IS DECLINED RATHER THAN BLOCKED, ON THREE GROUNDS THAT ARE NOT THE OLD ONE. ' +
+    '(1) An install nothing can exercise is an install nothing falsifies: wired against an empty ' +
+    'table, its first real exercise is the day somebody lands the identity provider, at which ' +
+    'point a console that can freeze accounts, revoke certificates and correct ledgers opens as a ' +
+    'SIDE EFFECT of an unrelated slice, carrying no signal that it did. ' +
+    '(2) It buys no observable change and costs a transaction against two tables on EVERY ' +
+    '`/admin/*` request including the ones answering 401 to a caller holding nothing, so an ' +
+    'anonymous prober gets to schedule database work; `start.ts:206` and `:245` say in their own ' +
+    'words that the rate limit `INV-M11-05` requires "EXISTS NOWHERE IN THIS TREE", so nothing ' +
+    'bounds that. ' +
+    '(3) It would move the triple to `wired: 11` and report as progress a port whose table cannot ' +
+    'be filled. ' +
+    'WHAT IS STILL OWED IS THE PURCHASE AND A CALLER. `refusingAssertionVerifier` and ' +
+    '`operatorFromAssertion` have ZERO callers outside their own suite, and the caller is a login ' +
+    'route minting an `operator_sessions` row, which needs a verified assertion first. ' +
     'FIVE OTHER PORTS STILL REDUCE TO THIS ONE, four through `principal(request)` ' +
     '(`useAdminWriteBackend`, `useAdminPayoutBackend`, `useAdminWalletBackend` and ' +
     '`useCertificateRevokeBackend`) and a fifth through a door (`setAdminReadSource`, ADR-171 ' +
@@ -869,7 +895,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'CLAUSE HAS NAMED IT**: a driver-side decoder has to know `packages/db`s property names, ' +
     '`RI-01` forbids the engine from knowing them and that package`s own manifest says it ' +
     'never may, and `apps/api` and `apps/worker` cannot import each other, so `toSizeRow` ' +
-    '(`apps/worker/src/batch/adapter.ts:1296`) fits this port exactly and is unreachable from ' +
+    '(`apps/worker/src/batch/adapter.ts:1417`) fits this port exactly and is unreachable from ' +
     'it. ADR-239 slice A`s argument PUT `gates-codec.ts` in the engine and the same argument ' +
     'read in the other direction KEEPS this one out. **AND THE ONE `FM-16` IN THIS AREA IS THE ' +
     'CAP SCHEDULE RATHER THAN THE ROW, WHICH IS THE FINDING ADR-283 COULD NOT SEE FROM WHERE ' +
@@ -887,7 +913,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'value: `EligibleFoldUnwired` states it in its own message and `setAdminReadSource`s entry ' +
     'above carries it. ADR-286 section 7 item 1 is CLOSED. ' +
     'AND THE TREE STILL STATES THE RULES BLOB`s DECODING ' +
-    'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1109`) and ' +
+    'THREE TIMES UNTIL `toPublishedRules` (`apps/worker/src/batch/adapter.ts:1230`) and ' +
     '`decodeRules` (`apps/site/src/catalog/adapter.ts:549`) COLLAPSE ONTO THE ENGINE`s, which ' +
     'row 283`s fence put out of bounds; link 7 holds that census at exactly three, holds the ' +
     'cap-schedule census at ONE beside it, and asserts the repaired cap-schedule property so a ' +
@@ -1500,7 +1526,39 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'line 1506 was a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, ' +
     'which is the same drift in its quietest form. THOSE TWO NUMBERS ARE WRITTEN OUT OF ' +
     'CITATION GRAMMAR ON PURPOSE: a `file:line` pointer is a claim about THIS tree, so a ' +
-    'pointer quoted as HISTORY must not wear the shape that says follow me (ADR-212).',
+    'pointer quoted as HISTORY must not wear the shape that says follow me (ADR-212). ' +
+    'AND ADR-342 IS THE TENTH CORRECTION, THE THIRD THAT MAKES THIS ENTRY SMALLER, AND THE ' +
+    'FIRST WRITTEN BY A ROW DISPATCHED TO INSTALL THIS PORT RATHER THAN TO EXPLAIN IT. FOUR ' +
+    'SENTENCES ABOVE ARE NOW FALSE AND ARE KEPT WHERE THEY WERE MADE. (1) IT READ that NO ' +
+    'DOOR DRIVES `requested --> approved` EITHER. `runWithdrawalApprovals` ' +
+    '(`apps/worker/src/withdrawals/approval-sweep.ts`) performs that arrow AND ' +
+    '`cooling --> approved`, with the `LT-06` posting in the same transaction at a system ' +
+    'authority. (2) `F1` READ that `@merit/ledger` PUBLISHES NO `LT-06` BUILDER. ' +
+    '`packages/ledger/src/index.ts` exports `walletWithdrawalApprovalPosting` and ' +
+    '`apps/worker/src/sweeps/ledger.ts` calls `postTransaction` with it. (3) IT READ that ' +
+    'THE MANIFEST LINE IS STILL OWED and that slice 6 owes the worker its `@merit/ledger` ' +
+    'dependency. `apps/worker/package.json` declares it. (4) IT READ that the driver is a ' +
+    'move OUT of this deployable rather than a wiring inside it, so this entry was NO LONGER ' +
+    'WAITING ON A SLICE THAT COULD ARRIVE HERE. The move happened and the slice arrived, one ' +
+    'deployable over. ' +
+    'WHAT REFUSES NOW IS SMALLER THAN ANY OF THAT AND IS STILL NOT AN ADAPTER FOR THIS PORT. ' +
+    '`UNWIRED_WITHDRAWAL_APPROVAL_IO` is the only `WithdrawalApprovalSweepIo` in the tree, ' +
+    "the approval job carries `disposition: 'unscheduled'`, and `apps/worker/src/index.ts` " +
+    'states the condition in its own words: the installation MUST NOT BE DISPATCHED BEFORE A ' +
+    'PAYMENT RAIL EXISTS, because past `approved` there is no exit and `0072`s `WD-C2` ' +
+    'refuses `approved --> cancelled` at the database. The rail is FOUNDER-OWED and is ' +
+    'unchanged. ' +
+    'AND ADR-342 ADDS THE ONE BLOCKER THIS ENTRY NEVER NAMED, WHICH IS THIS DEPLOYABLES OWN. ' +
+    '`C-27` refuses every caller of both rows BEFORE the handler body runs, and ' +
+    '`databaseAuthBackend` declares `elevate` BLOCKED on both arms, so no session in a ' +
+    'deployment can be elevated and the 503 this port produces is itself unreachable. AN ' +
+    'INSTALL WOULD THEREFORE CHANGE NO OBSERVABLE RESPONSE AND WOULD ARM ITSELF SILENTLY on ' +
+    'the day an unrelated row lands a WebAuthn ceremony or an SMS sender, which is an ' +
+    'argument against installing rather than a reason it is harmless. ' +
+    'THE THREE LIVE BLOCKERS ARE NO LONGER PROSE: `INSTALL_BLOCKING_FINDINGS` in ' +
+    '`routes/wallet-withdrawals.ts` carries them with their sources and ' +
+    '`wallet-withdrawals.test.ts` RUNS each one, so the day any of them is discharged that ' +
+    'suite goes RED rather than this paragraph going quietly stale.',
 };
 
 // -----------------------------------------------------------------------------

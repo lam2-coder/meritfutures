@@ -103,7 +103,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { defineRoutes } from '../registry.ts';
-import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
+import { PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX, problem } from '../server.ts';
 import type { HttpMethod, RouteDefinition, RouteHandler } from '../registry.ts';
 import type { Problem } from '../server.ts';
 import type { AdminEventQuery, AdminEventRow } from './admin-feed.ts';
@@ -116,11 +116,25 @@ import type { AdminEventQuery, AdminEventRow } from './admin-feed.ts';
  * Thrown when the deployment, or the data it was handed, is not something an
  * operator may be shown.
  *
- * IT IS A 500 AND NEVER A 404 OR A 503, on ADR-110's precedent for the same
+ * IT IS A 500 AND NEVER A 404 OR A 503, and the REASON changed under it while
+ * the status did not (ADR-343 clause 3). The sentence that stood here is kept
+ * beside its correction (RI-14). It read: "on ADR-110's precedent for the same
  * shape one route over: an unwired port is a deployment that has not been
- * finished, and answering "no such account" or "try again shortly" would be this
- * file describing an operational gap as a fact about the estate. The default
- * error handler in `server.ts` maps an unmapped throw to `internal_error`.
+ * finished, and answering 'no such account' or 'try again shortly' would be this
+ * file describing an operational gap as a fact about the estate."
+ *
+ * THAT GROUND IS NOW SOMEBODY ELSE'S, BECAUSE THIS CLASS NO LONGER CARRIES AN
+ * UNWIRED PORT. ADR-190 item 2 registered the defect: one class carrying two
+ * facts with one status between them, an unwired port and a wired source
+ * returning data this module refuses. ADR-192 clause 1 closed that item for the
+ * four write modules and its section 3 recorded that it "remains open for
+ * `admin-reads.ts` alone, where the mixing is". The two wiring sites are gone
+ * from this class ({@link adminSessionSourceOrNull},
+ * {@link adminReadSourceOrNull}), so what is left is ONE fact: a wired source
+ * handed this module something an operator may not be shown, or a caller reached
+ * a state this module cannot describe. A 500 is right for every one of those and
+ * needs no precedent borrowed from a port. The default error handler in
+ * `server.ts` maps an unmapped throw to `internal_error`, unchanged.
  */
 export class AdminReadError extends Error {
   constructor(message: string) {
@@ -229,14 +243,40 @@ export function setAdminSessionSource(next: AdminSessionSource | null): void {
   sessionSource = next;
 }
 
-/** The wired source, or the refusal that says the deployment is unfinished. */
-function currentSessionSource(): AdminSessionSource {
-  if (sessionSource === null)
-    throw new AdminReadError(
-      'no admin session source is wired, so this deployment cannot tell an operator from ' +
-        'anybody else. That is a deployment which has not been finished rather than a request ' +
-        'that failed, and answering 401 would report it as the caller being logged out',
-    );
+/**
+ * The message an unwired session source carries INTO THE LOG.
+ *
+ * IT USED TO BE THROWN AND IT IS NOW LOGGED, AND THE SENTENCE THAT ARGUED FOR
+ * THE THROW IS KEPT HERE BESIDE ITS CORRECTION RATHER THAN DELETED (ADR-343).
+ * It ended "and answering 401 would report it as the caller being logged out",
+ * which is TRUE and is the cost ADR-192 clause 3 had already priced and paid one
+ * module over: the discrimination goes in the log, because the alternative is
+ * telling an unauthenticated caller which of this deployment's ports are
+ * unfinished. What the sentence did not price is what the throw actually
+ * answered. It was not a 503. `AdminReadError` carries no `statusCode`, so
+ * `server.ts` mapped it to 500, and a caller who presented ANY cookie could make
+ * the admin surface throw and log an error without holding a credential of any
+ * kind. That is not an operator being told the truth; it is an unauthenticated
+ * crash path.
+ */
+const SESSION_SOURCE_UNWIRED =
+  'no admin session source is wired, so this deployment cannot tell an operator from ' +
+  'anybody else. That is a deployment which has not been finished rather than a request ' +
+  'that failed. It is answered 401 rather than 500 or 503 (ADR-343 clause 1, on ADR-192 ' +
+  'clause 2s ground): a deployment that cannot authenticate anyone has authenticated ' +
+  'nobody, which is true of every caller and discloses nothing';
+
+/**
+ * The wired source, or `null` when this deployment has not installed one.
+ *
+ * `null` RATHER THAN A THROW, AND THAT IS ADR-343 CLAUSE 1. See
+ * {@link SESSION_SOURCE_UNWIRED} for the sentence this replaces and why. The
+ * absence is not an exception because it is not exceptional: it is the state of
+ * every deployment in this tree, C-08's hardware-key SSO is a purchase Merit has
+ * not made, and `adminHandler` reads the absence as the one lookup it can
+ * honestly make, which is `unknown`.
+ */
+function adminSessionSourceOrNull(): AdminSessionSource | null {
   return sessionSource;
 }
 
@@ -331,6 +371,31 @@ export function adminForbidden(
  */
 export function adminNotFound(reply: FastifyReply, requestId: string): FastifyReply {
   return sendProblem(reply, problem('not_found', 404, requestId));
+}
+
+/**
+ * An unfinished deployment, told to a caller who has already authenticated.
+ *
+ * `service_unavailable` IS A HANDLER CODE AND IS BUILT HERE, which is not this
+ * module inventing one: `admin-writes.ts:384` states the design in terms and
+ * `admin-certificates.ts`, `admin-payouts.ts` and `admin-wallet.ts` each build
+ * the identical document. `server.ts`'s `STATUS_CODE` and `TITLE` are closed
+ * over what the TRANSPORT can produce and stay byte for byte unchanged, which
+ * ADR-192 clause 4 ruled and ADR-343 does not reopen: an entry there for a
+ * status no transport path produces is a loaded gun for the next class that
+ * sets one.
+ *
+ * IT IS NEVER SENT BEFORE `authorizeAdmin` HAS RETURNED `allowed`. That ordering
+ * is the whole control (ADR-192 clause 2) and `adminHandler` is the only caller.
+ */
+export function adminUnavailable(reply: FastifyReply, requestId: string): FastifyReply {
+  return sendProblem(reply, {
+    type: `${PROBLEM_TYPE_PREFIX}service_unavailable`,
+    title: 'Service unavailable',
+    status: 503,
+    code: 'service_unavailable',
+    instance: requestId,
+  });
 }
 
 /** Section 2's `errors[]`, which is validation failures and nothing else. */
@@ -1076,17 +1141,42 @@ export function setAdminReadSource(next: AdminReadSource | null): void {
   readSource = next;
 }
 
-function currentReadSource(): AdminReadSource {
-  if (readSource === null)
-    throw new AdminReadError(
-      'no admin read source is wired, so the operator console has nothing to read. This is a ' +
-        'deployment which has not been finished rather than a request that failed: the door the ' +
-        "wiring slice must take is `systemDb('operator-console')`, and ADR-171 section 9 makes " +
-        'that door takeable by the slice landing an `AdminSessionSource` a deployment can ' +
-        'install. The shapes are NOT what is missing and this message used to say they were ' +
-        '(ADR-236): six of the seven reads have producers today and none of them reaches ' +
-        '`sqlExecutor`',
-    );
+/**
+ * The message an unwired read source carries, into the log AND onto the wire.
+ *
+ * ONTO THE WIRE IS SAFE HERE AND IS NOT SAFE ONE PORT UP, which is the whole of
+ * why these two absences are answered differently (ADR-343 clause 2). This one
+ * is reached only AFTER `authorizeAdmin` returned `allowed`, so the caller
+ * holding it is an authenticated operator carrying a role this endpoint admits.
+ * Telling that caller which port is unfinished is telling an operator about
+ * their own console. `SESSION_SOURCE_UNWIRED` is reached BEFORE anybody is
+ * authenticated, and the same sentence there would be ADR-192 clause 3's
+ * disclosure exactly.
+ */
+const READ_SOURCE_UNWIRED =
+  'no admin read source is wired, so the operator console has nothing to read. This is a ' +
+  'deployment which has not been finished rather than a request that failed: the door the ' +
+  "wiring slice must take is `systemDb('operator-console')`, and ADR-171 section 9 makes " +
+  'that door takeable by the slice landing an `AdminSessionSource` a deployment can ' +
+  'install. The shapes are NOT what is missing and this message used to say they were ' +
+  '(ADR-236): six of the seven reads have producers today and none of them reaches ' +
+  '`sqlExecutor`';
+
+/**
+ * The wired source, or `null` when this deployment has not installed one.
+ *
+ * `null` RATHER THAN A THROW, on {@link adminSessionSourceOrNull}'s ground and
+ * for a second reason of its own: this absence used to be one of `AdminReadError`'s
+ * throw sites, and ADR-190 item 2 registered that class as carrying TWO FACTS
+ * (a port is not installed, and a wired source returned data this module refuses)
+ * with one status between them. ADR-192 clause 1 closed that item for the four
+ * WRITE modules by giving each a dedicated class, and its section 3 recorded that
+ * "item 2 of ADR-190 remains open for `admin-reads.ts` alone, where the mixing
+ * is". THIS IS THAT ITEM CLOSED. The two wiring sites leave the class rather than
+ * a fifth class being minted, so `AdminReadError` now carries one fact, every
+ * remaining throw site refuses data, and its 500 is right for all of them.
+ */
+function adminReadSourceOrNull(): AdminReadSource | null {
   return readSource;
 }
 
@@ -1174,25 +1264,54 @@ export function authorizeAdmin(
  * Build the framework handler for one declared endpoint.
  *
  * EVERY ROUTE IN THIS MODULE GOES THROUGH HERE, so the role check runs before
- * any handler body does and no handler can forget it. The cookie is read before
- * the session source is consulted, which is what lets a deployment with nothing
- * wired still answer 401 to an anonymous caller rather than 500: there is no
- * token, so there is no lookup to make.
+ * any handler body does and no handler can forget it.
+ *
+ * THE PARAGRAPH THAT STOOD HERE WAS RIGHT ABOUT THE ANONYMOUS CALLER AND SILENT
+ * ABOUT THE OTHER ONE, AND IT IS KEPT BESIDE ITS CORRECTION (RI-14, ADR-343).
+ * It read: "The cookie is read before the session source is consulted, which is
+ * what lets a deployment with nothing wired still answer 401 to an anonymous
+ * caller rather than 500: there is no token, so there is no lookup to make."
+ * Every clause of that is true. What it does not say is what happened to a
+ * caller who DID send a cookie, and the answer was a 500, because the lookup was
+ * then made and `currentSessionSource()` threw. So the ordering it describes
+ * bought the honest answer for exactly the callers who present nothing, and the
+ * cheapest way for anybody at all to make this surface throw was to send a
+ * `Cookie:` header. `test/admin-reads.test.ts` asserted that 500 by name, which
+ * is the shape ADR-343 section 3 reports: a deliberate behaviour, tested, and
+ * measured by ADR-192 finding 1 as "10 routes answer 401 then 500" without the
+ * second half ever being ruled on.
+ *
+ * BOTH PATHS NOW ANSWER 401 AND THE COOKIE CHANGES NOTHING A CALLER CAN SEE.
+ * An unwired session source resolves to `unknown`, which is not a convenience:
+ * it is the only lookup a deployment that recognises no token can honestly make,
+ * and it is the same arm an unrecognised token already took. The role check is
+ * untouched and refuses exactly what it refused before.
  */
 export function adminHandler(spec: AdminEndpointSpec): RouteHandler {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<unknown> => {
     const token = adminTokenFromCookie(request.headers.cookie);
+    const installed = adminSessionSourceOrNull();
+    if (installed === null)
+      request.log.error({ port: 'setAdminSessionSource' }, SESSION_SOURCE_UNWIRED);
     const lookup: AdminSessionLookup =
-      token === null ? { kind: 'unknown' } : await currentSessionSource().lookup(token);
+      token === null || installed === null ? { kind: 'unknown' } : await installed.lookup(token);
 
     const decision = authorizeAdmin(lookup, spec.roles);
     if (decision.outcome === 'unauthenticated') return adminUnauthenticated(reply, request.id);
     if (decision.outcome === 'forbidden') return adminForbidden(reply, request.id, decision.detail);
 
+    // AFTER THE AUTHORIZATION AND NEVER BEFORE IT. See `adminUnavailable`: this
+    // is the only 503 this module sends and the ordering is what makes it safe.
+    const source = adminReadSourceOrNull();
+    if (source === null) {
+      request.log.error({ port: 'setAdminReadSource' }, READ_SOURCE_UNWIRED);
+      return adminUnavailable(reply, request.id);
+    }
+
     const body = await spec.handle({
       request,
       reply,
-      source: currentReadSource(),
+      source,
       principal: decision.principal,
       role: decision.role,
     });

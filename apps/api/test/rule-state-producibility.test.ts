@@ -203,7 +203,7 @@ describe('link 1: CLOSED. The worker deployable runs its job and fails loudly wh
   });
 });
 
-describe('link 2: a `BatchPorts` value IS constructed under `src/`, and it serves four of ten', () => {
+describe('link 2: a `BatchPorts` value IS constructed under `src/`, and it serves eight of ten', () => {
   test('the adapter is the one constructor, and it refuses six methods by name', () => {
     // **THIS BLOCK WAS NAMED "no `BatchPorts` value is constructed under any
     // `src/`" AND ADR-241 MADE THAT FALSE.** The batch takes its I/O as an
@@ -240,36 +240,33 @@ describe('link 2: a `BatchPorts` value IS constructed under `src/`, and it serve
       ).toContain(': BatchPorts = ');
   });
 
-  test('and the FOUR refusals left each carry a blocker, so a red batch names what to build', () => {
+  test('and the TWO refusals left each carry a blocker, so a red batch names what to build', () => {
     // A PORT THAT RETURNED A PLAUSIBLE VALUE WOULD BE WORSE THAN ONE THAT
     // REFUSES, because `runNightlyBatch` counts a `written` outcome per account
     // that did not throw. Each refusal below is a `BatchPortUnwired` naming the
     // method, and the message carries the slice that clears it.
     //
-    // **THE COUNT WAS FIVE AND `loadAccountDay` HAS LEFT IT.** This case named
-    // that port among the refusals and went RED on ADR-260 without being seeded,
-    // which is what a census is for. It is asserted in the other direction
-    // rather than deleted: the port is named as one that must NOT refuse, so an
-    // unwired arm restored to it is a named failure and not a silent return to
-    // where this file started.
+    // **THE COUNT WAS FIVE, THEN FOUR, AND ADR-346 TOOK IT TO TWO.**
+    // `loadAccountDay` left it on ADR-260 and the replay audit's two READS left
+    // it on ADR-346, and on both occasions this case went RED without being
+    // seeded, which is what a census is for. Every departed port is asserted in
+    // the OTHER DIRECTION rather than deleted, so an unwired arm restored to any
+    // of them is a named failure and not a silent return to where this file
+    // started.
     const adapter = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/adapter.ts'));
-    expect(adapter, 'loadAccountDay refuses again').not.toContain(
-      "new BatchPortUnwired('loadAccountDay'",
-    );
-    for (const port of ['accountDaysFrom', 'storedRuleStates'])
-      expect(adapter, `${port} no longer refuses by name`).toContain(
-        `new BatchPortUnwired('${port}'`,
-      );
+    for (const port of ['loadAccountDay', 'accountDaysFrom', 'storedRuleStates'])
+      expect(adapter, `${port} refuses again`).not.toContain(`new BatchPortUnwired('${port}'`);
     for (const port of ['raiseReconciliation', 'raiseDivergence'])
       expect(adapter, `${port} no longer refuses by name`).toContain(
         `new BatchPortUnwired('${port}'`,
       );
 
-    // AND THE TWO THAT STILL REFUSE ON THE READ SIDE ARE OFF `runNightlyBatch`'s
-    // PATH, WHICH IS WHY "THE FOLD COMPLETES" AND "THE ADAPTER IS WHOLE" ARE
+    // AND THE TWO READS THAT LANDED ARE STILL OFF `runNightlyBatch`'s PATH,
+    // WHICH IS WHY "THE FOLD COMPLETES" AND "THE ADAPTER IS WHOLE" ARE STILL
     // DIFFERENT SENTENCES. That function calls five methods and every one of
     // them answers; `accountDaysFrom` and `storedRuleStates` are the replay
-    // audit's, and `runReplayAudit` is unscheduled.
+    // audit's, they answer now, and `runReplayAudit` is still unscheduled
+    // because `raiseDivergence` is one of the two that refuse.
     const nightly = codeOf(join(REPO_ROOT, 'apps/worker/src/batch/nightly.ts'));
     for (const port of ['accountDaysFrom', 'storedRuleStates'])
       expect(nightly, `${port} is on the nightly path after all`).not.toContain(port);

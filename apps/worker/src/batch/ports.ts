@@ -569,7 +569,23 @@ export interface SettledPayoutFact {
    */
   readonly traderCents: bigint;
   /**
-   * `accounts.terminal_settlement_id IS NOT NULL` (`SD-M18-01`, `0007`).
+   * **`accounts.terminal_settlement_id = payout_requests.id`** (`SD-M18-01`,
+   * `0007`, `0010`).
+   *
+   * **THIS LINE READ "`accounts.terminal_settlement_id IS NOT NULL`" AND THAT
+   * PREDICATE IS WRONG BY EVERY EARLIER PAYOUT OF A GRADUATED ACCOUNT.** It is
+   * kept beside its correction rather than deleted, per `RI-14`. The column is
+   * `NULL` until graduation and then names WHICH request was the close-out:
+   * `0010:306` declares `FOREIGN KEY (terminal_settlement_id) REFERENCES
+   * payout_requests(id)`, and `M18` `SD-M18-01`'s own row says the column exists
+   * so that "a graduated account holding a balance is indistinguishable from one
+   * that paid out fully" stops being true. So the flag is a property of THE
+   * PAYOUT and not of the account, and a null test would mark every payout a
+   * graduated trader ever received as terminal. `ST-04` EXCLUDES terminal
+   * settlements, so under the null test a graduated trader's ordinary payouts
+   * would leave the mean and the median entirely, which is a published average
+   * computed over a cohort nobody chose. Found by `ADR-350` while writing the
+   * adapter that reads this column; `statistics-adapter.ts` takes the equality.
    *
    * THE TWO STATISTICS TREAT THIS FLAG IN OPPOSITE DIRECTIONS AND THAT IS
    * DELIBERATE. `ST-03` INCLUDES terminal settlements and labels them, because
