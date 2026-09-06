@@ -400,6 +400,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-386](ADR-386.md) | the line budget the citation graph imposes on prose, priced, and refused as a rule (2026-09-06, status: proposed) |
 | [ADR-387](ADR-387.md) | the claim site ADR-384 named was one of two, `S3` measured at full population is six of thirteen rather than three of five, and the gate is refused on three measurements rather than on a cost (2026-09-06, status: proposed) |
 | [ADR-388](ADR-388.md) | a pointer in a dated record is repairable exactly where the record names its subject and the tree once agreed, which is 289 of 8,390; the other 8,101 are not protected, they are undecidable; and `ADR-352:30` was exact on the day it was written (2026-09-06, status: proposed) |
+| [ADR-389](ADR-389.md) | option (d) is right about the page and is not takeable by a row that owns the runbook, because the fifth column is read out of the table row by eleven assertions in files no such row may write (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
