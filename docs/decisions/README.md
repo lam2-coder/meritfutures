@@ -367,6 +367,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-353](ADR-353.md) | the digest alarm gets all three of its ports and nothing in the adapter refuses, the dispatched expectation that a refusal would be surprising is confirmed, and the job stays off a clock because its subject set is empty rather than because its work is unsafe (2026-09-05, status: proposed) |
 | [ADR-354](ADR-354.md) | the digest producer gets four of its six ports, the transport's two channels are shown to block differently and only one of them is unwritten, and the job stays off a clock on a third blocker that a transport would not discharge (2026-09-05, status: proposed) |
 | [ADR-355](ADR-355.md) | the provisioning job store owes a drain, the drain is a ONE-SHOT pull that ADR-241 ruled FOR rather than against, the vendor already publishes the three methods it needs and `JobQueue` publishes none of them, and the emitter gap two files record as the drain's first blocker does not touch this shape at all (2026-09-06, status: proposed) |
+| [ADR-358](ADR-358.md) | the affiliate blocker entry has named THREE obstructions, then TWO, then a DIFFERENT ONE, then ONE, and the tree says TWO. The survivor it has never named is a WRITE with no write door, the door it did name for the disclosure is the wrong table's, and a case matching a retired sentence cannot go red while `RI-14` requires the sentence to be kept (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
