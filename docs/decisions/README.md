@@ -394,6 +394,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-380](ADR-380.md) | what `RI-15` and `RI-16` cover is now a measured number rather than a description, a fourth blindfold is named and a fifth is the check that has none of the legs, and `ADR-377` section 6's property survives while its stated cause does not (2026-09-06, status: proposed) |
 | [ADR-381](ADR-381.md) | the imprecision three rows declined, where the FIRST decline was an interim that recommended the repair, the two after it inherited the verdict without that qualification, and the ground all three cite for declining is the ground that makes the repair safe (2026-09-06, status: proposed) |
 | [ADR-382](ADR-382.md) | the expiry constructor is refused a THIRD time and the refusal becomes a STANDING BAR, because the premise four registers gave for it is false and the verdict it was offered for is not (2026-09-06, status: proposed) |
+| [ADR-385](ADR-385.md) | the two counts ADR-382 left unreconciled are two different sets, both are short, and the class they name is not checkable (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -39,12 +39,13 @@ import type { ApiClient, Transport } from '../src/http/client.ts';
 //
 // AND THE FAILURE DIRECTION IS THE ONE THAT MATTERS HERE. A KYC status is not
 // an ordinary read: a screen that says "verified" for a trader who is not is a
-// statement Merit makes about an identity check. `apps/api/src/routes/
-// accounts.ts:824` states the posture on the same question one deployable over
-// -- it "fails closed, because the alternative is reporting somebody verified
-// on the strength of an ordering this table does not declare" -- and the
-// fail-closed block below is that sentence asserted over every way this read
-// can go wrong, on the RENDERED BYTES rather than on a return value.
+// statement Merit makes. `apps/api/src/routes/accounts.ts:846-848` states the
+// same posture one deployable over -- it "fails closed, because the alternative
+// is reporting somebody verified on the strength of an ordering this table does
+// not declare" -- and the fail-closed block below is that sentence asserted
+// over every way this read can go wrong, on the RENDERED BYTES rather than on a
+// return value. **TWO DEFECTS ARE REPAIRED HERE (ADR-385, `RI-14`): the path
+// wrapped a line, and the pointer read 824, which opens a different paragraph.**
 // =============================================================================
 
 const HERE = dirname(fileURLToPath(import.meta.url));

@@ -971,8 +971,8 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // ADR-344, session 530, AND THE SIXTH TIME THE PARAGRAPH ABOVE HAS
     // PREDICTED THIS EDIT. The hourly expiry sweep's adapter: four of that
     // job's five ports over this deployable's own doors, with the event sink
-    // taken as a required argument because nothing in this repository can be
-    // passed for it. That row's fence carries `apps/worker/test/**`, so this
+    // taken as a required argument. **THAT REASON IS RETIRED, NAMED NOT QUOTED
+    // (`RI-14`, ADR-385).** That fence carries `apps/worker/test/**`, so this
     // file is inside it and the line is assigned rather than reached for.
     './sweeps/expiry-adapter.ts',
     // ADR-350, session 535, AND THE SEVENTH TIME THE PARAGRAPH ABOVE HAS
