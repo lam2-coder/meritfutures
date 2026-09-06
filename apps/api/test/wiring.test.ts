@@ -2716,3 +2716,118 @@ test('no member that answers is named inside the sentence saying which members r
       `\`${member}\` refuses in the adapter and the sentence listing what rejects does not name it`,
     ).toContain(`\`${member}\``);
 });
+
+// -----------------------------------------------------------------------------
+// The fourth measurement: the one port two rows read opposite ways (ADR-367)
+// -----------------------------------------------------------------------------
+//
+// TWO ROWS MEASURED `PRODUCTION_CHECKOUT_ADAPTERS` ON THE SAME DAY AND WROTE
+// DOWN OPPOSITE ANSWERS, AND BOTH ARE ON THIS TREE. ADR-363 section 6 predicted
+// the collision in those words and called it the mechanism working rather than
+// something to avoid, because the failure mode it replaces is ADR-357 section
+// 8's, documented four times over: two readings of one fact, only one defended,
+// and nothing going red when they part.
+//
+// THEY PARTED, AND NOTHING WENT RED. That is what this case is for. The wave
+// merged both entries and the tree carried no record that they disagree.
+//
+//   ADR-363 section 6, DERIVED: the default refuses, from four leaves and no
+//   name. `adapterFor: () => undefined` returns nothing, `returnUrl: ''` and
+//   `cancelUrl: ''` hold no value, `enrichment: null` holds nothing.
+//
+//   ADR-362 section 4, MEASURED THROUGH THE ROUTER: a funded wallet checkout
+//   against this same default answers 200, records a purchase at `paid`, moves
+//   the ledger and quotes `amount_cents` and `wallet_debit_cents`.
+//
+// BOTH ARE TRUE AND THE INFERENCE BETWEEN THEM IS WHAT IS FALSE. The grammar
+// proves things about LEAF SHAPES; `LIVE_DEFAULT`'s own docblock is about ports
+// "whose default SERVES a request rather than refusing one". A leaf that holds
+// nothing does not make a port refuse a request when the caller GUARDS that leaf
+// and carries on, and this one does: the wallet arm reads `enrichment`, finds
+// `null`, skips the observation and returns before the adapter guard.
+//
+// AND THE SHARP FORM OF IT IS IN THE INTERFACE RATHER THAN IN THE CALLER.
+// `CheckoutAdapters` DECLARES that member as admitting `null`, in the docblock's
+// own words, "`null` when this deployment observes nothing". So `null` here is a
+// value the contract names, not a stand-in for one it lacks, and the grammar's
+// `null` rule is being applied to a member whose type invites it. That is the
+// difference between this leaf and `setAdminSessionSource`'s `null`, where no
+// contract names it and the port genuinely has no source.
+//
+// WHAT THIS CASE DOES AND DOES NOT DO. It does not move the triple and it does
+// not add a member to `LIVE_DEFAULT`. Naming the category is ADR-362 section 9's
+// first open question and it is the founder's: `live` makes the triple
+// `{14, 12, 2}`, a third term such as `partial` makes it a quadruple, and that
+// entry records `refusing` as available and NOT recommended. What this case does
+// is refuse to let the two readings part quietly a second time: every input the
+// disagreement rests on is pinned, so the day the grammar changes, or the leaf
+// changes, or the contract stops admitting `null`, this bar goes red and names
+// the question instead of silently resolving it.
+
+/** The full type annotation of `member` on `interface iface`, as written. */
+function propertyAnnotation(source: string, iface: string, member: string): string | undefined {
+  const declared = new RegExp(`^export interface ${iface}\\b`, 'm').exec(source);
+  if (declared === null) return undefined;
+  const open = source.indexOf('{', declared.index);
+  if (open < 0) return undefined;
+  const body = stripComments(source.slice(open + 1, scanTop(source, open + 1, '')));
+  const at = new RegExp(`(?:^|\\s)readonly\\s+${member}\\s*:`).exec(body);
+  if (at === null) return undefined;
+  const from = at.index + at[0].length;
+  return body.slice(from, scanTop(body, from, ';')).trim();
+}
+
+test('the one port whose derived verdict and whose measured wire behaviour disagree is pinned', () => {
+  const port = 'useCheckoutAdapters';
+
+  // THE DERIVED HALF, ADR-363 SECTION 6. Pinned at the verdict and not at the
+  // reason text, so a reworded `why` does not fail this and a changed grammar
+  // does.
+  expect(resolveDefault(port).verdict, `\`${port}\` no longer resolves as a proven refusal`).toBe(
+    'refuses',
+  );
+  expect(LIVE_DEFAULT.has(port)).toBe(false);
+
+  // THE LEAF THE DISAGREEMENT TURNS ON, followed off the module rather than
+  // named: the port's own module-scope default, then that name's binding.
+  const checkout = read(join(ROUTES, 'checkout.ts'));
+  const held = defaultOf(port);
+  expect(held).toBe('PRODUCTION_CHECKOUT_ADAPTERS');
+  const members = objectMembers(bindingInit(checkout, held) ?? '');
+  expect(
+    members,
+    `\`${held}\` no longer reads as an object literal this case can descend`,
+  ).toBeDefined();
+  expect(
+    Object.fromEntries((members ?? []).map(([name, body]) => [name, body.trim()])),
+  ).toStrictEqual({
+    adapterFor: '() => undefined',
+    returnUrl: "''",
+    cancelUrl: "''",
+    enrichment: 'null',
+  });
+
+  // THE CONTRACT HALF, WHICH IS THE PART THAT MAKES THIS A DEFECT IN THE
+  // INFERENCE RATHER THAN A DIFFERENCE OF OPINION. The member's declared type
+  // ADMITS the leaf the grammar reads as a refusal.
+  const annotation = propertyAnnotation(checkout, 'CheckoutAdapters', 'enrichment');
+  expect(
+    annotation,
+    '`CheckoutAdapters.enrichment` no longer declares a type this case can read',
+  ).toBeDefined();
+  expect(
+    (annotation ?? '').split('|').map((part) => part.trim()),
+    'the disagreement rested on `enrichment` declaring `null` as a value rather than as an ' +
+      'absent one. If that is no longer true, ADR-362 section 4 and ADR-363 section 6 need ' +
+      're-reading together rather than this expectation loosening',
+  ).toContain('null');
+
+  // AND THE OTHER DIRECTION: nothing here has quietly answered ADR-362 section 9
+  // open question 1. The triple is asserted unmoved above and asserted unmoved
+  // here, so a later row cannot resolve the disagreement by editing this case.
+  expect({
+    blocked: Object.keys(BLOCKED).length,
+    refusing: Object.keys(BLOCKED).filter((name) => !LIVE_DEFAULT.has(name)).length,
+    live: LIVE_DEFAULT.size,
+  }).toStrictEqual({ blocked: 14, refusing: 13, live: 1 });
+});
