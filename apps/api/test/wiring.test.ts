@@ -55,7 +55,7 @@ import { expect, test } from 'vitest';
 // A NO-OP CALL IS NOT A WIRING, AND FOUR PORTS MAKE THAT REACHABLE
 // -----------------------------------------------------------------------------
 // `useAffiliateDeps`, `useKycDeps` and `useCheckoutAdapters` already hold their
-// PRODUCTION value at module scope (`affiliate.ts:478`, `kyc.ts:284`,
+// PRODUCTION value at module scope (`affiliate.ts:672`, `kyc.ts:284`,
 // `checkout.ts:1051`), so calling their setter from `start.ts` would install the
 // object that is already installed and change nothing a request sees. It would
 // also make this file pass. THE REASON TEXT IS WHERE THAT IS RECORDED, so a
@@ -1225,9 +1225,16 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'both null, so calling the setter here would install what is already installed. That is not ' +
     'a wiring.',
   useAffiliateDeps:
-    'ONE obstruction, and this entry has named THREE, then TWO, then a DIFFERENT ONE. THE ' +
-    'OBSTRUCTION THIS ENTRY LED WITH FOR TWO WAVES IS DISCHARGED AND THE ONE BEHIND IT IS NOT ' +
-    '(ADR-321 wrote the column, ADR-324 repaired what was still being said about it). ' +
+    'TWO obstructions, and this entry has named THREE, then TWO, then a DIFFERENT ONE, then ' +
+    '"ONE obstruction, and this entry has named THREE, then TWO, then a DIFFERENT ONE". ' +
+    'THE LAST OF THOSE IS CORRECTED BY ADR-358 AND IS QUOTED HERE RATHER THAN REPLACED, on ' +
+    'RI-14`s rule and on the rule this entry keeps being the subject of. THE ' +
+    'COUNT WAS WRONG BECAUSE NOBODY RE-DERIVED THE METHOD LIST: each rewrite repaired the ' +
+    'clause it was dispatched about and INHERITED the rest, and the second survivor had never ' +
+    'been named by ANY version of this entry. ADR-358 derives the door PER METHOD from the key ' +
+    'sets in `scoped-db.ts` instead, so this column stops being the place the answer lives. ' +
+    'THE OBSTRUCTION THIS ENTRY LED WITH FOR TWO WAVES IS DISCHARGED AND THE ONE BEHIND IT IS ' +
+    'NOT (ADR-321 wrote the column, ADR-324 repaired what was still being said about it). ' +
     'THE RETIRED CLAUSES ARE QUOTED RATHER THAN DELETED, on RI-14`s rule and on the rule this ' +
     'entry has now been the subject of twice. THEY READ: `affiliate_commissions` is ' +
     '"UNREGISTERED in packages/db/src/scope.ts and UNDECLARED in packages/db/src/schema.ts", ' +
@@ -1280,14 +1287,38 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'many times, so an issued handle and a click token cannot be one column, and every attribute ' +
     'a link would carry is already on `affiliate_clicks` at click grain. `issueLink` therefore ' +
     'waits on an ADAPTER and a BASE URL rather than on DDL, which is the same position ' +
-    '`affiliate`, `requiredDisclosure`, `submitCreative` and `statements` are in. FIVE of the ' +
-    'six methods are an adapter somebody can write and ONE is not, AND THE ONE IS STILL `stats`, ' +
-    'for a reason that is now the counting door alone. THE REPAIR REGISTERED HERE ' +
+    '`affiliate`, `requiredDisclosure` and `statements` are in. THIS LIST NAMED ' +
+    '`submitCreative` TOO AND NO LONGER DOES (ADR-358), and the removed name is the whole of ' +
+    'the correction: on that method the peer group WAS the claim, and it was false. ' +
+    '`requiredDisclosure` STAYS IN THE LIST AND ITS REASON IS REPLACED: it reads ' +
+    '`tos_versions`, which is `firm`, so its door is `ApiDb.firm()` and never the `owned` door ' +
+    'over `affiliates` that its refusal used to name. The answer was right and the reason was ' +
+    'followable to the wrong table. FOUR of the ' +
+    'six methods are an adapter somebody can write and TWO are not. THIS CLAUSE READ "FIVE of ' +
+    'the six methods are an adapter somebody can write and ONE is not, AND THE ONE IS STILL ' +
+    '`stats`, for a reason that is now the counting door alone", and it is kept beside its ' +
+    'correction per RI-14 (ADR-358). `stats` IS STILL ONE OF THE TWO and the counting door is ' +
+    'still its reason. THE SECOND IS `submitCreative`, WHICH NO VERSION OF THIS ENTRY HAS EVER ' +
+    'NAMED. It is a WRITE of `affiliate_creatives`, and it was served a refusal calling it a ' +
+    'READ and reasoning about `affiliates`. `affiliate_creatives` is `derived`, and no handle ' +
+    'a request path can open inserts one: `ScopedTx.insert` takes `OwnedTableKey`, ' +
+    "`insertUnder` takes `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>` " +
+    'and a CLOSED LIST OF ONE, `insertAsParty` takes `PartyWritableTableKey` and this table is ' +
+    'not `pair`, and `FirmTx.insert` takes `FirmTableKey`. `ApiDb` exposes `scoped`, `firm`, ' +
+    '`resolution`, `establishment` and `publicLookup` AND NO SYSTEM HANDLE. NOTHING IN THIS ' +
+    'TREE WRITES `affiliate_creatives`. So it waits on a `packages/db` WIDENING and then an ' +
+    'adapter, which is the shape `stats` waits in rather than the shape an adapter closes. ' +
+    'WHAT THIS PORT CAN SERVE TODAY, DERIVED RATHER THAN PROMISED: `affiliate`, `statements` ' +
+    'and `requiredDisclosure` have doors, so `GET /affiliate/statements` is servable on doors ' +
+    'alone once a cursor rule exists; `POST /affiliate/links` is servable the moment a base URL ' +
+    'is a configured value; and `GET /affiliate/stats` and `POST /affiliate/creatives` cannot ' +
+    'be served at all without a `packages/db` diff, the second because it needs BOTH the write ' +
+    'door and `requiredDisclosure`. THE REPAIR REGISTERED HERE ' +
     'TWO WAVES AGO IS TAKEN: `STATEMENTS_UNREACHABLE` served a caller the retired sentence that ' +
     '`affiliate_statements` is not in `schema.ts`, and ADR-253 section 5 repairs it at the ' +
     'constant and at the module header, which carried the same sentence a second time and which ' +
     'no entry had named. NOTE: this port already holds `productionAffiliateDeps` at module scope ' +
-    '(`affiliate.ts:613`), so calling the setter here would install what is already installed. ' +
+    '(`affiliate.ts:672`), so calling the setter here would install what is already installed. ' +
     'That is not a wiring.',
   setInternalOpsSource:
     'FOUR METHODS, AND ADR-242 RULES THEM ONE AT A TIME BECAUSE ONE REASON COVERED WHICHEVER OF ' +

@@ -712,7 +712,7 @@ const WRITE_CONTENT_TYPE = 'application/json';
  * The header API_CONTRACT line 23 names, spelled as this file spells `cookie`.
  *
  * LOWER CASE BECAUSE HEADER NAMES ARE CASE-INSENSITIVE AND THE READER IS
- * ALREADY LOWER CASE: `apps/api/src/routes/affiliate.ts:807` reads
+ * ALREADY LOWER CASE: `apps/api/src/routes/affiliate.ts:1003` reads
  * `headers['idempotency-key']`, which is the shape Fastify normalises to.
  */
 const IDEMPOTENCY_HEADER = 'idempotency-key';
