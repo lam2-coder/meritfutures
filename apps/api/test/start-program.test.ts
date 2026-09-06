@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import ts from 'typescript';
 import { expect, test } from 'vitest';
@@ -14,6 +14,29 @@ import { expect, test } from 'vitest';
 // cannot see the three things a wiring slice can get wrong: an install that
 // never runs, an install that runs twice, and an install that runs AFTER the
 // port is bound.
+//
+// THE FIRST SENTENCE ABOVE IS RETIRED AND IS KEPT WHERE IT STANDS, because it
+// was true on the day ADR-372 landed this file (ADR-375, ADR-379, `RI-14`).
+// `wiring.test.ts` no longer derives `wired` by matching a setter name at the
+// start of a line. ADR-375 took ADR-372 section 15 question 1 option (b), and
+// `wired` there is now the set a RUN would install, read off the same syntax
+// tree this file reads. THE PATTERN IS KEPT AND STILL RUN THERE, beside it and
+// under another name, which is why the extraction below still resolves and why
+// the agreement case below still has two derivations to compare.
+//
+// WHAT THAT RETIRES IS THIS FILE'S REASON FOR EXISTING AND NOT ITS CASES, and
+// the distinction is the whole of ADR-379 section 5. Three of the five cases
+// below now have a counterpart in `wiring.test.ts`, which ADR-375 could add
+// once `installs` was a LIST that file could read: the agreement of the two
+// derivations, the second install of one port, and the shape census. THE
+// DUPLICATION IS REPORTED RATHER THAN RESOLVED, because the two are not the
+// same assertion -- the reader here does NOT stop at `main()` and the reader
+// there does -- and retiring a money-path case to remove a redundancy is a
+// larger call than the row that noticed it holds.
+//
+// TWO CASES BELOW ARE STILL THE ONLY THING IN THIS REPOSITORY HOLDING WHAT THEY
+// HOLD: that `main()` is the LAST top-level statement, and that no other module
+// under `apps/api/src` installs a port on import.
 //
 // PARSING IS NOT EXECUTING, which is the whole reason this file can exist
 // beside that constraint. The TypeScript compiler API reads the module into a
@@ -98,11 +121,32 @@ function mainIndexOf(source: ts.SourceFile): number {
   return source.statements.findIndex((statement) => calleeOf(statement) === 'main');
 }
 
+/**
+ * Every `.ts` file under `dir`, AT ANY DEPTH.
+ *
+ * A NON-RECURSIVE LISTING IS HOW THE ONE-FILE-SCAN CASE BELOW CAME TO BE
+ * NARROWER THAN ITS OWN TITLE. It read `src` and `src/routes` by name, and
+ * ADR-374 section 7 item 1 measured that `src/admin-source/`'s ten modules were
+ * never opened by it. The CLAIM was true over all three directories when that
+ * row checked it; only the COVERAGE was short, and this is the repair it named.
+ */
+function tsFilesUnder(dir: string): readonly string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true }).sort((left, right) =>
+    left.name.localeCompare(right.name),
+  )) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...tsFilesUnder(path));
+    else if (entry.name.endsWith('.ts')) found.push(path);
+  }
+  return found;
+}
+
 const START = join(SRC, 'start.ts');
 const startTree = parse(START);
 const installs = installsOf(startTree);
 
-test('`start.ts` is a straight-line program, which is what makes reading it as text sound', () => {
+test('`start.ts` is a straight-line program, so its installs run in a total order', () => {
   // THE ROW WAS DISPATCHED TO ASK WHETHER A SETTER COULD BE COUNTED AS WIRED
   // WHILE INSTALLING NOTHING: inside a conditional, inside a function nobody
   // calls, behind an early return, or in dead code. NONE OF THOSE SHAPES CAN
@@ -115,6 +159,17 @@ test('`start.ts` is a straight-line program, which is what makes reading it as t
   // against the syntax tree, never to widen the pattern: a pattern taught to
   // recognise a conditional still cannot tell a taken branch from an untaken
   // one.
+  //
+  // THAT REMEDY HAS BEEN TAKEN AND THIS PIN IS STILL LOAD-BEARING, WHICH IS NOT
+  // THE SAME THING AS ITS REASON SURVIVING (ADR-375, ADR-379 section 5). The
+  // soundness this case was protecting is no longer on loan from the shape of
+  // the file, because `wired` is read off the tree now. WHAT THE PIN STILL
+  // HOLDS IS THE PREMISE UNDER THE ORDER ARGUMENT: every statement here runs
+  // exactly once, so "the installs run before `main()`" is a fact about a TOTAL
+  // ORDER rather than about one path through a branch. A top-level `throw`
+  // would truncate that order, and the tree derivation would report the
+  // truncation as a SMALLER `wired` -- a cardinal moving with no name attached
+  // to it. HERE IT ARRIVES CARRYING ITS OWN.
   const forbidden = new Map<string, ts.SyntaxKind>([
     ['a conditional statement', ts.SyntaxKind.IfStatement],
     ['a conditional expression', ts.SyntaxKind.ConditionalExpression],
@@ -152,10 +207,18 @@ test('`start.ts` is a straight-line program, which is what makes reading it as t
   expect(installs.length).toBeGreaterThan(0);
 });
 
-test("`wiring.test.ts`' text-matched `wired` set is the set a run would install", () => {
+test('the line pattern `wiring.test.ts` still declares agrees with the set a run installs', () => {
   // THE SECOND DERIVATION, BY A DIFFERENT METHOD, OVER THE SAME FILE. The
   // pattern is lifted out of the file that owns it so that this case follows a
   // change there rather than preserving a stale copy of it.
+  //
+  // THIS CASE'S TITLE NAMED A TEXT-MATCHED `wired` SET UNTIL ADR-379, AND THE
+  // RETIRED PHRASE IS NAMED HERE RATHER THAN REPRODUCED (`RI-14`). ADR-375
+  // moved that derivation into the tree, so there is no text-matched `wired`
+  // for a title to name: there is `wired`, from the tree, and the pattern kept
+  // beside it. WHAT THIS CASE COMPARES DID NOT CHANGE -- it always ran the
+  // pattern over `start.ts` and compared it with a walk -- and what it says
+  // about itself now matches what it computes.
   const scanner = /^const CALLS = \/(.+)\/([a-z]*);$/m.exec(
     read(join(APP, 'test', 'wiring.test.ts')),
   );
@@ -239,24 +302,48 @@ test('`start.ts` is the only module under `apps/api/src` that installs a port on
   // at its own module scope would install that port on import, in the suite as
   // well as in a deployment, and it would appear in neither `wired` nor
   // `BLOCKED`: it would be wired and recorded nowhere.
+  //
+  // AND THE SCAN IS RECURSIVE, WHICH IT WAS NOT UNTIL ADR-379. ADR-374 section 7
+  // item 1 measured this case reading `src` and `src/routes` by name while
+  // `src/admin-source/` held ten modules it never opened. The claim it makes was
+  // TRUE over those ten when that row checked it by hand; what was missing was a
+  // control that would still be reading them next month.
+  const scanned = tsFilesUnder(SRC);
   const offenders: string[] = [];
-  for (const dir of [SRC, ROUTES])
-    for (const name of readdirSync(dir)
-      .filter((entry) => entry.endsWith('.ts'))
-      .sort()) {
-      const path = join(dir, name);
-      if (path === START) continue;
-      const tree = parse(path);
-      for (const statement of tree.statements) {
-        const callee = calleeOf(statement);
-        if (callee !== undefined && IS_SETTER.test(callee))
-          offenders.push(
-            `${name}:${String(
-              tree.getLineAndCharacterOfPosition(statement.getStart(tree)).line + 1,
-            )} ${callee}`,
-          );
-      }
+  for (const path of scanned) {
+    if (path === START) continue;
+    const tree = parse(path);
+    for (const statement of tree.statements) {
+      const callee = calleeOf(statement);
+      if (callee !== undefined && IS_SETTER.test(callee))
+        offenders.push(
+          `${relative(SRC, path)}:${String(
+            tree.getLineAndCharacterOfPosition(statement.getStart(tree)).line + 1,
+          )} ${callee}`,
+        );
     }
+  }
+
+  // NON-VACUITY, AND IT IS THE EXACT SHAPE OF THE DEFECT THIS REPAIR CLOSES. An
+  // empty offender list is what a scan that read NOTHING reports too, so the
+  // directory that was unread is named rather than counted, and the walk is
+  // required to reach past the flat listing it replaced. A cardinal is not
+  // pinned here: one would move every time a module is added, which is a control
+  // that cries wolf and gets deleted.
+  expect(
+    scanned.some((path) => path.startsWith(join(SRC, 'admin-source'))),
+    '`src/admin-source/` is not reached by this scan, so the directory ADR-374 measured unread ' +
+      'is unread again and the empty result below says nothing whatever about it',
+  ).toBe(true);
+
+  expect(
+    scanned.length,
+    'the scan no longer reads more than a flat listing of `src` and `src/routes`, so the ' +
+      'recursive walk ADR-379 landed has been undone and every subdirectory is invisible again',
+  ).toBeGreaterThan(
+    readdirSync(SRC).filter((entry) => entry.endsWith('.ts')).length +
+      readdirSync(ROUTES).filter((entry) => entry.endsWith('.ts')).length,
+  );
 
   expect(
     offenders,
@@ -280,6 +367,19 @@ test('the four shapes a line pattern counts as wired and a run does not install'
   // and the two disagree on exactly four of the seven.
   //
   // THE FIXTURE IS SYNTHETIC AND `start.ts` IS NOT TOUCHED TO PRODUCE IT.
+  //
+  // AND WHAT THIS CASE IS FOR HAS MOVED, WHICH IS SAID HERE BECAUSE THE FOUR ARE
+  // NO LONGER OWED BY ANYBODY. ADR-375 section 3 RETIRED three of them outright
+  // in `wiring.test.ts` -- a block comment and a template literal are not
+  // statements, and a call below `main()` is a position -- by making `wired` the
+  // set a run installs. So this census is no longer a queue of defects one file
+  // over; it is the measurement that the PATTERN, which that file still declares
+  // and this file still reads out of it, misses exactly these and no others.
+  // THE NEIGHBOUR'S CENSUS IS FIVE RATHER THAN FOUR: ADR-375 added an
+  // UNINDENTED nested call, the shape ADR-372 could name and could not exercise
+  // because `prettier` would never write it. IT IS NOT COPIED HERE. A fifth
+  // fixture in a second file is the transcription this file's own header
+  // refuses, and the fifth is reported in ADR-379 section 5 instead.
   const scanner = /^const CALLS = \/(.+)\/([a-z]*);$/m.exec(
     read(join(APP, 'test', 'wiring.test.ts')),
   );
