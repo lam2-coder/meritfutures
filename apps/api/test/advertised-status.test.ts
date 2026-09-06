@@ -137,6 +137,21 @@ const NOT_A_STATUS = /\b[A-Z]{1,6}-\d+[\w-]*|:\d+(?:-\d+)?/g;
 /** A status the sentence says it does NOT answer, so it is not a promise. */
 const DENIED = /\b(?:never|not|rather than)\b[^.]{0,12}$/i;
 
+/**
+ * The leading decoration a block comment carries on each of its own lines.
+ *
+ * IT IS NOT A COMMENT STRIPPER AND IT IS SPELLED SO THAT NOBODY HAS TO TAKE
+ * THAT ON TRUST. `RI-30` refuses a `.replace()` written over a block-comment
+ * opener, on the measurement in its own header: two replacements cannot strip
+ * comments, because an opener inside a line comment opens a phantom block. That
+ * check went RED on this file's first draft and it was right to look. What runs
+ * here is the opposite operation -- the docblock has ALREADY been located and
+ * this removes the ` * ` rail from inside it so the prose reads as prose -- and
+ * `stripComments` is the wrong tool for it, since it would delete the very text
+ * this file exists to read.
+ */
+const DOC_RAIL = /^[ \t]*[*/]+/gm;
+
 /** The block comment immediately above a line, or `''`. */
 function docblockAbove(lines: readonly string[], index: number): string {
   const end = index - 1;
@@ -165,7 +180,7 @@ function affirmed(docblock: string): readonly number[] {
   const paragraphs = docblock
     .replace(NOT_A_STATUS, ' ')
     .split(/\n\s*\*\s*\n/)
-    .map((part) => part.replace(/^\s*(?:\/\*\*|\*\/|\*)/gm, ' '));
+    .map((part) => part.replace(DOC_RAIL, ' '));
   for (const prose of paragraphs) {
     const out = new Set<number>();
     for (const match of prose.matchAll(STATUS)) {
