@@ -276,10 +276,30 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'plan breaker evaluation',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_BREAKER_IO` is the only `BreakerIo` in the tree. AND IT WOULD DECLINE EVEN WIRED: ' +
-      "`OQ-M6-02`'s minimum sample is the founder's and is unanswered, so the evaluator raises " +
-      '`BreakerDeclined` rather than inventing a floor. Two blockers, and the second is not an ' +
-      'adapter.',
+      'THIS ROW READ "`UNWIRED_BREAKER_IO` is the only `BreakerIo` in the tree" AND ADR-352 ' +
+      'WROTE THE SECOND ONE, so the sentence is kept beside its correction (RI-14) and the ' +
+      'disposition does not move, BECAUSE THE ADAPTER WAS NEVER THE ONLY BLOCKER AND THERE ARE ' +
+      'THREE. The row already said so in its own second clause and that clause is unchanged and ' +
+      'is now blocker two. ' +
+      'ONE, `postgresBreakerIo` serves FOUR of `BreakerIo`s five members; the fifth is `events` ' +
+      'and no sink is reachable from this deployable at all (RI-04, node-linker=isolated), while ' +
+      'the name `breaker.state_changed` is in none of `EVENT_CATALOGUE`s ten and would be refused ' +
+      'by the producer under ADR-159 clause 1 even if one were. AND THE COST IS THE WHOLE RUN ' +
+      'RATHER THAN ONE PLAN: `evaluate.ts` holds ONE transaction for every plan (ADR-006) and ' +
+      'catches nothing, and the FIRST evaluation emits for every active plan because `from_state` ' +
+      'is null there, so a deployment holding the composed value writes no `plan_breaker_state` ' +
+      'row at all on its first night. ' +
+      "TWO, `OQ-M6-02`'s minimum sample is the founder's and is unanswered, so the evaluator " +
+      'raises `BreakerDeclined` rather than inventing a floor, and it raises it BEFORE it opens a ' +
+      'transaction or reads the clock. ' +
+      'THREE, AND IT IS NEW AND IS NOT RULED ANYWHERE: `0016` keys `plan_breaker_state` PRIMARY ' +
+      'KEY (plan_id, evaluated_on), `BreakerTx` publishes a plain insert with no upsert, and ' +
+      'CRON_INVENTORY schedules this job DAILY while `evaluated_on` would carry the LAST CLOSED ' +
+      'trading day. Those two cadences disagree on every non-session day, where a second run ' +
+      'recomputes a DIFFERENT window against the SAME key and Postgres refuses it. What ' +
+      '`evaluated_on` means is a founder ruling and ADR-352 section 5 records it as an open ' +
+      'question rather than deciding it. A clock in front of this job today is a process that ' +
+      'pages every weekend and writes nothing.',
   },
   {
     module: './detectors/runner.ts',

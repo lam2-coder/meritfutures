@@ -1187,6 +1187,27 @@ export type {
   LossRatioPolicy,
   PolicyNumber,
 } from './breaker/ports.ts';
+// THE ADAPTER, WHICH SERVES FOUR OF `BreakerIo`'s FIVE MEMBERS (ADR-352).
+//
+// **`postgresBreakerIo` IS `async` AND NO OTHER IO FACTORY IN THIS BARREL IS.**
+// `tradingDayOf` is synchronous and `anchorLastClosedDay` is not, so the day is
+// anchored once before the value exists and the same instant becomes `now()`.
+//
+// `UNWIRED_BREAKER_EVENT_SINK` IS THE FIFTH MEMBER AND IT REFUSES. The refusal
+// is the export rather than an omission, because a deployment has to be able to
+// name what it is holding: no event writer is reachable from `apps/worker`
+// (`RI-04`, `node-linker=isolated`) and `EVENT_CATALOGUE`'s ten names carry no
+// `breaker.` name for `ADR-159` clause 1 to admit.
+export {
+  BREAKER_TABLES_AGREE_WITH_THE_ACCESSOR,
+  BreakerAdapterUnwired,
+  BreakerCalendarRefused,
+  BreakerTableRefused,
+  UNWIRED_BREAKER_EVENT_SINK,
+  postgresBreakerIo,
+  postgresBreakerTransact,
+} from './breaker/adapter.ts';
+export type { WorkerBreakerTx } from './breaker/adapter.ts';
 export {
   BreakerRowError,
   UNCALIBRATED_CUSUM,
@@ -1565,6 +1586,7 @@ export const WORKER_BARREL_LEGS = [
   './batch/state-hash.ts',
   './batch/state-writer.ts',
   './batch/statistics-adapter.ts',
+  './breaker/adapter.ts',
   './breaker/evaluate.ts',
   './breaker/ports.ts',
   './detectors/adapter.ts',

@@ -901,6 +901,11 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // legs are counted here instead.
   const legs = [...BARREL.matchAll(/from '(\.\/[a-z-]+\/[a-z-]+\.ts)'/g)].map((match) => match[1]);
   for (const leg of [
+    // ADR-352's leg, and it is enumerated here for the reason the whole case
+    // exists: this row landed on a base carrying four concurrent sibling
+    // adapters, so a keep-both merge is the expected shape rather than the
+    // unlucky one.
+    './breaker/adapter.ts',
     './batch/nightly.ts',
     './batch/ports.ts',
     './batch/replay.ts',
@@ -1028,5 +1033,11 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
   // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
   // path shape in its regex. They are guarded there and not here.
-  expect(new Set(legs).size).toBe(33);
+  // **34 SINCE ADR-352 ADDED `./breaker/adapter.ts`.** It was 33 on that row's
+  // base and the four legs that made it 33 are enumerated above. THE NUMBER IS
+  // DERIVED AT THE MOMENT IT IS WRITTEN AND NOT PREDICTED: session 547 ran the
+  // regex above over `src/index.ts` after adding its own leg and read 34 back,
+  // which is the discipline the paragraph above records four rows failing at
+  // once.
+  expect(new Set(legs).size).toBe(34);
 });
