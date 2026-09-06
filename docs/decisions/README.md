@@ -389,6 +389,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-375](ADR-375.md) | everything `wiring.test.ts` owed, where the answer to the standing question is YES and `wired` is now the set a RUN installs, the support that expired is repaired on a narrower ground than it named, the `operator` hole four entries share is bound once, and the `RI-35` registration a prior row asked for CANNOT LAND until a sentence outside this fence is repaired (2026-09-06, status: proposed) |
 | [ADR-376](ADR-376.md) | the census that counted a name suffix was already derived by the row that found it, the replay row's SUPPORT expired in the one register nobody could reach, and a precise claim degraded into a false one in the `src/` file a reader actually meets (2026-09-06, status: proposed) |
 | [ADR-377](ADR-377.md) | a citation that carries only a path and a line cannot be made checkable on this corpus, the fifty dead pointers are repaired and the FORM is left alone, and the pointer that died inside the checker itself was true the day it was written and blind for three independent reasons (2026-09-06, status: proposed) |
+| [ADR-378](ADR-378.md) | a repair that left its own report standing, one paragraph still calling one of four blockers the only one, and the census hole whose shape is an ASYMMETRY between two readings of one name (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

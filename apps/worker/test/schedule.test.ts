@@ -449,6 +449,17 @@ test('5.2 the grant 0079 left out is in, it is exactly what was ruled, and it is
 // rather than a fifth paragraph correcting the fourth.
 
 /**
+ * THE TWO CENSUS GRAMMARS, NAMED HERE BECAUSE `8.3` RUNS THEM AND THE POINT OF
+ * `8.3` IS THAT THEY DISAGREE. Both key off the SAME name, `UNWIRED_`: the first
+ * INCLUDES on it and the second EXCLUDES on it. They are pulled out rather than
+ * copied so the case cannot drift away from the censuses it is about.
+ */
+const unwiredDefault = (): RegExp => /export const (UNWIRED_[A-Z0-9_]+):\s*([A-Za-z0-9_]+)\s*=/g;
+
+const boundInhabitant = (port: string): RegExp =>
+  new RegExp(`export const (?!UNWIRED_)\\w+:\\s*${port}\\s*=`);
+
+/**
  * Every `UNWIRED_*` default under `apps/worker/src`, mapped to its port type.
  *
  * **IT DOES NOT MATCH ON THE `_IO` SUFFIX AND THAT IS THE WHOLE REPAIR.** Every
@@ -462,9 +473,7 @@ function unwiredPorts(): ReadonlyMap<string, string> {
   const out = new Map<string, string>();
   for (const module of workerModules()) {
     if (module === './index.ts') continue;
-    for (const match of stripComments(sourceOf(module)).matchAll(
-      /export const (UNWIRED_[A-Z0-9_]+):\s*([A-Za-z0-9_]+)\s*=/g,
-    )) {
+    for (const match of stripComments(sourceOf(module)).matchAll(unwiredDefault())) {
       const [, value, port] = match;
       if (value !== undefined && port !== undefined) out.set(value, port);
     }
@@ -489,7 +498,7 @@ function constructorsOf(port: string): readonly string[] {
     const returns = new RegExp(`\\):\\s*(?:Promise<)?${port}>?\\s*\\{`).test(body);
     // A `const` of the port type that is not the unwired default is an
     // inhabitant by the same reading, so it counts here too.
-    const bound = new RegExp(`export const (?!UNWIRED_)\\w+:\\s*${port}\\s*=`).test(body);
+    const bound = boundInhabitant(port).test(body);
     if (returns || bound) out.push(module);
   }
   return out.sort();
@@ -738,4 +747,141 @@ test('7.2 the two rows the header read as uninhabited each have a refusing defau
   // the header's vocabulary a distinction rather than a synonym, and if it ever
   // stops holding the two states collapse for real.
   expect([...ports.values()]).not.toContain('ExpiryEventPort');
+});
+
+// =============================================================================
+// 8. What ADR-376 left, and the shape of the hole it measured (ADR-378)
+// =============================================================================
+// **A REPAIR THAT LEAVES ITS OWN REPORT STANDING IS THE DEFECT ONE LAYER UP.**
+// ADR-376 repaired `CRON_INVENTORY`'s replay row and the registry entry that
+// REPORTED that row unrepaired stayed exactly as ADR-370 wrote it, so a `src/`
+// file a reader meets went on naming an owed item that had been discharged in
+// the same wave. `8.1` binds the report to the page it reports on.
+//
+// **AND ONE PARAGRAPH STILL CALLED ONE OF FOUR BLOCKERS THE ONLY ONE.** `8.2`
+// binds that count to the register that carries it, fact first, and pins the
+// line the third blocker is declared on so the citation cannot rot silently.
+//
+// **`8.3` IS A MEASUREMENT RATHER THAN A CONTROL.** ADR-370 section 9 named its
+// own census's hole and got its SHAPE wrong; ADR-376 measured that with seeds.
+// What is asserted here is WHY it is wrong: the two censuses key off the SAME
+// name and read it in OPPOSITE directions, so one edit moves a port out of the
+// safe reading and into the unsafe one at once. Nothing is repaired by it.
+
+test('8.1 the registry`s report on the inventory tracks what the inventory says', () => {
+  const line = scheduledRows().find((entry) => entry.job === 'replay self-audit')?.line ?? '';
+  const audit = WORKER_JOB_ENTRY_POINTS.find((entry) => entry.entryPoint === 'runReplayAudit');
+  const why = audit?.why ?? '';
+  expect(line, 'CRON_INVENTORY has no replay self-audit row').not.toBe('');
+  expect(why, 'runReplayAudit is no longer registered').not.toBe('');
+
+  // **THE FACT FIRST**, which is `7.1`'s order read from the other side. `7.1`
+  // asserts the page carries the discharge; this asserts that BECAUSE it does,
+  // the registry may not still report it owed there.
+  expect(line).toContain('DISCHARGED SINCE');
+
+  // **AND THE REPORT SECOND.** The retired clause is NAMED and not re-quoted,
+  // per ADR-367, so what is asserted is the state it claimed: that the page
+  // still recorded this job as having no `src/` file supplying its ports, and
+  // that repairing it was outside the fence.
+  expect(
+    why,
+    'the registry reports the inventory unrepaired while the inventory records the discharge; ' +
+      'one of the two is stale and `7.1` says which',
+  ).not.toMatch(/not repaired there/i);
+  expect(why).toContain('ADR-376');
+
+  // **RED ON HARM IN THE OTHER DIRECTION TOO.** If the page ever loses the
+  // discharge, `7.1` goes red first; this case then has nothing to say, which is
+  // why the page is read here rather than trusted from `7.1`.
+  expect(line).toContain('ADR-346');
+});
+
+test('8.2 the adapter`s replay paragraph counts the blockers the register counts', () => {
+  const audit = WORKER_JOB_ENTRY_POINTS.find((entry) => entry.entryPoint === 'runReplayAudit');
+  const why = audit?.why ?? '';
+
+  // **THE REGISTER ENUMERATES FOUR AND NAMES EACH.** This is the fact the
+  // adapter's paragraph was wrong about, and it is derived before the paragraph
+  // is read. It goes RED the day a blocker is discharged and the row is
+  // rewritten, which is the day the adapter's pointer is owed a re-read.
+  expect(why).toContain('FOUR THINGS');
+  for (const ordinal of ['ONE,', 'TWO,', 'THREE,', 'FOUR,'])
+    expect(why, `the replay row no longer enumerates ${ordinal.slice(0, -1)}`).toContain(ordinal);
+
+  // **AND THE THIRD IS DECLARED IN THE ADAPTER ITSELF, AT THE LINE BOTH
+  // REGISTERS CITE.** Path-plus-line citations are caught by neither `RI-15` nor
+  // `RI-16` (ADR-375 section 8), so the line is pinned here by reading it: this
+  // is the one shape a green invariant run cannot vouch for.
+  const adapter = sourceOf('./batch/adapter.ts');
+  const line802 = adapter.split('\n')[801] ?? '';
+  expect(
+    line802,
+    '`batch/adapter.ts:802` no longer declares `accountsWithStoredState`, so every citation ' +
+      'of that line, in this file and in both registers, is now pointing at something else',
+  ).toContain('accountsWithStoredState');
+  expect(why).toContain('batch/adapter.ts:802');
+
+  // **THE PARAGRAPH POINTS AT THE ENUMERATION RATHER THAN COUNTING FOR ITSELF.**
+  // The comment is read UNSTRIPPED, deliberately: the defect this repairs lived
+  // in a comment, and `stripComments` would make the assertion vacuous.
+  expect(
+    adapter,
+    'the adapter`s replay paragraph no longer points at the enumeration, so it is free to ' +
+      'restate the count and degrade it again, which is exactly what it did once',
+  ).toContain('section 4.3 enumerates FOUR');
+  expect(adapter).toContain('`accountsWithStoredState` at `:802`');
+});
+
+test('8.3 the two censuses key off the SAME name and read it in opposite directions', () => {
+  // **THE SUBJECT IS CHOSEN OFF THE TREE RATHER THAN WRITTEN.** A port with a
+  // refusing default and no constructor is the case ADR-370 section 9 reasoned
+  // about, and there are five; the first by name is used so the case is
+  // deterministic without pinning which one.
+  const ports = unwiredPorts();
+  const subject = [...ports]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .find(([, port]) => constructorsOf(port).length === 0);
+  expect(
+    subject,
+    'no UNWIRED_* default now serves a port without a constructor, so the shape this case ' +
+      'measures cannot arise and section 9`s hole is closed by the tree rather than by a check',
+  ).toBeDefined();
+  const [value, port] = subject ?? ['', ''];
+
+  const module = workerModules().find(
+    (m) => m !== './index.ts' && stripComments(sourceOf(m)).includes(`export const ${value}`),
+  );
+  expect(module, `${value} is not declared in any module this census walks`).toBeDefined();
+  const body = stripComments(sourceOf(module ?? ''));
+
+  // ONE EDIT: the default keeps its type, its value and its module, and loses
+  // only the `UNWIRED_` prefix. This is a string, not a write: no file is
+  // touched and `sha256sum` on this tree is unchanged by running it.
+  const renamed = body.replace(
+    new RegExp(value, 'g'),
+    `REFUSING_${value.slice('UNWIRED_'.length)}`,
+  );
+  expect(renamed, 'the rename changed nothing, so the two readings below are of one text').not.toBe(
+    body,
+  );
+
+  // **ONE: IT DROPS OUT OF THE DEFAULT CENSUS, AND THAT DIRECTION IS SAFE.** The
+  // port reads as having no default at all, which over-states the gap. This is
+  // the whole of what ADR-370 section 9 predicted.
+  expect([...body.matchAll(unwiredDefault())].map((m) => m[1])).toContain(value);
+  expect([...renamed.matchAll(unwiredDefault())].map((m) => m[1])).not.toContain(value);
+
+  // **TWO: AND IT DROPS INTO THE CONSTRUCTOR CENSUS, WHICH IS THE UNSAFE ONE.**
+  // The same name that INCLUDES above EXCLUDES here, so removing it turns a
+  // refusal into an inhabitant and the port reads as SERVED: a port a job could
+  // be handed a live value for. **THAT IS THE OPPOSITE DIRECTION AND SECTION 9
+  // STATES IT THE SAFE WAY ROUND**, which ADR-376 section 8 measured in seeds
+  // and this derives from the grammars themselves.
+  expect(boundInhabitant(port).test(body)).toBe(false);
+  expect(
+    boundInhabitant(port).test(renamed),
+    'the constructor census no longer counts a renamed refusal, so its exclusion has stopped ' +
+      'being a NAME and ADR-370 section 9 is owed a re-read in the other direction',
+  ).toBe(true);
 });
