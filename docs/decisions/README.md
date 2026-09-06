@@ -385,6 +385,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-371](ADR-371.md) | the blocker whose SUPPORT expired while the blocker stood, found in the register ADR-370 did not open, and RI-35 was measured rather than extended because two of its nineteen artifacts carry a needle (2026-09-06, status: proposed) |
 | [ADR-372](ADR-372.md) | the wiring slice read as a program for the first time, where the install count is ELEVEN and not the dispatch's figure, the text derivation is CORRECT here and sound only by accident, the half-install this file could produce is unreachable today by the placement of one statement, and nothing enforces that placement (2026-09-06, status: proposed) |
 | [ADR-373](ADR-373.md) | the census of what every route module's refusal docblock PROMISES against what the router RETURNS, where four modules promised a status no request to this deployment can meet and one promises a status the deployment fails to produce, and the two are wrong on opposite sides (2026-09-06, status: proposed) |
+| [ADR-374](ADR-374.md) | the two properties ADR-372 ruled on, where one of the two was already guarded by the file ADR-372 itself landed, the other was read once by a session and re-read by nothing, and the construction closure is thirteen functions rather than the twelve that entry named (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
