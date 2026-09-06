@@ -250,7 +250,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'section 9 makes it takeable only by "the slice that lands an `AdminSessionSource` a ' +
     'deployment can install". SO THIS PORT REDUCES TO `setAdminSessionSource` TOO, one step ' +
     'further along than the four `principal(request)` backends do, and the SSO purchase blocks ' +
-    'SIX entries in this list rather than the four ADR-171 counted. ' +
+    'EIGHT entries in this list rather than the four ADR-171 counted. ' +
+    'THAT FIGURE READ SIX AND IS REPAIRED RATHER THAN DELETED (`RI-14`, ADR-360 section 7). ' +
+    'The two it omitted are `setInternalOpsSource`, whose `reconciliations` read waits on ' +
+    'the same ADR-171 clause 1 door, and `useCheckoutBackend`, whose admin mutations ' +
+    'resolve their principal through this port. NOTHING WENT RED, because a count spelled ' +
+    'into a string is asserted by nobody, and `test/admin-read-constructibility.test.ts` ' +
+    'was already deriving EIGHT beside it on every run. ' +
+    'THE RETIRED FIGURE IS NAMED RATHER THAN QUOTED, on this file`s own precedent in ' +
+    '`usePayoutBackend` below, and here the precedent has a second reason: the case that ' +
+    'now binds this clause reads the sentence AROUND the number, and a reproduced original ' +
+    'would hand it two answers. IT IS BOUND NOW, in both directions, by `the two prose ' +
+    'counts of the SSO purchase are derived from BLOCKED rather than typed` further down ' +
+    'this file. ' +
     'THE ONE THING HERE THAT IS NOT BEHIND THAT PURCHASE IS `readLiability`, WHICH IS STILL ' +
     'UNBUILT AND IS NOW BLOCKED ONE LAYER LOWER (ADR-269). This entry read that the figure ' +
     'holding the fold "is `eligible_next_7d`, whose last term is a `writeRuleState` ' +
@@ -354,12 +366,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'WHAT IS STILL OWED IS THE PURCHASE AND A CALLER. `refusingAssertionVerifier` and ' +
     '`operatorFromAssertion` have ZERO callers outside their own suite, and the caller is a login ' +
     'route minting an `operator_sessions` row, which needs a verified assertion first. ' +
-    'FIVE OTHER PORTS STILL REDUCE TO THIS ONE, four through `principal(request)` ' +
+    'SEVEN OTHER PORTS STILL REDUCE TO THIS ONE, four through `principal(request)` ' +
     '(`useAdminWriteBackend`, `useAdminPayoutBackend`, `useAdminWalletBackend` and ' +
-    '`useCertificateRevokeBackend`) and a fifth through a door (`setAdminReadSource`, ADR-171 ' +
-    'section 9, ADR-236). ADR-171 said THREE, which was right before ' +
-    '`useCertificateRevokeBackend` existed. `test/admin-read-constructibility.test.ts` derives ' +
-    'both counts from this file.',
+    '`useCertificateRevokeBackend`), two through the `SystemTx` door ADR-171 clause 1 ' +
+    'refuses (`setAdminReadSource`, ADR-171 section 9 and ADR-236, and ' +
+    '`setInternalOpsSource`, whose `reconciliations` read waits on that same clause), and ' +
+    'one through the operator route on the cap (`useCheckoutBackend`). ' +
+    'THAT FIGURE READ FIVE AND IS REPAIRED RATHER THAN DELETED (`RI-14`, ADR-360 ' +
+    'section 7), which makes this the SECOND figure this one clause has carried wrongly: ' +
+    'ADR-171 said THREE, which was right before `useCertificateRevokeBackend` existed, and ' +
+    'neither wrong figure was ever read by anything. THE RETIRED FIGURES ARE NAMED RATHER ' +
+    'THAN QUOTED, for the reason `setAdminReadSource` above states. ' +
+    '`test/admin-read-constructibility.test.ts` derives the set, and this file now binds ' +
+    'both prose counts to that same predicate rather than restating it.',
   useAdminPayoutBackend:
     '`principal(request)` (`routes/admin-payouts.ts:390`), which resolves only through ' +
     '`AdminSessionSource` and is therefore blocked on `setAdminSessionSource` above. THIS IS THE ' +
@@ -771,7 +790,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'RATHER THAN CLOSED. It read that this tree held no implementation of `PayoutTx` at all, and ' +
     'ADR-291 made that false. The retired wording is paraphrased rather than quoted, because a ' +
     'reason that reproduces its own retired sentence reads as live to every grep, and this entry ' +
-    'has retired a question that way four times already. **THE VALUE EXISTS AND IT IS FOUR ' +
+    'has retired a question that way four times already. **THE VALUE EXISTS AND IT IS SIX ' +
     'MEMBERS OF EIGHT**: `postgresPayoutBackend` (`apps/api/src/payout-backend.ts`) implements ' +
     '`transact`, which opens the scoped door on the session identity and is the ONE transaction ' +
     'every later slice reads on, `lockScope()`, which delegates to `ScopedTx.lockScope` in one ' +
@@ -782,12 +801,24 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '`plan_version_id` off `accounts` on the SAME transaction, names ELEVEN of the insert ' +
     'shape`s FOURTEEN fields, names `splitBp` and `clampReason` NOWHERE because neither has a ' +
     'column and both are already inside the snapshot, and leaves `identity_id` to the handle ' +
-    'to stamp. **ITS OTHER FOUR MEMBERS REJECT WITH `PayoutBackendUnwired`, AND SO DOES THE ' +
-    'HOLD BRANCH OF THE MEMBER THAT ANSWERS**: `subject` is ADR-287 slices 4 and 5, `holdFlag` ' +
+    'to stamp, AND, SINCE ADR-306 AND ADR-308, `subject()` ON ALL FOUR OF ITS LEGS, AND, ' +
+    'SINCE ADR-311, `listPayouts()`, the one member outside every write path. ' +
+    '**ITS OTHER TWO MEMBERS REJECT WITH `PayoutBackendUnwired`, AND SO DOES THE ' +
+    'HOLD BRANCH OF THE MEMBER THAT ANSWERS**: `holdFlag` ' +
     'and `insertPayoutRequest`s hold arm are slice 8, WHICH CANNOT BE SCHEDULED BECAUSE ' +
     '`HoldFlag.tosClause` HAS NO VALUE SPACE AND `DEP-M7-05` OWES THE CLAUSES TO COUNSEL, ' +
-    '`listPayouts` is slice 7, and `idempotency` IS THE ONE THAT COULD ANSWER TODAY AND ' +
-    'DELIBERATELY DOES NOT, on this entry`s own closing sentence below. AND THE RULED LINE ' +
+    'and `idempotency` IS THE ONE THAT COULD ANSWER TODAY AND ' +
+    'DELIBERATELY DOES NOT, on this entry`s own closing sentence below. ' +
+    'THIS PARTITION READ FOUR ANSWERING AND FOUR REJECTING AND NAMED `subject` AND ' +
+    '`listPayouts` AMONG THE REJECTERS, AND IS REPAIRED RATHER THAN DELETED (`RI-14`, ' +
+    'ADR-361 section 7). BOTH WERE BUILT WHILE THE CLAUSE STOOD, AND THE CLAUSE IS THE ONE ' +
+    'A SESSION WOULD ACT ON: a row dispatched off it would go and build two members that ' +
+    'already answer. The adapter`s own header says SIX answer and TWO reject twelve lines ' +
+    'below a line that still reads five of eight, and that half is OWED because it is a ' +
+    '`src/` file this row does not own. THE RETIRED FIGURES ARE NAMED RATHER THAN QUOTED, ' +
+    'on this entry`s own four-times precedent above, and the partition is now derived by ' +
+    '`the payout member partition is derived from the adapter rather than typed` below. ' +
+    'AND THE RULED LINE ' +
     'THAT WAS STILL OWED HERE IS BUILT, WHICH IS THE FIRST TIME THIS CLAUSE HAS CLOSED A HALF ' +
     'RATHER THAN NARROWED ONE: ADR-293 section 3.5 ruled that THE PAYOUT ' +
     'PATH LOCKS, as `PayoutTx.lockScope()` delegated to `handle.lockScope()` and called by ' +
@@ -1179,7 +1210,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'so `insertAsParty` STAMPS `affiliate_identity_id` and the insert takes NEITHER identity ' +
     "from the caller. That is ADR-238 ruling 2's own remedy, which is ADR-230's stamp applied " +
     "to the counterparty. SECOND AND LAST, THE LEDGER ARM, AND ADR-165's " +
-    'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:1030`) is a ' +
+    'GROUND STILL HOLDS: the `ledger` on the wallet arm (`routes/checkout.ts:1056`) is a ' +
     '`LedgerTx`, which only `SystemTx` satisfies because `ledger_transactions` and ' +
     '`ledger_entries` are both `derived` rather than `firm`, `SystemReason` is still exactly two ' +
     'members (`packages/db/src/scoped-db.ts:271`) and `ApiDb` still declares no door that yields ' +
