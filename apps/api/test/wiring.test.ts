@@ -557,7 +557,18 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'structurally satisfies at a reason that already exists. ONE SUPPLIER SHORT, AND THE ' +
     'SUPPLIER IS NOT A DOOR. Wiring it with `principal: async () => null` would report an ' +
     'unfinished deployment as a caller who is not an operator, on the endpoint that releases ' +
-    'held payouts. MONEY PATH.',
+    'held payouts. ' +
+    'AND `AdminPayoutBackend`s `operator` (`routes/admin-payouts.ts:383`) IS A SECOND BLOCKER ' +
+    'THIS ENTRY DID NOT NAME (ADR-369, ADR-375). It is the member that YIELDS the `AdminPayoutTx` ' +
+    'those four methods run on, so an entry that enumerated the four and called this port the ' +
+    'closest of the five to wireable was describing the handle and never the door that opens it. ' +
+    'It runs at an operator authority and needs a `SystemTx`; `ApiDb` (`apps/api/src/db.ts:173`) ' +
+    'declares five doors and NONE YIELDS ONE, refused by ADR-171 clause 1. THE SAME MEMBER IS ' +
+    'UNNAMED BY THREE SIBLING ENTRIES AND THAT IS ONE HOLE FOUR TIMES rather than four ' +
+    'oversights (ADR-358s mechanism, measured by ADR-369 section 4). The shut door is DERIVED ' +
+    'and asserted below rather than restated in each of the four, so the day it opens every ' +
+    'one of these clauses expires at once and the case names them. ' +
+    'MONEY PATH.',
   useAdminWalletBackend:
     '`principal(request)` (`routes/admin-wallet.ts:679`), blocked on `setAdminSessionSource` ' +
     'above, AND THREE FURTHER MEMBERS: `operator`, `writeCorrection` and `reconcile`. ' +
@@ -639,7 +650,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`packages/rules-engine/src/index.ts:185`). ADR-171 finding 10. That stale sentence ' +
     "survived in this port's own docstring, which was outside that entry's fence and is inside " +
     "ADR-251's; it is repaired at the source. `test/admin-write-trading-day.test.ts` derives " +
-    'every clause here from source on every run.',
+    'every clause here from source on every run. ' +
+    'AND `AdminWriteBackend`s `operator` (`routes/admin-writes.ts:267`) IS A BLOCKER THIS ENTRY ' +
+    'DID NOT NAME (ADR-369, ADR-375), WHICH IS WHY "ONE SUPPLIER" IS THE CLAUSE THIS PORT HAS ' +
+    'CARRIED WRONGLY TWICE. It yields the `AdminWriteTx` that freezes an account, closes one and ' +
+    'publishes a plan version, so the port with the widest write surface on this deployable named ' +
+    'every obstruction except the one that opens the transaction. ' +
+    'It runs at an operator authority and needs a `SystemTx`; `ApiDb` (`apps/api/src/db.ts:173`) ' +
+    'declares five doors and NONE YIELDS ONE, refused by ADR-171 clause 1. THE SAME MEMBER IS ' +
+    'UNNAMED BY THREE SIBLING ENTRIES AND THAT IS ONE HOLE FOUR TIMES rather than four ' +
+    'oversights (ADR-358s mechanism, measured by ADR-369 section 4). The shut door is DERIVED ' +
+    'and asserted below rather than restated in each of the four, so the day it opens every ' +
+    'one of these clauses expires at once and the case names them. ' +
+    'MONEY PATH.',
 
   // ---------------------------------------------------------------------------
   // THE LEDGER DOOR, AND THE TWO PORTS THAT REACHED FOR IT ARE NOW ONE.
@@ -1634,7 +1657,18 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "(`routes/admin-certificates.ts:363`) is `GET /verify/:code`'s copy, and the " +
     "`account_enforced` sentence is `OQ-M11-02`, still open. THIS ROUTE REVOKES A TRADER'S " +
     'PUBLIC PROOF; a backend that answered plausibly would be a fixture doing that to real ' +
-    'people.',
+    'people. ' +
+    'AND `AdminCertificateBackend`s `operator` (`routes/admin-certificates.ts:344`) IS A BLOCKER ' +
+    'THIS ENTRY DID NOT NAME (ADR-369, ADR-375). It yields the `AdminCertificateTx` the revoke ' +
+    'writes on, and the five citations this entry does carry are all about WHICH ROWS that ' +
+    'handle would have to span; none of them is about whether anything can hand one over. ' +
+    'It runs at an operator authority and needs a `SystemTx`; `ApiDb` (`apps/api/src/db.ts:173`) ' +
+    'declares five doors and NONE YIELDS ONE, refused by ADR-171 clause 1. THE SAME MEMBER IS ' +
+    'UNNAMED BY THREE SIBLING ENTRIES AND THAT IS ONE HOLE FOUR TIMES rather than four ' +
+    'oversights (ADR-358s mechanism, measured by ADR-369 section 4). The shut door is DERIVED ' +
+    'and asserted below rather than restated in each of the four, so the day it opens every ' +
+    'one of these clauses expires at once and the case names them. ' +
+    'MONEY PATH.',
   // ---------------------------------------------------------------------------
   // The cash door. THE REASON THAT STOOD HERE WAS FALSE AND IS REPLACED RATHER
   // THAN DELETED, because it was true when it was written. ADR-172.
@@ -3412,15 +3446,15 @@ test('the members no entry names are pinned, so a bare name is not free and a ne
       'listFlags',
       'listEvents',
     ],
-    useAdminPayoutBackend: ['operator', 'now'],
+    useAdminPayoutBackend: ['now'],
     useAdminWalletBackend: ['now'],
-    useAdminWriteBackend: ['operator', 'now'],
+    useAdminWriteBackend: ['now'],
     useCheckoutBackend: ['transact'],
     useCheckoutAdapters: ['adapterFor', 'enrichment'],
     useTurnstileVerifier: ['verify'],
     useKycDeps: ['backend'],
     useAffiliateDeps: ['backend'],
-    useCertificateRevokeBackend: ['operator', 'now'],
+    useCertificateRevokeBackend: ['now'],
     useWithdrawalBackend: ['transact', 'idempotency', 'now'],
   });
 
@@ -3483,4 +3517,72 @@ test('the admin wallet entry enumerates the members it blocks and the figure is 
     'ADR-366 measured that `operator` is the member this entry did not name and the one both ' +
       'of the module appends travel through. Removing it re-opens the defect',
   ).toContain('operator');
+});
+
+test('the four entries that block on `operator` block on ONE shut door, and it is still shut', () => {
+  // ADR-369 SECTION 4 FOUND THE SAME TWO MEMBERS MISSING FROM FOUR ENTRIES AND
+  // CALLED IT ONE HOLE FOUR TIMES. ADR-369 repaired one of the four and the
+  // other three were left owed; this case is what makes repairing them worth
+  // more than three paragraphs. THE FOUR CLAUSES REST ON ONE FACT ABOUT `ApiDb`
+  // AND THE FACT IS DERIVED HERE RATHER THAN RESTATED IN EACH OF THEM.
+  //
+  // IT FAILS ON GOOD NEWS, WHICH IS THE POINT. The day `ApiDb` opens a door
+  // yielding a `SystemTx`, every one of those four clauses stops being true in
+  // the same instant, and this bar goes red naming all four rather than each
+  // entry going stale on its own schedule for somebody to find one at a time.
+  const withOperator = CENSUS.filter((row) => row.members.includes('operator'))
+    .map((row) => row.port)
+    .sort();
+
+  expect(
+    withOperator,
+    'the set of blocked ports whose interface declares `operator` has moved. Each of these ' +
+      'entries accounts for that member by naming the door below, so a port joining or ' +
+      'leaving this set owes an accounting or has one nothing needs',
+  ).toStrictEqual([
+    'useAdminPayoutBackend',
+    'useAdminWalletBackend',
+    'useAdminWriteBackend',
+    'useCertificateRevokeBackend',
+  ]);
+
+  // AND EVERY ONE OF THEM NAMES IT, which is the ADR-369 repair asserted rather
+  // than trusted to survive the next rewrite of an entry.
+  for (const port of withOperator)
+    expect(
+      namesMember(BLOCKED[port] ?? '', 'operator'),
+      `\`${port}\`s entry does not name \`operator\`, the member that yields its transaction. ` +
+        'ADR-369 measured this omission on four entries at once and ADR-375 repaired the three ' +
+        'it left; a rewrite that drops the name re-opens it',
+    ).toBe(true);
+
+  // THE DOOR ITSELF, SLICED OUT OF `ApiDb` RATHER THAN GREPPED OVER `db.ts`. A
+  // whole-file grep would be satisfied by the word appearing in a comment
+  // arguing that the door does NOT exist, which is exactly what `db.ts` holds.
+  const dbSource = read(join(SRC, 'db.ts'));
+  const doors = interfaceMembers(dbSource, 'ApiDb');
+  expect(
+    doors.length,
+    '`ApiDb` sliced to no members, so the claim below would pass against nothing',
+  ).toBeGreaterThan(0);
+
+  const opening = new RegExp('^export interface ApiDb\\b', 'm').exec(dbSource);
+  const body = dbSource.slice(
+    opening?.index ?? 0,
+    pastBracket(dbSource, dbSource.indexOf('{', opening?.index ?? 0)),
+  );
+
+  // NON-VACUITY IN BOTH DIRECTIONS: the slice really is the door list, so a
+  // slicer that returned an empty string could not report the absence below.
+  expect(body, 'the `ApiDb` slice no longer carries the doors this deployable does open').toMatch(
+    /FirmTx/,
+  );
+
+  expect(
+    /SystemTx/.test(body),
+    '`ApiDb` now declares a door yielding a `SystemTx`. That is GOOD NEWS and it expires the ' +
+      '`operator` clause in all four entries at once: ' +
+      withOperator.join(', ') +
+      '. Re-read each of them against the door that landed rather than deleting this case',
+  ).toBe(false);
 });
