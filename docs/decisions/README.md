@@ -392,6 +392,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-378](ADR-378.md) | a repair that left its own report standing, one paragraph still calling one of four blockers the only one, and the census hole whose shape is an ASYMMETRY between two readings of one name (2026-09-06, status: proposed) |
 | [ADR-379](ADR-379.md) | the two rows' leavings, where the coverage gap one of them named is repaired and the four-shape claim the other made about its own guards is measured and FALSE FOR ONE (2026-09-06, status: proposed) |
 | [ADR-380](ADR-380.md) | what `RI-15` and `RI-16` cover is now a measured number rather than a description, a fourth blindfold is named and a fifth is the check that has none of the legs, and `ADR-377` section 6's property survives while its stated cause does not (2026-09-06, status: proposed) |
+| [ADR-381](ADR-381.md) | the imprecision three rows declined, where the FIRST decline was an interim that recommended the repair, the two after it inherited the verdict without that qualification, and the ground all three cite for declining is the ground that makes the repair safe (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
