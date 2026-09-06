@@ -2263,6 +2263,263 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // WHAT THESE TWO CHECKS ACTUALLY COVER, PINNED RATHER THAN DESCRIBED (ADR-380)
+  // ---------------------------------------------------------------------------
+  // EVERY CASE BELOW ASSERTS A HOLE, AND THAT IS THE POINT RATHER THAN AN
+  // ADMISSION. ADR-357, ADR-377 and ADR-380 each found a way for a citation to
+  // be READ by these checks and CHECKED BY NOTHING, and every one was found by
+  // accident: a seed written to redden a leg went GREEN, and the chase produced
+  // the property. Four such holes are now on record and none of them was ever
+  // asserted anywhere.
+  //
+  // A HOLE RECORDED ONLY IN A `covers` STRING IS A FACT CARRIED BY A PARAGRAPH,
+  // which is the drift ADR-034 exists to end and which this file has already
+  // watched happen to its own cardinals. So each case below goes RED THE DAY THE
+  // HOLE IS CLOSED, which is session 363's clearing-condition pattern applied to
+  // a coverage hole rather than to a blocker: a later row that widens one of
+  // these legs is told by its own suite which blindfold it just removed, and no
+  // later row can over-trust these invariants by reading a sentence that has
+  // since gone stale.
+  //
+  // THE SILENT DIRECTION IS THE ASSERTION AND THE LOUD ONE IS THE CONTROL. Each
+  // case pairs the hole with a seed that differs in ONE variable and DOES fire,
+  // because a case that only ever asserts silence cannot tell a blindfold from a
+  // check that has stopped running.
+
+  test('RI-15 checks the RANGE of a pointer only when the path names ONE file', () => {
+    // BLINDFOLD FOUR, AND IT IS THE RANGE LEG RATHER THAN THE VACANT ONE. The
+    // check's own miss (10) records that the VACANT-LINE rule fires only when
+    // EVERY file a suffix path could name is vacant there. THE RANGE LEG HAS THE
+    // IDENTICAL SHAPE AND NO LINE SAID SO: `reachable` keeps every candidate
+    // long enough to hold the line, so a pointer past the end of the file it
+    // MEANS is answered by any same-named file that happens to be longer.
+    //
+    // IT IS THE ONE LEG THAT NEEDS NO NAME, which is why ADR-377 used it to seed
+    // this check twice, and it is off for every ambiguous path in the tree.
+    // THE ONLY VARIABLE BETWEEN THE TWO HALVES IS HOW MANY FILES THE PATH NAMES.
+    const root = cleanTree();
+    write(root, 'apps/api/src/probe-ports.ts', '//\n'.repeat(40));
+    const reason = (path: string, line: number): string =>
+      `// The port list is at (\`${path}:${line}\`).\n`;
+
+    write(root, REASON, reason('apps/api/src/probe-ports.ts', 400));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `apps/api/src/probe-ports.ts:400` and apps/api/src/probe-ports.ts has 41 lines',
+    );
+
+    // THE SAME POINTER, with a second file of that name that happens to be long
+    // enough. Nothing about the citation changed and nothing is now asserted.
+    write(root, 'apps/worker/src/probe-ports.ts', '//\n'.repeat(500));
+    write(root, REASON, reason('probe-ports.ts', 400));
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // AND THE POINTER IS STILL BEING READ, which is what separates a blindfold
+    // from a token the reader never parsed: past the end of BOTH files it fires.
+    write(root, REASON, reason('probe-ports.ts', 900));
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+  });
+
+  test('RI-15 checks the VACANCY of a cited line only when the path names ONE file', () => {
+    // MISS (10), ASSERTED FOR THE FIRST TIME. The `covers` line has named this
+    // since ADR-212 and named `provisioning/payload.ts:217` citing `ports.ts:98`
+    // as its live instance, and no case has ever held it. It is the same rule as
+    // the range leg above, and the two together are why every citation in this
+    // tree whose path names more than one file has an in-file detection rate of
+    // exactly ZERO: no wrong line number in it is reported by anything.
+    const root = cleanTree();
+    const blank = `//\n//\n\n${'//\n'.repeat(40)}`;
+    write(root, 'apps/api/src/probe-blank.ts', blank);
+    const reason = (path: string): string => `// The refusal is at (\`${path}:3\`).\n`;
+
+    write(root, REASON, reason('apps/api/src/probe-blank.ts'));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `apps/api/src/probe-blank.ts:3` and that line is BLANK OR A BARE CLOSING BRACKET',
+    );
+
+    write(root, 'apps/worker/src/probe-blank.ts', '//\n'.repeat(40));
+    write(root, REASON, reason('probe-blank.ts'));
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // STILL READ, on the one leg ambiguity does not disarm.
+    write(root, REASON, '// The refusal is at (`probe-blank.ts:900`).\n');
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+  });
+
+  test('RI-16 carries NO vacancy leg, so one pointer is a finding for RI-15 and silent for RI-16', () => {
+    // THE SAME DEFECT, THE SAME READER, THE SAME TREE, AND OPPOSITE VERDICTS.
+    // RI-16's header records that it does not yet apply RI-15's vacancy and
+    // anchor legs and gives a cost for adding them. THAT COST IS THE FIGURE THIS
+    // CASE EXISTS BESIDE: it was measured once, on a smaller corpus, and it is
+    // now more than twice what the sentence says, which is exactly what happens
+    // to a number no runner derives.
+    //
+    // WHY IT MATTERS MORE HERE THAN IN SOURCE IS RI-16's OWN ARGUMENT. A wrong
+    // citation in a document is read by the founder at an E2 review and by every
+    // later session that treats the entry as settled, and neither opens the file.
+    const root = cleanTree();
+    write(root, 'apps/api/src/probe-blank.ts', `//\n//\n\n${'//\n'.repeat(40)}`);
+    write(root, REASON, '// The refusal is at (`apps/api/src/probe-blank.ts:3`).\n');
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'that line is BLANK OR A BARE CLOSING BRACKET',
+    );
+
+    write(root, LIVE_DOC, liveDoc('The refusal is at (`apps/api/src/probe-blank.ts:3`).'));
+    expect(findings('RI-16', root)).toEqual([]);
+  });
+
+  test('RI-16 says nothing about WHICH line a bare pointer names, anywhere inside the file', () => {
+    // THE COVERAGE OF THIS CHECK OVER A CITATION THAT BINDS NO NAME IS THAT THE
+    // FILE EXISTS AND IS LONG ENOUGH. Nothing else is asserted, and a bare
+    // pointer is the overwhelming majority shape in this corpus: markdown writes
+    // a citation alone in a table cell as readily as inside a link.
+    //
+    // SO THE POINTER IS MOVED ACROSS THE WHOLE FILE AND THE CHECK NEVER SPEAKS,
+    // which is the statement a reader of the `covers` line should not have to
+    // infer from the absence of a leg.
+    const root = cleanTree();
+    write(root, 'apps/api/src/probe-target.ts', fileWithNameAt(60, 30, 'refuseWithdrawal'));
+    for (const line of [1, 7, 29, 31, 60]) {
+      write(
+        root,
+        LIVE_DOC,
+        liveDoc(`The refusal is at (\`apps/api/src/probe-target.ts:${line}\`).`),
+      );
+      expect(findings('RI-16', root)).toEqual([]);
+    }
+    // THE CONTROL, and it is the only line number in that file this check can
+    // refuse: one past the end of it.
+    write(root, LIVE_DOC, liveDoc('The refusal is at (`apps/api/src/probe-target.ts:62`).'));
+    expect(findings('RI-16', root).join('\n')).toContain('The pointer is past the end of the file');
+  });
+
+  test('RI-15 skips its own package by PACKAGE and not by specimen, so eleven files go unread', () => {
+    // BLINDFOLD TWO, AND THE EXCLUSION IS CORRECT WHILE ITS SHAPE IS WIDER THAN
+    // ITS REASON. The reason is that two files' pointers are the grammar's
+    // WORKED EXAMPLES and this suite's SEEDS: a file that must contain false
+    // citations cannot be checked for false ones. The rule is `startsWith` over
+    // the whole package, and on the real tree that is thirteen source files, of
+    // which ELEVEN carry no specimen at all and six live citations between them.
+    //
+    // NARROWING IT WAS MEASURED AND REFUSED BY ADR-377 AND AGAIN BY ADR-380, on
+    // ADR-371's ground: it newly guards six citations and all six pass. THE
+    // POINT OF THIS CASE IS NOT THAT THE RULE IS WRONG. It is that the blindness
+    // is real, reaches files nobody exempted on purpose, and is now asserted
+    // instead of being rediscovered by the next row that seeds a check inside
+    // its own package and cannot make it fire.
+    const root = cleanTree();
+    write(root, 'apps/api/src/probe-short.ts', '//\n');
+    const claim = '// The list is at (`apps/api/src/probe-short.ts:900`).\n';
+
+    write(root, REASON, claim);
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+
+    // THE IDENTICAL CLAIM, in a file of this package that holds no specimen.
+    write(root, REASON, '// nothing to see.\n');
+    write(root, 'packages/tooling/checks/probe-check.mjs', claim);
+    expect(findings('RI-15', root)).toEqual([]);
+  });
+
+  test('RI-15 binds no name across three linking words, so one wording is checked and another is not', () => {
+    // BLINDFOLD ONE, WHICH ADR-357 NAMED AND NOTHING HAS EVER ASSERTED.
+    // `IDENTIFIER_GLUE` admits at most ONE linking word from `at|in|is|see`, and
+    // "at module scope (" is three. That phrase is how this corpus states
+    // precisely this kind of fact, and ADR-357 found THREE citations in one file
+    // written that way with none of them guarded.
+    //
+    // THE CLAIM IS THE SAME CLAIM IN BOTH HALVES AND SO IS THE POINTER. Only the
+    // words between the name and the pointer move.
+    const root = cleanTree();
+    write(root, 'apps/api/src/routes/admin-writes.ts', fileWithNameAt(300, 269, 'principal'));
+
+    write(root, REASON, '// `principal` (`routes/admin-writes.ts:250`) is the gate.\n');
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/admin-writes.ts:250` for `principal`',
+    );
+
+    write(
+      root,
+      REASON,
+      '// `principal` at module scope (`routes/admin-writes.ts:250`) is the gate.\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // THE POINTER IS STILL READ AND ONLY THE NAME IS LOST, which is the precise
+    // shape of the hole: resolution and range survive, the claim does not.
+    write(
+      root,
+      REASON,
+      '// `principal` at module scope (`routes/admin-writes.ts:900`) is the gate.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+  });
+
+  test('RI-15 reads a negation out of the PREVIOUS line, so the same sentence binds in one place and not another', () => {
+    // BLINDFOLD THREE, WITH THE CAUSE CORRECTED. ADR-377 section 6 measured that
+    // an identical sentence binds a name at one insertion point and not three
+    // lines down, and attributed it to the scanner's running pairing state. IT
+    // IS NOT THAT. `citedIdentifier` reads 70 FLATTENED CHARACTERS before the
+    // name to decide whether the claim is NEGATED, and `flattenReasons` replaces
+    // a newline with a SPACE rather than a sentence end, so a preceding comment
+    // line that does not close with `.` or `;` leaks its own words into the next
+    // sentence's negation test.
+    //
+    // THE NEGATED-CLAIM SKIP IS RIGHT AND ITS REACH IS WRONG, and the difference
+    // is one line of unrelated prose above the citation. The two halves below
+    // differ by a single full stop.
+    const root = cleanTree();
+    write(root, 'apps/api/src/routes/admin-writes.ts', fileWithNameAt(300, 269, 'principal'));
+
+    write(
+      root,
+      REASON,
+      '// The route serves no row.\n// `principal` (`routes/admin-writes.ts:250`) is the gate.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/admin-writes.ts:250` for `principal`',
+    );
+
+    write(
+      root,
+      REASON,
+      '// The route serves no row\n// `principal` (`routes/admin-writes.ts:250`) is the gate.\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // THE POINTER IS STILL READ AND ONLY THE NAME IS LOST.
+    write(
+      root,
+      REASON,
+      '// The route serves no row\n// `principal` (`routes/admin-writes.ts:900`) is the gate.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+  });
+
+  test('RI-15 loses a path the text STATES when the path itself wraps a line', () => {
+    // A CITATION THAT NAMES ITS FILE OUTRIGHT AND IS RESOLVED BY SUFFIX ANYWAY.
+    // `flattenReasons` joins a wrapped comment with a SPACE, which is what lets
+    // a citation opening the next line be read at all; the same space severs a
+    // PATH that wrapped, and the reader keeps only the basename. The citation
+    // then inherits blindfold four, because a basename is what names many files.
+    //
+    // TWO SITES IN THE REAL TREE ARE WRITTEN THIS WAY AND ONE OF THEM RESOLVES
+    // TO THE WRONG FILE. The two halves below differ by one line break.
+    const root = cleanTree();
+    write(root, 'apps/api/src/probe-wrap.ts', '//\n'.repeat(40));
+    write(root, 'apps/worker/src/probe-wrap.ts', '//\n'.repeat(500));
+
+    write(root, REASON, '// The list is at `apps/api/src/probe-wrap.ts:400`.\n');
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+
+    write(root, REASON, '// The list is at `apps/api/src/\n// probe-wrap.ts:400`.\n');
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // AND THE SEVERED POINTER IS STILL READ, against the wrong file: past the
+    // end of BOTH candidates it fires, which is the only thing left guarding it.
+    write(root, REASON, '// The list is at `apps/api/src/\n// probe-wrap.ts:900`.\n');
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+  });
+
+  // ---------------------------------------------------------------------------
   // RI-13, and the seeds run in BOTH directions on the same entry
   // ---------------------------------------------------------------------------
   // The block is what an unsigned entry owes its reader, so the cases that matter

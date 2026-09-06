@@ -2283,6 +2283,23 @@ const ri13 = {
 // findings where 2 stand today, 40-odd of them the vacant-line rule inside
 // documents whose frontmatter reads `status: approved`, where a change is an
 // ADR rather than a commit. Extending it is a slice, not a line.
+//
+// THAT MEASUREMENT HAS BEEN RE-DERIVED AND IT NO LONGER HOLDS (ADR-380). The
+// 46-finding figure is RETIRED and named rather than reproduced: on this tree
+// the vacant-line rule raises 101 findings over RI-16's scope, 87 of them in
+// documents whose frontmatter reads `approved`, and the anchor raises 15 more.
+// The sentence above is kept beside its correction under RI-14. THE RULING IS
+// UNCHANGED and the reason is stronger than it was: extending it is a slice
+// twice the size the number said, and 87 of the 101 are repairs that need an
+// ADR rather than a commit.
+//
+// WHAT THAT COSTS RI-16 IS NOW A MEASURED NUMBER RATHER THAN AN ABSENT LEG.
+// Of the 1,259 single-line citations in its scope whose path resolves, 1,189 --
+// 94.4% -- are checked by NOTHING about WHICH line they name: no name binds, so
+// no window runs, and neither the vacancy leg nor the anchor is asked. What is
+// asserted about those 1,189 is that the file exists and is long enough. The
+// same pointer onto a blank line is a FINDING here and SILENT there, which the
+// suite now holds as a case rather than leaving to be rediscovered.
 
 /** The extensions a reason is written in. */
 const CITED_REASON_EXTENSIONS = /\.(?:ts|tsx|mts|mjs|js)$/;
@@ -3254,6 +3271,29 @@ const ri15 = {
     'suffix path is answered by all of them, so ' +
     '`provisioning/payload.ts:217` citing `ports.ts:98` -- blank in the one it ' +
     'means and not in the other ten -- is NOT raised. ' +
+    '(11) THE RANGE LEG HAS MISS (10)s SHAPE AND NO LINE SAID SO UNTIL ' +
+    'ADR-380: `reachable` keeps every candidate long enough to hold the line, ' +
+    'so a pointer PAST THE END of the file it MEANS is answered by any ' +
+    'same-named file that happens to be longer. It is the one leg that needs ' +
+    'NO NAME, which is why ADR-377 seeded this check with it twice, and it is ' +
+    'off for every ambiguous path: 13 citations here name more than one file, ' +
+    'and every citation in this input whose line number is guarded by NOTHING ' +
+    'AT ALL is one of them. ' +
+    'WHAT THIS CHECK COVERS, MEASURED RATHER THAN DESCRIBED (ADR-380). Over ' +
+    'the 359 single-line citations here whose path resolves, the share of ' +
+    'WRONG in-file line numbers this check would report is 44.2 percent on ' +
+    'average: 24 are fully guarded, 8 are guarded by nothing, and the rest are ' +
+    'caught only where the wrong line happens to be blank. THE SCOPE CARDINALS ' +
+    'ABOVE ARE RETIRED AND NAMED RATHER THAN REPRODUCED, under RI-14: the ' +
+    '588-file and 207-citation figures were true when the input set was ' +
+    'derived, and this tree gives 753 files and 390 citations of which 129 ' +
+    'carry a bindable name. FOUR HOLES ARE ASSERTED IN THE SUITE rather than ' +
+    'only described here, because a hole carried by a paragraph goes stale the ' +
+    'way those cardinals did: the glue (ADR-357), this package (ADR-377), miss ' +
+    '(11), and the negation lookback -- which is ADR-377 section 6s property ' +
+    'with its cause CORRECTED, from the scanners running pairing state to ' +
+    '`NEGATED_CLAIM` reading 70 flattened characters back ACROSS THE NEWLINE ' +
+    'JOINER into the previous lines prose. ' +
     `${CITATIONS_OWNED_ELSEWHERE.length} CITATION(S) ARE NAMED AND NOT ENFORCED, in ` +
     'CITATIONS_OWNED_ELSEWHERE, each exact on file, pointer and name so that it ' +
     'covers one citation and expires by itself. The `wiring.test.ts` entry this ' +
@@ -3692,7 +3732,16 @@ const ri16 = {
     'RI-15 lists about the window, the possessive, the negated claim and the ' +
     'range, since this reads the same grammar. (5) It never reads git history, ' +
     'so it cannot say whether a citation drifted or was false the day it was ' +
-    `written. ${DOC_CITATIONS_OWNED_ELSEWHERE.length} citation(s) are ` +
+    'written. (6) NEITHER RI-15s VACANCY LEG NOR ITS ANCHOR RUNS HERE, and ' +
+    'ADR-380 measured the coverage that leaves: of the 1,259 single-line ' +
+    'citations in scope whose path resolves, 1,189 -- 94.4 percent -- are ' +
+    'checked by NOTHING about WHICH line they name, so any wrong in-file ' +
+    'line number passes and what is asserted is that the file exists and is ' +
+    'long enough. Adding the vacancy leg raises 101 findings on this tree, ' +
+    '87 of them in `approved` documents, and the anchor 15 more; the ' +
+    'smaller figure this check carried for that is RETIRED and named rather ' +
+    'than reproduced, under RI-14. ' +
+    `${DOC_CITATIONS_OWNED_ELSEWHERE.length} citation(s) are ` +
     'REGISTERED in DOC_CITATIONS_OWNED_ELSEWHERE, each one a repair this gate ' +
     'is waiting for and none of them repairable here: four sit in documents ' +
     'whose frontmatter reads `status: approved` in a frozen corpus, where a ' +
