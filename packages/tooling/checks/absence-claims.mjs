@@ -110,6 +110,33 @@
 // the corpus would reach every dated record in it, which is exactly the set the
 // rule above refuses. What changed is that leg 1 was always able to read the
 // site the register names, and nobody had decided whether it may.
+//
+// -----------------------------------------------------------------------------
+// THE NEAR MISS: A REGISTRATION THAT BOUND THE SITE SOMEBODY NAMED
+// -----------------------------------------------------------------------------
+// ADR-384 registered the runbook clause, measured that a needle on the entry
+// point would reach ONE unregistered line, and left the needle and that line for
+// whoever held `apps/worker/**` next. ADR-387 held it. THE MEASUREMENT
+// REPRODUCED AND THE CONCLUSION DID NOT: "a needle would reach it and nothing
+// else" is a statement about what a NEEDLE reaches, and the tree carried a
+// SECOND site. `apps/worker/src/index.ts` says the same absence about the same
+// job in the words `Nothing calls`, and no marker in the vocabulary below
+// reached that verb.
+//
+// **THAT IS OCCURRENCE 3's SHAPE ARRIVING INSIDE THE REGISTER WRITTEN TO END
+// IT.** Occurrence 3 is the sentence ADR-326 left behind one package away
+// because nothing bound it. Here the two sentences are one file apart, in one
+// deployable, about one function, and the register was one commit from binding
+// the visible one and shipping past the other. Both are registered, and the
+// vocabulary gained the verb in the same commit, which is what item 1 of
+// ADR-384's own owed list asked for and one entry more than it knew to ask.
+//
+// THE GENERAL FORM IS WORTH MORE THAN THE FIX, and it is the reason both
+// registers are written rather than computed. A needle measured against the
+// tree tells you what a needle reaches. It cannot tell you what the tree says,
+// because a claim phrased outside the vocabulary is invisible to the very
+// measurement that would price it, and the vocabulary is the thing the
+// measurement is silent about.
 // =============================================================================
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -1029,17 +1056,22 @@ export const ABSENCE_ARTIFACTS = [
       '`apps/worker/src/batch/replay.ts:608` and the barrel that re-exports the name. The ' +
       'replay self-audit is BUILT and UNSCHEDULED, and ADR-346 ended the PORTS half of what ' +
       'keeps it that way while leaving the CALLER half exactly where it stood',
-    needles: [],
+    needles: [/runReplayAudit/],
     sweptBy:
-      'nothing, and here the reason is a measurement rather than an inherited precedent. A ' +
-      'needle on `runReplayAudit` reaches exactly ONE unregistered line in the swept scope: ' +
-      '`apps/worker/src/schedule.ts:407`, whose `NO CALLER` is the absence word and whose ' +
-      'needle sits one line below it at `:408`, both inside the job registry row for this ' +
-      'same job, which states this same absence in the same words. That is a ' +
-      'claim site OWED rather than a needle to tighten, and ADR-384 could not take it because ' +
-      '`apps/worker/**` was a concurrent row`s fence on that wave. A needle registered ahead ' +
-      'of the site it reaches is this register reporting a finding at a file nobody holding ' +
-      'the needle may repair',
+      'the entry point`s own name, and ADR-387 registered the site before registering the ' +
+      'needle rather than after. ADR-384 measured that this needle reaches exactly ONE ' +
+      'unregistered line and declined to add it, because `apps/worker/**` was a concurrent ' +
+      'row`s fence that wave and a needle registered ahead of the site it reaches is this ' +
+      'register reporting a finding at a file nobody holding the needle may repair. ' +
+      'RE-DERIVED ON THE COMMIT THAT ADDED IT, over 398 swept files: the needle reaches 18 ' +
+      'lines, and under the vocabulary as ADR-384 left it exactly ONE of those windows ' +
+      'carries an absence word, `apps/worker/src/schedule.ts:407`. That figure reproduces. ' +
+      '**WHAT ADR-384 COULD NOT SEE IS THAT THE SITE IT NAMED WAS NOT THE ONLY ONE**: ' +
+      '`apps/worker/src/index.ts:449` states the same absence about the same job in the ' +
+      'words `Nothing calls`, which no marker in the vocabulary reached, so the sweep would ' +
+      'have gone green over a second site one file from the first. That is occurrence 3`s ' +
+      'shape arriving inside the register written to end it, and it is why ADR-387 widened ' +
+      'the vocabulary in the same commit. Both sentences are registered below',
     probe: (root) => {
       const files = shippedSources(root);
       if (files.length === 0) {
@@ -1156,6 +1188,26 @@ const ABSENCE_MARKERS = [
   // no registered needle within the window, and therefore silent. Nothing about
   // it was rewritten to accommodate this marker.
   /\bcannot be imported\b/i,
+  // ADR-387. The SECOND entry added since this vocabulary was written, and it
+  // was found the way ADR-330's was: by a sweep going green over a site that
+  // asserts an absence in words nobody had written down.
+  //
+  // `nothing[^.]{0,60}\bimports?\b` sits four entries above and is this one's
+  // twin. It was taken from occurrence 2's phrasing and reaches a sentence
+  // about an IMPORT; the estate's other way of saying a thing is unreached is
+  // to say nothing CALLS it, and `apps/worker/src/index.ts:449` says exactly
+  // that about the same job `apps/worker/src/schedule.ts:408` says it about.
+  // One was reachable and the other was not, and the difference was a verb.
+  //
+  // MEASURED OVER THE 398 SWEPT FILES ON THE COMMIT THAT ADDED IT. This marker
+  // reaches 25 lines. TWENTY-THREE of them carry no registered needle within
+  // the window and are therefore silent, which is leg 6's own limit doing the
+  // work rather than a narrowing bought to keep a run green: they are true
+  // sentences about ports, screens and adapters no artifact here claims. The
+  // two it adds are `index.ts:449` and `schedule.ts:408`, both registered
+  // below. So the widening costs ZERO registrations beyond the ones it exists
+  // to force, and that is derived rather than hoped for.
+  /nothing[^.]{0,60}\bcalls?\b/i,
 ];
 
 // -----------------------------------------------------------------------------
@@ -1485,6 +1537,52 @@ export const ABSENCE_CLAIMS = [
       'says so in its own words, so the day a `src/` caller lands, the sentence telling an ' +
       'operator the switch has no subject is the line this check goes red at',
   },
+
+  // --- the two `apps/worker` sites that say what the runbook says, ADR-387 ---
+  // **ADR-384 SECTION 13 ITEM 1 NAMED ONE SITE OWED AND THERE WERE TWO.** That
+  // row registered the runbook clause, measured that a needle on the entry
+  // point would reach `schedule.ts:407` "and nothing else", and left both the
+  // needle and the site for whoever held `apps/worker/**` next. The needle
+  // measurement reproduces exactly. The "and nothing else" is about what the
+  // NEEDLE reaches and was never about what EXISTS, and the difference is a
+  // second site: `index.ts:449` writes the same absence about the same job in
+  // words the vocabulary did not carry.
+  //
+  // **SO THIS IS OCCURRENCE 3's SHAPE, IN THE REGISTER WRITTEN TO END IT.** The
+  // header's own account of that occurrence is that ADR-326 repaired a barrel
+  // and left an identical sentence one package away, because nothing bound the
+  // second site. Here the two sentences are one file apart, in one deployable,
+  // about one function, and the sweep could see one of them. Registering the
+  // needle without the marker would have bound the visible half and left the
+  // other exactly where occurrence 3 sat.
+  //
+  // BOTH ARE `live` AGAINST ONE ARTIFACT AND THAT IS THE POINT RATHER THAN A
+  // DUPLICATION. The day a `src/` caller lands, all THREE sentences are false
+  // in the same commit, and leg 2 reports three lines in three files rather
+  // than one. A row that repaired the runbook alone would leave two.
+  {
+    site: 'apps/worker/src/schedule.ts',
+    claim: 'nothing under any `src/` calls `runReplayAudit`',
+    disposition: 'live',
+    artifact: 'replay-audit-src-caller',
+    why:
+      'the job registry row states the runbook`s caller clause in the runbook`s own words, ' +
+      'which is why the anchor here is the same substring the runbook entry uses. The row ' +
+      'gives it as the FIRST of the four things keeping this job unscheduled, so a caller ' +
+      'landing does not merely falsify a sentence, it removes a stated blocker from a ' +
+      'disposition somebody has to re-read',
+  },
+  {
+    site: 'apps/worker/src/index.ts',
+    claim: 'STILL NOT SCHEDULED. Nothing calls `runReplayAudit`',
+    disposition: 'live',
+    artifact: 'replay-audit-src-caller',
+    why:
+      'THE SITE NO SWEEP COULD REACH, and it is the barrel: the same file that carried ' +
+      'occurrence 2 and three of the retired claims above. Its phrasing is the reason the ' +
+      'vocabulary gained `nothing ... calls` in the same commit, and the entry is bound by ' +
+      'leg 1 rather than by that widening, so it holds even if a later row narrows the marker',
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -1745,9 +1843,19 @@ export const ri35 = {
     'absence phrasing reaches more than twenty sites today of which most are TRUE and a ' +
     'gate satisfied by deleting honest prose is a gate somebody deletes. THE VOCABULARY IS ' +
     'WRITTEN: a sentence asserting absence in words not in it is invisible, and every entry ' +
-    'in it was taken from a sentence that actually went false. IT IS LINE SCOPED: a claim ' +
-    'whose needle and whose absence word land on different lines is missed, which is why ' +
-    'two artifacts here register no needle at all and say so. IT READS TEXT AND NEVER ' +
+    'in it was taken from a sentence that actually went false OR from one standing in the ' +
+    'tree today, which is this file`s own rule and is what ADR-387`s `nothing ... calls` ' +
+    'entry was taken under: that phrasing is TRUE at both the sites it reached and the ' +
+    'defect was that neither could be seen. IT IS WINDOW SCOPED AND NOT LINE SCOPED, which ' +
+    'ADR-387 corrects in this sentence rather than in the mechanism: `SWEEP_WINDOW` is TWO ' +
+    'and its docblock is the measurement, because occurrence 3 wraps with the artifact on ' +
+    'one line and the absence word on the next, and ADR-387`s own registration is that shape ' +
+    'again. THE RETIRED CLAUSE SAID THE OPPOSITE AND CARRIED A COUNT OF NEEDLE-LESS ' +
+    'ARTIFACTS WITH IT; it is named rather than re-quoted per ADR-367, and the count is ' +
+    'DELETED rather than corrected per ADR-034, because the register below is the source and ' +
+    'a figure retyped beside it is the drift that entry exists to end. WHAT IS STILL MISSED ' +
+    'is a claim whose needle and whose absence word sit MORE THAN TWO LINES APART, and ' +
+    '`SWEEP_WINDOW` states what three was measured to reach. IT READS TEXT AND NEVER ' +
     'MEANING: a line carrying a needle and a marker while asserting no absence is a false ' +
     'positive that has to be registered or have its needle tightened, and BOTH of the two ' +
     'the widened scope surfaced are QUOTED ERROR STRINGS -- pg-boss`s own thrown text and ' +

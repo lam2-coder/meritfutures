@@ -1097,12 +1097,28 @@ describe('ADR-384: the replay self-audit`s caller half, bound at a runbook row',
   // IT WAS LEARNED AT. Three headers under `apps/worker/src/` name this function
   // in order to say nothing runs it. A probe over raw text reads one of those
   // sentences as the wiring and retires a claim that is still true.
+  //
+  // **ADR-387 AMENDED THIS CASE AND THE REASON IS THE FINDING RATHER THAN THE
+  // REPAIR.** It asserted the whole check EMPTY, which was a true reading of the
+  // probe and an accidental reading of the sweep: this fixture's own body is the
+  // shape of `apps/worker/src/index.ts:449`, the SECOND unregistered site, and
+  // the case went green over it because the vocabulary carried no marker that
+  // reached `Nothing calls`. With the needle and that marker registered, leg 6
+  // reports the seeded line, correctly. So the assertion is now made AT THE
+  // PROBE, which is what the case was always about and is stronger than an
+  // emptiness that two mechanisms had to agree on, and what the sweep says is
+  // stated rather than folded into a zero.
   test('GREEN: a comment naming the call shape is not a caller', () => {
     const root = runbookTree({
       rel: 'apps/worker/src/index.ts',
       body: '// STILL NOT SCHEDULED. Nothing calls `runReplayAudit(ports, config)`: no cron.\n',
     });
-    expect(checkAbsenceClaims(root, register)).toEqual([]);
+    expect(artifact('replay-audit-src-caller').probe(root)).toBe('absent');
+
+    const findings = checkAbsenceClaims(root, register);
+    expect(findings.filter((f) => f.startsWith('docs/ops/runbooks/'))).toEqual([]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('apps/worker/src/index.ts:1');
   });
 
   test('GREEN: the declaration is not a call, so the entry point does not wire itself', () => {
@@ -1237,5 +1253,149 @@ describe('ADR-384: the one `docs/` site the register admits', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]?.line).toContain('**Replay self-audit**');
     expect(lines[0]?.line).toContain('`RI-35` registers the caller clause below');
+  });
+});
+
+// =============================================================================
+// ADR-387. THE SECOND SITE, AND THE VERB THAT HID IT
+// =============================================================================
+// ADR-384 registered the runbook clause, measured that a needle on the entry
+// point reaches ONE unregistered line, and left the needle and that site for
+// whoever held `apps/worker/**` next. The measurement reproduces. What it does
+// not say, because it is a statement about a NEEDLE and not about the tree, is
+// that a SECOND site states the same absence about the same job one file away,
+// in the words `Nothing calls`, which no marker in the vocabulary reached.
+//
+// THAT IS OCCURRENCE 3's SHAPE INSIDE THE REGISTER WRITTEN TO END IT: a repair
+// that binds the site somebody named and leaves an identical sentence one file
+// over, because nothing binds the second. These cases hold both bindings open
+// and hold the marker that reaches the second one accountable to a
+// counterfactual, so a later narrowing of the vocabulary fails here rather than
+// going quietly green.
+// =============================================================================
+
+describe('ADR-387: the runbook`s absence, stated twice more in the deployable', () => {
+  const CALLER_CLAIMS = ABSENCE_CLAIMS.filter((c) => c.artifact === 'replay-audit-src-caller');
+  const RUNBOOK_ANCHOR = 'nothing under any `src/` calls `runReplayAudit`';
+
+  /** The three registered sentences in a tree of their own, plus whatever `src/` a case wants. */
+  function threeSites(src?: { rel: string; body: string }): string {
+    const root = bareTree();
+    for (const claim of CALLER_CLAIMS) write(root, claim.site, `${claim.claim}\n`);
+    if (src) write(root, src.rel, src.body);
+    return root;
+  }
+
+  const register = { artifacts: only(['replay-audit-src-caller']), claims: CALLER_CLAIMS };
+
+  test('three sites are registered live, one runbook and two in the deployable', () => {
+    expect(CALLER_CLAIMS.map((c) => c.site).sort()).toEqual([
+      'apps/worker/src/index.ts',
+      'apps/worker/src/schedule.ts',
+      'docs/ops/runbooks/CRON_INVENTORY.md',
+    ]);
+    for (const claim of CALLER_CLAIMS) expect(claim.disposition).toBe('live');
+  });
+
+  // THE ANCHOR IS THE RUNBOOK'S OWN, CHARACTER FOR CHARACTER. ADR-384 section 13
+  // said the registry row "states the same absence in the same words", and this
+  // is that sentence asserted rather than believed: one substring binds a
+  // markdown table cell and a TypeScript string literal, in two files.
+  test('the schedule row carries the runbook`s clause verbatim', () => {
+    const sites = CALLER_CLAIMS.filter((c) => c.claim === RUNBOOK_ANCHOR).map((c) => c.site);
+    expect(sites.sort()).toEqual([
+      'apps/worker/src/schedule.ts',
+      'docs/ops/runbooks/CRON_INVENTORY.md',
+    ]);
+  });
+
+  // LEG 1's DEMAND, READ AT THE SHIPPED SITES. Zero means the sentence moved
+  // without the register; two means the disposition is about a line nobody
+  // chose. The check would report both, and this reports WHICH file.
+  test('each anchor occurs exactly once in the file it names', () => {
+    for (const claim of CALLER_CLAIMS) {
+      const hits = readFileSync(join(REPO_ROOT, claim.site), 'utf8')
+        .split('\n')
+        .filter((line) => line.includes(claim.claim));
+      expect({ site: claim.site, hits: hits.length }).toEqual({ site: claim.site, hits: 1 });
+    }
+  });
+
+  // THE CASE THE REGISTRATION EXISTS FOR, AND IT FAILS ON GOOD NEWS AT THREE
+  // LINES AT ONCE. A row that had repaired the runbook alone would leave two
+  // sentences telling the next session this job has no caller.
+  test('RED: one `src/` caller falsifies all three sentences in one commit', () => {
+    const root = threeSites({
+      rel: 'apps/worker/src/job.ts',
+      body: 'const report = await runReplayAudit(ports, config);\n',
+    });
+    const findings = checkAbsenceClaims(root, register);
+    expect(findings).toHaveLength(3);
+    expect(findings.filter((f) => f.includes('EXISTS'))).toHaveLength(3);
+    for (const claim of CALLER_CLAIMS) {
+      expect(findings.some((f) => f.startsWith(claim.site))).toBe(true);
+    }
+  });
+
+  test('GREEN: the counterfactual is the same three sentences with no caller', () => {
+    expect(checkAbsenceClaims(threeSites(), register)).toEqual([]);
+  });
+
+  // THE NEEDLE, WHICH ADR-384 MEASURED AND COULD NOT ADD. Its whole purpose is
+  // that a FOURTH site cannot arrive unregistered, so the assertion is a
+  // discovery on a tree that has one.
+  test('LEG 6 REPORTS A FOURTH SITE, which is what the needle buys', () => {
+    const root = threeSites({
+      rel: 'apps/worker/src/sweeps/ports.ts',
+      body: '// no caller: nothing hands `runReplayAudit` a port here either.\n',
+    });
+    const findings = checkAbsenceClaims(root, register);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('apps/worker/src/sweeps/ports.ts:1');
+  });
+
+  // AND THE VERB IS THE WHOLE OF WHY THE SECOND SITE WAS INVISIBLE. `Nothing
+  // calls` is reached only because ADR-387 wrote it into the vocabulary; a
+  // sentence phrased outside the vocabulary is still silent, which is this
+  // check's own written limit and is asserted here rather than assumed. Both
+  // halves, because the RED alone would pass over a vocabulary that had grown
+  // to match everything.
+  test('the marker reaches `nothing calls`, and the vocabulary is still written', () => {
+    const reached = checkAbsenceClaims(
+      threeSites({
+        rel: 'apps/worker/src/sweeps/ports.ts',
+        body: '// Nothing calls `runReplayAudit` from this adapter.\n',
+      }),
+      register,
+    );
+    expect(reached).toHaveLength(1);
+    expect(reached[0]).toContain('apps/worker/src/sweeps/ports.ts:1');
+
+    const silent = checkAbsenceClaims(
+      threeSites({
+        rel: 'apps/worker/src/sweeps/ports.ts',
+        body: '// There is no cron in front of `runReplayAudit` on this tree.\n',
+      }),
+      register,
+    );
+    expect(silent).toEqual([]);
+  });
+
+  // THE BARREL'S BINDING DOES NOT REST ON THE WIDENING. Leg 1 reads the site the
+  // register names whatever the vocabulary says, so a later row that narrowed
+  // the marker would lose the SWEEP over that phrasing and keep the binding.
+  test('leg 1 binds the barrel site with no needle and no marker in play', () => {
+    const barrel = CALLER_CLAIMS.find((c) => c.site === 'apps/worker/src/index.ts');
+    expect(barrel).toBeDefined();
+    const root = bareTree();
+    write(root, 'apps/worker/src/index.ts', `${barrel?.claim ?? ''}\n`);
+    write(root, 'apps/worker/src/job.ts', 'await runReplayAudit(ports, config);\n');
+    const findings = checkAbsenceClaims(root, {
+      artifacts: [{ ...artifact('replay-audit-src-caller'), needles: [] }],
+      claims: barrel === undefined ? [] : [barrel],
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('apps/worker/src/index.ts');
+    expect(findings[0]).toContain('EXISTS');
   });
 });
