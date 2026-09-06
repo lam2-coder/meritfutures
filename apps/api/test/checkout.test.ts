@@ -69,8 +69,10 @@ import {
   DAILY_WINDOW_MS,
   DEFAULT_PAYMENT_METHOD,
   PAYMENT_METHODS,
+  PRODUCTION_CHECKOUT_ADAPTERS,
   RESET_PATH,
   ROLLING_7D_WINDOW_MS,
+  UNWIRED_CHECKOUT_BACKEND,
   centsToJson,
   lt08,
   lt08KeyOf,
@@ -2505,5 +2507,231 @@ describe('the doors this slice reports rather than opens', () => {
     const source = readFileSync(new URL('../src/routes/checkout.ts', import.meta.url), 'utf8');
     expect(source).toContain('LAST ROW APPENDED');
     expect(source).toContain("routes/wallet.ts`'s `balanceOf`");
+  });
+});
+
+// -----------------------------------------------------------------------------
+// ADR-362: THE MONEY-IN PAIR, AND THE TWO DEFAULTS ARE NOT THE SAME KIND OF
+// THING.
+//
+// `UNWIRED_CHECKOUT_BACKEND` (`checkout.ts:1191`) refuses in the ordinary way:
+// one member, rejecting with a named class the handler catches at `:2792`.
+// `PRODUCTION_CHECKOUT_ADAPTERS` (`checkout.ts:1203`) names no `UNWIRED_` value
+// at all, and ADR-357 section 3 counted it among the thirteen that "refuse".
+//
+// IT DOES NOT REFUSE. It refuses ONE of the four members' paths, is UNREACHABLE
+// on two, and SILENTLY DEGRADES on the fourth, and a funded wallet checkout
+// against it COMMITS A PURCHASE AND QUOTES A FIGURE. These cases hold each of
+// those four answers separately, because a single "does it refuse" case is the
+// question that produced the wrong classification in the first place.
+// -----------------------------------------------------------------------------
+
+describe('ADR-362: the two money-in defaults, measured member by member', () => {
+  it('THE FULL DEFAULT PAIR REFUSES, and the backend gets there FIRST', async () => {
+    // `runCheckout` (`checkout.ts:2778`) calls the installed backend as its
+    // OUTERMOST act, and the unwired default rejects rather than invoking the
+    // body it was handed. So NONE of
+    // the adapter members is read on the tree as it stands: the empty trace is
+    // the assertion, because a fixture method pushes to it on every call.
+    resetCheckoutWiring();
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(fixture.trace).toEqual([]);
+    expect(fixture.committed.purchases).toEqual([]);
+  });
+
+  it('the backend default REFUSES WITHOUT QUOTING A FIGURE', async () => {
+    resetCheckoutWiring();
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    // The problem document carries the five members `handlerProblem` writes and
+    // no sixth. A `detail` naming a number, a balance or a price would be this
+    // port telling an unauthenticated caller something it refused to compute.
+    const body = res.json() as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['code', 'instance', 'status', 'title', 'type']);
+    expect(res.body).not.toMatch(/\d+ ?(cents|USD)/i);
+  });
+
+  it('the backend default has EXACTLY ONE member and it rejects', async () => {
+    // Read off the interface body rather than counted with a line regex: the
+    // `CheckoutBackend` body (`checkout.ts:1121-1130`) declares `transact` and
+    // nothing else.
+    expect(Object.keys(UNWIRED_CHECKOUT_BACKEND)).toEqual(['transact']);
+    await expect(
+      UNWIRED_CHECKOUT_BACKEND.transact(SESSION, () => Promise.resolve('unreachable')),
+    ).rejects.toThrow(/transact/);
+  });
+
+  it('THE ADAPTER DEFAULT HAS FOUR MEMBERS, and only ONE of them can refuse', () => {
+    // `CheckoutAdapters` (`checkout.ts:1153-1170`). `cancelUrl` carries no doc
+    // comment of its own and `enrichment` sits behind a ten line one, which is
+    // why this is a key read and not a grep.
+    expect(Object.keys(PRODUCTION_CHECKOUT_ADAPTERS).sort()).toEqual([
+      'adapterFor',
+      'cancelUrl',
+      'enrichment',
+      'returnUrl',
+    ]);
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.adapterFor('psp_a')).toBeUndefined();
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.returnUrl).toBe('');
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.cancelUrl).toBe('');
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.enrichment).toBeNull();
+  });
+
+  it('MEMBER 1, `adapterFor`: the card arm REFUSES 503, and it is a GUARD rather than a throw', async () => {
+    // Inside `completePurchase` (`checkout.ts:2211`) the card arm reads the
+    // adapter, tests it against `undefined` and answers through the route's own
+    // refusal helper. NOTHING REJECTS and no `CheckoutBackendUnwired` is
+    // constructed, so the catch inside `runCheckout` (`checkout.ts:2778`) never
+    // runs. That is the difference from the other default in this pair, and it
+    // is why `unavailableWhenUnwired` has nothing to do with this 503.
+    useCheckoutAdapters(PRODUCTION_CHECKOUT_ADAPTERS);
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody({ payment_method: 'psp' }),
+    });
+
+    expect(res.statusCode).toBe(503);
+    const body = res.json() as { code: string; detail: string };
+    expect(body.code).toBe('service_unavailable');
+    expect(body.detail).toBe('No payment provider adapter is configured for this deployment.');
+    expect(fixture.committed.purchases).toEqual([]);
+  });
+
+  it('MEMBERS 2 AND 3, the empty URLs: READ AT ONE SITE EACH, and both sit behind the guard', () => {
+    // THIS IS THE MEMBER MOST LIKELY TO BE READ AS A HAZARD AND IT IS NOT ONE
+    // ON THIS TREE. Both are read inside `completePurchase`
+    // (`checkout.ts:2211`), at the `createSession` call, which sits AFTER the
+    // adapter guard in the same function. With the default
+    // `adapterFor` there is no adapter to hand them to, so `''` reaches no
+    // provider, produces no redirect and raises no `TypeError`.
+    //
+    // A FIRST DRAFT OF THIS CASE ASSERTED THE RESPONSE INSTEAD AND IS NOT WHAT
+    // SHIPPED. It read `payment_session` absent and no `location` header, and it
+    // stayed GREEN under the counterfactual that gives the default a REAL
+    // adapter while leaving the URLs empty, which is precisely the state it
+    // claimed to exclude. It was measuring a 503 rather than the URLs. What is
+    // asserted instead is the thing that actually makes them unreachable: there
+    // is ONE read site each, and both are behind the guard.
+    const source = readFileSync(new URL('../src/routes/checkout.ts', import.meta.url), 'utf8');
+    const returnReads = source.split('currentCheckoutAdapters().returnUrl').length - 1;
+    const cancelReads = source.split('currentCheckoutAdapters().cancelUrl').length - 1;
+    expect(returnReads).toBe(1);
+    expect(cancelReads).toBe(1);
+
+    // And the value they hold is the empty string, so a read site added ahead of
+    // the guard would send a buyer nowhere rather than to a provider.
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.returnUrl).toBe('');
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.cancelUrl).toBe('');
+  });
+
+  it('AND THE ORDERING IS WHAT MAKES THEM UNREACHABLE, so it is asserted rather than described', () => {
+    // If a successor moved the adapter guard below the `createSession` call, the
+    // empty strings WOULD reach a provider. That is a one line edit and nothing
+    // else in this file would notice, so the ordering is held here by index.
+    const source = readFileSync(new URL('../src/routes/checkout.ts', import.meta.url), 'utf8');
+    const guard = source.indexOf('No payment provider adapter is configured for this deployment.');
+    const returnUrlRead = source.indexOf('returnUrl: currentCheckoutAdapters().returnUrl');
+    const cancelUrlRead = source.indexOf('cancelUrl: currentCheckoutAdapters().cancelUrl');
+    expect(guard).toBeGreaterThan(-1);
+    expect(returnUrlRead).toBeGreaterThan(-1);
+    expect(cancelUrlRead).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(returnUrlRead);
+    expect(guard).toBeLessThan(cancelUrlRead);
+  });
+
+  it('MEMBER 4, `enrichment`: `null` SKIPS THE OBSERVATION AND THE PURCHASE COMMITS', async () => {
+    // `completePurchaseTail` (`checkout.ts:2458`) reads it and guards it against
+    // `null` before observing anything. This is not a refusal
+    // and not a failure: it is a deliberate degradation, and the purchase is
+    // written exactly as it would have been. The case above at "records NOTHING
+    // when the deployment wires no vendor" asserts the same behaviour through
+    // the FAKE adapter set; this one asserts it against the REAL default value.
+    useCheckoutAdapters(PRODUCTION_CHECKOUT_ADAPTERS);
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody({ payment_method: 'wallet' }),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(fixture.outcomes).toEqual([]);
+    expect(fixture.committed.signals).toEqual([]);
+    expect(fixture.committed.dispatches).toEqual([]);
+  });
+
+  it('THE FINDING: a funded WALLET checkout SUCCEEDS against the adapter default, RECORDS A PURCHASE AND QUOTES A FIGURE', async () => {
+    // THE MOST SERIOUS FINDING IN THIS MAP, AND IT IS STATED IN THOSE TERMS.
+    // The wallet arm of `completePurchase` (`checkout.ts:2211`) returns BEFORE
+    // the adapter guard further down the same function. It touches exactly one
+    // adapter member, `enrichment`, whose `null` is guarded and skipped. So
+    // `PRODUCTION_CHECKOUT_ADAPTERS` does not refuse this path in any sense: it
+    // takes the payment.
+    //
+    // WHAT KEEPS THE DEPLOYMENT SAFE TODAY IS THE OTHER PORT AND NOT THIS ONE.
+    // `start.ts` calls neither setter, so `UNWIRED_CHECKOUT_BACKEND` refuses
+    // inside `runCheckout` (`checkout.ts:2778`) first, which is case 1. A wiring
+    // slice that installs the backend and not the adapters produces exactly the
+    // request below.
+    useCheckoutAdapters(PRODUCTION_CHECKOUT_ADAPTERS);
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody({ payment_method: 'wallet' }),
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    // A PURCHASE IS RECORDED.
+    expect(fixture.committed.purchases).toHaveLength(1);
+    expect(fixture.committed.purchases[0]?.status).toBe('paid');
+    expect(fixture.committed.purchases[0]?.amountPaidCents).toBe(SIZE.priceCents);
+
+    // AND A FIGURE A BUYER READS AS A PRICE AND AS A BALANCE MOVEMENT IS
+    // QUOTED. Both are integer cents through `centsToJson`, so the defect is
+    // that they are quoted at all rather than how.
+    const body = res.json() as Record<string, unknown>;
+    expect(body['amount_cents']).toBe(centsToJson(SIZE.priceCents));
+    expect(body['wallet_debit_cents']).toBe(centsToJson(SIZE.priceCents));
+
+    // AND MONEY MOVED IN THE LEDGER.
+    expect(fixture.committed.ledgerTransactions).toHaveLength(1);
+  });
+
+  it('so the ADR-357 classification is wrong for THIS port and right for the other one', () => {
+    // ADR-357 section 3 lists both under "refuses". The backend default earns
+    // it: every member rejects with a named class. The adapter default does
+    // not: one of its four members refuses, and the path that takes money never
+    // consults that member. RECORDED HERE UNDER `RI-14`: the retired reading is
+    // kept beside its correction rather than deleted, and the repair to
+    // `LIVE_DEFAULT` and the `{blocked, refusing, live}` triple in
+    // `wiring.test.ts` is OWED to that file's owner rather than taken here.
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.adapterFor('psp_a')).toBeUndefined();
+    expect(PRODUCTION_CHECKOUT_ADAPTERS.enrichment).toBeNull();
+    // The member that would have to refuse for the "refuses" reading to hold is
+    // the one the wallet arm never reads.
+    expect(Object.keys(PRODUCTION_CHECKOUT_ADAPTERS)).toContain('adapterFor');
   });
 });

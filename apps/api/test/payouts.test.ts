@@ -98,6 +98,7 @@ import {
   PAYOUT_ENDPOINT,
   PAYOUT_NOT_ELIGIBLE,
   PAYOUT_REQUIRED_FACTORS,
+  PayoutBackendUnwired,
   centsFromJson,
   centsToJson,
   gateIdentityStatus,
@@ -1296,6 +1297,71 @@ describe('an unwired deployment answers 503 and never approves', () => {
     expect(posted.statusCode).toBe(503);
     expect(posted.json().code).toBe('service_unavailable');
     expect(fixture.requests).toHaveLength(0);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE COUNSEL BLOCKER IS ON THE WRITE PATH, WHICH IS WHAT MAKES IT A CONTROL
+// -----------------------------------------------------------------------------
+// `postgresPayoutBackend` serves SIX of this port's eight members and refuses
+// two: `holdFlag`, and `insertPayoutRequest`'s hold branch. Both wait on the
+// same thing, and it is not a door: `HoldFlag.tosClause` has no value space in
+// this repository and `DEP-M7-05` owes the clauses to counsel.
+//
+// A REFUSAL THAT IS NEVER REACHED IS NOT A CONTROL, AND THAT IS THE HALF WORTH
+// EXECUTING. `decidePayout` calls `tx.holdFlag()` UNCONDITIONALLY on every path
+// that reaches `tx.insertPayoutRequest()`, with no branch between them, so a
+// backend whose only refusal is `holdFlag` cannot write a `payout_requests` row
+// at all. If a later edit moved the hold read behind a condition, or below the
+// insert, this case would go green on a route that had just learned how to
+// approve a payout past an unanswerable question, and nothing else in this file
+// would notice.
+//
+// THE PAIR IS THE HONEST PATH ABOVE, which runs the SAME fixture with
+// `holdFlag` answering and commits the row. A port that refused everything
+// would pass this case and fail that one.
+// -----------------------------------------------------------------------------
+
+describe('ADR-287 slice 8: the unanswerable hold sits between the decision and the insert', () => {
+  /** The fixture backend with `holdFlag` alone refusing. Every other member answers. */
+  function holdFlagRefuses(): PayoutBackend {
+    return {
+      ...backend,
+      transact: <T>(session: AuthSession, fn: (tx: PayoutTx) => Promise<T>): Promise<T> =>
+        backend.transact(session, (tx) =>
+          fn({
+            ...tx,
+            holdFlag: () => Promise.reject(new PayoutBackendUnwired('holdFlag')),
+          }),
+        ),
+    };
+  }
+
+  it('answers 503 and writes NOTHING, on a request the honest path approves', async () => {
+    usePayoutBackend(holdFlagRefuses());
+    const res = await requestPayout();
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json().code).toBe('service_unavailable');
+    // The row the honest path commits out of this same fixture.
+    expect(fixture.requests).toHaveLength(0);
+  });
+
+  it('and the 503 quotes no figure a trader could read as an amount', async () => {
+    usePayoutBackend(holdFlagRefuses());
+    const res = await requestPayout({ payload: { amount_cents: centsToJson(SUPPLIED) } });
+
+    expect(res.statusCode).toBe(503);
+    const body = res.json() as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toStrictEqual(['code', 'instance', 'status', 'title', 'type']);
+    expect(JSON.stringify(body)).not.toContain(String(centsToJson(SUPPLIED)));
+  });
+
+  it('THE PAIR: the same fixture with the hold ANSWERING commits the row', async () => {
+    const res = await requestPayout();
+
+    expect(res.statusCode).toBe(200);
+    expect(fixture.requests).toHaveLength(1);
   });
 });
 

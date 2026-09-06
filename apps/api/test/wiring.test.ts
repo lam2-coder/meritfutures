@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { expect, test } from 'vitest';
 
@@ -1688,8 +1688,24 @@ const DEFAULTS: Readonly<Record<string, string>> = {
  * `unconfigured` and `POST /auth/otp` serves that as 503 (ADR-226), so there is
  * no configuration under which this port admits an unverified token, which is
  * why it is counted live here and still carries a reason above.
+ *
+ * THIS CONSTANT WAS `LIVE_DEFAULT` AND IT IS NO LONGER THE SOURCE (ADR-363).
+ * IT IS KEPT HERE UNDER `RI-14`, BECAUSE WHAT IT SAYS IS STILL TRUE AND ONLY
+ * ITS AUTHORITY HAS CHANGED. It was the ANSWER, hand-written, and nothing read
+ * the tree back to check it: `defaultOf` resolves a default EXACTLY ONE HOP and
+ * returns the initializer AS TEXT, so three of the thirteen were recorded as
+ * refusing on the strength of a NAME beginning `production` while their
+ * contents went unread. All three do refuse today, which is what made this
+ * dangerous rather than harmless: the day one of them held a real backend,
+ * `defaultOf` would still return the same string, `DEFAULTS` would still match,
+ * this line would still say one, and `refusing: 13` would become a lie with
+ * every gate green.
+ *
+ * `LIVE_DEFAULT` BELOW IS DERIVED BY `resolveDefault`, AND THE ASSERTION
+ * COMPARES THE TWO. So this line is now a PIN that must move when the tree
+ * moves, rather than the thing the tree is trusted against.
  */
-const LIVE_DEFAULT: ReadonlySet<string> = new Set(['useTurnstileVerifier']);
+const LIVE_DEFAULT_DECLARED: ReadonlySet<string> = new Set(['useTurnstileVerifier']);
 
 // -----------------------------------------------------------------------------
 // The assertions
@@ -1823,6 +1839,407 @@ function defaultOf(port: string): string {
   return /=\s*(.+);\s*$/.exec(decl ?? '')?.[1] ?? '<no module-scope binding>';
 }
 
+// -----------------------------------------------------------------------------
+// THE DERIVATION: WHAT A DEFAULT HOLDS PAST THE FIRST HOP (ADR-363)
+// -----------------------------------------------------------------------------
+// `defaultOf` above resolves a default EXACTLY ONE HOP. It reads the setter's
+// target, finds that target's module-scope binding, and returns the
+// initializer AS TEXT. So `useAffiliateDeps` records the STRING
+// `productionAffiliateDeps` and nothing ever opened it, and three of the
+// fourteen record a default whose name begins `production` while its contents
+// decide whether it refuses.
+//
+// TODAY ALL THREE DO REFUSE, AND THAT IS WHAT MADE THE HAND-WRITTEN ANSWER
+// DANGEROUS RATHER THAN HARMLESS. The day somebody gives
+// `productionAffiliateDeps` (`routes/affiliate.ts:672`) a real backend,
+// `defaultOf` still returns the same string, `DEFAULTS` still matches,
+// `LIVE_DEFAULT_DECLARED` still says one, and `refusing: 13` becomes a lie
+// with every gate in this repository green. That is the class this repo
+// already has a name for: a check that goes green on a commented-out control.
+//
+// SO THE ANSWER IS DERIVED HERE INSTEAD, BY FOLLOWING THE CHAIN. An identifier
+// naming another module-scope binding is followed to ITS initializer; an
+// object literal is descended into member by member; a call is followed into
+// the factory it names, across a relative import when the factory lives in a
+// sibling module. The walk stops at leaves, and the leaves are classified.
+//
+// THE GRAMMAR IS ASYMMETRIC AND THE ASYMMETRY IS THE WHOLE CONTROL.
+// `refuses` must be PROVEN, out of a closed list of forms written below.
+// Everything that parses and is not a proven refusal is `unproven`, and
+// everything that does not parse at all is `unresolved`. NEITHER OF THOSE EVER
+// BECOMES A REFUSAL BY DEFAULT, which is the property that matters: a resolver
+// that silently gave up would be indistinguishable from one that proved a
+// refusal, and the number would go green on the give-up.
+//
+// IT DOES NOT READ THE WORD `UNWIRED_`, DELIBERATELY. ADR-357 wrote that probe,
+// ran it, and refused it on its own result: it classifies thirteen correctly
+// and `PRODUCTION_CHECKOUT_ADAPTERS` (`routes/checkout.ts:1203`) WRONGLY,
+// because that value names no `UNWIRED_` member and refuses by being empty.
+// The walk below proves all four of its members refuse without ever reading a
+// name, and it would equally catch an `UNWIRED_`-named value that had stopped
+// refusing. A probe that reads the WORD is the failure `RI-35`'s register
+// carries its comments about.
+//
+// THE MODULES ARE READ AS TEXT, which is this file's own standing reason:
+// importing one would bind a port.
+
+/** What resolving a default proved about it. */
+type Verdict = 'refuses' | 'unproven' | 'unresolved';
+
+interface Resolution {
+  /** `refuses` is proven. `unproven` parsed and is not a refusal. `unresolved` did not parse. */
+  readonly verdict: Verdict;
+  /** What was proved, or the shape the walk stopped on. Carried into the failure message. */
+  readonly why: string;
+}
+
+const refuses = (why: string): Resolution => ({ verdict: 'refuses', why });
+const unproven = (why: string): Resolution => ({ verdict: 'unproven', why });
+const unresolved = (why: string): Resolution => ({ verdict: 'unresolved', why });
+
+/** The index of the closing quote of the string literal opening at `at`. */
+function endOfString(text: string, at: number): number {
+  const quote = text[at];
+  for (let i = at + 1; i < text.length; i += 1) {
+    if (text[i] === '\\') {
+      i += 1;
+      continue;
+    }
+    if (text[i] === quote) return i;
+  }
+  return text.length;
+}
+
+/**
+ * The first character of `stop` at bracket depth zero from `from`, or the
+ * closer that ends the enclosing bracket run, whichever comes first.
+ *
+ * STRINGS AND COMMENTS ARE SKIPPED. Every reason in this deployable is a long
+ * string full of `;`, `,`, `(` and `{`, so a scanner that did not skip them
+ * would end a statement inside a sentence.
+ */
+function scanTop(text: string, from: number, stop: string): number {
+  let depth = 0;
+  for (let i = from; i < text.length; i += 1) {
+    const ch = text[i] ?? '';
+    if (ch === "'" || ch === '"' || ch === '`') {
+      i = endOfString(text, i);
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '/') {
+      const nl = text.indexOf('\n', i);
+      if (nl < 0) return text.length;
+      i = nl;
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '*') {
+      const close = text.indexOf('*/', i);
+      if (close < 0) return text.length;
+      i = close + 1;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') {
+      depth += 1;
+      continue;
+    }
+    if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) return i;
+      depth -= 1;
+      continue;
+    }
+    if (depth === 0 && stop.includes(ch)) return i;
+  }
+  return text.length;
+}
+
+/** The index just past the bracket run opening at `open`. */
+function pastBracket(text: string, open: number): number {
+  return scanTop(text, open + 1, '') + 1;
+}
+
+/** The initializer text of the module-scope `const` or `let` named `name`. */
+function bindingInit(source: string, name: string): string | undefined {
+  const declared = new RegExp(`^(?:export )?(?:const|let) ${name}\\b`, 'm').exec(source);
+  if (declared === null) return undefined;
+  const eq = scanTop(source, declared.index + declared[0].length, '=');
+  if (source[eq] !== '=') return undefined;
+  return source.slice(eq + 1, scanTop(source, eq + 1, ';')).trim();
+}
+
+/**
+ * The expression a module-scope `function name(...)` returns.
+ *
+ * The `return` is taken at the function body's OWN depth, so the many inner
+ * returns of a real adapter are not mistaken for the factory's.
+ */
+function factoryReturn(source: string, name: string): string | undefined {
+  const declared = new RegExp(`^(?:export )?function ${name}\\(`, 'm').exec(source);
+  if (declared === null) return undefined;
+  const brace = source.indexOf('{', pastBracket(source, declared.index + declared[0].length - 1));
+  if (brace < 0) return undefined;
+  let depth = 1;
+  for (let i = brace + 1; i < source.length; i += 1) {
+    const ch = source[i] ?? '';
+    if (ch === "'" || ch === '"' || ch === '`') {
+      i = endOfString(source, i);
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') {
+      depth += 1;
+      continue;
+    }
+    if (ch === ')' || ch === ']' || ch === '}') {
+      depth -= 1;
+      if (depth === 0) return undefined;
+      continue;
+    }
+    if (depth === 1 && source.startsWith('return ', i) && !/[\w$]/.test(source[i - 1] ?? ' '))
+      return source.slice(i + 7, scanTop(source, i + 7, ';')).trim();
+  }
+  return undefined;
+}
+
+/** The specifier a named import of `name` comes from, if this module imports it. */
+function importedFrom(source: string, name: string): string | undefined {
+  for (const line of source.matchAll(/^import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'([^']+)';/gm)) {
+    const names = (line[1] ?? '').split(',').map(
+      (entry) =>
+        entry
+          .trim()
+          .split(/\s+as\s+/)
+          .pop()
+          ?.trim() ?? '',
+    );
+    if (names.includes(name)) return line[2];
+  }
+  return undefined;
+}
+
+/**
+ * The top-level members of an object literal, as `[key, value text]`.
+ *
+ * `undefined` when the literal holds a shape this reader does not split, which
+ * becomes `unresolved` at the call site rather than an empty member list. An
+ * empty member list would report "all 0 members refuse", which is the silent
+ * give-up this whole block exists to make impossible.
+ */
+function objectMembers(text: string): readonly (readonly [string, string])[] | undefined {
+  if (!text.startsWith('{')) return undefined;
+  const inner = text.slice(1, text.lastIndexOf('}'));
+  const members: (readonly [string, string])[] = [];
+  let i = 0;
+  while (i < inner.length) {
+    while (i < inner.length && /[\s,]/.test(inner[i] ?? '')) i += 1;
+    if (i >= inner.length) break;
+    if (inner.startsWith('//', i)) {
+      const nl = inner.indexOf('\n', i);
+      i = nl < 0 ? inner.length : nl;
+      continue;
+    }
+    if (inner.startsWith('/*', i)) {
+      const close = inner.indexOf('*/', i);
+      i = close < 0 ? inner.length : close + 2;
+      continue;
+    }
+    const start = i;
+    const key = /^(?:(?:async|get|set)\s+)?([A-Za-z_$][\w$]*)/.exec(inner.slice(i));
+    if (key === null) return undefined;
+    i += key[0].length;
+    while (i < inner.length && /\s/.test(inner[i] ?? '')) i += 1;
+    if (inner[i] === ':') {
+      const end = scanTop(inner, i + 1, ',');
+      members.push([key[1] ?? '', inner.slice(i + 1, end).trim()]);
+      i = end;
+    } else if (inner[i] === '(') {
+      const brace = inner.indexOf('{', pastBracket(inner, i));
+      if (brace < 0) return undefined;
+      const end = pastBracket(inner, brace);
+      members.push([key[1] ?? '', inner.slice(start, end).trim()]);
+      i = end;
+    } else if (i >= inner.length || inner[i] === ',') {
+      members.push([key[1] ?? '', key[1] ?? '']);
+    } else return undefined;
+  }
+  return members;
+}
+
+/**
+ * A function leaf, classified on its BODY.
+ *
+ * THE CLOSED LIST OF REFUSALS IS HERE AND IT IS FOUR FORMS: a body that
+ * throws, a body that returns a rejection, a body that returns nothing, and
+ * nothing else. A body that does anything else RETURNS SOMETHING TO THE
+ * HANDLER, and this file will not call that a refusal on its own authority.
+ */
+function classifyBody(body: string): Resolution {
+  const text = body.trim();
+  if (text.startsWith('{')) {
+    const inner = text.slice(1, text.lastIndexOf('}')).trim();
+    const first = scanTop(inner, 0, ';');
+    const only = inner.slice(0, first).trim();
+    if (inner.slice(first + 1).trim() !== '')
+      return unproven(`a block body of more than one statement: ${only.slice(0, 50)}`);
+    if (/^throw\b/.test(only)) return refuses('throws and does nothing else');
+    if (/^return Promise\.reject\(/.test(only)) return refuses('rejects and does nothing else');
+    if (only === 'return' || only === 'return undefined') return refuses('returns nothing');
+    return unproven(`a body that is not a refusal: ${only.slice(0, 50)}`);
+  }
+  if (text === 'undefined') return refuses('returns nothing');
+  if (/^Promise\.reject\(/.test(text)) return refuses('returns a rejection');
+  return unproven(`a body that is not a refusal: ${text.slice(0, 50)}`);
+}
+
+/**
+ * What `expression`, read in `modulePath`, resolves to.
+ *
+ * `seen` breaks a binding cycle rather than recursing to a stack overflow, and
+ * a cycle is `unresolved` because a value defined in terms of itself is not a
+ * proven refusal.
+ */
+function resolveExpression(
+  expression: string,
+  modulePath: string,
+  seen: ReadonlySet<string>,
+): Resolution {
+  const text = expression.trim();
+
+  if (text === 'null' || text === 'undefined') return refuses('holds nothing');
+  if (text === "''" || text === '""' || text === '``') return refuses('holds no value');
+
+  // An arrow function, with or without a return-type annotation.
+  if (/^(?:async\s+)?\(/.test(text)) {
+    const after = text
+      .slice(pastBracket(text, text.indexOf('(')))
+      .trim()
+      .replace(/^:[^=]*/, '')
+      .trim();
+    if (after.startsWith('=>')) return classifyBody(after.slice(2));
+  }
+
+  // A method shorthand, or a call. Both open with a name and a paren, and what
+  // follows the parameters tells them apart: a method has a body.
+  if (/^(?:async\s+)?[A-Za-z_$][\w$]*\s*\(/.test(text)) {
+    const after = text.slice(pastBracket(text, text.indexOf('('))).trim();
+    if (after.startsWith('{')) return classifyBody(after);
+    if (/^:[^{]*\{/.test(after)) return classifyBody(after.slice(after.indexOf('{')));
+    if (after !== '') return unresolved(`a call with trailing syntax: ${text.slice(0, 60)}`);
+    return followName(/^([A-Za-z_$][\w$]*)/.exec(text)?.[1] ?? '', modulePath, seen, factoryReturn);
+  }
+
+  if (text.startsWith('{')) {
+    const members = objectMembers(text);
+    if (members === undefined)
+      return unresolved(`an object literal this reader cannot split: ${text.slice(0, 60)}`);
+    const walked = members.map(
+      ([key, value]) => [key, resolveExpression(value, modulePath, seen)] as const,
+    );
+    const stuck = walked.find(([, member]) => member.verdict === 'unresolved');
+    if (stuck !== undefined) return unresolved(`member \`${stuck[0]}\` is ${stuck[1].why}`);
+    const live = walked.find(([, member]) => member.verdict === 'unproven');
+    if (live !== undefined) return unproven(`member \`${live[0]}\` has ${live[1].why}`);
+    return refuses(`all ${String(walked.length)} members refuse`);
+  }
+
+  if (/^[A-Za-z_$][\w$]*$/.test(text)) return followName(text, modulePath, seen, bindingInit);
+
+  return unresolved(`an expression shape this reader does not know: ${text.slice(0, 60)}`);
+}
+
+/**
+ * Follow `name` to what `take` reads out of its declaring module, here or one
+ * relative import away, and resolve THAT.
+ *
+ * THE REACH STOPS AT `apps/api/src` ON PURPOSE. A default reaching a package is
+ * a default this file cannot read as text, and it must say so rather than
+ * assume anything about it.
+ */
+function followName(
+  name: string,
+  modulePath: string,
+  seen: ReadonlySet<string>,
+  take: (source: string, of: string) => string | undefined,
+): Resolution {
+  const key = `${modulePath}#${name}`;
+  if (seen.has(key)) return unresolved(`\`${name}\` is defined in terms of itself`);
+  const next = new Set([...seen, key]);
+
+  const here = take(read(modulePath), name);
+  if (here !== undefined) return resolveExpression(here, modulePath, next);
+
+  const specifier = importedFrom(read(modulePath), name);
+  if (specifier === undefined || !specifier.startsWith('.'))
+    return unresolved(`\`${name}\`, which this module neither declares nor imports relatively`);
+  const target = join(dirname(modulePath), specifier);
+  if (!target.startsWith(SRC))
+    return unresolved(`\`${name}\`, imported from ${specifier}, outside apps/api/src`);
+  const there = take(read(target), name);
+  if (there === undefined)
+    return unresolved(`\`${name}\`, imported from ${specifier}, which declares no such value`);
+  return resolveExpression(there, target, next);
+}
+
+/** What `port`'s module-scope default resolves to, followed past the first hop. */
+function resolveDefault(port: string): Resolution {
+  return resolveExpression(defaultOf(port), moduleOf(port), new Set());
+}
+
+/**
+ * The ruling for each default that is NOT a proven refusal, and why.
+ *
+ * TWO, AND BOTH ARE IRREDUCIBLE JUDGEMENTS RATHER THAN GAPS IN THE WALK. The
+ * assertion below requires this record to hold EXACTLY the ports the
+ * derivation reports as `unproven`, in both directions, so a default that
+ * stops being a proven refusal cannot reach `refusing` without somebody
+ * writing a sentence here, and a ruling cannot outlive the shape it ruled on.
+ *
+ * THIS IS THE HAND-MAINTAINED PART AND IT IS SMALLER AND LOUDER THAN WHAT IT
+ * REPLACED. `LIVE_DEFAULT_DECLARED` was the ANSWER, unchecked against anything.
+ * These are INPUTS to an answer that is now computed, and each one is enforced
+ * for presence and for necessity.
+ */
+const UNPROVEN_RULING: Readonly<
+  Record<string, { readonly verdict: 'live' | 'refuses'; readonly why: string }>
+> = {
+  useTurnstileVerifier: {
+    verdict: 'live',
+    why:
+      'ADR-357, and the derivation reaches the same leaf its ruling rests on. `cloudflareTurnstileVerifier` ' +
+      'at `turnstile.ts:211` returns an object whose `verify` is a real vendor call: it reads ' +
+      '`MERIT_TURNSTILE_SECRET` from the environment PER CALL, posts to siteverify under a timeout, and ' +
+      'answers on what comes back. A deployment holding the secret verifies tokens with nothing installed, ' +
+      'so this default SERVES. An absent secret is a refusal rather than an unwired state, which is why ' +
+      'the port is counted live here and still carries a reason above.',
+  },
+  useWithdrawalBackend: {
+    verdict: 'refuses',
+    why:
+      'THE DERIVATION FOUND A LEAF ADR-357 DID NOT, AND THE RULING IS THAT THE PORT STILL REFUSES. ' +
+      '`UNWIRED_WITHDRAWAL_BACKEND` refuses on `transact` and on all three members of its idempotency ' +
+      'store, and its `now` at `wallet-withdrawals.ts:1128` is `() => new Date()`, a working clock rather ' +
+      'than a refusal, and the FOUR sibling defaults that carry a `now` all throw from it instead. It reaches no caller, and ' +
+      'that is measured at both doors rather than argued: the creation door reads the clock at ' +
+      '`wallet-withdrawals.ts:2468` and the very next statement rejects, because `begin` at ' +
+      '`wallet-withdrawals.ts:1112` refuses, and `unwiredOrThrow` at `wallet-withdrawals.ts:2381` answers ' +
+      '503; the cancellation door reads it at `wallet-withdrawals.ts:2604` and `transact` refuses at ' +
+      '`wallet-withdrawals.ts:2621` into that same refusal handler. A timestamp ' +
+      'computed and discarded is not a request served, so this port belongs among the thirteen.',
+  },
+};
+
+/**
+ * The blocked ports whose default SERVES a request rather than refusing one,
+ * DERIVED rather than declared.
+ *
+ * Every port the walk proves refusing is out. Of the rest, the ones this file
+ * has ruled live are in. Nothing here is a literal.
+ */
+const LIVE_DEFAULT: ReadonlySet<string> = new Set(
+  Object.keys(BLOCKED).filter(
+    (port) =>
+      resolveDefault(port).verdict === 'unproven' && UNPROVEN_RULING[port]?.verdict === 'live',
+  ),
+);
+
 test('every blocked port records the module-scope default it actually holds', () => {
   // ADR-357. The INPUT to the ruling below, measured rather than described, so
   // a default that changes cannot leave the ruling standing beside it. This is
@@ -1847,6 +2264,11 @@ test('exactly one blocked port is live with nothing installed, and it is named',
   // takes `blocked: 14` for fourteen obstructions is wrong by exactly this.
   expect([...LIVE_DEFAULT].sort()).toStrictEqual(['useTurnstileVerifier']);
 
+  // THE DERIVATION AND THE RETIRED HAND-WRITTEN FORM AGREE (ADR-363). The set
+  // above is now computed from the tree, and the literal it replaced is kept
+  // beside it as a pin rather than as the source.
+  expect([...LIVE_DEFAULT].sort()).toStrictEqual([...LIVE_DEFAULT_DECLARED].sort());
+
   // A live port with no entry would be unaccounted; a named one that is not
   // blocked would be a reason pointing at nothing.
   expect([...LIVE_DEFAULT].filter((port) => !(port in BLOCKED))).toStrictEqual([]);
@@ -1856,4 +2278,79 @@ test('exactly one blocked port is live with nothing installed, and it is named',
     refusing: Object.keys(BLOCKED).filter((port) => !LIVE_DEFAULT.has(port)).length,
     live: LIVE_DEFAULT.size,
   }).toStrictEqual({ blocked: 14, refusing: 13, live: 1 });
+});
+
+test('every blocked default resolves to a shape this file can read', () => {
+  // ADR-363. A RESOLVER THAT SILENTLY GIVES UP IS WORSE THAN NO RESOLVER,
+  // because the give-up is indistinguishable from a proven refusal and the
+  // count goes green on it. Anything the grammar does not read is `unresolved`,
+  // and `unresolved` fails HERE, naming the port and the text it stopped on.
+  const unread = Object.keys(BLOCKED)
+    .map((port) => [port, resolveDefault(port)] as const)
+    .filter(([, resolution]) => resolution.verdict === 'unresolved')
+    .map(([port, resolution]) => `${port}: ${resolution.why}`)
+    .sort();
+
+  expect(unread).toStrictEqual([]);
+});
+
+test('a default shape the resolver cannot read fails rather than passing as a refusal', () => {
+  // THE FAILURE MODE ABOVE, DRIVEN DIRECTLY. A control whose failure mode is
+  // never exercised is a control nobody has watched, and this is the one that
+  // decides whether the count can go green on something nobody read.
+  const module = moduleOf('useTurnstileVerifier');
+  for (const shape of [
+    'deploymentConfig.checkout',
+    'resolveAdapters() ?? PRODUCTION_FALLBACK',
+    '{ ...PRODUCTION_CHECKOUT_ADAPTERS }',
+    'noSuchBindingAnywhere',
+    '[UNWIRED_CHECKOUT_BACKEND]',
+    '42',
+  ])
+    expect(resolveExpression(shape, module, new Set()).verdict, shape).toBe('unresolved');
+
+  // AND IT IS NOT THE `unresolved` BRANCH SWALLOWING EVERYTHING, which would
+  // make the case above pass over a resolver that reads nothing at all.
+  expect(resolveExpression('null', module, new Set()).verdict).toBe('refuses');
+  expect(resolveExpression('() => Promise.reject(new Error())', module, new Set()).verdict).toBe(
+    'refuses',
+  );
+  expect(resolveExpression('() => new Date()', module, new Set()).verdict).toBe('unproven');
+});
+
+test('the derivation follows a default past its first hop rather than stopping at the name', () => {
+  // THE DEFECT ADR-363 WAS DISPATCHED ON, ASSERTED. `defaultOf` returns the
+  // STRING `productionAffiliateDeps`, and three of the fourteen record a name
+  // beginning `production` whose CONTENTS decide whether they refuse. These
+  // three are proven refusing by their leaves, so a later edit to any of them
+  // moves this file rather than passing under it.
+  for (const port of ['useAffiliateDeps', 'useKycDeps', 'useCheckoutAdapters']) {
+    expect(defaultOf(port), `${port} still records a name rather than a value`).toMatch(
+      /^(production|PRODUCTION)/,
+    );
+    expect(resolveDefault(port).verdict, `${port}`).toBe('refuses');
+  }
+
+  // AND THE WALK IS NOT READING THE WORD `UNWIRED_`, WHICH IS THE PROBE ADR-357
+  // WROTE AND REFUSED ON ITS OWN RESULT. `PRODUCTION_CHECKOUT_ADAPTERS` names
+  // no such value and refuses by being EMPTY, and it is proven from its four
+  // leaves; `UNWIRED_WITHDRAWAL_BACKEND` carries the word and is NOT proven,
+  // because one of its members is a working clock.
+  expect(resolveDefault('useCheckoutAdapters').why).toBe('all 4 members refuse');
+  expect(resolveDefault('useWithdrawalBackend').verdict).toBe('unproven');
+});
+
+test('every default that is not a proven refusal carries a ruling, and no ruling outlives its shape', () => {
+  // BOTH DIRECTIONS, WHICH IS WHAT MAKES THE HAND-MAINTAINED HALF SAFE. A
+  // default that stops being a proven refusal cannot reach `refusing` until
+  // somebody writes the sentence, and a ruling cannot survive the shape that
+  // needed it.
+  const unprovenPorts = Object.keys(BLOCKED)
+    .filter((port) => resolveDefault(port).verdict === 'unproven')
+    .sort();
+
+  expect(unprovenPorts).toStrictEqual(Object.keys(UNPROVEN_RULING).sort());
+
+  for (const [port, ruling] of Object.entries(UNPROVEN_RULING))
+    expect(ruling.why.length, `${port}'s ruling is too short to be checkable`).toBeGreaterThan(80);
 });
