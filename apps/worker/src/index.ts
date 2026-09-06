@@ -318,6 +318,32 @@ export {
 } from './batch/adapter.ts';
 export type { BatchTx, TradingDayAnchor } from './batch/adapter.ts';
 
+// -----------------------------------------------------------------------------
+// ADR-350: A `StatisticsPorts` VALUE, OVER POSTGRES, WITH THREE PORTS REFUSING
+// -----------------------------------------------------------------------------
+// **THE FIRST `StatisticsPorts` VALUE CONSTRUCTED UNDER ANY `src/` IN THIS
+// WORKSPACE**, on the leg above's own terms and with the same reason for being a
+// leg: it is the composition this deployable's suite substitutes a recorder
+// into, and a composition nobody can import is a composition nobody can test.
+//
+// **IT IS NOT THE SAME KIND OF LANDING AS THAT ONE AND THE DIFFERENCE IS ON THE
+// RECORD.** Four of the six read ports and the write port are served; three
+// refuse by name, and two of those three refuse because Merit cannot yet produce
+// the FACT the definition asks for rather than because nobody has written the
+// query. `runStatisticsRun` reads all five fact sets per window, so a refusal
+// ends the run, and `ADR-350` argues that the totality is correct: a run that
+// published only the statistics whose facts happened to be constructible is
+// `FM-M12-02`'s selected set with the selection taken by an adapter.
+export {
+  FUNDED_LIVES_BLOCKER,
+  PublishedWindowAlreadyExists,
+  STATISTICS_HALT_SINK_BLOCKER,
+  StatisticsPortUnwired,
+  StatisticsRowError,
+  WITHDRAWAL_SETTLEMENTS_BLOCKER,
+  postgresStatisticsPorts,
+} from './batch/statistics-adapter.ts';
+
 // SD-08. Exported because the replay self-audit is the other caller: it will
 // re-derive a state and hash it with THIS function, and a second implementation
 // of the canonical serialization would make the audit compare two serializers
@@ -1451,6 +1477,30 @@ export type {
 } from './recon/ports.ts';
 
 // -----------------------------------------------------------------------------
+// AND ITS ADAPTER (ADR-345)
+// -----------------------------------------------------------------------------
+// **THE SENTENCE ABOVE READS "WHAT IS NOT IS THE ADAPTER AND THE SCHEDULE", AND
+// ADR-345 MADE THE FIRST HALF OF IT FALSE.** It is kept beside its correction
+// rather than edited, per `RI-14`, because the shape of what changed is the
+// point: the sweep was written against a port, the port had exactly one
+// inhabitant and that inhabitant rejected every call, and this leg is the
+// inhabitant that answers. **THE SECOND HALF IS STILL TRUE AND IS STILL TRUE ON
+// PURPOSE**: `postgresReconSweepIo` makes the sweep RUNNABLE and nothing under
+// `src/` calls `runReconciliationSweep`, so `test/schedule.test.ts` case 3.1's
+// caller census still reports the recon row unscheduled and reports it
+// correctly. `adapter.ts` header section 6 carries the three reasons and
+// `ADR-345` argues them.
+export {
+  RECON_READ_FILTERS,
+  RECON_TERMS,
+  RECON_WRITE_ADDRESS,
+  ReconAdapterError,
+  postgresReconSweepIo,
+  reconTxOver,
+} from './recon/adapter.ts';
+export type { ReconDbTx } from './recon/adapter.ts';
+
+// -----------------------------------------------------------------------------
 // THE JOB REGISTRATION (ADR-305 section 7 slice 8, ADR-326)
 // -----------------------------------------------------------------------------
 // WHICH JOBS THIS DEPLOYABLE HAS BUILT, WHICH ONE HAS A CLOCK, AND FOR EVERY
@@ -1514,6 +1564,7 @@ export const WORKER_BARREL_LEGS = [
   './batch/replay.ts',
   './batch/state-hash.ts',
   './batch/state-writer.ts',
+  './batch/statistics-adapter.ts',
   './breaker/evaluate.ts',
   './breaker/ports.ts',
   './detectors/adapter.ts',
@@ -1532,6 +1583,7 @@ export const WORKER_BARREL_LEGS = [
   './live/ingest.ts',
   './live/ports.ts',
   './provisioning/index.ts',
+  './recon/adapter.ts',
   './recon/ports.ts',
   './recon/sweep.ts',
   './schedule.ts',
