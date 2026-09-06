@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-09-05
+last_updated: 2026-09-06
 ---
 
 # STATE
@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->360<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->361<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13126,3 +13126,31 @@ Counts derived at reporting time off each runner's own last line: suite **335 fi
 **Next.** The founder's `E2` read of [ADR-375](decisions/ADR-375.md) and the three decisions its approval block names, of which **section 4 is the one about authority rather than about code**: this row implemented one of three options an earlier entry recorded as open, on the argument that nothing outside this file changes meaning. Then **section 7's ORDER**, so the next row does not spend its budget discovering that a registration cannot precede the repair it depends on. Then section 8, which asks whether a citation into a test file is a control or a reading aid, because it has been treated as both for four waves.
 
 Counts derived at reporting time off each runner's own last line: suite **335 files / 8,064 passed / 10 skipped / 0 failed**, against a base reproduced on `c7987c3c` **before the first edit** of **335 files / 8,060 passed / 10 skipped / 0 failed**, a delta of **+4 cases in ONE EXISTING FILE entirely by ADDITION with zero removals**, files and skips unmoved, attributed by removal: `wiring.test.ts` runs **27** alone on this tree and **23** alone on the base. Gates **33 of 33** after `generate`. Invariants **35 of 35**. Typecheck, lint and `format:check` clean. **`pnpm run verify` and `scripts/corpus/falsify.mjs` were NOT run**, both forbidden by the row.
+
+---
+
+## 2026-09-06 - Session 574: the two rows' leavings, where a control's claim about the class it catches is measured on the real file and found false for one of four
+
+[ADR-379](decisions/ADR-379.md), `status: proposed`, approval line UNSIGNED. **MONEY PATH, ADR-003 STRICT, `E2` READ OWED.** [ADR-374](decisions/ADR-374.md) and [ADR-375](decisions/ADR-375.md) landed together against `apps/api` and each recorded what it left. This row picked up both lists and **verified every item at primary source before acting on it**, seven claims re-derived of which six hold exactly.
+
+**THE REFUTATION IS THE MOST VALUABLE OUTPUT, AS IT HAS BEEN IN EACH OF THE LAST THREE WAVES, AND THIS TIME IT IS OF A CLAIM RATHER THAN OF A DISPATCH.** [ADR-374](decisions/ADR-374.md) section 5 states that all four of [ADR-372](decisions/ADR-372.md) section 5's shapes are caught by the guards that row built. **THREE ARE.** Each shape was seeded into the REAL [`start.ts`](../apps/api/src/start.ts) at the last install, and the three files in the slice were run SEPARATELY so that each one's answer is its own. A block comment, an install below `await main()` and a call inside a template literal turn all three RED. **Dead code after a top-level `throw` left `start-construction.test.ts` ENTIRELY GREEN**, because `factoriesInstalledBeforeMain` broke at `main()` and nowhere else, so all eleven factories stayed in the pinned list while a run of the module aborts at the throw and constructs nothing past it.
+
+**THE SHAPE WAS NEVER LOOSE AND THE DISTINCTION IS THE WHOLE FINDING.** The same seed reddens the other two files: `start-program.test.ts` forbids a top-level `throw` outright and `wiring.test.ts` truncates `wired` at one. **What was defective is a control's account of its own mechanism, and the error ran in the OVER-REPORTING direction, which is how a guard goes quiet rather than red.** **Running the three files separately is what made it visible**: one suite run reports RED, the row records that the shape is caught, and the false claim survives. The reader now stops at a top-level `throw` where both siblings already stopped, and a fixture case holds the clause, because a clause defended by no case is a claim.
+
+**[ADR-374](decisions/ADR-374.md) SECTION 7 ITEM 1 IS REPAIRED AND IT WAS A COVERAGE GAP RATHER THAN A DEFECT IN THE TREE.** The one-file-scan case is titled for all of `apps/api/src` and read `src` and `src/routes` by name: **58** `.ts` files under `src` recursively, **48** read, **10** missed, all ten under `admin-source/`. **The CLAIM holds over all 58** at zero module-scope setter calls outside `start.ts`, so only the COVERAGE was short. The walk is recursive now, the unread directory is NAMED rather than counted, and **no cardinal is pinned**, because one would move on every new module and be deleted as noise.
+
+**WHAT `wired` MOVING TO THE SYNTAX TREE RETIRES IS A REASON AND NO PIN.** Every count in this slice was already derived, so the dispatch's guess that pinned counts may now be derivable does not survive. What was false was `start-program.test.ts`' opening sentence, one case title naming a text-matched `wired` set that no longer exists, and one census framed as a QUEUE that [ADR-375](decisions/ADR-375.md) has emptied by construction. **The one pin that named the old derivation as its ground is still load-bearing on another**: a top-level `throw` truncates the install order, and the tree derivation reports the truncation as a smaller `wired`, a cardinal moving with no name attached. Under `RI-14` the retired sentence is kept where it stands and the retired phrase is named rather than reproduced.
+
+**REPORTED AND NOT RESOLVED: THREE FACTS IN THIS SLICE ARE NOW ASSERTED IN TWO FILES**, which [ADR-375](decisions/ADR-375.md) was awake to and declined for a fourth fact. Retiring a money-path case to remove a redundancy is a larger call than the row that noticed it holds, and it ships as an open question with no value chosen.
+
+**`start.ts` IS NOT EDITED AND THE IMPRECISION AT `start.ts:311` IS LEFT FOR THE THIRD TIME, RE-CHECKED AT PRIMARY SOURCE RATHER THAN INHERITED.** The comment is at `:311`, the install at `:315`, `await main()` at `:317`. **The append the sentence invites was SEEDED and three of three files went red**, where [ADR-374](decisions/ADR-374.md) section 6 named two. It is a landmine for a **fourth** consecutive entry.
+
+**`wiring.test.ts` WAS NEVER OPENED FOR WRITING, AND THAT WAS MEASURED RATHER THAN PREFERRED.** [ADR-375](decisions/ADR-375.md) section 8 reports 183 citation sites across 74 files pointing into it at 50 distinct lines, every one moved by that row with `RI-15` and `RI-16` green throughout, so nothing here can see such a citation drift. **The one line this diff did move is cited six times**: `start-program.test.ts:188` is `:251`, repaired in six files including two belonging to another row, line numbers only, **derived by reading at both ends rather than by arithmetic or by trusting a gate**.
+
+**SIX SEEDS, SEVEN OBSERVATIONS OF RED AND ONE OF GREEN, THE GREEN BEING THE FINDING.** Four edited `src/`, every file was restored byte-identical under `sha256sum -c` against a four-file manifest re-verified after each restore, and **no restore was done with `git checkout --`**, which is the mistake three consecutive waves recorded. **Seed 5 is falsification in both directions in one step**: the same edit reddens the repaired case here and leaves it GREEN at 6 of 6 on `origin/main`.
+
+**No `src/` file changed, no port wired, no door opened, no triple moved, no gate weakened, no test skipped, disabled or quarantined, no invariant number minted, no `CI-06` letter spent, no migration number taken or reserved, no `status` field moved.** **`377` and `378` are RESERVED** so `CI-06f` stays gapless with two siblings running now; the cells name no subject and claim nothing.
+
+**Next.** The founder's `E2` read of [ADR-379](decisions/ADR-379.md) and the three decisions its approval block names, of which **section 5's duplication is the one this row most wants told rather than guessed**: three facts asserted in two files, where every argument for keeping both is also the argument for never deleting a passing test. Then the landmine at `start.ts:311`, named by four entries and repaired by none, and the four owed items outside this fence that were verified still wrong here.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,071 passed / 10 skipped / 0 failed**, against a base reproduced on `6698f9c0` **before the first edit** of **336 files / 8,070 passed / 10 skipped / 0 failed**, a delta of **+1 case in ONE EXISTING FILE entirely by ADDITION with zero removals**, files unmoved at 336 and skips unmoved at 10, attributed by removal: `start-construction.test.ts` runs **5** alone on this tree and **4** alone on the base, and `start-program.test.ts` runs **6** alone on both. Gates **33 of 33** after `generate`. Invariants **35 of 35**. Typecheck, lint and `format:check` clean. `pnpm run verify` and `scripts/corpus/falsify.mjs` **not run**, both forbidden by the row.
