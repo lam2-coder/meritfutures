@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->372<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->373<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13444,3 +13444,32 @@ Counts derived at reporting time off each runner's own last line: suite **336 fi
 **Next.** The founder's `E2` read of [ADR-388](decisions/ADR-388.md) and the three decisions its approval block names, of which **the first is whether the 42 pointers that were never true are clerical or are failed checks**. Everything else in the entry follows from that answer.
 
 Counts derived at reporting time off each runner's own last line: suite **336 files / 8,097 passed / 10 skipped / 0 failed**, against a base reproduced on `8fa66104` **before the first edit** of **336 / 8,097 / 10 / 0**, a **delta of ZERO on every axis**; gates **33 of 33** after `generate`; invariants **35 of 35**; `typecheck`, `lint` and `format:check` all exit 0.
+---
+
+## 2026-09-06 - Session 584: the runbook restructure built, measured and refused, because its fifth column is read out of the table row by eleven assertions no row that owns the page may write ([ADR-389](decisions/ADR-389.md), proposed)
+
+**[ADR-388](decisions/ADR-388.md) SECTION 15 ITEM 1 PRICED OPTION (d) AT "FIFTEEN POINTERS MOVE, TWELVE ARE ALREADY WRONG, NINE SIT IN DATED RECORDS" AND SAID THE ROW TAKING IT NEEDS `docs/ops/runbooks/**` PLUS THE CITATION-REPAIR RIGHT. THAT SPECIFICATION IS ONE FENCE SHORT BY A FACTOR OF THREE.**
+
+**THE RESTRUCTURE WAS BUILT RATHER THAN ESTIMATED, AND IT WORKS.** Columns one to four as the table, column five as a `## Severity if absent, by job` section of 21 `### <job>` notes keyed by the job name, normalised exactly as `gates.mjs`'s own `normJob` normalises it. The table falls from **31,301 characters to 2,700**, from nine rows over 2,000 characters to **zero**, from a longest row of **4,653 to 427**, and, wrapped at 100 columns, from **324 rendered lines to 34** with its tallest row going **47 to 5**. **Columns one to four are BYTE-IDENTICAL across the move**, 2,427 trimmed characters at both ends. **Gates 33 of 33 and invariants 35 of 35 throughout, `RI-35` included.**
+
+**AND THEN THE SUITE WENT RED AT ELEVEN ASSERTIONS IN SEVEN FILES ACROSS THREE DEPLOYABLES**, 8,096 passed against a base of 8,107. **Ten of the eleven assert that a named phrase of the SEVERITY PROSE occurs in the TABLE ROW LINE**, which is the one thing option (d) exists to stop being true: `NOT YET WIRED OR SCHEDULED`, `DISCHARGED SINCE`, `GS-122`, `FM-M7-08`, `payout_requests.hold_expires_at`, `It asserts the query, not the job`. Four of them read `schedule.test.ts`'s own copy of `cronRows`, which returns the whole row line, **so no note format puts the prose back without putting it back in the table.**
+
+**SIXTEEN TEST FILES READ THAT RUNBOOK. FIFTEEN ARE ROW `391`'s, ONE IS ROW `390`'s, AND NONE IS THIS ROW'S.** Editing them is forbidden, shipping a red suite is worse than shipping nothing, and weakening a test is refused outright. **So the page is REVERTED BYTE-IDENTICAL**, `git diff 3b664fcf -- docs/ops/runbooks` empty, and the corrected four-fence specification is handed on with every figure measured.
+
+**THE ONE THE DISPATCH TOLD THIS ROW TO WATCH IS NOT WHAT IT LOOKED LIKE.** `RI-35`'s registered anchor SURVIVES the restructure untouched, occurring once, on one line, in the `### Replay self-audit` note, because [ADR-384](decisions/ADR-384.md) anchored it to a SENTENCE and not a coordinate. **The register needed no change. Its TEST does**, asserting the anchor sits on the row it is about, and that test is row `390`'s.
+
+**SEED E IS THE HAZARD NOBODY TAKING (d) SHOULD REDISCOVER.** Written first as a `###` subsection inside `## Scheduled work`, the notes sit inside the span `cronRows` parses; a pipe-leading note line is then read as a scheduled JOB, and since that set only grows, **a phantom job made of note prose SATISFIES a coverage row whose real scheduled row is gone**. A job renamed out of `CI-06l`'s reach is RED at three findings; **the same rename plus one pipe-leading note line is GREEN at 33 of 33**. Promoting the notes to a peer `##` terminates the scan and the pair is RED at 32 of 33 in both halves. **Seed E exists because seed D's prediction was wrong**, recorded rather than quietly corrected.
+
+**THE CLASS TEST WAS RUN ON ALL FIFTEEN POINTERS BEFORE ONE WAS TOUCHED AND IT REFUSED FOUR.** The `:35` sites were born ONE LINE SHORT on 2026-08-28, at `a21bfb8e` and `4b3e8e57`, when the digest row stood at 36; only [P7](plans/P7-risk-and-abuse.md) line 407, written a day earlier at `acec6666`, was ever true. **They were never in [ADR-388](decisions/ADR-388.md)'s 42**, whose census ran through a reader that entry had itself measured as blind to thirteen of these fifteen. **The corpus's figure for born-wrong pointers is a floor and now has four underneath it.**
+
+**[ADR-388](decisions/ADR-388.md) IS RIGHT ABOUT `ADR-352:30` AND [ADR-384](decisions/ADR-384.md) IS REFUTED, DERIVED INDEPENDENTLY AT FOUR COMMITS.** `key: 'event-sink-caller'` sits at **822 at `3303e58c`**, the one and only commit that has ever touched that file, then 852, 875 and **902 on `3b664fcf`**. **The dispatch's own `:875` was exact on the previous row's base and is 27 lines short of this one**, which is the corpus's recurring error arriving a third time in one wave. The repair is anchored to `3b664fcf` in the sentence itself, because `packages/tooling/**` is row `390`'s.
+
+**A METHOD FINDING THAT ALMOST COST THE ANSWER.** This container arrived with **no clone at all**. On the shallow clone taken to recover, `git blame -w` fell back to a merge commit and returned G2 **FALSE** for [session 342](sessions/2026-08-28-session-342.md); on full history it names `d597b383` and the same test is **EXACT**. **A shallow clone does not refuse a G2 question, it answers it wrongly, in the direction of falsifying a true pointer.**
+
+**[ADR-388](decisions/ADR-388.md)'s "SEVEN" IS EIGHT AND ITS "THREE IN `ADR-312`" IS FOUR**: line 193 carries the token twice. All six commit hashes it named reproduce exactly, [ADR-337](decisions/ADR-337.md) line 70's CLASS TWO verdict included, which is re-derived and left alone. **Seven repairs landed**: [ADR-352](decisions/ADR-352.md) line 30 and six on [`ALLOCATION.md`](decisions/ALLOCATION.md).
+
+**NOTHING WAS WIDENED AND NOTHING WAS MINTED.** No invariant number, no gate added, widened or weakened, no leg written, no register grown, no test skipped, disabled or quarantined, no `CI-06` letter spent, no migration number taken or reserved, and no file owned by row `390` or row `391` written.
+
+**Next.** The founder's `E2` read of [ADR-389](decisions/ADR-389.md), whose approval block asks first whether a row may move the tests that read the page it owns: **if the runbook and its tests are one artifact, option (d) is a single four-fence dispatch and everything it needs is derived; if the current fencing holds, (d) keeps bouncing, because every row that can edit the page is a row that cannot edit what reads it.** Then [P7](plans/P7-risk-and-abuse.md) line 407 and [session 342](sessions/2026-08-28-session-342.md) line 9, both class one and both outside this fence.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `3b664fcf` **before the first edit** of **336 files / 8,107 passed / 10 skipped / 0 failed**, delta zero on every axis; gates **33 of 33** after `generate`; invariants **35 of 35**; typecheck 0, lint 0, `format:check` clean. **`pnpm run verify` was NOT run and `falsify.mjs` was NOT run.**
