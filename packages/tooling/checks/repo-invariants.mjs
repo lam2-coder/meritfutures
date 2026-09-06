@@ -3319,8 +3319,12 @@ const ri15 = {
     'caught only where the wrong line happens to be blank. THE SCOPE CARDINALS ' +
     'ABOVE ARE RETIRED AND NAMED RATHER THAN REPRODUCED, under RI-14: the ' +
     '588-file and 207-citation figures were true when the input set was ' +
-    'derived, and this tree gives 753 files and 390 citations of which 129 ' +
-    'carry a bindable name. FOUR HOLES ARE ASSERTED IN THE SUITE rather than ' +
+    'derived. ADR-380 corrected them to 753 files and 390 citations of which ' +
+    '129 carried a name, and THAT CORRECTION WAS STALE ONE ROW LATER: this ' +
+    'tree gives 753, 389 and 130, derived at ADR-383. Both figures are named ' +
+    'with the ref they were derived at, because a cardinal in a `covers` line ' +
+    'has now drifted twice in two rows and ADR-383 section 7 rules that they ' +
+    'should not be here at all. FOUR HOLES ARE ASSERTED IN THE SUITE rather than ' +
     'only described here, because a hole carried by a paragraph goes stale the ' +
     'way those cardinals did: the glue (ADR-357), this package (ADR-377), miss ' +
     '(11), and the negation lookback -- which is ADR-377 section 6s property ' +
@@ -3763,8 +3767,10 @@ const ri16 = {
     'whose path was INHERITED rather than stated is a registry shorthand in 41 ' +
     'of the 166 cases here and in 154 of 154 in RI-15s input. None of the three ' +
     'binds. WHAT IT DOES NOT CATCH. (1) The name half is STILL THIN and the ' +
-    'number says so: 19 of the 668 citations in scope carry a bindable name, ' +
-    'against 27 in `wiring.test.ts` alone, because markdown writes a citation ' +
+    'number says so, and the figure it said it with is RETIRED AND NAMED ' +
+    'rather than reproduced, under RI-14: it read 19 of 668, and this tree ' +
+    'gives 73 of 1,374 in scope, derived at ADR-383, against 69 of the 110 in ' +
+    '`wiring.test.ts` alone, because markdown writes a citation ' +
     'alone in a table cell as readily as inside a link. The other 649 ' +
     'are checked for RESOLUTION AND RANGE only, which is the half that found ' +
     '`DECISIONS.md:483`. (2) A name written AFTER the pointer, in a SECOND ' +
