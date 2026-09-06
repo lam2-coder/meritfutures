@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import ts from 'typescript';
 import { expect, test } from 'vitest';
 
 import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
@@ -187,8 +188,149 @@ for (const [dir, label] of [
     for (const port of matches(read(join(dir, name)), DECLARES))
       declaredIn.set(port, label === 'routes' ? name : `../${name}`);
 
-const startSource = read(join(SRC, 'start.ts'));
-const wired = new Set(matches(startSource, CALLS));
+const START = join(SRC, 'start.ts');
+const startSource = read(START);
+
+// -----------------------------------------------------------------------------
+// `wired` IS THE SET A RUN WOULD INSTALL, AND IT USED TO BE THE SET A LINE
+// PATTERN COULD SEE (ADR-375, taking ADR-372 section 15 question 1 option (b))
+// -----------------------------------------------------------------------------
+// THE CONSTRAINT THIS FILE'S HEADER STATES IS NOT LIFTED. Importing `start.ts`
+// binds a port, so this file still never imports it. PARSING IS NOT EXECUTING:
+// the compiler API reads the module into a syntax tree, evaluates nothing, opens
+// no socket and binds no port, which is ADR-372's measurement and the whole
+// reason this derivation can sit beside that constraint rather than against it.
+//
+// WHAT WAS WRONG WITH THE LINE PATTERN, AND IT WAS NOT THAT IT GAVE A WRONG
+// ANSWER. It gave the RIGHT answer on every tree anybody has measured, and
+// ADR-372 section 4 measured WHY: the pattern is anchored at column zero, and
+// three separate things hold that anchor up, ONE OF THEM THE FORMATTER. Every
+// nested shape is refused because `prettier` indents a nested statement and
+// `format:check` is a gate in a different runner. A derivation whose soundness
+// is on loan from a formatter is sound by accident, and ADR-372 said so in those
+// words. THE FOUR SHAPES IT COUNTS AS WIRED WHILE A RUN INSTALLS NOTHING are a
+// BLOCK comment at column zero, a call below `main()`, dead code after a
+// top-level `throw`, and a call inside a multi-line template literal. The first
+// is `RI-25`'s own class, seeded into the real file by ADR-372 and counted.
+//
+// A PARSER REFUSES ALL FOUR WITHOUT BEING TAUGHT ANY OF THEM, which is the
+// argument for deriving rather than for widening. A comment and a template
+// literal are not statements; a nested call is not a TOP-LEVEL statement whether
+// it is indented or not; and position is a fact the tree carries and text does
+// not. ADR-372 section 10 item 6's reliance on the formatter is retired here
+// rather than written down again.
+//
+// THIS TAKES A DECISION ADR-372 RECORDED AS OPEN AND THE ENTRY SAYS SO. Its
+// section 15 question 1 offered (a) leave the pattern with a second derivation
+// beside it, (b) move the derivation into the tree walk, (c) report both. It
+// argued that (b) "is the only one that makes the triple's own input sound" and
+// left it to a row that owned this file. THE PATTERN IS KEPT AND STILL RUN, so
+// what ships is (b) with (a)'s agreement bar beside it rather than (b) instead
+// of it: `test/start-program.test.ts` reads `CALLS` out of this file and the
+// case below runs it here too, so a pattern that stopped meaning what it means
+// is still a red bar and not a silent deletion.
+//
+// AND THE SCAN STILL READS ONE FILE, WHICH IS THE ONE OWED ITEM THIS CHANGE
+// DOES NOT REACH. A setter called at module scope in a route module would
+// install that port on IMPORT and appear in neither `wired` nor `BLOCKED`.
+// That premise is held by `test/start-program.test.ts`'s case naming
+// `start.ts` as the only module under `apps/api/src` that installs on import,
+// and it is named here rather than asserted twice.
+
+/** One install a run of the wiring slice would perform. */
+interface Install {
+  readonly port: string;
+  readonly index: number;
+  readonly line: number;
+}
+
+/** A port setter's name shape, the same one `DECLARES` and `CALLS` read. */
+const IS_SETTER = /^(?:use|set)[A-Z]/;
+
+/** The module as a tree. Evaluates nothing: see the block above. */
+function parseModule(path: string, source: string): ts.SourceFile {
+  return ts.createSourceFile(path, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
+}
+
+/**
+ * The callee of a top-level statement that is a bare call, `await` included.
+ *
+ * A statement that is anything else has no callee, which is how a nested call
+ * is refused without the refusal being written: a call inside an `if` is a
+ * child of the `if` statement and never appears in `statements` at all.
+ */
+function calleeOf(statement: ts.Statement): string | undefined {
+  if (!ts.isExpressionStatement(statement)) return undefined;
+  const expression = ts.isAwaitExpression(statement.expression)
+    ? statement.expression.expression
+    : statement.expression;
+  if (!ts.isCallExpression(expression) || !ts.isIdentifier(expression.expression)) return undefined;
+  return expression.expression.text;
+}
+
+/** The index of the top-level call to `main`, which is the statement that binds the port. */
+function mainIndexOf(source: ts.SourceFile): number {
+  return source.statements.findIndex((statement) => calleeOf(statement) === 'main');
+}
+
+/**
+ * The installs a run would perform BEFORE the process begins serving, in order.
+ *
+ * THREE THINGS THE TEXT SCAN COULD NOT DO, AND THE THIRD IS THE ONE WITH A
+ * DEPLOYMENT ON THE OTHER SIDE OF IT.
+ *
+ *   REACHABILITY. A top-level `throw` ends the module, so nothing below it
+ *   runs. `start.ts` holds none, so the clause changes no answer about this
+ *   tree; it is exercised anyway by a fixture whose answer CHANGES when it goes,
+ *   because a clause defended by a case that does not run it is a claim rather
+ *   than a control (ADR-369 section 10, ADR-372 section 5).
+ *
+ *   POSITION. `app.listen` is reached only inside `main`, and `await main()`
+ *   is the last top-level statement. An install BELOW it lands on a server that
+ *   is already serving, so the port was the fail-closed default for every
+ *   request in between. `start.ts`' own header rules that window out in prose
+ *   and its own header also tells the next session to resolve conflicts here by
+ *   APPEND, "keep every line", which is exactly the edit that produces it.
+ *   SUCH A PORT IS NOT WIRED and this derivation does not count it.
+ *
+ *   NOT BEING TEXT. A call inside a block comment or a template literal is not
+ *   a statement, so it is refused by construction rather than by a rule.
+ */
+function installsBeforeServing(source: ts.SourceFile): readonly Install[] {
+  const main = mainIndexOf(source);
+  const found: Install[] = [];
+  for (const [index, statement] of source.statements.entries()) {
+    if (ts.isThrowStatement(statement)) break;
+    if (main >= 0 && index > main) break;
+    const callee = calleeOf(statement);
+    if (callee !== undefined && IS_SETTER.test(callee))
+      found.push({
+        port: callee,
+        index,
+        line: source.getLineAndCharacterOfPosition(statement.getStart(source)).line + 1,
+      });
+  }
+  return found;
+}
+
+const startTree = parseModule(START, startSource);
+
+/** Every install a run would perform, IN ORDER and WITH REPETITION. */
+const installs = installsBeforeServing(startTree);
+
+/**
+ * The ports a deployment actually installs.
+ *
+ * IT IS STILL A `Set` AND THAT IS STILL LOSSY, which is ADR-372 section 10
+ * item 2 and is why `installs` above is kept beside it: a port installed twice
+ * enters here once and the second install is invisible to every count derived
+ * from it. The list is what the case below reads, so the loss is bounded by an
+ * assertion rather than by nobody noticing.
+ */
+const wired: ReadonlySet<string> = new Set(installs.map((install) => install.port));
+
+/** What the line pattern sees, kept so the two derivations can be compared. */
+const wiredByText: ReadonlySet<string> = new Set(matches(startSource, CALLS));
 
 /**
  * A port `start.ts` does not call, and the specific thing it waits on.
@@ -360,9 +502,34 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'SIDE EFFECT of an unrelated slice, carrying no signal that it did. ' +
     '(2) It buys no observable change and costs a transaction against two tables on EVERY ' +
     '`/admin/*` request including the ones answering 401 to a caller holding nothing, so an ' +
-    'anonymous prober gets to schedule database work; `start.ts:206` and `:245` say in their own ' +
-    'words that the rate limit `INV-M11-05` requires "EXISTS NOWHERE IN THIS TREE", so nothing ' +
-    'bounds that. ' +
+    'anonymous prober gets to schedule database work, and NOTHING BOUNDS THAT. ' +
+    'THE SUPPORT THIS GROUND CITED HAS EXPIRED AND THE GROUND HAS NOT (ADR-370, ADR-371, ' +
+    'ADR-375). This clause pointed at two lines of `start.ts` for the claim that the limit ' +
+    '`INV-M11-05` requires is absent from this tree. THE CITATION WAS EXACT WHEN IT WAS ' +
+    'WRITTEN AND A MERGE MOVED IT: the branch that added the limit is not an ancestor of the ' +
+    'branch that wrote the pointer, so each was right over the tree it was derived on and ' +
+    'both pointers now land in an argument about the certificate image source. ' +
+    'THE RETIRED CLAUSE IS NAMED HERE AND NOT REPRODUCED. `start.ts` keeps it beside its ' +
+    'correction under `RI-14` in three places, so a reader matching on the prose gets four ' +
+    'answers of which three are history, and a fifth copy in this file would be that ' +
+    'collision one register down (ADR-367, ADR-371 section 4.4). ' +
+    'AND THE CLAIM WAS FALSE IN HALF RATHER THAN FALSE, WHICH IS WHY THE GROUND SURVIVES. ' +
+    'The PER-IP dimension is BUILT AND INSTALLED: `useCertificateRateLimiter` ' +
+    '(`start.ts:315`) is the wiring line and it is one of the eleven counted above. The ' +
+    'PER-ASN dimension is still absent and `start.ts` records it owed with its blocker named. ' +
+    'THE SURVIVING SUPPORT IS NARROWER THAN THE ONE THIS CLAUSE NAMED. ' +
+    '`RATE_LIMITED_ROUTES` (`certificate-rate-limit.ts:151`) is the two PUBLIC certificate ' +
+    'rows and `start.ts` installs no second limiter, so the limit that exists has never ' +
+    'reached `/admin/*` and this ground is about a surface it does not cover. A row that read ' +
+    'the old pointer, found the limit built and struck this ground would have removed a TRUE ' +
+    'reason on a FALSE reading, which is the failure mode an expired SUPPORT produces and an ' +
+    'expired BLOCKER does not. THE VERDICT DOES NOT MOVE. ' +
+    'AND THE REPAIR CHANGES WHICH OF `RI-15`s LEGS HOLDS THIS SENTENCE. The old pointer ' +
+    'carried a path and a line and no name, because its subject was a QUOTED SENTENCE, so ' +
+    'only the three weak legs applied and all three passed while the pointer was wrong ' +
+    '(ADR-371 section 5.1). Both citations above carry a backticked NAME, which is the leg ' +
+    'that checks the cited line is part of what the sentence names. THE REMEDY FOR THAT BLIND ' +
+    'SPOT IS TO CITE A NAME RATHER THAN TO WIDEN THE CHECK. ' +
     '(3) It would move the triple to `wired: 11` and report as progress a port whose table cannot ' +
     'be filled. ' +
     'WHAT IS STILL OWED IS THE PURCHASE AND A CALLER. `refusingAssertionVerifier` and ' +
@@ -390,7 +557,18 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'structurally satisfies at a reason that already exists. ONE SUPPLIER SHORT, AND THE ' +
     'SUPPLIER IS NOT A DOOR. Wiring it with `principal: async () => null` would report an ' +
     'unfinished deployment as a caller who is not an operator, on the endpoint that releases ' +
-    'held payouts. MONEY PATH.',
+    'held payouts. ' +
+    'AND `AdminPayoutBackend`s `operator` (`routes/admin-payouts.ts:383`) IS A SECOND BLOCKER ' +
+    'THIS ENTRY DID NOT NAME (ADR-369, ADR-375). It is the member that YIELDS the `AdminPayoutTx` ' +
+    'those four methods run on, so an entry that enumerated the four and called this port the ' +
+    'closest of the five to wireable was describing the handle and never the door that opens it. ' +
+    'It runs at an operator authority and needs a `SystemTx`; `ApiDb` (`apps/api/src/db.ts:173`) ' +
+    'declares five doors and NONE YIELDS ONE, refused by ADR-171 clause 1. THE SAME MEMBER IS ' +
+    'UNNAMED BY THREE SIBLING ENTRIES AND THAT IS ONE HOLE FOUR TIMES rather than four ' +
+    'oversights (ADR-358s mechanism, measured by ADR-369 section 4). The shut door is DERIVED ' +
+    'and asserted below rather than restated in each of the four, so the day it opens every ' +
+    'one of these clauses expires at once and the case names them. ' +
+    'MONEY PATH.',
   useAdminWalletBackend:
     '`principal(request)` (`routes/admin-wallet.ts:679`), blocked on `setAdminSessionSource` ' +
     'above, AND THREE FURTHER MEMBERS: `operator`, `writeCorrection` and `reconcile`. ' +
@@ -472,7 +650,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`packages/rules-engine/src/index.ts:185`). ADR-171 finding 10. That stale sentence ' +
     "survived in this port's own docstring, which was outside that entry's fence and is inside " +
     "ADR-251's; it is repaired at the source. `test/admin-write-trading-day.test.ts` derives " +
-    'every clause here from source on every run.',
+    'every clause here from source on every run. ' +
+    'AND `AdminWriteBackend`s `operator` (`routes/admin-writes.ts:267`) IS A BLOCKER THIS ENTRY ' +
+    'DID NOT NAME (ADR-369, ADR-375), WHICH IS WHY "ONE SUPPLIER" IS THE CLAUSE THIS PORT HAS ' +
+    'CARRIED WRONGLY TWICE. It yields the `AdminWriteTx` that freezes an account, closes one and ' +
+    'publishes a plan version, so the port with the widest write surface on this deployable named ' +
+    'every obstruction except the one that opens the transaction. ' +
+    'It runs at an operator authority and needs a `SystemTx`; `ApiDb` (`apps/api/src/db.ts:173`) ' +
+    'declares five doors and NONE YIELDS ONE, refused by ADR-171 clause 1. THE SAME MEMBER IS ' +
+    'UNNAMED BY THREE SIBLING ENTRIES AND THAT IS ONE HOLE FOUR TIMES rather than four ' +
+    'oversights (ADR-358s mechanism, measured by ADR-369 section 4). The shut door is DERIVED ' +
+    'and asserted below rather than restated in each of the four, so the day it opens every ' +
+    'one of these clauses expires at once and the case names them. ' +
+    'MONEY PATH.',
 
   // ---------------------------------------------------------------------------
   // THE LEDGER DOOR, AND THE TWO PORTS THAT REACHED FOR IT ARE NOW ONE.
@@ -1467,7 +1657,18 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "(`routes/admin-certificates.ts:363`) is `GET /verify/:code`'s copy, and the " +
     "`account_enforced` sentence is `OQ-M11-02`, still open. THIS ROUTE REVOKES A TRADER'S " +
     'PUBLIC PROOF; a backend that answered plausibly would be a fixture doing that to real ' +
-    'people.',
+    'people. ' +
+    'AND `AdminCertificateBackend`s `operator` (`routes/admin-certificates.ts:344`) IS A BLOCKER ' +
+    'THIS ENTRY DID NOT NAME (ADR-369, ADR-375). It yields the `AdminCertificateTx` the revoke ' +
+    'writes on, and the five citations this entry does carry are all about WHICH ROWS that ' +
+    'handle would have to span; none of them is about whether anything can hand one over. ' +
+    'It runs at an operator authority and needs a `SystemTx`; `ApiDb` (`apps/api/src/db.ts:173`) ' +
+    'declares five doors and NONE YIELDS ONE, refused by ADR-171 clause 1. THE SAME MEMBER IS ' +
+    'UNNAMED BY THREE SIBLING ENTRIES AND THAT IS ONE HOLE FOUR TIMES rather than four ' +
+    'oversights (ADR-358s mechanism, measured by ADR-369 section 4). The shut door is DERIVED ' +
+    'and asserted below rather than restated in each of the four, so the day it opens every ' +
+    'one of these clauses expires at once and the case names them. ' +
+    'MONEY PATH.',
   // ---------------------------------------------------------------------------
   // The cash door. THE REASON THAT STOOD HERE WAS FALSE AND IS REPLACED RATHER
   // THAN DELETED, because it was true when it was written. ADR-172.
@@ -1857,6 +2058,150 @@ test('the wired count is reported, so a regression is a number and not a paragra
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
   }).toStrictEqual({ declared: 25, wired: 11, blocked: 14 });
+});
+
+test('no port is installed twice, which `wired` cannot report because it is a set', () => {
+  // ADR-372 SECTION 10 ITEM 2, IN THE FILE THAT OWES IT. `wired` is a `Set`, so
+  // a second install of one port enters it once and the triple reports one
+  // install where a deployment performs two. What a second install DOES at run
+  // time is the setter's business and not this file's: some overwrite, some
+  // ignore, and the reader of the triple has no way to tell that a choice
+  // between two backends was taken at all.
+  //
+  // THE LIST IS THE INPUT AND THE SET IS DERIVED FROM IT, which is the only
+  // reason this is assertable here rather than only in a neighbouring file.
+  const counted = new Map<string, number>();
+  for (const install of installs) counted.set(install.port, (counted.get(install.port) ?? 0) + 1);
+
+  expect(
+    [...counted]
+      .filter(([, times]) => times > 1)
+      .map(([port, times]) => `${port} (${String(times)} times)`)
+      .sort(),
+    'a port is installed more than once and the wiring triple counts it once. Two installs of ' +
+      'one port is a choice about which backend serves and it must be one line',
+  ).toStrictEqual([]);
+
+  // NON-VACUITY. A tree that parsed to nothing satisfies the clause above.
+  expect(installs.length).toBeGreaterThan(0);
+});
+
+test('the two derivations of `wired` agree here, and the shapes where they cannot are named', () => {
+  // WHAT THIS CASE IS AND IS NOT. It is NOT a claim that the line pattern is
+  // sound; ADR-372 measured that it is not, and the fixtures below are that
+  // measurement executed rather than quoted. It is the bar that goes red the
+  // day the two part, so that a pattern which stopped meaning what it means is
+  // a failure here rather than a quiet second opinion nobody asked for.
+  expect(
+    [...wiredByText].sort(),
+    'the ports the line pattern sees and the ports a run would install have parted. `wired` is ' +
+      'the program derivation and is not moved by this: what has changed is that the pattern, ' +
+      'which `test/start-program.test.ts` reads out of this file, no longer describes it',
+  ).toStrictEqual([...wired].sort());
+
+  // THE FIVE SHAPES, EACH A WHOLE MODULE, SCANNED BY THE PATTERN AND PARSED BY
+  // THE DERIVATION. Every one of them is a shape the pattern counts as WIRED
+  // while a run installs nothing, and the second is `RI-25`'s own class: a
+  // control passing while the thing it guarded was merely commented out.
+  const shapes: readonly (readonly [string, string, boolean])[] = [
+    ['an honest top-level install', 'useGhostBackend(ghost());\nawait main();\n', true],
+    ['a line comment', '// useGhostBackend(ghost());\nawait main();\n', true],
+    [
+      'a call nested in a conditional',
+      'if (flag)\n  useGhostBackend(ghost());\nawait main();\n',
+      true,
+    ],
+    [
+      'an UNINDENTED call nested in a conditional',
+      'if (flag)\nuseGhostBackend(ghost());\nawait main();\n',
+      false,
+    ],
+    ['a BLOCK comment', '/*\nuseGhostBackend(ghost());\n*/\nawait main();\n', false],
+    ['a call AFTER `main()`', 'await main();\nuseGhostBackend(ghost());\n', false],
+    [
+      'dead code after a top-level `throw`',
+      "throw new Error('x');\nuseGhostBackend(ghost());\nawait main();\n",
+      false,
+    ],
+    [
+      'a call inside a template literal',
+      'const s = `\nuseGhostBackend(ghost());\n`;\nawait main();\n',
+      false,
+    ],
+  ];
+
+  const parted: string[] = [];
+  for (const [label, source, agrees] of shapes) {
+    const byText = matches(source, CALLS).join(',');
+    const byProgram = installsBeforeServing(parseModule('fixture.ts', source))
+      .map((install) => install.port)
+      .join(',');
+    if ((byText === byProgram) !== agrees) parted.push(label);
+    // AND THE DERIVATION IS RIGHT IN EVERY ONE OF THEM, which is the half that
+    // says the disagreement is the pattern's rather than a coin toss. Only the
+    // honest install installs anything.
+    expect(byProgram, `the derivation counts ${label} as an install`).toBe(
+      label === 'an honest top-level install' ? 'useGhostBackend' : '',
+    );
+  }
+
+  expect(
+    parted,
+    'a shape the line pattern was measured to miscount now behaves differently. The census of ' +
+      'what a text derivation cannot see is the finding, so a change here is a change to the ' +
+      'finding rather than a test to adjust',
+  ).toStrictEqual([]);
+
+  // THE FIVE ARE NAMED RATHER THAN COUNTED, so one leaving the list arrives in
+  // the diff carrying its own name. THE FIRST IS THE ONE ADR-372 COULD NOT
+  // NAME: an unindented nested call is refused by the pattern only because
+  // `prettier` would never write it and `format:check` is a gate in a DIFFERENT
+  // runner. It is here because the reliance is what was owed, and a fixture is
+  // the only place a formatter cannot reach in to hold the answer up.
+  expect(shapes.filter(([, , agrees]) => !agrees).map(([label]) => label)).toStrictEqual([
+    'an UNINDENTED call nested in a conditional',
+    'a BLOCK comment',
+    'a call AFTER `main()`',
+    'dead code after a top-level `throw`',
+    'a call inside a template literal',
+  ]);
+});
+
+test('`wired` is initialised from the program derivation rather than from the pattern', () => {
+  // THIS CASE EXISTS BECAUSE A SEED WENT GREEN. Reverting the line below to
+  // `new Set(matches(startSource, CALLS))` left EVERY case in this file passing,
+  // including the agreement case above, because that case then compares the text
+  // derivation with itself and the two agree on this tree by construction. The
+  // fixtures defend `installsBeforeServing`; nothing defended that `wired` USES
+  // it, and a fixture cannot: on a tree where the two derivations agree, no
+  // observation of `wired` can tell which one produced it.
+  //
+  // SO THE BIND IS STRUCTURAL AND THIS ENTRY SAYS SO RATHER THAN DRESSING IT UP.
+  // It reads this file's own source and asserts the initialiser, on the same
+  // precedent `test/start-program.test.ts` uses when it reads `CALLS` out of
+  // here: a derivation that can be silently swapped is a derivation nobody is
+  // holding. IT IS ANCHORED AT THE START OF A LINE, because `toContain` on a
+  // whole-file read is satisfied by the statement COMMENTED OUT, which is the
+  // weakness ADR-371 section 7 found in its own case 2 on that case's first run.
+  const own = read(join(HERE, 'wiring.test.ts'));
+
+  expect(
+    /^const wired: ReadonlySet<string> = new Set\(installs\.map\(/m.test(own),
+    '`wired` is no longer initialised from `installs`, the set a run would install. If the ' +
+      'derivation moved on purpose, move this assertion with it; if it was reverted to the line ' +
+      'pattern, the wiring triple is reporting what a scanner sees rather than what a ' +
+      'deployment serves and nothing else in this file would have said so',
+  ).toBe(true);
+
+  // AND THE PATTERN IS STILL DECLARED IN THE SHAPE ITS OTHER READER EXPECTS.
+  // `test/start-program.test.ts` extracts `CALLS` from this file by that exact
+  // line shape, and a derivation nobody can find becomes a silently empty set
+  // one file over rather than a red bar there.
+  expect(
+    /^const CALLS = \/(.+)\/([a-z]*);$/m.test(own),
+    '`CALLS` is no longer declared in the one-line shape `test/start-program.test.ts` reads it ' +
+      'out of, so that file would scan `start.ts` with an empty pattern and agree with nothing',
+  ).toBe(true);
 });
 
 // -----------------------------------------------------------------------------
@@ -2904,9 +3249,14 @@ test('the one port whose derived verdict and whose measured wire behaviour disag
 //      backtick as an APOSTROPHE, so `usePayoutBackend` and
 //      `useWithdrawalBackend` carry an ODD number of backticks and every
 //      span-pairing reader desynchronises at the first one. That is the same
-//      hazard `RI-15` met at `wiring.test.ts:215` and it is met here the same
+//      hazard `RI-15` met at `wiring.test.ts:357` and it is met here the same
 //      way, by reading the backtick immediately before the name rather than by
-//      pairing from the start.
+//      pairing from the start. THAT POINTER READ `:215` AND THIS ROW BROKE IT
+//      ITSELF (ADR-375): the derivation above added lines and every one of the
+//      FIFTY citations into this file drifted with them, while `RI-15` and
+//      `RI-16` stayed green because not one of the fifty carries a name they
+//      can check. This is the only one inside this row fence and the rest are
+//      reported rather than repaired.
 //
 //   3. THE TRAILING CHARACTER MAY NOT CONTINUE AN IDENTIFIER OR A PATH, so that
 //      a member name that is a PREFIX of a longer backticked token, as `operator`
@@ -3101,15 +3451,15 @@ test('the members no entry names are pinned, so a bare name is not free and a ne
       'listFlags',
       'listEvents',
     ],
-    useAdminPayoutBackend: ['operator', 'now'],
+    useAdminPayoutBackend: ['now'],
     useAdminWalletBackend: ['now'],
-    useAdminWriteBackend: ['operator', 'now'],
+    useAdminWriteBackend: ['now'],
     useCheckoutBackend: ['transact'],
     useCheckoutAdapters: ['adapterFor', 'enrichment'],
     useTurnstileVerifier: ['verify'],
     useKycDeps: ['backend'],
     useAffiliateDeps: ['backend'],
-    useCertificateRevokeBackend: ['operator', 'now'],
+    useCertificateRevokeBackend: ['now'],
     useWithdrawalBackend: ['transact', 'idempotency', 'now'],
   });
 
@@ -3172,4 +3522,72 @@ test('the admin wallet entry enumerates the members it blocks and the figure is 
     'ADR-366 measured that `operator` is the member this entry did not name and the one both ' +
       'of the module appends travel through. Removing it re-opens the defect',
   ).toContain('operator');
+});
+
+test('the four entries that block on `operator` block on ONE shut door, and it is still shut', () => {
+  // ADR-369 SECTION 4 FOUND THE SAME TWO MEMBERS MISSING FROM FOUR ENTRIES AND
+  // CALLED IT ONE HOLE FOUR TIMES. ADR-369 repaired one of the four and the
+  // other three were left owed; this case is what makes repairing them worth
+  // more than three paragraphs. THE FOUR CLAUSES REST ON ONE FACT ABOUT `ApiDb`
+  // AND THE FACT IS DERIVED HERE RATHER THAN RESTATED IN EACH OF THEM.
+  //
+  // IT FAILS ON GOOD NEWS, WHICH IS THE POINT. The day `ApiDb` opens a door
+  // yielding a `SystemTx`, every one of those four clauses stops being true in
+  // the same instant, and this bar goes red naming all four rather than each
+  // entry going stale on its own schedule for somebody to find one at a time.
+  const withOperator = CENSUS.filter((row) => row.members.includes('operator'))
+    .map((row) => row.port)
+    .sort();
+
+  expect(
+    withOperator,
+    'the set of blocked ports whose interface declares `operator` has moved. Each of these ' +
+      'entries accounts for that member by naming the door below, so a port joining or ' +
+      'leaving this set owes an accounting or has one nothing needs',
+  ).toStrictEqual([
+    'useAdminPayoutBackend',
+    'useAdminWalletBackend',
+    'useAdminWriteBackend',
+    'useCertificateRevokeBackend',
+  ]);
+
+  // AND EVERY ONE OF THEM NAMES IT, which is the ADR-369 repair asserted rather
+  // than trusted to survive the next rewrite of an entry.
+  for (const port of withOperator)
+    expect(
+      namesMember(BLOCKED[port] ?? '', 'operator'),
+      `\`${port}\`s entry does not name \`operator\`, the member that yields its transaction. ` +
+        'ADR-369 measured this omission on four entries at once and ADR-375 repaired the three ' +
+        'it left; a rewrite that drops the name re-opens it',
+    ).toBe(true);
+
+  // THE DOOR ITSELF, SLICED OUT OF `ApiDb` RATHER THAN GREPPED OVER `db.ts`. A
+  // whole-file grep would be satisfied by the word appearing in a comment
+  // arguing that the door does NOT exist, which is exactly what `db.ts` holds.
+  const dbSource = read(join(SRC, 'db.ts'));
+  const doors = interfaceMembers(dbSource, 'ApiDb');
+  expect(
+    doors.length,
+    '`ApiDb` sliced to no members, so the claim below would pass against nothing',
+  ).toBeGreaterThan(0);
+
+  const opening = new RegExp('^export interface ApiDb\\b', 'm').exec(dbSource);
+  const body = dbSource.slice(
+    opening?.index ?? 0,
+    pastBracket(dbSource, dbSource.indexOf('{', opening?.index ?? 0)),
+  );
+
+  // NON-VACUITY IN BOTH DIRECTIONS: the slice really is the door list, so a
+  // slicer that returned an empty string could not report the absence below.
+  expect(body, 'the `ApiDb` slice no longer carries the doors this deployable does open').toMatch(
+    /FirmTx/,
+  );
+
+  expect(
+    /SystemTx/.test(body),
+    '`ApiDb` now declares a door yielding a `SystemTx`. That is GOOD NEWS and it expires the ' +
+      '`operator` clause in all four entries at once: ' +
+      withOperator.join(', ') +
+      '. Re-read each of them against the door that landed rather than deleting this case',
+  ).toBe(false);
 });
