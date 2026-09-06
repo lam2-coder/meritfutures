@@ -9063,6 +9063,26 @@ const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
  * THE BACKLOG: migrations that landed with no record, each with the file and
  * the ruling its own header cites.
  *
+ * IT IS EXPORTED, AND THAT IS A SEAM THE EMPTINESS FORCED RATHER THAN A
+ * CONVENIENCE. `packages/db/test/migration-landing-record.test.ts` carries a
+ * case per leg, and leg 3's two cases used a LIVE register entry (`0073`) as
+ * their fixture. With the register empty there is no live entry left to seed
+ * from, so leg 3 would have become untestable and its cases would have been
+ * deleted -- coverage lost to a repair, which is the worst of the options. The
+ * suite now seeds an entry into this Map and removes it in a `finally`, so leg
+ * 3 is asserted exactly as before against a register that holds nothing. THE
+ * CHECK'S BEHAVIOUR IS UNCHANGED: nothing here reads the export and no caller
+ * writes to it outside that suite.
+ *
+ * IT IS EMPTY, AS OF 2026-09-05, AND THE EMPTINESS IS THE POINT RATHER THAN A
+ * REASON TO DELETE IT. Every `nnnn_*.sql` under packages/db/migrations now has
+ * a landing record, so leg 1 is UNCONDITIONAL from here: a merged migration
+ * with no section is a finding on the commit that merges it and there is no
+ * row left to absorb one. Deleting the map would delete leg 3 with it, and leg
+ * 3 is the mechanism that emptied it; the next twenty-migration backlog would
+ * then arrive with nowhere to be registered and would be argued about in prose
+ * instead. An empty map asserts nothing and costs one iteration of a loop.
+ *
  * IT IS A REGISTER AND NOT AN EXEMPTION LIST, and the difference is leg 3: an
  * entry naming a migration that HAS a record, or a migration that is not on
  * disk, is a finding. So a session that writes one of these sections must
@@ -9077,14 +9097,24 @@ const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
  * of measured is the exact thing this check exists to make somebody stop and do
  * properly.
  *
- * IT HAS SHRUNK TWICE AND EACH SHRINK IS THE MECHANISM WORKING. ADR-334 opened
- * it at TWENTY entries. ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for
- * `0052` to `0057`, the chart-of-accounts and ledger-code run, and deleted
- * those six rows in the same commit. ADR-336 wrote sections 46 to 48 for
- * `0068`, `0070` and `0072`, the withdrawal-approval run, and deleted those
- * three. Both measured against PostgreSQL 16.13 rather than reconstructed.
- * ELEVEN remain and SIX of them open with an `E2 READ: MONEY PATH` header,
- * counted off the files rather than off these rows.
+ * IT SHRANK FIVE TIMES AND REACHED ZERO, AND EACH SHRINK IS THE MECHANISM
+ * WORKING. ADR-334 opened it at TWENTY entries. ADR-335 wrote DELTA_MANIFEST
+ * sections 40 to 45 for `0052` to `0057`, the chart-of-accounts and
+ * ledger-code run, and deleted those six rows in the same commit. ADR-336
+ * wrote sections 46 to 48 for `0068`, `0070` and `0072`, the
+ * withdrawal-approval run, and deleted those three. ADR-351 took the remaining
+ * eleven in three clusters: sections 49 to 51 for `0037`, `0059` and `0063`;
+ * sections 52 to 55 for `0039`, `0040`, `0041` and `0043`; sections 56 to 59
+ * for `0044`, `0050`, `0073` and `0074`. Every one of the twenty was measured
+ * against PostgreSQL 16.13 rather than reconstructed from its ADR.
+ *
+ * WHAT THE ZERO DOES NOT MEAN. This check reads no content, so it cannot tell
+ * a section measured against a database from one copied out of a ruling, which
+ * is the distinction ADR-334 refused to blur when it opened the register
+ * rather than writing twenty sections in one diff. Nor does it mean the
+ * schema is watched: ADR-351 section 3 measured that FOUR of its eleven are
+ * covered by nothing under scripts/db/, `0044` and `0074` among them, and both
+ * of those open with an `E2 READ: MONEY PATH` header.
  *
  * THE MONEY-PATH FIGURE ADR-334 RECORDED WAS SIXTEEN OF TWENTY AND THE MEASURED
  * FIGURE IS FIFTEEN. `0073_operator_directory.sql:4` opens `NOT THE MONEY PATH
@@ -9094,19 +9124,7 @@ const SECTION_NUMBER_ROW = /^\|\s*\*{0,2}(\d+)(?:\s+to\s+(\d+))?\*{0,2}\s*\|/;
  * two halves of that entry disagreed and this one, the machine-readable half,
  * was right. No merged record is amended; ADR-335 reports it.
  */
-const LANDING_RECORD_BACKLOG = new Map([
-  ['0037', '0037_supersede_rule_states_high_water_bounds_balance.sql, ADR-053. MONEY PATH'],
-  ['0039', '0039_economic_calendar.sql, ADR-066 via FOLD-03'],
-  ['0040', '0040_report_schedules.sql, ADR-066 via FOLD-03'],
-  ['0041', '0041_contact_channel_complaints.sql, ADR-066 via FOLD-03'],
-  ['0043', '0043_admin_attributed_actions.sql, ADR-069 via FOLD-04'],
-  ['0044', '0044_fee_back_and_ladder_unlock.sql, ADR-070 via FOLD-05. MONEY PATH'],
-  ['0050', '0050_live_cache_and_role.sql, ADR-164. MONEY PATH'],
-  ['0059', '0059_reversal_chain.sql, ADR-193. MONEY PATH'],
-  ['0063', '0063_otp_challenge_consumption.sql, ADR-200. MONEY PATH'],
-  ['0073', '0073_operator_directory.sql, ADR-237'],
-  ['0074', '0074_firm_parameters.sql, ADR-252 is the ruling. MONEY PATH'],
-]);
+export const LANDING_RECORD_BACKLOG = new Map([]);
 
 /**
  * Every landing record `packages/db/DELTA_MANIFEST.md` carries, by migration
@@ -9244,14 +9262,19 @@ const ri37 = {
     'claim about one migration set rather than a property of the check and ' +
     'constitution E2 already forbids deleting a merged migration; a mis-keyed ' +
     'row is caught by leg 1 instead, since the number it failed to absorb is ' +
-    'then reported as unrecorded. IT OPENED AT TWENTY UNDER ADR-334 AND HOLDS ELEVEN, ' +
-    'SIX of them carrying an `E2 READ: MONEY PATH` header, each with its file and the ADR its own header ' +
-    'cites; ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for `0052` to `0057` ' +
-    'and deleted those six rows in the same commit, and ADR-336 wrote sections ' +
-    '46 to 48 for `0068`, `0070` and `0072` and deleted those three, which is ' +
-    'leg 3 doing its work rather than an allowlist being trimmed. ' +
+    'then reported as unrecorded. IT OPENED AT TWENTY UNDER ADR-334 AND IS NOW EMPTY: ' +
+    'ADR-335 wrote DELTA_MANIFEST sections 40 to 45 for `0052` to `0057` ' +
+    'and deleted those six rows in the same commit, ADR-336 wrote sections ' +
+    '46 to 48 for `0068`, `0070` and `0072` and deleted those three, and ADR-351 ' +
+    'wrote sections 49 to 59 for the remaining eleven and deleted them across ' +
+    'three commits, which is leg 3 doing its work rather than an allowlist ' +
+    'being trimmed. SO LEG 1 IS UNCONDITIONAL FROM HERE and a merged migration ' +
+    'with no section is a finding on the commit that merges it. THE EMPTY MAP ' +
+    'IS KEPT RATHER THAN DELETED, because deleting it takes leg 3 out of the ' +
+    'tree and the next backlog would have nowhere to be registered. ' +
     'A migration outside it with no record is a finding on the commit ' +
-    'that adds it, so the backlog cannot grow without an edit to this file. ' +
+    'that adds it, so the backlog cannot grow without an edit to this file, ' +
+    'and with the register empty that is EVERY migration. ' +
     'LEG 4 IS THE OTHER REGISTRY IN THE SAME FILE AND IT CLOSES THIS CHECK`s ' +
     'OWN INSTRUCTION (ADR-337): leg 1 tells a session to claim the section`s ' +
     'number in section 16`s section-number table and nothing could tell ' +

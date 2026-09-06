@@ -1536,6 +1536,43 @@ export function databaseAuthBackend(
     // endpoint that is already 503. `GET /me` serves a trader their own account,
     // and a `Me` that cannot be assembled without a row nobody has written makes
     // the whole response unavailable rather than one number.
+    //
+    // -------------------------------------------------------------------------
+    // CORRECTED BY ADR-341, AND THE SENTENCE IT CORRECTS IS KEPT BESIDE IT
+    // -------------------------------------------------------------------------
+    // THE CLAUSE THAT WAS WRONG IS THE LAST ONE, AND IT WAS WRONG BY BEING
+    // NARROWER THAN IT READS. "Every other field of `Me` is reachable through
+    // the scoped door" is a claim about the DOOR and it is still TRUE: `users`,
+    // `accounts`, `kycVerifications`, `identityPhones`, `affiliates` and
+    // `identityRestrictionEpisodes` are all `owned` and `identities` is `root`,
+    // so a scoped transaction reaches every row this response needs. WHAT IT WAS
+    // READ AS SAYING, AND WHAT THE ROW DISPATCHING ADR-341 REPEATED, is that the
+    // cap was the LAST thing between this method and a response. REACHABLE IS
+    // NOT RESOLVABLE, and two more fields have a reachable row and no reader:
+    //
+    //   `Me.kyc.placement` IS NON-NULLABLE IN THE CONTRACT AND AN IDENTITY WITH
+    //   NO VERIFICATION HAS NO FIRED TRIGGER TO REPORT. The one settled fill is
+    //   `pendingTrigger` in `routes/kyc.ts`, the earliest UNREACHED member of
+    //   the trader's own pinned trigger set, and it is computed from the seven
+    //   `KycGateFacts` a `KycBackend` measures. THERE IS NO DATABASE `KycBackend`
+    //   IN THIS DEPLOYABLE: `productionKycDeps.backend` is `UNWIRED_KYC_BACKEND`
+    //   and no `databaseKyc` factory exists to install. Writing a second fill
+    //   here would be a second statement of ADR-021's trigger ruling, in the
+    //   file least likely to be read beside the first.
+    //
+    //   `Me.accounts_count` HAS EXACTLY ONE READER AND NO PRODUCER. It is
+    //   projected in `routes/me.ts` and computed nowhere: `liveAccounts` exists
+    //   as a field of `AccountCapRow` in `routes/checkout.ts`, on a port whose
+    //   backend is itself blocked, `account_status` declares SEVEN members and
+    //   NOTHING IN THE CORPUS SAYS WHICH OF THEM ARE LIVE. ADR-238 already
+    //   registered this in its own approval block: "no implementation of
+    //   `accountCap` exists to confirm it".
+    //
+    // SO THE HEADLINE IS NOT ONE INTEGER. It is one integer, one fold and one
+    // count, and ADR-341 rules that saying so is worth more than a method that
+    // would still refuse. The cap clause below is unchanged, because it was
+    // right about the cap. `apps/api/test/me-blockers.test.ts` RUNS all three
+    // rather than reading them.
     readMe: blocked(
       'readMe',
       '`Me.max_accounts` has a source, has a READER, and has no ROW. ' +
@@ -1551,7 +1588,25 @@ export function databaseAuthBackend(
         'reading and is why wiring this method would make the WHOLE of `GET /me` unavailable ' +
         'rather than put a number nobody approved on the response that quotes the buyer their ' +
         'own limit. Every other field of `Me` is reachable through the scoped door, which is ' +
-        'what makes this one worth reporting rather than working around',
+        'what makes this one worth reporting rather than working around. ' +
+        'ADR-341 CORRECTED THE LAST CLAUSE AND KEPT IT, BECAUSE REACHABLE IS NOT RESOLVABLE. ' +
+        'The door reaches every row and TWO MORE FIELDS HAVE NO READER. `Me.kyc.placement` is ' +
+        'a non-nullable string in the contract and an identity with no verification has no ' +
+        'fired trigger to report; the one settled fill is `pendingTrigger` in `routes/kyc.ts`, ' +
+        'over the seven `KycGateFacts` a `KycBackend` measures, and THIS DEPLOYABLE HAS NO ' +
+        'DATABASE `KycBackend` at all -- `productionKycDeps.backend` is `UNWIRED_KYC_BACKEND` ' +
+        'and no `databaseKyc` factory exists to install -- so a fill written here would be a ' +
+        "second statement of ADR-021's trigger ruling. `Me.accounts_count` is projected in " +
+        '`routes/me.ts` and computed NOWHERE: `liveAccounts` is a field of `AccountCapRow` on ' +
+        'a port that is itself blocked, `account_status` declares seven members, and the ' +
+        'corpus never says which of them are live. ' +
+        'AND THE CAP ROW IS NOT LANDABLE BY THIS REPOSITORY EVEN WITH A RULED NUMBER. ADR-284 ' +
+        'built the write control in `0076_firm_parameter_write_control.sql`, so a ' +
+        '`firm_parameters` row needs a `dual_control_approvals` row approved by TWO DISTINCT ' +
+        '`owner` operators and an `admin_actions` row, and `0076` refuses to seed an operator ' +
+        "because a real operator's identifiers are not this repository's to hold (ADR-012). " +
+        'Writing the cap is a DEPLOY-TIME act through that control and never a seed migration, ' +
+        'which is why ADR-341 takes no migration number',
     ),
   };
 }

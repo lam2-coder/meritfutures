@@ -2,7 +2,10 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
+
+import { resetCertificateRateLimiter } from '../src/certificate-rate-limit.ts';
+import { admitEveryRequest } from './support/certificate-rate-limit.ts';
 
 import {
   CERTIFICATE_CARD_MAX_AGE_VAR,
@@ -75,8 +78,20 @@ const SRC = join(REPO, 'apps', 'api', 'src');
 
 const onDisk = await discoverRouteModules();
 
+// THE LIMIT IS NOT WHAT THIS FILE ASSERTS AND IT SAYS SO RATHER THAN INHERITING
+// IT. ADR-347 put a fail-closed rate limiter ahead of both public certificate
+// rows, so every case below would answer 503 under the port's own default. The
+// stub `admitEveryRequest` installs counts nothing, which keeps a per-file
+// request budget from coupling cases that assert something else;
+// `certificate-rate-limit.test.ts` is where the real limiter is driven over its
+// threshold, held under it, and stripped of its configuration.
+beforeEach(() => {
+  admitEveryRequest();
+});
+
 afterEach(() => {
   resetCertificateImageSource();
+  resetCertificateRateLimiter();
 });
 
 // -----------------------------------------------------------------------------
