@@ -365,6 +365,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-351](ADR-351.md) | the eleven migrations `RI-37` still registered as having no landing record get one, all eleven measured against PostgreSQL 16.13 rather than reconstructed, the backlog register that opened at twenty reaches zero and stops being a register, and the manifest's superseded `OI` table is found carrying nine stale STATE cells that its own superseding banner never claimed to supersede (2026-09-05, status: proposed) |
 | [ADR-352](ADR-352.md) | the breaker evaluator gets four of its five ports, the fifth is shown to be unreachable rather than unwritten, the synchronous `tradingDayOf` is found to have no synchronous source and is anchored once instead, and the job stays unscheduled with three blockers named of which the third is new (2026-09-05, status: proposed) |
 | [ADR-353](ADR-353.md) | the digest alarm gets all three of its ports and nothing in the adapter refuses, the dispatched expectation that a refusal would be surprising is confirmed, and the job stays off a clock because its subject set is empty rather than because its work is unsafe (2026-09-05, status: proposed) |
+| [ADR-354](ADR-354.md) | the digest producer gets four of its six ports, the transport's two channels are shown to block differently and only one of them is unwritten, and the job stays off a clock on a third blocker that a transport would not discharge (2026-09-05, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

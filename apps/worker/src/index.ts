@@ -1376,6 +1376,43 @@ export type {
   ProducerSchedule,
 } from './digests/produce.ts';
 
+// **THE DELIVERY PRODUCER'S ADAPTER, AND IT SERVES FOUR OF `DigestIo`'s SIX.**
+// `./digests/adapter.ts` builds `transact` over this deployable's one door,
+// `terms` over the accessor's `atLeast`, and takes the clock and the trading day
+// as arguments. `content` and `transport` REFUSE, and the blockers are DATA
+// rather than a paragraph: `DIGEST_TRANSPORT_BLOCKERS` and
+// `DIGEST_CONTENT_BLOCKERS` carry each one with the source it was read from, and
+// `test/digests-adapter.test.ts` RUNS them, so a blocker that dissolves turns
+// the suite red instead of leaving a stale sentence behind.
+//
+// **THE TRANSPORT'S TWO CHANNELS HAVE DIFFERENT BLOCKERS AND THE DIFFERENCE IS
+// THE RULING.** `sftp` is UNREACHABLE: `OQ-F3-04` is open and it is the
+// founder's, because `M06` section 3.6 and `ADR-066` section 3 both call SFTP a
+// SECOND CREDENTIAL SURFACE. `email` is UNWRITTEN, and what it waits on is a
+// vendor ruling rather than an adapter: a working sender exists one deployable
+// away and `ADR-229`'s own argument for it is that the credential scopes to
+// sending from ONE server.
+//
+// **CONSTRUCTING THE VALUE ARMS NOTHING AND A CLOCK WOULD**, which is why
+// `schedule.ts` keeps the delivery row `unscheduled` with this file present.
+// `deliverOne` CATCHES a refusing port and writes `failed`, and `0040` revokes
+// `UPDATE` and `DELETE` on `report_deliveries`, so a scheduled run would write
+// one permanent `failed` row per schedule per window for a transport that never
+// existed.
+export {
+  DIGEST_CONTENT_BLOCKERS,
+  DIGEST_READ_FILTERS,
+  DIGEST_TERMS,
+  DIGEST_TRANSPORT_BLOCKERS,
+  DigestAdapterError,
+  DigestRunRefusal,
+  digestTxOver,
+  postgresDigestIo,
+  resolveDigestTradingDay,
+  tradingDayAnchoredAt,
+} from './digests/adapter.ts';
+export type { DigestBlocker, DigestDbTx } from './digests/adapter.ts';
+
 // -----------------------------------------------------------------------------
 // M10's LIFECYCLE MESSAGING (session 328, P7-m)
 // -----------------------------------------------------------------------------
@@ -1615,6 +1652,7 @@ export const WORKER_BARREL_LEGS = [
   './detectors/ports.ts',
   './detectors/runner.ts',
   './digests/alarm-adapter.ts',
+  './digests/adapter.ts',
   './digests/alarm.ts',
   './digests/ports.ts',
   './digests/produce.ts',

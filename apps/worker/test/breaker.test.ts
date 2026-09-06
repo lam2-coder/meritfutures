@@ -1008,6 +1008,13 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // DERIVED at the merge that carries them and is not this branch's
     // prediction plus one.
     './digests/alarm-adapter.ts',
+    // ADR-354, session 549, AND THE EIGHTH TIME THE PARAGRAPH FORTY LINES UP HAS
+    // PREDICTED THIS EDIT. The scheduled digest producer's adapter: four of
+    // `DigestIo`'s six members over this deployable's own door and clock, with
+    // `content` and `transport` refusing and their blockers carried as DATA
+    // rather than as prose. That row's fence carries `apps/worker/test/**`, so
+    // this file is inside it and the line is assigned rather than reached for.
+    './digests/adapter.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
   // **34 SINCE ADR-353 ADDED `./digests/alarm-adapter.ts`, DERIVED FROM THE
@@ -1067,5 +1074,25 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // the moment of writing is on a branch and the number is a property of the
   // merge. Only the merge can count, and 35 is what the regex reads over
   // `src/index.ts` with both legs present.
-  expect(new Set(legs).size).toBe(35);
+  // (That reading was correct on the two-leg merge and is superseded below,
+  // kept under `RI-14` because it is the step that produced the number.)
+  // **34 SINCE ADR-354 ADDED `./digests/adapter.ts`, AND THE NUMBER IS WHAT THE
+  // ASSERTION REPORTED WITH THE LEG PRESENT RATHER THAN 33 PLUS ONE.** The
+  // paragraph above records four concurrent rows each typing a number one or two
+  // short in a single wave, so this row COUNTED instead of subtracting: the
+  // regex above was run over `src/index.ts` as it stands and printed 34.
+  // **TWO SIBLING ROWS ARE ADDING A LEG EACH ON BRANCHES THIS ONE CANNOT SEE**
+  // (`352`, the breaker evaluator's io, and `353`, the digest alarm's), so the
+  // merge that keeps every leg is again the merge that has to count them, and 35
+  // or 36 on a merged head is this literal working rather than this row being
+  // wrong.
+  //
+  // **AND 36 SINCE ADR-354 ADDED `./digests/adapter.ts`. THE ROW ABOVE CALLED
+  // THIS OUTCOME BEFORE IT HAPPENED**: "35 or 36 on a merged head is this
+  // literal working rather than this row being wrong." It is 36, and all three
+  // of `352`, `353` and `354` wrote 34 on their own branches, each correctly.
+  // **THREE ROWS DERIVING CORRECTLY STILL PRODUCE A WRONG MERGED TOTAL**, which
+  // is the whole lesson and is why the number below is read off the regex on the
+  // merged tree and nowhere else.
+  expect(new Set(legs).size).toBe(36);
 });
