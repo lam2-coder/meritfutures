@@ -589,19 +589,26 @@ describe('what each message says about its door is what the key sets say', () =>
     expect(SCOPED_DB).toMatch(/insert<K extends OwnedTableKey>/);
   });
 
-  test('`requiredDisclosure` names the table it actually reads', async () => {
+  test('`requiredDisclosure` names the table it reads and the door it actually has', async () => {
     const message = (await refusals()).get('requiredDisclosure') as string;
     const rule = ruleOf('tosVersions') as Rule;
     expect(rule).not.toBeNull();
     // The class the registry gives it, quoted by the message rather than assumed.
     expect(ownVoice(message)).toContain(`\`tos_versions\` is scope class \`${rule.class}\``);
-    // And the door really is the firm one rather than the catalogue one, for as
-    // long as `CATALOG_TABLE_KEYS` does not carry it.
-    expect(doorFor('tosVersions', 'read')).toBe(
-      CATALOG_KEYS.includes('tosVersions') ? 'catalogRows' : 'FirmTx.rows',
-    );
-    if (!CATALOG_KEYS.includes('tosVersions'))
-      expect(ownVoice(message)).toMatch(/`CATALOG_TABLE_KEYS` is a CLOSED LIST/);
+
+    if (CATALOG_KEYS.includes('tosVersions')) {
+      // Somebody admitted it to the catalogue, so a scoped transaction CAN read
+      // it and the sentence saying an adapter would not compile is false. This
+      // is the branch that fails on the day the list widens, rather than a wave
+      // later when somebody reads the refusal and believes it.
+      expect(ownVoice(message)).not.toMatch(/CLOSED LIST that does not carry/);
+      expect(ownVoice(message)).not.toMatch(/DOES NOT COMPILE/);
+      return;
+    }
+
+    expect(ownVoice(message)).toMatch(/`CATALOG_TABLE_KEYS` is a CLOSED LIST that does not carry/);
+    expect(ownVoice(message)).toMatch(/DOES NOT COMPILE/);
+    expect(doorFor('tosVersions', 'read')).toBe('FirmTx.rows');
   });
 
   test('`issueLink` still waits on an adapter and a base URL rather than on DDL', async () => {
