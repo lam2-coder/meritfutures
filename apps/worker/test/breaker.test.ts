@@ -993,8 +993,25 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // enumerated here, which is session 387's choice and not a gap this row
     // repairs.
     './recon/adapter.ts',
+    // ADR-353, session 548, AND THE EIGHTH TIME THE PARAGRAPH ABOVE HAS
+    // PREDICTED THIS EDIT. The digest alarm's `DigestAlarmIo` over the same
+    // doors, and the first adapter in this deployable that serves its WHOLE
+    // port: three members, all three served, nothing defaulted to a refusal.
+    // That row's fence carries `apps/worker/test/**`, so this file is inside it
+    // and the line is assigned rather than reached for. **ROWS 352 AND 354 ARE
+    // EACH ADDING A LEG ON A CONCURRENT BRANCH**, so the literal below is
+    // DERIVED at the merge that carries them and is not this branch's
+    // prediction plus one.
+    './digests/alarm-adapter.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
+  // **34 SINCE ADR-353 ADDED `./digests/alarm-adapter.ts`, DERIVED FROM THE
+  // BARREL AT THE MOMENT THAT LINE WAS WRITTEN AND NOT ADDED TO THE NUMBER
+  // BELOW.** Rows 352 and 354 are each adding a leg on a concurrent branch, so
+  // this literal is expected to collide exactly the way the paragraph below
+  // describes, and the merge that keeps every leg is the merge that has to COUNT
+  // them: a keep-both merge of the enumeration type-checks and leaves this total
+  // short. It was
   // 33 SINCE FOUR CONCURRENT ROWS LANDED IN ONE WAVE, adding
   // `./sweeps/expiry-adapter.ts` (ADR-344), `./batch/statistics-adapter.ts`
   // (ADR-350), `./detectors/adapter.ts` (ADR-349) and `./recon/adapter.ts`
@@ -1028,5 +1045,5 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
   // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
   // path shape in its regex. They are guarded there and not here.
-  expect(new Set(legs).size).toBe(33);
+  expect(new Set(legs).size).toBe(34);
 });
