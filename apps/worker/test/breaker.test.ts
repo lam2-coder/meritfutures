@@ -993,6 +993,13 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // enumerated here, which is session 387's choice and not a gap this row
     // repairs.
     './recon/adapter.ts',
+    // ADR-354, session 549, AND THE EIGHTH TIME THE PARAGRAPH FORTY LINES UP HAS
+    // PREDICTED THIS EDIT. The scheduled digest producer's adapter: four of
+    // `DigestIo`'s six members over this deployable's own door and clock, with
+    // `content` and `transport` refusing and their blockers carried as DATA
+    // rather than as prose. That row's fence carries `apps/worker/test/**`, so
+    // this file is inside it and the line is assigned rather than reached for.
+    './digests/adapter.ts',
   ])
     expect(legs, `${leg} is no longer re-exported by the barrel`).toContain(leg);
   // 33 SINCE FOUR CONCURRENT ROWS LANDED IN ONE WAVE, adding
@@ -1028,5 +1035,15 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // by its source rather than typed: `WORKER_BARREL_LEGS` is the list and
   // `test/digests.test.ts` case 9.1 counts BOTH top-level legs over it, with no
   // path shape in its regex. They are guarded there and not here.
-  expect(new Set(legs).size).toBe(33);
+  // **34 SINCE ADR-354 ADDED `./digests/adapter.ts`, AND THE NUMBER IS WHAT THE
+  // ASSERTION REPORTED WITH THE LEG PRESENT RATHER THAN 33 PLUS ONE.** The
+  // paragraph above records four concurrent rows each typing a number one or two
+  // short in a single wave, so this row COUNTED instead of subtracting: the
+  // regex above was run over `src/index.ts` as it stands and printed 34.
+  // **TWO SIBLING ROWS ARE ADDING A LEG EACH ON BRANCHES THIS ONE CANNOT SEE**
+  // (`352`, the breaker evaluator's io, and `353`, the digest alarm's), so the
+  // merge that keeps every leg is again the merge that has to count them, and 35
+  // or 36 on a merged head is this literal working rather than this row being
+  // wrong.
+  expect(new Set(legs).size).toBe(34);
 });

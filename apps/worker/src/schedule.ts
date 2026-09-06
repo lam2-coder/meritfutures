@@ -321,9 +321,38 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'scheduled digest delivery',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_DIGEST_IO` is the only `DigestIo` in the tree. Its row asserts the query rather ' +
-      'than the job, so the switch is correct with nothing running: an enabled schedule whose ' +
-      'window has closed with no delivered row is the finding.',
+      'THIS ROW READ "`UNWIRED_DIGEST_IO` is the only `DigestIo` in the tree" AND ADR-354 WROTE ' +
+      'THE SECOND ONE, so the sentence is kept beside its correction (RI-14) and the disposition ' +
+      'does not move, because THE ADAPTER WAS NEVER THE ONLY BLOCKER AND THERE ARE THREE. ' +
+      '`./digests/adapter.ts` serves FOUR of `DigestIo`s six over this deployable`s own door and ' +
+      'clock. (1) **`transport` HAS NO INHABITANT ANYWHERE IN THIS WORKSPACE AND ITS TWO ' +
+      'CHANNELS BLOCK DIFFERENTLY**: `sftp` is UNREACHABLE because `OQ-F3-04` is an OPEN founder ' +
+      'question and M06 section 3.6 and ADR-066 section 3 both call it a SECOND CREDENTIAL ' +
+      'SURFACE; `email` is UNWRITTEN and waits on a VENDOR ruling rather than an adapter, ' +
+      'because the one working sender in this workspace is `apps/api`s and ADR-229s argument for ' +
+      'it is that the credential scopes to sending from ONE server. (2) **`content` REFUSES ON ' +
+      'BOTH READS AND NEITHER IS AN ADAPTER**: `lossRatioCusum` needs a `BreakerEvaluationReport` ' +
+      'and the breaker row two entries up carries the same two blockers, the second being ' +
+      '`OQ-M6-02`s unanswered minimum sample; `flagQueue` is `readFlagQueue` in `apps/api` and ' +
+      'RI-04 forbids the import. (3) **THE WINDOW ANCHOR IS UNSTATED AND A CRON INTERVAL IS AN ' +
+      'ANCHOR**: `DIGEST_WINDOW_ANCHOR` ships `weekdayOfWeeklyWindow` and `hourOfWindowClose` ' +
+      '`unstated` with their citations, `produce.ts` says `due_at` is the CALLER`s "because the ' +
+      'anchor is unstated and whatever schedules this job is what knows when it fired", and this ' +
+      'file is that caller. Setting an interval here would invent the number that file refuses ' +
+      'to invent, and `report_deliveries_window_attempt_uq` would then key the whole delivery ' +
+      'history on a window nobody agreed to. **THAT THIRD BLOCKER SURVIVES THE TRANSPORT ' +
+      'LANDING.** ' +
+      '**AND A CLOCK TODAY WOULD WRITE PERMANENT ROWS FOR A TRANSPORT THAT NEVER EXISTED**, ' +
+      'which is the composed value`s own hazard stated where the decision is taken: `deliverOne` ' +
+      'CATCHES a refusing port and writes `outcome: failed` rather than crashing, and `0040` ' +
+      'REVOKES UPDATE and DELETE on `report_deliveries`, so a scheduled run appends one ' +
+      'uncorrectable `failed` row per enabled schedule per window at climbing `attempt` ' +
+      'ordinals. A `failed` written by a producer that had NO transport is indistinguishable in ' +
+      'that table from one written by a transport that was wired and broke, which is ' +
+      '`DigestUnwired`s own indistinguishability with the sign flipped. ' +
+      'THE ROW`S ORIGINAL CLAUSE STANDS UNCHANGED AND IS WHY NONE OF THIS IS URGENT: the cron ' +
+      'row asserts the QUERY rather than the job, so the switch is correct with nothing running, ' +
+      'and an enabled schedule whose window has closed with no delivered row is the finding.',
   },
   {
     module: './job.ts',
