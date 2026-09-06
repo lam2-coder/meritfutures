@@ -371,6 +371,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-357](ADR-357.md) | the wiring triple is honest arithmetic and `blocked` is the wrong name for what it counts, one of the fourteen holds a WORKING live default while thirteen refuse, and the count must not move because lowering it disarms the gate standing beside it (2026-09-06, status: proposed) |
 | [ADR-358](ADR-358.md) | the affiliate blocker entry has named THREE obstructions, then TWO, then a DIFFERENT ONE, then ONE, and the tree says TWO. The survivor it has never named is a WRITE with no write door, the door it did name for the disclosure is the wrong table's, and a case matching a retired sentence cannot go red while `RI-14` requires the sentence to be kept (2026-09-06, status: proposed) |
 | [ADR-359](ADR-359.md) | certificate revocation CANNOT be served by this deployment and the route that reaches for it refuses correctly, writing nothing and inventing nothing; the refusal is loud in the one channel that matters and DELIBERATELY MUTE on the wire, and until this row nothing executed was holding that channel open (2026-09-06, status: proposed) |
+| [ADR-363](ADR-363.md) | the live count was a hand-written literal standing on a resolver that reads one hop, and the three defaults NAMED `production*` were counted as refusing without anything opening them; the answer is now derived from the leaves and the residual judgement is two ports rather than fourteen (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
