@@ -95,6 +95,20 @@
 // would be taking it as a MEANS. **IT IS OWED AND IT IS NOT TAKEN**, and what
 // this door does instead is make this deployable unable to trip it.
 //
+// **THE "MEETS THE EMITTER GAP BEFORE ANYTHING ELSE" CLAUSE IS FALSE OF THE
+// DRAIN AND IS KEPT BESIDE ITS CORRECTION per `RI-14` (ADR-355).** It is true
+// of MAINTENANCE and of `consume`, which is why the sentence stands above. It
+// is NOT true of taking a job off the queue: the emitter gap is a property of
+// the SUPERVISOR, which has no caller to throw to. `pg-boss@12.28.0` publishes
+// `fetch`, `complete` and `fail`, all three of which resolve a db handle from
+// the caller's own options and run ONE statement; `manager.fetch` rethrows
+// every error but SQLSTATE 23505 and neither completion method touches a worker
+// or an emitter. **So a one-shot drain's failure channel is the process exit
+// code**, which is the channel ADR-241 already built and `test/entrypoint.
+// test.ts` already spawns a process to assert. The sixth method is still owed
+// and still `packages/queue`'s, but it is owed as a PULL rather than as an
+// emitter, and the drain does not wait on the event sink.
+//
 // -----------------------------------------------------------------------------
 // WHICH EXECUTOR EACH PATH TAKES, WHICH IS TWO CONNECTION LIFETIMES
 // -----------------------------------------------------------------------------

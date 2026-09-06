@@ -73,6 +73,12 @@
 // `packages/rithmic`'s and does not exist, and `ProvisioningAdvancePort` and
 // `ProvisioningReadPort`, which `ports.ts` measures as BLOCKED by ADR-102's
 // `WHERE`-less system write path rather than by a missing session.
+// **NAMING THE LAST TWO AS THE SAGA'S IS FALSE AND IS KEPT BESIDE ITS
+// CORRECTION per `RI-14` (ADR-355 section 7).** `SagaIo`'s four members are
+// `tx`, `queue`, `platform` and `rows`, the last being DATA; neither
+// `ProvisioningAdvancePort` nor `ProvisioningReadPort` is taken by any function
+// in this workspace or constructed anywhere. The count of FOUR and the
+// conclusion are unchanged, which is why it went uncaught.
 //
 // -----------------------------------------------------------------------------
 // WHAT STOPS THE JOB STORE GROWING, STATED PLAINLY BECAUSE THE ANSWER IS THIN
@@ -91,6 +97,17 @@
 // supervise failure on an emitter `pgBossQueue` does not expose, so surfacing
 // it is a SIXTH method on `JobQueue` and therefore `packages/queue`'s row and
 // not this deployable's (ADR-165 clause 5, ADR-331 section 4 clause 4).
+//
+// **ADR-355 RULED THE DRAIN OWED, AND THE FAILURE-CHANNEL CLAUSE ABOVE IS FALSE
+// OF THE SHAPE IT RULED. Both are kept per `RI-14`.** The disjunction resolved
+// to "owes a drain"; the shape is a ONE-SHOT PULL, so `consume` and `start`
+// stay withheld and ADR-241 is applied rather than narrowed. **The drain does
+// NOT meet the emitter gap first**: that gap belongs to the supervisor, which
+// has no caller, while `fetch`, `complete` and `fail` each run one statement on
+// the caller's handle and throw to the caller, so the channel is the process
+// exit code. **THE SIXTH METHOD IS STILL OWED AND STILL NOT THIS ROW'S**, but
+// it is owed as a PULL: `JOB_QUEUE_METHODS` is five and none of them takes a
+// job off a queue without staying up to do it.
 // =============================================================================
 
 import { LIVE_QUEUE } from '../queue.ts';
