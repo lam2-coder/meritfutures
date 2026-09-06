@@ -55,19 +55,36 @@ import { expect, test } from 'vitest';
 // A NO-OP CALL IS NOT A WIRING, AND FOUR PORTS MAKE THAT REACHABLE
 // -----------------------------------------------------------------------------
 // `useAffiliateDeps`, `useKycDeps` and `useCheckoutAdapters` already hold their
-// PRODUCTION value at module scope (`affiliate.ts:478`, `kyc.ts:284`,
-// `checkout.ts:1051`), so calling their setter from `start.ts` would install the
+// PRODUCTION value at module scope (`affiliate.ts:672`, `kyc.ts:284`,
+// `checkout.ts:1211`), so calling their setter from `start.ts` would install the
 // object that is already installed and change nothing a request sees. It would
 // also make this file pass. THE REASON TEXT IS WHERE THAT IS RECORDED, so a
 // later reader raising the count that way meets the sentence saying it is not a
 // wiring before they meet the green tick.
 //
+// **THESE THREE LINE NUMBERS WERE REPAIRED BY TWO ROWS AT ONCE AND EACH GOT HALF
+// OF IT RIGHT.** ADR-357 measured `affiliate.ts:615` and `checkout.ts:1211`;
+// ADR-358 measured `affiliate.ts:672` and `checkout.ts:1051`. Neither was
+// careless: each ran its measurement before the other's edits existed, and
+// ADR-358's own additions to `affiliate.ts` are what moved 615 to 672.
+// **CITATION REPAIR IS ITSELF SUBJECT TO THE MERGE PROBLEM**, which is worth
+// saying beside `RI-15` and `RI-16` rather than only in a session log: a repair
+// derived on a branch is as perishable as the citation it replaced. The three
+// above are re-derived on the merged tree and belong to neither side.
+//
 // `useTurnstileVerifier` IS THE FOURTH AND IT IS NOT WAITING ON ANYTHING
 // (ADR-226). Its module-scope default is the REAL Cloudflare verifier rather
 // than a fail-closed stand-in, so the port is live with nothing installed, and
 // an absent secret is a refusal rather than an unwired state. Its entry says so
-// in those terms, because a reader who meets it beside fifteen liabilities
-// should not read it as a sixteenth.
+// in those terms, because a reader who meets it beside THIRTEEN liabilities
+// should not read it as a fourteenth.
+//
+// THOSE TWO WORDS READ "fifteen" AND "a sixteenth" AND ARE REPAIRED RATHER THAN
+// DELETED (`RI-14`). Both were TRUE when written, against a `BLOCKED` of
+// sixteen, and went stale the day the two card entries left it for the reason
+// the next block states. Nothing went red, because a count spelled in prose is
+// asserted by nobody: that is the drift `ADR-034` exists to end, arriving in
+// the paragraph that explains why this port is not a liability.
 //
 // -----------------------------------------------------------------------------
 // THE LIST HAS NOW SHRUNK TWICE ON THE SAME ARTEFACT, IN ORDER (ADR-261, ADR-266)
@@ -941,8 +958,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'this route builds none. `RuleStateUnreadable` IS DELIBERATELY NOT CAUGHT and stays a 500, ' +
     'because a row whose columns disagree with the schema that wrote them is an internal error ' +
     'and a retryable status would tell a trader to retry what no retry can fix. ' +
-    'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED AT TEN OF TWENTY-FOUR DECLARED ' +
-    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A FOURTH TIME: every clause on this ' +
+    'THE PORT IS UNCHANGED AND THE TRIPLE HAS MOVED WITHOUT IT, AT ELEVEN OF TWENTY-FIVE ' +
+    'DECLARED WITH FOURTEEN BLOCKED. THIS CLAUSE READ "THE WIRED COUNT IS UNCHANGED AT TEN OF ' +
+    'TWENTY-FOUR DECLARED" AND IS REPAIRED RATHER THAN DELETED (`RI-14`): it was true until ' +
+    'ADR-347 declared `useCertificateRateLimiter` and installed it, which moved both halves by ' +
+    'one and left `blocked` where it was. It is the SECOND hand-spelled count in this file ' +
+    'found stale by ADR-357, and neither was asserted by anything, which is why the triple is ' +
+    'derived at the assertion and a count written in prose is not. ' +
+    'AND THE REASON FOR THAT IS NEW A FOURTH TIME: every clause on this ' +
     'entry until ADR-264 named something nobody had BUILT, ADR-268 closed the one that named a ' +
     'READ, ADR-281 found a decoding whose home was RULED and untaken, ADR-283 TOOK IT, and ' +
     'ADR-285 IS THE FIRST CLAUSE TO CLOSE ON A REFUSAL PATH RATHER THAN ON A CAPABILITY. ' +
@@ -1182,7 +1205,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'a configured PSP adapter per MID plus the `returnUrl` and `cancelUrl` configuration. ' +
     '`packages/psp` ships a port and TWO FAKES (`fakes/psp-a.ts`, `fakes/psp-b.ts`) and no ' +
     'vendor adapter, and `packages/enrichment` is in the same position. NOTE: this port already ' +
-    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1051`), so calling the ' +
+    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1211`), so calling the ' +
     'setter here would install what is already installed. That would raise the wired count and ' +
     'serve nothing, and it is not a wiring.',
 
@@ -1225,9 +1248,16 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'both null, so calling the setter here would install what is already installed. That is not ' +
     'a wiring.',
   useAffiliateDeps:
-    'ONE obstruction, and this entry has named THREE, then TWO, then a DIFFERENT ONE. THE ' +
-    'OBSTRUCTION THIS ENTRY LED WITH FOR TWO WAVES IS DISCHARGED AND THE ONE BEHIND IT IS NOT ' +
-    '(ADR-321 wrote the column, ADR-324 repaired what was still being said about it). ' +
+    'TWO obstructions, and this entry has named THREE, then TWO, then a DIFFERENT ONE, then ' +
+    '"ONE obstruction, and this entry has named THREE, then TWO, then a DIFFERENT ONE". ' +
+    'THE LAST OF THOSE IS CORRECTED BY ADR-358 AND IS QUOTED HERE RATHER THAN REPLACED, on ' +
+    'RI-14`s rule and on the rule this entry keeps being the subject of. THE ' +
+    'COUNT WAS WRONG BECAUSE NOBODY RE-DERIVED THE METHOD LIST: each rewrite repaired the ' +
+    'clause it was dispatched about and INHERITED the rest, and the second survivor had never ' +
+    'been named by ANY version of this entry. ADR-358 derives the door PER METHOD from the key ' +
+    'sets in `scoped-db.ts` instead, so this column stops being the place the answer lives. ' +
+    'THE OBSTRUCTION THIS ENTRY LED WITH FOR TWO WAVES IS DISCHARGED AND THE ONE BEHIND IT IS ' +
+    'NOT (ADR-321 wrote the column, ADR-324 repaired what was still being said about it). ' +
     'THE RETIRED CLAUSES ARE QUOTED RATHER THAN DELETED, on RI-14`s rule and on the rule this ' +
     'entry has now been the subject of twice. THEY READ: `affiliate_commissions` is ' +
     '"UNREGISTERED in packages/db/src/scope.ts and UNDECLARED in packages/db/src/schema.ts", ' +
@@ -1280,14 +1310,38 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'many times, so an issued handle and a click token cannot be one column, and every attribute ' +
     'a link would carry is already on `affiliate_clicks` at click grain. `issueLink` therefore ' +
     'waits on an ADAPTER and a BASE URL rather than on DDL, which is the same position ' +
-    '`affiliate`, `requiredDisclosure`, `submitCreative` and `statements` are in. FIVE of the ' +
-    'six methods are an adapter somebody can write and ONE is not, AND THE ONE IS STILL `stats`, ' +
-    'for a reason that is now the counting door alone. THE REPAIR REGISTERED HERE ' +
+    '`affiliate`, `requiredDisclosure` and `statements` are in. THIS LIST NAMED ' +
+    '`submitCreative` TOO AND NO LONGER DOES (ADR-358), and the removed name is the whole of ' +
+    'the correction: on that method the peer group WAS the claim, and it was false. ' +
+    '`requiredDisclosure` STAYS IN THE LIST AND ITS REASON IS REPLACED: it reads ' +
+    '`tos_versions`, which is `firm`, so its door is `ApiDb.firm()` and never the `owned` door ' +
+    'over `affiliates` that its refusal used to name. The answer was right and the reason was ' +
+    'followable to the wrong table. FOUR of the ' +
+    'six methods are an adapter somebody can write and TWO are not. THIS CLAUSE READ "FIVE of ' +
+    'the six methods are an adapter somebody can write and ONE is not, AND THE ONE IS STILL ' +
+    '`stats`, for a reason that is now the counting door alone", and it is kept beside its ' +
+    'correction per RI-14 (ADR-358). `stats` IS STILL ONE OF THE TWO and the counting door is ' +
+    'still its reason. THE SECOND IS `submitCreative`, WHICH NO VERSION OF THIS ENTRY HAS EVER ' +
+    'NAMED. It is a WRITE of `affiliate_creatives`, and it was served a refusal calling it a ' +
+    'READ and reasoning about `affiliates`. `affiliate_creatives` is `derived`, and no handle ' +
+    'a request path can open inserts one: `ScopedTx.insert` takes `OwnedTableKey`, ' +
+    "`insertUnder` takes `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>` " +
+    'and a CLOSED LIST OF ONE, `insertAsParty` takes `PartyWritableTableKey` and this table is ' +
+    'not `pair`, and `FirmTx.insert` takes `FirmTableKey`. `ApiDb` exposes `scoped`, `firm`, ' +
+    '`resolution`, `establishment` and `publicLookup` AND NO SYSTEM HANDLE. NOTHING IN THIS ' +
+    'TREE WRITES `affiliate_creatives`. So it waits on a `packages/db` WIDENING and then an ' +
+    'adapter, which is the shape `stats` waits in rather than the shape an adapter closes. ' +
+    'WHAT THIS PORT CAN SERVE TODAY, DERIVED RATHER THAN PROMISED: `affiliate`, `statements` ' +
+    'and `requiredDisclosure` have doors, so `GET /affiliate/statements` is servable on doors ' +
+    'alone once a cursor rule exists; `POST /affiliate/links` is servable the moment a base URL ' +
+    'is a configured value; and `GET /affiliate/stats` and `POST /affiliate/creatives` cannot ' +
+    'be served at all without a `packages/db` diff, the second because it needs BOTH the write ' +
+    'door and `requiredDisclosure`. THE REPAIR REGISTERED HERE ' +
     'TWO WAVES AGO IS TAKEN: `STATEMENTS_UNREACHABLE` served a caller the retired sentence that ' +
     '`affiliate_statements` is not in `schema.ts`, and ADR-253 section 5 repairs it at the ' +
     'constant and at the module header, which carried the same sentence a second time and which ' +
     'no entry had named. NOTE: this port already holds `productionAffiliateDeps` at module scope ' +
-    '(`affiliate.ts:613`), so calling the setter here would install what is already installed. ' +
+    '(`affiliate.ts:672`), so calling the setter here would install what is already installed. ' +
     'That is not a wiring.',
   setInternalOpsSource:
     'FOUR METHODS, AND ADR-242 RULES THEM ONE AT A TIME BECAUSE ONE REASON COVERED WHICHEVER OF ' +
@@ -1346,7 +1400,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
     'class `owned` on `identity_id` (`packages/db/src/scope.ts:970`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1607-1609`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1614-1616`; it stood at sixteen hundred and seven through ' +
+    'sixteen hundred and nine when this entry was written, and that number is out of ' +
+    "citation grammar on purpose, ADR-212, because it now points inside `operatorSessions`' " +
+    'own reason and a grep would find a live line). THE CLAIM ITSELF IS UNCHANGED AND WAS ' +
+    'RE-MEASURED: the type is still every key whose class is `firm`. `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
     '(`packages/db/src/scope.ts:1119`), so the audit half alone has a door and the subject half ' +
@@ -1562,6 +1620,78 @@ const BLOCKED: Readonly<Record<string, string>> = {
 };
 
 // -----------------------------------------------------------------------------
+// WHAT EACH BLOCKED PORT HOLDS BEFORE ANYTHING INSTALLS ONE (ADR-357)
+// -----------------------------------------------------------------------------
+// `BLOCKED` COUNTS THE PORTS `start.ts` DOES NOT CALL AND HAS NEVER COUNTED
+// OBSTRUCTION. The two readings agree on thirteen of the fourteen entries and
+// part on the fourteenth: `useTurnstileVerifier`'s reason opens with the word
+// `NOTHING`, because its module-scope default is the real Cloudflare verifier
+// and the port is live with nothing installed. So `blocked` in the triple below
+// is a name for the SET, not a claim about every member of it.
+//
+// THE COUNT IS RIGHT AND MUST NOT MOVE, and the reason is mechanical rather
+// than editorial. The first assertion below requires every declared port
+// `start.ts` does not call to carry an entry here, so deleting the live one to
+// report `blocked: 13` makes `unaccounted` RED. A number that cannot fall
+// without disarming the gate beside it is not a number a session may lower,
+// and the honest repair is therefore the vocabulary and a second measurement.
+//
+// THIS IS THAT SECOND MEASUREMENT. `DEFAULTS` records the initializer each
+// port's module-scope variable actually carries, read off the declaring module,
+// so a default that changes goes RED here instead of quietly disagreeing with
+// the paragraph describing it. That is `useWithdrawalBackend`'s own stated
+// remedy one entry up, applied to the property this file reports.
+//
+// THE CLASSIFICATION IS A RULING AND IS DELIBERATELY NOT A REGEX. A probe
+// asking "does the initializer name an `UNWIRED_` value" classifies thirteen
+// correctly and `useCheckoutAdapters` WRONGLY: `PRODUCTION_CHECKOUT_ADAPTERS`
+// (`checkout.ts:1203`) names no such value and refuses by being EMPTY
+// (`adapterFor: () => undefined`, both URLs `''`). A probe that reads the WORD
+// is the failure `RI-35`'s register carries its comments about, so the input is
+// measured and the judgement is written down beside it.
+// -----------------------------------------------------------------------------
+
+/**
+ * The initializer each blocked port's module-scope variable carries, as text.
+ *
+ * Every value is read back off the tree by the assertion below, so a stale
+ * entry here is a failure rather than a comment.
+ */
+const DEFAULTS: Readonly<Record<string, string>> = {
+  setAdminReadSource: 'null',
+  setAdminSessionSource: 'null',
+  setInternalOpsSource: 'null',
+  useAdminPayoutBackend: 'UNWIRED_ADMIN_PAYOUT_BACKEND',
+  useAdminWalletBackend: 'UNWIRED_ADMIN_WALLET_BACKEND',
+  useAdminWriteBackend: 'UNWIRED_ADMIN_WRITE_BACKEND',
+  useAffiliateDeps: 'productionAffiliateDeps',
+  useCertificateRevokeBackend: 'UNWIRED_ADMIN_CERTIFICATE_BACKEND',
+  useCheckoutAdapters: 'PRODUCTION_CHECKOUT_ADAPTERS',
+  useCheckoutBackend: 'UNWIRED_CHECKOUT_BACKEND',
+  useKycDeps: 'productionKycDeps',
+  usePayoutBackend: 'UNWIRED_PAYOUT_BACKEND',
+  useTurnstileVerifier: 'cloudflareTurnstileVerifier()',
+  useWithdrawalBackend: 'UNWIRED_WITHDRAWAL_BACKEND',
+};
+
+/**
+ * The blocked ports whose default SERVES A REQUEST rather than refusing one.
+ *
+ * ONE, AND IT IS A RULING RATHER THAN A DERIVATION (ADR-357).
+ * `cloudflareTurnstileVerifier()` reads `MERIT_TURNSTILE_SECRET` from
+ * `process.env` PER CALL (`turnstile.ts:211`) and calls Cloudflare, so a
+ * deployment holding the secret verifies tokens with nothing installed. The
+ * other thirteen refuse in three shapes: `null` (three), an `UNWIRED_*`
+ * stand-in (seven), and a `production*` value that resolves nothing (three).
+ *
+ * AN ABSENT SECRET IS A REFUSAL AND NOT AN UNWIRED STATE. The default answers
+ * `unconfigured` and `POST /auth/otp` serves that as 503 (ADR-226), so there is
+ * no configuration under which this port admits an unverified token, which is
+ * why it is counted live here and still carries a reason above.
+ */
+const LIVE_DEFAULT: ReadonlySet<string> = new Set(['useTurnstileVerifier']);
+
+// -----------------------------------------------------------------------------
 // The assertions
 // -----------------------------------------------------------------------------
 
@@ -1662,4 +1792,68 @@ test('the wired count is reported, so a regression is a number and not a paragra
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
   }).toStrictEqual({ declared: 25, wired: 11, blocked: 14 });
+});
+
+// -----------------------------------------------------------------------------
+// The second measurement: what the blocked ports hold (ADR-357)
+// -----------------------------------------------------------------------------
+
+/** The path of the module declaring `port`, from `declaredIn`'s own labels. */
+function moduleOf(port: string): string {
+  const where = declaredIn.get(port) ?? '';
+  return where.startsWith('../') ? join(SRC, where.slice(3)) : join(ROUTES, where);
+}
+
+/**
+ * The initializer of the module-scope variable `port`'s setter assigns to.
+ *
+ * Reads the declaring module AS TEXT, for this file's own stated reason:
+ * importing it would bind a port. The setter names its target in its body, and
+ * the target is declared once at module scope.
+ */
+function defaultOf(port: string): string {
+  const lines = read(moduleOf(port)).split('\n');
+  const at = lines.findIndex((line) => line.startsWith(`export function ${port}(`));
+  const target = lines
+    .slice(at + 1, at + 8)
+    .map((line) => /^\s*([A-Za-z_$][\w$]*) = /.exec(line)?.[1])
+    .find((name) => name !== undefined);
+  if (target === undefined) return '<no assignment in the setter body>';
+  const decl = lines.find((line) => new RegExp(`^let ${target}\\b`).test(line));
+  return /=\s*(.+);\s*$/.exec(decl ?? '')?.[1] ?? '<no module-scope binding>';
+}
+
+test('every blocked port records the module-scope default it actually holds', () => {
+  // ADR-357. The INPUT to the ruling below, measured rather than described, so
+  // a default that changes cannot leave the ruling standing beside it. This is
+  // the check whose absence let a port be live and counted as blocked for four
+  // waves while every gate stayed green.
+  const measured = Object.fromEntries(Object.keys(BLOCKED).map((port) => [port, defaultOf(port)]));
+
+  expect(measured).toStrictEqual(DEFAULTS);
+});
+
+test('the recorded defaults cover the blocked list exactly', () => {
+  // A port leaving `BLOCKED` must leave `DEFAULTS` with it. The day a wiring
+  // slice installs one of the fourteen this fails until both move, which is
+  // the conflict being VISIBLE rather than silent.
+  expect(Object.keys(DEFAULTS).sort()).toStrictEqual(Object.keys(BLOCKED).sort());
+});
+
+test('exactly one blocked port is live with nothing installed, and it is named', () => {
+  // ADR-357's ruling, as a number. `blocked` counts what `start.ts` does not
+  // call; `refusing` counts what a request actually meets. THE TWO DIFFER BY
+  // ONE AND THE ONE IS WRITTEN DOWN, which is the whole finding: a reader who
+  // takes `blocked: 14` for fourteen obstructions is wrong by exactly this.
+  expect([...LIVE_DEFAULT].sort()).toStrictEqual(['useTurnstileVerifier']);
+
+  // A live port with no entry would be unaccounted; a named one that is not
+  // blocked would be a reason pointing at nothing.
+  expect([...LIVE_DEFAULT].filter((port) => !(port in BLOCKED))).toStrictEqual([]);
+
+  expect({
+    blocked: Object.keys(BLOCKED).length,
+    refusing: Object.keys(BLOCKED).filter((port) => !LIVE_DEFAULT.has(port)).length,
+    live: LIVE_DEFAULT.size,
+  }).toStrictEqual({ blocked: 14, refusing: 13, live: 1 });
 });

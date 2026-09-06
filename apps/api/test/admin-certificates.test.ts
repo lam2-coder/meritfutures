@@ -38,6 +38,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import { TABLE_KEYS } from '@merit/db';
@@ -45,6 +46,7 @@ import type { TableKey } from '@merit/db';
 
 import adminCertificates, {
   ADMIN_CERTIFICATE_ENDPOINTS,
+  adminCertificateHandler,
   ADMIN_CERTIFICATE_ROLES,
   ADMIN_CERTIFICATE_TABLES,
   AdminCertificateUnwired,
@@ -54,6 +56,7 @@ import adminCertificates, {
   needsOnBehalfOf,
   resetCertificateRevokeBackend,
   toRevocationSubject,
+  UNWIRED_ADMIN_CERTIFICATE_BACKEND,
   useCertificateRevokeBackend,
   validateRevokeRequest,
   RevocationSubjectError,
@@ -68,7 +71,7 @@ import { REVOCATION_CLASSES } from '../src/routes/certificates.ts';
 import { UNKNOWN_STATEMENT } from '../src/routes/verify.ts';
 import type { VerifyPresentation, VerifyResponse } from '../src/routes/verify.ts';
 import { discoverRouteModules } from '../src/registry.ts';
-import { buildServer } from '../src/server.ts';
+import { buildServer, PROBLEM_TYPE_PREFIX } from '../src/server.ts';
 import { BASE_PATH } from '../src/surface.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -829,5 +832,160 @@ describe('an unwired backend', () => {
     const res = await revoke({});
     expect(res.statusCode).toBe(503);
     expect(calls).toEqual([]);
+  });
+});
+
+/** Keep a rejection as a value, so four members can be settled in one array. */
+function keep(err: unknown): unknown {
+  return err;
+}
+
+/** Run a synchronous member and keep whatever it throws. */
+function throwsTo(fn: () => unknown): unknown {
+  try {
+    fn();
+    return null;
+  } catch (err: unknown) {
+    return err;
+  }
+}
+
+/**
+ * The argument `principal` ignores.
+ *
+ * `UNWIRED_ADMIN_CERTIFICATE_BACKEND.principal` is `() => Promise.reject(...)`
+ * and reads nothing off the request, so the stub carries nothing: a fuller fake
+ * would suggest the default consults it.
+ */
+const REQUEST_STUB = {} as unknown as FastifyRequest;
+
+// -----------------------------------------------------------------------------
+// Which channel discriminates an unwired deployment, and which does not
+// -----------------------------------------------------------------------------
+// ADR-359. THE BLOCK ABOVE PROVES THE STATUS CODE AND THIS ONE PROVES THE
+// DISCLOSURE, which is the half a status code cannot carry.
+// `adminCertificateHandler` answers the unwired `principal` with the SAME
+// document it answers a genuinely anonymous caller with, deliberately, and its
+// own comment says the discrimination lives "in the log". That sentence is the
+// whole control and nothing executed was holding it: a refactor that dropped
+// `request.log.error` would leave this deployment with NO channel telling an
+// unwired revoke route apart from a rejected credential, and every case in the
+// block above would stay green.
+//
+// THIS ROUTE IS THE ONLY WRITER OF `certificates.revoked_at` IN THE TREE
+// (`src/routes/admin-certificates.ts:862`; `auth-backend.ts`' two `revokedAt`
+// writes are `sessions`), so what it refuses is the whole of revocation rather
+// than one path to it.
+describe('what an unwired deployment discloses, and to which channel', () => {
+  test('the unwired 401 and the anonymous 401 are the same document but for `instance`', async () => {
+    // ADR-192 clause 2 as an EXECUTED fact rather than a paragraph. A later
+    // slice that adds a `detail` naming the port, or moves the unwired leg onto
+    // its own code, fails here and re-argues the disclosure rather than
+    // drifting through it.
+    const unwired = (await revoke({})).json() as Record<string, unknown>;
+    wire({ anonymous: true });
+    const anonymous = (await revoke({})).json() as Record<string, unknown>;
+
+    const { instance: unwiredInstance, ...unwiredRest } = unwired;
+    const { instance: anonymousInstance, ...anonymousRest } = anonymous;
+    expect(unwiredRest).toStrictEqual(anonymousRest);
+    // `instance` is the request id and differs between two injections, which is
+    // what makes it the one excluded key rather than an exception being made.
+    expect(typeof unwiredInstance).toBe('string');
+    expect(typeof anonymousInstance).toBe('string');
+  });
+
+  test('the log is the channel that discriminates, and it names the port member', async () => {
+    // Driven through the exported handler rather than through `inject`, because
+    // `buildServer` takes `logger` as a boolean and a boolean sink cannot be
+    // read back. The handler is the same function `toAdminCertificateRoutes`
+    // registers, so what is exercised here is what is served.
+    const logged: { readonly err?: unknown }[] = [];
+    const sent: unknown[] = [];
+    const spec = ADMIN_CERTIFICATE_ENDPOINTS[0];
+    if (spec === undefined) throw new Error('the revoke endpoint is not declared');
+
+    const reply: FastifyReply = {
+      code: () => reply,
+      type: () => reply,
+      send: (body: unknown) => {
+        sent.push(body);
+        return reply;
+      },
+    } as unknown as FastifyReply;
+    const request = {
+      id: 'req-1',
+      params: { id: CERT_ID },
+      body: { revocation_class: 'account_enforced', reason: REASON },
+      ip: '203.0.113.7',
+      log: {
+        error: (payload: { readonly err?: unknown }) => {
+          logged.push(payload);
+        },
+      },
+    } as unknown as FastifyRequest;
+
+    await adminCertificateHandler(spec)(request, reply);
+
+    expect(sent).toStrictEqual([
+      {
+        type: `${PROBLEM_TYPE_PREFIX}unauthenticated`,
+        title: 'Unauthenticated',
+        status: 401,
+        code: 'unauthenticated',
+        instance: 'req-1',
+      },
+    ]);
+    // ONE ENTRY, carrying the error itself rather than a rewritten string, so
+    // the message an operator reads is the one the class composes.
+    expect(logged).toHaveLength(1);
+    const err = logged[0]?.err;
+    expect(err).toBeInstanceOf(AdminCertificateUnwired);
+    // THE TWO THINGS THAT MAKE THE LINE ACTIONABLE: which member refused, and
+    // the name of the setter that would install one.
+    expect((err as Error).message).toContain('AdminCertificateBackend.principal');
+    expect((err as Error).message).toContain('useCertificateRevokeBackend');
+  });
+
+  test('every one of the default four refuses, so no arm can answer plausibly', async () => {
+    // The shape this file refuses elsewhere is a port with one live arm beside
+    // arms that reject. `UNWIRED_ADMIN_CERTIFICATE_BACKEND` has no live arm at
+    // all, and each of the four names ITSELF, so whichever one a future caller
+    // reaches first the log says which.
+    const back = UNWIRED_ADMIN_CERTIFICATE_BACKEND;
+    const settled: readonly [string, unknown][] = [
+      ['operator', await back.operator(() => Promise.resolve(null)).then(() => null, keep)],
+      ['principal', await back.principal(REQUEST_STUB).then(() => null, keep)],
+      ['now', throwsTo(() => back.now())],
+      ['presentation', throwsTo(() => back.presentation())],
+    ];
+    for (const [member, raised] of settled) {
+      expect(raised, member).toBeInstanceOf(AdminCertificateUnwired);
+      expect((raised as Error).message, member).toContain(
+        `AdminCertificateBackend.${member} cannot be served`,
+      );
+    }
+  });
+
+  test('an unwired clock refuses BEFORE the audit row, so nothing half-written survives', async () => {
+    // `ctx.backend.now()` is read one statement ahead of
+    // `insert('adminActions', ...)`. THE ORDER IS THE CONTROL: `admin_actions`
+    // is append-only under `0026` and its retention is forever, so an audit row
+    // explaining a mutation that never happened is a record no later read can
+    // withdraw. The lock is taken and given back by the rollback; neither write
+    // is attempted at all.
+    const calls: Call[] = [];
+    useCertificateRevokeBackend({
+      operator: (fn) => fn(makeTx(calls, certRow())),
+      principal: () => Promise.resolve({ actor: 'ops@merit.invalid', role: 'owner' }),
+      now: () => {
+        throw new AdminCertificateUnwired('now');
+      },
+      presentation: () => PRESENTATION,
+    });
+    const res = await revoke({});
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ code: 'service_unavailable', status: 503 });
+    expect(calls.map((c) => `${c.op} ${c.key}`)).toStrictEqual(['lockAt certificates']);
   });
 });

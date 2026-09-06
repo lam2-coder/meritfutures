@@ -111,8 +111,18 @@
 // **A METHOD IS NOT A PORT, WHICH IS WHY THE TRIPLE DOES NOT MOVE.**
 // `wiring.test.ts` counts `^export function (use|set)X(` in `src/routes/`, and
 // ADR-184 ruling 1 puts the feed's read on the port that already has a setter
-// rather than on one of its own. `{ declared: 23, wired: 6, blocked: 17 }` is
-// unchanged and was re-run rather than predicted.
+// rather than on one of its own. The triple is unchanged by this directory and
+// was re-run rather than predicted.
+//
+// **THIS SENTENCE CARRIED THE TRIPLE AS THREE HAND-TYPED NUMERALS AND ALL THREE
+// WENT STALE, WHICH IS `ADR-356`'s FINDING AND IS THE DEFECT THIS WHOLE FILE IS
+// WRITTEN AGAINST, OCCURRING INSIDE IT.** It read
+// `{ declared: 23, wired: 6, blocked: 17 }`; `wiring.test.ts` asserts a
+// different triple today and row `357` is concurrently ruling on whether that
+// one is honest. **The old numerals are kept here under `RI-14` and are NOT
+// replaced by new ones**, because a numeral copied out of another file is the
+// thing that went stale, and this directory's claim was only ever that IT does
+// not move the triple. `wiring.test.ts` is the source and states its own.
 //
 // **THAT ENTRY'S STATED REASON IS NARROWED BY THIS SLICE AND IS NOT RETIRED BY
 // IT, AND THE DIFFERENCE MATTERS.** The reason reads: "A READ SHAPE, and the door
