@@ -243,8 +243,15 @@ test("the switch's expected-by time is a document cell and this repository holds
   // times like `06:00 CT` in a table, not rows of any relation, and no migration
   // in this schema holds one. The count is derived so that a register that grows
   // or shrinks is visible here rather than in a sentence.
+  //
+  // **THE TABLE IS FOUR COLUMNS WIDE SINCE ADR-392**, which cut the severity
+  // prose out into a peer `## Severity if absent, by job` section. This pattern
+  // is anchored to the row's END so it counts rows of THAT table and nothing
+  // else: the expected-by time is the third cell of a four-cell row, and a
+  // five-cell row would mean the column came back and this count stopped being
+  // about the same thing.
   const inventory = read('docs', 'ops', 'runbooks', 'CRON_INVENTORY.md');
-  const scheduled = [...inventory.matchAll(/^\| \*\*[^|]+\| [^|]+\| [^|]+\| [^|]+\| /gm)];
+  const scheduled = [...inventory.matchAll(/^\| \*\*[^|]+\| [^|]+\| [^|]+\| [^|]+\|$/gm)];
   expect(scheduled.length).toBeGreaterThan(15);
   expect(inventory).toContain('06:00 CT');
 });

@@ -44,6 +44,24 @@ const M06 = 'docs/plans/M06-admin-ops-console.md';
 const CRON = 'docs/ops/runbooks/CRON_INVENTORY.md';
 const RITUAL = 'docs/ops/runbooks/WEEKLY_RISK_RITUAL.md';
 
+/**
+ * One job's `### <job>` note out of `CRON_INVENTORY`'s peer
+ * `## Severity if absent, by job` section.
+ *
+ * **ADR-392 CUT COLUMN FIVE OUT OF THE SCHEDULED TABLE**, so the row now
+ * carries the schedule, the expected-by time and the dead-man alert, and what
+ * the page says about the severity is a note. Returns the empty string when a
+ * job has no note, so a lost note goes RED.
+ */
+const severityNote = (document: string, job: string): string => {
+  const marker = `\n### ${job}\n`;
+  const start = document.indexOf(marker);
+  if (start === -1) return '';
+  const after = document.slice(start + marker.length);
+  const end = after.search(/\n#{2,3} /);
+  return (end === -1 ? after : after.slice(0, end)).trim();
+};
+
 /** The migration, minus `--` comments, so prose in the header cannot satisfy a DDL assertion. */
 function ddl(): string {
   const body = read(MIGRATION);
@@ -149,10 +167,14 @@ describe('GS-288: the alarm fires on the delivery record, never on the job', () 
     const row = body.split('\n').find((l) => l.includes('**Scheduled digest delivery**'));
     expect(row, 'the digest job is not in the cron inventory').toBeDefined();
     // The inventory's own rule: a job in the estate without a dead-man switch
-    // is a job that does not exist.
+    // is a job that does not exist. The switch is column four and stayed on the
+    // row when ADR-392 cut column five out of the table.
     expect(row).toContain('report_deliveries');
-    expect(row).toContain('It asserts the query, not the job');
-    expect(row).toContain('INV-M5-18');
+    // What the page SAYS about the alarm is the job's note now.
+    const note = severityNote(body, 'Scheduled digest delivery');
+    expect(note, 'the digest job has no severity note').not.toBe('');
+    expect(note).toContain('It asserts the query, not the job');
+    expect(note).toContain('INV-M5-18');
   });
 
   test('a retry is a new row, so the failure that was retried survives', () => {

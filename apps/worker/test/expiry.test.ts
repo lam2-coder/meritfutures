@@ -103,6 +103,24 @@ const ADMIN_PAYOUTS_TS = '../../api/src/routes/admin-payouts.ts';
 const EVENTS_MD = '../../../docs/architecture/EVENTS.md';
 const CRON_INVENTORY_MD = '../../../docs/ops/runbooks/CRON_INVENTORY.md';
 
+/**
+ * One job's `### <job>` note out of `CRON_INVENTORY`'s peer
+ * `## Severity if absent, by job` section.
+ *
+ * **ADR-392 CUT COLUMN FIVE OUT OF THE SCHEDULED TABLE.** The four operational
+ * columns stayed on the row; the severity and everything the page says about a
+ * job moved to a note keyed by the job name. Returns the empty string when a
+ * job has no note, so a lost note goes RED rather than passing quietly.
+ */
+const severityNote = (document: string, job: string): string => {
+  const marker = `\n### ${job}\n`;
+  const start = document.indexOf(marker);
+  if (start === -1) return '';
+  const after = document.slice(start + marker.length);
+  const end = after.search(/\n#{2,3} /);
+  return (end === -1 ? after : after.slice(0, end)).trim();
+};
+
 // -----------------------------------------------------------------------------
 // The fake, which makes nothing durable unless the transaction committed
 // -----------------------------------------------------------------------------
@@ -457,12 +475,18 @@ describe('wallet_withdrawals_freeze_is_complete is THREE columns and the rail is
 
 describe('one job, three clocks, and CRON_INVENTORY says it is one job', () => {
   it('EXPIRY_CLOCKS is the three columns the sweep’s row names', () => {
-    const row = source(CRON_INVENTORY_MD)
+    const document = source(CRON_INVENTORY_MD);
+    const row = document
       .split('\n')
       .find((line) => line.includes('Freeze expiry sweep') && line.includes('hourly'));
     expect(row).toBeDefined();
-    for (const clock of EXPIRY_CLOCKS) expect(row).toContain(clock);
-    expect(row).toContain('one job rather than three');
+    // **ADR-392 MOVED THE SEVERITY PROSE OFF THE ROW.** The schedule is still
+    // the row's second cell, which is what finds it above; the three clocks and
+    // the reason they are one job are the job's note under
+    // `## Severity if absent, by job`.
+    const note = severityNote(document, 'Freeze expiry sweep');
+    for (const clock of EXPIRY_CLOCKS) expect(note).toContain(clock);
+    expect(note).toContain('one job rather than three');
   });
 
   it('each clock also has its own row in the release-job table, all naming ONE job', () => {
