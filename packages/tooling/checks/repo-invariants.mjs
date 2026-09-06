@@ -2569,9 +2569,31 @@ const CITATION_TOKEN = new RegExp('\\.(?:' + CITED_EXTENSIONS + '):\\d');
  */
 const IDENTIFIER_GLUE = /^[\s(,:*-]*(?:at|in|is|see)?[\s(,:*-]*$/i;
 
-/** A claim that the cited line does NOT hold the name, which is RI-14's half. */
+/**
+ * A claim that the cited line does NOT hold the name, which is RI-14's half.
+ *
+ * THE CLAUSE ENDS AT A COLON AS WELL AS AT A FULL STOP OR A SEMICOLON, and the
+ * fourth character is ADR-383's. This corpus writes a verdict and then the
+ * thing the verdict is about -- "**THE UNIQUE INDEX IS A BACKSTOP AND NOT THE
+ * CONTROL**: `payout_requests_no_in_flight_uq` (`0010_payouts.sql:200-201`)" --
+ * so a negation in the verdict was reaching past the colon and taking the name
+ * of the SUBJECT with it. Three citations in the two checks' live scopes bind
+ * because of this character and every one of them is a claim ABOUT the name
+ * rather than a claim that the name is absent; each was opened at primary
+ * source before the character was added. A NEW MISS COMES WITH IT and it is
+ * RI-15's miss (12): "no such column: `identity_id` (`schema.ts:20`)" is a
+ * negated claim this now BINDS. There is no site of that shape in this tree,
+ * which is a measurement rather than an argument, and the day one is written it
+ * is a finding rather than a silence.
+ *
+ * THE LOOKBACK STILL CROSSES THE NEWLINE JOINER AND THAT IS DELIBERATE
+ * (ADR-383 section 4). Bounding it at the line the name is written on was
+ * measured and refused: these reasons are wrapped string literals, so a
+ * negation and the name it negates are routinely on different physical lines,
+ * and the floor disarms the skip on exactly the shape it exists for.
+ */
 const NEGATED_CLAIM =
-  /\b(?:no|not|never|neither|nor|without|nothing|none|lacks?|absent|missing)\b[^`.;]{0,40}$/i;
+  /\b(?:no|not|never|neither|nor|without|nothing|none|lacks?|absent|missing)\b[^`.;:]{0,40}$/i;
 
 /**
  * One file as a single stream, with the source line of every character.
@@ -3248,7 +3270,13 @@ const ri15 = {
     'in the file cited above it. (2) A ' +
     'NEGATED claim is skipped, ' +
     'because "`fills` HAS NO `identity_id` (`schema.ts:3005`)" cites the line ' +
-    'the name must be ABSENT from; that half is RI-14. (3) Only the NEAREST ' +
+    'the name must be ABSENT from; that half is RI-14. THE CLAUSE A NEGATION ' +
+    'IS READ WITHIN NOW ENDS AT A COLON as well as at a full stop or a ' +
+    'semicolon (ADR-383): this corpus writes a verdict and then its subject, ' +
+    'and the negation in the verdict was taking the subject name with it. It ' +
+    'binds 3 citations in the two live scopes, all TRUE and all opened at ' +
+    'primary source, and it found ' +
+    'the one FALSE citation the whole exercise turned on. (3) Only the NEAREST ' +
     'backticked token binds, so a possessive is dropped rather than guessed. ' +
     '(4) It reads docs/decisions NOT AT ALL, deliberately: an ADR is a dated ' +
     'record of the tree as it was, its citations go stale by design when the ' +
@@ -3279,6 +3307,11 @@ const ri15 = {
     'off for every ambiguous path: 13 citations here name more than one file, ' +
     'and every citation in this input whose line number is guarded by NOTHING ' +
     'AT ALL is one of them. ' +
+    '(12) A NEGATED CLAIM WHOSE NEGATION IS CLOSED BY A COLON BEFORE THE NAME ' +
+    'IS BOUND rather than skipped, which is the price of the character miss ' +
+    '(2) names. "no such column: `identity_id` (`schema.ts:20`)" would be read ' +
+    'as a claim ABOUT `identity_id`. No site in this tree is written that way, ' +
+    'derived over all 13 citations the character newly binds. ' +
     'WHAT THIS CHECK COVERS, MEASURED RATHER THAN DESCRIBED (ADR-380). Over ' +
     'the 359 single-line citations here whose path resolves, the share of ' +
     'WRONG in-file line numbers this check would report is 44.2 percent on ' +
@@ -3293,7 +3326,17 @@ const ri15 = {
     '(11), and the negation lookback -- which is ADR-377 section 6s property ' +
     'with its cause CORRECTED, from the scanners running pairing state to ' +
     '`NEGATED_CLAIM` reading 70 flattened characters back ACROSS THE NEWLINE ' +
-    'JOINER into the previous lines prose. ' +
+    'JOINER into the previous lines prose. THE HOLE IS NOT CLOSED AND ONE OF ' +
+    'ITS TWO MECHANISMS IS (ADR-383): the joiner half is LEFT, because it is ' +
+    'load-bearing. Bounding the lookback at the line the name is written on ' +
+    'was written and run against this tree; it newly binds 2 citations here ' +
+    'and ONE OF THE TWO IS A GENUINE NEGATED CLAIM whose negation wrapped, ' +
+    '`schedule.ts:419` saying a name is in NEITHER the ten-name ' +
+    '`EVENT_CATALOGUE` NOR EVENTS.md. These reasons are wrapped string ' +
+    'literals, so the joiner the citation reader needs is the joiner the ' +
+    'negation reader needs, and a line floor cannot keep one and drop the ' +
+    'other. Closing the clause at a colon takes the other mechanism and leaves ' +
+    'the guard whole. ' +
     `${CITATIONS_OWNED_ELSEWHERE.length} CITATION(S) ARE NAMED AND NOT ENFORCED, in ` +
     'CITATIONS_OWNED_ELSEWHERE, each exact on file, pointer and name so that it ' +
     'covers one citation and expires by itself. The `wiring.test.ts` entry this ' +
