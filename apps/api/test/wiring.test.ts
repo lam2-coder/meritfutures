@@ -2908,10 +2908,19 @@ test('the one port whose derived verdict and whose measured wire behaviour disag
 //      way, by reading the backtick immediately before the name rather than by
 //      pairing from the start.
 //
-//   3. THE TRAILING CHARACTER MAY NOT CONTINUE AN IDENTIFIER OR A PATH, because
-//      `packages/enrichment` is not the member `enrichment` and
-//      `operator-console` is not the member `operator`. Both are live in these
-//      entries today and a rule without this clause counts both.
+//   3. THE TRAILING CHARACTER MAY NOT CONTINUE AN IDENTIFIER OR A PATH, so that
+//      a member name that is a PREFIX of a longer backticked token, as `operator`
+//      is of `operator-console`, is not counted as the member.
+//
+//      THIS CLAUSE IS DEFENSIVE AND IT IS INERT ON THIS TREE, WHICH IS SAID HERE
+//      RATHER THAN LEFT FOR A READER TO ASSUME. A seed removing it left all
+//      twenty-three cases GREEN. The first draft of this block claimed the clause
+//      is what refuses `packages/enrichment` and `systemDb(operator-console)`, and
+//      that claim was FALSE: in both of those the backtick sits before `packages`
+//      and before `systemDb`, so clause 1 refuses them and clause 3 never runs.
+//      The fixture below now carries a case that DISCRIMINATES, so the clause is
+//      held by something rather than only believed. Clauses 1 and 2 are the
+//      load-bearing pair, each measured by its own seed.
 //
 // TWO STRONGER DEFINITIONS WERE MEASURED AND BOTH ARE WORSE, WHICH IS WHY THIS
 // ONE IS HERE RATHER THAN ASSERTED AS THE ONLY OPTION.
@@ -2969,13 +2978,22 @@ test('the naming rule counts a code span and refuses prose, a path and a hyphena
   );
   expect(namesMember('`idempotency.find` names a member of the store', 'idempotency')).toBe(true);
 
-  // AND THE FOUR IT MUST REFUSE.
+  // AND THE FOUR IT MUST REFUSE, EACH REFUSED BY CLAUSE 1: the backtick sits
+  // before `packages`, before `systemDb` and before `operatorSessions`, never
+  // before the member name.
   expect(namesMember('a trader can now take that request back', 'now')).toBe(false);
   expect(namesMember('and `packages/enrichment` is in the same position', 'enrichment')).toBe(
     false,
   );
   expect(namesMember('the operator door, `systemDb(operator-console)`', 'operator')).toBe(false);
   expect(namesMember('it now points inside `operatorSessions` own reason', 'operator')).toBe(false);
+
+  // AND THE TWO THAT REACH CLAUSE 3, which the four above do not. These are the
+  // only shapes in this fixture whose answer CHANGES when the trailing rule is
+  // removed, and they are here because a seed proved the four above do not hold
+  // that clause at all.
+  expect(namesMember('`operator-console` is the door this port waits on', 'operator')).toBe(false);
+  expect(namesMember('`db/scoped.ts` is where the handle lives', 'db')).toBe(false);
 });
 
 /** Every blocked port, its interface, and that interface's members. */
