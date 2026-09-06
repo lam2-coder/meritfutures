@@ -394,7 +394,9 @@ export interface AdminPayoutBackend {
   now(): Date;
 }
 
-/** Raised by a backend that is not installed. Answered as 503, never 500. */
+/** Raised by a backend that is not installed. THE STATUS THIS LINE NAMED IS
+ * RETIRED BY ADR-373 AND NOT REPEATED HERE: `adminPayoutHandler` reads
+ * `principal` first, so every request meets 401 (ADR-192 clause 2). */
 export class AdminPayoutUnwired extends Error {
   constructor(what: string) {
     super(

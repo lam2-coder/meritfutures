@@ -707,7 +707,9 @@ export interface AdminWalletBackend {
   reconcile(asOf: Date): Promise<WalletReconciliationResponse>;
 }
 
-/** Raised by a backend that is not installed. Answered as 503, never 500. */
+/** Raised by a backend that is not installed. THE STATUS THIS LINE NAMED IS
+ * RETIRED BY ADR-373 AND NOT REPEATED HERE: `adminWalletHandler` reads
+ * `principal` first, so every request meets 401 (ADR-192 clause 2). */
 export class AdminWalletUnwired extends Error {
   constructor(what: string) {
     super(

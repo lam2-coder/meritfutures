@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->354<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->357<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -12970,3 +12970,63 @@ Counts derived at reporting time off each runner's own last line: suite **332 fi
 **Next.** The founder's read of [ADR-369](decisions/ADR-369.md) and the three questions its approval block names, of which **section 12 question 1 is the one this row was built to ask well rather than to answer**: does a `BLOCKED` entry owe an accounting for every member of its port? Its **option (c), that an entry which ENUMERATES members must enumerate completely, is the smallest rule that catches every defect this census found and demands nothing of the five port-level entries.** Then the three unrepaired `operator` omissions, and `RI-15`'s two named holes.
 
 Counts derived at reporting time off each runner's own last line: suite **331 files / 8,024 passed / 10 skipped / 0 failed**, against a base reproduced on `8ff3a2a4` **before the first edit** of **331 files / 8,019 passed / 10 skipped / 0 failed**, a delta of **+5 cases in ONE EXISTING FILE entirely by ADDITION with zero removals** and `skipped` unmoved at 10, attributed by removal: `wiring.test.ts` runs **23** alone on this tree and **18** alone on the base. Gates **33 of 33** after `generate`. Invariants **35 of 35**. Typecheck, lint and `format:check` clean.
+
+---
+
+## 2026-09-06 - Session 567: the wiring slice read as a program, where the install count is eleven and the half-install is unreachable by the placement of one statement nothing was guarding ([ADR-372](decisions/ADR-372.md), proposed)
+
+**The row.** Read [`apps/api/src/start.ts`](../apps/api/src/start.ts) as a PROGRAM rather than as text, and rule on what it installs, whether the derivation `wiring.test.ts` uses is right, and whether the file can produce a deployment that half-installs and then serves. **MONEY PATH, `E2` READ OWED. [ADR-372](decisions/ADR-372.md) ships `proposed` and UNSIGNED.**
+
+**Fourteen waves measured this file from the OUTSIDE**, as text, because importing it would bind a port. **That constraint is correct and this row did not lift it: parsing is not executing.** The TypeScript compiler API builds a syntax tree, evaluates nothing, opens no socket and binds no port.
+
+**THE FILE IS A STRAIGHT-LINE PROGRAM, AND THAT IS THE FINDING UNDER EVERY OTHER ONE.** Twenty-six top-level statements: **14** imports, **11** installs, one `await main()`. **Zero variable statements, functions, conditionals, loops, `try`, `throw` or `return`.** Every statement runs exactly once on every run.
+
+**BOTH DISPATCHED FIGURES WERE RE-DERIVED AND ONE IS FALSE.** **317** lines holds exactly. **About twenty-four install calls** does not: the install count is **ELEVEN**, and **23** is the count of call expressions of every kind, because every install line has the shape `setter(factory(LIVE_DB))`. **Nothing in this corpus carried the wrong figure**, checked rather than assumed, so nothing is retired and no `RI-14` correction is owed.
+
+**THE TEXT DERIVATION IS CORRECT ON THIS TREE AND SOUND ONLY BY ACCIDENT.** The two derivations agree exactly, and three separate things hold that agreement up, **one of them the formatter**: the pattern refuses every nested shape only because `prettier` indents it and `format:check` is a gate. **`RI-25`'s class is real here and has no instance on this tree**, asserted in both halves: a `//` comment and a nested call are refused, while a BLOCK comment, a call after `main()`, dead code after a top-level `throw` and a call inside a template literal are all **counted as wired**.
+
+**THE HALF-INSTALL [ADR-356](decisions/ADR-356.md) PRICED AT 200/500 AND RULED WORSE CANNOT ARISE FROM THIS FILE, FOR TWO INDEPENDENT REASONS.** No adapter factory holds a construction-reachable `throw`, so no install can fail; and `app.listen` is reached only inside `main`, whose call is the LAST of the twenty-six statements, so any failure aborts before anything is served and the process serves nothing rather than serving some routes. **And that property was held by one statement's placement and asserted by nobody**, while the file's own header tells the next session to resolve its conflicts by APPEND, which is exactly the edit that puts an install below `main()` where `wired` still counts it.
+
+**Nothing is installed that no port declares, nothing is installed twice** (which a `Set` could not report), **and `start.ts` is the only module under `apps/api/src` that installs on import**, which is the premise the one-file scan rests on and had never been stated.
+
+**Six items are owed to `wiring.test.ts`, which was never opened for writing**, and none of them is a reason to widen the pattern.
+
+**`start.ts` is NOT edited.** No finding forced it. The one imprecision found is reported at its line rather than repaired.
+
+**Eight falsification seeds, every one watched RED and every one restored byte-identical**, five of them editing `src/`. **No port wired, no door opened, no triple moved, no gate weakened, no test skipped, disabled or quarantined, no invariant minted, no `CI-06` letter spent, no migration number taken or reserved.** **Row `371` is RESERVED** so `CI-06f` stays gapless, measured at 32 of 33 with `372` alone.
+
+**Next.** The founder's `E2` read of [ADR-372](decisions/ADR-372.md) and the three decisions its approval block names, the first being whether `wired` should be derived from the syntax tree rather than from text.
+
+Counts derived at reporting time off each runner's own last line: suite **333 files / 8,042 passed / 10 skipped / 0 failed**, against a base reproduced on `133315cb` **before the first edit** of **332 files / 8,036 passed / 10 skipped / 0 failed**, a delta of **+1 file and +6 cases with skips unchanged**, attributed by removal; gates **33 of 33** after `generate`; invariants **35 of 35**; `typecheck`, `lint` and `format:check` all clean. **`pnpm run verify` and `scripts/corpus/falsify.mjs` were NOT run**, both forbidden by the row.
+
+---
+
+## 2026-09-06 - Session 568: the status every docblock promises, measured against the status the router returns, where four modules promised one no request can meet and the fifth promises one the deployment fails to produce ([ADR-373](decisions/ADR-373.md), proposed)
+
+**[ADR-373](decisions/ADR-373.md), `status: proposed`, approval line UNSIGNED. MONEY PATH, ADR-003 STRICT, `E2` READ OWED.** Three rows found one defect one module at a time and each repaired only its own port: [ADR-359](decisions/ADR-359.md) on certificate revocation, [ADR-365](decisions/ADR-365.md) on the payout console, [ADR-366](decisions/ADR-366.md) on the wallet. This row asked how many of the rest are wrong.
+
+**RULED: FIVE OF THE TWENTY-ONE REFUSAL CLASSES DISAGREE WITH THEIR OWN ROUTER, FOUR OF THE FIVE ARE ONE DEFECT WITH ONE REPAIR, AND THE FIFTH IS WRONG ON THE OTHER SIDE.** Scope derived rather than carried: **27** route modules, **24** mentioning `503`, **21** refusal classes across **17** modules. **The dispatch's "roughly 24" reproduces exactly.**
+
+**BOTH HALVES ARE DERIVED AND NEITHER IS WRITTEN DOWN.** ADVERTISED is parsed out of each refusal docblock, taking the first paragraph that names a status and dropping every status the sentence DENIES; REACHABLE is DRIVEN through `buildServer` and `app.inject` over every registered route on both surfaces, with and without a session, against the shipped module-scope defaults. **The rule is a SUBSET and not an equality**: a module may reach statuses no docblock names, and may not PROMISE one no request to it can meet.
+
+**THE ADMIN FOUR PROMISED A STATUS NO REQUEST TO THIS DEPLOYMENT CAN MEET, AND THE HANDLER IS RIGHT.** `principal` is the first member every request touches on every route of `admin-certificates`, `admin-payouts`, `admin-wallet` and `admin-writes`; its refusal is answered 401 by an inner catch on [ADR-192](decisions/ADR-192.md) clause 2, and the outer leg is reachable only from a PARTIAL install. **`admin-writes` IS NEW AND NO ROW HAD READ IT**, and it is the surface on which an account is frozen, closed and a plan version published.
+
+**THE RULING IS NOT INHERITED, WHICH IS [ADR-364](decisions/ADR-364.md)'s OWN LESSON.** The PREMISE was re-derived in each file from each handler's own comment rather than carried from ADR-359, and a fifth module carrying the same shape is ruled the OTHER way.
+
+**`catalog.ts` PROMISES A STATUS THE DEPLOYMENT FAILS TO PRODUCE, AND THERE THE HANDLER IS THE WRONG SIDE.** `CatalogUnwired` is caught by NOTHING anywhere in the deployable, so `server.ts`'s error handler answers `internal_error` on all three catalogue rows and logs *"unmapped error status"*. `STATUS_CODE` carries no 503, so the cheap fix does not work either; what is missing is the handler-level catch every other module in the table has, and **a catch is behaviour this row may not write**. The disagreement is pinned by an executed case that expires when the catch lands.
+
+**THREE PRIOR ROWS DISPOSED OF ONE SENTENCE THREE DIFFERENT WAYS ACROSS THREE CONSECUTIVE WAVES** (ADR-359 declined the edit, ADR-365 recorded it owed and reverted its own repair, ADR-366 recorded it a landmine). **This row settles it against ADR-359 using ADR-359's own measurement**, that a reader grepping for the status would predict the wrong one.
+
+**`internal.ts` AND `public-methods.ts` ANSWER 500 AND ARE NOT FINDINGS**, both arguing for it in their own source. **The defect is never a status; it is prose disagreeing with the wire.**
+
+**THE LOG WAS THE ONLY CHANNEL ON THREE MORE MODULES AND NOTHING WAS HOLDING ANY OF THEM.** Deleting `admin-writes.ts`'s `request.log.error` left that module's own suite entirely GREEN. Three cases now hold all three.
+
+**TEN FALSIFICATION SEEDS, EVERY ONE WATCHED RED AND EVERY ONE RESTORED BYTE-IDENTICAL under `sha256sum -c`**, including the historical defect itself, a BEHAVIOUR seed against this row's own repair, and one that gives `catalog.ts` the catch its docblock argues for so the exception fails on GOOD NEWS. **`RI-30` WENT RED ON THIS ROW'S OWN FIRST DRAFT at 34 of 35 and no checker was edited**, which is the third consecutive wave in which an invariant caught the defect it was minted for inside the diff that introduced it.
+
+**THE `catalog.ts` ANNOTATION WAS IMPOSSIBLE UNDER THE FENCE AS DISPATCHED, AND THAT IS MEASURED RATHER THAN ASSERTED.** A one-line insertion lands `wiring.test.ts:958`'s pointer on a blank line and a two-line one on a bare closing brace, so no insertion size fits and the two-line window does not save it. **THE CONTRADICTION WAS THE DISPATCH'S OWN**, which granted citation-repair rights across `apps/**` and forbade that file in the same prompt; the dispatcher resolved it mid-row in the narrowest form and **the grant was used exactly ONCE, for one line number**. The annotation landed, its argument standing word for word because the ruling is that the handler is the wrong side. **`ALLOCATION.md:278` is now drifted by exactly two on both its `catalog.ts` pointers**, inside `CITATION_WINDOW` so `RI-16` is silent and wrong anyway; it is another row's cell and is owed. The four admin repairs are three lines each because a longer one in `admin-payouts.ts` breaks three citations in that same file. **[ADR-361](decisions/ADR-361.md) section 9's maintenance cost, measured a THIRD time, forbidding a correction until a fence was widened by hand rather than merely taxing one.**
+
+**No handler, status, document, log level or port changed, no door opened, no gate weakened, no test skipped, disabled or quarantined, no invariant number minted, no `CI-06` letter spent, no migration number taken or reserved, no `status` field moved**; `git diff origin/main -- apps/api/src` is five docblocks and nothing else. **Rows `371` and `372` are RESERVED so `CI-06f` stays gapless**, naming no subject, which is the fourth consecutive wave dispatched without a reservation block.
+
+**Next.** The founder's `E2` read of [ADR-373](decisions/ADR-373.md) and the three decisions its approval block names, of which **`OQ-373-01` is the one with a trader on the other side**: an unwired plan catalogue answers a public read with `internal_error` while every other module in this tree that can say *"this deployment was never finished"* does say it. Then `OQ-373-03`, `RI-15`'s citation grammar, now owed by four entries.
+
+Counts derived at reporting time off each runner's own last line: suite **333 files / 8,052 passed / 10 skipped / 0 failed**, against a base reproduced on `133315cb` **before the first edit** of **332 files / 8,036 passed / 10 skipped / 0 failed**, a delta of **+1 file and +16 cases entirely by ADDITION with zero removals** and `skipped` unmoved at 10, attributed by removal: `advertised-status.test.ts` is new and runs **16** alone, and `admin-wallet-port.test.ts` runs **17** alone on this tree and **17** alone on the base. Gates **33 of 33** after `generate`. Invariants **35 of 35**. Typecheck, lint and `format:check` clean.
