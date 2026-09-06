@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->354<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->355<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -12970,3 +12970,31 @@ Counts derived at reporting time off each runner's own last line: suite **332 fi
 **Next.** The founder's read of [ADR-369](decisions/ADR-369.md) and the three questions its approval block names, of which **section 12 question 1 is the one this row was built to ask well rather than to answer**: does a `BLOCKED` entry owe an accounting for every member of its port? Its **option (c), that an entry which ENUMERATES members must enumerate completely, is the smallest rule that catches every defect this census found and demands nothing of the five port-level entries.** Then the three unrepaired `operator` omissions, and `RI-15`'s two named holes.
 
 Counts derived at reporting time off each runner's own last line: suite **331 files / 8,024 passed / 10 skipped / 0 failed**, against a base reproduced on `8ff3a2a4` **before the first edit** of **331 files / 8,019 passed / 10 skipped / 0 failed**, a delta of **+5 cases in ONE EXISTING FILE entirely by ADDITION with zero removals** and `skipped` unmoved at 10, attributed by removal: `wiring.test.ts` runs **23** alone on this tree and **18** alone on the base. Gates **33 of 33** after `generate`. Invariants **35 of 35**. Typecheck, lint and `format:check` clean.
+
+---
+
+## 2026-09-06 - Session 567: the wiring slice read as a program, where the install count is eleven and the half-install is unreachable by the placement of one statement nothing was guarding ([ADR-372](decisions/ADR-372.md), proposed)
+
+**The row.** Read [`apps/api/src/start.ts`](../apps/api/src/start.ts) as a PROGRAM rather than as text, and rule on what it installs, whether the derivation `wiring.test.ts` uses is right, and whether the file can produce a deployment that half-installs and then serves. **MONEY PATH, `E2` READ OWED. [ADR-372](decisions/ADR-372.md) ships `proposed` and UNSIGNED.**
+
+**Fourteen waves measured this file from the OUTSIDE**, as text, because importing it would bind a port. **That constraint is correct and this row did not lift it: parsing is not executing.** The TypeScript compiler API builds a syntax tree, evaluates nothing, opens no socket and binds no port.
+
+**THE FILE IS A STRAIGHT-LINE PROGRAM, AND THAT IS THE FINDING UNDER EVERY OTHER ONE.** Twenty-six top-level statements: **14** imports, **11** installs, one `await main()`. **Zero variable statements, functions, conditionals, loops, `try`, `throw` or `return`.** Every statement runs exactly once on every run.
+
+**BOTH DISPATCHED FIGURES WERE RE-DERIVED AND ONE IS FALSE.** **317** lines holds exactly. **About twenty-four install calls** does not: the install count is **ELEVEN**, and **23** is the count of call expressions of every kind, because every install line has the shape `setter(factory(LIVE_DB))`. **Nothing in this corpus carried the wrong figure**, checked rather than assumed, so nothing is retired and no `RI-14` correction is owed.
+
+**THE TEXT DERIVATION IS CORRECT ON THIS TREE AND SOUND ONLY BY ACCIDENT.** The two derivations agree exactly, and three separate things hold that agreement up, **one of them the formatter**: the pattern refuses every nested shape only because `prettier` indents it and `format:check` is a gate. **`RI-25`'s class is real here and has no instance on this tree**, asserted in both halves: a `//` comment and a nested call are refused, while a BLOCK comment, a call after `main()`, dead code after a top-level `throw` and a call inside a template literal are all **counted as wired**.
+
+**THE HALF-INSTALL [ADR-356](decisions/ADR-356.md) PRICED AT 200/500 AND RULED WORSE CANNOT ARISE FROM THIS FILE, FOR TWO INDEPENDENT REASONS.** No adapter factory holds a construction-reachable `throw`, so no install can fail; and `app.listen` is reached only inside `main`, whose call is the LAST of the twenty-six statements, so any failure aborts before anything is served and the process serves nothing rather than serving some routes. **And that property was held by one statement's placement and asserted by nobody**, while the file's own header tells the next session to resolve its conflicts by APPEND, which is exactly the edit that puts an install below `main()` where `wired` still counts it.
+
+**Nothing is installed that no port declares, nothing is installed twice** (which a `Set` could not report), **and `start.ts` is the only module under `apps/api/src` that installs on import**, which is the premise the one-file scan rests on and had never been stated.
+
+**Six items are owed to `wiring.test.ts`, which was never opened for writing**, and none of them is a reason to widen the pattern.
+
+**`start.ts` is NOT edited.** No finding forced it. The one imprecision found is reported at its line rather than repaired.
+
+**Eight falsification seeds, every one watched RED and every one restored byte-identical**, five of them editing `src/`. **No port wired, no door opened, no triple moved, no gate weakened, no test skipped, disabled or quarantined, no invariant minted, no `CI-06` letter spent, no migration number taken or reserved.** **Row `371` is RESERVED** so `CI-06f` stays gapless, measured at 32 of 33 with `372` alone.
+
+**Next.** The founder's `E2` read of [ADR-372](decisions/ADR-372.md) and the three decisions its approval block names, the first being whether `wired` should be derived from the syntax tree rather than from text.
+
+Counts derived at reporting time off each runner's own last line: suite **333 files / 8,042 passed / 10 skipped / 0 failed**, against a base reproduced on `133315cb` **before the first edit** of **332 files / 8,036 passed / 10 skipped / 0 failed**, a delta of **+1 file and +6 cases with skips unchanged**, attributed by removal; gates **33 of 33** after `generate`; invariants **35 of 35**; `typecheck`, `lint` and `format:check` all clean. **`pnpm run verify` and `scripts/corpus/falsify.mjs` were NOT run**, both forbidden by the row.
