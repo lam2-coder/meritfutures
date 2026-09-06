@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 // CI-02, the `unit` project.
 //
 // =============================================================================
@@ -2384,4 +2386,333 @@ test('every default that is not a proven refusal carries a ruling, and no ruling
 
   for (const [port, ruling] of Object.entries(UNPROVEN_RULING))
     expect(ruling.why.length, `${port}'s ruling is too short to be checkable`).toBeGreaterThan(80);
+});
+
+// -----------------------------------------------------------------------------
+// The third measurement: the counts this file writes in PROSE, derived (ADR-367)
+// -----------------------------------------------------------------------------
+//
+// THIS IS THE THIRD WAVE IN A ROW REPAIRING A HAND-MAINTAINED NUMBER IN THIS ONE
+// FILE, AND THE PATTERN IS THE FINDING. ADR-357 built `DEFAULTS` off the tree and
+// set an ANSWER beside it that read back off nothing. ADR-363 derived that answer
+// and left `UNPROVEN_RULING` hand-maintained on purpose, with a both-directions
+// assertion around it. This wave opened holding THREE stale figures that three
+// rows had found and none was allowed to repair, and every one of the three was a
+// count spelled into a string.
+//
+// A COUNT SPELLED INTO A STRING IS ASSERTED BY NOBODY, and two of these three sat
+// in the same tree as a live derivation of the very set they miscounted. The SSO
+// figures read SIX and FIVE while `test/admin-read-constructibility.test.ts`
+// derived EIGHT on every run, green, for eight sessions. The remedy is not a
+// better proofreader.
+//
+// WHAT IS DERIVED HERE AND WHAT IS NOT, so nobody reads these cases as stronger
+// than they are. The two SSO figures are derived from the live `BLOCKED` map by
+// the same predicate that other file runs over a parse of this one. The payout
+// partition is derived from the adapter's own refusal spellings and from the two
+// interfaces' member lists. NO JUDGEMENT IS DERIVED: the prose still says what a
+// number MEANS, and these cases only refuse to let it say a different number than
+// the tree does.
+//
+// AND THE RETIREMENT CONVENTION IS LOAD BEARING HERE RATHER THAN COSMETIC.
+// `RI-14` keeps a corrected sentence beside its correction, and ADR-358 measured
+// that this can collide with a prose-matching case: a repaired message that
+// QUOTES its false sentence puts the retired words back exactly where a matcher
+// reads them, inside the quotation of their own retirement. Every case below
+// therefore requires its anchor phrase EXACTLY ONCE in the entry, so the
+// collision is a RED bar naming the entry rather than a silent second answer.
+// The three entries retire their figures by NAMING them instead, which is
+// `usePayoutBackend`'s own precedent from four earlier retirements.
+
+/** The cardinals these entries spell. Widen it when an entry needs a bigger one. */
+const CARDINAL: Readonly<Record<string, number>> = {
+  ONE: 1,
+  TWO: 2,
+  THREE: 3,
+  FOUR: 4,
+  FIVE: 5,
+  SIX: 6,
+  SEVEN: 7,
+  EIGHT: 8,
+  NINE: 9,
+  TEN: 10,
+  ELEVEN: 11,
+  TWELVE: 12,
+  THIRTEEN: 13,
+  FOURTEEN: 14,
+  FIFTEEN: 15,
+};
+
+/**
+ * The one cardinal `pattern` finds in `reason`, as a number.
+ *
+ * EXACTLY ONE MATCH IS REQUIRED AND THAT IS THE ADR-358 GUARD, not a convenience.
+ * A second match means the entry has retired its own figure by reproducing the
+ * sentence that carried it, and a matcher reading the second one would report a
+ * count the entry no longer makes. Failing is the only honest answer available:
+ * the file cannot tell which of two identical sentences is live.
+ */
+function soleCardinal(reason: string, pattern: RegExp, where: string): number {
+  const hits = [...reason.matchAll(pattern)];
+  expect(
+    hits.length,
+    `${where} must carry ${pattern.source} exactly once. Two matches means a retired ` +
+      'figure was QUOTED rather than NAMED, which puts the old words back where this case ' +
+      'reads them; zero means the anchor phrase was reworded and the count is unbound again',
+  ).toBe(1);
+  const word = hits[0]?.[1] ?? '';
+  expect(
+    CARDINAL[word],
+    `${where} spells the cardinal "${word}", which CARDINAL above does not carry`,
+  ).toBeDefined();
+  return CARDINAL[word] ?? 0;
+}
+
+/** The port every entry behind the SSO purchase reduces to. */
+const SSO_PORT = 'setAdminSessionSource';
+
+/**
+ * Every `BLOCKED` entry the SSO purchase blocks.
+ *
+ * THE PREDICATE IS `test/admin-read-constructibility.test.ts`'s, deliberately,
+ * and it is run here over the LIVE map rather than over a parse of this file's
+ * own text. That file derives the set and names its members; this one binds the
+ * two PROSE figures to the same predicate, which is the half that was missing
+ * while both figures were wrong.
+ */
+const behindTheSsoPurchase: readonly string[] = Object.entries(BLOCKED)
+  .filter(([port, reason]) => port === SSO_PORT || reason.includes('AdminSessionSource'))
+  .map(([port]) => port)
+  .sort();
+
+test('the two prose counts of the SSO purchase are derived from BLOCKED rather than typed', () => {
+  // THE DEFECT THIS ENDS, STATED SO THE CASE IS NOT MISREAD AS TIDINESS.
+  // `setAdminReadSource` said the purchase blocks SIX and `setAdminSessionSource`
+  // said FIVE OTHER PORTS reduce to it. The tree derived EIGHT. Three sessions
+  // found it, ADR-360 section 7 wrote it down, and nothing in this file could
+  // have gone red, because the only reader of those two numbers was a person.
+  expect(behindTheSsoPurchase).toContain(SSO_PORT);
+
+  const blocks = soleCardinal(
+    BLOCKED['setAdminReadSource'] ?? '',
+    /the SSO purchase blocks ([A-Z]+) entries/g,
+    "`setAdminReadSource`'s reason",
+  );
+  expect(
+    blocks,
+    `\`setAdminReadSource\` says the purchase blocks ${blocks}; the map derives ` +
+      `${behindTheSsoPurchase.length}: ${behindTheSsoPurchase.join(', ')}`,
+  ).toBe(behindTheSsoPurchase.length);
+
+  // THE SECOND FIGURE IS THE FIRST ONE MINUS THE PORT ITSELF, and it is asserted
+  // as that rather than as its own literal, so the two can never part.
+  const others = soleCardinal(
+    BLOCKED[SSO_PORT] ?? '',
+    /([A-Z]+) OTHER PORTS STILL REDUCE TO THIS ONE/g,
+    `\`${SSO_PORT}\`'s reason`,
+  );
+  expect(
+    others,
+    `\`${SSO_PORT}\` says ${others} other ports reduce to it; the map derives ` +
+      `${behindTheSsoPurchase.length - 1} besides itself`,
+  ).toBe(behindTheSsoPurchase.length - 1);
+});
+
+/**
+ * The top-level member names an `export interface` declares.
+ *
+ * SLICED AT THE BRACES BY `scanTop` RATHER THAN MATCHED BY A LINE PATTERN, for
+ * the reason that scanner exists: every interface in this deployable is mostly
+ * docblock, and a line pattern would count a name out of a sentence.
+ */
+function interfaceMembers(source: string, name: string): readonly string[] {
+  const declared = new RegExp(`^export interface ${name}\\b`, 'm').exec(source);
+  if (declared === null) return [];
+  const open = source.indexOf('{', declared.index);
+  if (open < 0) return [];
+  const body = source.slice(open + 1, scanTop(source, open + 1, ''));
+  const names: string[] = [];
+  for (let pos = 0; pos < body.length;) {
+    const end = scanTop(body, pos, ';');
+    const member = /^(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*[<(:?]/.exec(
+      stripComments(body.slice(pos, end)).trim(),
+    );
+    if (member !== null) names.push(member[1] ?? '');
+    pos = end + 1;
+  }
+  return names;
+}
+
+/** The interface `member` is declared as a PROPERTY of, or undefined if it is a method. */
+function propertyType(source: string, iface: string, member: string): string | undefined {
+  const declared = new RegExp(`^export interface ${iface}\\b`, 'm').exec(source);
+  if (declared === null) return undefined;
+  const open = source.indexOf('{', declared.index);
+  if (open < 0) return undefined;
+  const body = stripComments(source.slice(open + 1, scanTop(source, open + 1, '')));
+  return new RegExp(`(?:^|\\s)readonly\\s+${member}\\s*:\\s*([A-Za-z_$][\\w$]*)`).exec(body)?.[1];
+}
+
+/** The one module under `src` or `src/routes` that declares `iface`. */
+function declaringSource(iface: string): string {
+  const found = [
+    ...tsFiles(SRC).map((name) => join(SRC, name)),
+    ...tsFiles(ROUTES).map((name) => join(ROUTES, name)),
+  ].filter((path) => new RegExp(`^export interface ${iface}\\b`, 'm').test(read(path)));
+  expect(found.length, `\`${iface}\` is declared in ${found.length} modules, not one`).toBe(1);
+  return read(found[0] ?? '');
+}
+
+const payoutRoutes = read(join(ROUTES, 'payouts.ts'));
+const payoutAdapter = read(join(SRC, 'payout-backend.ts'));
+
+/** The EIGHT members `PayoutBackend` and `PayoutTx` carry between them. */
+const PAYOUT_MEMBERS: readonly string[] = [
+  ...interfaceMembers(payoutRoutes, 'PayoutTx'),
+  ...interfaceMembers(payoutRoutes, 'PayoutBackend'),
+];
+
+/**
+ * The names `payout-backend.ts` spells into its own refusals.
+ *
+ * THE ADAPTER SPELLS THE MEMBER INTO THE ERROR ON PURPOSE, "so a 503 names the
+ * member a reader can go and look at" (`payout-backend.ts`'s `UNWIRED_STORE`
+ * docblock). That habit is what makes this partition derivable at all, and the
+ * case below asserts every occurrence was captured rather than trusting the
+ * pattern, because a refusal spelled some other way would silently promote its
+ * member into the answering half.
+ */
+const spelledRefusals: readonly string[] = matches(
+  payoutAdapter,
+  /new PayoutBackendUnwired\('([A-Za-z_$][\w$.]*)'\)/g,
+);
+
+/** Every refusal `payout-backend.ts` spells under `member`, as the part after its name. */
+function branchesRefused(member: string): readonly string[] {
+  return spelledRefusals
+    .filter((name) => name === member || name.startsWith(`${member}.`))
+    .map((name) => name.slice(member.length + 1));
+}
+
+/**
+ * Whether `member` refuses AS A WHOLE in `postgresPayoutBackend`.
+ *
+ * THE DOTTED NAMES ARE TWO DIFFERENT THINGS AND TELLING THEM APART IS THE WHOLE
+ * DERIVATION. `idempotency.find` names a MEMBER of the store `idempotency`
+ * holds, and when the spellings cover every member of that store's interface the
+ * field refuses whole. `insertPayoutRequest.hold` names a BRANCH of a method,
+ * and a method with one refusing branch still answers on the other: that is
+ * exactly the distinction the retired prose lost when it counted
+ * `insertPayoutRequest` as answering and `subject` as rejecting.
+ */
+function refusesWholly(member: string): boolean {
+  const tails = branchesRefused(member);
+  if (tails.length === 0) return false;
+  if (tails.includes('')) return true;
+  const held =
+    propertyType(payoutRoutes, 'PayoutBackend', member) ??
+    propertyType(payoutRoutes, 'PayoutTx', member);
+  if (held === undefined) return false;
+  return interfaceMembers(declaringSource(held), held).every((name) => tails.includes(name));
+}
+
+test('the payout member partition is derived from the adapter rather than typed', () => {
+  // ADR-361 SECTION 7. This entry read "FOUR MEMBERS OF EIGHT" and named
+  // `subject` and `listPayouts` among the four that reject. Both answer today,
+  // ADR-306 and ADR-308 built the first and ADR-311 the second, and the adapter's
+  // own header says so. A row dispatched off that clause would have gone and
+  // built two members that already exist, which is the cost that makes this the
+  // clause worth deriving rather than merely correcting.
+
+  // EVERY REFUSAL IS CAPTURED, ASSERTED RATHER THAN ASSUMED. A refusal written
+  // any other way is invisible to the pattern and would promote its member into
+  // the answering half without a bar going red, which is the one direction this
+  // derivation must not fail in.
+  expect(
+    spelledRefusals.length,
+    'a `new PayoutBackendUnwired(...)` in the adapter is not spelled with a literal member ' +
+      'name, so this derivation cannot see it and would count that member as answering',
+  ).toBe((payoutAdapter.match(/new PayoutBackendUnwired\(/g) ?? []).length);
+
+  const refusing = PAYOUT_MEMBERS.filter(refusesWholly).sort();
+
+  // NAMED RATHER THAN COUNTED, so a member that starts or stops refusing arrives
+  // in the diff with its own name on it.
+  expect(refusing).toStrictEqual(['holdFlag', 'idempotency']);
+
+  const answers = soleCardinal(
+    BLOCKED['usePayoutBackend'] ?? '',
+    /THE VALUE EXISTS AND IT IS ([A-Z]+) MEMBERS OF/g,
+    "`usePayoutBackend`'s reason",
+  );
+  const outOf = soleCardinal(
+    BLOCKED['usePayoutBackend'] ?? '',
+    /MEMBERS OF ([A-Z]+)\*\*/g,
+    "`usePayoutBackend`'s reason",
+  );
+  const rejects = soleCardinal(
+    BLOCKED['usePayoutBackend'] ?? '',
+    /ITS OTHER ([A-Z]+) MEMBERS REJECT WITH/g,
+    "`usePayoutBackend`'s reason",
+  );
+
+  expect(outOf, 'the entry states a member total the two interfaces do not carry').toBe(
+    PAYOUT_MEMBERS.length,
+  );
+  expect(
+    rejects,
+    `the entry states ${rejects} refusing; the adapter refuses on ${refusing.length}`,
+  ).toBe(refusing.length);
+  expect(
+    answers,
+    `the entry states ${answers} answering; ${PAYOUT_MEMBERS.length} declared less ` +
+      `${refusing.length} refusing is ${PAYOUT_MEMBERS.length - refusing.length}`,
+  ).toBe(PAYOUT_MEMBERS.length - refusing.length);
+});
+
+test('no member that answers is named inside the sentence saying which members reject', () => {
+  // THIS IS THE DEFECT ITSELF AND NOT THE COUNT AROUND IT. The retired clause
+  // was wrong twice over: the number was four, and `subject` and `listPayouts`
+  // were written into the list of names. A count binding alone would have caught
+  // the first and not the second, and the second is the half a dispatch reads.
+  //
+  // THE SPAN IS DELIMITED BY THE ENTRY'S OWN TWO MARKERS and a missing delimiter
+  // FAILS rather than widening the span to nothing, on this file's standing rule
+  // that a check must not go green on a shape nobody read.
+  const reason = BLOCKED['usePayoutBackend'] ?? '';
+  const from = reason.indexOf('ITS OTHER');
+  const to = reason.indexOf('THIS PARTITION READ');
+  expect(
+    from >= 0 && to > from,
+    'the rejection sentence is delimited by `ITS OTHER` and the retirement marker `THIS ' +
+      'PARTITION READ`. One of them was reworded, so this case can no longer find the span ' +
+      'it reads. Restore a delimiter or repoint this case; do not delete it',
+  ).toBe(true);
+
+  // A MEMBER THAT REFUSES ON A BRANCH MAY BE NAMED HERE AND A MEMBER THAT
+  // REFUSES NOWHERE MAY NOT, WHICH IS THE DISTINCTION THE RETIRED CLAUSE LOST.
+  // `insertPayoutRequest` is named in this sentence on purpose, because the
+  // sentence says in its own words that the hold branch of the member that
+  // answers rejects too, and the adapter spells that branch as
+  // `insertPayoutRequest.hold`. `subject` and `listPayouts` were spelled
+  // NOWHERE, and that is what made naming them an error rather than a nuance.
+  // THIS CASE WAS WRITTEN WITHOUT THE DISTINCTION AND ITS FIRST RUN FAILED ON
+  // `insertPayoutRequest`, which is kept here rather than quietly repaired:
+  // the first draft would have forced a true sentence to be deleted.
+  const sentence = reason.slice(from, to);
+  const unrefused = PAYOUT_MEMBERS.filter((member) => branchesRefused(member).length === 0);
+  for (const member of unrefused)
+    expect(
+      sentence,
+      `\`${member}\` refuses on no branch in the adapter and is named inside the sentence ` +
+        'listing what rejects, which is exactly how this clause sent a row to build what ' +
+        'already existed',
+    ).not.toContain(`\`${member}\``);
+
+  // AND THE OTHER DIRECTION, so the sentence cannot go silent instead of wrong.
+  for (const member of PAYOUT_MEMBERS.filter(refusesWholly))
+    expect(
+      sentence,
+      `\`${member}\` refuses in the adapter and the sentence listing what rejects does not name it`,
+    ).toContain(`\`${member}\``);
 });
