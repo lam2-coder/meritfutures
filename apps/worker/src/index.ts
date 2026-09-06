@@ -528,8 +528,8 @@ export type {
 // `SystemTx` is the one handle in this workspace that can write `events` while
 // `apps/api` opens no system door. So the handle and the producer are each in
 // the deployable the other cannot import, no `ExpirySweepIo` is constructed,
-// and `runExpirySweep` stays `unscheduled` in `schedule.ts` for a blocker that
-// is now a call that does not compile rather than a sentence.
+// and `runExpirySweep` stays `unscheduled` in `schedule.ts`. **THE CONSEQUENCE
+// HERE IS RETIRED (`RI-14`, ADR-385): the call is unwritten, not untypable.**
 export { EXPIRY_TERMS, expirySweepIo } from './sweeps/expiry-adapter.ts';
 export type { SweepTx } from './sweeps/expiry-adapter.ts';
 
@@ -590,11 +590,11 @@ export type {
 // `terms` is served; `expirySweepIo` calls `recordExpiryTransaction` inside
 // `WorkerDb.batch`'s callback, so `EXPIRY_LEDGER` now recognises the handle it
 // is given rather than refusing every one. **WHAT IS STILL TRUE IS THE HALF
-// THAT KEEPS THE JOB OFF A CLOCK**: `events` still needs the sink `P5-n` has
-// not written, the only producer in this repository is `apps/api/src/events.ts`
-// and `RI-04` plus `node-linker=isolated` put it out of reach, so
-// `expirySweepIo` takes the sink as a REQUIRED argument, nothing in this tree
-// can be passed for it, and no `ExpirySweepIo` is constructed here or anywhere.
+// THAT KEEPS THE JOB OFF A CLOCK**: `events` needs the PRODUCER `P5-n` has not
+// written, the only one in this repository is `apps/api/src/events.ts`, and
+// `RI-04` plus `node-linker=isolated` put it out of reach. No `ExpirySweepIo`
+// is constructed here or anywhere. **THE CLAUSE THAT STOOD HERE IS RETIRED
+// (`RI-14`, ADR-385): the call is unwritten, not untypable.**
 // **AND SLICE 7 PUT A SECOND PORT BEHIND THE SAME DOOR (ADR-325).**
 // `ApprovalLedgerPort` is `LT-06`, and its adapter is in `sweeps/ledger.ts`
 // rather than beside the driver because the manifest's own

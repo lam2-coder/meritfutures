@@ -87,6 +87,29 @@
 // reported `present` and `RI-35` still passed. **An absence check that goes
 // green over an emptied file is `strip-comments.mjs`'s own worst direction**,
 // and it had arrived inside the check written to prevent it.
+//
+// -----------------------------------------------------------------------------
+// WHAT A CLAIM SITE MAY BE, AND WHY ONE OF THEM IS NOW A RUNBOOK
+// -----------------------------------------------------------------------------
+// Every site here was a code file until ADR-384. The register now names one
+// page under `docs/`, and the rule that admitted it is narrow enough to state
+// in one line: **a LIVE operational document may be a claim site and a DATED
+// RECORD may not.**
+//
+// THE TWO ARE DIFFERENT KINDS OF SENTENCE AND ONLY ONE OF THEM CAN GO STALE. An
+// ADR, a session log or a review records a measurement made on its own day, so a
+// sentence in it that the tree later falsifies is still a true record of what
+// was measured; binding it would demand a repair that rewrites history, which is
+// `CI-06/derivable-counts`' ruling and `RI-16`'s exclusion 1. A runbook asserts
+// what is true NOW, to somebody deciding at 07:00 whether an alarm that did not
+// fire had anything to watch. **THAT SENTENCE CAN GO FALSE THE SAME WAY A
+// COMMENT CAN, AND NOBODY IS PAGED WHEN IT DOES.**
+//
+// IT IS ONE ENTRY AND NOT A WIDENING, WHICH IS THE PART A LATER ROW SHOULD NOT
+// UNDO BY HALVES. Leg 6's sweep still reads no `docs/` file: a scope that walked
+// the corpus would reach every dated record in it, which is exactly the set the
+// rule above refuses. What changed is that leg 1 was always able to read the
+// site the register names, and nobody had decided whether it may.
 // =============================================================================
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -999,6 +1022,99 @@ export const ABSENCE_ARTIFACTS = [
       return 'absent';
     },
   },
+  {
+    key: 'replay-audit-src-caller',
+    names:
+      'a caller of `runReplayAudit` under any `src/`, past the module that declares it at ' +
+      '`apps/worker/src/batch/replay.ts:608` and the barrel that re-exports the name. The ' +
+      'replay self-audit is BUILT and UNSCHEDULED, and ADR-346 ended the PORTS half of what ' +
+      'keeps it that way while leaving the CALLER half exactly where it stood',
+    needles: [],
+    sweptBy:
+      'nothing, and here the reason is a measurement rather than an inherited precedent. A ' +
+      'needle on `runReplayAudit` reaches exactly ONE unregistered line in the swept scope: ' +
+      '`apps/worker/src/schedule.ts:407`, whose `NO CALLER` is the absence word and whose ' +
+      'needle sits one line below it at `:408`, both inside the job registry row for this ' +
+      'same job, which states this same absence in the same words. That is a ' +
+      'claim site OWED rather than a needle to tighten, and ADR-384 could not take it because ' +
+      '`apps/worker/**` was a concurrent row`s fence on that wave. A needle registered ahead ' +
+      'of the site it reaches is this register reporting a finding at a file nobody holding ' +
+      'the needle may repair',
+    probe: (root) => {
+      const files = shippedSources(root);
+      if (files.length === 0) {
+        throw new Error(
+          'RI-35 found no source file under any `apps/*/src` or `packages/*/src`, so the ' +
+            'replay-audit caller probe measured nothing',
+        );
+      }
+      // A CALL AND NEVER THE DECLARATION, on `provisioning-saga-caller`s
+      // instrument: `export async function runReplayAudit(` at
+      // `batch/replay.ts:608` is the entry point itself, and a probe counting it
+      // would report every unscheduled job in this deployable as already called.
+      //
+      // AND NEVER THE MENTION, which is ADR-338's repair inherited rather than
+      // rediscovered. Three headers under `apps/worker/src/` name this function
+      // in order to say nothing runs it: `index.ts:449` writes "Nothing calls
+      // `runReplayAudit`", and `batch/adapter.ts:799` says a port has no caller
+      // "yet" beside the name. A raw scan would read the sentence as the wire
+      // and retire a claim that is still true. Stripped, it reads code.
+      //
+      // THE BARREL NEEDS NO EXCLUSION AND THAT IS MEASURED RATHER THAN ASSUMED.
+      // `apps/worker/src/index.ts:456` re-exports the name inside an export
+      // block, so the line carries no `(` and matches neither shape. Measured on
+      // the commit that added this artifact: `absent`, with every line above
+      // present.
+      //
+      // `src/` IS THE CLAIM'S OWN SCOPE AND NOT THIS PROBE'S CONVENIENCE, which
+      // matters because a caller EXISTS. `scripts/demo/world.ts:651` awaits this
+      // audit over a hand-built world, and `shippedSources` does not reach it.
+      // The runbook row says `src/` because a demo is not a schedule and cannot
+      // give the dead-man switch anything to watch; a probe widened to the swept
+      // scope would report `present` off that demo and retire a sentence that is
+      // true of every deployable.
+      //
+      // **AN ARGUMENT POSITION COUNTS, WHICH IS ADR-338's FINDING AGAINST THE
+      // DOOR PROBE APPLIED HERE BEFORE IT COSTS ANYTHING.** A job can be WIRED
+      // by being handed to something rather than called: the entry point in a
+      // map, in an array, or as an argument. A call-only probe would report
+      // `absent` over the row that wired it, which is this register's own defect
+      // arriving inside this register. So the name in a VALUE POSITION counts
+      // too: followed by `,`, `)`, `]`, `}`, `;` or the end of the line, MINUS
+      // the three shapes that are a re-export rather than a use. THE CLASS IS
+      // WIDER THAN THE DOOR PROBE'S BY THREE CHARACTERS AND A CASE IS WHY: a
+      // registry written `[runNightlyBatch, runReplayAudit]` puts the entry
+      // point LAST, where the next character is `]`, and the case asserting
+      // that shape failed against the narrower class before this line changed.
+      //
+      // MEASURED OVER THE SHIPPED SCOPE WITH COMMENTS STRIPPED at the moment
+      // this artifact was added: FOUR lines name this function at all. One is
+      // the declaration above. One is `apps/worker/src/index.ts:456`, the barrel
+      // member, which the bare-member shape removes. The other two are STRING
+      // LITERALS in `apps/worker/src/schedule.ts`, at `:390` and `:408`, and
+      // neither matches: this corpus quotes an identifier, so the character
+      // after the name is a quote or a backtick rather than a comma. The probe
+      // reaches zero lines today and the file it would most likely miss is
+      // excluded by SHAPE rather than by name, so a wiring written into the
+      // barrel itself is still seen.
+      /** @param {string} line */
+      const reexport = (line) =>
+        /^\s*runReplayAudit\s*,\s*$/.test(line) ||
+        /export\s*\{/.test(line) ||
+        /\bfrom\s*'/.test(line);
+      for (const rel of files) {
+        const wired = stripComments(readFileSync(join(root, rel), 'utf8'))
+          .split('\n')
+          .some((line) => {
+            if (/function\s+runReplayAudit/.test(line)) return false;
+            if (/runReplayAudit\s*\(/.test(line)) return true;
+            return /\brunReplayAudit\s*([,)\]};]|$)/.test(line) && !reexport(line);
+          });
+        if (wired) return 'present';
+      }
+      return 'absent';
+    },
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -1338,6 +1454,37 @@ export const ABSENCE_CLAIMS = [
       'ADR-342 landmine 1 is exactly this: four BLOCKED reasons were discharged by rows in ' +
       'other deployables and nothing noticed',
   },
+
+  // --- the runbook row whose dead-man switch has nothing to watch, ADR-384 ---
+  // **THE FIRST `docs/` SITE IN THIS REGISTER, AND IT IS A DECISION RATHER THAN
+  // A DRIFT.** ADR-375 section 13 question 2 asked whether a `docs/` file may be
+  // an `RI-35` claim site at all and left three options; ADR-384 takes (b), a
+  // LIVE runbook and never a dated record. The distinction is the one this
+  // file's own scope rules already draw: a dated record quoting a sentence the
+  // tree has since falsified is written out of citation grammar and must not be
+  // bound, while `CRON_INVENTORY.md` is a page an operator reads TODAY to decide
+  // whether an alarm has a subject. **THE SWEEP IS NOT LIFTED AND THIS ENTRY
+  // DOES NOT LIFT IT.** Leg 1 reads the site the register names, one file at a
+  // time; only leg 6 walks a scope, and it still walks no `docs/` file.
+  //
+  // **AND THE LINE SPLIT THREE ROWS QUEUED FOR THIS ENTRY WAS NOT NEEDED.**
+  // ADR-375 section 7 obstacle 4, restated as standing by ADR-377 section 9 and
+  // ADR-380 section 10, held that both halves of the runbook row sit on ONE
+  // 2,576-character markdown table row, so a registration bound to that line
+  // would bind the retired half with the live one. Leg 1 anchors a VERBATIM
+  // SUBSTRING and stores no line number, so the anchor below selects the live
+  // caller half alone, occurs on exactly one line of that file, and binds
+  // nothing else. ADR-384 section 3 is the measurement.
+  {
+    site: 'docs/ops/runbooks/CRON_INVENTORY.md',
+    claim: 'nothing under any `src/` calls `runReplayAudit`',
+    disposition: 'live',
+    artifact: 'replay-audit-src-caller',
+    why:
+      'the replay self-audit row carries an S1 dead-man switch over a job nothing runs and ' +
+      'says so in its own words, so the day a `src/` caller lands, the sentence telling an ' +
+      'operator the switch has no subject is the line this check goes red at',
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -1605,9 +1752,12 @@ export const ri35 = {
     'positive that has to be registered or have its needle tightened, and BOTH of the two ' +
     'the widened scope surfaced are QUOTED ERROR STRINGS -- pg-boss`s own thrown text and ' +
     'PostgreSQL`s -- registered `unbindable` rather than narrowed away, because a per-line ' +
-    'scan over raw text cannot tell a quotation from an assertion in any file shape. IT ' +
-    'EXCLUDES `docs/` AND `test/`: a dated record quoting a false sentence is written out of ' +
-    'citation grammar (ADR-212, RI-15, RI-16) and a case asserting a refusal quotes it. AND IT ' +
+    'scan over raw text cannot tell a quotation from an assertion in any file shape. THE ' +
+    'SWEEP EXCLUDES `docs/` AND `test/`: a dated record quoting a false sentence is written ' +
+    'out of citation grammar (ADR-212, RI-15, RI-16) and a case asserting a refusal quotes it. ' +
+    'LEG 1 IS NOT THE SWEEP AND ADR-384 SEPARATED THEM: leg 1 reads the site the register ' +
+    'names, so ONE LIVE RUNBOOK ROW is bound there, while the sweep still walks no `docs/` ' +
+    'file and this register still binds no dated record. AND IT ' +
     'CANNOT SEE A CLAIM ABOUT BEHAVIOUR RATHER THAN EXISTENCE: `0079`s header said granting ' +
     'the queue role means granting CREATE, which ADR-327 falsified by RUNNING pg-boss, and ' +
     'no probe over this tree reports what a function does under an option no caller passes. ' +

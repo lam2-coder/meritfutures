@@ -25,8 +25,8 @@
 //     directory is a READ (`apps/api/src/admin-source/liability.ts` folds open
 //     mismatches, `apps/api/src/routes/internal.ts` renders them) or a
 //     REGISTRATION (`packages/db/src/scope.ts`, `packages/db/src/schema.ts`).
-//   * NOTHING SETS `accounts.recon_blocked`. Every occurrence in application
-//     code reads it.
+//   * NOTHING OUTSIDE THIS DIRECTORY SETS `accounts.recon_blocked`, which is
+//     the scope `test/recon-sweep.test.ts` pins. `recon/sweep.ts:614` sets it.
 //   * `BatchWritePort.raiseReconciliation` IS A DIFFERENT CHANNEL AND IT WOULD
 //     BE EASY TO MISTAKE FOR THIS ONE. `batch/ports.ts` declares it for `DO-3`:
 //     "A failure does not throw: it returns an `AssertionFailure`, the batch
@@ -147,11 +147,11 @@
 // it either.
 //
 // **THE CLEARING PATH DOES NOT EXIST ANYWHERE AND THAT IS REPORTED RATHER THAN
-// BUILT.** No module in this tree writes `recon_blocked` in either direction,
-// so the first account this sweep blocks stays blocked until somebody writes the
-// operator's endpoint. That is a finding for the session log and not a reason to
-// weaken the block, because the alternative -- a sweep that clears its own
-// findings -- is the control deleting itself.
+// BUILT.** No module in this tree CLEARS `recon_blocked` (this file SETS it at
+// `recon/sweep.ts:614`; the broader claim that stood here is retired under
+// `RI-14` by ADR-385), so the first account this sweep blocks stays blocked
+// until somebody writes the operator's endpoint. That is not a reason to weaken
+// the block: a sweep that clears its own findings is the control deleting itself.
 // =============================================================================
 
 import {

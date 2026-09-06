@@ -2466,6 +2466,20 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     // THE NEGATED-CLAIM SKIP IS RIGHT AND ITS REACH IS WRONG, and the difference
     // is one line of unrelated prose above the citation. The two halves below
     // differ by a single full stop.
+    //
+    // THE REACH IS ALSO LOAD-BEARING, WHICH ADR-383 MEASURED AND WHICH IS WHY
+    // THIS CASE IS STILL HERE. Bounding the lookback at the line the name is
+    // written on was written and run against the whole tree: it newly binds two
+    // citations in RI-15's scope and ONE OF THE TWO IS A GENUINE NEGATED CLAIM
+    // whose negation wrapped, `apps/worker/src/schedule.ts` saying a name is in
+    // NEITHER the ten-name `EVENT_CATALOGUE` NOR EVENTS.md. It also turns the
+    // case above this one RED, because that seed wraps between `fills` HAS NO
+    // and `identity_id` exactly as the tree does. These reasons are wrapped
+    // string literals, so the joiner `flattenReasons` gives the citation reader
+    // is the joiner it gives the negation reader, and a line floor cannot keep
+    // one and drop the other. WHAT WAS TAKEN IS THE OTHER MECHANISM, the colon,
+    // in the case below. THIS HOLE IS STILL OPEN and this case still names the
+    // day somebody closes it.
     const root = cleanTree();
     write(root, 'apps/api/src/routes/admin-writes.ts', fileWithNameAt(300, 269, 'principal'));
 
@@ -2490,6 +2504,46 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
       root,
       REASON,
       '// The route serves no row\n// `principal` (`routes/admin-writes.ts:900`) is the gate.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
+  });
+
+  test('RI-15 reads a negation only as far as the COLON that closes its clause', () => {
+    // ADR-383, AND IT IS THE HALF OF BLINDFOLD THREE THAT COULD BE TAKEN. This
+    // corpus writes a verdict and then the thing the verdict is about --
+    // "**THE UNIQUE INDEX IS A BACKSTOP AND NOT THE CONTROL**:
+    // `payout_requests_no_in_flight_uq` (`0010_payouts.sql:200-201`)" -- so the
+    // negation in the VERDICT was reaching past the colon and taking the name
+    // of the SUBJECT with it. Three citations in the two live scopes bind
+    // because of this one character and every one of them was opened at primary
+    // source first. The two halves below differ by that character.
+    const root = cleanTree();
+    write(root, 'apps/api/src/routes/admin-writes.ts', fileWithNameAt(300, 269, 'principal'));
+
+    write(
+      root,
+      REASON,
+      '// The gate is not the route: `principal` (`routes/admin-writes.ts:250`) is it.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/admin-writes.ts:250` for `principal`',
+    );
+
+    // AND A COMMA DOES NOT CLOSE THE CLAUSE, which is what keeps the character
+    // from being a licence to bind through any punctuation at all.
+    write(
+      root,
+      REASON,
+      '// The gate is not the route, `principal` (`routes/admin-writes.ts:250`) is it.\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // THE POINTER IS STILL READ IN THE QUIET HALF, which is what separates a
+    // name deliberately not bound from a reader that has stopped.
+    write(
+      root,
+      REASON,
+      '// The gate is not the route, `principal` (`routes/admin-writes.ts:900`) is it.\n',
     );
     expect(findings('RI-15', root).join('\n')).toContain('The pointer is past the end of the file');
   });

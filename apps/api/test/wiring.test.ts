@@ -933,8 +933,8 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'table. ADR-258 TOOK FIVE SIXTHS OF THE ADAPTER AND THE EMPTY TABLE IS UNTOUCHED, so what ' +
     '`state` waits on is now the gates ruling and a scheduled run that produces a row. ' +
     'THE READ THIS PORT NEEDS IS NOW SERVED BY A FUNCTION AND BY NO ROW: ' +
-    '`PayoutTx.subject` (`routes/payouts.ts:606`) returns a ' +
-    '`PayoutSubject` whose `state` (`routes/payouts.ts:400`) is a `RuleState`, ' +
+    '`PayoutTx.subject` (`routes/payouts.ts:609`) returns a ' +
+    '`PayoutSubject` whose `state` (`routes/payouts.ts:402`) is a `RuleState`, ' +
     '`RuleState.engineGates` (`packages/rules-engine/src/types.ts:1020`) is `EngineGateResults` ' +
     '(`packages/rules-engine/src/types.ts:975`), `rule_states.engine_gates` is `jsonb`, and ' +
     '`decodeEngineGates` is what rebuilds one from the other. ' +
@@ -3249,14 +3249,14 @@ test('the one port whose derived verdict and whose measured wire behaviour disag
 //      backtick as an APOSTROPHE, so `usePayoutBackend` and
 //      `useWithdrawalBackend` carry an ODD number of backticks and every
 //      span-pairing reader desynchronises at the first one. That is the same
-//      hazard `RI-15` met at `wiring.test.ts:357` and it is met here the same
-//      way, by reading the backtick immediately before the name rather than by
-//      pairing from the start. THAT POINTER READ `:215` AND THIS ROW BROKE IT
-//      ITSELF (ADR-375): the derivation above added lines and every one of the
-//      FIFTY citations into this file drifted with them, while `RI-15` and
-//      `RI-16` stayed green because not one of the fifty carries a name they
-//      can check. This is the only one inside this row fence and the rest are
-//      reported rather than repaired.
+//      hazard `RI-15` met in THIS FILE, met here the same way, by reading the
+//      backtick immediately before the name. THE POINTER THAT NAMED A LINE IS
+//      GONE AND THE FILE IS NAMED INSTEAD (ADR-383), which is ADR-377 section
+//      7's repair to `citedIdentifier`'s docblock for this same claim. The
+//      retired figures are NAMED and not written as pointers, on that same
+//      precedent: line 215, which ADR-375 broke by adding lines above it, then
+//      line 357, which replaced it by ARITHMETIC rather than by a read. The
+//      earliest of this file's 72 odd-backtick lines is 404.
 //
 //   3. THE TRAILING CHARACTER MAY NOT CONTINUE AN IDENTIFIER OR A PATH, so that
 //      a member name that is a PREFIX of a longer backticked token, as `operator`
