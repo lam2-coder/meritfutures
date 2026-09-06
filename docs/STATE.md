@@ -13588,3 +13588,29 @@ Counts derived at reporting time off each runner's own last line: suite **336 fi
 **Next.** The founder's `E2` read of [ADR-393](decisions/ADR-393.md) and the three decisions its approval block names, of which the first is whether pointer repair is worth doing at this scale at all: this row repaired 24 coordinates and left **63 wrong pointers standing in 35 files it did not hold**, nine of them in ADRs no entry before this one has named.
 
 Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `c5648f00` **before the first edit** of **336 / 8,107 / 10 / 0**, a delta of **ZERO on every axis**, which is the expected result for a documents-only diff; gates **33 of 33**, invariants **35 of 35**, typecheck, lint and `format:check` clean.
+
+---
+
+## 2026-09-06 - Session 589: the retired clause repaired at the site nobody had been given, two pointers repaired to names because both targets move again this wave, and one class-two pointer confirmed and left ([ADR-394](decisions/ADR-394.md), proposed)
+
+**Four items, three of them carrying verdicts already derived elsewhere, all four re-derived and all four verdicts surviving.** The row is [ADR-394](decisions/ADR-394.md), `proposed` and UNSIGNED. MONEY-ADJACENT, ADR-003 STRICT, `E2` READ OWED.
+
+**THE RETIRED SINK CLAUSE IS REPAIRED AT [ADR-376](decisions/ADR-376.md) LINE 92.** [ADR-385](decisions/ADR-385.md) section 9 item 4 raised it as a new finding and no row had ever been given that file; [ADR-391](decisions/ADR-391.md) named it again and could not take it. The false absolute and the false consequence drawn from it are kept whole beside their correction under `RI-14`, named rather than reproduced per [ADR-367](decisions/ADR-367.md), and the verdict does not move. **The falsification was re-derived at the tree and is sharper than the published one**: `test/expiry-adapter.test.ts` PASSES `UNWIRED_EXPIRY_SWEEP_IO`'s refusing `ExpiryEventPort` to `expirySweepIo` and asserts the same value back, so a claim that nothing in the tree can be passed is refuted by a green test in the tree that passes something.
+
+**RULED: A REPAIR MINTS A NEW POINTER, SO A REPAIR IS BOUND BY [ADR-388](decisions/ADR-388.md)'s RULE FOR NEW POINTERS.** Both class-one pointers are repaired to the NAME of their subject rather than to a fresh coordinate, because both targets move again inside this wave and one moves inside this row's own diff. **A pointer repaired to a coordinate its own diff invalidates is the defect re-armed with a fresher date.**
+
+**[ADR-337](decisions/ADR-337.md) line 70 is CLASS TWO, re-derived a THIRD time and left wrong.** At the commit that wrote it the cited coordinate held the `RI-36` row and `RI-37` sat one line below, so it was off by one on the day it was written. **The finding is now written beside the pointer**, which [ADR-388](decisions/ADR-388.md) requires and no row had done, so a fourth row does not spend itself confirming it again.
+
+**THE GENERATOR COUPLING WAS VERIFIED AT THE GENERATOR AND THEN WATCHED.** `session_entries` copies a session file's own `<!--index:` text verbatim; [`split-sessions.mjs`](../scripts/corpus/split-sessions.mjs) is not the mechanism and cannot run, because `docs/SESSION_LOG.md` does not exist. One repair moved exactly one line of the sessions README.
+
+**THE DISPATCH'S INHERITED FIGURE DOES NOT REPRODUCE.** [ADR-391](decisions/ADR-391.md) calls `ADR-376 line 92` a positional reference in four documents and says it derived that: it is **five** at the parent of its own commit, **seven** at that commit, and seven on `c5648f00`. Every edit here is line-count neutral in consequence, and nothing outside this fence went stale.
+
+**THE CLONE WAS SHALLOW ON ARRIVAL AND WAS DEEPENED BEFORE ANY HISTORY WAS READ**, since three of the four items are decided by `git blame`, which a truncated graph answers wrongly rather than refusing.
+
+**NOTHING WAS WIDENED AND NOTHING WAS MINTED.** No invariant number, no gate added or widened, no register grown, no test skipped, disabled or quarantined, no `CI-06` letter spent, no migration taken or reserved, no port wired, no sink passed, no default parameter added to `expirySweepIo`. The standing bar stands for the sixth consecutive row. **Not one executable line changed, nothing outside `docs/` was written, and no citation moved.**
+
+**Owed.** The `ADR-376` header clause in `apps/worker/src/schedule.ts`, plus a SECOND clause in the same header carrying the same defect, both named without a coordinate because that file is another row's this wave. [ADR-394](decisions/ADR-394.md) section 4 carries the exact replacement.
+
+**Next.** The founder's `E2` read of [ADR-394](decisions/ADR-394.md) and the three decisions its approval block names, of which the first is whether a repaired pointer should ever be a coordinate again.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `c5648f00` **before the first edit** of **336 / 8,107 / 10 / 0**, delta **ZERO on every axis**; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean.
