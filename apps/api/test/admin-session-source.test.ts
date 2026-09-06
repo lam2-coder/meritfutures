@@ -32,9 +32,13 @@ import type {
 // THAT IS THE FINDING THIS FILE EXISTS FOR. `adminHandler` answers an unwired
 // session source with the SAME BYTES it answers a genuinely anonymous caller
 // with, deliberately, on ADR-192 clause 2's disclosure rule as ADR-343 clause 1
-// re-argued it. So the discrimination is not on the wire; it is the one
-// `request.log.error` at `src/routes/admin-reads.ts:1295`. Nothing executed was
-// holding that line, and nothing reaching the module the ordinary way COULD.
+// re-argued it. So the discrimination is not on the wire; it is the single
+// `request.log.error` that `adminHandler` (`src/routes/admin-reads.ts:1290`)
+// emits when it finds no source installed, in the third statement of its body,
+// one statement before the lookup it stands in for, which
+// is the only place in this deployment where the name of the uncomposed port is
+// written down at run time. Nothing executed was holding that statement, and
+// nothing reaching the module the ordinary way COULD.
 // A refactor that dropped it would leave this deployment with no channel at all
 // distinguishing "this deployment cannot authenticate anybody" from "your
 // credentials were rejected", and every case in every other file would stay
