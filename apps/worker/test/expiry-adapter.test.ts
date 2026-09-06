@@ -72,6 +72,7 @@ import {
   runExpirySweep,
 } from '../src/sweeps/expiry.ts';
 import { EXPIRY_LEDGER } from '../src/sweeps/ledger.ts';
+import { UNWIRED_EXPIRY_SWEEP_IO } from '../src/sweeps/ports.ts';
 import type {
   ExpiryEvent,
   ExpiryEventPort,
@@ -572,5 +573,52 @@ describe('5. nothing constructs the io, which is why the row is still unschedule
     // this deployable invented, which is the value `ExpirySweepUnwired` says it
     // refuses to invent one level down.
     expect(body).not.toContain('emit(');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 6. WHAT THE ARITY PIN IS ACTUALLY THE ONLY THING HOLDING
+// -----------------------------------------------------------------------------
+
+describe('6. the sink is passable, and the pin above is what bars the default', () => {
+  it('takes the refusing member of the io`s own unwired default, by type and at run time', async () => {
+    // **THIS IS THE MEASUREMENT THAT RETIRES A CLAUSE FOUR REGISTERS CARRY.**
+    // Those registers say that nothing in this tree can be passed for `events`,
+    // and therefore that the blocker is a call which does not compile. **THE
+    // SECOND HALF DOES NOT FOLLOW AND THE FIRST HALF IS FALSE**: the io's own
+    // unwired default composes a refusing `ExpiryEventPort` inline, that member
+    // is exported with the value that holds it, and the call below both
+    // type-checks and runs. The clause is named rather than reproduced per
+    // `RI-14`; ADR-382 rules on it and `test/schedule.test.ts` case `9.1` holds
+    // the census half.
+    //
+    // **PASSING IT HERE IS NOT WIRING AND THE DISTINCTION IS THE FILE BOUNDARY.**
+    // Section 5 asserts that no module under `src/` calls this factory, and this
+    // is a test. What a suite can construct and what a deployment holds are two
+    // different questions, and only the second one is a clock.
+    const io = expirySweepIo(recordingDb(storeWith([])).db, UNWIRED_EXPIRY_SWEEP_IO.events);
+    expect(io.events).toBe(UNWIRED_EXPIRY_SWEEP_IO.events);
+    await expect(io.events.emit({} as ExpiryTx, {} as ExpiryEvent)).rejects.toThrow(
+      'no adapter is installed',
+    );
+  });
+
+  it('so what bars the default is the arity above, and NOT the port census', () => {
+    // **THE GUARD IS ONE INTEGER AND SAYING SO IS THE POINT.** The cheapest
+    // repair a later row could make is one line: give `events` a default built
+    // from the value this file just passed, or written inline in the same shape.
+    // It declares no `export const` and returns no port type, so
+    // `test/schedule.test.ts`'s two censuses stay GREEN on it and the pin at the
+    // top of this file is the whole of what turns red. **A BAR HELD BY ONE
+    // ASSERTION IS A BAR WHOSE REASON HAD BETTER BE TRUE**, which is why the
+    // reason is repaired rather than the pin widened.
+    const source = stripComments(
+      readFileSync(
+        fileURLToPath(new URL('../src/sweeps/expiry-adapter.ts', import.meta.url)),
+        'utf8',
+      ),
+    );
+    expect(/events:\s*ExpiryEventPort\s*,/.test(source)).toBe(true);
+    expect(/events:\s*ExpiryEventPort\s*=/.test(source)).toBe(false);
   });
 });
