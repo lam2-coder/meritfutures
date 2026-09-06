@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import ts from 'typescript';
 import { expect, test } from 'vitest';
 
 import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
@@ -187,8 +188,149 @@ for (const [dir, label] of [
     for (const port of matches(read(join(dir, name)), DECLARES))
       declaredIn.set(port, label === 'routes' ? name : `../${name}`);
 
-const startSource = read(join(SRC, 'start.ts'));
-const wired = new Set(matches(startSource, CALLS));
+const START = join(SRC, 'start.ts');
+const startSource = read(START);
+
+// -----------------------------------------------------------------------------
+// `wired` IS THE SET A RUN WOULD INSTALL, AND IT USED TO BE THE SET A LINE
+// PATTERN COULD SEE (ADR-375, taking ADR-372 section 15 question 1 option (b))
+// -----------------------------------------------------------------------------
+// THE CONSTRAINT THIS FILE'S HEADER STATES IS NOT LIFTED. Importing `start.ts`
+// binds a port, so this file still never imports it. PARSING IS NOT EXECUTING:
+// the compiler API reads the module into a syntax tree, evaluates nothing, opens
+// no socket and binds no port, which is ADR-372's measurement and the whole
+// reason this derivation can sit beside that constraint rather than against it.
+//
+// WHAT WAS WRONG WITH THE LINE PATTERN, AND IT WAS NOT THAT IT GAVE A WRONG
+// ANSWER. It gave the RIGHT answer on every tree anybody has measured, and
+// ADR-372 section 4 measured WHY: the pattern is anchored at column zero, and
+// three separate things hold that anchor up, ONE OF THEM THE FORMATTER. Every
+// nested shape is refused because `prettier` indents a nested statement and
+// `format:check` is a gate in a different runner. A derivation whose soundness
+// is on loan from a formatter is sound by accident, and ADR-372 said so in those
+// words. THE FOUR SHAPES IT COUNTS AS WIRED WHILE A RUN INSTALLS NOTHING are a
+// BLOCK comment at column zero, a call below `main()`, dead code after a
+// top-level `throw`, and a call inside a multi-line template literal. The first
+// is `RI-25`'s own class, seeded into the real file by ADR-372 and counted.
+//
+// A PARSER REFUSES ALL FOUR WITHOUT BEING TAUGHT ANY OF THEM, which is the
+// argument for deriving rather than for widening. A comment and a template
+// literal are not statements; a nested call is not a TOP-LEVEL statement whether
+// it is indented or not; and position is a fact the tree carries and text does
+// not. ADR-372 section 10 item 6's reliance on the formatter is retired here
+// rather than written down again.
+//
+// THIS TAKES A DECISION ADR-372 RECORDED AS OPEN AND THE ENTRY SAYS SO. Its
+// section 15 question 1 offered (a) leave the pattern with a second derivation
+// beside it, (b) move the derivation into the tree walk, (c) report both. It
+// argued that (b) "is the only one that makes the triple's own input sound" and
+// left it to a row that owned this file. THE PATTERN IS KEPT AND STILL RUN, so
+// what ships is (b) with (a)'s agreement bar beside it rather than (b) instead
+// of it: `test/start-program.test.ts` reads `CALLS` out of this file and the
+// case below runs it here too, so a pattern that stopped meaning what it means
+// is still a red bar and not a silent deletion.
+//
+// AND THE SCAN STILL READS ONE FILE, WHICH IS THE ONE OWED ITEM THIS CHANGE
+// DOES NOT REACH. A setter called at module scope in a route module would
+// install that port on IMPORT and appear in neither `wired` nor `BLOCKED`.
+// That premise is held by `test/start-program.test.ts`'s case naming
+// `start.ts` as the only module under `apps/api/src` that installs on import,
+// and it is named here rather than asserted twice.
+
+/** One install a run of the wiring slice would perform. */
+interface Install {
+  readonly port: string;
+  readonly index: number;
+  readonly line: number;
+}
+
+/** A port setter's name shape, the same one `DECLARES` and `CALLS` read. */
+const IS_SETTER = /^(?:use|set)[A-Z]/;
+
+/** The module as a tree. Evaluates nothing: see the block above. */
+function parseModule(path: string, source: string): ts.SourceFile {
+  return ts.createSourceFile(path, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
+}
+
+/**
+ * The callee of a top-level statement that is a bare call, `await` included.
+ *
+ * A statement that is anything else has no callee, which is how a nested call
+ * is refused without the refusal being written: a call inside an `if` is a
+ * child of the `if` statement and never appears in `statements` at all.
+ */
+function calleeOf(statement: ts.Statement): string | undefined {
+  if (!ts.isExpressionStatement(statement)) return undefined;
+  const expression = ts.isAwaitExpression(statement.expression)
+    ? statement.expression.expression
+    : statement.expression;
+  if (!ts.isCallExpression(expression) || !ts.isIdentifier(expression.expression)) return undefined;
+  return expression.expression.text;
+}
+
+/** The index of the top-level call to `main`, which is the statement that binds the port. */
+function mainIndexOf(source: ts.SourceFile): number {
+  return source.statements.findIndex((statement) => calleeOf(statement) === 'main');
+}
+
+/**
+ * The installs a run would perform BEFORE the process begins serving, in order.
+ *
+ * THREE THINGS THE TEXT SCAN COULD NOT DO, AND THE THIRD IS THE ONE WITH A
+ * DEPLOYMENT ON THE OTHER SIDE OF IT.
+ *
+ *   REACHABILITY. A top-level `throw` ends the module, so nothing below it
+ *   runs. `start.ts` holds none, so the clause changes no answer about this
+ *   tree; it is exercised anyway by a fixture whose answer CHANGES when it goes,
+ *   because a clause defended by a case that does not run it is a claim rather
+ *   than a control (ADR-369 section 10, ADR-372 section 5).
+ *
+ *   POSITION. `app.listen` is reached only inside `main`, and `await main()`
+ *   is the last top-level statement. An install BELOW it lands on a server that
+ *   is already serving, so the port was the fail-closed default for every
+ *   request in between. `start.ts`' own header rules that window out in prose
+ *   and its own header also tells the next session to resolve conflicts here by
+ *   APPEND, "keep every line", which is exactly the edit that produces it.
+ *   SUCH A PORT IS NOT WIRED and this derivation does not count it.
+ *
+ *   NOT BEING TEXT. A call inside a block comment or a template literal is not
+ *   a statement, so it is refused by construction rather than by a rule.
+ */
+function installsBeforeServing(source: ts.SourceFile): readonly Install[] {
+  const main = mainIndexOf(source);
+  const found: Install[] = [];
+  for (const [index, statement] of source.statements.entries()) {
+    if (ts.isThrowStatement(statement)) break;
+    if (main >= 0 && index > main) break;
+    const callee = calleeOf(statement);
+    if (callee !== undefined && IS_SETTER.test(callee))
+      found.push({
+        port: callee,
+        index,
+        line: source.getLineAndCharacterOfPosition(statement.getStart(source)).line + 1,
+      });
+  }
+  return found;
+}
+
+const startTree = parseModule(START, startSource);
+
+/** Every install a run would perform, IN ORDER and WITH REPETITION. */
+const installs = installsBeforeServing(startTree);
+
+/**
+ * The ports a deployment actually installs.
+ *
+ * IT IS STILL A `Set` AND THAT IS STILL LOSSY, which is ADR-372 section 10
+ * item 2 and is why `installs` above is kept beside it: a port installed twice
+ * enters here once and the second install is invisible to every count derived
+ * from it. The list is what the case below reads, so the loss is bounded by an
+ * assertion rather than by nobody noticing.
+ */
+const wired: ReadonlySet<string> = new Set(installs.map((install) => install.port));
+
+/** What the line pattern sees, kept so the two derivations can be compared. */
+const wiredByText: ReadonlySet<string> = new Set(matches(startSource, CALLS));
 
 /**
  * A port `start.ts` does not call, and the specific thing it waits on.
@@ -1857,6 +1999,113 @@ test('the wired count is reported, so a regression is a number and not a paragra
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
   }).toStrictEqual({ declared: 25, wired: 11, blocked: 14 });
+});
+
+test('no port is installed twice, which `wired` cannot report because it is a set', () => {
+  // ADR-372 SECTION 10 ITEM 2, IN THE FILE THAT OWES IT. `wired` is a `Set`, so
+  // a second install of one port enters it once and the triple reports one
+  // install where a deployment performs two. What a second install DOES at run
+  // time is the setter's business and not this file's: some overwrite, some
+  // ignore, and the reader of the triple has no way to tell that a choice
+  // between two backends was taken at all.
+  //
+  // THE LIST IS THE INPUT AND THE SET IS DERIVED FROM IT, which is the only
+  // reason this is assertable here rather than only in a neighbouring file.
+  const counted = new Map<string, number>();
+  for (const install of installs) counted.set(install.port, (counted.get(install.port) ?? 0) + 1);
+
+  expect(
+    [...counted]
+      .filter(([, times]) => times > 1)
+      .map(([port, times]) => `${port} (${String(times)} times)`)
+      .sort(),
+    'a port is installed more than once and the wiring triple counts it once. Two installs of ' +
+      'one port is a choice about which backend serves and it must be one line',
+  ).toStrictEqual([]);
+
+  // NON-VACUITY. A tree that parsed to nothing satisfies the clause above.
+  expect(installs.length).toBeGreaterThan(0);
+});
+
+test('the two derivations of `wired` agree here, and the shapes where they cannot are named', () => {
+  // WHAT THIS CASE IS AND IS NOT. It is NOT a claim that the line pattern is
+  // sound; ADR-372 measured that it is not, and the fixtures below are that
+  // measurement executed rather than quoted. It is the bar that goes red the
+  // day the two part, so that a pattern which stopped meaning what it means is
+  // a failure here rather than a quiet second opinion nobody asked for.
+  expect(
+    [...wiredByText].sort(),
+    'the ports the line pattern sees and the ports a run would install have parted. `wired` is ' +
+      'the program derivation and is not moved by this: what has changed is that the pattern, ' +
+      'which `test/start-program.test.ts` reads out of this file, no longer describes it',
+  ).toStrictEqual([...wired].sort());
+
+  // THE FIVE SHAPES, EACH A WHOLE MODULE, SCANNED BY THE PATTERN AND PARSED BY
+  // THE DERIVATION. Every one of them is a shape the pattern counts as WIRED
+  // while a run installs nothing, and the second is `RI-25`'s own class: a
+  // control passing while the thing it guarded was merely commented out.
+  const shapes: readonly (readonly [string, string, boolean])[] = [
+    ['an honest top-level install', 'useGhostBackend(ghost());\nawait main();\n', true],
+    ['a line comment', '// useGhostBackend(ghost());\nawait main();\n', true],
+    [
+      'a call nested in a conditional',
+      'if (flag)\n  useGhostBackend(ghost());\nawait main();\n',
+      true,
+    ],
+    [
+      'an UNINDENTED call nested in a conditional',
+      'if (flag)\nuseGhostBackend(ghost());\nawait main();\n',
+      false,
+    ],
+    ['a BLOCK comment', '/*\nuseGhostBackend(ghost());\n*/\nawait main();\n', false],
+    ['a call AFTER `main()`', 'await main();\nuseGhostBackend(ghost());\n', false],
+    [
+      'dead code after a top-level `throw`',
+      "throw new Error('x');\nuseGhostBackend(ghost());\nawait main();\n",
+      false,
+    ],
+    [
+      'a call inside a template literal',
+      'const s = `\nuseGhostBackend(ghost());\n`;\nawait main();\n',
+      false,
+    ],
+  ];
+
+  const parted: string[] = [];
+  for (const [label, source, agrees] of shapes) {
+    const byText = matches(source, CALLS).join(',');
+    const byProgram = installsBeforeServing(parseModule('fixture.ts', source))
+      .map((install) => install.port)
+      .join(',');
+    if ((byText === byProgram) !== agrees) parted.push(label);
+    // AND THE DERIVATION IS RIGHT IN EVERY ONE OF THEM, which is the half that
+    // says the disagreement is the pattern's rather than a coin toss. Only the
+    // honest install installs anything.
+    expect(byProgram, `the derivation counts ${label} as an install`).toBe(
+      label === 'an honest top-level install' ? 'useGhostBackend' : '',
+    );
+  }
+
+  expect(
+    parted,
+    'a shape the line pattern was measured to miscount now behaves differently. The census of ' +
+      'what a text derivation cannot see is the finding, so a change here is a change to the ' +
+      'finding rather than a test to adjust',
+  ).toStrictEqual([]);
+
+  // THE FIVE ARE NAMED RATHER THAN COUNTED, so one leaving the list arrives in
+  // the diff carrying its own name. THE FIRST IS THE ONE ADR-372 COULD NOT
+  // NAME: an unindented nested call is refused by the pattern only because
+  // `prettier` would never write it and `format:check` is a gate in a DIFFERENT
+  // runner. It is here because the reliance is what was owed, and a fixture is
+  // the only place a formatter cannot reach in to hold the answer up.
+  expect(shapes.filter(([, , agrees]) => !agrees).map(([label]) => label)).toStrictEqual([
+    'an UNINDENTED call nested in a conditional',
+    'a BLOCK comment',
+    'a call AFTER `main()`',
+    'dead code after a top-level `throw`',
+    'a call inside a template literal',
+  ]);
 });
 
 // -----------------------------------------------------------------------------
