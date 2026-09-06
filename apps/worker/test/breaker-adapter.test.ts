@@ -58,7 +58,12 @@ import {
   BreakerDeclined,
   LOSS_RATIO_POLICY,
 } from '../src/breaker/ports.ts';
-import type { BreakerEvent, BreakerEventPort, BreakerTx, LossRatioPolicy } from '../src/breaker/ports.ts';
+import type {
+  BreakerEvent,
+  BreakerEventPort,
+  BreakerTx,
+  LossRatioPolicy,
+} from '../src/breaker/ports.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '..', 'src');
@@ -281,18 +286,20 @@ describe('1. the composed default serves four members and refuses the fifth', ()
   it('1.2 refuses `events.emit` with the blocker named rather than returning', async () => {
     const rec = recorder(CALENDAR_TABLES);
     const io = await postgresBreakerIo(rec.db, AT);
-    await expect(
-      io.events.emit(null as never, null as never),
-    ).rejects.toThrow(BreakerAdapterUnwired);
+    await expect(io.events.emit(null as never, null as never)).rejects.toThrow(
+      BreakerAdapterUnwired,
+    );
     // THE BLOCKER IS IN THE MESSAGE, because "not wired" is the answer that
     // sends the next session looking for a file that was never missing.
     await expect(io.events.emit(null as never, null as never)).rejects.toThrow(/RI-04/);
-    await expect(io.events.emit(null as never, null as never)).rejects.toThrow(/node-linker=isolated/);
+    await expect(io.events.emit(null as never, null as never)).rejects.toThrow(
+      /node-linker=isolated/,
+    );
     // AND THE EXPORTED DEFAULT IS THE SAME REFUSAL, so a caller that named it
     // directly gets the same sentence.
-    await expect(
-      UNWIRED_BREAKER_EVENT_SINK.emit(null as never, null as never),
-    ).rejects.toThrow(BreakerAdapterUnwired);
+    await expect(UNWIRED_BREAKER_EVENT_SINK.emit(null as never, null as never)).rejects.toThrow(
+      BreakerAdapterUnwired,
+    );
   });
 });
 
@@ -399,7 +406,10 @@ describe('3. the clock is pinned and the day is read from the calendar', () => {
     // loaded through June and read in August folds June's day and stamps it.
     await expect(
       postgresBreakerIo(
-        recorder({ tradingCalendar: CALENDAR, tradingCalendarLoads: [load('2026-06-01', '2026-06-30')] }).db,
+        recorder({
+          tradingCalendar: CALENDAR,
+          tradingCalendarLoads: [load('2026-06-01', '2026-06-30')],
+        }).db,
         AT,
       ),
     ).rejects.toThrow(BreakerCalendarRefused);
@@ -517,7 +527,7 @@ describe('6. what this adapter does NOT discharge', () => {
     // ADR-352 section 5 names it and does not rule it.
     const catalogue = read('apps/api/src/events.ts');
     const body = catalogue.slice(catalogue.indexOf('export const EVENT_CATALOGUE'));
-    const names = [...body.matchAll(/^ {2}'([a-z_]+\.[a-z_]+)':/gm)].map((m) => m[1]);
+    const names = [...body.matchAll(/^ {2}'([a-z_]+\.[a-z_]+)':/gm)].map((m) => m[1] ?? '');
     // TEN, DERIVED AT THE MOMENT THIS RUNS rather than carried from a prior run.
     expect(names).toHaveLength(10);
     expect(names.filter((name) => name.startsWith('breaker.'))).toEqual([]);

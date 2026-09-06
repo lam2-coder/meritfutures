@@ -273,8 +273,7 @@ function breakerTx(tx: WorkerBreakerTx): BreakerTx {
  * why: the alert commits with the row that changed state or neither does.
  */
 export function postgresBreakerTransact(db: WorkerDb): BreakerIo['transact'] {
-  return <T>(fn: (tx: BreakerTx) => Promise<T>): Promise<T> =>
-    db.batch((tx) => fn(breakerTx(tx)));
+  return <T>(fn: (tx: BreakerTx) => Promise<T>): Promise<T> => db.batch((tx) => fn(breakerTx(tx)));
 }
 
 /**
