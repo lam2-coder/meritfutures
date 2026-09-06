@@ -14,10 +14,29 @@
 // The block pass runs FIRST and it cannot tell that a block-comment OPENER sits
 // inside a LINE comment. So a header that quotes a glob opens a phantom block
 // that runs to the next real closer and takes every line of code between them
-// with it. ADR-277 section 7 found it and ADR-279 measured it: on
-// `apps/worker/src/index.ts` that idiom strips 55,728 characters to 2,753, the
-// largest phantom span is chars 4,096 to 45,294, and a `new Date().getHours()`
-// placed inside that span is INVISIBLE to `RI-28`, which reports PASS.
+// with it. ADR-277 section 7 found it and ADR-279 measured it on
+// `apps/worker/src/index.ts` at `90b3a617`: the idiom took that file's 55,728
+// characters to 2,821, the largest phantom span ran chars 4,096 to 45,294, and a
+// `new Date().getHours()` placed inside that span was INVISIBLE to `RI-28`,
+// which reported PASS.
+//
+// THREE OF THOSE FOUR FIGURES RE-DERIVE AT THAT COMMIT AND ONE DOES NOT (ADR-390).
+// The file's own length, the span's bounds, and the seed's invisibility all
+// reproduce exactly there. THE STRIPPED LENGTH DOES NOT: ADR-279 recorded 2,753,
+// the idiom it transcribes gives 2,821 on that revision, and no revision of that
+// file in this repository's history gives 2,753. The figure was carried into six
+// further sites and re-derived at none of them.
+//
+// THE EXAMPLE HAS MOVED AND THE DEFECT HAS NOT, WHICH IS WHY EVERY LIVE NUMBER
+// ABOUT IT IS DERIVED ELSEWHERE. `apps/worker/src/index.ts` no longer carries a
+// phantom span worth the name: ADR-327 retired the prose whose globstar opened it
+// at line 64, and what is left in a line comment there is a quoted `apps` glob
+// that the next glob on the same line closes 23 characters later. The tree-wide
+// figures that replace it -- how many files the idiom eats source out of, how
+// much, and which file is worst -- are DERIVED ON EVERY RUN by
+// `packages/tooling/test/strip-comments.test.ts`, which picks its victim rather
+// than naming one, and they are deliberately not transcribed here. A count in a
+// comment is the defect this paragraph is about.
 //
 // **THAT IS THE WORST DIRECTION A DEFECT CAN FAIL IN.** A presence assertion
 // over an emptied file goes red and somebody looks. An ABSENCE check over an

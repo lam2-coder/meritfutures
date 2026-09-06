@@ -46,10 +46,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // THE ONE COMMENT STRIPPER, IMPORTED RATHER THAN DECLARED. ADR-279. This file
 // carried its own two-replacement copy until then, and that copy could not tell
 // a block-comment OPENER written inside a LINE comment from a real one: on
-// `apps/worker/src/index.ts` it stripped 55,728 characters to 2,753 and a
-// `new Date().getHours()` seeded inside the phantom span was INVISIBLE to
-// `RI-28`, which reported PASS. See `strip-comments.mjs`'s header for the
-// measurement and for what the scanner does not model.
+// `apps/worker/src/index.ts` it stripped 55,728 characters to 2,821 at `90b3a617`
+// and a `new Date().getHours()` seeded inside the phantom span was INVISIBLE to
+// `RI-28`, which reported PASS. ADR-279 recorded 2,753 for that second figure and
+// no revision of that file yields it, ADR-390. See `strip-comments.mjs`'s header.
 import { stripComments } from './strip-comments.mjs';
 
 // RI-11 LIVES IN ITS OWN FILE AND IS IMPORTED HERE, WHICH IS THE FIRST TIME A
@@ -3520,9 +3520,9 @@ const ri15 = {
 // sections and which no directory rule can split. It puts a new session log out
 // of scope the day it is written and a new plan IN scope the day it is written,
 // with nobody maintaining a list. And it is one rule this corpus already keeps
-// rather than a second one that drifts from it. The recogniser is
-// `RECORD_HEADING` and it is read at heading levels 1 and 2 only, so an ADR's
-// `### 3.` inherits the dated `##` its file opens with, for CI-06's reason.
+// rather than a second one that drifts from it. THE RECOGNISER IS `RECORD_HEADING`,
+// AND A TITLE THAT DATES A DOCUMENT DATES ALL OF IT (ADR-390): reading it per level
+// 1-2 heading let a `##` SECTION cancel a dated title in 25 files and 286 pointers.
 //
 // EXCLUSION 2: A FENCED BLOCK OR A GENERATED SPAN, masked with CI-06's own two
 // expressions. A worked example of this check's own finding is exactly what the
@@ -3720,10 +3720,10 @@ function documentScope(text) {
     .replace(/^(```+|~~~+)[\s\S]*?^\1.*$/gm, blank);
   /** @type {boolean[]} */
   const inRecord = [];
+  const dated = RECORD_HEADING.test(body.split('\n').find((l) => /^#{1,2}\s/.test(l)) ?? '');
   let flag = false;
   for (const line of body.split('\n')) {
-    const heading = /^(#{1,6})\s/.exec(line);
-    if (heading !== null && (heading[1] ?? '').length <= 2) flag = RECORD_HEADING.test(line);
+    if (/^#{1,2}\s/.test(line)) flag = dated || RECORD_HEADING.test(line);
     inRecord.push(flag);
   }
   return { body, inRecord };
@@ -7284,9 +7284,9 @@ const ri29 = {
 //
 // The block pass runs FIRST and cannot tell that a block-comment OPENER sits
 // inside a LINE comment, so a header quoting a glob opens a phantom block that
-// runs to the next real closer. On `apps/worker/src/index.ts` that idiom strips
-// 55,728 characters to 2,753, and a `new Date().getHours()` seeded inside the
-// phantom span was INVISIBLE to `RI-28`, which reported PASS.
+// runs to the next real closer. On `apps/worker/src/index.ts` that idiom struck
+// 55,728 characters to 2,821 at `90b3a617`, and a `new Date().getHours()` seeded
+// inside the phantom span was INVISIBLE to `RI-28`, which reported PASS. ADR-390.
 //
 // **THE DIRECTION IS WHAT MAKES THIS WORTH A CHECK.** A PRESENCE assertion over
 // an emptied file goes red and somebody looks. An ABSENCE check over an emptied
@@ -7404,12 +7404,12 @@ const ri30 = {
     'SOURCE IMPORTS IT (ADR-279). Seven files declared their own and six were ' +
     'the two-replacement idiom, whose block pass runs first and cannot tell a ' +
     'block-comment OPENER written inside a LINE comment from a real one: on ' +
-    '`apps/worker/src/index.ts` it stripped 55,728 characters to 2,753 WHEN ' +
-    'ADR-279 MEASURED IT, a live count of a file that is HALF AS LONG AGAIN ' +
-    '(ADR-386), and a ' +
-    '`new Date().getHours()` seeded inside the phantom span was invisible to ' +
-    '`RI-28`, which reported PASS. LEG 1 IS THE NAME: no file but the home ' +
-    'declares a `strip*Comment*` binding. LEG 2 IS THE IDIOM AND IS ' +
+    '`apps/worker/src/index.ts` it stripped 55,728 characters to 2,821 AT `90b3a617` ' +
+    '(ADR-279 recorded 2,753; no revision of it yields that), a live count of a file ' +
+    'HALF AS LONG AGAIN (ADR-386) that HAS CARRIED NO PHANTOM SPAN SINCE ADR-327, so ' +
+    'the live figures are derived by the stripper suite rather than written here ' +
+    '(ADR-390). A seeded `new Date().getHours()` was invisible to `RI-28`. LEG 1 IS ' +
+    'THE NAME: only the home declares `strip*Comment*`. LEG 2 IS THE IDIOM AND IS ' +
     'NAME-BLIND: no file but the home carries a `.replace()` over a ' +
     'block-comment or line-comment regex, which catches a copy under another ' +
     'name and one written inline with no function at all. ' +
@@ -7527,7 +7527,7 @@ const ri30 = {
             '`.replace()` over a comment regex. TWO REPLACEMENTS CANNOT DO THIS: the block ' +
             'pass runs first and a block-comment OPENER written inside a LINE comment opens a ' +
             'phantom block that runs to the next real closer. On `apps/worker/src/index.ts` ' +
-            'that deletes 53,000 of 55,728 characters and `RI-28` reported PASS over a live ' +
+            'that deleted 53,000 of 55,728 characters at `90b3a617` and `RI-28` PASSED over a live ' +
             `\`new Date().getHours()\` (ADR-279). Import \`stripComments\` from ${STRIPPER_HOME}`,
         );
       }
