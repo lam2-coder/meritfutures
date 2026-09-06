@@ -377,6 +377,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-363](ADR-363.md) | the live count was a hand-written literal standing on a resolver that reads one hop, and the three defaults NAMED `production*` were counted as refusing without anything opening them; the answer is now derived from the leaves and the residual judgement is two ports rather than fourteen (2026-09-06, status: proposed) |
 | [ADR-364](ADR-364.md) | `setInternalOpsSource` is DECLINED rather than blocked; its port declares FOUR members, so a partial install IS expressible here and ADR-360's impossibility does not carry; the refusal is a 500 whose document says nothing at all, and the one thing a half install turns from a refusal into a success is the row that COMMANDS the nightly batch (2026-09-06, status: proposed) |
 | [ADR-365](ADR-365.md) | the admin money-out console refuses correctly and both refusal properties hold, and the entry describing it is wrong about what stops it: it names ONE blocker where the tree has TWO, and the unnamed one is the very door this deployable's OTHER admin port names in its own source (2026-09-06, status: proposed) |
+| [ADR-366](ADR-366.md) | the admin wallet port has FIVE members and the entry that blocks it names THREE, the write surface is TWO members rather than one because both appends go through the door nobody counted, and against the unwired default exactly one member is ever consulted (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
