@@ -437,7 +437,9 @@ export interface CatalogReads {
  * Raised when this deployment has not been wired to a database.
  *
  * A 503 and not a 404: "this deployment does not serve that yet" is true, and
- * "no such plan" would be a lie about a catalogue nobody looked in.
+ * "no such plan" would be a lie about a catalogue nobody looked in. THE TREE
+ * DOES NOT DELIVER IT: nothing catches this class, so `server.ts` answers
+ * `internal_error` on all three rows. ADR-373 rules the HANDLER wrong, not this.
  */
 export class CatalogUnwired extends Error {
   constructor(message: string) {

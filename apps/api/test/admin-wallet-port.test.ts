@@ -485,15 +485,23 @@ describe('the status a request actually meets', () => {
     expect(statuses).not.toContain(503);
   });
 
-  it('even though `AdminWalletUnwired` documents itself as the 503 and never a 500', () => {
-    // THE CLASS DOCBLOCK IS TRUE OF THE CLASS AND NOT OF THIS DEPLOYMENT. Every
-    // member of the default constructs one, and the handler DOES answer 503 for
-    // four of the five; but `principal` is consulted first on every route, and
-    // ADR-192 clause 2 rules its refusal a 401 so that an anonymous caller is
-    // not told which of this deployment's ports are uncomposed. So the 503 leg
-    // is unreachable while the whole default stands, and it is reachable only
-    // for a deployment that installs a PARTIAL backend.
-    expect(MODULE).toContain('Answered as 503, never 500.');
+  it('and `AdminWalletUnwired` now documents the status a request meets, ADR-373', () => {
+    // THIS PIN HELD THE RETIRED SENTENCE AND IT MOVED WITH THE PROSE, WHICH IS
+    // WHY IT IS WORTH READING. ADR-366 wrote it to record that the class
+    // docblock was true of the CLASS and not of this DEPLOYMENT: every member of
+    // the default constructs one and the handler does answer the outer leg for
+    // four of the five, but `principal` is consulted first on every route and
+    // ADR-192 clause 2 rules its refusal a 401 so an anonymous caller is not
+    // told which of this deployment's ports are uncomposed. ADR-373 measured the
+    // same shape on four admin modules at once and retired the sentence rather
+    // than leaving it beside a landmine note.
+    //
+    // BOTH DIRECTIONS ARE PINNED, and the retired wording appears here ONCE, in
+    // the arm that proves it is GONE. Reproducing it in the module beside its
+    // correction is what ADR-367 seed 3 watched go red: a prose matcher then has
+    // two answers to find and passes on either.
+    expect(MODULE).not.toContain('Answered as 503, never 500.');
+    expect(MODULE).toContain('RETIRED BY ADR-373 AND NOT REPEATED HERE');
     expect(ADMIN_WALLET_ENDPOINTS.every((spec) => spec.roles.length > 0)).toBe(true);
   });
 });
