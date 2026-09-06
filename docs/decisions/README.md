@@ -397,6 +397,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-383](ADR-383.md) | the negation lookback is repaired at the character that closes a clause and NOT at the line boundary, because the reach ADR-380 called wrong is the reach the guard is built on (2026-09-06, status: proposed) |
 | [ADR-384](ADR-384.md) | the line split three rows queued for `RI-35` was never what `RI-35` needed, the registration lands with the runbook row unsplit, and the split is refused by a gate rather than by taste (2026-09-06, status: proposed) |
 | [ADR-385](ADR-385.md) | the two counts ADR-382 left unreconciled are two different sets, both are short, and the class they name is not checkable (2026-09-06, status: proposed) |
+| [ADR-388](ADR-388.md) | a pointer in a dated record is repairable exactly where the record names its subject and the tree once agreed, which is 289 of 8,390; the other 8,101 are not protected, they are undecidable; and `ADR-352:30` was exact on the day it was written (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
