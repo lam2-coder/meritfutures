@@ -5251,6 +5251,15 @@ const ci06v = {
 // delimiter and these sat inside a well formed table. NEITHER GATE ASKS WHETHER A
 // ROW BELONGS.
 //
+// A THIRD ASSERTION LANDED WITH ADR-390 AND IT IS NOT A CELL COUNT. A body row
+// that OPENS a row and never CLOSES it renders correctly, because GFM makes the
+// trailing pipe optional, and `rowCells` strips that pipe only IF PRESENT. So
+// such a row carries the declared width and the cell-count assertion is blind to
+// it by construction. `docs/sessions/README.md` carried one for nine consecutive
+// sampled days while every gate passed. Two seeds of it passed 33 of 33 in
+// ADR-388 and a third, an unescaped pipe on the same row, went red at 32 of 33:
+// the gate was armed and could not see this.
+//
 // THE HYPOTHESIS THAT PULL REQUEST NAMED, AND THE MEASUREMENT THAT REPLACED IT.
 // #299 proposed the cheap check as "a table row whose first cell is not shaped
 // like the table's key column". That was surveyed against every table under
@@ -5393,6 +5402,17 @@ const ci06TableRowWidth = {
     'split by an unescaped pipe with its tail dropped on render -- fifteen of the seventeen ' +
     "registered rows, six in ALLOCATION's own ADR table where a whole disposition paragraph " +
     'is invisible to every reader of the rendered file. ' +
+    'ASSERTION 3 IS A THIRD LEG AND IT IS NOT A CELL COUNT (ADR-390). A body row must ' +
+    'CLOSE with an unescaped pipe. rowCells strips a trailing pipe IF PRESENT, which is ' +
+    "GFM's rule and is right for counting cells, so a row that never closes carries the " +
+    'declared width and assertion 2 cannot express it: ADR-384 found such a row in ' +
+    'sessions/README.md, ADR-388 repaired it, and every gate passed over it on every ref ' +
+    'it stood on. It is warranted by a base rate rather than by the one instance: over the ' +
+    'last commit of every day this corpus has existed, 13 of 22 days ended with at least ' +
+    'one row open and unclosed, and three of the seven rows that have ever been ragged were ' +
+    'ragged and unclosed at once. It carries NO register: the population was 0 of 24,534 ' +
+    'body rows when it landed, and header and delimiter rows were measured at 0 too, which ' +
+    'is why the leg is scoped to body rows. ' +
     'FOUR THINGS IT DOES NOT DO. It counts cells and reads none of them, so a row of the ' +
     "right width holding absorbed prose passes and that is CI-06u's question. A ONE-COLUMN " +
     'table is beyond it by construction and docs/ has none (the narrowest is two, 479 of ' +
@@ -5415,6 +5435,7 @@ const ci06TableRowWidth = {
     const found = new Map(); // file -> Set(key)
     let tables = 0;
     let rows = 0;
+    let unclosed = 0;
 
     for (const file of files.sort()) {
       for (const table of markdownTables(read(file))) {
@@ -5449,6 +5470,32 @@ const ci06TableRowWidth = {
           }
           if (!past) continue;
           rows++;
+
+          // ASSERTION 3: THE ROW CLOSES. `rowCells` strips a trailing pipe IF
+          // PRESENT, which is GFM's rule for counting cells and is right for
+          // counting them, so a row that never closes carries the declared width
+          // and assertion 2 is blind to it BY CONSTRUCTION. ADR-384 found one in
+          // `sessions/README.md`, ADR-388 repaired it, and 33 gates passed over
+          // it on every ref it stood on; ADR-388 also watched two seeds of it
+          // pass and a third, an unescaped pipe on the same row, go red. The
+          // OPENING pipe is not asserted separately because it is structural:
+          // the run splitter above claims only lines that start with one, so a
+          // row that does not open is not a row of this table to begin with.
+          // ADR-390 ruled the scope BODY ROWS, having derived that no header and
+          // no delimiter row under docs/ fails to close either.
+          if (!/(?<!\\)\|$/.test(row.raw.trim())) {
+            unclosed += 1;
+            findings.push(
+              `${file}:${row.n}: this row opens a table row and does not close it (table opens ` +
+                `at line ${table[0].n}). First cell: ` +
+                `"${firstCellKey(rowCells(row.raw)[0] ?? '').slice(0, 60)}". GFM makes the ` +
+                'trailing pipe optional, so the row renders and its cells count either way and ' +
+                'the width assertion above can never see this. It is the same edit that leaves ' +
+                'a ragged row and it lands in the same rows: of the seven rows that have ever ' +
+                'been ragged in this corpus, three were ragged and unclosed at once',
+            );
+          }
+
           const cells = rowCells(row.raw);
           if (cells.length === width) continue;
           const key = firstCellKey(cells[0] ?? '');
@@ -5505,7 +5552,9 @@ const ci06TableRowWidth = {
     console.log(
       `       CI-06/table-row-width note: ${rows} body row(s) over ${tables} table(s) under ` +
         `${CI06U_DOCS}; ${registered} ragged row(s) registered across ` +
-        `${CI06_WIDTH_REGISTER.size} file(s), each one a repair this gate is waiting for`,
+        `${CI06_WIDTH_REGISTER.size} file(s), each one a repair this gate is waiting for; ` +
+        `${unclosed} body row(s) opening a row without closing it, which is assertion 3 and ` +
+        'carries no register of its own because the population was empty when it landed',
     );
     return findings;
   },
@@ -9141,14 +9190,22 @@ const ci06DerivableCounts = {
 
       let inRecord = false;
       const lines = body.split('\n');
+      // A TITLE THAT DATES A DOCUMENT DATES ALL OF IT (ADR-390). Levels 1 and 2
+      // only, so an ADR's `### 3.` inherits the dated `##` its file opens with,
+      // which is what makes a whole dated ruling a record rather than only its
+      // opening paragraph. That inheritance was the STATED intent of the line
+      // below and it did not hold for a document whose SECTIONS are also level
+      // 2: the first of them cancelled the title's date. 25 files under docs/
+      // are written that way and 286 citations in 16 of them sat on the wrong
+      // side of it. `docs/STATE.md` is why the per-heading read stays for a
+      // document whose own title is undated: it accumulates dated sections
+      // inside a live file and no title rule can split it.
+      const dated = RECORD_HEADING.test(lines.find((l) => /^#{1,2}\s/.test(l)) ?? '');
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const heading = /^(#{1,6})\s/.exec(line);
         if (heading) {
-          // Levels 1 and 2 only. An ADR's `### 3.` inherits the dated `##` its
-          // file opens with, which is what makes a whole dated ruling a record
-          // rather than only its opening paragraph.
-          if (heading[1].length <= 2) inRecord = RECORD_HEADING.test(line);
+          if (heading[1].length <= 2) inRecord = dated || RECORD_HEADING.test(line);
           continue;
         }
         const isTableRow = line.trimStart().startsWith('|');

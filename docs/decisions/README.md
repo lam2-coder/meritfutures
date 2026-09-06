@@ -401,6 +401,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-387](ADR-387.md) | the claim site ADR-384 named was one of two, `S3` measured at full population is six of thirteen rather than three of five, and the gate is refused on three measurements rather than on a cost (2026-09-06, status: proposed) |
 | [ADR-388](ADR-388.md) | a pointer in a dated record is repairable exactly where the record names its subject and the tree once agreed, which is 289 of 8,390; the other 8,101 are not protected, they are undecidable; and `ADR-352:30` was exact on the day it was written (2026-09-06, status: proposed) |
 | [ADR-389](ADR-389.md) | option (d) is right about the page and is not takeable by a row that owns the runbook, because the fifth column is read out of the table row by eleven assertions in files no such row may write (2026-09-06, status: proposed) |
+| [ADR-390](ADR-390.md) | a title that dates a document dates all of it, which is 286 pointers in 16 documents and costs none of the 73 the checks actually assert on; a claimed table row must close; and 40 of the 41 pointers into `gates.mjs` this diff moved were already wrong before it (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
