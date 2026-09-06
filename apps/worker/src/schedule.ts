@@ -464,9 +464,23 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'UNSCHEDULED: there is NO CALLER, and three of the saga`s four ports have no ' +
       'implementation, the platform one because `packages/rithmic` implements nothing and the ' +
       'advance and read ones because ADR-102`s system write path renders no WHERE clause. ' +
+      'NAMING THE ADVANCE AND READ PORTS AS THE SAGA`S IS FALSE AND IS KEPT BESIDE ITS ' +
+      'CORRECTION per RI-14 (ADR-355 section 7): `SagaIo`s four members are `tx`, `queue`, ' +
+      '`platform` and `rows`, the last being DATA rather than a port, and neither ' +
+      '`ProvisioningAdvancePort` nor `ProvisioningReadPort` is taken by any function in this ' +
+      'workspace or constructed anywhere. THE COUNT AND THE CONCLUSION DO NOT MOVE. ' +
       'AND NOTHING DRAINS THE QUEUE: this deployable`s door withholds `consume` and `start` on ' +
       'ADR-241`s one-shot ruling, so the row that gives this job a caller owes a drain or owes ' +
-      'the argument for running without one.',
+      'the argument for running without one. ' +
+      'ADR-355 IS THAT ROW AND IT RULED THE DRAIN OWED, which settles the disjunction above ' +
+      'rather than falsifying it, so the clause is kept whole per RI-14. THE SHAPE IS A ONE-SHOT ' +
+      'PULL and it does NOT narrow ADR-241: a bounded claim-settle-report-exit is a discrete run ' +
+      'with a discrete completion, which is what ADR-241 ruled FOR and what CRON_INVENTORY`s ' +
+      '"two consecutive cycles missed" is the only shape that can satisfy. `consume` and `start` ' +
+      'STAY WITHHELD, permanently, because those are the process that stays up. ' +
+      'THE DRAIN IS STILL NOT BUILT AND THIS ROW STAYS `unscheduled`: `JobQueue` publishes five ' +
+      'methods and none is a pull, so the first slice is a SIXTH method and ADR-165 clause 5 ' +
+      'makes that `packages/queue`s row and not this deployable`s. It is owed and it is not taken.',
   },
   {
     module: './recon/sweep.ts',

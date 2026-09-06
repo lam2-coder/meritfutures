@@ -159,7 +159,23 @@
 // and a read port. `PlatformProvisioningPort`'s implementation is
 // `packages/rithmic`'s and does not exist; `ProvisioningAdvancePort` and
 // `ProvisioningReadPort` are BLOCKED by ADR-102's `WHERE`-less system write path
-// and say so on their own declarations. So the saga still has no caller, `RI-35`
+// and say so on their own declarations.
+//
+// **THE SECOND SENTENCE ABOVE IS FALSE AND IS KEPT BESIDE ITS CORRECTION per
+// `RI-14` (ADR-355 section 7). `runProvisioningSaga` TAKES NEITHER OF THE LAST
+// TWO.** It takes one `SagaIo`, whose four members are `tx: ProvisioningTx`,
+// `queue: ProvisioningJobQueue`, `platform: PlatformProvisioningPort` and
+// `rows: readonly unknown[]` -- and the fourth is DATA rather than a port, so it
+// has no implementation because it is not the kind of thing that has one. A
+// grep for `ProvisioningAdvancePort` and `ProvisioningReadPort` across `apps/`
+// and `packages/` returns FOURTEEN lines and every one is inert: two
+// declarations, four barrel type re-exports and eight comments. **No function
+// in this workspace takes either as a parameter and no value of either type is
+// constructed anywhere, in `src/` or in a suite.** The conclusion does not move,
+// which is exactly why it went uncaught: the saga has no caller either way. What
+// it costs is that a session dispatched to build `ProvisioningAdvancePort` would
+// have been building a port nothing consumes, against a sentence saying the saga
+// consumed it. `test/queue.test.ts` binds the absence so it cannot drift back. So the saga still has no caller, `RI-35`
 // still binds that at `provisioning-saga-caller`, and `schedule.ts` still
 // registers the job `unscheduled`.
 //
