@@ -2108,6 +2108,43 @@ test('the two derivations of `wired` agree here, and the shapes where they canno
   ]);
 });
 
+test('`wired` is initialised from the program derivation rather than from the pattern', () => {
+  // THIS CASE EXISTS BECAUSE A SEED WENT GREEN. Reverting the line below to
+  // `new Set(matches(startSource, CALLS))` left EVERY case in this file passing,
+  // including the agreement case above, because that case then compares the text
+  // derivation with itself and the two agree on this tree by construction. The
+  // fixtures defend `installsBeforeServing`; nothing defended that `wired` USES
+  // it, and a fixture cannot: on a tree where the two derivations agree, no
+  // observation of `wired` can tell which one produced it.
+  //
+  // SO THE BIND IS STRUCTURAL AND THIS ENTRY SAYS SO RATHER THAN DRESSING IT UP.
+  // It reads this file's own source and asserts the initialiser, on the same
+  // precedent `test/start-program.test.ts` uses when it reads `CALLS` out of
+  // here: a derivation that can be silently swapped is a derivation nobody is
+  // holding. IT IS ANCHORED AT THE START OF A LINE, because `toContain` on a
+  // whole-file read is satisfied by the statement COMMENTED OUT, which is the
+  // weakness ADR-371 section 7 found in its own case 2 on that case's first run.
+  const own = read(join(HERE, 'wiring.test.ts'));
+
+  expect(
+    /^const wired: ReadonlySet<string> = new Set\(installs\.map\(/m.test(own),
+    '`wired` is no longer initialised from `installs`, the set a run would install. If the ' +
+      'derivation moved on purpose, move this assertion with it; if it was reverted to the line ' +
+      'pattern, the wiring triple is reporting what a scanner sees rather than what a ' +
+      'deployment serves and nothing else in this file would have said so',
+  ).toBe(true);
+
+  // AND THE PATTERN IS STILL DECLARED IN THE SHAPE ITS OTHER READER EXPECTS.
+  // `test/start-program.test.ts` extracts `CALLS` from this file by that exact
+  // line shape, and a derivation nobody can find becomes a silently empty set
+  // one file over rather than a red bar there.
+  expect(
+    /^const CALLS = \/(.+)\/([a-z]*);$/m.test(own),
+    '`CALLS` is no longer declared in the one-line shape `test/start-program.test.ts` reads it ' +
+      'out of, so that file would scan `start.ts` with an empty pattern and agree with nothing',
+  ).toBe(true);
+});
+
 // -----------------------------------------------------------------------------
 // The second measurement: what the blocked ports hold (ADR-357)
 // -----------------------------------------------------------------------------
