@@ -23,7 +23,7 @@ import { expect, test } from 'vitest';
 //     reachable `throw`" was READ, by a session, once. Nothing re-reads it.
 //   - THE PREMISE UNDER REASON TWO. "`app.listen` is reached only inside
 //     `main`" appears in this repository as prose in ADR-372 section 6 and as a
-//     COMMENT at `start-program.test.ts:188`. A comment is not a control.
+//     COMMENT at `start-program.test.ts:251`. A comment is not a control.
 //
 // PARSING IS NOT EXECUTING, which is what lets this file exist beside the
 // constraint that importing `start.ts` binds a port. The compiler API builds a
