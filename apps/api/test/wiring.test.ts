@@ -502,9 +502,34 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'SIDE EFFECT of an unrelated slice, carrying no signal that it did. ' +
     '(2) It buys no observable change and costs a transaction against two tables on EVERY ' +
     '`/admin/*` request including the ones answering 401 to a caller holding nothing, so an ' +
-    'anonymous prober gets to schedule database work; `start.ts:206` and `:245` say in their own ' +
-    'words that the rate limit `INV-M11-05` requires "EXISTS NOWHERE IN THIS TREE", so nothing ' +
-    'bounds that. ' +
+    'anonymous prober gets to schedule database work, and NOTHING BOUNDS THAT. ' +
+    'THE SUPPORT THIS GROUND CITED HAS EXPIRED AND THE GROUND HAS NOT (ADR-370, ADR-371, ' +
+    'ADR-375). This clause pointed at two lines of `start.ts` for the claim that the limit ' +
+    '`INV-M11-05` requires is absent from this tree. THE CITATION WAS EXACT WHEN IT WAS ' +
+    'WRITTEN AND A MERGE MOVED IT: the branch that added the limit is not an ancestor of the ' +
+    'branch that wrote the pointer, so each was right over the tree it was derived on and ' +
+    'both pointers now land in an argument about the certificate image source. ' +
+    'THE RETIRED CLAUSE IS NAMED HERE AND NOT REPRODUCED. `start.ts` keeps it beside its ' +
+    'correction under `RI-14` in three places, so a reader matching on the prose gets four ' +
+    'answers of which three are history, and a fifth copy in this file would be that ' +
+    'collision one register down (ADR-367, ADR-371 section 4.4). ' +
+    'AND THE CLAIM WAS FALSE IN HALF RATHER THAN FALSE, WHICH IS WHY THE GROUND SURVIVES. ' +
+    'The PER-IP dimension is BUILT AND INSTALLED: `useCertificateRateLimiter` ' +
+    '(`start.ts:315`) is the wiring line and it is one of the eleven counted above. The ' +
+    'PER-ASN dimension is still absent and `start.ts` records it owed with its blocker named. ' +
+    'THE SURVIVING SUPPORT IS NARROWER THAN THE ONE THIS CLAUSE NAMED. ' +
+    '`RATE_LIMITED_ROUTES` (`certificate-rate-limit.ts:151`) is the two PUBLIC certificate ' +
+    'rows and `start.ts` installs no second limiter, so the limit that exists has never ' +
+    'reached `/admin/*` and this ground is about a surface it does not cover. A row that read ' +
+    'the old pointer, found the limit built and struck this ground would have removed a TRUE ' +
+    'reason on a FALSE reading, which is the failure mode an expired SUPPORT produces and an ' +
+    'expired BLOCKER does not. THE VERDICT DOES NOT MOVE. ' +
+    'AND THE REPAIR CHANGES WHICH OF `RI-15`s LEGS HOLDS THIS SENTENCE. The old pointer ' +
+    'carried a path and a line and no name, because its subject was a QUOTED SENTENCE, so ' +
+    'only the three weak legs applied and all three passed while the pointer was wrong ' +
+    '(ADR-371 section 5.1). Both citations above carry a backticked NAME, which is the leg ' +
+    'that checks the cited line is part of what the sentence names. THE REMEDY FOR THAT BLIND ' +
+    'SPOT IS TO CITE A NAME RATHER THAN TO WIDEN THE CHECK. ' +
     '(3) It would move the triple to `wired: 11` and report as progress a port whose table cannot ' +
     'be filled. ' +
     'WHAT IS STILL OWED IS THE PURCHASE AND A CALLER. `refusingAssertionVerifier` and ' +
