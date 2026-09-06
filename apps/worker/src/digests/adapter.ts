@@ -497,10 +497,15 @@ export const DIGEST_CONTENT_BLOCKERS: readonly DigestBlocker[] = [
     cite: 'apps/worker/src/schedule.ts (plan breaker evaluation row), apps/worker/src/breaker/ports.ts',
     why:
       'The body is P7-k`s BreakerEvaluationReport folded by lossRatioBodyFrom, and this ' +
-      'deployment can produce no such report. UNWIRED_BREAKER_IO is the only BreakerIo in the ' +
-      'tree, AND THE EVALUATOR WOULD DECLINE EVEN WIRED: OQ-M6-02`s minimum sample is the ' +
+      'deployment can produce no such report. THE FIRST BLOCKER IS RETIRED AND THE SECOND ' +
+      'STANDS, WHICH IS WHY THIS MEMBER STILL REFUSES. This clause read "UNWIRED_BREAKER_IO ' +
+      'is the only BreakerIo in the tree" and ADR-352 made that false by writing ' +
+      'breaker/adapter.ts; the sentence is kept beside its correction per RI-14 because it ' +
+      'was true when written and names the step that retired it. WHAT DID NOT MOVE: THE ' +
+      'EVALUATOR WOULD DECLINE EVEN WIRED, because OQ-M6-02`s minimum sample is the ' +
       'founder`s and is unanswered, so evaluateBreaker raises BreakerDeclined rather than ' +
-      'inventing a floor. Two blockers and the second is not an adapter.',
+      'inventing a floor. Two blockers, the second was never an adapter, and it is the one ' +
+      'that still holds.',
   },
   {
     member: 'content.flagQueue',

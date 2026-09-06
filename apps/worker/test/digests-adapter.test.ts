@@ -421,16 +421,38 @@ test('4.6 `apps/worker` STILL DECLARES NO PATH INTO `apps/api`, which is flagQue
   expect(Object.keys(dependencies)).not.toContain('@merit/api');
 });
 
-test('4.7 `UNWIRED_BREAKER_IO` IS STILL THE ONLY `BreakerIo`, which is lossRatioCusum`s first blocker', () => {
+test('4.7 lossRatioCusum`s FIRST blocker is RETIRED and its SECOND still holds, so the refusal is unchanged', () => {
+  // THIS CASE WAS WRITTEN AS "`UNWIRED_BREAKER_IO` IS STILL THE ONLY `BreakerIo`"
+  // AND IT FIRED, WHICH IS THE TRIPWIRE WORKING RATHER THAN A DEFECT. ADR-352
+  // landed `./breaker/adapter.ts` on a concurrent branch and the two rows met in
+  // one integration merge. The original wording is kept here per `RI-14`,
+  // because it was true when written and it names the step that retired it: the
+  // case failed the day the constructor arrived rather than the day somebody
+  // remembered to re-read a paragraph, which is exactly what it was for.
+  //
+  // **THE RE-LOOK IT DEMANDED IS DONE AND THE ANSWER IS THAT NOTHING MOVES.**
+  // `DIGEST_CONTENT_BLOCKERS` records TWO blockers on this member and says in
+  // its own words that "the second is not an adapter": `OQ-M6-02`'s minimum
+  // sample is the founder's and is unanswered, so `evaluateBreaker` raises
+  // `BreakerDeclined` even fully wired rather than inventing a floor. So
+  // `content.lossRatioCusum` still refuses, for one reason now instead of two.
   const declaring = join(ROOT, 'apps/worker/src/breaker/ports.ts');
   const inhabited = shippedSources()
     .filter((file) => file !== declaring)
     .filter((file) => /\):\s*BreakerIo\b|satisfies\s+BreakerIo\b/.test(readFileSync(file, 'utf8')));
 
+  // The tripwire now guards the OTHER direction: a SECOND constructor, or the
+  // adapter disappearing, both mean this reasoning needs re-reading.
   expect(
-    inhabited,
-    'a BreakerIo constructor now exists and lossRatioCusum is due a re-look',
-  ).toEqual([]);
+    inhabited.map((file) => file.slice(ROOT.length + 1)),
+    'the BreakerIo inhabitant set moved again and lossRatioCusum is due another re-look',
+  ).toEqual(['apps/worker/src/breaker/adapter.ts']);
+
+  // AND THE BLOCKER THAT ACTUALLY HOLDS IS ASSERTED, not just described: the
+  // member is still refused and the surviving reason is still the founder's.
+  const adapter = readFileSync(join(ROOT, 'apps/worker/src/digests/adapter.ts'), 'utf8');
+  expect(adapter).toContain('THE FIRST BLOCKER IS RETIRED AND THE SECOND');
+  expect(adapter).toContain('OQ-M6-02');
 });
 
 // -----------------------------------------------------------------------------
