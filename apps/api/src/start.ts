@@ -308,10 +308,10 @@ useCertificateBackend(databaseCertificateBackend(LIVE_DB));
 // `UNWIRED_CERTIFICATE_RATE_LIMITER` and answers 503 on both public rows,
 // exactly as it does for auth.
 //
-// AND IT IS THE LAST LINE RATHER THAN THE FIRST FOR NO ORDERING REASON AT ALL.
-// Nothing above reads the limiter and the limiter reads nothing above it; this
-// file's header rules the conflict shape for concurrent slices as an APPEND, and
-// this is one.
+// AND IT IS THE LAST INSTALL RATHER THAN THE FIRST FOR NO ORDERING REASON AT ALL.
+// It is not the last LINE. `await main()` is, two below it, and every install
+// belongs above it. Nothing above reads the limiter and the limiter reads
+// nothing above it; the header rules that conflict an APPEND, and this is one.
 useCertificateRateLimiter(environmentCertificateRateLimiter());
 
 await main();
