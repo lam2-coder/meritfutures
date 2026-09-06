@@ -395,6 +395,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-381](ADR-381.md) | the imprecision three rows declined, where the FIRST decline was an interim that recommended the repair, the two after it inherited the verdict without that qualification, and the ground all three cite for declining is the ground that makes the repair safe (2026-09-06, status: proposed) |
 | [ADR-382](ADR-382.md) | the expiry constructor is refused a THIRD time and the refusal becomes a STANDING BAR, because the premise four registers gave for it is false and the verdict it was offered for is not (2026-09-06, status: proposed) |
 | [ADR-383](ADR-383.md) | the negation lookback is repaired at the character that closes a clause and NOT at the line boundary, because the reach ADR-380 called wrong is the reach the guard is built on (2026-09-06, status: proposed) |
+| [ADR-384](ADR-384.md) | the line split three rows queued for `RI-35` was never what `RI-35` needed, the registration lands with the runbook row unsplit, and the split is refused by a gate rather than by taste (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
