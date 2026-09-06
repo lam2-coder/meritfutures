@@ -637,3 +637,105 @@ test('6.3 exactly one of the detector runner`s three event names is outside the 
   // further blockers that a transcription does not touch.
   expect(names.filter((name) => !rows.includes(name))).toEqual(['detector.run_degraded']);
 });
+
+// =============================================================================
+// 7. The support that expired, and the vocabulary that collapsed (ADR-376)
+// =============================================================================
+// **TWO REGISTERS CARRIED THE REPLAY ROW'S RETIRED HALF AND ONLY ONE WAS INSIDE
+// ADR-370'S FENCE.** That row repaired `src/schedule.ts` and recorded
+// `CRON_INVENTORY` as owed; ADR-371 re-confirmed it uncorrected a wave later and
+// refined what the defect is: **the SUPPORT expired and the BLOCKER did not**,
+// so the repair is to the sentence and never to the verdict. The cases below
+// hold both halves of that, and neither of them can be satisfied by moving the
+// marker.
+//
+// **AND THE SECOND CASE IS ADR-371 SECTION 6 ITEM 4 MADE MECHANICAL.** A
+// restatement degrading a precise claim into a false one is invisible to every
+// check in this tree, because both sentences are prose and the tree agrees with
+// neither. What CAN be derived is the fact each sentence is about, and the
+// precise form is the one that survives it.
+
+test('7.1 the inventory records the replay row`s discharged half without moving its verdict', () => {
+  const row = scheduledRows().find((entry) => entry.job === 'replay self-audit');
+  expect(row, 'CRON_INVENTORY has no replay self-audit row').toBeDefined();
+  const line = row?.line ?? '';
+
+  // **THE FACT FIRST AND THE WORDS SECOND**, which is `1.1`'s order and the
+  // reason ADR-324 gave for it. A constructor under this `src/` returns the
+  // audit's own port, so the page's retired clause is false about this tree
+  // before anything is asserted about what the page says.
+  const builds = /export function postgresBatchPorts\([^)]*\):\s*([A-Za-z0-9_]+)\s*\{/.exec(
+    stripComments(sourceOf('./batch/adapter.ts')),
+  );
+  expect(
+    builds?.[1],
+    'no `src/` constructor returns the replay audit`s port any more. If the wiring went away, ' +
+      'the inventory row`s discharge goes with it and this page is owed a second repair',
+  ).toBe('BatchPorts');
+
+  // **AND THE PAGE RECORDS IT, IN THE SHAPE THE STATISTICS ROW ALREADY USED.**
+  // The discharge names the row that ended the clause rather than asserting it
+  // bare, so a reader who met the retired half can find out what replaced it.
+  expect(line).toContain('DISCHARGED SINCE');
+  expect(line).toContain('ADR-346');
+
+  // **THE VERDICT DOES NOT MOVE, WHICH IS THE HALF A HURRIED REPAIR WOULD TAKE
+  // WITH IT.** `4.2` holds the marker against the registry in both directions;
+  // these three are the rest of what an expired SUPPORT must leave standing, and
+  // the last of them is the reason a scheduled run would be worse than this one.
+  expect(line).toContain('NOT YET WIRED OR SCHEDULED');
+  expect(line).toContain('**S1.**');
+  expect(line).toContain('replay.audit_completed');
+
+  // **AND THE HALF THAT HOLDS IS STILL STATED.** `3.1` derives the caller census
+  // for every entry point in both directions; what this asserts is that the page
+  // has not quietly dropped the surviving half while repairing the retired one.
+  expect(line).toMatch(/calls it/);
+});
+
+test('7.2 the two rows the header read as uninhabited each have a refusing default', () => {
+  // **ADR-370 SECTION 3.1 RECORDED BOTH AS HAVING NO INHABITANT OF ANY KIND AND
+  // ADR-371 MEASURED THAT FALSE**, and the restatement had already travelled
+  // into `src/schedule.ts`'s header. The two facts below are what make it false,
+  // and both are read off the tree.
+  const ports = unwiredPorts();
+  const byPort = new Map([...ports].map(([value, port]) => [port, value] as const));
+
+  for (const port of ['LiveIngestIo', 'WithdrawalApprovalSweepIo']) {
+    const value = byPort.get(port);
+    expect(
+      value,
+      `${port} has no UNWIRED_* default under apps/worker/src. If the default went away, the ` +
+        'header clause this case refutes becomes TRUE and the correction beside it moves',
+    ).toBeDefined();
+
+    // **AND `THE ONLY VALUE OF ITS TYPE` IS THE PRECISE CLAIM, WHICH IS WHAT
+    // BOTH ROWS AND `CRON_INVENTORY` SAY AND WHAT THE HEADER LOST.** It goes RED
+    // on GOOD NEWS: the day an adapter lands for either port, this stops
+    // holding and the row that lands it re-reads a blocker that was never only
+    // the adapter.
+    expect(
+      constructorsOf(port),
+      `${port} now has a constructor, so "the only ${port} in the tree" is no longer true and ` +
+        'the row that says it is owed a re-read',
+    ).toEqual([]);
+  }
+
+  // **THE ROWS SAY IT IN THE PRECISE FORM AND THE HEADER'S CLAUSE IS KEPT BESIDE
+  // ITS CORRECTION.** The rows are asserted rather than the header, because a
+  // row is what a reader deciding whether to write a port actually meets, and
+  // `RI-14` requires the header's clause to STAY where it is.
+  for (const entryPoint of ['startLiveIngest', 'runWithdrawalApprovals']) {
+    const job = WORKER_JOB_ENTRY_POINTS.find((entry) => entry.entryPoint === entryPoint);
+    expect(job, `${entryPoint} is no longer registered`).toBeDefined();
+    const why = job?.why ?? '';
+    expect(why).toMatch(/is the only/);
+    expect(why).toContain('UNWIRED_');
+  }
+
+  // **AND THE ONE PORT THE PHRASE IS RESERVED FOR STILL HAS NOTHING.** `6.1`
+  // asserts the same absence for a different reason; this is the half that makes
+  // the header's vocabulary a distinction rather than a synonym, and if it ever
+  // stops holding the two states collapse for real.
+  expect([...ports.values()]).not.toContain('ExpiryEventPort');
+});

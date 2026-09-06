@@ -275,6 +275,64 @@
 // are two decisions, this file is where the second one is recorded, and a job
 // that starts running because an inventory row looked clear is the failure the
 // file exists to prevent.
+//
+// -----------------------------------------------------------------------------
+// ADR-376: THE CENSUS RE-DERIVED, AND ONE PARAGRAPH ABOVE COLLAPSES A
+// DISTINCTION THE LINES DIRECTLY ABOVE IT DRAW
+// -----------------------------------------------------------------------------
+// Every paragraph above is kept whole per `RI-14`, ADR-370's included. **THE
+// CENSUS IS RE-DERIVED AT THIS ROW AND BOTH FIGURES REPRODUCE EXACTLY**: eleven
+// `UNWIRED_*` defaults under `apps/worker/src`, nine of them with a name ending
+// in the suffix five earlier paragraphs counted. **THE FIGURE THOSE FIVE AGREE
+// ON IS NAMED AND THE SENTENCE THAT CARRIED IT IS NOT REPRODUCED**, per `RI-14`
+// as ADR-367 measured it: that sentence stands five times in this header already
+// and a sixth copy would hand a prose-matching reader one more answer to a
+// question the suite settles on every run.
+// **AND IT IS ALREADY DERIVED RATHER THAN TYPED**, which is a finding and not an
+// embarrassment: ADR-370 moved the number into `test/schedule.test.ts` case
+// `6.1`, which reads the defaults off the tree on every run, matches on the
+// `UNWIRED_` PREFIX rather than the `_IO` suffix, and asserts the two readings
+// side by side so the disagreement stays visibly about WHICH VALUES ARE COUNTED.
+// Nothing here re-types it. **WHETHER THE CENSUS SHOULD BE A GATE RATHER THAN A
+// CASE IS ADR-370's OWN SECOND APPROVAL QUESTION AND IS FOUNDER-OWED**, so no
+// `RI-nn` is minted for it here.
+//
+// **WHAT IS FALSE IS THE CLAUSE ABOVE THAT READS THE LIVE INGEST ROW AND THE
+// WITHDRAWAL ROW AS PORTS NOTHING INHABITS.** Both are inhabited, by a refusing
+// default: `UNWIRED_LIVE_INGEST_IO` (`live/ports.ts:565`) and
+// `UNWIRED_WITHDRAWAL_APPROVAL_IO` (`withdrawals/ports.ts:329`), **and this
+// header counts both among its own eleven** while reserving no value at all, not
+// even a refusing one, for `ExpiryEventPort` alone. **SO THE FILE DRAWS THE
+// DISTINCTION IN ONE PARAGRAPH AND COLLAPSES IT IN THE NEXT.** What is true of
+// those two rows is the narrower thing their OWN rows below already say in the
+// precise words, and `CRON_INVENTORY` says in the same words: each refusing
+// default is THE ONLY value of its port type in the tree. The clause is kept
+// beside this correction rather than deleted, and the census it contradicts
+// stands in this same header.
+//
+// **THIS IS ADR-371 SECTION 6 ITEM 4's MECHANISM AT A SECOND SITE.** That entry
+// found the same collapse in ADR-370's own section 3.1 and recorded it rather
+// than repairing it; this is the `src/` register the restatement travelled into,
+// where a reader deciding whether a port needs writing meets it. **A RESTATEMENT
+// DEGRADING A PRECISE CLAIM INTO A FALSE ONE IS THE HARM**, and it runs in the
+// direction that invents work: a port with a refusing default needs an adapter,
+// and a port with nothing at all reads as needing a declaration first.
+//
+// **THE REPLAY ROW'S SUPPORT EXPIRED AND ITS BLOCKER DID NOT, AND THE INVENTORY
+// NOW SAYS SO.** ADR-370 section 7 item 1 and ADR-371 section 6 item 2 both
+// recorded `CRON_INVENTORY`'s replay self-audit row as still carrying the
+// retired half; it is repaired at this row, in the shape the Statistics run row
+// two rows down already used, with the marker, the switch and the S1 all left
+// exactly where they were. **NEITHER DISPOSITION MOVES AND NOTHING IS WIRED.**
+//
+// **AND THE EXPIRY CONSTRUCTOR IS STILL UNCALLABLE AND THAT IS NOT THIS ROW'S TO
+// REPAIR.** `expirySweepIo` still takes the sink as a required positional
+// argument with no default, re-derived at its own declaration. The only repair
+// that does not wire anything is a refusing `ExpiryEventPort` default, which the
+// expiry row argues against in its own words and which case `6.1` asserts the
+// ABSENCE of, on the ground that an hourly job releasing nothing while the S1
+// switch reports it present is worse than the unscheduled state. **A ROW THAT
+// REPAIRED IT WOULD BE FAILING A CASE WRITTEN TO CATCH EXACTLY THAT REPAIR.**
 // =============================================================================
 
 /** Whether a job runs on a clock in a deployment, or does not. */
