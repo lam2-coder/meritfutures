@@ -156,6 +156,118 @@ const SCOPED_TX_MEMBERS = (() => {
  */
 const CONVERSION_DOOR_BUILT = SCOPED_TX_MEMBERS.some((name) => /conversion/i.test(name));
 
+// -----------------------------------------------------------------------------
+// THE DOOR IS DERIVED PER METHOD, AND `RI-14` IS WHY IT HAD TO BE. ADR-358
+// -----------------------------------------------------------------------------
+// ADR-324 derived the `stats` obstruction and left the other five methods
+// pinned as prose, and two of the five were wrong. The case below this one used
+// to read `expect(message).toMatch(/has a door and no adapter has been written
+// for it yet/)` over a hardcoded list of four, and it could not have caught
+// either error, for a reason sharper than the staleness ADR-324 named.
+//
+// `RI-14` REQUIRES A RETIRED SENTENCE TO BE KEPT BESIDE ITS CORRECTION. So when
+// a false "this read has a door" is repaired, the repaired message QUOTES the
+// false sentence, the quoted words are still in the string, and a case matching
+// those words passes forever. The convention that makes the corpus honest and a
+// case that matches prose are in direct conflict: the first guarantees the
+// second can never go red. That is not a test going stale in silence; it is a
+// test that has been disarmed by a rule the corpus is right to have.
+//
+// SO THE MESSAGE'S OWN VOICE IS SEPARATED FROM WHAT IT QUOTES, and the
+// separator is the corpus's own convention rather than a new one: a retired
+// clause is carried inside DOUBLE QUOTES at every site in this module. Strip
+// the quoted runs and what is left is what the port is asserting TODAY. The
+// non-vacuity case below pins the stripper, because a stripper that removed
+// everything would make each of these pass by accident.
+//
+// AND THE EXPECTATION COMES FROM `scoped-db.ts` RATHER THAN FROM THIS FILE. A
+// door is a KEY SET MEMBERSHIP: which of `OwnedTableKey`, `ScopedTableKey`,
+// `ParentedTableKey`, `PartyWritableTableKey`, `FirmTableKey` and
+// `CATALOG_TABLE_KEYS` admits the table this method touches, for the operation
+// it performs. Widening any of those lists turns the matching case red on the
+// day it happens rather than a wave later.
+
+/** `ParentedTableKey`'s members, read off the `Extract<...>` that declares it. */
+const PARENTED_TABLE_KEYS = (() => {
+  const line = /export type ParentedTableKey = Extract<DerivedTableKey, ([^>]*)>;/.exec(SCOPED_DB);
+  return line === null || line[1] === undefined
+    ? []
+    : [...line[1].matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1] as string);
+})();
+
+/** `CATALOG_TABLE_KEYS`' members, read off the array literal that declares it. */
+const CATALOG_KEYS = (() => {
+  const start = SCOPED_DB.indexOf('export const CATALOG_TABLE_KEYS = [');
+  if (start === -1) return [];
+  const body = SCOPED_DB.slice(start, SCOPED_DB.indexOf('] as const', start));
+  return [...body.matchAll(/'([A-Za-z]+)',/g)].map((m) => m[1] as string);
+})();
+
+/** Whether a `pair` table's registry rule lets a party author the row (ADR-230). */
+function partyWritable(key: string): boolean {
+  const start = SCOPE.indexOf(`\n  ${key}: {\n`);
+  if (start === -1) return false;
+  const end = SCOPE.indexOf('\n  },\n', start);
+  return /by: 'party'/.test(SCOPE.slice(start, end === -1 ? SCOPE.length : end));
+}
+
+/**
+ * The door that serves one table for one operation, or `null` where this
+ * deployable has none. Computed from the registry class and the key sets, never
+ * from a list written here.
+ *
+ * `ApiDb` EXPOSES NO SYSTEM HANDLE, which is why `SystemTx` is absent from every
+ * branch: `scoped`, `firm`, `resolution`, `establishment` and `publicLookup` are
+ * the five doors a request path can open, and the first two are the only ones
+ * generic over a table key.
+ */
+function doorFor(key: string, op: 'read' | 'write'): string | null {
+  const rule = ruleOf(key);
+  if (rule === null) return null;
+  if (op === 'read') {
+    // `ScopedTableKey` is `Exclude<TableKey, FirmTableKey | PairTableKey>`, so
+    // every class but those two reads through the scoped handle.
+    if (rule.class === 'pair') return null;
+    if (rule.class === 'firm') return CATALOG_KEYS.includes(key) ? 'catalogRows' : 'FirmTx.rows';
+    return 'ScopedTx.rows';
+  }
+  if (rule.class === 'owned' || rule.class === 'root') return 'ScopedTx.insert';
+  if (rule.class === 'firm') return 'FirmTx.insert';
+  if (rule.class === 'derived')
+    return PARENTED_TABLE_KEYS.includes(key) ? 'ScopedTx.insertUnder' : null;
+  return partyWritable(key) ? 'ScopedTx.insertAsParty' : null;
+}
+
+/**
+ * What each method of the port actually touches, and how.
+ *
+ * `stats` NAMES `attributions` AND NOT `affiliates`, because the subject here is
+ * the table the method is BLOCKED on: its other three sources are `affiliates`,
+ * `affiliate_clicks` and `affiliate_commissions`, and all three have doors. The
+ * three money figures stopped being the obstruction when `0078` merged.
+ *
+ * `submitCreative` IS THE ONLY `write` IN THIS TABLE, and it was served a
+ * sentence calling it a read for two waves.
+ */
+const METHOD_SUBJECT: Readonly<
+  Record<string, { readonly key: string; readonly op: 'read' | 'write' }>
+> = {
+  affiliate: { key: 'affiliates', op: 'read' },
+  stats: { key: 'attributions', op: 'read' },
+  statements: { key: 'affiliateStatements', op: 'read' },
+  issueLink: { key: 'affiliates', op: 'read' },
+  requiredDisclosure: { key: 'tosVersions', op: 'read' },
+  submitCreative: { key: 'affiliateCreatives', op: 'write' },
+};
+
+/** The claim a message makes IN ITS OWN VOICE, with every quoted retirement removed. */
+function ownVoice(message: string): string {
+  return message.replace(/"[^"]*"/g, ' ');
+}
+
+/** The sentence a message uses to say a door exists and only an adapter is owed. */
+const DOOR_CLAIM = /has a door and no adapter has been written for it yet/;
+
 /** Every method of the port, called, with the message it refuses with. */
 async function refusals(): Promise<Map<keyof AffiliateBackend, string>> {
   const out = new Map<keyof AffiliateBackend, string>();
@@ -396,17 +508,100 @@ describe('the `stats` refusal keeps the obstruction `0078` did not touch', () =>
   });
 });
 
-describe('the other five messages are unchanged in what they say a caller must build', () => {
-  // THE REPAIR IS BOUNDED, ASSERTED RATHER THAN INTENDED. Four methods wait on
-  // an adapter and one waits on an adapter and a base URL, and neither ADR-304
-  // nor ADR-324 moves any of them. A message drifting into naming DDL would
-  // send a session to `packages/db` for work that is not owed.
-  test('four methods say a door exists and an adapter does not', async () => {
+describe('what each message says about its door is what the key sets say', () => {
+  // THE CASE THIS REPLACED NAMED FOUR METHODS AND IS QUOTED RATHER THAN DELETED,
+  // per `RI-14`. It read: "four methods say a door exists and an adapter does
+  // not", over the list `['affiliate', 'requiredDisclosure', 'submitCreative',
+  // 'statements']`, and it asserted `/has a door and no adapter has been written
+  // for it yet/` against each. TWO OF THE FOUR WERE FALSE (ADR-358).
+  // `submitCreative` is a WRITE of `affiliate_creatives`, which no handle in this
+  // deployable can insert, and `requiredDisclosure` reads `tos_versions` and not
+  // `affiliates`, so the door it has is not the one the message named. The case
+  // could not have failed on either, for the reason the section header measures.
+
+  test('the key-set readers found their lists, so no case below passes vacuously', () => {
+    expect(PARENTED_TABLE_KEYS).not.toStrictEqual([]);
+    expect(CATALOG_KEYS.length).toBeGreaterThan(1);
+    // Every subject resolves to a registry rule, so `doorFor` never returns
+    // `null` merely because a key was misspelled here.
+    for (const [method, subject] of Object.entries(METHOD_SUBJECT))
+      expect(ruleOf(subject.key), method).not.toBeNull();
+  });
+
+  test('the quoted-retirement stripper removes quotations and keeps the rest', async () => {
     const served = await refusals();
-    for (const method of ['affiliate', 'requiredDisclosure', 'submitCreative', 'statements']) {
+    // NON-VACUITY IN BOTH DIRECTIONS. It must shorten the two messages that
+    // carry a retirement in quotes and leave every other message untouched, so
+    // a stripper that deleted everything, or nothing, fails here.
+    const shortened = [...served].filter(([, m]) => ownVoice(m).length < m.length).map(([k]) => k);
+    expect(shortened.sort()).toStrictEqual(['requiredDisclosure', 'submitCreative']);
+    for (const [method, message] of served)
+      expect(ownVoice(message).length, method).toBeGreaterThan(0);
+  });
+
+  test('a method claims a door in its own voice only where a door exists', async () => {
+    const served = await refusals();
+    for (const [method, subject] of Object.entries(METHOD_SUBJECT)) {
       const message = served.get(method as keyof AffiliateBackend) as string;
-      expect(message, method).toMatch(/has a door and no adapter has been written for it yet/);
+      if (doorFor(subject.key, subject.op) === null) {
+        // No door. The message may QUOTE a retired sentence that claimed one,
+        // and may not make the claim itself.
+        expect(ownVoice(message), method).not.toMatch(DOOR_CLAIM);
+        continue;
+      }
+      // A door exists, so the message must not send a session to `packages/db`
+      // for a widening that is not owed. `issueLink` has a door and says so in
+      // its own words, which is why the positive claim is not asserted here and
+      // the case below carries it.
+      expect(ownVoice(message), method).not.toMatch(/WIDENING IN `packages\/db`/);
     }
+  });
+
+  test('the three methods that wait on an adapter alone say exactly that', async () => {
+    const served = await refusals();
+    // DERIVED AND NOT LISTED: the methods whose subject has a door AND whose
+    // message uses this module's standing sentence for it.
+    const adapterOnly = Object.entries(METHOD_SUBJECT)
+      .filter(([, s]) => doorFor(s.key, s.op) !== null)
+      .map(([method]) => method)
+      .filter((method) => method !== 'issueLink');
+    expect(adapterOnly.sort()).toStrictEqual(['affiliate', 'requiredDisclosure', 'statements']);
+    for (const method of adapterOnly)
+      expect(served.get(method as keyof AffiliateBackend) as string, method).toMatch(DOOR_CLAIM);
+  });
+
+  test('`submitCreative` names a write door and not a read, for as long as it has none', async () => {
+    const message = (await refusals()).get('submitCreative') as string;
+    const door = doorFor('affiliateCreatives', 'write');
+
+    if (door !== null) {
+      // Somebody widened a list. The refusal is then wrong the way it was wrong
+      // about `0078`, and this is the case that says so on the day it happens.
+      expect(ownVoice(message)).not.toMatch(/NOTHING IN THIS TREE/);
+      return;
+    }
+
+    expect(ownVoice(message)).toMatch(/WRITE DOOR rather than an adapter/);
+    expect(ownVoice(message)).toMatch(/WIDENING IN `packages\/db`/);
+    // Derived: the three write verbs really are closed against this table.
+    expect((ruleOf('affiliateCreatives') as Rule).class).toBe('derived');
+    expect(PARENTED_TABLE_KEYS).not.toContain('affiliateCreatives');
+    expect(SCOPED_DB).toMatch(/insert<K extends OwnedTableKey>/);
+  });
+
+  test('`requiredDisclosure` names the table it actually reads', async () => {
+    const message = (await refusals()).get('requiredDisclosure') as string;
+    const rule = ruleOf('tosVersions') as Rule;
+    expect(rule).not.toBeNull();
+    // The class the registry gives it, quoted by the message rather than assumed.
+    expect(ownVoice(message)).toContain(`\`tos_versions\` is scope class \`${rule.class}\``);
+    // And the door really is the firm one rather than the catalogue one, for as
+    // long as `CATALOG_TABLE_KEYS` does not carry it.
+    expect(doorFor('tosVersions', 'read')).toBe(
+      CATALOG_KEYS.includes('tosVersions') ? 'catalogRows' : 'FirmTx.rows',
+    );
+    if (!CATALOG_KEYS.includes('tosVersions'))
+      expect(ownVoice(message)).toMatch(/`CATALOG_TABLE_KEYS` is a CLOSED LIST/);
   });
 
   test('`issueLink` still waits on an adapter and a base URL rather than on DDL', async () => {

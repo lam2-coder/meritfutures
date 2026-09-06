@@ -501,10 +501,69 @@ function unwired(method: string, because: string): () => Promise<never> {
   return () => Promise.reject(new AffiliateBackendUnwired(method, because));
 }
 
-/** The scoped door is available for these. `affiliates` is registered `owned`. */
+/** The scoped door is available for this one. `affiliates` is registered `owned`. */
 const AFFILIATES_READABLE =
   '`affiliates` is scope class `owned` on `identity_id`, so this read has a door and no ' +
   'adapter has been written for it yet.';
+
+/**
+ * THIS METHOD WAS SERVED `AFFILIATES_READABLE` AND IT IS A WRITE. ADR-358.
+ *
+ * The retired sentence called this a READ, and it named `affiliates`, which is
+ * not the table this method writes. Both halves were wrong and the second is
+ * the one with a cost: a refusal is where a later session reads to find out
+ * what to build, and this one sent that session to write an adapter over a
+ * door that does not exist. It is quoted below rather than deleted, per
+ * `RI-14`, because a false sentence removed leaves nothing for the next reader
+ * to check.
+ *
+ * `RI-14` COULD NOT HAVE CAUGHT THIS AND THE SHAPE IS WHY. That check reads
+ * "no reason claims a named thing does not exist while the tree exports it"
+ * (ADR-214), which is a claim of ABSENCE against a present thing. This sentence
+ * claimed a door was PRESENT while the tree has none, which is the same defect
+ * inverted and outside every mechanical check in this repository until
+ * `affiliate-stats-obstructions.test.ts` derived the door per method.
+ */
+const CREATIVES_HAVE_NO_WRITE_DOOR =
+  'ONE obstruction, and it is a WRITE DOOR rather than an adapter. THE SENTENCE THIS ' +
+  'CONSTANT REPLACED IS KEPT BESIDE ITS CORRECTION PER `RI-14` AND IT READ: "`affiliates` ' +
+  'is scope class `owned` on `identity_id`, so this read has a door and no adapter has been ' +
+  'written for it yet." IT CALLED A WRITE A READ and it named a table this method does not ' +
+  'write. `affiliate_creatives` is scope class `derived` via `affiliates` on `affiliate_id`, ' +
+  'and NOTHING IN THIS DEPLOYABLE CAN INSERT ONE. `ScopedTx.insert` takes `OwnedTableKey` ' +
+  'and this table is not `owned`; `insertUnder` takes `ParentedTableKey`, which is ' +
+  "`Extract<DerivedTableKey, 'sessions'>`, A CLOSED LIST OF ONE; `insertAsParty` takes " +
+  '`PartyWritableTableKey`, which is a subset of `PairTableKey` and this table is `derived`; ' +
+  'and `FirmTx.insert` takes `FirmTableKey`. `ApiDb` exposes `scoped`, `firm`, `resolution`, ' +
+  '`establishment` and `publicLookup` AND NO SYSTEM HANDLE, so `SystemTx.insert` is not ' +
+  'reachable from a request path at all, and `SystemReason` never had a member a request ' +
+  'path could name. NOTHING IN THIS TREE WRITES `affiliate_creatives`. So this method waits ' +
+  'on A WIDENING IN `packages/db` AND THEN AN ADAPTER, in that order, which is the shape ' +
+  '`stats` waits in and NOT the position `affiliate`, `statements`, `requiredDisclosure` and ' +
+  '`issueLink` are in.';
+
+/**
+ * THE ANSWER WAS RIGHT AND THE REASON NAMED THE WRONG TABLE. ADR-358.
+ *
+ * This method was also served `AFFILIATES_READABLE`, and unlike `submitCreative`
+ * it really does have a door. It is a different door: what this method reads is
+ * a `tos_versions` row and never an `affiliates` one. The correction is kept
+ * beside the retired sentence per `RI-14`, because the wrong reason is
+ * followable and the right one is one table over.
+ */
+const DISCLOSURE_READABLE =
+  '`tos_versions` is scope class `firm`, so this read has a door and no adapter has been ' +
+  'written for it yet. THE SENTENCE THIS CONSTANT REPLACED NAMED THE WRONG TABLE AND IS KEPT ' +
+  'BESIDE ITS CORRECTION PER `RI-14`. IT READ: "`affiliates` is scope class `owned` on ' +
+  '`identity_id`, so this read has a door and no adapter has been written for it yet." THE ' +
+  'CONCLUSION WAS RIGHT AND THE REASON WAS NOT, and on this method the difference decides ' +
+  'which door an adapter opens: `firm` keys are excluded from `ScopedTableKey`, and ' +
+  '`CATALOG_TABLE_KEYS` is a CLOSED LIST that does not carry `tos_versions`, so an adapter ' +
+  "reading the disclosure INSIDE the caller's scoped transaction, which is where the retired " +
+  'sentence points, DOES NOT COMPILE. What serves it is `ApiDb.firm()` and `FirmTx.rowAt`, ' +
+  'which this deployable already opens on other routes. ADR-113 clause 2 is why a second ' +
+  'transaction costs nothing here: the disclosure is read AFTER the row is written and is ' +
+  'pinned to nothing, so it is not a value this endpoint prepares.';
 
 /**
  * THE HEADER'S FINDING 1, IN THE PLACE A CALLER WILL ACTUALLY MEET IT. IT WAS
@@ -594,8 +653,8 @@ export const UNWIRED_AFFILIATE_BACKEND: AffiliateBackend = {
   stats: unwired('stats', COMMISSIONS_UNREACHABLE),
   statements: unwired('statements', STATEMENTS_READABLE),
   issueLink: unwired('issueLink', LINK_HAS_NO_TABLE),
-  requiredDisclosure: unwired('requiredDisclosure', AFFILIATES_READABLE),
-  submitCreative: unwired('submitCreative', AFFILIATES_READABLE),
+  requiredDisclosure: unwired('requiredDisclosure', DISCLOSURE_READABLE),
+  submitCreative: unwired('submitCreative', CREATIVES_HAVE_NO_WRITE_DOOR),
 };
 
 /** Everything this module reaches the world through. All of it injected. */
