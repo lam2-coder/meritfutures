@@ -156,14 +156,25 @@
 // row its own line for, and the anomaly signal, which is the
 // `certificate_verifications` write below.
 //
-// OF THOSE THREE, ONE IS NOW ENFORCED AND ONE STILL DOES NOT EXIST, and the
-// sentence above states the SPECIFICATION rather than the deployment. ADR-235
-// built the mint the first leg names: `mintCertificateCode` in `@merit/db` at
-// 130 bits, measured by `RI-22` on every CI-01 pass. THE RATE LIMIT THIS ROW
-// HAS ITS OWN LINE FOR EXISTS NOWHERE IN THIS TREE, per IP or per `code`, and
-// ADR-235 section 5 rules it owed. Read the first leg as a property this
-// repository now holds and the second as one it does not. ADR-168 foreclosure 5 exists to stop
-// an implementer chasing the fourth one forever.
+// ALL THREE ARE NOW ENFORCED ON THIS ROW, and this paragraph is amended in
+// place rather than deleted because two sessions read it as a live gap. It said
+// "OF THOSE THREE, ONE IS NOW ENFORCED AND ONE STILL DOES NOT EXIST ... THE RATE
+// LIMIT THIS ROW HAS ITS OWN LINE FOR EXISTS NOWHERE IN THIS TREE, per IP or per
+// `code`, and ADR-235 section 5 rules it owed". ADR-235 built the mint the first
+// leg names: `mintCertificateCode` in `@merit/db` at 130 bits, measured by
+// `RI-22` on every CI-01 pass. ADR-347 built the second in BOTH dimensions
+// section 11 gives this row, per IP and per `code`, in
+// `src/certificate-rate-limit.ts` and consulted by `imageHandler` below before
+// any other work. The third, the `certificate_verifications` write, was always
+// real.
+//
+// WHAT IS STILL OWED ON THIS ROW IS NOT A DIMENSION, IT IS THE POPULATION THE
+// TABLE SEES. A refused request is not written, because `result`'s CHECK admits
+// four values and none of them is a refusal, so past the limit the anomaly
+// detector reads a rate capped at the limit rather than the true one. ADR-347
+// records the fifth member as owed with the migration it costs. ADR-168
+// foreclosure 5 exists to stop an implementer chasing the fourth control
+// forever.
 //
 // -----------------------------------------------------------------------------
 // EVERY FETCH IS RECORDED, AND A FETCH THAT CANNOT BE RECORDED DOES NOT HAPPEN
@@ -235,6 +246,13 @@
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import {
+  CertificateRateLimitUnconfigured,
+  CertificateRateLimitUnwired,
+  currentCertificateRateLimiter,
+  sendRateLimited,
+} from '../certificate-rate-limit.ts';
+import type { RateLimitDecision } from '../certificate-rate-limit.ts';
 import type { ApiDb } from '../db.ts';
 import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
@@ -1350,12 +1368,37 @@ function sendNotFound(request: FastifyRequest, reply: FastifyReply): FastifyRepl
 export const imageHandler: RouteHandler = async (request, reply) => {
   const params = request.params as { code?: unknown };
   const code = typeof params.code === 'string' ? params.code : '';
+  const ip = request.ip === '' ? null : request.ip;
+
+  // THE LIMIT IS DECIDED BEFORE ANY OTHER WORK, THE 404 INCLUDED, and on this
+  // row the placement is what prices the handler rather than merely reporting on
+  // it: this is a PNG ENCODE on an unauthenticated path, ADR-249 section 2.2
+  // accepted in writing that render-on-fetch is compute an attacker can drive,
+  // and ADR-256's approval block recorded that the acceptance "was cheap while
+  // the render did not exist". A limiter consulted after the lookup, the log or
+  // the render would have let all three happen first.
+  //
+  // BOTH DIMENSIONS SECTION 11 NAMES ARE ASKED, per IP and per `code`, because
+  // that row states in its own words that "an enumeration campaign and a single
+  // hot card look identical when only the IP is counted".
+  //
+  // AND NO CLOCK IS EQUALISED HERE, which is not a gap this adds. API_CONTRACT
+  // section 6.3 puts this row inside `INV-M11-05`'s rate-limit and
+  // non-enumerability clauses and OUTSIDE its constant-time one, and this file's
+  // header carries that ruling in full.
+  let admitted: RateLimitDecision;
+  try {
+    admitted = currentCertificateRateLimiter().check({ route: 'certificate_image', ip, code });
+  } catch (err) {
+    return unwiredOrThrow(err, request, reply);
+  }
+  if (!admitted.allowed) return sendRateLimited(request, reply, admitted, null);
+
   // An empty segment cannot reach here through the router, and it is refused
   // anyway rather than handed to a lookup as an empty predicate.
   if (code === '') return sendNotFound(request, reply);
 
   const source = imageSource;
-  const ip = request.ip === '' ? null : request.ip;
 
   let found: CertificateLookup | null;
   try {
@@ -1412,12 +1455,21 @@ export const imageHandler: RouteHandler = async (request, reply) => {
 
 /** An unwired port is a 503 and never a 500. Anything else is the transport's. */
 function unwiredOrThrow(err: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply {
-  // TWO CLASSES, ONE ANSWER, WHICH IS `routes/verify.ts`' SHAPE: it answers the
+  // FOUR CLASSES, ONE ANSWER, WHICH IS `routes/verify.ts`' SHAPE: it answers the
   // same 503 for `VerifySourceUnwired` and `VerifyPresentationError`, because a
   // port nobody installed and a port nobody configured are the same deployment
-  // fact seen twice. `CertificateImageError` is deliberately NOT here: those are
+  // fact seen twice. THE RATE LIMITER CONTRIBUTES THE SAME PAIR AGAIN and joins
+  // for the same reason rather than by analogy: ADR-226's rule is that an absent
+  // control refuses rather than passing, so a limit no deployment set is a 503
+  // for every code alike and never an unmetered render.
+  // `CertificateImageError` is deliberately NOT here: those are
   // defects and a defect is a 500.
-  if (!(err instanceof CertificateImageUnwired) && !(err instanceof CertificateImageUnconfigured))
+  if (
+    !(err instanceof CertificateImageUnwired) &&
+    !(err instanceof CertificateImageUnconfigured) &&
+    !(err instanceof CertificateRateLimitUnwired) &&
+    !(err instanceof CertificateRateLimitUnconfigured)
+  )
     throw err;
   request.log.error({ err }, 'certificate image source is not wired or not configured');
   return reply
