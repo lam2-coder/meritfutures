@@ -1346,7 +1346,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
     'class `owned` on `identity_id` (`packages/db/src/scope.ts:970`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1607-1609`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1614-1616`; it stood at sixteen hundred and seven through ' +
+    'sixteen hundred and nine when this entry was written, and that number is out of ' +
+    "citation grammar on purpose, ADR-212, because it now points inside `operatorSessions`' " +
+    'own reason and a grep would find a live line). THE CLAIM ITSELF IS UNCHANGED AND WAS ' +
+    'RE-MEASURED: the type is still every key whose class is `firm`. `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
     '(`packages/db/src/scope.ts:1119`), so the audit half alone has a door and the subject half ' +
