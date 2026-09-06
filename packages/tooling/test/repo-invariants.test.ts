@@ -1798,6 +1798,84 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     expect(findings('RI-15', root)).toEqual([]);
   });
 
+  test('RI-15 stays GREEN when ONE INSERTED LINE makes a nameless citation point somewhere else', () => {
+    // A GREEN RUN IS NOT EVIDENCE A CITATION SURVIVED, ASSERTED RATHER THAN
+    // WRITTEN IN A PARAGRAPH (ADR-386). Every dispatch since ADR-380 has told a
+    // row that this check going green proves nothing about a pointer its diff
+    // moved, and until now that was carried by prose in three headers.
+    //
+    // THE SEED IS THE PREVIOUS CASE'S, MOVED BY ONE LINE. `identityScope` is at
+    // 1527 and the reason cites `:1527` with no name beside it, so the pointer
+    // is RIGHT. Inserting one line above it puts the declaration at 1528 and
+    // leaves the pointer on a comment line, so the pointer is now WRONG. The
+    // check reports nothing in either direction, because a nameless citation is
+    // asked for resolution, range and vacancy alone and all three still hold.
+    const cited = (root: string, insert: number): void => {
+      write(
+        root,
+        'apps/api/src/routes/wallet-withdrawals.ts',
+        '//\n'.repeat(insert) + fileWithNameAt(1600, 1527, 'identityScope'),
+      );
+      write(
+        root,
+        REASON,
+        'const BLOCKED = {\n' +
+          "  useWithdrawalBackend: 'it serves the identity arm this route presents " +
+          "(`routes/wallet-withdrawals.ts:1527`).',\n" +
+          '};\n',
+      );
+    };
+    const right = cleanTree();
+    cited(right, 0);
+    expect(findings('RI-15', right)).toEqual([]);
+
+    const wrong = cleanTree();
+    cited(wrong, 1);
+    expect(findings('RI-15', wrong)).toEqual([]);
+  });
+
+  test('RI-15 catches a NAMED citation on the FIRST inserted line, and the leg that catches it is the ANCHOR', () => {
+    // THE CEILING ON WHAT AN INSERTION CAN COST, MEASURED AT ITS OWN BOUNDARY
+    // (ADR-386), AND IT IS NOT THE WINDOW. The case below this one walks
+    // `CITATION_WINDOW` with a HAND-MOVED pointer and finds its edge at three
+    // lines. An INSERTION is not that: it carries the declaration one line down
+    // while the pointer stays put, so the window is still satisfied at a drift
+    // of one, and the check fires anyway because the CITED LINE NO LONGER
+    // DECLARES THE NAME. The anchor is the whole of what bites here.
+    //
+    // WHY THIS PAIR IS WORTH A CASE. Together with the one above it, it is the
+    // whole mechanism behind the corpus number ADR-386 ruled on: a citation
+    // that binds a name is caught by the FIRST line inserted under it, and a
+    // citation that binds none is never caught at all. So what one moved line
+    // costs a runner is decided by the share of pointers carrying a bindable
+    // name, which is a property of how this corpus WRITES rather than of either
+    // check, and it is a minority in both scopes.
+    const seed = (insert: number): string => {
+      const root = cleanTree();
+      write(
+        root,
+        'apps/api/src/routes/wallet-withdrawals.ts',
+        '//\n'.repeat(insert) + fileWithNameAt(1400, 1254, 'gateNoInFlight'),
+      );
+      write(
+        root,
+        REASON,
+        'const BLOCKED = {\n' +
+          '  useWithdrawalBackend:\n' +
+          "    'so `gateNoInFlight` (`routes/wallet-withdrawals.ts:1254`) refuses it.',\n" +
+          '};\n',
+      );
+      return root;
+    };
+    expect(findings('RI-15', seed(0))).toEqual([]);
+    const one = findings('RI-15', seed(1)).join('\n');
+    expect(one).toContain('cites `routes/wallet-withdrawals.ts:1254` for `gateNoInFlight`');
+    // THE LEG IS NAMED IN THE ASSERTION rather than inferred from a red run:
+    // the window's finding says the name "is at ... lines away" and the
+    // anchor's says the cited line is not part of anything the sentence names.
+    expect(one).toContain('WITHOUT THE CITED LINE BEING PART OF ANYTHING THIS SENTENCE NAMES');
+  });
+
   test('RI-15 admits a pointer ON the declaration, refuses one two lines off it, and catches one three lines off', () => {
     // THE WINDOW AT ITS TWO BOUNDARIES, AND THE ANCHOR BETWEEN THEM. The widest
     // TRUE citation measured in this corpus is one line off and the narrowest

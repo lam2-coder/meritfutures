@@ -3005,6 +3005,16 @@ function anchoredIn(lines, c) {
  * table a bare pointer is usually a registry shorthand, and every one of the
  * fifteen findings inheritance adds there is the reader guessing.
  *
+ * WHAT THIS GRAMMAR COSTS THE PROSE AROUND IT IS RULED BY ADR-386 AND THE
+ * RULING IS NOT LINE-COUNT NEUTRALITY. Nine sessions held a diff to equal
+ * insertions and deletions so no pointer would drift, and three entries
+ * recorded a clause dropped to fit. That property is neither necessary nor
+ * sufficient. THE ONE THAT IS BOTH IS THAT NO CITED LINE MOVES, and where one
+ * must, every pointer in a live file is repaired and every pointer in a DATED
+ * RECORD is NAMED, because miss (4) makes that one an amendment and not a
+ * commit. Most of this corpus's citation edges are in that second position, so
+ * a moved line rarely costs a repair: it costs a pointer nobody may fix.
+ *
  * @param {string} text
  * @param {boolean} [inherit]
  * @returns {{at: number, target: string, href: string | null, start: number, end: number, cited: string, name: string | null, subjects: string[]}[]}
@@ -3221,9 +3231,9 @@ const ri15 = {
     'copies this check flagged, in a file the list did not name. The one ' +
     'exclusion is this package, whose citations are the grammar WORKED EXAMPLES ' +
     'and the suite SEEDS rather than claims about this tree, and it is measured: ' +
-    'all 78 findings inside it sit in the two files whose subject IS this ' +
-    'grammar and the other four carry none. It is 588 files and 207 citations ' +
-    'where it was 6 and 94. Plus the bare `:12` that continues a path cited within ' +
+    'the citations inside it concentrate in the two files whose subject IS ' +
+    'this grammar. The file, finding and citation counts that stood here are ' +
+    'RETIRED (ADR-386) and the input set is DERIVED, so none replaces them. Plus the bare `:12` that continues a path cited within ' +
     `${CITATION_INHERIT_LINES} lines above it, AND the comma list ` +
     '`x.ts:644,649`, which is read as ONE CITATION PER NUMBER and was read as ' +
     'NO CITATION AT ALL before ADR-212: the tail was anchored at the end of the ' +
@@ -3243,28 +3253,29 @@ const ri15 = {
     'DECLARES the name, or the ENCLOSING DECLARATION of the cited line is ' +
     `named among the backticked tokens within ${CITATION_SUBJECT_SPAN} ` +
     'characters before the citation. THE ANCHOR IS WHAT THE WINDOW COULD NOT ' +
-    'SUPPLY. In `scope.ts` the tokens `firm`, `owned` and `identity_id` sit on ' +
-    '107, 72 and 109 lines, so a window around any of the 41 `class: ' +
-    "'owned'" +
-    '` ' +
-    'lines is satisfied by coincidence; a registry entry key appears ONCE. THE ' +
+    'SUPPLY. In `scope.ts` the tokens `firm`, `owned` and `identity_id` EACH ' +
+    'SIT ON MORE THAN SEVENTY LINES, so a window around any registry row ' +
+    'carrying one is satisfied by coincidence; a registry entry key appears ' +
+    'ONCE. Four cardinals RETIRED here (ADR-386). THE ' +
     'WINDOW IS TUNED AGAINST THIS CORPUS: the widest TRUE ' +
     'citation measured is one line off and the narrowest FALSE one on record is ' +
     'three, so two catches every false citation on record and admits every true ' +
     'one -- and it is now known to be beside the point, because narrowing it ' +
     'from 2 to 0 moves NO SITE on this tree and catches NONE of the five. WHAT ' +
-    'WAS REFUSED, EACH COST DERIVED BY RUNNING IT: requiring the cited line ' +
-    'itself to DECLARE the name turns 26 of 52 named citations red and 18 of ' +
-    'those are honest; requiring the anchor of EVERY citation turns 116 of 225 ' +
+    'WAS REFUSED, EACH COST DERIVED BY RUNNING IT AGAINST A 225-CITATION ' +
+    'INPUT AND NOT RE-RUN SINCE (ADR-386): requiring the cited line itself to ' +
+    'DECLARE the name turned 26 of 52 named citations red and 18 of those ' +
+    'were honest; requiring the anchor of EVERY citation turned 116 of 225 ' +
     'red. WHAT IT DOES NOT CATCH. (1) A citation with no name beside it is ' +
     'checked for resolution and range only; of the four false citations of ' +
     '2026-08-28 this catches THREE and misses `wallet-withdrawals.ts:1506`, ' +
     'which sits behind the words "the identity arm this route presents" and ' +
-    'names nothing a runner can look up. 47 of the 207 citations this check ' +
-    'reads today carry a bindable name, 27 of them in `wiring.test.ts`. (1a) ' +
+    'names nothing a runner can look up. A MINORITY OF THIS INPUT CARRIES A ' +
+    'BINDABLE NAME AND MOST OF THAT MINORITY IS ONE FILE, `wiring.test.ts`; ' +
+    'the three cardinals that said so are RETIRED (ADR-386). (1a) ' +
     'THE IN-TOKEN NAME IS RI-16s HALF IN PRACTICE, because it is read only ' +
     'where a markdown LINK states the path and no source file here writes one. ' +
-    'A prefixed token INHERITS NO PATH AT ALL: all 154 in this input are a ' +
+    'A prefixed token INHERITS NO PATH AT ALL: every one in this input is a ' +
     'MIGRATION number, a PLAN and a section line, a document, or a clock ' +
     '(`0017:82`, `M07:111`, `EVENTS:407`, `+00:00`), and not one is a symbol ' +
     'in the file cited above it. (2) A ' +
@@ -3292,9 +3303,9 @@ const ri15 = {
     'first pair, because the nearest token is the only one this reader can ' +
     'attach without guessing the positions -- reading the comma list makes the ' +
     'later pointers RESOLVE and RANGE-CHECK, and does not give them their own ' +
-    'name. (9) The ANCHOR is asked only where a name binds, which is 52 of the ' +
-    '225 citations here; the other 173 are checked for resolution, range and ' +
-    'vacancy alone. (10) The vacant-line rule fires only when EVERY file a ' +
+    'name. (9) The ANCHOR is asked only where a name binds, a MINORITY of ' +
+    'this input; every other citation is checked for resolution, range and ' +
+    'vacancy alone. Both cardinals RETIRED (ADR-386). (10) The vacant-line rule fires only when EVERY file a ' +
     'suffix path could name is vacant there, on `nearestName`s rule that a ' +
     'suffix path is answered by all of them, so ' +
     '`provisioning/payload.ts:217` citing `ports.ts:98` -- blank in the one it ' +
@@ -3304,27 +3315,26 @@ const ri15 = {
     'so a pointer PAST THE END of the file it MEANS is answered by any ' +
     'same-named file that happens to be longer. It is the one leg that needs ' +
     'NO NAME, which is why ADR-377 seeded this check with it twice, and it is ' +
-    'off for every ambiguous path: 13 citations here name more than one file, ' +
-    'and every citation in this input whose line number is guarded by NOTHING ' +
-    'AT ALL is one of them. ' +
+    'off for every ambiguous path, and every citation in this input whose ' +
+    'line number is guarded by NOTHING AT ALL names more than one file. The ' +
+    'count RETIRED (ADR-386). ' +
     '(12) A NEGATED CLAIM WHOSE NEGATION IS CLOSED BY A COLON BEFORE THE NAME ' +
     'IS BOUND rather than skipped, which is the price of the character miss ' +
     '(2) names. "no such column: `identity_id` (`schema.ts:20`)" would be read ' +
     'as a claim ABOUT `identity_id`. No site in this tree is written that way, ' +
     'derived over all 13 citations the character newly binds. ' +
-    'WHAT THIS CHECK COVERS, MEASURED RATHER THAN DESCRIBED (ADR-380). Over ' +
-    'the 359 single-line citations here whose path resolves, the share of ' +
-    'WRONG in-file line numbers this check would report is 44.2 percent on ' +
-    'average: 24 are fully guarded, 8 are guarded by nothing, and the rest are ' +
-    'caught only where the wrong line happens to be blank. THE SCOPE CARDINALS ' +
-    'ABOVE ARE RETIRED AND NAMED RATHER THAN REPRODUCED, under RI-14: the ' +
-    '588-file and 207-citation figures were true when the input set was ' +
-    'derived. ADR-380 corrected them to 753 files and 390 citations of which ' +
-    '129 carried a name, and THAT CORRECTION WAS STALE ONE ROW LATER: this ' +
-    'tree gives 753, 389 and 130, derived at ADR-383. Both figures are named ' +
-    'with the ref they were derived at, because a cardinal in a `covers` line ' +
-    'has now drifted twice in two rows and ADR-383 section 7 rules that they ' +
-    'should not be here at all. FOUR HOLES ARE ASSERTED IN THE SUITE rather than ' +
+    'WHAT THIS CHECK COVERS, MEASURED RATHER THAN DESCRIBED (ADR-380, whose ' +
+    'input was 359 resolving single-line citations). The share of WRONG ' +
+    'in-file line numbers it would report was 44.2 percent on average there: ' +
+    'a quarter fully guarded, a handful guarded by nothing, the rest caught ' +
+    'only where the wrong line happens to be blank. NO LIVE COUNT OF THIS ' +
+    'TREE IS WRITTEN IN THIS STRING ANY MORE (ADR-386). ADR-380 corrected the ' +
+    'scope cardinals, ADR-383 found that correction stale ONE ROW LATER and ' +
+    'ruled they should not be here, and ADR-386 derived every remaining one ' +
+    'and found ALL OF THEM stale. A cardinal that counts a walk over this ' +
+    'tree is now either DELETED or DATED TO THE REF IT WAS DERIVED AT, and ' +
+    'the two are the same repair: both turn a live claim into a record. ' +
+    'FOUR HOLES ARE ASSERTED IN THE SUITE rather than ' +
     'only described here, because a hole carried by a paragraph goes stale the ' +
     'way those cardinals did: the glue (ADR-357), this package (ADR-377), miss ' +
     '(11), and the negation lookback -- which is ADR-377 section 6s property ' +
@@ -3748,14 +3758,16 @@ const ri16 = {
     'lines of it, matched case-insensitively as a substring. THREE EXCLUSIONS, ' +
     'ALL BY SHAPE, ALL MEASURED on this branch on 2026-08-28. (1) A citation ' +
     'under a level-1 or level-2 heading naming a DATE or a SESSION is out of ' +
-    'scope: 2,387 of the 3,055 path-bearing citations, and the rule is ' +
-    "CI-06/derivable-counts' rather than this check's -- such an entry is a " +
+    'scope, and it is FIVE SIXTHS of the path-bearing citations under docs/ ' +
+    '(both cardinals RETIRED, ADR-386, which re-derived the ratio). The rule ' +
+    "is CI-06/derivable-counts' rather than this check's: such an entry is a " +
     'record of a measurement made that day, and repairing it would rewrite the ' +
     'record to say something it did not say. It reaches INSIDE `docs/STATE.md`, ' +
     'a LIVE document that accumulates dated sections and that no directory rule ' +
     'could split. (2) A fenced block or a generated span, masked with CI-06s ' +
     'own two expressions. (3) A bare `:12` with NO path of its own and no link ' +
-    'beside it: 1,414 citations. RI-15 lets such a pointer inherit the nearest ' +
+    'beside it, more than a thousand of them (count RETIRED, ADR-386). RI-15 ' +
+    'lets such a pointer inherit the nearest ' +
     'path within 6 lines and names that as its miss (6); in THIS corpus ' +
     'inheritance adds 15 findings inside this scope and ALL FIFTEEN are the ' +
     'check guessing, because a bare pointer here is usually a REGISTRY ID: ' +
@@ -3764,15 +3776,14 @@ const ri16 = {
     'a prefix that is a PATH names the file, a prefix the target basename ' +
     'BEGINS WITH names the file by this corpus nickname for it ' +
     '(``[`EVENTS:396`](../architecture/EVENTS.md)``), and a prefixed token ' +
-    'whose path was INHERITED rather than stated is a registry shorthand in 41 ' +
-    'of the 166 cases here and in 154 of 154 in RI-15s input. None of the three ' +
-    'binds. WHAT IT DOES NOT CATCH. (1) The name half is STILL THIN and the ' +
-    'number says so, and the figure it said it with is RETIRED AND NAMED ' +
-    'rather than reproduced, under RI-14: it read 19 of 668, and this tree ' +
-    'gives 73 of 1,374 in scope, derived at ADR-383, against 69 of the 110 in ' +
-    '`wiring.test.ts` alone, because markdown writes a citation ' +
-    'alone in a table cell as readily as inside a link. The other 649 ' +
-    'are checked for RESOLUTION AND RANGE only, which is the half that found ' +
+    'whose path was INHERITED rather than stated is a registry shorthand in a ' +
+    'MINORITY of the cases here and in EVERY ONE of RI-15s input (counts ' +
+    'RETIRED, ADR-386). None of the three ' +
+    'binds. WHAT IT DOES NOT CATCH. (1) The name half is STILL THIN. It read ' +
+    '19 of 668 (RETIRED under RI-14), then 73 of 1,374 derived at ADR-383 -- ' +
+    'and the COMPLEMENT of the OLD figure was left standing beside the NEW ' +
+    "one, which is ADR-386's class arriving inside the repair for it. THE " +
+    'REST ARE CHECKED FOR RESOLUTION AND RANGE ONLY, the half that found ' +
     '`DECISIONS.md:483`. (2) A name written AFTER the pointer, in a SECOND ' +
     'backticked token, is not read; the in-token half reads the name inside the ' +
     'pointer and not one beside it. (3) A registry ' +
@@ -3782,14 +3793,14 @@ const ri16 = {
     'range, since this reads the same grammar. (5) It never reads git history, ' +
     'so it cannot say whether a citation drifted or was false the day it was ' +
     'written. (6) NEITHER RI-15s VACANCY LEG NOR ITS ANCHOR RUNS HERE, and ' +
-    'ADR-380 measured the coverage that leaves: of the 1,259 single-line ' +
-    'citations in scope whose path resolves, 1,189 -- 94.4 percent -- are ' +
-    'checked by NOTHING about WHICH line they name, so any wrong in-file ' +
-    'line number passes and what is asserted is that the file exists and is ' +
-    'long enough. Adding the vacancy leg raises 101 findings on this tree, ' +
-    '87 of them in `approved` documents, and the anchor 15 more; the ' +
-    'smaller figure this check carried for that is RETIRED and named rather ' +
-    'than reproduced, under RI-14. ' +
+    'ADR-380 measured the coverage that leaves, against the 1,259 resolving ' +
+    'single-line citations IT walked: 94.4 percent were checked by NOTHING ' +
+    'about WHICH line they name, so any wrong in-file line number passes and ' +
+    'what is asserted is that the file exists and is long enough. Adding the ' +
+    'vacancy leg raised 101 findings there, 87 of them in `approved` ' +
+    'documents, and the anchor 15 more; the smaller figure this check carried ' +
+    'for that is RETIRED under RI-14. EVERY COUNT IN THIS SENTENCE IS DATED ' +
+    'TO ADR-380 AND NONE WAS RE-RUN HERE (ADR-386). ' +
     `${DOC_CITATIONS_OWNED_ELSEWHERE.length} citation(s) are ` +
     'REGISTERED in DOC_CITATIONS_OWNED_ELSEWHERE, each one a repair this gate ' +
     'is waiting for and none of them repairable here: four sit in documents ' +
@@ -7393,7 +7404,9 @@ const ri30 = {
     'SOURCE IMPORTS IT (ADR-279). Seven files declared their own and six were ' +
     'the two-replacement idiom, whose block pass runs first and cannot tell a ' +
     'block-comment OPENER written inside a LINE comment from a real one: on ' +
-    '`apps/worker/src/index.ts` it strips 55,728 characters to 2,753 and a ' +
+    '`apps/worker/src/index.ts` it stripped 55,728 characters to 2,753 WHEN ' +
+    'ADR-279 MEASURED IT, a live count of a file that is HALF AS LONG AGAIN ' +
+    '(ADR-386), and a ' +
     '`new Date().getHours()` seeded inside the phantom span was invisible to ' +
     '`RI-28`, which reported PASS. LEG 1 IS THE NAME: no file but the home ' +
     'declares a `strip*Comment*` binding. LEG 2 IS THE IDIOM AND IS ' +
