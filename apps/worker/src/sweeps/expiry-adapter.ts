@@ -50,11 +50,11 @@
 // the JOB'S ABSENCE rather than on its outcome, reports a job that is present.
 // **THAT IS `ADR-239`'s DEFECT WITH A CLOCK IN FRONT OF IT**: a process that
 // looks healthy to a supervisor because it exits having done nothing. So the
-// missing capability is a PARAMETER, the wiring row cannot compile without
-// supplying one, and there is nothing in this repository it could supply.
+// missing capability is a PARAMETER and the wiring row must name one. **THE
+// CLAUSE THAT CLOSED HERE IS RETIRED, NAMED NOT QUOTED (`RI-14`, ADR-385).**
 //
 // -----------------------------------------------------------------------------
-// WHY THERE IS NOTHING TO SUPPLY, MEASURED RATHER THAN ASSERTED
+// WHY THERE IS NO PRODUCER TO SUPPLY ONE, MEASURED RATHER THAN ASSERTED
 // -----------------------------------------------------------------------------
 // `apps/api/src/events.ts` holds `EVENT_CATALOGUE`, `buildEvent`,
 // `makeEventSink` and `TRANSACTION_EVENT_WRITER`, and it is the ONLY event
@@ -173,21 +173,21 @@ export const EXPIRY_TERMS: ExpiryTerms = { atMost, isNull };
 /**
  * The sweep's whole outside world, over this deployable's doors.
  *
- * **`events` HAS NO DEFAULT AND NOTHING IN THIS REPOSITORY CAN BE PASSED FOR
- * IT.** That is the header's ruling in the type system: a wiring row that means
- * to schedule this job cannot construct its `io` without naming a sink, and
- * there is no sink to name, so the blocker stops being a sentence in
- * `schedule.ts` and becomes a call that does not compile. `declareProvisioningQueue`
- * takes its door as an argument with no default for the same reason (ADR-338).
+ * **`events` HAS NO DEFAULT, THE BAR ON GIVING IT ONE STANDS (ADR-382), AND
+ * THE CLAUSE THAT STOOD HERE GAVE THE WRONG GROUND FOR IT.** Retired and NAMED
+ * rather than reproduced under `RI-14`, ruled on by ADR-385: it denied this
+ * repository any value that could be passed, and drew a blocker which could not
+ * be typed. `sweeps/ports.ts:366` composes a refusing `ExpiryEventPort` inline,
+ * so the one-line default COMPILES and what bars it is the arity pin rather
+ * than the type system. `declareProvisioningQueue` is ADR-338's parallel.
  *
  * `now` IS DEFAULTED AND `events` IS NOT, AND THE ASYMMETRY IS THE POINT. A
- * process clock is a thing this deployable has; an event sink is a thing it does
- * not. `job.ts` already spends `() => new Date()` at the wiring for the nightly
- * fold, and ADR-157's bound is the sweep's own instant, so a fixture pins it by
- * passing its own.
+ * process clock is a thing this deployable has; a PRODUCER is a thing it does
+ * not. `job.ts` spends `() => new Date()`; ADR-157 bounds the sweep's own
+ * instant, so a fixture pins it by passing one.
  *
  * @param db the door, so a suite substitutes a recorder and needs no `DATABASE_URL`
- * @param events the sink, which this deployable cannot supply and the caller must
+ * @param events the sink this deployable has no PRODUCER for, named by the caller
  * @param now the sweep's one instant, defaulted to the process clock
  */
 export function expirySweepIo(
