@@ -175,6 +175,13 @@ import { createHash } from 'node:crypto';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import {
+  CertificateRateLimitUnconfigured,
+  CertificateRateLimitUnwired,
+  currentCertificateRateLimiter,
+  sendRateLimited,
+} from '../certificate-rate-limit.ts';
+import type { RateLimitDecision } from '../certificate-rate-limit.ts';
 import type { ApiDb } from '../db.ts';
 import { defineRoutes } from '../registry.ts';
 import type { RouteHandler } from '../registry.ts';
@@ -1005,7 +1012,30 @@ export const verifyHandler: RouteHandler = async (
   const startedNs = process.hrtime.bigint();
   const wired = source;
 
-  // FIRST, AND BEFORE ANY CODE IS LOOKED AT. See this file's header: a copy
+  const ip = request.ip === '' ? null : request.ip;
+
+  // THE LIMIT IS DECIDED BEFORE ANY OTHER WORK AND THAT PLACEMENT IS THE WHOLE
+  // OF WHAT MAKES IT A BOUND. `INV-M11-05` requires this endpoint to be rate
+  // limited and `AS-M11-04` counter 3 is what makes an enumeration attempt
+  // VISIBLE where counter 1 makes it fail; a limiter consulted after the copy
+  // table, the lookup or the log would be a report about work already done.
+  //
+  // AND IT DISCLOSES NOTHING, WHICH IS WHY IT MAY SIT AHEAD OF THE FLOOR. This
+  // row's limit is per IP and per ASN and DELIBERATELY NOT per `code`
+  // (API_CONTRACT section 11), so the decision below reads the address and never
+  // the token: a `429` is identical for a code that resolves and one that names
+  // no row, and it holds no information about Merit's book to hold to a floor.
+  // ADR-170 section 4.2's floor governs the paths that DO read a code and none
+  // of them is reached from here.
+  let admitted: RateLimitDecision;
+  try {
+    admitted = currentCertificateRateLimiter().check({ route: 'verify', ip, code: null });
+  } catch (err) {
+    return refuseOrThrow(err, request, reply, null);
+  }
+  if (!admitted.allowed) return sendRateLimited(request, reply, admitted, VERIFY_CACHE_CONTROL);
+
+  // SECOND, AND BEFORE ANY CODE IS LOOKED AT. See this file's header: a copy
   // table validated lazily makes a configuration error into an oracle. This is
   // also the one refusal that is NOT held to the floor, because it is the same
   // refusal for every code and holds no information about any of them.
@@ -1022,8 +1052,6 @@ export const verifyHandler: RouteHandler = async (
   // any other token that names no row, at the same floor, so the shortcut
   // discloses nothing: the floor is what is observable and it does not move.
   const code = typeof params.code === 'string' ? params.code : '';
-
-  const ip = request.ip === '' ? null : request.ip;
 
   try {
     const row = code === '' ? null : await wired.lookup(code);
@@ -1056,6 +1084,13 @@ export const verifyHandler: RouteHandler = async (
  * it is read before the lookup. A `VerifyRowError` is NOT in this set: that is a
  * row the source handed over that cannot be published, which is a real defect
  * and answers 500 through the transport.
+ *
+ * THE RATE LIMITER'S TWO CLASSES JOIN THE SET FOR THE IDENTICAL REASON AND NOT
+ * BY ANALOGY. `CertificateRateLimitUnwired` is a port nobody installed and
+ * `CertificateRateLimitUnconfigured` is one nobody configured, which is the same
+ * pair this function already answers one line up, and ADR-226's rule is that an
+ * absent control refuses rather than passing. Both are decided before the lookup
+ * and are identical for every code, so neither takes the floor either.
  */
 async function refuseOrThrow(
   err: unknown,
@@ -1063,7 +1098,13 @@ async function refuseOrThrow(
   reply: FastifyReply,
   floor: { readonly startedNs: bigint; readonly floorMs: number } | null,
 ): Promise<FastifyReply> {
-  if (!(err instanceof VerifySourceUnwired) && !(err instanceof VerifyPresentationError)) throw err;
+  if (
+    !(err instanceof VerifySourceUnwired) &&
+    !(err instanceof VerifyPresentationError) &&
+    !(err instanceof CertificateRateLimitUnwired) &&
+    !(err instanceof CertificateRateLimitUnconfigured)
+  )
+    throw err;
   request.log.error({ err }, 'verify source is not wired or is not configured');
   // HELD TO THE FLOOR WHEN THERE IS ONE, so the refusal is not a faster path
   // than an answer. There is no floor before the presentation is read, and that

@@ -46,7 +46,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, test } from 'vitest';
 
-import { CHECKS, REPO_ROOT } from '../../tooling/checks/repo-invariants.mjs';
+import {
+  CHECKS,
+  LANDING_RECORD_BACKLOG,
+  REPO_ROOT,
+} from '../../tooling/checks/repo-invariants.mjs';
 
 const MIGRATIONS = 'packages/db/migrations';
 const MANIFEST = 'packages/db/DELTA_MANIFEST.md';
@@ -188,29 +192,48 @@ function withSections(body: string, sections: readonly (readonly [number, string
  * goes red beside the register row, which is the friction a shrink-only
  * register is supposed to create.
  *
- * IT WAS TWENTY AND ADR-335 TOOK SIX OUT. `0052` to `0057` now hold
- * DELTA_MANIFEST sections 40 to 45 and their register rows came out in the same
- * commit, which is leg 3 doing the job it was written for. NINE OF THE FOURTEEN
- * BELOW OPEN WITH AN `E2 READ: MONEY PATH` HEADER, counted off the files rather
- * than off a register row: all but `0039`, `0040`, `0041`, `0043` and `0073`.
+ * IT IS EMPTY, AND THE FRICTION ABOVE IS WHAT EMPTIED IT. It was TWENTY under
+ * ADR-334. ADR-335 took `0052` to `0057` out into DELTA_MANIFEST sections 40 to
+ * 45; ADR-336 took `0068`, `0070` and `0072` out into 46 to 48; ADR-351 took
+ * the remaining eleven out into 49 to 59, six of them money path by their own
+ * headers. Each shrink was a section written and a row deleted in one commit.
+ *
+ * THE LIST STAYS RATHER THAN THE CASE BEING DELETED, and the assertion INVERTS
+ * rather than disappearing. An empty register means leg 1 is unconditional, so
+ * what the case below now watches is that a manifest recording every migration
+ * produces NO leg-3 finding and that the register the check holds is genuinely
+ * empty -- which is the same claim the twenty-entry version made, read from the
+ * other end. THE DAY SOMEBODY ADDS A ROW TO THE REGISTER THIS CASE GOES RED,
+ * which is the friction a shrink-only register needs in the direction it can
+ * now only be pushed.
+ *
  * ADR-334 recorded sixteen of the original twenty as money path and the true
  * figure is fifteen; `0073_operator_directory.sql:4` opens `NOT THE MONEY PATH
  * BY FILE`, and ADR-334's own register row for it carries no marker, so the two
  * halves of that diff disagreed and the machine-readable half was right.
  */
-const MIGRATION_NUMBERS_WITH_NO_SECTION = [
-  '0037',
-  '0039',
-  '0040',
-  '0041',
-  '0043',
-  '0044',
-  '0050',
-  '0059',
-  '0063',
-  '0073',
-  '0074',
-] as const;
+const MIGRATION_NUMBERS_WITH_NO_SECTION = [] as const;
+
+/**
+ * Seed one register entry, run `body`, and take it out again.
+ *
+ * LEG 3's CASES USED A LIVE ENTRY (`0073`) AND THERE IS NO LONGER ONE. With the
+ * register empty, leg 3 is reachable only by putting something in it, and the
+ * alternative was deleting the two cases that assert it -- coverage lost to a
+ * repair. The Map is restored in a `finally` so a failing expectation cannot
+ * leave the register dirty for the next case in the file.
+ */
+const withRegisterEntry = <T>(number: string, why: string, body: () => T): T => {
+  if (LANDING_RECORD_BACKLOG.has(number)) {
+    throw new Error(`the register already holds \`${number}\`, so this seed asserts nothing`);
+  }
+  LANDING_RECORD_BACKLOG.set(number, why);
+  try {
+    return body();
+  } finally {
+    LANDING_RECORD_BACKLOG.delete(number);
+  }
+};
 
 /** The body of the smallest manifest the check accepts, without section 16. */
 const MINIMAL_BODY = [
@@ -271,32 +294,62 @@ describe('RI-37 holds on this repository', () => {
   // each. That count is the register's size, and it is only reachable if every
   // one of those numbers was genuinely unrecorded a moment ago.
   //
-  // THE LITERAL MOVED FROM 20 TO 14 TO 11 AND THAT IS THE ASSERTION, NOT THE
-  // MAINTENANCE. A register that only shrinks is a register whose size is a
+  // THE LITERAL MOVED FROM 20 TO 14 TO 11 TO 0 AND THAT IS THE ASSERTION, NOT
+  // THE MAINTENANCE. A register that only shrinks is a register whose size is a
   // claim, so the number is written twice here on purpose: once as the list's
   // own length and once as a literal a session cannot change by editing the
-  // list. ADR-335 wrote six sections and deleted six rows in one commit, and
-  // ADR-336 wrote three and deleted three in one commit.
-  test('the backlog register holds eleven migrations the manifest does not record', () => {
-    const found = findings(
-      estate(
-        withSections(
-          liveManifest(),
-          MIGRATION_NUMBERS_WITH_NO_SECTION.map(
-            (number) =>
-              [
-                Number(`9${number}`),
-                `\`${number}\` lands, seeded by this case (2026-09-05)`,
-              ] as const,
-          ),
+  // list. ADR-335 wrote six sections and deleted six rows in one commit,
+  // ADR-336 wrote three and deleted three, and ADR-351 wrote eleven and deleted
+  // eleven, which took it to zero.
+  //
+  // THE CASE INVERTED WHEN THE REGISTER EMPTIED AND IT DID NOT WEAKEN. It used
+  // to seed a section for every registered number and count one leg-3 finding
+  // each, which was only reachable if every one of them was genuinely
+  // unrecorded a moment before. With nothing registered there is nothing to
+  // seed, so what it asserts instead is that the register the check actually
+  // holds is EMPTY and that the live tree therefore produces no leg-3 finding
+  // at all. Both halves are written, because `toHaveLength(0)` on a derived
+  // list is also what a dead reader returns: the second expectation reads the
+  // register itself.
+  test('the backlog register is empty, so every migration is recorded unconditionally', () => {
+    expect([...LANDING_RECORD_BACKLOG.keys()]).toEqual([]);
+    expect(MIGRATION_NUMBERS_WITH_NO_SECTION).toHaveLength(0);
+    expect(findings(REPO_ROOT).join('\n')).not.toContain('backlog register holds');
+    expect(findings(REPO_ROOT)).toEqual([]);
+  });
+
+  // AND THE DISCRIMINATOR, because "no leg-3 finding" is what a dead leg
+  // returns too. Put ONE entry back over a migration the manifest records and
+  // leg 3 reports it, which proves the leg is alive over an empty register
+  // rather than merely quiet.
+  test('leg 3 is alive over the empty register, watched by seeding one entry', () => {
+    const found = withRegisterEntry('0074', 'seeded by this case', () => findings(REPO_ROOT));
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('backlog register holds `0074`');
+    expect(found[0]).toContain('The register may only shrink');
+    expect([...LANDING_RECORD_BACKLOG.keys()]).toEqual([]);
+  });
+
+  // AND THE FINDING NAMES EVERY SITE RATHER THAN THE FIRST. `sites.join('; ')`
+  // is the half of leg 3 a single-section fixture cannot reach, and it is the
+  // half that matters to a session trying to find what to delete: a register
+  // row standing behind TWO records should say so. Seeded with a second
+  // section for `0074`, whose real one is 59.
+  test('leg 3 names every landing record the number now has, not just one', () => {
+    const found = withRegisterEntry('0074', 'seeded by this case', () =>
+      findings(
+        estate(
+          withSections(liveManifest(), [
+            [998, '`0074` lands again, seeded by this case (2026-09-05)'],
+          ]),
         ),
       ),
     );
-    expect(found).toHaveLength(MIGRATION_NUMBERS_WITH_NO_SECTION.length);
-    expect(found).toHaveLength(11);
-    for (const number of MIGRATION_NUMBERS_WITH_NO_SECTION) {
-      expect(found.join('\n')).toContain(`backlog register holds \`${number}\``);
-    }
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('backlog register holds `0074`');
+    expect(found[0]).toContain('; ');
+    expect(found[0]).toContain('lands again, seeded by this case');
+    expect(found[0]).toContain('lands, the register that opened at twenty reaches zero');
   });
 });
 
@@ -485,15 +538,17 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
     expect(found.join('\n')).toContain('carries no such file');
   });
 
-  // LEG 3, THE DIRECTION THAT MAKES THE REGISTER SHRINK-ONLY. `0073` is on the
-  // backlog today. Give it a section and the register entry becomes furniture,
-  // which is a finding on the commit that writes the section rather than an
-  // exemption left standing behind a repair.
+  // LEG 3, THE DIRECTION THAT MAKES THE REGISTER SHRINK-ONLY. `0073` was on the
+  // backlog until ADR-351 wrote its section, so the entry is SEEDED here rather
+  // than borrowed from the live register, which now holds nothing. Give a
+  // registered migration a section and the entry becomes furniture, which is a
+  // finding on the commit that writes the section rather than an exemption left
+  // standing behind a repair.
   test('a backlog entry whose gap has been closed is itself a finding', () => {
-    const found = findings(
-      estate(
-        withSections(liveManifest(), [[99, '`0073` lands, seeded by this case (2026-09-05)']]),
-      ),
+    const found = withRegisterEntry(
+      '0073',
+      '0073_operator_directory.sql, seeded by this case',
+      () => findings(estate(liveManifest())),
     );
     expect(found).toHaveLength(1);
     expect(found[0]).toContain('backlog register holds `0073`');
@@ -508,7 +563,12 @@ describe('RI-37 reads the manifest the way the manifest is written', () => {
   // entry on any tree carrying a smaller set. Constitution E2 makes a merged
   // migration permanent, so the state it would guard is already forbidden.
   test('a register entry naming a migration this tree does not carry is inert', () => {
-    expect(findings(estate(liveManifest(), ['0073_operator_directory.sql']))).toEqual([]);
+    const found = withRegisterEntry(
+      '0073',
+      '0073_operator_directory.sql, seeded by this case',
+      () => findings(estate(withoutSection(liveManifest(), '58'), ['0073_operator_directory.sql'])),
+    );
+    expect(found).toEqual([]);
   });
 
   // AND THE COMPENSATING HALF, EXECUTED RATHER THAN CLAIMED. A row that types
@@ -742,11 +802,15 @@ describe('RI-37 leg 4 excludes a lettered heading by the table`s own rule', () =
   // same on a green run. The same seed with a NUMBER instead of a letter is a
   // finding, so the exemption is about the letter.
   test('the same section with a NUMBER instead of a letter IS a finding', () => {
+    // THE NUMBER IS `999` AND IT USED TO BE `49`. ADR-351 claimed 49 to 59 for
+    // the eleven landing records it wrote, so a seed inside the live range is a
+    // number the table now legitimately holds and the case stopped asserting
+    // what it names. `999` is outside any range this file will plausibly reach.
     const found = findings(
-      estate(`${liveManifest()}\n## 49. A numbered section, seeded by this case (2026-09-05)\n`),
+      estate(`${liveManifest()}\n## 999. A numbered section, seeded by this case (2026-09-05)\n`),
     );
     expect(found).toHaveLength(1);
-    expect(found[0]).toContain('heads section `49`');
+    expect(found[0]).toContain('heads section `999`');
   });
 });
 
