@@ -918,6 +918,57 @@ export const ABSENCE_ARTIFACTS = [
       return 'absent';
     },
   },
+  {
+    key: 'digest-transport',
+    names:
+      'a VALUE of type `DigestTransport` under any `src/`, past the module that declares it. ' +
+      'ADR-354. `apps/worker/src/digests/produce.ts` renders a digest and hands it to ' +
+      '`io.transport.send`, and no channel adapter exists in this workspace for either of the ' +
+      'two channels `0040` admits, so `UNWIRED_DIGEST_IO` and `postgresDigestIo` both refuse ' +
+      'that member and no deployment can deliver a digest at all',
+    needles: [],
+    sweptBy:
+      'nothing, on `event-sink-caller`s reason. The type name reaches four lines in the shipped ' +
+      'scope with comments stripped: the interface declaration and the `DigestIo` member ' +
+      'declaration, both in the module this probe already excludes, and two type-only re-export ' +
+      'entries in `apps/worker/src/index.ts` that assert nothing about this tree. A needle on ' +
+      'the name would sweep the declaration this register already binds and two barrel lines ' +
+      'about no artifact, which is the noise-registering shape ADR-328 forbids',
+    probe: (root) => {
+      const files = shippedSources(root);
+      if (files.length === 0) {
+        throw new Error(
+          'RI-35 found no source file under any `apps/*/src` or `packages/*/src`, so the ' +
+            'digest transport probe measured nothing',
+        );
+      }
+      // THE SHAPE AND NEVER THE WORD, and the shape is a VALUE POSITION. The
+      // claim is not that the name is unmentioned, it is that nothing in this
+      // workspace INHABITS the type: the producer would call any inhabitant the
+      // wiring handed it. So the probe reads a type ANNOTATION or a `satisfies`
+      // clause, which is how every other port inhabitant in this deployable is
+      // written (`UNWIRED_DIGEST_IO: DigestIo`, `postgresReconSweepIo(...):
+      // ReconSweepIo`), and it reads them with comments STRIPPED so that
+      // `adapter.ts`s header, which names the type in order to say this
+      // workspace has no inhabitant of it, cannot make its own claim false.
+      //
+      // THE DECLARING MODULE IS EXCLUDED AND NOTHING ELSE IS. `digests/ports.ts`
+      // declares the interface AND declares `transport: DigestTransport` as a
+      // member of `DigestIo`, and that second line is a `: DigestTransport` in a
+      // TYPE position rather than a value: a probe over the whole tree would
+      // report the port declaring itself inhabited. Measured on the commit that
+      // added this artifact: `absent`, with both of those lines present.
+      const declaring = 'apps/worker/src/digests/ports.ts';
+      for (const rel of files) {
+        if (rel === declaring) continue;
+        const inhabited = stripComments(readFileSync(join(root, rel), 'utf8'))
+          .split('\n')
+          .some((line) => /:\s*DigestTransport\b|satisfies\s+DigestTransport\b/.test(line));
+        if (inhabited) return 'present';
+      }
+      return 'absent';
+    },
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -1229,6 +1280,26 @@ export const ABSENCE_CLAIMS = [
     why:
       'the route names the three catalogue rows it owes and refuses to invent a sink for ' +
       'them, which is the correct refusal and is bound here rather than trusted',
+  },
+  {
+    site: 'apps/worker/src/digests/adapter.ts',
+    claim: 'HAS NO INHABITANT ANYWHERE IN THIS WORKSPACE',
+    disposition: 'live',
+    artifact: 'digest-transport',
+    why:
+      'the adapter serves four of `DigestIo`s six and this is the sentence carrying the first ' +
+      'of the two it refuses, so the day a channel adapter lands the file that says it cannot ' +
+      'be delivered is the file that goes red',
+  },
+  {
+    site: 'apps/worker/src/schedule.ts',
+    claim: 'HAS NO INHABITANT ANYWHERE IN THIS WORKSPACE',
+    disposition: 'live',
+    artifact: 'digest-transport',
+    why:
+      'the delivery row`s disposition rests on this clause as its first of three blockers, and ' +
+      'ADR-342 landmine 1 is exactly this: four BLOCKED reasons were discharged by rows in ' +
+      'other deployables and nothing noticed',
   },
 ];
 
