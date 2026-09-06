@@ -55,8 +55,8 @@ import { expect, test } from 'vitest';
 // A NO-OP CALL IS NOT A WIRING, AND FOUR PORTS MAKE THAT REACHABLE
 // -----------------------------------------------------------------------------
 // `useAffiliateDeps`, `useKycDeps` and `useCheckoutAdapters` already hold their
-// PRODUCTION value at module scope (`affiliate.ts:478`, `kyc.ts:284`,
-// `checkout.ts:1051`), so calling their setter from `start.ts` would install the
+// PRODUCTION value at module scope (`affiliate.ts:615`, `kyc.ts:284`,
+// `checkout.ts:1211`), so calling their setter from `start.ts` would install the
 // object that is already installed and change nothing a request sees. It would
 // also make this file pass. THE REASON TEXT IS WHERE THAT IS RECORDED, so a
 // later reader raising the count that way meets the sentence saying it is not a
@@ -66,8 +66,15 @@ import { expect, test } from 'vitest';
 // (ADR-226). Its module-scope default is the REAL Cloudflare verifier rather
 // than a fail-closed stand-in, so the port is live with nothing installed, and
 // an absent secret is a refusal rather than an unwired state. Its entry says so
-// in those terms, because a reader who meets it beside fifteen liabilities
-// should not read it as a sixteenth.
+// in those terms, because a reader who meets it beside THIRTEEN liabilities
+// should not read it as a fourteenth.
+//
+// THOSE TWO WORDS READ "fifteen" AND "a sixteenth" AND ARE REPAIRED RATHER THAN
+// DELETED (`RI-14`). Both were TRUE when written, against a `BLOCKED` of
+// sixteen, and went stale the day the two card entries left it for the reason
+// the next block states. Nothing went red, because a count spelled in prose is
+// asserted by nobody: that is the drift `ADR-034` exists to end, arriving in
+// the paragraph that explains why this port is not a liability.
 //
 // -----------------------------------------------------------------------------
 // THE LIST HAS NOW SHRUNK TWICE ON THE SAME ARTEFACT, IN ORDER (ADR-261, ADR-266)
@@ -941,8 +948,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'this route builds none. `RuleStateUnreadable` IS DELIBERATELY NOT CAUGHT and stays a 500, ' +
     'because a row whose columns disagree with the schema that wrote them is an internal error ' +
     'and a retryable status would tell a trader to retry what no retry can fix. ' +
-    'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED AT TEN OF TWENTY-FOUR DECLARED ' +
-    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A FOURTH TIME: every clause on this ' +
+    'THE PORT IS UNCHANGED AND THE TRIPLE HAS MOVED WITHOUT IT, AT ELEVEN OF TWENTY-FIVE ' +
+    'DECLARED WITH FOURTEEN BLOCKED. THIS CLAUSE READ "THE WIRED COUNT IS UNCHANGED AT TEN OF ' +
+    'TWENTY-FOUR DECLARED" AND IS REPAIRED RATHER THAN DELETED (`RI-14`): it was true until ' +
+    'ADR-347 declared `useCertificateRateLimiter` and installed it, which moved both halves by ' +
+    'one and left `blocked` where it was. It is the SECOND hand-spelled count in this file ' +
+    'found stale by ADR-357, and neither was asserted by anything, which is why the triple is ' +
+    'derived at the assertion and a count written in prose is not. ' +
+    'AND THE REASON FOR THAT IS NEW A FOURTH TIME: every clause on this ' +
     'entry until ADR-264 named something nobody had BUILT, ADR-268 closed the one that named a ' +
     'READ, ADR-281 found a decoding whose home was RULED and untaken, ADR-283 TOOK IT, and ' +
     'ADR-285 IS THE FIRST CLAUSE TO CLOSE ON A REFUSAL PATH RATHER THAN ON A CAPABILITY. ' +
@@ -1182,7 +1195,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'a configured PSP adapter per MID plus the `returnUrl` and `cancelUrl` configuration. ' +
     '`packages/psp` ships a port and TWO FAKES (`fakes/psp-a.ts`, `fakes/psp-b.ts`) and no ' +
     'vendor adapter, and `packages/enrichment` is in the same position. NOTE: this port already ' +
-    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1051`), so calling the ' +
+    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1211`), so calling the ' +
     'setter here would install what is already installed. That would raise the wired count and ' +
     'serve nothing, and it is not a wiring.',
 
@@ -1562,6 +1575,78 @@ const BLOCKED: Readonly<Record<string, string>> = {
 };
 
 // -----------------------------------------------------------------------------
+// WHAT EACH BLOCKED PORT HOLDS BEFORE ANYTHING INSTALLS ONE (ADR-357)
+// -----------------------------------------------------------------------------
+// `BLOCKED` COUNTS THE PORTS `start.ts` DOES NOT CALL AND HAS NEVER COUNTED
+// OBSTRUCTION. The two readings agree on thirteen of the fourteen entries and
+// part on the fourteenth: `useTurnstileVerifier`'s reason opens with the word
+// `NOTHING`, because its module-scope default is the real Cloudflare verifier
+// and the port is live with nothing installed. So `blocked` in the triple below
+// is a name for the SET, not a claim about every member of it.
+//
+// THE COUNT IS RIGHT AND MUST NOT MOVE, and the reason is mechanical rather
+// than editorial. The first assertion below requires every declared port
+// `start.ts` does not call to carry an entry here, so deleting the live one to
+// report `blocked: 13` makes `unaccounted` RED. A number that cannot fall
+// without disarming the gate beside it is not a number a session may lower,
+// and the honest repair is therefore the vocabulary and a second measurement.
+//
+// THIS IS THAT SECOND MEASUREMENT. `DEFAULTS` records the initializer each
+// port's module-scope variable actually carries, read off the declaring module,
+// so a default that changes goes RED here instead of quietly disagreeing with
+// the paragraph describing it. That is `useWithdrawalBackend`'s own stated
+// remedy one entry up, applied to the property this file reports.
+//
+// THE CLASSIFICATION IS A RULING AND IS DELIBERATELY NOT A REGEX. A probe
+// asking "does the initializer name an `UNWIRED_` value" classifies thirteen
+// correctly and `useCheckoutAdapters` WRONGLY: `PRODUCTION_CHECKOUT_ADAPTERS`
+// (`checkout.ts:1203`) names no such value and refuses by being EMPTY
+// (`adapterFor: () => undefined`, both URLs `''`). A probe that reads the WORD
+// is the failure `RI-35`'s register carries its comments about, so the input is
+// measured and the judgement is written down beside it.
+// -----------------------------------------------------------------------------
+
+/**
+ * The initializer each blocked port's module-scope variable carries, as text.
+ *
+ * Every value is read back off the tree by the assertion below, so a stale
+ * entry here is a failure rather than a comment.
+ */
+const DEFAULTS: Readonly<Record<string, string>> = {
+  setAdminReadSource: 'null',
+  setAdminSessionSource: 'null',
+  setInternalOpsSource: 'null',
+  useAdminPayoutBackend: 'UNWIRED_ADMIN_PAYOUT_BACKEND',
+  useAdminWalletBackend: 'UNWIRED_ADMIN_WALLET_BACKEND',
+  useAdminWriteBackend: 'UNWIRED_ADMIN_WRITE_BACKEND',
+  useAffiliateDeps: 'productionAffiliateDeps',
+  useCertificateRevokeBackend: 'UNWIRED_ADMIN_CERTIFICATE_BACKEND',
+  useCheckoutAdapters: 'PRODUCTION_CHECKOUT_ADAPTERS',
+  useCheckoutBackend: 'UNWIRED_CHECKOUT_BACKEND',
+  useKycDeps: 'productionKycDeps',
+  usePayoutBackend: 'UNWIRED_PAYOUT_BACKEND',
+  useTurnstileVerifier: 'cloudflareTurnstileVerifier()',
+  useWithdrawalBackend: 'UNWIRED_WITHDRAWAL_BACKEND',
+};
+
+/**
+ * The blocked ports whose default SERVES A REQUEST rather than refusing one.
+ *
+ * ONE, AND IT IS A RULING RATHER THAN A DERIVATION (ADR-357).
+ * `cloudflareTurnstileVerifier()` reads `MERIT_TURNSTILE_SECRET` from
+ * `process.env` PER CALL (`turnstile.ts:211`) and calls Cloudflare, so a
+ * deployment holding the secret verifies tokens with nothing installed. The
+ * other thirteen refuse in three shapes: `null` (three), an `UNWIRED_*`
+ * stand-in (seven), and a `production*` value that resolves nothing (three).
+ *
+ * AN ABSENT SECRET IS A REFUSAL AND NOT AN UNWIRED STATE. The default answers
+ * `unconfigured` and `POST /auth/otp` serves that as 503 (ADR-226), so there is
+ * no configuration under which this port admits an unverified token, which is
+ * why it is counted live here and still carries a reason above.
+ */
+const LIVE_DEFAULT: ReadonlySet<string> = new Set(['useTurnstileVerifier']);
+
+// -----------------------------------------------------------------------------
 // The assertions
 // -----------------------------------------------------------------------------
 
@@ -1662,4 +1747,68 @@ test('the wired count is reported, so a regression is a number and not a paragra
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
   }).toStrictEqual({ declared: 25, wired: 11, blocked: 14 });
+});
+
+// -----------------------------------------------------------------------------
+// The second measurement: what the blocked ports hold (ADR-357)
+// -----------------------------------------------------------------------------
+
+/** The path of the module declaring `port`, from `declaredIn`'s own labels. */
+function moduleOf(port: string): string {
+  const where = declaredIn.get(port) ?? '';
+  return where.startsWith('../') ? join(SRC, where.slice(3)) : join(ROUTES, where);
+}
+
+/**
+ * The initializer of the module-scope variable `port`'s setter assigns to.
+ *
+ * Reads the declaring module AS TEXT, for this file's own stated reason:
+ * importing it would bind a port. The setter names its target in its body, and
+ * the target is declared once at module scope.
+ */
+function defaultOf(port: string): string {
+  const lines = read(moduleOf(port)).split('\n');
+  const at = lines.findIndex((line) => line.startsWith(`export function ${port}(`));
+  const target = lines
+    .slice(at + 1, at + 8)
+    .map((line) => /^\s*([A-Za-z_$][\w$]*) = /.exec(line)?.[1])
+    .find((name) => name !== undefined);
+  if (target === undefined) return '<no assignment in the setter body>';
+  const decl = lines.find((line) => new RegExp(`^let ${target}\\b`).test(line));
+  return /=\s*(.+);\s*$/.exec(decl ?? '')?.[1] ?? '<no module-scope binding>';
+}
+
+test('every blocked port records the module-scope default it actually holds', () => {
+  // ADR-357. The INPUT to the ruling below, measured rather than described, so
+  // a default that changes cannot leave the ruling standing beside it. This is
+  // the check whose absence let a port be live and counted as blocked for four
+  // waves while every gate stayed green.
+  const measured = Object.fromEntries(Object.keys(BLOCKED).map((port) => [port, defaultOf(port)]));
+
+  expect(measured).toStrictEqual(DEFAULTS);
+});
+
+test('the recorded defaults cover the blocked list exactly', () => {
+  // A port leaving `BLOCKED` must leave `DEFAULTS` with it. The day a wiring
+  // slice installs one of the fourteen this fails until both move, which is
+  // the conflict being VISIBLE rather than silent.
+  expect(Object.keys(DEFAULTS).sort()).toStrictEqual(Object.keys(BLOCKED).sort());
+});
+
+test('exactly one blocked port is live with nothing installed, and it is named', () => {
+  // ADR-357's ruling, as a number. `blocked` counts what `start.ts` does not
+  // call; `refusing` counts what a request actually meets. THE TWO DIFFER BY
+  // ONE AND THE ONE IS WRITTEN DOWN, which is the whole finding: a reader who
+  // takes `blocked: 14` for fourteen obstructions is wrong by exactly this.
+  expect([...LIVE_DEFAULT].sort()).toStrictEqual(['useTurnstileVerifier']);
+
+  // A live port with no entry would be unaccounted; a named one that is not
+  // blocked would be a reason pointing at nothing.
+  expect([...LIVE_DEFAULT].filter((port) => !(port in BLOCKED))).toStrictEqual([]);
+
+  expect({
+    blocked: Object.keys(BLOCKED).length,
+    refusing: Object.keys(BLOCKED).filter((port) => !LIVE_DEFAULT.has(port)).length,
+    live: LIVE_DEFAULT.size,
+  }).toStrictEqual({ blocked: 14, refusing: 13, live: 1 });
 });
