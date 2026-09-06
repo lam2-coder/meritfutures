@@ -382,6 +382,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-368](ADR-368.md) | both merged entries are right about their own port and the GENERALISATION they share is false, because both located the half-install arms in the MEMBER LIST and the arms are in the RETURN TYPE; the one-member port presents three of them and answers 401, 403 and 503, so ADR-356's shape arises on the port ruled incapable of it (2026-09-06, status: proposed) |
 | [ADR-369](ADR-369.md) | the blocker census over all fourteen entries, where the admin wallet entry is one of ELEVEN with a gap and not the only one, the member set is derived while the requirement to state one is deliberately not, and `RI-15` was measured to have a second hole (2026-09-06, status: proposed) |
 | [ADR-370](ADR-370.md) | eleven entry points are unscheduled and ten of the eleven reasons hold, the one that expired was discharged by a row that was not about it and nobody recorded it, the census this file has repeated five times counts a NAME SUFFIX rather than a fact, and NOT ONE of the eleven is schedulable today (2026-09-06, status: proposed) |
+| [ADR-371](ADR-371.md) | the blocker whose SUPPORT expired while the blocker stood, found in the register ADR-370 did not open, and RI-35 was measured rather than extended because two of its nineteen artifacts carry a needle (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
