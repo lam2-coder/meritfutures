@@ -4216,7 +4216,7 @@ function sqlExecutorOn(conn: PoolClient, reason: TransactionSqlExecutorReason): 
  * recovered here and PROVED at runtime instead of asserted by a cast, and the
  * suite watches this function returning a pool. `pg` is imported for its TYPES
  * ONLY, which erases, so `client.ts` remains the only file in the workspace that
- * imports it at runtime.
+ * imports it at runtime. **ALSO FALSE; ADR-391 corrects both (`RI-14`).**
  */
 function poolFromClient(): Pool {
   const handle = client() as unknown as { readonly $client?: unknown };

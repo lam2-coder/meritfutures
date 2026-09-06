@@ -2,11 +2,11 @@
 // packages/queue/src/pg-boss-queue.ts
 // =============================================================================
 // THE ONLY FILE IN THE WORKSPACE THAT NAMES `pg-boss`. ADR-006 chose it and
-// closed with the sentence this file is graded against: "the job interface stays
-// narrow enough that a later move to BullMQ is a contained change." A move is
-// contained exactly while the vendor's name appears in one module, so
-// `test/surface.test.ts` asserts that it does, over the whole tree.
-//
+// closed with the sentence this file is graded against: "the job interface
+// stays narrow enough that a later move to BullMQ is a contained change." A
+// move is contained exactly while the vendor's name appears in one module, so
+// `test/surface.test.ts` asserts that it does, over the whole tree. **NAMES IS
+// THE WRONG VERB AND THE CASE ASSERTS IMPORTS; ADR-391 (`RI-14`).**
 // -----------------------------------------------------------------------------
 // IT OPENS NO POOL, AND IT CANNOT
 // -----------------------------------------------------------------------------

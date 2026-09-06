@@ -5,8 +5,8 @@
 // database through `scopedDb(identity)` or `systemDb(reason)`, and the ESLint
 // rule `merit/no-raw-db-client` makes that mechanical rather than a convention:
 // it is attached in the workspace root's eslint.config.js to `apps/**` and
-// `packages/**` with `packages/db/**` as the single `ignores` entry.
-//
+// `packages/**` with `packages/db/**` as the single `ignores` entry. **THE
+// FIRST SENTENCE IS FALSE AND KEPT BESIDE THIS CORRECTION (ADR-391, `RI-14`).**
 // THE DRIVER IS `pg` AND ADR-006 DECIDES IT, NOT PREFERENCE. postgres.js is the
 // better answer on VG-12 read in isolation: it installs 1 package where `pg`
 // installs 14. It is refused because this is not in isolation. `pg-boss@12.27.0`
