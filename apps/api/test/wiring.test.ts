@@ -393,7 +393,23 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'held payouts. MONEY PATH.',
   useAdminWalletBackend:
     '`principal(request)` (`routes/admin-wallet.ts:679`), blocked on `setAdminSessionSource` ' +
-    'above, AND TWO METHODS THAT WIRING DOES NOT REACH. `writeCorrection` is refused on THREE ' +
+    'above, AND THREE FURTHER MEMBERS: `operator`, `writeCorrection` and `reconcile`. ' +
+    'THAT FIGURE READ TWO AND THE MEMBER IT OMITTED IS `operator` (ADR-366, ADR-369, ' +
+    '`RI-14`). The retired figure is NAMED rather than quoted, on `setAdminReadSource`s ' +
+    'precedent above, because the case that binds this clause reads the sentence AROUND the ' +
+    'number and a reproduced original would hand it two answers. ' +
+    '`AdminWalletBackend`s `operator` (`routes/admin-wallet.ts:670`) IS THE ONE BOTH APPENDS ' +
+    'TRAVEL THROUGH and it ' +
+    'is a door rather than a shape: it yields the `AdminWalletTx` that carries `insert`, that ' +
+    'handle needs a `SystemTx` (`packages/db/src/scoped-db.ts:3769`), and `ApiDb` ' +
+    '(`apps/api/src/db.ts:173`) declares five doors of which none yields one, refused by ' +
+    'ADR-171 clause 1. The two appends are the `admin_actions` row every mutating endpoint ' +
+    'writes first and the spend limit, which is the whole of that write, and NEITHER GOES ' +
+    'THROUGH ' +
+    '`writeCorrection`: a slice that solved the other three would still write nothing, and a ' +
+    'slice that solved `principal` and `operator` alone would have a working spend-limit ' +
+    'endpoint with the correction still refusing (ADR-366 section 4). ' +
+    '`writeCorrection` is refused on THREE ' +
     'constraints, each a CHECK on `account_adjustments` that no draft this module composes can ' +
     'satisfy. (1) A correcting DEBIT is unwritable unless it exactly reverses a prior adjustment ' +
     'CREDIT: `account_adjustments_debit_is_a_reversal` is a biconditional and the wire carries ' +
@@ -2830,4 +2846,312 @@ test('the one port whose derived verdict and whose measured wire behaviour disag
     refusing: Object.keys(BLOCKED).filter((name) => !LIVE_DEFAULT.has(name)).length,
     live: LIVE_DEFAULT.size,
   }).toStrictEqual({ blocked: 14, refusing: 13, live: 1 });
+});
+
+// =============================================================================
+// THE CENSUS: EVERY BLOCKED PORT'S MEMBER SET, AND WHICH OF THOSE MEMBERS ITS
+// OWN ENTRY NAMES (ADR-369)
+// =============================================================================
+// ADR-366 MEASURED THAT `useAdminWalletBackend` DECLARES FIVE MEMBERS WHILE ITS
+// ENTRY CARRIED BLOCKERS FOR THREE, and that the member it did not name is the
+// one BOTH of that module's appends travel through. The obvious question is
+// whether that entry is the only one, and the answer measured here is NO: on the
+// tree this case landed against, ELEVEN of the fourteen entries leave at least
+// one member of their own port's interface unnamed, and the wallet entry is not
+// the worst of them. `useWithdrawalBackend` names NONE of its three in eleven
+// thousand characters.
+//
+// THE ROT MECHANISM IS ADR-358's AND IT IS NOT CARELESSNESS. Each rewrite of an
+// entry repaired the clause it was dispatched about and INHERITED the rest, so
+// no entry's member list has ever been re-derived as a whole. Nothing could go
+// red, because the member set lives in a `src/` interface and the claim about it
+// lives in a string, and no reader held both.
+//
+// -----------------------------------------------------------------------------
+// WHAT THIS CASE DERIVES, AND THE ONE THING IT DELIBERATELY DOES NOT
+// -----------------------------------------------------------------------------
+// DERIVED: the member set of every blocked port's interface, sliced at the
+// braces, and which of those members the port's own entry NAMES. Both halves are
+// facts about the tree and neither answers a question anybody is holding.
+//
+// NOT DERIVED, AND THIS IS A RULING RATHER THAN A SHORTFALL: that every entry
+// MUST name every member. That is a policy about what a `BLOCKED` reason owes a
+// reader, nothing in this tree has ruled it, and it is measurably WRONG for at
+// least five entries. `useTurnstileVerifier` is live and waits on nothing, so it
+// has no member-level blocker to state; `useAffiliateDeps`, `useKycDeps` and
+// `useCheckoutAdapters` are blocked at the PORT level, because calling their
+// setter would install what is already installed. Demanding a member-by-member
+// accounting from those would be this file legislating rather than measuring.
+// THAT IS ADR-367 SECTION 5's REASON RECURRING and it is why the gap below is
+// PINNED rather than required to be empty: the pin makes the census loud and
+// leaves the ruling to the founder, which is the strongest thing available
+// inside a fence that does not reach the ruling.
+//
+// -----------------------------------------------------------------------------
+// WHAT "NAMES" MEANS, MECHANICALLY, AND WHY IT IS THIS AND NOT SOMETHING BETTER
+// -----------------------------------------------------------------------------
+// A member is NAMED when the entry contains a BACKTICK IMMEDIATELY FOLLOWED BY
+// the member's name, ending at a character that neither continues an identifier
+// nor continues a path. Three measured reasons, each for one clause of it:
+//
+//   1. THE BACKTICK IS REQUIRED because these members are ordinary English
+//      words. `now`, `operator`, `backend`, `provider`, `verify` and `transact`
+//      are all member names AND all appear in these entries as prose. Without
+//      the backtick, "a trader can now take that request back" names `now`.
+//
+//   2. THE BACKTICKS ARE NOT PAIRED INTO SPANS, which is the opposite of the
+//      obvious implementation and is forced by this file. It uses a lone
+//      backtick as an APOSTROPHE, so `usePayoutBackend` and
+//      `useWithdrawalBackend` carry an ODD number of backticks and every
+//      span-pairing reader desynchronises at the first one. That is the same
+//      hazard `RI-15` met at `wiring.test.ts:215` and it is met here the same
+//      way, by reading the backtick immediately before the name rather than by
+//      pairing from the start.
+//
+//   3. THE TRAILING CHARACTER MAY NOT CONTINUE AN IDENTIFIER OR A PATH, because
+//      `packages/enrichment` is not the member `enrichment` and
+//      `operator-console` is not the member `operator`. Both are live in these
+//      entries today and a rule without this clause counts both.
+//
+// TWO STRONGER DEFINITIONS WERE MEASURED AND BOTH ARE WORSE, WHICH IS WHY THIS
+// ONE IS HERE RATHER THAN ASSERTED AS THE ONLY OPTION.
+//
+//   "NAMED AT ITS OWN DECLARATION LINE", meaning the entry cites `file:line` and
+//   the line is where the member is declared, would count FIVE of the forty-five
+//   members. It is not this file's convention and requiring it would invent one.
+//
+//   "NAMED WITHIN TWO HUNDRED CHARACTERS OF AN `ADR-nnn` OR A `file:line`" would
+//   count nineteen where naming counts twenty-three, and the four it drops are
+//   real accountings: `useCheckoutAdapters` says `returnUrl` and `cancelUrl` are
+//   CONFIGURATION it waits on, and `setAdminReadSource` says
+//   `adminReadSourceParts` supplies `exportEvidence`. A definition that discards
+//   a true accounting to look stricter is a worse definition.
+//
+// SO NAMING IS THE NECESSARY HALF OF ACCOUNTING AND NOT THE SUFFICIENT HALF, and
+// this file says so rather than pretending otherwise. Whether an entry that
+// names a member also says what BLOCKS it cannot be derived without a list of
+// blocker verbs, and a word list is a judgement wearing a derivation's clothes
+// (ADR-367 section 10's own confession about its dotted-name rule). WHAT THE PIN
+// BUYS INSTEAD IS THAT A BARE NAME IS NOT FREE: an entry that names a member it
+// does not account for SHRINKS THE GAP and turns this case RED with the member's
+// own name in the message, so the name has to be defended or removed. A census
+// that went green on a bare mention would be worthless, and this one does not.
+
+/** The interface a port's setter installs, read off the setter's own parameter. */
+function portInterface(port: string): string | undefined {
+  for (const [dir] of [[ROUTES], [SRC]] as const)
+    for (const name of tsFiles(dir)) {
+      const hit = new RegExp(
+        `^export function ${port}\\(\\s*[A-Za-z_$][\\w$]*\\s*:\\s*([A-Za-z_$][\\w$]*)`,
+        'm',
+      ).exec(read(join(dir, name)));
+      if (hit !== null) return hit[1];
+    }
+  return undefined;
+}
+
+/**
+ * Whether `reason` NAMES `member`, on the rule the block above defends.
+ *
+ * NO SPAN PAIRING. The opening backtick is read immediately before the name.
+ */
+function namesMember(reason: string, member: string): boolean {
+  return new RegExp('`' + member + '($|[^A-Za-z0-9_$/-])').test(reason);
+}
+
+test('the naming rule counts a code span and refuses prose, a path and a hyphenated name', () => {
+  // THE DEFINITION IS ASSERTED BEFORE IT IS USED, in both directions, because a
+  // census resting on an undefended predicate is the defect it exists to end.
+  // Every string below is a shape that is LIVE in the entries above.
+  expect(namesMember('refused on `now` at module scope', 'now')).toBe(true);
+  expect(namesMember('`principal(request)` (`routes/admin-wallet.ts:679`)', 'principal')).toBe(
+    true,
+  );
+  expect(namesMember('`idempotency.find` names a member of the store', 'idempotency')).toBe(true);
+
+  // AND THE FOUR IT MUST REFUSE.
+  expect(namesMember('a trader can now take that request back', 'now')).toBe(false);
+  expect(namesMember('and `packages/enrichment` is in the same position', 'enrichment')).toBe(
+    false,
+  );
+  expect(namesMember('the operator door, `systemDb(operator-console)`', 'operator')).toBe(false);
+  expect(namesMember('it now points inside `operatorSessions` own reason', 'operator')).toBe(false);
+});
+
+/** Every blocked port, its interface, and that interface's members. */
+const CENSUS: readonly { port: string; iface: string; members: readonly string[] }[] = Object.keys(
+  BLOCKED,
+).map((port) => {
+  const iface = portInterface(port) ?? '';
+  return {
+    port,
+    iface,
+    members: iface === '' ? [] : interfaceMembers(declaringSource(iface), iface),
+  };
+});
+
+test('every blocked port resolves to one interface this file can slice', () => {
+  // THE NON-VACUITY GUARD, AND IT IS THE ONE THIS CASE CANNOT DO WITHOUT. A port
+  // whose interface is not found slices to ZERO members, and zero members is an
+  // empty gap, which is a GREEN census over a port nobody measured. So an
+  // unresolvable port FAILS here rather than passing quietly below.
+  for (const row of CENSUS) {
+    expect(
+      row.iface,
+      `\`${row.port}\` declares no setter this scan can read a parameter type off`,
+    ).not.toBe('');
+    expect(
+      row.members.length,
+      `\`${row.iface}\` sliced to zero members, so the census below would pass \`${row.port}\` ` +
+        'without reading anything. The slicer or the declaration has moved',
+    ).toBeGreaterThan(0);
+  }
+});
+
+test('the member census is derived from the interfaces rather than from the entries', () => {
+  // NAMED RATHER THAN COUNTED, so a member added to or removed from a port
+  // arrives in the diff carrying its own name. A count alone would have let
+  // ADR-366's finding land as "five became six" with nobody able to say which.
+  expect(Object.fromEntries(CENSUS.map((row) => [row.port, row.members]))).toStrictEqual({
+    setAdminReadSource: [
+      'searchAccounts',
+      'readAccount',
+      'readIdentityGraph',
+      'listFlags',
+      'readLiability',
+      'exportEvidence',
+      'listEvents',
+    ],
+    setAdminSessionSource: ['lookup'],
+    useAdminPayoutBackend: ['operator', 'principal', 'now'],
+    useAdminWalletBackend: ['operator', 'principal', 'now', 'writeCorrection', 'reconcile'],
+    useAdminWriteBackend: ['operator', 'principal', 'validatePlan', 'now', 'tradingDay'],
+    usePayoutBackend: ['transact', 'listPayouts', 'idempotency'],
+    useCheckoutBackend: ['transact'],
+    useCheckoutAdapters: ['adapterFor', 'returnUrl', 'cancelUrl', 'enrichment'],
+    useTurnstileVerifier: ['verify'],
+    useKycDeps: ['provider', 'backend', 'returnUrl'],
+    useAffiliateDeps: ['backend'],
+    setInternalOpsSource: ['readDependencies', 'readJobs', 'readReconStatus', 'runBatch'],
+    useCertificateRevokeBackend: ['operator', 'principal', 'now', 'presentation'],
+    useWithdrawalBackend: ['transact', 'idempotency', 'now'],
+  });
+
+  // THE THREE INDEPENDENT AGREEMENTS THAT SAY THE SLICER IS RIGHT, asserted so
+  // that a slicer regression is caught by a figure a HUMAN derived by hand in a
+  // different session rather than only by this file's own pin. ADR-360 read
+  // seven off `AdminReadSource`, ADR-364 four off `InternalOpsSource`, and
+  // ADR-366 five off `AdminWalletBackend`, each by its own means.
+  const size = (port: string): number =>
+    CENSUS.find((row) => row.port === port)?.members.length ?? -1;
+  expect({
+    adminReads: size('setAdminReadSource'),
+    internalOps: size('setInternalOpsSource'),
+    adminWallet: size('useAdminWalletBackend'),
+  }).toStrictEqual({ adminReads: 7, internalOps: 4, adminWallet: 5 });
+});
+
+test('the members no entry names are pinned, so a bare name is not free and a new member is not quiet', () => {
+  // BOTH DIRECTIONS, WHICH IS THE WHOLE POINT OF PINNING THE GAP RATHER THAN
+  // REQUIRING IT EMPTY:
+  //
+  //   A PORT GAINS A MEMBER  -> the gap grows -> RED, naming the member. That is
+  //   the ADR-358 rot caught at the moment it starts, which is the control this
+  //   file did not have.
+  //
+  //   AN ENTRY NAMES A MEMBER -> the gap shrinks -> RED, naming the member. A
+  //   name is the NECESSARY half of an accounting and not the sufficient half,
+  //   so the name has to be defended in the diff that adds it or taken out. This
+  //   is the direction that stops the census going green on a bare mention.
+  const gap = Object.fromEntries(
+    CENSUS.map((row) => [
+      row.port,
+      row.members.filter((member) => !namesMember(BLOCKED[row.port] ?? '', member)),
+    ]).filter(([, missing]) => (missing as readonly string[]).length > 0),
+  );
+
+  expect(
+    gap,
+    'the census moved. A member appearing here is a member whose port waits on something no ' +
+      'entry states; a member LEAVING here was NAMED by an entry, which is not the same as ' +
+      'being accounted for, and the diff that named it owes a blocker or owes the name back',
+  ).toStrictEqual({
+    setAdminReadSource: [
+      'searchAccounts',
+      'readAccount',
+      'readIdentityGraph',
+      'listFlags',
+      'listEvents',
+    ],
+    useAdminPayoutBackend: ['operator', 'now'],
+    useAdminWalletBackend: ['now'],
+    useAdminWriteBackend: ['operator', 'now'],
+    useCheckoutBackend: ['transact'],
+    useCheckoutAdapters: ['adapterFor', 'enrichment'],
+    useTurnstileVerifier: ['verify'],
+    useKycDeps: ['backend'],
+    useAffiliateDeps: ['backend'],
+    useCertificateRevokeBackend: ['operator', 'now'],
+    useWithdrawalBackend: ['transact', 'idempotency', 'now'],
+  });
+
+  // THE THREE THAT ACCOUNT FOR EVERY MEMBER ARE ASSERTED AS SUCH rather than
+  // left as an absence, so that an entry falling out of the complete set is a
+  // named regression instead of a quietly longer object above.
+  expect(CENSUS.filter((row) => !(row.port in gap)).map((row) => row.port)).toStrictEqual([
+    'setAdminSessionSource',
+    'usePayoutBackend',
+    'setInternalOpsSource',
+  ]);
+});
+
+test('the admin wallet entry enumerates the members it blocks and the figure is bound to that list', () => {
+  // ADR-366 SECTION 10 ITEM 1 IS THE OWED REPAIR AND THIS IS IT. The clause read
+  // TWO and the member it omitted is `operator`, which is the member BOTH of
+  // that module's appends travel through. The figure is retired by being NAMED
+  // in the entry rather than by the sentence around it being reproduced, which
+  // is the `RI-14` collision ADR-367 section 7 measured: `soleCardinal` requires
+  // its anchor EXACTLY ONCE, so an editor who quotes instead of naming gets a
+  // red bar with instructions rather than a silent second answer.
+  const reason = BLOCKED['useAdminWalletBackend'] ?? '';
+  const wallet = CENSUS.find((row) => row.port === 'useAdminWalletBackend');
+  expect(wallet, 'the admin wallet port left the blocked list').toBeDefined();
+
+  const stated = soleCardinal(
+    reason,
+    /AND ([A-Z]+) FURTHER MEMBERS/g,
+    "`useAdminWalletBackend`'s reason",
+  );
+
+  // THE LIST IS READ OUT OF THE ENTRY'S OWN SENTENCE and every name in it is
+  // asserted to be a real member of the port, so a rename in `src/` reddens this
+  // rather than leaving the entry naming something that no longer exists.
+  const listed = matches(
+    /AND [A-Z]+ FURTHER MEMBERS: (.*?)\. THAT FIGURE/.exec(reason)?.[1] ?? '',
+    /`([A-Za-z_$][\w$]*)`/g,
+  );
+  expect(
+    listed.length,
+    'the enumeration sentence no longer parses, so the figure below binds to nothing',
+  ).toBeGreaterThan(0);
+  for (const name of listed)
+    expect(
+      wallet?.members,
+      `the entry blocks \`${name}\`, which \`AdminWalletBackend\` does not declare`,
+    ).toContain(name);
+
+  expect(
+    stated,
+    `the entry states ${stated} further members and enumerates ${listed.length}: ` +
+      listed.join(', '),
+  ).toBe(listed.length);
+
+  // AND THE FINDING ITSELF IS PINNED BY NAME, so a later rewrite cannot inherit
+  // its way back to the three-blocker census ADR-366 found. `operator` is the
+  // member the entry omitted and it is the one that matters.
+  expect(
+    listed,
+    'ADR-366 measured that `operator` is the member this entry did not name and the one both ' +
+      'of the module appends travel through. Removing it re-opens the defect',
+  ).toContain('operator');
 });
