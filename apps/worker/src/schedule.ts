@@ -353,9 +353,9 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'FINDING ONLY, so a book that AGREES returns a report and a book that DISAGREES throws ' +
       'and records nothing. That is the event-sink gap RI-04 holds and it is not this job`s ' +
       'to close. ' +
-      'THREE, `accountsWithStoredState` (`batch/adapter.ts:802`) reads the whole of ' +
-      '`rule_states` to compute a projection, and the adapter states at its own site that the ' +
-      'repair is a read on `packages/db` and is owed BEFORE this audit runs nightly. ' +
+      'THREE, `readPort`s `accountsWithStoredState` leg (`batch/adapter.ts:802`) reads the ' +
+      'whole of `rule_states` to compute a projection, and the adapter states at its own site ' +
+      'that the repair is a read on `packages/db` and is owed BEFORE this audit runs nightly. ' +
       'FOUR, THE DEAD-MAN SWITCH WOULD HAVE NOTHING TO WATCH. CRON_INVENTORY`s row for this ' +
       'job fires on `replay.audit_completed` absent, and that name is in neither the ten-name ' +
       '`EVENT_CATALOGUE` (`apps/api/src/events.ts:382`) nor EVENTS.md, so a scheduled run`s ' +
