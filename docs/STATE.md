@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-09-05
+last_updated: 2026-09-06
 ---
 
 # STATE
@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->360<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->361<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13126,3 +13126,33 @@ Counts derived at reporting time off each runner's own last line: suite **335 fi
 **Next.** The founder's `E2` read of [ADR-375](decisions/ADR-375.md) and the three decisions its approval block names, of which **section 4 is the one about authority rather than about code**: this row implemented one of three options an earlier entry recorded as open, on the argument that nothing outside this file changes meaning. Then **section 7's ORDER**, so the next row does not spend its budget discovering that a registration cannot precede the repair it depends on. Then section 8, which asks whether a citation into a test file is a control or a reading aid, because it has been treated as both for four waves.
 
 Counts derived at reporting time off each runner's own last line: suite **335 files / 8,064 passed / 10 skipped / 0 failed**, against a base reproduced on `c7987c3c` **before the first edit** of **335 files / 8,060 passed / 10 skipped / 0 failed**, a delta of **+4 cases in ONE EXISTING FILE entirely by ADDITION with zero removals**, files and skips unmoved, attributed by removal: `wiring.test.ts` runs **27** alone on this tree and **23** alone on the base. Gates **33 of 33** after `generate`. Invariants **35 of 35**. Typecheck, lint and `format:check` clean. **`pnpm run verify` and `scripts/corpus/falsify.mjs` were NOT run**, both forbidden by the row.
+
+---
+
+## 2026-09-06 - Session 572: the fifty pointers worth nothing are eight thousand two hundred and fifty, both remedies offered were measured and both are dead, and the pointer that died inside the checker itself was true the day it was written ([ADR-377](decisions/ADR-377.md), proposed)
+
+**[ADR-377](decisions/ADR-377.md), `status: proposed`, approval line UNSIGNED. CONTROL OVER THE CORPUS'S HONESTY, `E2` READ OWED.** [ADR-375](decisions/ADR-375.md) section 8 measured fifty citations into one file, moved every one of them, watched `RI-15` and `RI-16` stay green at 35 of 35, and asked whether a citation carrying only a path and a line can be made checkable and whether it is worth it. **This row answers.**
+
+**RULED: OUTCOME (c). THE DEAD POINTERS ARE REPAIRED WHERE SOMEBODY OWNS THEM AND THE FORM IS LEFT ALONE.** Every alternative was measured before it was refused, and the measurements are the deliverable rather than the ruling.
+
+**THE POPULATION IS NOT FIFTY AND IT IS NOT ABOUT ONE FILE.** Derived corpus-wide by importing the checkers' own reader rather than by grepping, because a hand-rolled regex would have measured a different grammar than the one the checks enforce: **8,723 citation sites, 473 carrying a bindable name and 8,250 carrying a path and a line only. The checkable fraction of this corpus is one citation in nineteen.** **AND `wiring.test.ts` IS EIGHTH RATHER THAN WORST**, at 168 sites against `packages/db/src/scoped-db.ts`'s **436 across 136 files at 170 distinct lines**. A remedy scoped to the file four waves fenced would have been scoped to the file somebody happened to look at.
+
+**OUTCOME (b) IS MEASURABLY DEAD AND THE MEASUREMENT IS THE POINT.** A content check needs the citation to carry content, and the corpus writes quotations beside its pointers, so it was run: of **1,558** bare citations in checkable scope, **335** carry a quoted phrase and **exactly ONE** quote lands near the line it sits beside, while **58 appear nowhere in the cited file at all**. **A path and a line has one degree of freedom and nothing to check it against.** Outcome (b) is not a weaker outcome (a); it IS outcome (a), and the second datum it needs is not written down.
+
+**WIDENING `IDENTIFIER_GLUE` IS A DISTRACTION FOR THESE POINTERS AND A BAD TRADE ON ITS OWN, BOTH HALVES MEASURED.** [ADR-357](decisions/ADR-357.md)'s hole is about a citation that HAS a name a few words away; **these have none, and a four-word glue binds not one of them.** On its own merits it newly binds 49 citations of which **33 go RED**, on the nearest common word rather than the subject, which is [ADR-212](decisions/ADR-212.md)'s finding recurring.
+
+**TWO FURTHER BLINDFOLDS ARE NAMED AND NEITHER WAS ON RECORD.** `citedReasonFiles` puts `RI-15`'s own package outside `RI-15`, so the check that guards every citation in this tree cannot read its own; **the exclusion is CORRECT and is NOT narrowed**, because those files reproduce false citations as the specimens the grammar is taught with, and narrowing it would newly guard **six** citations that all pass. **And the NAMED form is not reliably checkable either**: the same sentence binds at one insertion point and binds nothing three lines down, found by a seed that went GREEN when it should have gone RED.
+
+**THE EXEMPLARY SLICE IS TWO CITATIONS, BOTH IN THIS FENCE AND BOTH NAMED AS OWED BY [ADR-375](decisions/ADR-375.md).** The retired figure was **TRUE THE DAY IT WAS WRITTEN**, at the commit that introduced `RI-15`, where the file was 424 lines; it is 3,593 now and the clause it named has been rewritten away. **They are RETIRED rather than repointed, because the subject is gone and the claim is about the FILE.**
+
+**AND THE INSTRUCTION THIS ROW INHERITED WAS ITSELF WRONG, WHICH IS THE STRONGEST ARGUMENT IN THE ENTRY.** [ADR-375](decisions/ADR-375.md) section 12 item 2 names the line those two citations mean; that line carries an unrelated comment and the subject is elsewhere. **The repair tracked where the old line's TEXT had moved rather than where the SUBJECT had moved**, and following it would have written a second wrong pointer into this fence. **A dead pointer is repaired to its subject, never to its position.**
+
+**`RI-35`: THE ORDERING OBSTACLE HAS CLEARED ITSELF AND THAT IS THE ANSWER RATHER THAN THE WORK.** The `CRON_INVENTORY` repair [ADR-375](decisions/ADR-375.md) section 7 said must come first landed in [ADR-376](decisions/ADR-376.md), in the same merge that carried the entry saying it was owed. Both underlying facts re-verified at primary source. **What remains is obstacle 4 alone, both halves of the claim on one 2,576-character line, so what would clear it is a LINE SPLIT rather than a repair** and it is outside this fence. **`RI-35` was not extended and `absence-claims.mjs` was not opened for writing**, on [ADR-371](decisions/ADR-371.md) section 5.2 re-read and not disturbed.
+
+**FIVE SEEDS, TWO RED AND THREE GREEN ON PURPOSE, every one restored byte-identical under `sha256sum -c` against a four-file manifest re-checked after each restore.** Thirty lines into `wiring.test.ts` stayed green at 35 of 35, reproducing [ADR-375](decisions/ADR-375.md)'s probe here rather than inheriting it; a past-end-of-file citation went red at 34 of 35 and **the same citation inside `packages/tooling/` stayed green**, which is the own-package finding as an A/B needing no name to bind.
+
+**Two of [ADR-375](decisions/ADR-375.md)'s three figures reproduce exactly and the site count is one high**, named rather than re-quoted under `RI-14`. **No invariant number was minted, no invariant widened, no gate weakened, no test skipped, disabled or quarantined, no `CI-06` letter spent, no migration number taken or reserved, no `status` field moved, no port wired**; `git diff origin/main -- apps packages/db packages/rules-engine packages/ledger scripts` is **EMPTY**. **No row is reserved**: `377` follows `376`, the highest on the merged head.
+
+**Next.** The founder's `E2` read of [ADR-377](decisions/ADR-377.md) and the three decisions its approval block names, of which **the first is a decision to live with a known hole**: 8,250 citations no check can hold honest, where the alternative is not a check but a smaller corpus of citations. Then section 8, which is about a standard no check enforces and every row must therefore be told. Then **`RI-35`'s remaining obstacle, now a line split rather than a repair.**
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,070 passed / 10 skipped / 0 failed**, against a base reproduced on `6698f9c0` **before the first edit** of **336 files / 8,070 passed / 10 skipped / 0 failed**, a delta of **ZERO on every axis**, attributed by removal: `repo-invariants.test.ts` runs **257** alone on this tree and **257** alone on the base, this row's code diff being comment text in two files. Gates **33 of 33** after `generate`. Invariants **35 of 35**. Typecheck, lint and `format:check` clean. **`pnpm run verify` and `scripts/corpus/falsify.mjs` were NOT run.**
