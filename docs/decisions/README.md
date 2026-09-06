@@ -375,6 +375,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-361](ADR-361.md) | neither way out of Merit is blocked by a missing door, and the two are blocked by DIFFERENT KINDS of thing: the payout port waits on COUNSEL for a value space and the withdrawal port waits on nothing this deployable can build, its adapter being whole. The refusal is loud, quotes no figure, and on the withdrawal side is produced by a default whose docblock says it refuses every call while its FIRST-TOUCHED member serves (2026-09-06, status: proposed) |
 | [ADR-362](ADR-362.md) | the two ways money comes IN hold defaults of different KINDS, and the one whose name says production does not refuse, it takes the payment (2026-09-06, status: proposed) |
 | [ADR-363](ADR-363.md) | the live count was a hand-written literal standing on a resolver that reads one hop, and the three defaults NAMED `production*` were counted as refusing without anything opening them; the answer is now derived from the leaves and the residual judgement is two ports rather than fourteen (2026-09-06, status: proposed) |
+| [ADR-364](ADR-364.md) | `setInternalOpsSource` is DECLINED rather than blocked; its port declares FOUR members, so a partial install IS expressible here and ADR-360's impossibility does not carry; the refusal is a 500 whose document says nothing at all, and the one thing a half install turns from a refusal into a success is the row that COMMANDS the nightly batch (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
