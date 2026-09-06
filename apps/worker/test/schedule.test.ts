@@ -433,3 +433,207 @@ test('5.2 the grant 0079 left out is in, it is exactly what was ruled, and it is
       'public, and pgboss.create_queue needs it only for a partitioned queue nothing declares',
   ).toEqual([]);
 });
+
+// =============================================================================
+// 6. The port inhabitant census, derived rather than typed (ADR-370)
+// =============================================================================
+// **THE HEADER OF `src/schedule.ts` HAS CARRIED THIS COUNT FIVE TIMES AND WAS
+// WRONG FOUR OF THEM.** ADR-344, ADR-345, ADR-349, ADR-350 and ADR-353 each
+// subtracted its own adapter from the number it found and landed on a branch
+// that could not see the others, so the merged prose enumerated fewer
+// implementations than the tree already held. Every one of those paragraphs is
+// kept whole under `RI-14` and NOT ONE OF THEM WAS ASSERTED BY ANYTHING.
+//
+// So the number moves here. The cases below read it off the tree on every run,
+// which means the next adapter is a green suite that goes RED on good news
+// rather than a fifth paragraph correcting the fourth.
+
+/**
+ * Every `UNWIRED_*` default under `apps/worker/src`, mapped to its port type.
+ *
+ * **IT DOES NOT MATCH ON THE `_IO` SUFFIX AND THAT IS THE WHOLE REPAIR.** Every
+ * paragraph in `src/schedule.ts` since ADR-344 counts "the nine `UNWIRED_*_IO`
+ * values", and nine is the number of defaults whose NAME ends that way rather
+ * than the number of defaults. The two the suffix drops are the event sinks, and
+ * the sink is blocker ONE on the breaker row and blocker ONE on the detector
+ * row, so the census excluded exactly the blocker it kept naming.
+ */
+function unwiredPorts(): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  for (const module of workerModules()) {
+    if (module === './index.ts') continue;
+    for (const match of stripComments(sourceOf(module)).matchAll(
+      /export const (UNWIRED_[A-Z0-9_]+):\s*([A-Za-z0-9_]+)\s*=/g,
+    )) {
+      const [, value, port] = match;
+      if (value !== undefined && port !== undefined) out.set(value, port);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every module declaring something whose RETURN type is `port`.
+ *
+ * **A CENSUS OF CONSTRUCTORS, WHICH IS NOT THE SAME QUESTION AS A CENSUS OF
+ * INHABITANTS**, and the difference is stated because `src/schedule.ts` has
+ * stated it four times and it keeps being the thing a reader loses. A value
+ * composed inline at a call site has no return type to find, so it is invisible
+ * here and the case below names the one that is.
+ */
+function constructorsOf(port: string): readonly string[] {
+  const out: string[] = [];
+  for (const module of workerModules()) {
+    if (module === './index.ts') continue;
+    const body = stripComments(sourceOf(module));
+    const returns = new RegExp(`\\):\\s*(?:Promise<)?${port}>?\\s*\\{`).test(body);
+    // A `const` of the port type that is not the unwired default is an
+    // inhabitant by the same reading, so it counts here too.
+    const bound = new RegExp(`export const (?!UNWIRED_)\\w+:\\s*${port}\\s*=`).test(body);
+    if (returns || bound) out.push(module);
+  }
+  return out.sort();
+}
+
+test('6.1 the unwired defaults and the ports with no constructor are both derived here', () => {
+  const ports = unwiredPorts();
+  // **THE PARSE, CHECKED BEFORE ANYTHING RESTS ON IT, AND IT IS ALSO THE
+  // FINDING.** Nine is the figure five paragraphs of `src/schedule.ts` agree on
+  // and it counts a suffix; eleven is the number of unwired defaults. The two
+  // are asserted separately so a reader can see that the disagreement is about
+  // WHICH VALUES ARE COUNTED and not about which adapters exist.
+  expect(ports.size, 'the UNWIRED_* scan found a different set; re-read before trusting').toBe(11);
+  expect([...ports.keys()].filter((name) => name.endsWith('_IO'))).toHaveLength(9);
+  expect([...ports.keys()].filter((name) => !name.endsWith('_IO')).sort()).toEqual([
+    'UNWIRED_BREAKER_EVENT_SINK',
+    'UNWIRED_DETECTOR_EVENT_SINK',
+  ]);
+
+  const served: string[] = [];
+  const bare: string[] = [];
+  for (const port of [...new Set(ports.values())].sort())
+    (constructorsOf(port).length > 0 ? served : bare).push(port);
+
+  // **THE PORTS A JOB COULD BE HANDED A LIVE VALUE FOR.** This list going
+  // LONGER is the good news this case exists to fail on: the row that lands the
+  // tenth adapter reads `src/schedule.ts`'s row for that job and finds out
+  // whether the adapter was ever the binding blocker, which for four of these
+  // it was not.
+  expect(served).toEqual([
+    'BreakerIo',
+    'DetectorRunnerIo',
+    'DigestAlarmIo',
+    'DigestIo',
+    'ExpirySweepIo',
+    'ReconSweepIo',
+  ]);
+
+  // **AND THE FIVE THAT HAVE NOTHING, WHICH IS THE MEASUREMENT THAT REFUTES "NOT
+  // ONE REMAINING JOB IS BLOCKED ON A MISSING ADAPTER".** Two of them are a
+  // job's whole io: `startLiveIngest`'s and `runWithdrawalApprovals`'. Two are
+  // the event sinks that are blocker one on the breaker and detector rows. The
+  // fifth is the inline case below. Not one of these five jobs is blocked ONLY
+  // on its adapter, and every row says so at length, which is what `3.2` holds.
+  expect(bare).toEqual([
+    'BreakerEventPort',
+    'DetectorEventPort',
+    'LiveIngestIo',
+    'RuleStateWriterIo',
+    'WithdrawalApprovalSweepIo',
+  ]);
+
+  // **`RuleStateWriterIo` HAS AN INHABITANT AND NO GREP FOR A RETURN TYPE FINDS
+  // IT**, which is ADR-345's caveat asserted rather than repeated in prose: it
+  // is composed INLINE, at the `writeRuleState` leg of the adapter the ONE
+  // SCHEDULED JOB runs on. The distinction is kept live because a reader who
+  // takes `bare` for "ports nothing can supply" is wrong by one, in the
+  // direction that invents work.
+  expect(bare).toContain('RuleStateWriterIo');
+  expect(stripComments(sourceOf('./batch/adapter.ts'))).toContain('writeRuleStateVia(');
+
+  // **AND A TWELFTH PORT HAS NO VALUE AT ALL, NOT EVEN A REFUSING ONE.** It is
+  // absent from `ports` above because there is no default to find, and that is
+  // deliberate: the expiry row records that a refusing default was REFUSED,
+  // because every leg of that sweep emits inside its own release transaction, so
+  // a live io over a rejecting sink is an hourly job that releases nothing while
+  // the S1 switch reports it present. This case fails the day somebody adds the
+  // convenience default, which is the direction the harm runs.
+  expect([...ports.values()]).not.toContain('ExpiryEventPort');
+  expect(constructorsOf('ExpiryEventPort')).toEqual([]);
+});
+
+test('6.2 the replay audit takes the port the one scheduled job already runs on', () => {
+  // **THE RETIRED CLAUSE, PINNED SO IT CANNOT DRIFT BACK.** The replay row's
+  // opening said no `src/` file supplies its ports. ADR-346 ended that and
+  // nothing recorded it here, so the row read as adapter-blocked through a whole
+  // wave of adapter work that never touched it. The three facts below are what
+  // make the clause false, and each is read off the tree.
+  const replay = stripComments(sourceOf('./batch/replay.ts'));
+  const adapter = stripComments(sourceOf('./batch/adapter.ts'));
+  const job = stripComments(sourceOf('./job.ts'));
+
+  // 1. The audit's io is `BatchPorts`, taken as its first parameter.
+  const takes = /export async function runReplayAudit\(\s*ports:\s*([A-Za-z0-9_]+),/.exec(replay);
+  expect(takes?.[1], 'runReplayAudit no longer takes a named port as its first argument').toBe(
+    'BatchPorts',
+  );
+
+  // 2. A constructor under this same `src/` returns that exact port.
+  const builds = /export function postgresBatchPorts\([^)]*\):\s*([A-Za-z0-9_]+)\s*\{/.exec(
+    adapter,
+  );
+  expect(builds?.[1], 'postgresBatchPorts no longer returns a named port').toBe('BatchPorts');
+
+  // 3. And it is not merely constructible: the scheduled job builds one every
+  //    run, so the value the audit needs is composed in this deployable today.
+  expect(
+    job,
+    'job.ts no longer builds a BatchPorts, which is the fact that makes the replay row`s ' +
+      'retired clause retired. If the wiring moved, the row moves with it',
+  ).toContain('postgresBatchPorts(io.db)');
+
+  // **AND THE DISPOSITION STILL DOES NOT MOVE, WHICH IS THE POINT.** An expired
+  // blocker is not a schedule. `3.1` derives that this entry point has no caller
+  // and `3.2` that its row states its blockers, and the row now carries four of
+  // them, none an adapter.
+  const audit = WORKER_JOB_ENTRY_POINTS.find((entry) => entry.entryPoint === 'runReplayAudit');
+  expect(audit?.disposition).toBe('unscheduled');
+});
+
+test('6.3 exactly one of the detector runner`s three event names is outside the catalogue', () => {
+  // **THE FIGURE `src/schedule.ts` CARRIED WAS TWO AND THE TREE SAYS ONE.**
+  // `event-sink.test.ts` section 4 already derives the same fact over a wider
+  // set and has done since ADR-325; nothing connected it to the sentence in the
+  // job register, because a sentence is asserted by nothing. This case is the
+  // connection and it is deliberately narrow: the DECLARED union of this one
+  // port, against the producer's own table.
+  const ports = stripComments(sourceOf('./detectors/ports.ts'));
+  const union = /export type DetectorEventName =([^;]+);/.exec(ports)?.[1] ?? '';
+  const names = [...union.matchAll(/'([a-z_]+(?:\.[a-z_]+)+)'/g)]
+    .map((match) => match[1] ?? '')
+    .sort();
+  expect(names, 'the declared union of detector event names changed shape').toHaveLength(3);
+
+  const catalogue = readFileSync(join(ROOT, 'apps/api/src/events.ts'), 'utf8');
+  const start = catalogue.indexOf('export const EVENT_CATALOGUE = {');
+  expect(start).toBeGreaterThan(-1);
+  const block = catalogue.slice(start, catalogue.indexOf('\n} as const satisfies', start));
+  const rows = [...block.matchAll(/^ {2}'([a-z_]+(?:\.[a-z_]+)+)': \{$/gm)].map(
+    (match) => match[1] ?? '',
+  );
+  // **THE PARSE IS GUARDED AND THE SIZE IS DELIBERATELY NOT PINNED HERE.**
+  // `event-sink.test.ts` pins the catalogue at ten against that file's own
+  // docblock, and a second pin would mean one transcription reddens two files
+  // for one fact. This guard proves the parse found the table; the assertion
+  // below is the one that carries the finding.
+  expect(rows.length, 'the catalogue parse found nothing; re-read before trusting').toBeGreaterThan(
+    5,
+  );
+  expect(rows).toContain('payout.requested');
+
+  // **IT GOES RED ON GOOD NEWS AND THAT IS THE WHOLE VALUE.** The day
+  // `detector.run_degraded` is transcribed into EVENTS and into the producer,
+  // this drops to zero and somebody re-reads the detector row, which carries two
+  // further blockers that a transcription does not touch.
+  expect(names.filter((name) => !rows.includes(name))).toEqual(['detector.run_degraded']);
+});

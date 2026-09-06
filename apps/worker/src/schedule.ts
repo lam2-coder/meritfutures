@@ -119,7 +119,9 @@
 // fifth is the EVENT SINK and this deployable can reach no sink at all:
 // `test/event-sink.test.ts` establishes the shape of that gap across three ports
 // at once, and two of the detector runner's three event names would be refused
-// by the producer one deployable over even if the import were legal. `runner.ts`
+// by the producer one deployable over even if the import were legal. **THAT
+// FIGURE IS WRONG BY ONE AND THE DETECTOR ROW BELOW CARRIES THE CORRECTION**,
+// which is kept here rather than edited away per `RI-14`. `runner.ts`
 // emits inside the write transaction and emits UNCONDITIONALLY, so the composed
 // value writes NO `detector_runs` row. That is the second blocker; the empty
 // `detector_definitions` table is the third. The row's `why` enumerates all
@@ -209,6 +211,70 @@
 // so the driver gets a `CRON_INVENTORY` row with a dead-man switch and does not
 // get a live schedule, and the switch fires today precisely because the job is
 // not running.
+//
+// -----------------------------------------------------------------------------
+// ADR-370: THE ADAPTER WAVE IS FINISHED AND ITS CONCLUSION DOES NOT REACH THREE
+// OF THESE ROWS. THE CENSUS IS DERIVED HERE AND IT IS BOUND IN THE SUITE.
+// -----------------------------------------------------------------------------
+// Every paragraph above is kept whole per `RI-14`. Each was correct over the
+// tree it was derived on and each states a count the next merge moved, four
+// times, in the file written about hand-typed counts. **SO THIS ROW STOPPED
+// TYPING THE NUMBER.** `test/schedule.test.ts` derives the inhabitant census
+// from the tree on every run, so a paragraph here can go stale without taking a
+// count with it.
+//
+// **AND THE FIGURE EVERY PARAGRAPH ABOVE AGREES ON IS THE ONE THIS ROW
+// FALSIFIED: THERE ARE ELEVEN UNWIRED DEFAULTS UNDER `apps/worker/src` AND NOT
+// NINE.** Nine is the count of values whose NAME ends `_IO`, which is a suffix
+// rather than a fact, and it is the one number in this header nothing had ever
+// contradicted precisely because five separate rows each re-derived it the same
+// wrong way. **THE TWO THE SUFFIX MISSES ARE THE EVENT SINKS**:
+// `UNWIRED_BREAKER_EVENT_SINK` (`breaker/adapter.ts:207`) and
+// `UNWIRED_DETECTOR_EVENT_SINK` (`detectors/adapter.ts:217`), both of them a
+// refusing default living in an ADAPTER file rather than a `ports.ts`. **SO THE
+// CENSUS THIS HEADER HAS REPEATED FIVE TIMES EXCLUDED EXACTLY THE BLOCKER IT
+// MOST OFTEN NAMES**: the sink is blocker ONE on the breaker row and blocker ONE
+// on the detector row, and neither has an inhabitant that is not a refusal.
+//
+// **DERIVED AT THIS ROW OVER `apps/worker/src`, AND STATED AS A PARTITION RATHER
+// THAN A NUMBER.** Of the eleven, SIX ports have a declaration whose RETURN type
+// is the same port: `./breaker/adapter.ts` for `BreakerIo`,
+// `./detectors/adapter.ts` for `DetectorRunnerIo`, `./digests/adapter.ts` for
+// `DigestIo`, `./digests/alarm-adapter.ts` for `DigestAlarmIo`,
+// `./recon/adapter.ts` for `ReconSweepIo` and `./sweeps/expiry-adapter.ts` for
+// `ExpirySweepIo`. **FIVE HAVE NONE**: `LiveIngestIo`,
+// `WithdrawalApprovalSweepIo`, `RuleStateWriterIo`, `BreakerEventPort` and
+// `DetectorEventPort`. `RuleStateWriterIo` is the one among those five that has
+// an inhabitant anyway, composed INLINE at `batch/adapter.ts:908` where no
+// census of return types can find it, which is ADR-345`s caveat surviving a
+// fourth restatement. **AND A TWELFTH PORT HAS NO VALUE AT ALL, NOT EVEN A
+// REFUSING ONE**: `ExpiryEventPort`, deliberately, for the reason the expiry row
+// states in its own words.
+//
+// **SO THE CLAIM THAT NO REMAINING JOB IS BLOCKED ON A MISSING ADAPTER IS FALSE
+// ON THIS TREE, ON THREE ROWS, AND THE THREE FAIL DIFFERENTLY.** The live ingest
+// row and the withdrawal row are the two ports with no inhabitant at all. The
+// provisioning row is the third and it is the one a return-type census cannot
+// see: `SagaIo` takes a `ProvisioningTx` and a `PlatformProvisioningPort`, and
+// neither has an inhabitant under any `src/` in this workspace. **A FOURTH ROW
+// FAILS IN A FOURTH WAY WITHOUT FALSIFYING THE CLAIM AND IS SAID HERE SO IT IS
+// NOT COUNTED TWICE**: `ExpirySweepIo` HAS a constructor and the constructor
+// CANNOT BE CALLED, because `expirySweepIo` (`sweeps/expiry-adapter.ts:193`)
+// takes the sink as a required argument with no default and nothing in this tree
+// can be passed for it.
+//
+// **AND ONE ROW BELOW HAD ITS BLOCKER EXPIRE WITHOUT ANYBODY WRITING IT AN
+// ADAPTER, WHICH IS THE OPPOSITE DIRECTION AND IS THIS ROW`S MOST VALUABLE
+// OUTPUT.** The replay self-audit takes `BatchPorts`, which is the port THE ONE
+// SCHEDULED JOB ON THIS LIST ALREADY RUNS ON, and it has taken it since ADR-346.
+// Its own row carries the correction and the four things that keep it off a
+// clock anyway, none of which is an adapter.
+//
+// **THIS ROW SCHEDULES NOTHING AND WIRES NOTHING.** An expired blocker is a
+// finding about the record, not a licence to start a job: wiring and scheduling
+// are two decisions, this file is where the second one is recorded, and a job
+// that starts running because an inventory row looked clear is the failure the
+// file exists to prevent.
 // =============================================================================
 
 /** Whether a job runs on a clock in a deployment, or does not. */
@@ -269,7 +335,35 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     why:
       'NO LIVE PORTS AND NO CALLER. The audit takes its reads and its writes as an argument and ' +
       'no `src/` file supplies one, so a clock in front of it would start a process with nothing ' +
-      'to hand it. ADR-119 is why it is its own job rather than a leg of the batch.',
+      'to hand it. ADR-119 is why it is its own job rather than a leg of the batch. ' +
+      'THE OPENING CLAUSE IS HALF FALSE AND IS KEPT BESIDE ITS CORRECTION per RI-14, NAMED ' +
+      'RATHER THAN RE-QUOTED because ADR-367 measured that a retirement reproducing its own ' +
+      'false sentence hands a prose-matching case two answers. THE RETIRED HALF IS THE ' +
+      'NO-LIVE-PORTS ONE, AND IT DID NOT EXPIRE IN THIS WAVE: ADR-346 ended it. This audit ' +
+      'takes `BatchPorts` (`batch/replay.ts:609`), which is THE SAME PORT THE ONE SCHEDULED JOB ' +
+      'ON THIS LIST RUNS ON. `postgresBatchPorts` (`batch/adapter.ts:940`) returns it and ' +
+      '`job.ts:206` builds one on every nightly run, so a `src/` file supplies exactly this ' +
+      'port today and the adapter has not been this row`s blocker since ADR-346. NO OTHER ROW ' +
+      'ON THIS LIST HAD ITS BLOCKER DISCHARGED BY A ROW THAT WAS NOT ABOUT IT. ' +
+      'WHAT KEEPS THIS ROW UNSCHEDULED IS FOUR THINGS AND THE ADAPTER IS NONE OF THEM. ' +
+      'ONE, the second half of the opening clause is unchanged: there is still NO CALLER, ' +
+      'nothing under any `src/` calls `runReplayAudit`, and case 3.1 derives that rather than ' +
+      'trusting it. ' +
+      'TWO, `raiseDivergence` REFUSES (`batch/adapter.ts:34`) and the audit reaches it ON A ' +
+      'FINDING ONLY, so a book that AGREES returns a report and a book that DISAGREES throws ' +
+      'and records nothing. That is the event-sink gap RI-04 holds and it is not this job`s ' +
+      'to close. ' +
+      'THREE, `readPort`s `accountsWithStoredState` leg (`batch/adapter.ts:802`) reads the ' +
+      'whole of `rule_states` to compute a projection, and the adapter states at its own site ' +
+      'that the repair is a read on `packages/db` and is owed BEFORE this audit runs nightly. ' +
+      'FOUR, THE DEAD-MAN SWITCH WOULD HAVE NOTHING TO WATCH. CRON_INVENTORY`s row for this ' +
+      'job fires on `replay.audit_completed` absent, and that name is in neither the ten-name ' +
+      '`EVENT_CATALOGUE` (`apps/api/src/events.ts:382`) nor EVENTS.md, so a scheduled run`s ' +
+      'completion would be invisible to an S1 switch that gates payout eligibility and M12 ' +
+      'publication both. ' +
+      'AND THE INVENTORY CARRIES THE RETIRED HALF TOO AND THIS FENCE DOES NOT HOLD IT: that ' +
+      'row still records this job as having no `src/` file that supplies its ports. Reported ' +
+      'here and not repaired there.',
   },
   {
     module: './batch/statistics.ts',
@@ -341,7 +435,14 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'THERE ARE THREE. (1) `postgresDetectorRunnerIo` serves four of `DetectorRunnerIo`s five ' +
       'members; the fifth is `events` and no sink is reachable from this deployable at all ' +
       '(RI-04, node-linker=isolated), while two of the runners three event names would be ' +
-      'refused by the producer even if one were. `runner.ts` emits INSIDE the write transaction ' +
+      'refused by the producer even if one were. THAT FIGURE IS WRONG BY ONE AND IS KEPT BESIDE ' +
+      'ITS CORRECTION per RI-14, NAMED RATHER THAN RE-QUOTED (ADR-367): the retired figure is ' +
+      'the TWO. `DetectorEventName` (`detectors/ports.ts:527`) is three names and EXACTLY ONE ' +
+      'of them, `detector.run_degraded`, is absent from the ten `EVENT_CATALOGUE` carries ' +
+      '(`apps/api/src/events.ts:382`), which is what `buildEvent` (`:692`) refuses on under ' +
+      'ADR-159 clause 1. `flag.raised` and `detector.run_completed` are both rows. THE BLOCKER ' +
+      'DOES NOT MOVE, because no sink is reachable from here at all and the count only ever ' +
+      'mattered to the counterfactual. `runner.ts` emits INSIDE the write transaction ' +
       'and emits UNCONDITIONALLY, so a deployment holding the composed value writes no ' +
       '`detector_runs` row and every outcome comes back `unrecorded`. (2) `detector_definitions` ' +
       'has no producer: `packages/db/src/seed/detectors/` is a JSON file and no `.ts` under any ' +
