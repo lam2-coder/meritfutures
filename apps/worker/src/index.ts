@@ -1339,6 +1339,24 @@ export type {
   DigestAlarmReport,
   WindowFold as DigestWindowFold,
 } from './digests/alarm.ts';
+// ADR-353. THE ALARM'S `DigestAlarmIo` OVER THIS DEPLOYABLE'S OWN DOORS, AND IT
+// IS THE FIRST ADAPTER IN THIS DEPLOYABLE THAT SERVES ITS WHOLE PORT: three
+// members, all three served, nothing defaulted to a refusal. It is a SEPARATE
+// leg from the producer's, which is row 354's and is not this one: a file
+// serving both is a file whose success on the alarm half reads as evidence about
+// the delivery half.
+//
+// **THE JOB IS STILL `unscheduled` AND THE BLOCKER IS NO LONGER AN ADAPTER.**
+// Nothing in this repository ever writes a `report_schedules` row, so the alarm's
+// subject set is empty and a clock in front of it reports zero undelivered
+// windows over zero schedules. `schedule.ts`'s row carries the measurement.
+export {
+  DIGEST_ALARM_TERMS,
+  digestAlarmReadTx,
+  postgresDigestAlarmRead,
+  postgresDigestAlarmIo,
+} from './digests/alarm-adapter.ts';
+export type { WorkerDigestTx } from './digests/alarm-adapter.ts';
 export {
   artifactDigest,
   decideOutcome,
@@ -1596,6 +1614,7 @@ export const WORKER_BARREL_LEGS = [
   './detectors/identity.ts',
   './detectors/ports.ts',
   './detectors/runner.ts',
+  './digests/alarm-adapter.ts',
   './digests/alarm.ts',
   './digests/ports.ts',
   './digests/produce.ts',

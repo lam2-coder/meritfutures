@@ -142,6 +142,34 @@
 // ONE IS RECORDED**, which is the whole reason the disposition is derived from a
 // census rather than typed.
 //
+// **AND ADR-353 TOOK THE FOURTH BITE, AND IN TAKING IT FOUND THAT "THE OTHER
+// SEVEN" WAS ALREADY WRONG BY ONE BEFORE THIS ROW TOUCHED IT.** Both paragraphs
+// above are kept whole per `RI-14`. `./digests/alarm-adapter.ts` builds a
+// `DigestAlarmIo` over this deployable's own doors, and it is the FIRST ADAPTER
+// IN THIS DEPLOYABLE THAT SERVES ITS WHOLE PORT: three members, all three
+// served, nothing taken as an argument nothing can be passed for and nothing
+// defaulted to a refusal.
+//
+// **DERIVED AT THE MOMENT THIS PARAGRAPH WAS WRITTEN AND NOT SUBTRACTED FROM
+// SEVEN.** Of the nine `UNWIRED_*_IO` values, a census for a function or a value
+// under `apps/worker/src` whose declared type is the same port finds one for
+// `ExpirySweepIo`, one for `ReconSweepIo`, one for `DetectorRunnerIo` and now
+// one for `DigestAlarmIo`, and none for `DigestIo`, `BreakerIo`, `LiveIngestIo`,
+// `RuleStateWriterIo` or `WithdrawalApprovalSweepIo`. **THE COUNT IS FIVE, AND
+// IT WAS SIX BEFORE THIS ROW RATHER THAN THE SEVEN THE PARAGRAPH ABOVE STATES**:
+// ADR-345 and ADR-349 each landed in the same wave, each counted its own row on
+// top of ADR-344's, and neither could see the other, so the merged prose
+// enumerates two implementations where the tree already held three. That is the
+// same hand-typed-count defect this file was written about, occurring in the
+// file that was written about it, which is why the number above is stated with
+// its census beside it.
+//
+// **THE VALUES THEMSELVES DID NOT MOVE AND NEITHER DID THE CALLER CENSUS**: all
+// nine are still exported, still the DEFAULT, and refusing is still the correct
+// outcome for a deployment that installs nothing; nothing under `src/` calls
+// `findUndeliveredWindows`, and the alarm row's own `why` carries the blocker
+// that is not an adapter.
+//
 // **AND THE CENSUS ABOVE IS A CENSUS OF CONSTRUCTORS, WHICH IS SAID BECAUSE IT
 // IS NOT THE SAME QUESTION.** `UNWIRED_RULE_STATE_WRITER_IO` is counted among
 // the seven and `batch/adapter.ts` composes a `RuleStateWriterIo` INLINE at its
@@ -331,8 +359,29 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     disposition: 'unscheduled',
     why:
       'THE SECOND OF THE TWO DIGEST ENTRY POINTS, and the half the replaced sentence was ' +
-      'counting as one with the first. `UNWIRED_DIGEST_ALARM_IO` is the only `DigestAlarmIo` in ' +
-      'the tree. It reads what the producer failed to deliver, so it is exactly as unscheduled ' +
+      'counting as one with the first. THIS ROW READ "`UNWIRED_DIGEST_ALARM_IO` is the only ' +
+      '`DigestAlarmIo` in the tree" AND ADR-353 WROTE THE SECOND ONE, so the sentence is kept ' +
+      'beside its correction (RI-14) and the disposition does not move, because THE ADAPTER WAS ' +
+      'NEVER THE ONLY BLOCKER AND IT WAS NOT THE BINDING ONE. `postgresDigestAlarmIo` serves ALL ' +
+      'THREE members of `DigestAlarmIo` and nothing in it refuses, which is the first time that ' +
+      'is true of an adapter in this deployable. **THE BLOCKER IS THAT THE SUBJECT SET IS ' +
+      'EMPTY.** Re-derived at the moment of writing: NOTHING IN THIS REPOSITORY EVER WRITES A ' +
+      '`report_schedules` ROW, in any `src/` tree, any migration or any seed, and both readers ' +
+      'filter `enabled: true`. So a clock in front of this today evaluates zero schedules and ' +
+      'publishes `admin.report_windows_undelivered` as zero, and M06 section 3.6 already calls ' +
+      'that metric "zero, always": the number a scheduled run would report is the number a ' +
+      'healthy estate reports, and no field of `DigestAlarmReport` except `schedulesEvaluated` ' +
+      'tells the two apart. THAT IS THE ADR-239 DEFECT WITH A CLOCK IN FRONT OF IT AND IT IS ' +
+      'WORSE THAN SILENCE, because a green metric is read as evidence. SECOND, A RAISED FINDING ' +
+      'REACHES NOBODY: `DigestAlarmReport` and `DigestAlarmFinding` have no consumer under any ' +
+      '`src/`, both metric names appear in no `src/` file outside `alarm.ts`s own comments, ' +
+      'alarm.ts emits no event and no sink is reachable from this deployable (RI-04), and this ' +
+      'row IS the dead-man switch rather than a job one watches, so there is no completion ' +
+      'signal whose absence would page. THIRD, WHETHER A FINDING SHOULD FAIL THE PROCESS IS A ' +
+      'NUMBER NOBODY HAS STATED: the inventory row is S2 and S1 in effect for the two MUST ' +
+      'digests, `cadence_unanchored` is a finding that is not a failure, and no document maps ' +
+      'kinds to an exit code, so ADR-353 records it as an open question rather than inventing ' +
+      'one. It still reads what the producer failed to deliver, so it is exactly as unscheduled ' +
       'as the producer and not more so.',
   },
   {
