@@ -467,3 +467,95 @@ test('nothing enqueues, which is what stops the job store growing', () => {
       module,
     );
 });
+
+// -----------------------------------------------------------------------------
+// 6. ADR-355: the drain is OWED, its shape is a one-shot pull, and neither the
+//    interface nor this deployable can express one yet
+// -----------------------------------------------------------------------------
+// **THESE THREE CASES BIND A RULING RATHER THAN A WIRE, and the first is built
+// to FAIL ON GOOD NEWS.** ADR-355 ruled that this deployable owes a drain for
+// `PROVISIONING_QUEUE_NAME`, that the shape owed is a bounded pull which claims,
+// settles, reports and exits, and that `consume` and `start` therefore stay
+// withheld because those are the process that stays up. The reason no drain
+// LANDED with that ruling is section 5.2: `JobQueue` publishes five methods and
+// not one of them takes a job off a queue, so the first slice is a SIXTH method
+// and ADR-165 clause 5 makes that `packages/queue`'s row and not this one's.
+//
+// A paragraph saying so goes stale in silence. The case below goes RED the day
+// the sixth method lands, which is the day the drain becomes buildable and the
+// day somebody should re-read the ruling rather than discover it by grep.
+
+test('JobQueue publishes no pull, so the drain ADR-355 ruled owed is not expressible yet', () => {
+  // THE LIST IS `packages/queue`'s OWN DATA, read rather than restated, which is
+  // case 2's instrument pointed at a different property: case 2 asks WHICH of
+  // the five this door takes, and this one asks whether any of the five is the
+  // kind of method a drain is built from.
+  expect([...JOB_QUEUE_METHODS].sort()).toEqual([
+    'consume',
+    'declareQueue',
+    'enqueue',
+    'start',
+    'stop',
+  ]);
+
+  // **`consume` IS NOT A PULL AND THAT IS THE WHOLE DISTINCTION ADR-355 TURNS
+  // ON.** `pgBossQueue` implements it as `boss.work()`, which registers a
+  // handler and stays up; `manager.work` throws "Workers are disabled" when the
+  // instance is stopped. A pull is `fetch`/`complete`/`fail`: one statement on
+  // the caller's own handle, no supervisor, and a rejection that reaches the
+  // caller. None of those three names is on this interface.
+  const pulls = JOB_QUEUE_METHODS.filter((method) =>
+    ['fetch', 'complete', 'fail', 'poll', 'drain'].includes(method),
+  );
+  expect(
+    pulls,
+    'a pull arrived on JobQueue: ADR-355 section 5.2 is now actionable and the drain is buildable',
+  ).toEqual([]);
+});
+
+test('nothing under src drains a job, which is the absence ADR-355 rules is owed', () => {
+  // THE ABSENCE IS BOUND THE WAY `RI-35` BINDS ONE, over STRIPPED source, which
+  // is ADR-338's lesson applied ahead of the case: this file, `src/queue.ts` and
+  // `src/provisioning/queue-adapter.ts` all now DISCUSS `fetch`, `complete` and
+  // `fail` at length in prose, and a substring test over raw source would read
+  // those sentences as the very wiring they say does not exist.
+  const drainers = sourceFiles()
+    .filter((file) => {
+      const body = stripComments(readFileSync(file, 'utf8'));
+      return /\.(?:fetch|complete|fail)\s*\(/.test(body);
+    })
+    .map(asPosix);
+  expect(
+    drainers,
+    'a drain landed under src: ADR-355 ruled the shape, and the row that landed it owes the cycle, the batch size and the attempt ceiling section 8 leaves open',
+  ).toEqual([]);
+});
+
+test('the advance and read ports are taken by no function, which three files said otherwise', () => {
+  // **ADR-355 SECTION 7.** `src/index.ts` read "`runProvisioningSaga` takes a
+  // queue, a platform, an advance port and a read port", and `schedule.ts` and
+  // `queue-adapter.ts` carried the same claim. It takes neither: `SagaIo`'s four
+  // members are `tx`, `queue`, `platform` and `rows`, and the last is DATA.
+  //
+  // THE CHECK IS A PARAMETER POSITION AND NEVER A MENTION, because all three
+  // corrections quote the port names in order to say they are not taken.
+  const takers = sourceFiles()
+    .filter((file) => {
+      const body = stripComments(readFileSync(file, 'utf8'));
+      // A type annotation in an argument or a member position, which is what a
+      // port being CONSUMED looks like. The declarations in `ports.ts` are
+      // `export interface X {`, which this does not match.
+      return /:\s*Provisioning(?:Advance|Read)Port\b/.test(body);
+    })
+    .map(asPosix);
+  expect(
+    takers,
+    'a function now takes the advance or read port: ADR-355 section 7 recorded that none did',
+  ).toEqual([]);
+
+  // AND THE TWO INTERFACES STILL EXIST, so this case cannot pass by their
+  // deletion, which would make the assertion above vacuously true.
+  const ports = readFileSync(join(APP, 'src/provisioning/ports.ts'), 'utf8');
+  expect(ports).toContain('export interface ProvisioningAdvancePort');
+  expect(ports).toContain('export interface ProvisioningReadPort');
+});

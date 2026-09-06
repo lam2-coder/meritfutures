@@ -516,6 +516,36 @@ export const ABSENCE_ARTIFACTS = [
     },
   },
   {
+    key: 'job-queue-pull',
+    names:
+      'a PULL on `JobQueue`: a method that takes a job off a queue without staying up to do ' +
+      'it. ADR-355 ruled the provisioning drain OWED and this is the interface slice that ' +
+      'has to land before one can be written',
+    needles: [],
+    sweptBy:
+      'nothing of its own, and the reason is that `queue-door`s fourth needle already reaches ' +
+      'its one claim site: that sentence names the vendor in the `pg-boss` spelling. A fifth ' +
+      'needle here would register the same line twice. **THE PROBE IS THE POINT RATHER THAN ' +
+      'THE SWEEP**: this entry exists so that the day `packages/queue` publishes a pull, ' +
+      'RI-35 goes RED at the sentence saying none exists, which is the same instrument ' +
+      '`apps/worker/test/queue.test.ts` case 6.1 carries one layer down. Both fail on GOOD ' +
+      'NEWS, and two independent controls on one fact is deliberate here because the fact is ' +
+      'the trigger for a ruling somebody has to re-read rather than a wire somebody notices',
+    probe: (root) => {
+      // THE LIST IS READ AND NOT RESTATED, which is `packages/queue`s own rule for
+      // `JOB_QUEUE_METHODS`: an interface is erased at runtime, so the data is the authority.
+      // A written copy of the five here would be the drift ADR-034 exists to end.
+      const body = requireFile(root, 'packages/queue/src/job-queue.ts');
+      const block = /JOB_QUEUE_METHODS\s*=\s*\[([\s\S]*?)\]/.exec(body)?.[1] ?? '';
+      const declared = [...block.matchAll(/'([a-zA-Z]+)'/g)].map((match) => match[1] ?? '');
+      return declared.some((method) =>
+        ['fetch', 'complete', 'fail', 'poll', 'drain', 'claim'].includes(method),
+      )
+        ? 'present'
+        : 'absent';
+    },
+  },
+  {
     key: 'worker-queue-manifest',
     names: '`apps/worker/package.json` declaring a dependency on `@merit/queue`',
     needles: [],
@@ -997,6 +1027,13 @@ export const ABSENCE_CLAIMS = [
     disposition: 'retired',
     artifact: 'queue-door',
     why: 'the package published an interface and an adapter, and `apps/worker` has now taken it',
+  },
+  {
+    site: 'apps/worker/src/queue.ts',
+    claim: 'NO PULL IS PUBLISHED ON `JobQueue`, WHICH IS WHY NO DRAIN LANDED WITH THE',
+    disposition: 'live',
+    artifact: 'job-queue-pull',
+    why: 'ADR-355 ruled the drain owed and could not write one: the interface publishes no pull',
   },
   {
     site: 'packages/queue/src/index.ts',
