@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->351<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->352<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -12904,3 +12904,37 @@ Counts derived at reporting time off each runner's own last line: suite **329 fi
 **Next.** The founder's read of [ADR-367](decisions/ADR-367.md) and the three decisions its approval block names: section 9 question 1, now asked by two rows and carrying a fourth option this row adds; whether the three `src/` repairs in section 8 are worth a row of their own; and whether enumerating rather than trusting a dispatch becomes the default for collection rows.
 
 Counts derived at reporting time off each runner's own last line: suite **328 files / 7,970 passed / 10 skipped / 0 failed**, against an `ee7ce5a4` baseline reproduced **before the first edit** of **328 files / 7,966 passed / 10 skipped / 0 failed**, a delta of **+4 cases in ONE EXISTING FILE, no file added and skips unchanged**, attributed by removal at **18** alone against **14** alone on the base. Gates **33 of 33** after `generate`, invariants **35 of 35**, `typecheck`, `lint` and `format:check` all clean.
+
+---
+
+## 2026-09-06 - Session 563: two merged entries rule opposite ways on one rule, and both put the arms in the member list where the arms are in the return type ([ADR-368](decisions/ADR-368.md), proposed)
+
+**[ADR-368](decisions/ADR-368.md), `status: proposed`, approval line UNSIGNED. MONEY-ADJACENT (auth, admin), `E2` READ OWED.** Two merged entries written four hours apart disagree about a general rule, both `proposed`, both UNSIGNED, and nothing in the corpus recorded which was right. [ADR-360](decisions/ADR-360.md) ruled that no half-install of `setAdminSessionSource` exists to get wrong because *"That shape needs at least two members"*. [ADR-364](decisions/ADR-364.md) ruled that the claim does not carry to a four-member port.
+
+**THE DISAGREEMENT IS NOT TWO RIVAL ANSWERS. IT IS ONE ANSWER ASSERTED TWICE.** `ADR-364.md:32` says the prior ruling *"was correct about a ONE-member port"* and `:3` restates the member-count reason approvingly before flipping the conclusion for its own port. So the corpus held one claim, endorsed by both entries, and this row is the first thing to test it.
+
+**RULED: BOTH ENTRIES ARE RIGHT ABOUT THEIR OWN PORT'S DISPOSITION AND THE GENERALISATION THEY SHARE IS FALSE, and it is false about the port it was first stated about rather than only about the transfer.** Both located the half-install arms in the MEMBER LIST. The arms are in the RETURN TYPE. `AdminSessionSource` declares ONE member (`admin-reads.ts:235-237`) whose return type `AdminSessionLookup` is a closed THREE-arm union (`:207-210`), and `authorizeAdmin` branches on all three. Driven through the real `adminHandler`, the arms answer **401**, **403** and **503**, the last because an admitted `operator` reaches the statement after authorization and finds no read source.
+
+**AND ADR-356's SHAPE IS BUILT ON THE PORT RULED INCAPABLE OF PRESENTING IT.** One object, installed through the single setter, typed with no cast, answers **401** to one token and **503** to another. That is a live arm beside a refusing one, which is `ADR-360.md:3`'s own definition, on a port it ruled *"installed or it is not"*.
+
+**THE REFUTATION WAS ALREADY IN ADR-360's OWN TRANSCRIPT AND DID NOT REACH ITS CONCLUSION.** `ADR-360.md:174` records the seed *"the installed source answers `not-an-operator` instead of `unknown`"* going RED on two cases. An arm of the single member changing an observable answer is an arm to get wrong, measured by the row that ruled there was none.
+
+**THE PROPERTY THAT ACTUALLY DECIDES IT IS MEMBERS TIMES THE ARMS OF EACH MEMBER'S RETURN TYPE.** Member count is one factor of that product and is neither necessary nor sufficient alone. A rule reading *"at least two members"* off the member list orders the two ports the wrong way round, because the one-member port presents more arms than its arity. **The sufficient direction is left UNMEASURED as OQ-1 rather than assumed**, because establishing it means sweeping all fourteen ports and not the two this row was sent to.
+
+**THE HALF OF ADR-356 THAT IS ARITY-BLIND CARRIES, AND ADR-360 APPLIED IT CORRECTLY.** `adminHandler` gates the port's only run-time name on `installed === null`, so any non-null source silences it whichever arm it returns. That is why the full honest install is a regression, and it needs no claim about arms at all. **The entry reached a correct ruling and then justified it with a claim it did not need and had not measured.**
+
+**BOTH DISPOSITIONS STAND AND NEITHER FROZEN ENTRY IS AMENDED.** `setAdminSessionSource` and `setInternalOpsSource` both stay DECLINED, the honest empty-directory install still has a zero wire delta, and `wired: 11` and `blocked: 14` are unchanged and were re-derived green.
+
+**SIX EXECUTED SITES CARRY THE REFUTED REASON AND NOT ONE IS A FAILING ASSERTION.** `admin-session-source.test.ts:328` and `:329-333`; `internal-ops-source.test.ts:352`, `:354-355`, `:7-9` and `:325`. Every assertion beneath them is true. What propagated is the REASON, in test NAMES and comments, where nothing asserts it and nothing can redden. **That is [ADR-358](decisions/ADR-358.md)'s shape confirmed rather than assumed**: ADR-364 repaired the clause it was dispatched about, the `null` default, and inherited the rest. Nine further register and journal sites restate one of the two titles and are generated spans off frozen headings, so they cannot be repaired and must not be.
+
+**`RI-14` IS FOLLOWED IN [ADR-367](decisions/ADR-367.md)'s FORM RATHER THAN ITS BREACH.** Nothing is deleted, and the executed file NAMES the retired figure instead of reproducing the sentence that carried it, so a prose-matching case is not handed two answers. **This row's OWN slicer defect is kept as a fixture**: the union slicer's first draft took the first `;` after the alias, which sits INSIDE the `operator` arm, and reported three arms as one. It is the mirror of the defect ADR-360 records in its own slicer, and it was caught by a failing case while every wire case was already green.
+
+**STILL OWED AND OUTSIDE THIS ROW'S FENCE.** `apps/api/test/wiring.test.ts:1415-1418` still ends the `setInternalOpsSource` entry with *"this port's OWN docblock refuses it harder"*, which `ADR-364.md:164` measured as overstated and whose repair text it already states. **[ADR-367](decisions/ADR-367.md) collected what rows 360 to 363 left owed and row 364's item was not in its enumeration.** Confirmed independently, reported, not repaired.
+
+**No port was wired, no triple moved, no migration was written, edited or reserved, no door opened, no closed list widened, no gate weakened, no test skipped, disabled or quarantined, no invariant number taken, and no `src/` file in either workspace was opened for writing.**
+
+**PUSHING WORKS AND THE GITHUB API DOES NOT, TESTED IN BOTH DIRECTIONS RATHER THAN ASSUMED.** No `gh` binary and no `mcp__github__*` tool; `api.github.com/repos/lam2-coder/meritfutures` answers **403**; `git push -u origin` authenticated and succeeded. **No pull request was opened and none is this row's to open.** The repository was not present in this container at session start and was attached and cloned before any work began, landing at the base this row was given.
+
+**Next.** The founder's read of [ADR-368](decisions/ADR-368.md) and the three decisions its approval block names: whether a refuted reason standing under a correct ruling is worth a row at all, OQ-1's fourteen-port sweep, and whether a claim propagating only through test names wants a control.
+
+Counts derived at reporting time off each runner's own last line: suite **332 files / 8,028 passed / 10 skipped / 0 failed**, against an `8ff3a2a4` baseline reproduced **before the first edit** of **331 files / 8,019 passed / 10 skipped / 0 failed**, a delta of **+1 FILE and +9 cases, skips unchanged**, attributed by removal: deleting the one new file returns the suite to baseline exactly. Gates **33 of 33** after `generate`, invariants **35 of 35**, `typecheck`, `lint` and `format:check` all clean.

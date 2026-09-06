@@ -379,6 +379,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-365](ADR-365.md) | the admin money-out console refuses correctly and both refusal properties hold, and the entry describing it is wrong about what stops it: it names ONE blocker where the tree has TWO, and the unnamed one is the very door this deployable's OTHER admin port names in its own source (2026-09-06, status: proposed) |
 | [ADR-366](ADR-366.md) | the admin wallet port has FIVE members and the entry that blocks it names THREE, the write surface is TWO members rather than one because both appends go through the door nobody counted, and against the unwired default exactly one member is ever consulted (2026-09-06, status: proposed) |
 | [ADR-367](ADR-367.md) | the collection row, where every owed item was real and the dispatch's own list of three was one item counted twice, one right, one naming a figure that is not in the file it named, and two missing; two counts are DERIVED now and the third stays hand-maintained because deriving it would answer a founder's question (2026-09-06, status: proposed) |
+| [ADR-368](ADR-368.md) | both merged entries are right about their own port and the GENERALISATION they share is false, because both located the half-install arms in the MEMBER LIST and the arms are in the RETURN TYPE; the one-member port presents three of them and answers 401, 403 and 503, so ADR-356's shape arises on the port ruled incapable of it (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
