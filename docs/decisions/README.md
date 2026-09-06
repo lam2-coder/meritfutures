@@ -398,6 +398,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-384](ADR-384.md) | the line split three rows queued for `RI-35` was never what `RI-35` needed, the registration lands with the runbook row unsplit, and the split is refused by a gate rather than by taste (2026-09-06, status: proposed) |
 | [ADR-385](ADR-385.md) | the two counts ADR-382 left unreconciled are two different sets, both are short, and the class they name is not checkable (2026-09-06, status: proposed) |
 | [ADR-386](ADR-386.md) | the line budget the citation graph imposes on prose, priced, and refused as a rule (2026-09-06, status: proposed) |
+| [ADR-387](ADR-387.md) | the claim site ADR-384 named was one of two, `S3` measured at full population is six of thirteen rather than three of five, and the gate is refused on three measurements rather than on a cost (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
