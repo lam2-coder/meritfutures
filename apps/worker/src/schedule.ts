@@ -73,6 +73,17 @@
 // scheduler that starts a process to throw, so the blocker is the adapter and
 // the clock is downstream of it.
 //
+// **AND IT IS TRUE OF EVERY PORT EXCEPT TWO SINCE ADR-350, WHICH IS THE SAME
+// AMENDMENT A SECOND TIME AND IS KEPT BESIDE THE FIRST.**
+// `./batch/statistics-adapter.ts` implements `StatisticsPorts` over the one
+// door, so the statistics run is the second job on this list whose ports have a
+// live inhabitant. **IT IS THE FIRST ONE WHOSE ADAPTER IS PARTIAL ON PURPOSE**:
+// three of its nine methods refuse, and two of the three refuse because a
+// published statistic would otherwise be computed over a fact this estate cannot
+// produce. `runStatisticsRun` reads every fact set per window, so a refusal ends
+// the run rather than shrinking it, which is `FM-M12-02` holding by construction.
+// **THE CALLER CENSUS DID NOT MOVE**: `runStatisticsRun` still has none.
+//
 // **THE OPENING CLAUSE IS NOW TRUE OF EVERY PORT EXCEPT ONE AND IT IS KEPT
 // WHOLE, per `RI-14`.** ADR-338 wrote `./provisioning/queue-adapter.ts`, so
 // `ProvisioningJobQueue` has a live inhabitant and the provisioning saga is
@@ -93,6 +104,72 @@
 // outcome for a deployment that installs nothing, and `runExpirySweep` still
 // has no caller under any `src/`. The expiry row's own `why` carries the
 // measurement and the fifth port it cannot serve.
+//
+// **AND ADR-349 TOOK THE THIRD BITE, ON THE DETECTOR RUNNER.**
+// `./detectors/adapter.ts` builds a `DetectorRunnerIo` over the same doors, so
+// `UNWIRED_DETECTOR_RUNNER_IO` is no longer THE ONLY inhabitant of its port type
+// either, and the count of ports with no implementation anywhere is **SEVEN**
+// rather than eight, derived over `apps/worker/src` after the merge that carried
+// both rows. **THE NINE `UNWIRED_*_IO` VALUES STILL DID NOT MOVE** and the
+// caller census did not either: nothing under any `src/` calls `runDetectors`.
+//
+// **AND THE DETECTOR ROW STAYS `unscheduled` FOR A REASON THAT IS NOT THE
+// ADAPTER, WHICH IS WHY THE OPENING CLAUSE SURVIVES BEING FALSIFIED A THIRD
+// TIME.** That adapter serves FOUR of `DetectorRunnerIo`'s five members. The
+// fifth is the EVENT SINK and this deployable can reach no sink at all:
+// `test/event-sink.test.ts` establishes the shape of that gap across three ports
+// at once, and two of the detector runner's three event names would be refused
+// by the producer one deployable over even if the import were legal. `runner.ts`
+// emits inside the write transaction and emits UNCONDITIONALLY, so the composed
+// value writes NO `detector_runs` row. That is the second blocker; the empty
+// `detector_definitions` table is the third. The row's `why` enumerates all
+// three.
+// **AND ADR-345 TOOK THE THIRD BITE, WHICH IS WHY THE PARAGRAPH ABOVE'S "EIGHT"
+// IS ALREADY STALE AND IS KEPT ANYWAY per `RI-14`.** `./recon/adapter.ts` builds
+// a `ReconSweepIo` over this deployable's one door, so `UNWIRED_RECON_SWEEP_IO`
+// is no longer THE ONLY inhabitant of its port type either. **THE TWO ROWS
+// LANDED IN THE SAME WAVE AND EACH COUNTED NINE DOWN TO EIGHT WITHOUT SEEING THE
+// OTHER**, which is this file's own lesson about hand-typed counts arriving one
+// register over. **DERIVED AT THIS MERGE RATHER THAN SUBTRACTED**: of the nine
+// `UNWIRED_*_IO` values, a census for a function or a value under `src/` whose
+// type is the same port finds one for `ExpirySweepIo` and one for
+// `ReconSweepIo` and none for the other seven. **THE VALUES THEMSELVES DID NOT
+// MOVE AND NEITHER DID THE CALLER CENSUS**: all nine are still exported, still
+// the DEFAULT, and refusing is still the correct outcome for a deployment that
+// installs nothing; nothing under `src/` calls `runReconciliationSweep`, and the
+// recon row's own `why` carries the three blockers that are not an adapter.
+// **WIRING AND SCHEDULING ARE TWO DECISIONS AND THIS FILE IS WHERE THE SECOND
+// ONE IS RECORDED**, which is the whole reason the disposition is derived from a
+// census rather than typed.
+//
+// **AND THE CENSUS ABOVE IS A CENSUS OF CONSTRUCTORS, WHICH IS SAID BECAUSE IT
+// IS NOT THE SAME QUESTION.** `UNWIRED_RULE_STATE_WRITER_IO` is counted among
+// the seven and `batch/adapter.ts` composes a `RuleStateWriterIo` INLINE at its
+// `writeRuleState` leg, so that one has an inhabitant no grep for a returned
+// type will find. Reported here rather than repaired: the number this file cares
+// about is which JOBS have no live io, and that one is a leg of a job that runs.
+//
+// **BOTH PARAGRAPHS ABOVE CALL THEMSELVES THE THIRD BITE AND BOTH SAY SEVEN,
+// AND NEITHER IS THE COUNT ON THIS TREE.** ADR-349 and ADR-345 landed in the
+// same wave on branches that could not see each other, exactly as ADR-344 and
+// ADR-350 did one paragraph up, and each subtracted its own adapter from eight
+// and arrived at seven. Both are kept whole under `RI-14` because each was
+// correct over the tree it was derived on. **DERIVED AT THIS MERGE, OVER ALL
+// THREE ROWS AT ONCE: THE COUNT IS SIX.** Of the nine `UNWIRED_*_IO` values, a
+// census for a declaration under `apps/worker/src` whose RETURN type is the
+// same port finds `./sweeps/expiry-adapter.ts` for `ExpirySweepIo`,
+// `./detectors/adapter.ts` for `DetectorRunnerIo` and `./recon/adapter.ts` for
+// `ReconSweepIo`, and nothing for the other six. **THE NINE VALUES STILL DID
+// NOT MOVE AND NEITHER DID THE CALLER CENSUS**: all nine are still exported,
+// still the DEFAULT, refusing is still the correct outcome for a deployment
+// that installs nothing, and nothing under any `src/` calls `runExpirySweep`,
+// `runDetectors` or `runReconciliationSweep`. **THE CENSUS IS OF CONSTRUCTORS
+// AND THAT IS NOT THE SAME QUESTION**, which is ADR-345's caveat and it
+// survives the correction: `UNWIRED_RULE_STATE_WRITER_IO` is among the six and
+// `batch/adapter.ts:908` composes a `RuleStateWriterIo` INLINE through
+// `writeRuleStateVia`, so that one has an inhabitant no grep for a returned
+// type will find. Reported and not repaired: the number this file cares about
+// is which JOBS have no live io, and that one is a leg of a job that runs.
 //
 // **THE WITHDRAWAL DRIVER IS THE ONE WHOSE BLOCKER IS NOT AN ADAPTER**, and it
 // is the reason this row does not simply write eleven adapters. `ADR-305`
@@ -175,7 +252,23 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'NO LIVE PORTS AND NO CALLER, and its own CRON_INVENTORY row already says so in its own ' +
       'words. Its two preconditions are the batch and the self-audit, and the second of those ' +
       'is unscheduled one row up, so scheduling this one first would publish off an unaudited ' +
-      'fold. ADR-122.',
+      'fold. ADR-122. ' +
+      'THE FIRST CLAUSE IS HALF FALSE NOW AND IS KEPT BESIDE ITS CORRECTION per RI-14. ADR-350 ' +
+      'wrote `./batch/statistics-adapter.ts`, so `StatisticsPorts` has an inhabitant that ' +
+      'reaches the real tables: four of the six read ports and the write port are SERVED. ' +
+      'WHAT KEEPS THIS ROW UNSCHEDULED IS FOUR THINGS AND THE ADAPTER IS NONE OF THEM. ' +
+      'ONE, there is still NO CALLER: no `src/` file calls `runStatisticsRun`. ' +
+      'TWO, the self-audit precondition above is unchanged, so `selfAuditGreen` can never be ' +
+      'established and every run would halt at `waiting` with `inputs_not_vouched`. ' +
+      'THREE, `statistic_definitions` has NO ROWS in this repository, no seed and no migration ' +
+      'that inserts one, so a run over a freshly migrated database halts at ' +
+      '`no_effective_definitions`. ' +
+      'FOUR, three ports REFUSE and two of those refuse because Merit cannot yet produce the ' +
+      "FACT the definition asks for: ST-02's denominator needs the plan's maximum plausible " +
+      'time-to-first-payout, which no column, plan rule or config row carries, and ST-06 needs ' +
+      'the trading day a rail settlement counts for, which no column carries and no document ' +
+      'rules. A clock in front of this job today is a process that pages every night and ' +
+      'publishes nothing, which is the ADR-239 defect in its other direction.',
   },
   {
     module: './breaker/evaluate.ts',
@@ -194,9 +287,22 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'detector runs',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_DETECTOR_RUNNER_IO` is the only `DetectorRunnerIo` in the tree. Its row already ' +
-      'carries the marker and both halves of its dead-man switch are live and correct today: a ' +
-      'run that is absent is a job nobody scheduled.',
+      'THIS ROW READ "`UNWIRED_DETECTOR_RUNNER_IO` is the only `DetectorRunnerIo` in the tree" ' +
+      'AND ADR-349 WROTE THE SECOND ONE, so the sentence is kept beside its correction (RI-14) ' +
+      'and the disposition does not move, because THE ADAPTER WAS NEVER THE ONLY BLOCKER AND ' +
+      'THERE ARE THREE. (1) `postgresDetectorRunnerIo` serves four of `DetectorRunnerIo`s five ' +
+      'members; the fifth is `events` and no sink is reachable from this deployable at all ' +
+      '(RI-04, node-linker=isolated), while two of the runners three event names would be ' +
+      'refused by the producer even if one were. `runner.ts` emits INSIDE the write transaction ' +
+      'and emits UNCONDITIONALLY, so a deployment holding the composed value writes no ' +
+      '`detector_runs` row and every outcome comes back `unrecorded`. (2) `detector_definitions` ' +
+      'has no producer: `packages/db/src/seed/detectors/` is a JSON file and no `.ts` under any ' +
+      '`src/` reads it, so `readDefinition` finds nothing and every detector is ' +
+      '`DetectorUnregistered`. (3) Eleven of the eighteen seeded rows state no number at all ' +
+      '(`OQ-M7-02` is the founders and unanswered), so a loaded registry still gets ' +
+      '`DetectorDeclined`. Only the first is an adapter, and its row already carries the marker ' +
+      'and both halves of its dead-man switch are live and correct today: a run that is absent ' +
+      'is a job nobody scheduled.',
   },
   {
     module: './digests/alarm.ts',
@@ -270,9 +376,21 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
     cronRow: 'per-identity ledger reconciliation',
     disposition: 'unscheduled',
     why:
-      '`UNWIRED_RECON_SWEEP_IO` is the only `ReconSweepIo` in the tree. Its row is S1 because a ' +
-      'per-identity error hides behind a global zero (GS-231), and an S1 switch watching a job ' +
-      'nobody wired is the state this list exists to make legible.',
+      'THE FIRST CLAUSE OF THIS ROW READ "`UNWIRED_RECON_SWEEP_IO` is the only `ReconSweepIo` in ' +
+      'the tree" AND ADR-345 MADE IT FALSE, and it is kept beside its correction per RI-14. ' +
+      '`./recon/adapter.ts` is a second inhabitant, so the sweep is RUNNABLE against a real ' +
+      'database and this row stays unscheduled for reasons that are not the adapter. ' +
+      'THE BLOCK HAS NO RELEASE: the sweep sets `accounts.recon_blocked` on a mismatch and ' +
+      '`0014_marks.sql` reserves the clearing for a HUMAN, and nothing in this tree clears it in ' +
+      'code or in a route, so a clock today is a control that can stop eligibility and no ' +
+      'control that can restore it. THE RUN NEEDS A `batch_run_id` NOBODY IS MINTING: OVERVIEW ' +
+      'section 5.2 puts this stage INSIDE the nightly batch and `runReconciliationSweep` refuses ' +
+      'a non-uuid rather than generating one, so the caller is `batch/`s and not this file`s. ' +
+      'AND THE SWITCH WOULD BE SATISFIED BY THE WRONG CHECK: the row above is INV-M20-10`s ' +
+      'per-identity WALLET assertion, S1 because a per-identity error hides behind a global zero ' +
+      '(GS-231), and this sweep compares a rule state against a vendor mark per ACCOUNT-DAY. ' +
+      'That registration mismatch is reported in ADR-345 as an open question and is not ' +
+      'repaired here.',
   },
   {
     module: './sweeps/expiry.ts',

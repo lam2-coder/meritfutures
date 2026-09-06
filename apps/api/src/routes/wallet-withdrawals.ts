@@ -1145,6 +1145,112 @@ export function currentWithdrawalBackend(): WithdrawalBackend {
   return backend;
 }
 
+// -----------------------------------------------------------------------------
+// WHY THE COMPLETE ADAPTER BELOW IS STILL NOT INSTALLED. ADR-342
+// -----------------------------------------------------------------------------
+// THE ADAPTER IS NOT WHAT REFUSES, AND THAT IS THE FINDING RATHER THAN AN
+// APOLOGY FOR ONE. `databaseWithdrawalBackend` below is whole: every member of
+// `WithdrawalTx` is served, the lock is real, the identity, KYC, in-flight,
+// funds and cooling arms all run through `db.scoped`, and no float appears on
+// any of them. A session reading only the port and only the adapter would
+// conclude that one line in `start.ts` is all that stands between this route
+// and service, and would be wrong for a reason neither file states.
+//
+// WHAT STANDS THERE IS THE ESTATE PAST THE INSERT. A withdrawal created here is
+// `requested` or `cooling`; the arrow out of both is `G-WITHDRAWAL-CLEARED`
+// into `approved`, which posts `LT-06` and extinguishes the wallet claim; past
+// `approved` the only arrow is `transferring`, reached by enqueueing on a rail.
+// THE DRIVER FOR THE FIRST OF THOSE NOW EXISTS AND NOTHING RUNS IT, and the
+// rail is still a package with no socket. So a wired deployment would take a
+// trader's withdrawal request and hold it at `requested` for as long as the
+// estate stays as it is.
+//
+// AND THE ROUTE IS UNREACHABLE TODAY ANYWAY, WHICH IS AN ARGUMENT AGAINST
+// INSTALLING RATHER THAN A REASON IT IS HARMLESS. See finding `E`: C-27 refuses
+// every caller before this file's handler runs, so an install would change no
+// response any client can observe, would be exercised by nothing, and would
+// arm itself silently on the day a different row wires an elevation factor.
+// An install whose first live request is one nobody was watching for is the
+// defect this row was dispatched to end, arriving from the other side.
+//
+/**
+ * WHY `useWithdrawalBackend` IS NOT CALLED, WITH THE SOURCES THAT SETTLE IT.
+ *
+ * {@link TERMINAL_EDGE_FINDINGS}'s SHAPE AND ITS DISCIPLINE, one port over:
+ * each entry is `{id, claim, ruled, sources}`, the sources are paths a second
+ * reader can open, and `wallet-withdrawals.test.ts` RUNS each claim against
+ * this tree rather than against this comment. THE DAY ANY OF THESE IS
+ * DISCHARGED THIS FILE'S SUITE GOES RED and the install is due a re-decision,
+ * which is the whole point: a refusal recorded only in prose is a refusal that
+ * outlives its reason, and this entry has already watched that happen nine
+ * times in `wiring.test.ts`.
+ */
+export const INSTALL_BLOCKING_FINDINGS = [
+  {
+    id: 'D',
+    claim:
+      'the approval edge has a driver and NOTHING RUNS IT, which is a different sentence from ' +
+      'the one this port carried for four corrections. runWithdrawalApprovals in ' +
+      'apps/worker/src/withdrawals/approval-sweep.ts performs requested --> approved and ' +
+      'cooling --> approved with the LT-06 posting in the same transaction, and ' +
+      'apps/worker/src/sweeps/ledger.ts calls postTransaction with ' +
+      'walletWithdrawalApprovalPosting, which packages/ledger/src/index.ts exports. So the ' +
+      'driver, the builder and the manifest line all exist. WHAT DOES NOT EXIST IS AN ADAPTER ' +
+      'FOR ITS OWN IO: UNWIRED_WITHDRAWAL_APPROVAL_IO is the only WithdrawalApprovalSweepIo in ' +
+      'the tree and it refuses every call, and the job carries disposition unscheduled in ' +
+      'apps/worker/src/schedule.ts.',
+    ruled:
+      'NOT RULED HERE AND NOT THIS ROW TO RULE. apps/worker/src/index.ts states the condition ' +
+      'in its own words: the installation MUST NOT BE DISPATCHED BEFORE A PAYMENT RAIL EXISTS, ' +
+      'because past approved there is no exit and 0072 WD-C2 refuses approved --> cancelled at ' +
+      'the database. That is a founder-owed rail rather than a slice, so this port waits on ' +
+      'the same condition its driver waits on, one deployable over.',
+    sources: [
+      'apps/worker/src/withdrawals/approval-sweep.ts',
+      'apps/worker/src/withdrawals/ports.ts',
+      'apps/worker/src/schedule.ts',
+      'apps/worker/src/sweeps/ledger.ts',
+    ],
+  },
+  {
+    id: 'E',
+    claim:
+      'C-27 makes this route unreachable in a deployment, so the 503 the unwired port produces ' +
+      'is itself unreachable and an install would be observable to nobody. Both endpoints ' +
+      "declare required 'passkey or dual_channel'; authorize in routes/auth.ts answers " +
+      'forbidden for any session that is not elevated, and endpointHandler applies it BEFORE ' +
+      'spec.handle runs. No session can be elevated: databaseAuthBackend in src/auth-backend.ts ' +
+      'declares elevate blocked on BOTH arms, the passkey arm for an absent WebAuthn ceremony ' +
+      'and the dual_channel arm for absent SMS delivery. So every caller of this route is ' +
+      'answered 403 by the factor gate and no request reaches the backend at all.',
+    ruled:
+      'RULED HERE, AND THE RULING IS THAT UNREACHABILITY ARGUES AGAINST THE INSTALL RATHER ' +
+      'THAN FOR IT. An install that changes no observable response is an install nothing ' +
+      'exercises and nothing can falsify, and it would go live on the day an unrelated row ' +
+      'lands a WebAuthn ceremony or an SMS sender, carrying no signal that it had just opened ' +
+      'the cash door. THE GATE IS NOT WEAKENED TO REACH THE ROUTE EITHER: C-27 is the ' +
+      'authentication boundary and this file adds no second refusal and removes none.',
+    sources: [
+      'apps/api/src/routes/auth.ts',
+      'apps/api/src/auth-backend.ts',
+      'docs/architecture/SECURITY.md',
+    ],
+  },
+  {
+    id: 'F',
+    claim:
+      'the rail is unchanged since finding A was written and is what both of the above rest ' +
+      'on. packages/rail opens no socket and names no vendor SDK by its own index.ts header, ' +
+      'its only RailAdapter is SandboxRail under src/fakes/, and nothing imports the package.',
+    ruled:
+      'RULED IN FINDING A AND RESTATED HERE BECAUSE IT IS THIS PORT S BLOCKER TOO. Finding A ' +
+      'holds it for settled and this entry holds it for the install: the same absent rail is ' +
+      'why an approved withdrawal has no exit, and therefore why a requested one must not be ' +
+      'openable through a door Merit cannot close.',
+    sources: ['packages/rail/src/index.ts', 'packages/rail/src/port.ts'],
+  },
+] as const;
+
 /**
  * The backend, reading and writing through the accessor.
  *
