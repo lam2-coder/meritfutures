@@ -3249,9 +3249,14 @@ test('the one port whose derived verdict and whose measured wire behaviour disag
 //      backtick as an APOSTROPHE, so `usePayoutBackend` and
 //      `useWithdrawalBackend` carry an ODD number of backticks and every
 //      span-pairing reader desynchronises at the first one. That is the same
-//      hazard `RI-15` met at `wiring.test.ts:215` and it is met here the same
+//      hazard `RI-15` met at `wiring.test.ts:357` and it is met here the same
 //      way, by reading the backtick immediately before the name rather than by
-//      pairing from the start.
+//      pairing from the start. THAT POINTER READ `:215` AND THIS ROW BROKE IT
+//      ITSELF (ADR-375): the derivation above added lines and every one of the
+//      FIFTY citations into this file drifted with them, while `RI-15` and
+//      `RI-16` stayed green because not one of the fifty carries a name they
+//      can check. This is the only one inside this row fence and the rest are
+//      reported rather than repaired.
 //
 //   3. THE TRAILING CHARACTER MAY NOT CONTINUE AN IDENTIFIER OR A PATH, so that
 //      a member name that is a PREFIX of a longer backticked token, as `operator`
