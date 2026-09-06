@@ -68,7 +68,7 @@
 // (`packages/db/src/scope.ts:913`); `ScopedTx.insert` takes
 // `OwnedTableKey` (`scoped-db.ts:3607`) and `insertUnder` takes
 // `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
-// (`scoped-db.ts:2138`), a closed list of ONE. So the ONLY handle that
+// (`scoped-db.ts:2149`), a closed list of ONE. So the ONLY handle that
 // satisfies `LedgerTx` is `SystemTx.insert<K extends TableKey>`
 // (`scoped-db.ts:3713`), which is generic over EVERY TABLE IN THE ESTATE. THAT
 // LAST NUMBER READ `3138` AND POINTED AT A REFUSAL STRING INSIDE `tradingDay`,

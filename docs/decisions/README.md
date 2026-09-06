@@ -369,6 +369,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-355](ADR-355.md) | the provisioning job store owes a drain, the drain is a ONE-SHOT pull that ADR-241 ruled FOR rather than against, the vendor already publishes the three methods it needs and `JobQueue` publishes none of them, and the emitter gap two files record as the drain's first blocker does not touch this shape at all (2026-09-06, status: proposed) |
 | [ADR-356](ADR-356.md) | the operator console's one read door serves ZERO of its seven reads today and FIVE on the day the door opens, the composition the dispatch says nothing joins is joined and green in two suites, and `start.ts` does not install the port because there is no expression it could write (2026-09-06, status: proposed) |
 | [ADR-357](ADR-357.md) | the wiring triple is honest arithmetic and `blocked` is the wrong name for what it counts, one of the fourteen holds a WORKING live default while thirteen refuse, and the count must not move because lowering it disarms the gate standing beside it (2026-09-06, status: proposed) |
+| [ADR-358](ADR-358.md) | the affiliate blocker entry has named THREE obstructions, then TWO, then a DIFFERENT ONE, then ONE, and the tree says TWO. The survivor it has never named is a WRITE with no write door, the door it did name for the disclosure is the wrong table's, and a case matching a retired sentence cannot go red while `RI-14` requires the sentence to be kept (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
