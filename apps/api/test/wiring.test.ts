@@ -55,8 +55,8 @@ import { expect, test } from 'vitest';
 // A NO-OP CALL IS NOT A WIRING, AND FOUR PORTS MAKE THAT REACHABLE
 // -----------------------------------------------------------------------------
 // `useAffiliateDeps`, `useKycDeps` and `useCheckoutAdapters` already hold their
-// PRODUCTION value at module scope (`affiliate.ts:478`, `kyc.ts:284`,
-// `checkout.ts:1051`), so calling their setter from `start.ts` would install the
+// PRODUCTION value at module scope (`affiliate.ts:615`, `kyc.ts:284`,
+// `checkout.ts:1211`), so calling their setter from `start.ts` would install the
 // object that is already installed and change nothing a request sees. It would
 // also make this file pass. THE REASON TEXT IS WHERE THAT IS RECORDED, so a
 // later reader raising the count that way meets the sentence saying it is not a
@@ -66,8 +66,15 @@ import { expect, test } from 'vitest';
 // (ADR-226). Its module-scope default is the REAL Cloudflare verifier rather
 // than a fail-closed stand-in, so the port is live with nothing installed, and
 // an absent secret is a refusal rather than an unwired state. Its entry says so
-// in those terms, because a reader who meets it beside fifteen liabilities
-// should not read it as a sixteenth.
+// in those terms, because a reader who meets it beside THIRTEEN liabilities
+// should not read it as a fourteenth.
+//
+// THOSE TWO WORDS READ "fifteen" AND "a sixteenth" AND ARE REPAIRED RATHER THAN
+// DELETED (`RI-14`). Both were TRUE when written, against a `BLOCKED` of
+// sixteen, and went stale the day the two card entries left it for the reason
+// the next block states. Nothing went red, because a count spelled in prose is
+// asserted by nobody: that is the drift `ADR-034` exists to end, arriving in
+// the paragraph that explains why this port is not a liability.
 //
 // -----------------------------------------------------------------------------
 // THE LIST HAS NOW SHRUNK TWICE ON THE SAME ARTEFACT, IN ORDER (ADR-261, ADR-266)
@@ -941,8 +948,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'this route builds none. `RuleStateUnreadable` IS DELIBERATELY NOT CAUGHT and stays a 500, ' +
     'because a row whose columns disagree with the schema that wrote them is an internal error ' +
     'and a retryable status would tell a trader to retry what no retry can fix. ' +
-    'THE PORT IS UNCHANGED AND THE WIRED COUNT IS UNCHANGED AT TEN OF TWENTY-FOUR DECLARED ' +
-    'WITH FOURTEEN BLOCKED, AND THE REASON FOR THAT IS NEW A FOURTH TIME: every clause on this ' +
+    'THE PORT IS UNCHANGED AND THE TRIPLE HAS MOVED WITHOUT IT, AT ELEVEN OF TWENTY-FIVE ' +
+    'DECLARED WITH FOURTEEN BLOCKED. THIS CLAUSE READ "THE WIRED COUNT IS UNCHANGED AT TEN OF ' +
+    'TWENTY-FOUR DECLARED" AND IS REPAIRED RATHER THAN DELETED (`RI-14`): it was true until ' +
+    'ADR-347 declared `useCertificateRateLimiter` and installed it, which moved both halves by ' +
+    'one and left `blocked` where it was. It is the SECOND hand-spelled count in this file ' +
+    'found stale by ADR-357, and neither was asserted by anything, which is why the triple is ' +
+    'derived at the assertion and a count written in prose is not. ' +
+    'AND THE REASON FOR THAT IS NEW A FOURTH TIME: every clause on this ' +
     'entry until ADR-264 named something nobody had BUILT, ADR-268 closed the one that named a ' +
     'READ, ADR-281 found a decoding whose home was RULED and untaken, ADR-283 TOOK IT, and ' +
     'ADR-285 IS THE FIRST CLAUSE TO CLOSE ON A REFUSAL PATH RATHER THAN ON A CAPABILITY. ' +
@@ -1182,7 +1195,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'a configured PSP adapter per MID plus the `returnUrl` and `cancelUrl` configuration. ' +
     '`packages/psp` ships a port and TWO FAKES (`fakes/psp-a.ts`, `fakes/psp-b.ts`) and no ' +
     'vendor adapter, and `packages/enrichment` is in the same position. NOTE: this port already ' +
-    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1051`), so calling the ' +
+    'holds `PRODUCTION_CHECKOUT_ADAPTERS` at module scope (`checkout.ts:1211`), so calling the ' +
     'setter here would install what is already installed. That would raise the wired count and ' +
     'serve nothing, and it is not a wiring.',
 

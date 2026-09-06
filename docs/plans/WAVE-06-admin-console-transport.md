@@ -270,12 +270,21 @@ uncomposed. **NEITHER SIDE OF THE PARTITION IS COUNTED HERE AND THAT IS DELIBERA
 [ADR-190](../decisions/ADR-190.md) section 5 holds it and pins no cardinal, on its own ground that a slice
 wiring a backend moves a route between the sets, so a figure written down here would go false for the right
 thing happening.
-[`wiring.test.ts:1554`](../../apps/api/test/wiring.test.ts) pins the triple at
-`{ declared: 24, wired: 10, blocked: 14 }`. **Both the citation and the triple are repointed rather than
+[`wiring.test.ts:1749`](../../apps/api/test/wiring.test.ts) pins the triple at
+`{ declared: 25, wired: 11, blocked: 14 }`. **Both the citation and the triple are repointed rather than
 left** ([ADR-343](../decisions/ADR-343.md), `RI-14`): this line read `wiring.test.ts:457` and
-`{ declared: 23, wired: 6, blocked: 17 }`, which was the triple ADR-184 section 8 confirmed unmoved and
-which eleven wiring slices have moved since. **ADR-343 installs no port, so it does not move it either**;
+`{ declared: 23, wired: 6, blocked: 17 }`, and then `wiring.test.ts:1554` and
+`{ declared: 24, wired: 10, blocked: 14 }`, which was the triple ADR-184 section 8 confirmed unmoved and
+which twelve wiring slices have moved since. **ADR-343 installs no port, so it does not move it either**;
 the value is re-derived at the assertion rather than carried, which is the whole of `ADR-034`'s remedy.
+
+**AND THE SECOND REPOINT WAS OWED FOR A WAVE BEFORE IT WAS MADE** ([ADR-357](../decisions/ADR-357.md)).
+ADR-347 moved the triple to `{ declared: 25, wired: 11, blocked: 14 }` and left this line reading the
+previous one, which is the same drift the paragraph above records itself repairing. **`blocked: 14` counts
+the ports `start.ts` does not call and not the ports a request finds refusing**; those two figures differ
+by one, because `useTurnstileVerifier` holds a working live default. The partition is now asserted at
+`wiring.test.ts` rather than described here, so a reader taking `blocked` for fourteen obstructions meets
+the number that says otherwise.
 
 **THIS IS NOT A REASON TO WAIT AND THE PLAN SAYS SO PLAINLY.** A console that renders "this deployment
 is unfinished" against a 503 is the same honest state `apps/api` already ships, and it is what
