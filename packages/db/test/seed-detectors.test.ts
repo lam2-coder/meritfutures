@@ -36,7 +36,7 @@
 // =============================================================================
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -1210,5 +1210,97 @@ describe('every finding the generator can produce is seeded, or is named with it
         detectorsNamedByTheAuthority('### 3.2 The detector set\n\n| ID | Detector |\n|---|---|\n'),
       ),
     ).toBe('authority-names-no-detector');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// WHY THE TABLE IS EMPTY, PINNED SO THE NEXT ROW READS IT RATHER THAN DERIVING IT
+// -----------------------------------------------------------------------------
+// ADR-412. `detector_definitions` holds no row, and the reasons are separable.
+// Two of them live in this package and this suite asserts both.
+//
+// THE FIRST IS THAT NOTHING UNDER `src/seed` OPENS A DATABASE. Both seed
+// READMEs and both generators say so in prose, and until this suite nothing
+// checked it. `RI-35` exists precisely for a shipped sentence that asserts an
+// absence, and its register carries NEITHER seed, so on the day a loader lands
+// both READMEs go false and nothing goes red. That register is in
+// `packages/tooling` and outside this row's fence; this case is the half that
+// is inside it, and it goes red on the same day for the same reason.
+//
+// THE SECOND IS THAT THE SCHEMA IS NOT WHAT STANDS IN THE WAY. A row reading
+// "the table is empty" and reaching for a migration number would be taking one
+// for a table that has carried its DDL since `0008` and its grant since `0026`,
+// and a migration is the one artifact this corpus can never edit back.
+//
+// THE THIRD REASON IS DELIBERATELY NOT PINNED HERE. Loading is NECESSARY AND
+// NOT SUFFICIENT: thirteen of the fourteen detectors that exist decline against
+// a fully loaded registry. That is derived by RUNNING the modules, they live in
+// `apps/worker`, and `apps/worker/test/detector-census.test.ts` already asserts
+// it there. A copy here would be a figure restated rather than derived, which
+// is the defect `ADR-034` names.
+// -----------------------------------------------------------------------------
+
+describe('the seed reaches no database, and the schema is not what stops it', () => {
+  const SEED_DIR = fileURLToPath(new URL('../src/seed', import.meta.url));
+  const GRANTS = readFileSync(
+    fileURLToPath(new URL('../migrations/0026_roles_and_grants.sql', import.meta.url)),
+    'utf8',
+  );
+
+  /**
+   * Every executable module under `src/seed`, FOUND rather than named.
+   *
+   * Naming the two generators would make this case blind to exactly the file
+   * whose arrival it exists to catch, which is a loader written beside them.
+   */
+  const modulesUnderSeed = (): string[] =>
+    readdirSync(SEED_DIR, { recursive: true, encoding: 'utf8' })
+      .filter((each) => /\.(mjs|mts|ts|js)$/.test(each))
+      .sort();
+
+  it('imports node builtins and nothing else, across BOTH seeds rather than this one', () => {
+    const modules = modulesUnderSeed();
+    // NON-VACUITY FIRST, because the subject is an absence and an absence check
+    // over an empty scope reports PASS in silence. Two generators are on disk
+    // and a walk that finds fewer than two has not walked.
+    expect(modules.length).toBeGreaterThanOrEqual(2);
+
+    const specifiers = modules.flatMap((each) =>
+      readFileSync(`${SEED_DIR}/${each}`, 'utf8')
+        .split('\n')
+        .map((line) => /^import .* from '([^']+)';$/.exec(line)?.[1])
+        .filter((one): one is string => one !== undefined),
+    );
+    // Second non-vacuity: a regex that matched nothing would also report an
+    // empty set of offenders.
+    expect(specifiers.length).toBeGreaterThan(0);
+
+    // THE WHOLE ASSERTION. A loader reaches the accessor by a relative path or
+    // reaches `pg` by name, and either one lands here. The finding is the
+    // specifier, so the failure says which file gained what.
+    expect([...new Set(specifiers)].filter((one) => !one.startsWith('node:')).sort()).toEqual([]);
+  });
+
+  it('needs no migration and no grant, so a row that took a number would be taking it for nothing', () => {
+    // The DDL half is the first suite in this file. This is the privilege half,
+    // and `0026`'s own ordering is why it is two assertions rather than one: a
+    // broad grant FIRST and a targeted revoke after, so a table is writable
+    // unless something named it.
+    expect(GRANTS).toContain(
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO merit_app;',
+    );
+
+    // THE APPEND-ONLY REVOKE IS THE ONE THAT BINDS `merit_app`, and this table
+    // is not in it. Sliced to that statement rather than searched file-wide,
+    // because `detector_definitions` IS revoked further down the file, from
+    // `merit_analytics`, and a file-wide search would read the analytics revoke
+    // as this one and report the opposite of the truth.
+    const appendOnly = GRANTS.slice(
+      GRANTS.indexOf('REVOKE UPDATE, DELETE ON'),
+      GRANTS.indexOf('FROM merit_app, PUBLIC;'),
+    );
+    expect(appendOnly).toContain('ledger_entries');
+    expect(appendOnly).not.toContain('detector_definitions');
+    expect(GRANTS).toContain('detector_definitions');
   });
 });
