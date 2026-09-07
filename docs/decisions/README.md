@@ -412,6 +412,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-398](ADR-398.md) | nothing in those three entries was ever wrong, the register's value and its coordinate falsify at different commits, the wave that certified the coordinate sound broke it in the same diff, and the prose gate is refused because 30 of 33 `covers` strings mix limitations with assertions (2026-09-07, status: proposed) |
 | [ADR-399](ADR-399.md) | the eight are CLASS ONE and every one of them is repaired, `G2` holds on all eight at the commit that wrote them, four waves recorded them as blocked on a founder question that was never in the way, and ADR-392's one judgment call dissolves at the right tree (2026-09-07, status: proposed) |
 | [ADR-400](ADR-400.md) | `G2` is NOT enforced, and the reason [ADR-388](ADR-388.md) gave for refusing it does not hold: `RI-15` reads no dated record at all, the reachable red set is NINE, every one of the nine is ALREADY a registered finding, and two defensible instruments disagree about their class on 23 of 493; and `G1` is read by a PERSON, at 56 of 60 against the binder's 3.8 percent (2026-09-07, status: proposed) |
+| [ADR-403](ADR-403.md) | the four `:35` pointers are CLASS TWO for the second time and the finding is now written beside all four, `CI-06a` has been checking the runbook links all along so nothing binds them because something already does, and `ADR-337:202` is CLASS ONE and repaired to a name (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
