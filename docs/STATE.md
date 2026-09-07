@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->381<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->382<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13696,3 +13696,31 @@ Counts derived at reporting time off each runner's own last line: suite **336 fi
 **Next.** The founder's `E2` read of [ADR-397](decisions/ADR-397.md) and the three questions its approval block names.
 
 Counts derived at reporting time off each runner's own last line: suite **336 files / 8,109 passed / 10 skipped / 0 failed**, against a base reproduced on `ebc21238` **before the first edit** of **336 / 8,109 / 10 / 0**, delta zero on every axis; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean.
+
+## 2026-09-07 - Session 594: the eight are class one, all eight repaired, and the four waves that called them unrepairable were reading a test that was not the class test ([ADR-399](decisions/ADR-399.md), proposed)
+
+**THE ROW IS [ADR-399](decisions/ADR-399.md), `status: proposed`, approval line UNSIGNED. NON-MONEY, DATED RECORDS AND ONE OPERATIONS REVIEW, `E2` READ OWED.**
+
+**THE EIGHT POINTERS INTO [`CRON_INVENTORY.md`](ops/runbooks/CRON_INVENTORY.md) ARE CLASS ONE AND ALL EIGHT ARE REPAIRED.** `G2` is derived per pointer at the commit that WROTE each citing line, by `git log -S` oldest per [ADR-396](decisions/ADR-396.md) section 7 and never by `git blame -w`, and it holds on every one: each cited line held its named subject on the day the record was made. Two of the eight quote their subject verbatim, so those are decided by string equality at the blob rather than by reading. `git blame -w` was run beside it and agreed on all five citing files, which is a result and not a reassurance.
+
+**THE FOUR WAVES WERE NEVER BLOCKED BY [ADR-388](decisions/ADR-388.md), AND THE EVIDENCE WAS IN THE RECORD THE WHOLE TIME.** [ADR-392](decisions/ADR-392.md) states in its own section 6 that *"the test applied is not the class test"* and measured drift against its own base instead. Three later entries carried its conclusion without that caveat, which sits four paragraphs above the table they cited. **What actually left the eight standing is [ADR-390](decisions/ADR-390.md) section 9, a rule about WHOSE DIFF owes a repair rather than about whether one is permitted**, so every wave that declined declined correctly and the record of declining hardened into a prohibition. That is [ADR-381](decisions/ADR-381.md)'s mechanism with a receipt attached.
+
+**[ADR-392](decisions/ADR-392.md)'s ONE RECORDED JUDGMENT CALL DISSOLVES AT THE RIGHT TREE.** It flagged [ADR-080](decisions/ADR-080.md):110 as the case where a second reader could reasonably disagree, because at its base the cited line was a section heading. At the commit that WROTE that line the cited line held the `VG-9` drill row exactly as the sentence names, and the heading stood six lines above; the heading arrived at the cited number only by later drift. **A second reader cannot reasonably disagree with a blob**, and this is [ADR-388](decisions/ADR-388.md) section 5's wrong-tree lesson arriving a third time, this time producing a false appearance of difficulty rather than a wrong verdict.
+
+**[ADR-397](decisions/ADR-397.md)'s PRECONDITION IS APPLIED AND NOT ASSUMED, AND A STRICTER PROPERTY IS DERIVED.** Each of the six distinct destinations is byte-identical to its blob at the write commit **and occurs exactly once in the file**, so every destination is unambiguous and no repair here is a judgement about what a sentence meant. Retired coordinates are kept in backticks beside the new ones and never re-cited with a path, on a form derived from the corpus at **62 of 62** rather than from the dispatch, which wrote it unbackticked.
+
+**THE `:35` FOUR ARE RE-DERIVED AND LEFT, AND THE MECHANISM THAT MADE THEM BORN WRONG IS NEW.** At the write commit the cited line held the named TOKEN and not the named SUBJECT, one row above it, because *"It asserts the query, not the job"* is a house phrase five different jobs carry. **So `G1` as written is not strong enough: a token a later reader can search for and cannot RESOLVE passes it.** The condition owed is uniqueness in the cited file. It is recorded rather than taken, because [ADR-388](decisions/ADR-388.md) is row `400`'s file this wave and because it moves zero verdicts, including all eight repaired here.
+
+**THE INHERITED POPULATION DOES NOT REPRODUCE.** 20 tokens and not 21, because [ADR-394](decisions/ADR-394.md) repaired [P7](plans/P7-risk-and-abuse.md) to a row NAME between the two bases and a pointer stopped being a pointer. The "eight" is a count of COORDINATES at **seven sites in five documents**, which no entry says and which [ADR-392](decisions/ADR-392.md)'s own *"between four and six lines short"* is what fixes.
+
+**NOT ONE OF THE EIGHT IS CHECKED BY ANYTHING IN THIS REPOSITORY.** Seeded 9,803 lines past the end of the cited file in a session log, a decision record **and** an operations review, gates stay 33 of 33 and invariants 35 of 35. `RECORD_HEADING` masks all five citing files from `RI-16` and `RI-15` reads only source comments. **A green run is therefore not weak evidence on this fence, it is no evidence**, and every repair was read instead. Every seed was restored byte-identical under `sha256sum -c` and none with `git checkout --`.
+
+**[`CRON_INVENTORY.md`](ops/runbooks/CRON_INVENTORY.md) WAS READ AND NOT WRITTEN.** Its predicate was re-derived independently at 21 jobs against 21 notes, and editing it would have moved all eight targets inside the diff that repaired them. **Every edited file is line-count neutral**, 7 insertions against 7 deletions across five files, and of the twelve inbound pointers the two landing on an edited line survive because the retired coordinate was kept beside the new one, which is that convention paying for itself for the first time.
+
+**NOTHING WAS MINTED AND NOTHING WAS WIDENED.** No invariant number, no `RI-` reservation, no `CI-06` letter, no gate added, widened or weakened, no register grown, no test skipped, disabled or quarantined, no migration taken or reserved, no port wired, no job scheduled. Not one executable line changed and nothing outside `docs/` was written.
+
+**Next.** The founder's `E2` read of [ADR-399](decisions/ADR-399.md) and the three questions its approval block names, of which the first is whether four waves of "not repairable" should have been caught sooner given the caveat was in the record, and the third is whether a corpus whose citation habit is a line number in a file that grows by insertion should keep that habit at all.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,109 passed / 10 skipped / 0 failed**, against a base reproduced on `c219c0d1` **before the first edit** of 336 / 8,109 / 10 / 0, delta zero on every axis; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean. **There was no clone on arrival, the repository was not named in the dispatch either, and the clone this row made is FULL**: `is-shallow` `false` at 4,319 commits.
+
+---
