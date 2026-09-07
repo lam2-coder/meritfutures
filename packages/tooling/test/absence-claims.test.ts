@@ -1704,6 +1704,306 @@ describe('ADR-415: the `event-sink-caller` register after the producer moved', (
 });
 
 // =============================================================================
+// ADR-433: THE VALUE-POSITION PROXY LEARNS ASSIGNMENT
+// =============================================================================
+// ADR-431 SECTION 10 FOUND THIS AND DID NOT REPAIR IT, ON A REASON THAT IS THE
+// WHOLE JUSTIFICATION FOR THIS BLOCK EXISTING SEPARATELY. `const sink =
+// TRANSACTION_EVENT_WRITER;` is an install and matches none of `.`, `,`, `)`,
+// so the probe reported `absent` over a tree carrying one. Closing that is a
+// WIDENING OF WHAT THE PROBE ASSERTS rather than a repair to how it reads
+// formatting, and a widening changes what the corpus claims.
+//
+// WHAT IS ASSERTED AFTER THIS BLOCK THAT WAS NOT ASSERTED BEFORE IT: the name
+// standing as the whole right-hand side of an assignment is an install. One
+// shape added to the value-position class, none removed, which is why the
+// ADR-431 cases above stand unchanged beside these.
+//
+// THE MISS WAS DEMONSTRATED BEFORE IT WAS WIDENED. Against the check as it
+// stood, cases 1 to 5 below report `absent` over a tree holding a real install,
+// with `RI-35` reporting nothing at all. The counterfactual is one character:
+// `.write` after the same name in the same file turned the artifact `present`.
+//
+// AND THE SECOND HALF IS THE MORE IMPORTANT ONE. A widened probe that fires on
+// something innocent gets relaxed later by somebody in a hurry, so cases 6 to 11
+// are what the check must still REFUSE: a comparison, a type position, a
+// re-export list, a refusal string that names the writer in order to deny it.
+// =============================================================================
+describe('ADR-433: the caller probes read an ASSIGNMENT, and still refuse what they refused', () => {
+  const HOME = 'packages/ledger/src/events.ts';
+  const BARREL = 'packages/ledger/src/index.ts';
+  const OLD_PATH = 'apps/api/src/events.ts';
+  const INSTALL = 'apps/worker/src/install.ts';
+  const OWN_STATEMENT = "export { TRANSACTION_EVENT_WRITER } from './events.ts';\n";
+
+  const entry = artifact('event-sink-caller');
+  const claims = ABSENCE_CLAIMS.filter((c) => c.artifact === 'event-sink-caller');
+
+  /** The producer at its home, the barrel publishing the writer on its own line. */
+  function ledgerTree(): string {
+    const root = bareTree();
+    write(
+      root,
+      HOME,
+      'export function makeEventSink(deps) {\n  return deps;\n}\n' +
+        'export const TRANSACTION_EVENT_WRITER = { write() {} };\n',
+    );
+    write(root, BARREL, OWN_STATEMENT);
+    return root;
+  }
+
+  /** That tree, with `body` standing at a deployable under `apps/worker/src`. */
+  const withInstall = (body: string): string => {
+    const root = ledgerTree();
+    write(root, INSTALL, body);
+    return root;
+  };
+
+  const IMPORT_ONE = "import { TRANSACTION_EVENT_WRITER } from '@merit/ledger';\n";
+  const IMPORT_TWO = "import { EVENT_NAMES, TRANSACTION_EVENT_WRITER } from '@merit/ledger';\n";
+
+  // ---------------------------------------------------------------------------
+  // THE FIVE THAT FAIL ON THE OLD BEHAVIOUR AND PASS ON THE NEW.
+  // ---------------------------------------------------------------------------
+
+  // 1. THE SHAPE ADR-431 SECTION 10 NAMED, WRITTEN AS IT NAMED IT. A deployable
+  // that imports the writer on a statement of its own and binds it. Nothing here
+  // is exotic: it is the shortest install anybody would write.
+  test('RED: the writer assigned to a binding is an install', () => {
+    expect(
+      entry.probe(withInstall(IMPORT_ONE + 'export const sink = TRANSACTION_EVENT_WRITER;\n')),
+    ).toBe('present');
+  });
+
+  // 2. AND BEHIND A MULTI-NAME IMPORT, WHICH IS THE HALF ADR-431 SECTION 6 GAVE
+  // UP DELIBERATELY. That entry recorded the shape as caught before its repair
+  // only BY ACCIDENT, off the import's own separator comma, and lost even the
+  // accident when specifier lists were blanked. It is now caught on purpose,
+  // which is the difference between a backstop and an assertion.
+  test('RED: the same assignment behind a MULTI-NAME import is caught on purpose', () => {
+    expect(
+      entry.probe(
+        withInstall(
+          IMPORT_TWO +
+            'export const sink = TRANSACTION_EVENT_WRITER;\nexport const n = EVENT_NAMES;\n',
+        ),
+      ),
+    ).toBe('present');
+  });
+
+  // 3. **AND THE ASSIGNMENT PRETTIER ITSELF WRITES.** `printWidth` is 100 and
+  // prettier breaks after the `=` when the statement passes it: a 102-character
+  // `export const ... = TRANSACTION_EVENT_WRITER;` came back from
+  // `prettier --write` as two lines with the name alone on the second. A
+  // line-scoped assignment test would ship the exact formatting sensitivity
+  // ADR-431 was sent to remove, one leg over, so the read spans the newline and
+  // this case is what holds it there.
+  test('RED: the assignment wrapped after the `=`, which is what prettier writes', () => {
+    expect(
+      entry.probe(
+        withInstall(
+          IMPORT_ONE +
+            'export const provisioningEventWriterForTheWorkerDeployableSingletonInstance =\n' +
+            '  TRANSACTION_EVENT_WRITER;\n',
+        ),
+      ),
+    ).toBe('present');
+  });
+
+  // 4. AND A REASSIGNMENT RATHER THAN A DECLARATION, because the install a
+  // deployable actually writes is as likely to be a late binding into a slot
+  // that already exists as a `const` at the top of a module.
+  test('RED: a reassignment and a compound assignment are installs too', () => {
+    expect(
+      entry.probe(withInstall(IMPORT_ONE + 'let sink;\nsink = TRANSACTION_EVENT_WRITER;\n')),
+    ).toBe('present');
+    expect(
+      entry.probe(withInstall(IMPORT_ONE + 'let sink;\nsink ??= TRANSACTION_EVENT_WRITER;\n')),
+    ).toBe('present');
+  });
+
+  // 5. THE WHOLE CHECK AND NOT THE PROBE ALONE, so the widening is watched where
+  // a reader meets it: leg 2 going RED at the claim site with the sentence
+  // named. A probe verdict nobody reaches through `checkAbsenceClaims` is a
+  // verdict the corpus does not actually assert.
+  test('RED: leg 2 fires at the claim site over an assignment install', () => {
+    const root = withInstall(IMPORT_ONE + 'export const sink = TRANSACTION_EVENT_WRITER;\n');
+    write(root, OLD_PATH, '// `makeEventSink` is called by NO file under any `src/`.\n');
+    const findings = checkAbsenceClaims(root, { artifacts: [entry], claims });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('`makeEventSink` is called by NO file');
+  });
+
+  // ---------------------------------------------------------------------------
+  // **THE SIX THAT STOP THIS BEING A WEAKENING, AND THEY ARE THE MORE IMPORTANT
+  // HALF.** Widening a probe until it catches things that are not installs, then
+  // loosening the assertion to compensate, is the failure this row was forbidden
+  // outright. These are the line it must not cross, written as runs.
+  // ---------------------------------------------------------------------------
+
+  // 6. A COMPARISON IS NOT AN INSTALL, AND IT IS ROUTINELY THE LINE SAYING SO.
+  // `=\s*NAME` matches the last `=` of `===` unless the lookbehind stops it, and
+  // a file guarding `if (writer === TRANSACTION_EVENT_WRITER) throw ...` asserts
+  // the opposite of an install. The shipped scope carries 2,223 comparisons
+  // against a bare identifier and 50 against a SCREAMING_CASE name, so the shape
+  // is dense in this tree even though neither name is on either side today.
+  test('GREEN: a COMPARISON against the writer is not an install', () => {
+    for (const op of ['===', '==', '!==', '!=', '>=', '<=']) {
+      const root = withInstall(
+        IMPORT_ONE + `export const isDefault = (w) => w ${op} TRANSACTION_EVENT_WRITER;\n`,
+      );
+      expect({ op, verdict: entry.probe(root) }).toEqual({ op, verdict: 'absent' });
+    }
+  });
+
+  // 7. **AND A TYPE POSITION IS NOT AN INSTALL, WHICH IS THE CASE THAT SETTLES
+  // WHY THE PROXY IS `=` AND NOT `;`.** `replay-audit-src-caller` three
+  // artifacts down admits `;` and end-of-line, so it would catch assignment
+  // through a STATEMENT-END proxy and this line with it. `export type W = typeof
+  // TRANSACTION_EVENT_WRITER;` names the writer's type and installs nothing. The
+  // narrower proxy was chosen for exactly this, before it cost anything.
+  test('GREEN: a TYPE position is not an install, which is why the proxy is `=` and not `;`', () => {
+    const root = withInstall(
+      IMPORT_ONE + 'export type Writer = typeof TRANSACTION_EVENT_WRITER;\n',
+    );
+    expect(entry.probe(root)).toBe('absent');
+  });
+
+  // 8. THE FIVE REAL FILES' SHAPE, WHICH IS THE FALSE-POSITIVE SURFACE THIS
+  // WIDENING OPENS AND THE ONE IT WAS MEASURED AGAINST. `stripComments` cannot
+  // remove a string literal, and ADR-431 section 5 measured five files under
+  // `apps/worker/src` whose refusal STRINGS name the writer in order to say this
+  // deployable installs none. They spell `is TRANSACTION_EVENT_WRITER` and
+  // backticked prose; NONE spells an assignment, and this case holds the probe
+  // silent on the shape they do write.
+  test('GREEN: a refusal string naming the writer in order to deny it is not an install', () => {
+    const root = withInstall(
+      'export const EVENT_SINK_BLOCKER =\n' +
+        "  'the only composed event writer in this workspace is TRANSACTION_EVENT_WRITER and ' +\n" +
+        "  'this deployable INSTALLS no writer for it';\n",
+    );
+    expect(entry.probe(root)).toBe('absent');
+  });
+
+  // 9. AND ADR-431'S OWN PROPERTY, RE-ASSERTED UNDER THE WIDENING. A name in a
+  // re-export specifier list is a BINDING position, the repair one row back
+  // blanks those lists, and a widening that reached back through the blanking
+  // would undo it silently. Both spellings that entry measured, so neither can
+  // regress alone.
+  test('GREEN: a re-export list is still a binding and not an install', () => {
+    for (const exported of [
+      'export {\n  makeEventSink,\n  TRANSACTION_EVENT_WRITER,\n} from ' + "'./events.ts';\n",
+      "export { TRANSACTION_EVENT_WRITER, makeEventSink } from './events.ts';\n",
+      "export {\n  TRANSACTION_EVENT_WRITER,\n} from './events.ts';\n",
+    ]) {
+      const root = bareTree();
+      write(
+        root,
+        HOME,
+        'export function makeEventSink(deps) {\n  return deps;\n}\n' +
+          'export const TRANSACTION_EVENT_WRITER = { write() {} };\n',
+      );
+      write(root, BARREL, exported);
+      expect({ exported, verdict: entry.probe(root) }).toEqual({ exported, verdict: 'absent' });
+    }
+  });
+
+  // 10. **THE BOUNDARY OF THE WIDENING, ASSERTED RATHER THAN LEFT TO LOOK
+  // DELIBERATE.** `() => TRANSACTION_EVENT_WRITER` is a value position and is
+  // arguably an install; `=>` is excluded structurally, since `>` is not
+  // whitespace, and this row was sent to catch ASSIGNMENT and no further. So
+  // this reads `absent`, and that is a REMAINING MISS stated in ADR-433 section
+  // 6 rather than a property anybody wants. A later row closing it will find
+  // this case telling it exactly what it is changing.
+  test('GREEN: an arrow body returning the writer is still missed, and that is the fence', () => {
+    const root = withInstall(IMPORT_ONE + 'export const get = () => TRANSACTION_EVENT_WRITER;\n');
+    expect(entry.probe(root)).toBe('absent');
+  });
+
+  // 11. THE CONTROL. The same tree with no install at all, so a probe that had
+  // been widened into reporting `present` on everything would fail here rather
+  // than pass the ten cases above by accident.
+  test('GREEN: the tree with no install at all reports absent', () => {
+    expect(entry.probe(ledgerTree())).toBe('absent');
+  });
+
+  // ---------------------------------------------------------------------------
+  // AND THE SIBLING PROBE, WHICH CARRIES THE IDENTICAL PROXY.
+  //
+  // ADR-431 SECTION 10 ROW 4 NAMED THIS RATHER THAN LEAVING A READER TO DERIVE
+  // IT: `worker-queue-door-caller` reads `LIVE_QUEUE` followed by `.`, `,` or
+  // `)`, which is the same three characters, so `const q = LIVE_QUEUE;` was the
+  // same miss one probe over. Repairing one and not the other would leave the
+  // file holding two answers to one question, which is that entry's row 2 and is
+  // the defect this file is already carrying once.
+  // ---------------------------------------------------------------------------
+  describe('the door probe carries the same proxy and takes the same widening', () => {
+    const DOOR = 'apps/worker/src/queue.ts';
+    const door = artifact('worker-queue-door-caller');
+
+    /** The door declared at its module, and `body` at a second file. */
+    const doorTree = (body: string): string => {
+      const root = bareTree();
+      write(
+        root,
+        DOOR,
+        'export const LIVE_QUEUE = { declareQueue() {} };\n' +
+          'export function workerQueue(q) {\n  return q;\n}\n',
+      );
+      write(root, 'apps/worker/src/adapter.ts', body);
+      return root;
+    };
+
+    test('RED: the door assigned to a binding is an install', () => {
+      expect(
+        door.probe(
+          doorTree("import { LIVE_QUEUE } from './queue.ts';\nexport const q = LIVE_QUEUE;\n"),
+        ),
+      ).toBe('present');
+    });
+
+    test('GREEN: a comparison against the door is not an install', () => {
+      expect(
+        door.probe(
+          doorTree(
+            "import { LIVE_QUEUE } from './queue.ts';\nexport const isLive = (q) => q === LIVE_QUEUE;\n",
+          ),
+        ),
+      ).toBe('absent');
+    });
+
+    // **A DECLARATION IS NOT AN INSTALL, AND GETTING THE DIRECTION OF THE
+    // ASSIGNMENT BACKWARDS IS THE LIKELIEST WAY TO WRITE THIS WIDENING WRONG.**
+    // `const LIVE_QUEUE = ...` binds the name; `const q = LIVE_QUEUE` installs
+    // it, and only the second is what the register asserts about. The door's own
+    // module is excluded by path so it cannot show this, and a SECOND file
+    // declaring a binding of the same name can: a local shadow installs nothing.
+    // A proxy reading the name on the LEFT of the `=` reports it as the door
+    // arriving.
+    test('GREEN: a DECLARATION of the same name elsewhere is not the door being installed', () => {
+      const shadow = doorTree('const LIVE_QUEUE = 1;\nexport default LIVE_QUEUE;\n');
+      expect(door.probe(shadow)).toBe('absent');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // AND THE FALSE-POSITIVE SURFACE, BOUND OVER THE REAL TREE RATHER THAN
+  // ASSERTED IN PROSE.
+  //
+  // The widening adds ZERO files to what either probe reports over this
+  // repository: measured at the moment it landed, 350 shipped files carry 4,897
+  // assignments of a bare identifier, 175 of them to a SCREAMING_CASE name, and
+  // NONE inside a string literal. The day somebody writes a refusal string that
+  // spells `sink = TRANSACTION_EVENT_WRITER`, this case goes red and names the
+  // file, which is the whole of the surface this row opened.
+  // ---------------------------------------------------------------------------
+  test('the widening moves no verdict over this repository', () => {
+    expect(artifact('event-sink-caller').probe(REPO_ROOT)).toBe('absent');
+    expect(artifact('worker-queue-door-caller').probe(REPO_ROOT)).toBe('present');
+    expect(ri35.run(REPO_ROOT)).toEqual([]);
+  });
+});
+
+// =============================================================================
 // ADR-417: LEG 7, THE REGISTER'S OWN ARITHMETIC
 // =============================================================================
 // `sweptBy` argues for a needle or against one, and the argument is routinely a
