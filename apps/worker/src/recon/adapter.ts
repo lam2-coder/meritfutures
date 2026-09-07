@@ -138,7 +138,7 @@
 // =============================================================================
 
 import { isNull } from '../db.ts';
-import type { WorkerDb } from '../db.ts';
+import type { DeclaredRow, WorkerDb } from '../db.ts';
 import type {
   ReconFilter,
   ReconFilterTerm,
@@ -327,22 +327,39 @@ export const RECON_TERMS: ReconTerms = { isNull: reconIsNull };
  */
 export function reconTxOver(tx: ReconDbTx): ReconTx {
   return {
-    async rowsWhere(key: ReconReadTable, where: ReconFilter): Promise<unknown[]> {
+    // **THE THREE CASTS ARE THE PRICE OF THE DELETION AND THEY ARE PRICED HERE
+    // RATHER THAN HIDDEN (`ADR-430`, and `ADR-426` section 5 paid two of them
+    // one directory over).** The `switch` proves the key to a READER and not to
+    // `tsc`: inside `case 'dailyMarks'` the branch produces
+    // `DeclaredRow<'dailyMarks'>[]`, which is not assignable to
+    // `DeclaredRow<K>[]` while `K` is still unresolved. **THE CAST IS IN THE
+    // FILE WHOSE JOB IS TO BRIDGE**, and what it replaces is a signature that
+    // erased the row for every caller.
+    async rowsWhere<K extends ReconReadTable>(
+      key: K,
+      where: ReconFilter,
+    ): Promise<DeclaredRow<K>[]> {
       requireExactColumns(key, where, RECON_READ_FILTERS[key]);
       switch (key) {
         case 'dailyMarks': {
           const tradingDay = filterValue(key, where, 'tradingDay');
           const supersededBy = filterValue(key, where, 'supersededBy');
-          return await tx.rowsWhere('dailyMarks', { tradingDay, supersededBy });
+          return (await tx.rowsWhere('dailyMarks', {
+            tradingDay,
+            supersededBy,
+          })) as DeclaredRow<K>[];
         }
         case 'ruleStates': {
           const tradingDay = filterValue(key, where, 'tradingDay');
-          return await tx.rowsWhere('ruleStates', { tradingDay });
+          return (await tx.rowsWhere('ruleStates', { tradingDay })) as DeclaredRow<K>[];
         }
         case 'reconciliations': {
           const accountId = filterValue(key, where, 'accountId');
           const tradingDay = filterValue(key, where, 'tradingDay');
-          return await tx.rowsWhere('reconciliations', { accountId, tradingDay });
+          return (await tx.rowsWhere('reconciliations', {
+            accountId,
+            tradingDay,
+          })) as DeclaredRow<K>[];
         }
       }
     },

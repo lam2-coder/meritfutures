@@ -1557,7 +1557,6 @@ export type {
   ReconFilter,
   ReconFilterTerm,
   ReconReadTable,
-  ReconRow,
   ReconRunStatus,
   ReconStatus,
   ReconSweepIo,

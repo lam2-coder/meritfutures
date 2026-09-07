@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import {
   PLATFORM_STATED_MARK_SOURCES,
   RECON_READ_TABLES,
@@ -35,6 +37,7 @@ import {
   ReconSweepUnwired,
   UNWIRED_RECON_SWEEP_IO,
 } from '../src/recon/ports.ts';
+import type { DeclaredRow } from '../src/db.ts';
 import type {
   ReconFilter,
   ReconFilterTerm,
@@ -63,6 +66,9 @@ const ACCOUNT_A = '11111111-1111-4111-8111-111111111111';
 const ACCOUNT_B = '22222222-2222-4222-8222-222222222222';
 const FILE_ONE = '33333333-3333-4333-8333-333333333333';
 
+/** A fixed instant, for the reason the recorder's clock is a counter. */
+const COMPUTED_AT = new Date(Date.UTC(2026, 7, 26, 0, 0, 0));
+
 // -----------------------------------------------------------------------------
 // The recorder
 // -----------------------------------------------------------------------------
@@ -84,11 +90,16 @@ interface Recorder {
 
 const IS_NULL: ReconFilterTerm = { term: 'is-null' };
 
+// **THE STORE HOLDS DECLARED ROWS NOW, AND THAT IS THE HALF OF `ADR-430` THE
+// SUITE PAYS FOR.** It held `ReconValues[]`, which is `Record<string, unknown>`:
+// a fixture missing a column, or carrying one under a name no migration ever
+// created, compiled, and the suite went green over a row PostgreSQL cannot
+// produce. `mark({ closingBalanceCentss: 1n })` was a passing test.
 interface RecorderOptions {
-  readonly marks: readonly ReconValues[];
-  readonly states: readonly ReconValues[];
+  readonly marks: readonly DeclaredRow<'dailyMarks'>[];
+  readonly states: readonly DeclaredRow<'ruleStates'>[];
   /** Rows already on `reconciliations` for the day, keyed by account. */
-  readonly existing?: Readonly<Record<string, ReconValues>>;
+  readonly existing?: Readonly<Record<string, DeclaredRow<'reconciliations'>>>;
   /** Throw on the Nth transaction, counting from one. */
   readonly dieOnTransaction?: number;
 }
@@ -136,18 +147,118 @@ function recorder(options: RecorderOptions): Recorder {
   };
 }
 
-function mark(overrides: ReconValues = {}): ReconValues {
+/**
+ * One `daily_marks` row, WHOLE.
+ *
+ * **EVERY COLUMN `0014` DECLARES IS HERE, NOT ONLY THE FOUR THE SWEEP READS.**
+ * That is the cost `ADR-430` section 9 prices: the digests fixtures one
+ * directory over already carried every column, and these carried four of
+ * eighteen. What it buys is that a typo in an override is now a compile error
+ * instead of a silent `undefined`.
+ */
+function mark(overrides: Partial<DeclaredRow<'dailyMarks'>> = {}): DeclaredRow<'dailyMarks'> {
   return {
+    id: 1n,
     accountId: ACCOUNT_A,
-    source: 'report',
+    tradingDay: DAY,
+    openingBalanceCents: 5_000_000n,
     closingBalanceCents: 5_000_000n,
+    highBalanceCents: 5_000_000n,
+    lowBalanceCents: 5_000_000n,
+    realizedPnlCents: 0n,
+    fillCount: 0,
+    tradedDay: false,
+    winDay: false,
+    adjustmentCents: 0n,
+    sourceHash: new Uint8Array(),
+    source: 'report',
     ingestFileId: FILE_ONE,
+    supersededBy: null,
+    computedAt: COMPUTED_AT,
+    createdAt: COMPUTED_AT,
     ...overrides,
   };
 }
 
-function state(overrides: ReconValues = {}): ReconValues {
-  return { accountId: ACCOUNT_A, balanceCents: 5_000_000n, ...overrides };
+/** One `reconciliations` row, WHOLE, for {@link mark}'s reason. */
+function reconciliation(
+  overrides: Partial<DeclaredRow<'reconciliations'>> = {},
+): DeclaredRow<'reconciliations'> {
+  return {
+    id: 7n,
+    accountId: ACCOUNT_A,
+    tradingDay: DAY,
+    ourBalanceCents: 5_000_000n,
+    platformBalanceCents: 5_000_000n,
+    deltaCents: 0n,
+    status: 'match',
+    resolvedBy: null,
+    resolutionNote: null,
+    sourceIngestFileId: FILE_ONE,
+    ourSource: RECON_SOURCE,
+    createdAt: COMPUTED_AT,
+    updatedAt: COMPUTED_AT,
+    ...overrides,
+  };
+}
+
+/**
+ * A row the DATABASE COULD NOT PRODUCE, seeded on purpose.
+ *
+ * **THIS IS THE PRICE `ADR-430` SECTION 9 CHARGES AND IT IS CHARGED ONCE, HERE,
+ * RATHER THAN AT EVERY CASE THAT PAYS IT.** Two cases below exist to watch a
+ * VALUE refusal fire: `reconciliations.id` arriving as a `number`, and a
+ * `*_cents` column arriving as a `number` when money is integer cents. Under
+ * the narrowed port those columns ARE `bigint`, so the input each case exists
+ * to watch is no longer expressible without casting past the type.
+ *
+ * **THE CAST STAYS AND SO DOES EVERY REFUSAL, AND THAT IS RULED RATHER THAN
+ * PREFERRED.** `ADR-299` section 5.1 item 5: a type derived from a
+ * TRANSCRIPTION does not retire a runtime check, and `ADR-112` foreclosure 4
+ * records that nothing here compares a `schema.ts` column type against the DDL.
+ * The type says "this cannot happen" on an authority nothing verifies. Deleting
+ * the cast would delete the case; deleting the refusal would trade a guard that
+ * FIRES for a claim nothing checks. **On this slice the guard being traded away
+ * would be the one standing between a float and a balance.**
+ */
+function malformed<R extends object>(row: R, overrides: Readonly<Record<string, unknown>>): R {
+  return { ...row, ...overrides } as R;
+}
+
+/** One `rule_states` row, WHOLE, for {@link mark}'s reason. */
+function state(overrides: Partial<DeclaredRow<'ruleStates'>> = {}): DeclaredRow<'ruleStates'> {
+  return {
+    id: 1n,
+    accountId: ACCOUNT_A,
+    tradingDay: DAY,
+    phase: 'funded',
+    floorCents: 0n,
+    floorLocked: false,
+    floorOpenCents: 0n,
+    highWaterBalanceCents: 5_000_000n,
+    balanceCents: 5_000_000n,
+    withdrawableCents: 0n,
+    tradedDaysCount: 0,
+    winDaysCount: 0,
+    consistencyBestDayCents: 0n,
+    consistencyPeriodProfitCents: 0n,
+    consistencyPeriodStartDay: null,
+    payoutsSettledCount: 0,
+    payoutAnchorDay: null,
+    cadenceAnchorDay: null,
+    engineEligible: true,
+    engineGates: {},
+    contextGates: {},
+    stateHash: new Uint8Array(),
+    engineVersion: 'test',
+    computedAt: COMPUTED_AT,
+    createdAt: COMPUTED_AT,
+    calendarRevisionId: null,
+    lifetimeSettledCents: 0n,
+    breached: false,
+    breachKind: null,
+    ...overrides,
+  };
 }
 
 function candidate(overrides: Partial<ReconCandidate> = {}): ReconCandidate {
@@ -493,7 +604,9 @@ describe('4. the finding and its consequence', () => {
     const [, rec] = await sweep({
       marks: [mark({ closingBalanceCents: 1n })],
       states: [state()],
-      existing: { [ACCOUNT_A]: { id: 7n, status: 'resolved', resolvedBy: 'ops@merit.test' } },
+      existing: {
+        [ACCOUNT_A]: reconciliation({ status: 'resolved', resolvedBy: 'ops@merit.test' }),
+      },
     });
     for (const call of rec.calls) {
       for (const field of ['deltaCents', 'resolvedBy', 'resolutionNote', 'createdAt']) {
@@ -512,7 +625,7 @@ describe('5. a redelivered day updates rather than duplicates', () => {
     const [, rec] = await sweep({
       marks: [mark({ closingBalanceCents: 4_999_950n })],
       states: [state()],
-      existing: { [ACCOUNT_A]: { id: 7n } },
+      existing: { [ACCOUNT_A]: reconciliation() },
     });
     expect(rec.calls.some((c) => c.op === 'insert' && c.key === 'reconciliations')).toBe(false);
     const update = rec.calls.find((c) => c.op === 'updateAt' && c.key === 'reconciliations');
@@ -529,7 +642,7 @@ describe('5. a redelivered day updates rather than duplicates', () => {
     const rec = recorder({
       marks: [mark()],
       states: [state()],
-      existing: { [ACCOUNT_A]: { id: 7 } },
+      existing: { [ACCOUNT_A]: malformed(reconciliation(), { id: 7 }) },
     });
     const report = await runReconciliationSweep({ tradingDay: DAY, batchRunId: BATCH_RUN }, rec.io);
     expect(report.outcomes[0]).toMatchObject({ kind: 'failed' });
@@ -561,7 +674,10 @@ describe('6. what the sweep will not write', () => {
   });
 
   test('a number where cents are expected is refused, never coerced', async () => {
-    const rec = recorder({ marks: [mark({ closingBalanceCents: 5_000_000 })], states: [state()] });
+    const rec = recorder({
+      marks: [malformed(mark(), { closingBalanceCents: 5_000_000 })],
+      states: [state()],
+    });
     await expect(
       runReconciliationSweep({ tradingDay: DAY, batchRunId: BATCH_RUN }, rec.io),
     ).rejects.toThrow(ReconRowError);
@@ -638,4 +754,106 @@ describe('7. the handle that can reach both tables', () => {
       expect(text).not.toContain("from '@merit/db'");
     }
   });
+});
+
+// =============================================================================
+// 8. `ADR-303` LIMIT 4, SPENT ON THIS FAMILY, AND THE MAPPING IT DELETES
+//    (ADR-430)
+// =============================================================================
+// [ADR-421](docs/decisions/ADR-421.md) section 9 priced the shape and
+// [ADR-426](docs/decisions/ADR-426.md) landed it once, on the digest slice: a
+// narrowing no reader can see buys nothing, and what makes limit 4 takeable is
+// a row that shows a HAND-WRITTEN MAPPING DELETED in the same commit. This
+// section is that proof for the reconciliation slice, which is the cheapest
+// family still available and the FIRST one whose rows carry money.
+//
+// WHAT IS DELETED IS THE EXISTENCE MAPPING AND NOT ONE REFUSAL. `ADR-299`
+// section 5.1 item 5 rules it: "a type derived from a transcription does not
+// retire a runtime check", and `ADR-112` foreclosure 4 records that nothing in
+// this tree compares a `schema.ts` column type against the DDL. So `asRow()`
+// goes, and every VALUE refusal stays. On this slice one of those refusals is
+// the only thing standing between a `number` and a balance.
+
+const PORTS_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'ports.ts'), 'utf8');
+const SWEEP_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'sweep.ts'), 'utf8');
+
+test('8.1 the read port hands back the accessor row and no longer re-states `unknown`', () => {
+  // THE MEMBER'S OWN RETURN, and not an `unknown` NEARBY. `ReconTx` declares
+  // `insert` and `updateAt` two lines below, both still `Promise<unknown[]>`,
+  // so a case reading the block for the string would pass on the wrong member.
+  const start = PORTS_SOURCE.indexOf('export interface ReconTx {');
+  expect(start, '`ReconTx` was not found in `ports.ts`').toBeGreaterThan(-1);
+  const block = PORTS_SOURCE.slice(start, PORTS_SOURCE.indexOf('\n}', start));
+  const own = /rowsWhere[^)]*\)\s*:\s*(Promise<[^;{]*?)[;{]/.exec(block);
+  expect(own?.[1], '`ReconTx.rowsWhere` has no readable return').toBeDefined();
+  expect(own?.[1]?.trim()).not.toBe('Promise<unknown[]>');
+
+  // AND THE KEY IS STILL THE NARROW UNION OF THREE. This row spends limit 4's
+  // RETURN and widens no key vocabulary, which is the half
+  // [ADR-424](docs/decisions/ADR-424.md) section 7 watches.
+  expect(block).toContain('K extends ReconReadTable');
+  expect([...RECON_READ_TABLES]).toEqual(['dailyMarks', 'ruleStates', 'reconciliations']);
+
+  // THE WRITE PATH IS UNSPENT AND SAYS SO OUT LOUD. A later row narrowing
+  // `insert` or `updateAt` is answering a DIFFERENT question -- what the
+  // database made of what was sent -- and this case is what tells it so.
+  expect(block).toContain('insert(key: ReconWriteTable, values: ReconValues): Promise<unknown[]>;');
+});
+
+test('8.2 the hand-written existence mapping is DELETED from the slice', () => {
+  const code = (text: string): string => stripComments(text, { literals: 'blank' });
+
+  // THE ALIAS THAT WROTE `unknown` DOWN A SECOND TIME.
+  expect(code(PORTS_SOURCE)).not.toMatch(/export type ReconRow\b/);
+
+  // THE FUNCTION THAT CAST BACK OUT OF IT. `asRow(` is the mapping
+  // [ADR-421](docs/decisions/ADR-421.md) section 5 calls "a second place the
+  // `unknown` is written down", gone from the module and from all three callers.
+  expect(code(SWEEP_SOURCE)).not.toMatch(/\basRow\b/);
+
+  // AND THE BARREL NO LONGER OFFERS THE NAME.
+  const barrel = readFileSync(join(HERE, '..', 'src', 'index.ts'), 'utf8');
+  expect(code(barrel)).not.toMatch(/\bReconRow\b(?!Error)/);
+
+  // WHAT THE DELETION BOUGHT, asserted rather than described: a column name is
+  // checked by `tsc` now because `field` is keyed to the row. A reader that
+  // took a bare `string` would compile with a column no migration ever created.
+  for (const reader of ['requireString', 'optionalString', 'requireCents'])
+    expect(code(SWEEP_SOURCE), `${reader} still takes an unchecked column name`).toContain(
+      `field: keyof R & string`,
+    );
+});
+
+test('8.3 every VALUE refusal survived the deletion, one for one', () => {
+  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a
+  // guard for its EXISTENCE; it buys nothing about the VALUE, because
+  // `schema.ts` is a transcription and nothing compares it to the DDL. A row
+  // that deleted these along with the mapping would be trading a refusal that
+  // fires for a type that cannot -- and here, on money.
+  const code = stripComments(SWEEP_SOURCE, { literals: 'blank' });
+  const READERS = ['requireString', 'optionalString', 'requireCents'] as const;
+  for (const reader of READERS) {
+    expect(code, `${reader} was deleted along with the mapping`).toContain(`function ${reader}`);
+    const start = code.indexOf(`function ${reader}`);
+    const body = code.slice(start, code.indexOf('\n}', start));
+    expect(body, `${reader} no longer refuses anything`).toContain('throw new ReconRowError(');
+  }
+
+  // A COUNT IS REFUSED AS THE INSTRUMENT, for the two reasons
+  // [ADR-426](docs/decisions/ADR-426.md) section 7 gives: it is a derivable
+  // number written down (`CI-06`), and it passes just as happily when one
+  // reader loses its `throw` and another grows a second. The property is "each
+  // refusal is still reachable", so each is read.
+  //
+  // THE MONEY ONE IS ASSERTED BY ITS SUBJECT AND NOT ONLY BY ITS PRESENCE.
+  // `requireCents` refusing a `number` is what keeps a float out of a balance,
+  // and the narrowed port makes its input harder to seed rather than safer.
+  //
+  // READ WITH LITERALS INTACT, and the difference is the point: `literals:
+  // 'blank'` is the mode for a check hunting for a CALL, and this one hunts for
+  // a string. Comments are still stripped, so the paragraph explaining the
+  // refusal cannot be the thing that satisfies it.
+  const kept = stripComments(SWEEP_SOURCE);
+  const cents = kept.slice(kept.indexOf('function requireCents'));
+  expect(cents.slice(0, cents.indexOf('\n}'))).toContain("typeof value !== 'bigint'");
 });

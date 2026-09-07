@@ -439,6 +439,9 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-426](ADR-426.md) | `ADR-303` limit 4 is SPENT for one verb on one handle, and the proof is a hand-written mapping deleted in the same commit (2026-09-07, status: proposed) |
 | [ADR-427](ADR-427.md) | the enumeration kind is given a RETENTION TIER rather than a filter, its precision goes from 1 in 18 to 1 in 2 without one site being dropped, a walker spelling nobody folded turns 171 unresolved reads into 137 and finds a dependant no row has named, and the one-hop default is DECIDED and kept (2026-09-07, status: proposed) |
 | [ADR-428](ADR-428.md) | the never-run tests were run, four of nine are green, and the two that are RED were broken by a migration whose own entry found and repaired this exact failure in the two callers CI could see (2026-09-07, status: proposed) |
+| [ADR-429](ADR-429.md) | the two reds are repaired at the fixture and not at the constraint, the repair is proved to still be under the foreign key it satisfies, and the reason a test could stay red in silence is that the only job with a database runs no vitest (2026-09-07, status: proposed) |
+| [ADR-430](ADR-430.md) | `ADR-303` limit 4 is SPENT on the `recon` family, the mapping is deleted, and this is the first such row whose rows carry money (2026-09-07, status: proposed) |
+| [ADR-431](ADR-431.md) | `RI-35`'s caller probes read a specifier list as a value, the line break was never the trigger, and the repair is priced by what it stops catching (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -1551,9 +1551,46 @@ describe('ADR-415: the `event-sink-caller` register after the producer moved', (
   const OWN_STATEMENT = "export { TRANSACTION_EVENT_WRITER } from './events.ts';\n";
   const IN_A_LIST =
     'export {\n  makeEventSink,\n  TRANSACTION_EVENT_WRITER,\n} from ' + "'./events.ts';\n";
+  // THE WRITER IS NOT LAST IN THIS ONE, AND THE POSITION IS THE POINT. The old
+  // proxy read the SEPARATOR comma, so a list ending in the writer put a brace
+  // after the name and stayed green while a list continuing past it went red.
+  // Written with the writer last, this case passed on the old behaviour too and
+  // proved nothing; that is a mistake this row made and measured.
+  const ONE_LINE_LIST = "export { TRANSACTION_EVENT_WRITER, makeEventSink } from './events.ts';\n";
+  const WRAPPED_SINGLE = "export {\n  TRANSACTION_EVENT_WRITER,\n} from './events.ts';\n";
 
-  test('RED: the writer inside a re-export list is read as an INSTALL', () => {
-    expect(entry.probe(ledgerTree(IN_A_LIST))).toBe('present');
+  // ---------------------------------------------------------------------------
+  // ADR-431: THE REGISTERED FALSE POSITIVE IS REPAIRED, AND THIS IS THE CASE
+  // THAT FAILS ON THE OLD BEHAVIOUR AND PASSES ON THE NEW.
+  //
+  // **THE SENTENCE THIS EXPECTATION USED TO CARRY IS KEPT BESIDE ITS CORRECTION**
+  // (`RI-14`). It read `RED: the writer inside a re-export list is read as an
+  // INSTALL` and asserted `present`, which was ADR-415 watching a defect it was
+  // forbidden to repair rather than asserting a property anybody wanted. The
+  // register said so in its own `sweptBy` and the barrel said so in a comment
+  // asking the next reader not to add a second name to one export statement.
+  // ---------------------------------------------------------------------------
+  test('GREEN: the writer inside a re-export list is a BINDING and not an install', () => {
+    expect(entry.probe(ledgerTree(IN_A_LIST))).toBe('absent');
+  });
+
+  // **AND THE LINE BREAK WAS NEVER THE TRIGGER**, which is where this row parts
+  // company with the account it inherited. ADR-415 and the barrel both say the
+  // green is held by prettier leaving the statement on one line. The ONE-LINE
+  // form of the same list fired too, because the comma the proxy reads is the
+  // SEPARATOR and arrives with the second name whether or not the statement
+  // wraps. Both spellings are asserted so neither can regress alone.
+  test('GREEN: the same list on ONE line is a binding too', () => {
+    expect(entry.probe(ledgerTree(ONE_LINE_LIST))).toBe('absent');
+  });
+
+  // AND PRETTIER REACHES IT FROM THE OTHER SIDE. `trailingComma: "all"` puts a
+  // comma after the LAST name of any list long enough to wrap, so a SINGLE-name
+  // list that prettier decides to break carries the comma with nothing added to
+  // it at all. This is the purest form of the defect: identical exported
+  // surface, identical module, one line break.
+  test('GREEN: a single name wrapped with a trailing comma is a binding too', () => {
+    expect(entry.probe(ledgerTree(WRAPPED_SINGLE))).toBe('absent');
   });
 
   // THE COUNTERFACTUAL, AND IT IS THE LINE ADR-410 ACTUALLY WROTE. The same
@@ -1593,6 +1630,76 @@ describe('ADR-415: the `event-sink-caller` register after the producer moved', (
       'export const sink = { write: (e) => TRANSACTION_EVENT_WRITER.write(e) };\n',
     );
     expect(entry.probe(wrapped)).toBe('present');
+  });
+
+  // ---------------------------------------------------------------------------
+  // **THIS IS THE CASE THAT STOPS ADR-431 BEING A QUIET WEAKENING, AND IT IS THE
+  // MORE IMPORTANT OF THE PAIR.**
+  //
+  // The repair blanks specifier lists. The failure it could introduce is exactly
+  // this one: a REAL install whose importing file reaches the writer through a
+  // MULTI-NAME import list -- the same syntax the repair now discards -- read as
+  // `absent` because the discarded comma was the only thing the proxy ever saw.
+  // A check that stops firing on a real change is far worse than one that fires
+  // on a reflow, so the install is written in the shape most likely to be lost
+  // and asserted RED end to end, through `checkAbsenceClaims` and not only
+  // through the probe.
+  //
+  // BOTH HALVES OF THE INSTALL, ON THE PROBE'S OWN REASON THAT EITHER ALONE IS
+  // THE ARRIVAL, and both behind a multi-name import.
+  // ---------------------------------------------------------------------------
+  test('RED: an install reached through a MULTI-NAME import list is still caught', () => {
+    const composed = ledgerTree(OWN_STATEMENT);
+    write(
+      composed,
+      'apps/worker/src/install.ts',
+      "import { EVENT_NAMES, TRANSACTION_EVENT_WRITER, makeEventSink } from '@merit/ledger';\n" +
+        'export const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock });\n' +
+        'export const names = EVENT_NAMES;\n',
+    );
+    expect(entry.probe(composed)).toBe('present');
+
+    const member = ledgerTree(OWN_STATEMENT);
+    write(
+      member,
+      'apps/worker/src/install.ts',
+      "import { EVENT_NAMES, TRANSACTION_EVENT_WRITER } from '@merit/ledger';\n" +
+        'export const sink = { write: (e) => TRANSACTION_EVENT_WRITER.write(e), EVENT_NAMES };\n',
+    );
+    expect(entry.probe(member)).toBe('present');
+  });
+
+  // AND THE SPAN IS THE BRACE AND NEVER THE LINE. An import and an install
+  // written as ONE statement is a line the shipped tree does not carry today and
+  // is the line a repair that blanked whole lines would lose outright. The
+  // per-line `reexport` heuristic one artifact over discards any line carrying
+  // `from '`, which is the shape this case is written against.
+  test('RED: an install sharing a line with its own import is still caught', () => {
+    const inline = ledgerTree(OWN_STATEMENT);
+    write(
+      inline,
+      'apps/worker/src/install.ts',
+      "import { TRANSACTION_EVENT_WRITER } from '@merit/ledger'; " +
+        'export const sink = wrap(TRANSACTION_EVENT_WRITER);\n',
+    );
+    expect(entry.probe(inline)).toBe('present');
+  });
+
+  // THE WHOLE CHECK AND NOT THE PROBE ALONE, so the repair is watched where a
+  // reader meets it: leg 2 going RED at the claim site, with the sentence named.
+  test('RED: leg 2 still fires at the claim site over a real install', () => {
+    const composed = ledgerTree(OWN_STATEMENT);
+    write(composed, OLD_PATH, '// `makeEventSink` is called by NO file under any `src/`.\n');
+    write(
+      composed,
+      'apps/worker/src/install.ts',
+      "import { EVENT_NAMES, TRANSACTION_EVENT_WRITER, makeEventSink } from '@merit/ledger';\n" +
+        'export const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock });\n' +
+        'export const names = EVENT_NAMES;\n',
+    );
+    const findings = checkAbsenceClaims(composed, { artifacts: [entry], claims });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('`makeEventSink` is called by NO file');
   });
 });
 
