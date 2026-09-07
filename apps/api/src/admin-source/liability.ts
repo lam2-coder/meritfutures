@@ -377,7 +377,13 @@ import type {
 /**
  * The tables this module reads, and no others.
  *
- * EIGHT, FOR A RESPONSE THAT IS SEVEN GROUPS. `routes/admin-writes.ts`'s
+ * NO NUMERAL, AND THE ARRAY BELOW IS THE COUNT. This sentence read EIGHT
+ * against a response of seven groups, and the array had grown past it: `B2`
+ * added the two calendar tables and `payoutTransfers`, and `B4` added
+ * `reconciliationRuns`. `ADR-034`'s remedy has exactly two branches, generate
+ * the value or delete it and point at the source, and the source is three lines
+ * down. `test/admin-source-liability-book.test.ts` counts the members and
+ * asserts every one is a real `TableKey`. `routes/admin-writes.ts`'s
  * `ADMIN_WRITE_TABLES` idiom, for its reason: a typo is a compile error here,
  * and the suite asserts every member is a real `TableKey` of `packages/db`,
  * which is the half this module cannot make about itself because it holds no
@@ -421,7 +427,12 @@ export const LIABILITY_READ_TABLES = [
 export type LiabilityReadTable = (typeof LIABILITY_READ_TABLES)[number];
 
 /**
- * ADR-112's keyed accessor, READ HALF ONLY, over this module's eight tables.
+ * ADR-112's keyed accessor, READ HALF ONLY, over the tables
+ * {@link LIABILITY_READ_TABLES} names.
+ *
+ * THE NUMERAL IS DELETED RATHER THAN CORRECTED, on that array's own docblock and
+ * on `ADR-034`'s remedy: this line said eight while the array held more, and a
+ * second hand-typed count of one list is the defect the first one already was.
  *
  * `rowAt` IS DELIBERATELY ABSENT, which is one method fewer than `FlagsTx`
  * carries. The one address this module would take is the treasury anchor, and
@@ -453,7 +464,15 @@ export type LiabilityPlanRow = LiabilityResponse['per_plan'][number];
 export type LiabilityBookGap = LiabilityResponse['gaps'][number];
 
 /**
- * `LiabilityResponse` MINUS the thirteen leaves nothing in this estate produces.
+ * `LiabilityResponse` MINUS the leaves nothing in this estate produces.
+ *
+ * THE NUMERAL IS DELETED AND `BLOCKED_LEAVES` IS THE SOURCE. This line said
+ * THIRTEEN, which was true when four blockers stood over four groups; `B2`,
+ * `B3` and `B4` each spent one and `ADR-208` moved the DECLARED count as well,
+ * so the figure was wrong in both terms. `test/admin-source-liability-book.test.ts`
+ * derives declared, blocked and produced from `API_CONTRACT` and asserts all
+ * three, which is the only honest statement of the position and is why it is
+ * read there.
  *
  * WRITTEN AS A SUBTRACTION AND NEVER AS A COPY. A hand-written shape would be a
  * second declaration of a served type, which is `RI-18`'s whole subject, and it
@@ -1153,7 +1172,11 @@ function readGaps(
 // -----------------------------------------------------------------------------
 
 /**
- * The 27 leaves of `LiabilityResponse` this estate can produce, from live rows.
+ * The leaves of `LiabilityResponse` this estate can produce, from live rows.
+ *
+ * THE NUMERAL IS DELETED FOR THIS FILE'S OWN STATED REASON. Its header refuses a
+ * count beside a derivation, and this line carried one that every blocker lift
+ * since has moved. `test/admin-source-liability-book.test.ts` derives it.
  *
  * `null` WHEN NO SNAPSHOT HAS BEEN WRITTEN, which is `AdminReadSource.readLiability`'s
  * own `Promise<LiabilityResponse | null>` and not a shape invented here: the
