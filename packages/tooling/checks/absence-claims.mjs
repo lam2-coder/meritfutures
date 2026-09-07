@@ -565,11 +565,24 @@ export const ABSENCE_ARTIFACTS = [
     needles: [/@merit\/queue/, /pgBossQueue/, /pgboss/i, /pg-boss/i],
     sweptBy:
       'the package specifier, the adapter factory name, and the schema name in both ' +
-      'spellings. MEASURED at the moment this register was written: the four needles reach ' +
-      'seven lines in the shipped scope and every one of them is a claim registered below. ' +
-      'Widening them to `@merit/db` was tried and rejected in the same sitting: that ' +
-      'needle reaches six lines about five different artifacts, which is a different rows ' +
-      'fence and not a tighter gate',
+      'spellings. **THE TWO FIGURES THAT CARRIED THIS ARGUMENT ARE DELETED RATHER THAN ' +
+      'CORRECTED, AND NO `census` REPLACES THEM.** They read that the four needles reach ' +
+      '"seven lines in the shipped scope" and that widening to `@merit/db` reaches "six ' +
+      'lines about five different artifacts". ADR-419 re-derived both under every reader ' +
+      'this register owns and neither figure is any of them, and neither sentence named ' +
+      'the reader it meant, so a replacement integer would first require choosing one. ' +
+      'A READER CHOSEN TO MAKE A NUMBER COME OUT RIGHT IS THE WORST WAY TO CHOOSE ONE, ' +
+      'which is ADR-417 section 8s rule. **AND A CENSUS IS REFUSED ON A SECOND GROUND ' +
+      'THAT IS ABOUT THESE NAMES RATHER THAN ABOUT THIS ROW.** Leg 7 reddens when a name ' +
+      'lands in a place the entry does not account for, which is news when the name is an ' +
+      'artifacts own and routine when it is a package specifier: these four needles are ' +
+      'spelt across this estate in prose about queues in general, so an account of them ' +
+      'would redden on somebody elses correct paragraph. THE ARGUMENT SURVIVES THE ' +
+      'ARITHMETIC AND IS ALREADY CHECKED. That every line these needles reach is a ' +
+      'registered claim is what leg 6 asserts on every run, so the integer was never the ' +
+      'evidence for it; and widening to `@merit/db` reaches a different rows fence about ' +
+      'other artifacts, which is a fact about what those lines ARE and not about how many ' +
+      'there are',
     probe: (root) =>
       importedAnywhere(root, '@merit/queue', (rel) => rel.startsWith('packages/queue/')),
   },
@@ -802,9 +815,40 @@ export const ABSENCE_ARTIFACTS = [
     names: 'a caller of `runProvisioningSaga` under any `src/`, past its own barrel re-exports',
     needles: [],
     sweptBy:
-      'nothing. The entry point`s name reaches four lines in the shipped scope and three of ' +
-      'them are a declaration or a re-export, so a needle on it would sweep the register ' +
-      'that already binds it',
+      'nothing, and the figure that argued for it is now DERIVED rather than written. It ' +
+      'read that the entry point`s name reaches "four lines in the shipped scope and three ' +
+      'of them are a declaration or a re-export". ADR-419 re-derived it and it REPRODUCES, ' +
+      'under exactly one reader: the STRIPPED shipped scan this entry`s own probe already ' +
+      'runs. **IT IS BOUND ANYWAY AND REPRODUCING IS WHY IT COULD BE.** The reader was ' +
+      'fixed by the probe before the figure was ever checked, so writing the census chooses ' +
+      'nothing, which is the test `queue-door` fails and this entry passes. The integers ' +
+      'are deleted on ADR-034`s second branch and leg 7 derives the arithmetic at the ' +
+      'moment it is read. The conclusion is unchanged: every line the name reaches is the ' +
+      'declaration, a barrel re-export, or the registry row that names the job without ' +
+      'calling it, so a needle on it would sweep the register that already binds it',
+    census: {
+      names: ['runProvisioningSaga'],
+      scope: 'shipped',
+      strip: true,
+      places: [
+        {
+          where: 'apps/worker/src/provisioning/saga.ts',
+          is: 'the declaring module, which the probe excludes by shape',
+        },
+        {
+          where: 'apps/worker/src/provisioning/index.ts',
+          is: 'the provisioning barrel re-exporting the entry point',
+        },
+        {
+          where: 'apps/worker/src/index.ts',
+          is: 'the deployable barrel re-exporting it a second time',
+        },
+        {
+          where: 'apps/worker/src/schedule.ts',
+          is: 'the registry row that names the job in order to say nothing calls it',
+        },
+      ],
+    },
     probe: (root) => {
       const files = shippedSources(root);
       if (files.length === 0) {
@@ -845,7 +889,17 @@ export const ABSENCE_ARTIFACTS = [
       'nothing of its own. `queue-door`s `pgboss` and `pg-boss` needles already reach every ' +
       'line in the shipped scope that names this migration, and a fifth needle spelling ' +
       '`CREATE SCHEMA` reaches none of them: the sentences say "the job store" and "that ' +
-      'migration", never the DDL',
+      'migration", never the DDL. **THIS FIGURE IS KEPT, AND IT IS THE ONE OF ADR-417 ' +
+      'SECTION 8s EIGHT THAT LEG 7 STRUCTURALLY CANNOT BIND.** ADR-419 re-derived it and ' +
+      'it reproduces: the needle reaches ZERO lines in either scope. A census cannot hold ' +
+      'it, and the refusal is this packages own rather than a budget: leg 7 asserts a ' +
+      'total against a sum of parts, so a census whose names reach nothing satisfies the ' +
+      'identity while measuring nothing, and the case `every census reaches lines on this ' +
+      'repository` refuses exactly that vacuous pass. **LEG 7 CAN BIND "THE NAMES LAND ' +
+      'ONLY HERE" AND CANNOT BIND "THE NAMES LAND NOWHERE",** which is a limit of the ' +
+      'mechanism worth knowing before a later row tries. Deleting the sentence instead ' +
+      'would delete the ARGUMENT rather than the arithmetic, and the argument is why this ' +
+      'entry registers no needle',
     probe: (root) =>
       migrations(root).some(({ body }) => /CREATE SCHEMA IF NOT EXISTS pgboss/i.test(body))
         ? 'present'
@@ -874,12 +928,21 @@ export const ABSENCE_ARTIFACTS = [
     needles: [],
     sweptBy:
       'nothing, and this one is a MEASUREMENT rather than an omission. The obvious needle, ' +
-      '`affiliate_commissions`, reaches three lines in `packages/db/src/scope.ts` where a ' +
-      'single line is a several-thousand-character `why` string holding a whole paragraph. ' +
-      'Line-scoped proximity means nothing there: the marker and the needle land in ' +
-      'sentences about different tables. The sweep would demand three registrations for ' +
-      'prose that asserts no absence about this column, which is a gate satisfied by ' +
-      'registering noise',
+      '`affiliate_commissions`, lands in `packages/db/src/scope.ts` where a single line is ' +
+      'a several-thousand-character `why` string holding a whole paragraph. Line-scoped ' +
+      'proximity means nothing there: the marker and the needle land in sentences about ' +
+      'different tables. The sweep would demand registrations for prose that asserts no ' +
+      'absence about this column, which is a gate satisfied by registering noise. **THE ' +
+      'INTEGER IS DELETED AND NO CENSUS REPLACES IT, AND WHICH READER IT MEANT IS THE ' +
+      'WHOLE OF WHY.** It read "three lines", and ADR-419 re-derived it through leg 7: the ' +
+      'needle reaches eighteen lines in the shipped scope and six of them are in the file ' +
+      'this sentence names, so it holds under NEITHER reader leg 7 can run. That is not ' +
+      'enough to call it wrong, because the sentence goes on to count REGISTRATIONS the ' +
+      'sweep would demand, and a registration is leg 6s marker-and-window output rather ' +
+      'than a line. A CENSUS WOULD THEREFORE ASSERT A DIFFERENT PROPOSITION UNDER A ' +
+      'DIFFERENT READER WHILE LOOKING LIKE A CONFIRMATION OF THIS ONE, which is worse than ' +
+      'no census at all. The integer is deleted on ADR-034s second branch and the count is ' +
+      'leg 6s to produce on demand',
     probe: (root) =>
       migrations(root).some(({ body }) =>
         /ALTER TABLE[\s\S]{0,200}?affiliate_commissions[\s\S]{0,200}?ADD COLUMN\s+affiliate_id/i.test(
@@ -896,11 +959,19 @@ export const ABSENCE_ARTIFACTS = [
       '`packages/queue`s `JobTransaction` declares',
     needles: [],
     sweptBy:
-      'nothing, MEASURED. `SqlExecutor` and `sqlExecutor` together reach one line in the ' +
-      'shipped scope and it is a claim about a different artifact, the live-feed adapter; ' +
-      '`@merit/db` and `packages/db` reach six lines about five artifacts. Neither is this ' +
-      'artifacts sweep, and a needle that mostly names other things is a needle that ' +
-      'registers noise',
+      'nothing. **BOTH FIGURES THAT ARGUED FOR IT ARE DELETED RATHER THAN CORRECTED AND NO ' +
+      '`census` REPLACES THEM**, on `queue-door`s reasons, which apply here harder than ' +
+      'anywhere else in this register. They read that `SqlExecutor` and `sqlExecutor` ' +
+      'together reach "one line in the shipped scope" and that `@merit/db` and ' +
+      '`packages/db` reach "six lines about five artifacts". ADR-419 re-derived both under ' +
+      'every reader this register owns and neither is any of them; the second is the ' +
+      'widest-of-the-wide, and this entry declares NO needle at all, so nothing here fixes ' +
+      'a reader for a replacement integer to be honest under. An account of these names ' +
+      'would also be an account of most of this estate and would redden whenever anybody ' +
+      'imported the database package correctly, which is leg 7 turned into noise. THE ' +
+      'ARGUMENT NEEDED NO INTEGER AND STILL DOES NOT: these are a common type name and a ' +
+      'package specifier, they are spelt in files about other artifacts, and a needle that ' +
+      'mostly names other things is a needle that registers noise',
     probe: (root) => {
       const barrel = requireFile(root, 'packages/db/src/index.ts');
       const runsATransaction = /^\s*transaction,\s*$/m.test(barrel);
@@ -917,14 +988,52 @@ export const ABSENCE_ARTIFACTS = [
     needles: [/direct-invocation guard/i, /process\.exit\(main\(\)\)/],
     sweptBy:
       'the two phrasings that NAME THE ARTIFACT rather than the file, and the distinction is ' +
-      'the measurement. `gates.mjs` reaches 84 lines over the widened scope, 32 of them in ' +
-      '`falsify.mjs` alone, about the runner in general; ADR-328s own rule is that a needle ' +
-      'which mostly names other things is a needle that registers noise, and it was measured ' +
-      'reaching one further line, `falsify.mjs:3217`s expectation string `and no file ' +
-      'provides it`, which asserts nothing about this tree. The two kept here name the guard ' +
-      'and the unguarded shape it replaced: together they reach TEN lines over the widened ' +
-      'scope, of which the seventh occurrence is the only one carrying an absence word ' +
-      'within the window',
+      'the measurement. A bare `gates.mjs` needle lands across this estate about the runner ' +
+      'in general, most of it in `falsify.mjs` and in the runner itself; ADR-328s own rule ' +
+      'is that a needle which mostly names other things is a needle that registers noise, ' +
+      'and it was measured reaching a further line whose expectation string asserts nothing ' +
+      'about this tree. The two kept here name the guard and the unguarded shape it ' +
+      'replaced, and the `census` below writes WHERE they land while leg 7 derives HOW ' +
+      'MANY. **EVERY INTEGER THIS ENTRY CARRIED IS DELETED AND ONE OF THEM WAS TRUE.** It ' +
+      'read that `gates.mjs` reaches "84 lines over the widened scope, 32 of them in ' +
+      '`falsify.mjs` alone" and that the kept pair reach "TEN lines", of which "the seventh ' +
+      'occurrence" is the only one carrying an absence word. ADR-419 re-derived all four ' +
+      'THROUGH LEG 7 ITSELF rather than through a second walk, which is the only way to be ' +
+      'reading `sweptSources` and not an imitation of it: **the TEN and the 32 REPRODUCE ' +
+      'EXACTLY and the 84 does not.** THE 32 WAS NOT REWRITTEN TO AGREE WITH ITS OWN ' +
+      'TOTAL. A partition can survive its total going wrong, and correcting a right part ' +
+      'to match a wrong whole is the failure mode a derived figure exists to prevent; both ' +
+      'go because the whole class goes, not because either was suspect, and ADR-419 ' +
+      'records what each reproduced at. THE ORDINAL GOES FOR A REASON OF ITS OWN: ' +
+      '"the seventh occurrence" indexes into an ordering no reader here fixes, so it was ' +
+      'never checkable in any scope. That every reached line is a registered claim or a ' +
+      'runner naming another runner stays leg 6s to assert',
+    census: {
+      names: ['direct-invocation guard', 'process.exit(main())'],
+      scope: 'swept',
+      places: [
+        {
+          where: 'scripts/corpus/gates.mjs',
+          is: 'the artifact itself, carrying the guard this entry claims it has',
+        },
+        {
+          where: 'scripts/corpus/data-model-columns.mjs',
+          is: 'ADR-329s seventh occurrence, which names the guard and the shape at once',
+        },
+        {
+          where: 'scripts/corpus/falsify.mjs',
+          is: 'the second reader, whose own guard is why this artifact had to become importable',
+        },
+        { where: 'scripts/corpus/covers-census.mjs', is: 'a corpus runner carrying the shape' },
+        { where: 'scripts/corpus/fixture-backlog.mjs', is: 'a corpus runner carrying the shape' },
+        { where: 'scripts/corpus/rewrite-links.mjs', is: 'a corpus runner carrying the shape' },
+        { where: 'scripts/corpus/split-decisions.mjs', is: 'a corpus runner carrying the shape' },
+        {
+          where: 'apps/site/src/content/lint-cli.ts',
+          is: 'the one shipped source carrying the shape, a lint entry point outside the scripts tree',
+        },
+      ],
+    },
     probe: (root) => {
       // BOTH HALVES, BECAUSE THE FALSE SENTENCE MADE TWO CLAIMS. It said the
       // module ends in `process.exit(main())` at module scope with no guard, and
@@ -1212,9 +1321,24 @@ export const ABSENCE_ARTIFACTS = [
       'unregistered line and declined to add it, because `apps/worker/**` was a concurrent ' +
       'row`s fence that wave and a needle registered ahead of the site it reaches is this ' +
       'register reporting a finding at a file nobody holding the needle may repair. ' +
-      'RE-DERIVED ON THE COMMIT THAT ADDED IT, over 398 swept files: the needle reaches 18 ' +
-      'lines, and under the vocabulary as ADR-384 left it exactly ONE of those windows ' +
-      'carries an absence word, `apps/worker/src/schedule.ts:407`. That figure reproduces. ' +
+      '**THE THREE FIGURES THAT STOOD HERE ARE DELETED AND NO `census` REPLACES THEM, ' +
+      'WHICH IS A MEASURED REFUSAL RATHER THAN A BUDGET.** They read that over "398 swept ' +
+      'files" the needle reaches "18 lines", of which under ADR-384s vocabulary exactly ONE ' +
+      'window carried an absence word. ADR-419 re-derived them through leg 7 itself: the ' +
+      '18 REPRODUCES, the 398 is STALE because the swept scope has grown since the commit ' +
+      'that anchored it, and the ONE is anchored to a vocabulary ADR-387 has already ' +
+      'widened, so it describes a reader this register no longer has. They go together ' +
+      'because the class goes, on ADR-417 section 5s finding that anchoring a figure to a ' +
+      'moment makes it honest and does not make it checked: the 18 is the same sentence as ' +
+      'the 398 and keeping the half that still happens to hold would leave a reader ' +
+      'believing the register checks it. **THE CENSUS WAS WRITTEN AND WITHDRAWN, AND THE ' +
+      'REASON IS A PROPERTY OF LEG 7 RATHER THAN OF THIS ENTRY.** A census accounts for ' +
+      'REPO-ABSOLUTE paths, and this is the one artifact here whose cases build SYNTHETIC ' +
+      'trees: seeding a caller at a path the real tree does not have is how six of them ' +
+      'watch their RED, so leg 7 reports those seeded paths as unaccounted and every case ' +
+      'would carry a second finding it is not about. That is a tax on every later row that ' +
+      'writes a fixture for this artifact, and ADR-419 declined to pay it by editing six ' +
+      'RED-watching cases of its own accord. ADR-419 section 6 prices it. ' +
       '**WHAT ADR-384 COULD NOT SEE IS THAT THE SITE IT NAMED WAS NOT THE ONLY ONE**: ' +
       '`apps/worker/src/index.ts:449` states the same absence about the same job in the ' +
       'words `Nothing calls`, which no marker in the vocabulary reached, so the sweep would ' +
