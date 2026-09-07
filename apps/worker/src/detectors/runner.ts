@@ -290,6 +290,7 @@ async function runOne(
   let recorded = false;
   let runId: string | undefined;
   let writeError: Error | undefined;
+  let emitError: Error | undefined;
   try {
     runId = await io.transact(async (tx) => {
       const id = await insertRun(tx, {
@@ -310,7 +311,10 @@ async function runOne(
       for (const group of groups) {
         await insertGroup(tx, config, id, group);
       }
-      await emitRunEvents(tx, io, {
+      // THE RETURN VALUE IS THE BI POINT'S REFUSAL AND IT IS NOT AN EXCEPTION.
+      // A page that could not be written has already thrown by here and taken
+      // this transaction with it (ADR-409).
+      emitError = await emitRunEvents(tx, io, {
         detector: detector.id,
         version,
         tradingDay: config.tradingDay,
@@ -341,7 +345,7 @@ async function runOne(
     syntheticMissing: missing,
     recorded,
     runId,
-    error: describe(scan.error, writeError),
+    error: describe(scan.error, writeError, emitError),
   };
 }
 
@@ -786,12 +790,60 @@ interface RunEventFacts {
  * only the page would leave a hole in the series exactly where the interesting
  * night is. `detector.run_degraded`'s consumers are "ALERT (page), FEED"
  * (`M07` section 5) and its payload below is that row's, field for field.
+ *
+ * -----------------------------------------------------------------------------
+ * THE TWO EVENTS ARE NOT BOUND TO THE RUN ROW BY THE SAME RULE, AND THIS
+ * FUNCTION USED TO TREAT THEM AS IF THEY WERE. ADR-409.
+ * -----------------------------------------------------------------------------
+ * **THE PAGE IS BOUND AND THE BI POINT IS NOT.** `ports.ts`'s
+ * `DetectorEventPort` states the criterion it relies on `ADR-006` for, and it
+ * states it about ONE name: *"`detector.run_degraded` commits with the run row
+ * that is degraded, or neither does"*. **No rule in `M07`, in `EVENTS` or in
+ * this deployable binds `detector.run_completed` to the run row**, and its
+ * consumers are BI and an alert on failure rather than a page.
+ *
+ * **WHAT THE OLD ORDER DID IS THE DEFECT.** `run_completed` was emitted FIRST
+ * and UNCONDITIONALLY, inside the write transaction, so a sink that refuses
+ * destroyed the `detector_runs` row of EVERY run: `ok`, `failed` and `degraded`
+ * alike. `INV-M7-07` is *"every detector run is recorded, including runs that
+ * raised nothing"*, and a BI event was able to make every run in the estate
+ * unrecorded.
+ *
+ * **AND THE RULING THAT ALLOWED IT DOES NOT COVER THE RUNS IT DESTROYED.**
+ * `adapter.ts` argued that a `detector_runs` row committed without its
+ * `detector.run_degraded` page is `AS-M7-05`'s green dashboard with an extra
+ * step. That is true of a DEGRADED run and **a non-degraded run has no page to
+ * lose**, so the argument was applied to a population it was never about. The
+ * old sentence is kept beside this correction rather than deleted (`RI-14`).
+ *
+ * **SO THE ORDER IS INVERTED AND THE FAILURE IS SPLIT.** The page goes first
+ * and stays FATAL, which preserves the criterion exactly. The BI point goes
+ * second and its failure is RETURNED rather than thrown, so the run row commits
+ * and the caller still learns the sink refused. **IT IS RETURNED AND NOT
+ * SWALLOWED**, and the difference is the whole point: a swallowed emit is the
+ * no-op sink `adapter.ts` calls the worst value in that file, arriving by
+ * another door.
  */
 async function emitRunEvents(
   tx: DetectorTx,
   io: DetectorRunnerIo,
   facts: RunEventFacts,
-): Promise<void> {
+): Promise<Error | undefined> {
+  // THE PAGE FIRST, AND IT THROWS. A degraded run whose page cannot be written
+  // takes its run row down with it, which is the criterion ports.ts states.
+  if (facts.status === 'degraded') {
+    await io.events.emit(tx, {
+      name: 'detector.run_degraded',
+      payload: {
+        detector: facts.detector,
+        detector_version: facts.version,
+        trading_day: facts.tradingDay,
+        synthetic_expected: facts.syntheticExpected,
+        synthetic_found: facts.syntheticFound,
+        rows_scanned: facts.rowsScanned,
+      },
+    });
+  }
   const completed: DetectorEvent = {
     name: 'detector.run_completed',
     payload: {
@@ -803,29 +855,23 @@ async function emitRunEvents(
       duration_ms: facts.durationMs,
     },
   };
-  await io.events.emit(tx, completed);
-  if (facts.status !== 'degraded') {
-    return;
+  // THE BI POINT SECOND, AND IT DOES NOT. Returned so `runOne` can put it on
+  // the outcome: the run is recorded AND the refusal is reported, which is the
+  // pair INV-M7-07 and AS-M7-05 both want and the old order could not give.
+  try {
+    await io.events.emit(tx, completed);
+    return undefined;
+  } catch (cause) {
+    return asError(cause);
   }
-  await io.events.emit(tx, {
-    name: 'detector.run_degraded',
-    payload: {
-      detector: facts.detector,
-      detector_version: facts.version,
-      trading_day: facts.tradingDay,
-      synthetic_expected: facts.syntheticExpected,
-      synthetic_found: facts.syntheticFound,
-      rows_scanned: facts.rowsScanned,
-    },
-  });
 }
 
 function asError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
 }
 
-function describe(scan: Error | undefined, write: Error | undefined): string | undefined {
-  const parts = [scan, write]
+function describe(...causes: readonly (Error | undefined)[]): string | undefined {
+  const parts = causes
     .filter((e): e is Error => e !== undefined)
     .map((e) => `${e.name}: ${e.message}`);
   return parts.length === 0 ? undefined : parts.join(' | ');

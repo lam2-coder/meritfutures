@@ -32,23 +32,23 @@
 // slice's fence.
 //
 // -----------------------------------------------------------------------------
-// AND THE REFUSAL IS NOT QUIET, WHICH IS WHY THE DEFAULT IS THE REFUSAL
+// AND THE REFUSAL IS NOT QUIET, THOUGH IT NO LONGER COSTS THE RUN ITS ROW
 // -----------------------------------------------------------------------------
-// **`runner.ts` CALLS `emitRunEvents` INSIDE THE WRITE TRANSACTION AND CALLS IT
-// UNCONDITIONALLY.** A rejecting `events.emit` therefore rolls back the
-// `detector_runs` row that was inserted three statements earlier, `runOne`
-// catches it, and the outcome comes back `recorded: false` with the detector's
-// name in `DetectorRunReport.unrecorded`.
-//
-// THAT IS THE HONEST ANSWER AND IT IS ALSO A USELESS RUN, and both halves are
-// the ruling. It is honest because `INV-M7-07` says every run is RECORDED and a
-// half-written run is worse than none: `AS-M7-05`'s subject is a green dashboard
-// over an absent detector, and a `detector_runs` row committed without its
-// `detector.run_degraded` page is that dashboard with an extra step
-// (`ports.ts`'s `DetectorEventPort` says so in its own words, citing `ADR-006`).
-// It is useless because a deployment holding this value writes NO run rows at
-// all, which is why ADR-349 rules the job STILL UNSCHEDULED and why
-// `schedule.ts`'s row now names three blockers instead of one.
+// **THE PARAGRAPH HERE SAID `runner.ts` EMITS UNCONDITIONALLY SO A REJECTING
+// `events.emit` ROLLS THE `detector_runs` ROW BACK, CALLED THAT THE HONEST
+// ANSWER AND A USELESS RUN, AND ADR-409 RULES IT A DEFECT** (kept beside its
+// correction, `RI-14`). The argument is sound and was applied to a population it
+// is not about: a row committed without its page is `AS-M7-05`'s dashboard with
+// an extra step only where there IS a page. The emit destroying every row was
+// `detector.run_completed`, a BI point **no rule in `M07`, in `EVENTS` or in
+// this deployable binds to the run row**; the bound one is
+// `detector.run_degraded` and `ports.ts` says so of that name alone, citing
+// `ADR-006`. So a BI event made every run unrecorded, `ok` runs included,
+// against `INV-M7-07`. **`runner.ts` NOW EMITS THE PAGE FIRST AND FATALLY AND
+// THE BI POINT SECOND AND RECOVERABLY**: this value RECORDS every non-degraded
+// run carrying `DetectorAdapterUnwired` on the outcome, and a DEGRADED run still
+// takes its row down with its page. Both are asserted in section 2 of
+// `test/detector-adapter.test.ts`, the second of them being the control.
 //
 // -----------------------------------------------------------------------------
 // THE SEAM, AND THE ONE THING IT MUST NOT BECOME

@@ -1151,6 +1151,16 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
     ).rejects.toThrow(/What is missing is the INSTALL/);
+    // AND THE CLAUSE AFTER IT MOVED A FOURTH TIME, on the rule this block
+    // already states. It read `which is a decision about a deployment rather
+    // than a file on disk` and was backwards on both halves: no deployment in
+    // this tree can take that decision, and the missing thing IS a file on disk.
+    // ADR-408 corrects it, so the assertion follows it here rather than being
+    // deleted, and `event-placement.test.ts` section 4 measures the address the
+    // corrected message names.
+    await expect(
+      UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
+    ).rejects.toThrow(/IS FALSE AND IS KEPT HERE BESIDE ITS CORRECTION \(ADR-408\)/);
   });
 
   test('`events` really is REGISTERED now, so the refusal above is about the writer and not the registry', () => {

@@ -1215,3 +1215,115 @@ describe('blocker B4: integrations.recon.last_run_at, LIFTED -- a run IS recorde
     );
   });
 });
+
+// =============================================================================
+// THE COMPOSITION FILE'S OWN REASON, WHICH IS THE ONE PLACE THE FOUR SPENT
+// BLOCKERS OUTLIVED THEIR MEASUREMENT
+// =============================================================================
+// `src/admin-source/index.ts` is where a reader asking "why is `readLiability`
+// not in `IMPLEMENTED_ADMIN_READS`" looks first, and its answer named FOUR
+// blockers that are every one of them spent: the calendar registration, the
+// velocity window, the absent form for the CUSUM, and the reconciliation run
+// record. Each was lifted by a session that spent its clearing condition in the
+// file that HELD it, and none of those sessions held the composition file, so
+// the reason there was never inverted. A reader following it would go and clear
+// a blocker four sessions old and find the work already done.
+//
+// **THAT IS THE SAME DEFECT `RI-14` EXISTS FOR AND `RI-14` CANNOT SEE IT.** The
+// invariant asks whether a reason claims a NAMED THING does not exist while the
+// tree EXPORTS it. `trading_calendar` is a registry key rather than an export,
+// a ruling is not an export, and a migration is not an export, so all four
+// clauses passed a green check. **REPORTED AND NOT REPAIRED**: widening that
+// invariant is `packages/tooling` and this fence may not take it.
+//
+// SO THE PROPERTY IS HELD HERE INSTEAD, and it is held from BOTH ends. Each of
+// the four is asserted spent AT ITS PRIMARY SOURCE, so this block goes red if a
+// primary source regresses rather than if a comment is re-typed; and the
+// composition file is asserted to name the blocker that actually stands, so the
+// reason cannot drift back to the four without failing.
+describe('the composition reason, and the four blockers that outlived their measurement', () => {
+  const index = () => readFileSync(join(ROOT, 'apps/api/src/admin-source/index.ts'), 'utf8');
+
+  // NON-VACUITY FIRST, AND IT IS THE WHOLE POINT OF THE BLOCK. Every assertion
+  // below is about a REASON, so a block that did not first pin the FACT the
+  // reason is about would pass over a session that composed the method and
+  // forgot to say so.
+  it('still does not compose `readLiability`, which is what the reason is a reason FOR', () => {
+    expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');
+    expect(() => composeAdminReadSource({}).readLiability()).toThrow(AdminSourceNotComposed);
+    // AND THE REFUSAL NAMES THE METHOD, which is the deliverable a deployment
+    // that cannot fill the group actually gets: a named, synchronous "this
+    // deployment is not finished" rather than a 500 off a half-filled body.
+    expect(() => composeAdminReadSource({}).readLiability()).toThrow('readLiability');
+  });
+
+  it('B1 is spent at `packages/db`: the calendar is a registry key', () => {
+    expect(TABLE_KEYS).toContain('tradingCalendar' satisfies TableKey);
+    expect(TABLE_KEYS).toContain('tradingCalendarLoads' satisfies TableKey);
+  });
+
+  it('B2 is spent at `ADR-201`: the window is a ruling rather than a gap', () => {
+    expect(readFileSync(join(ROOT, 'docs/decisions/ADR-201.md'), 'utf8')).toContain(
+      '`avg_30d_cents` is the trailing thirty-day settled total scaled to seven days',
+    );
+  });
+
+  it('B3`s WIRE half is spent at the contract: the CUSUM has an absent form', () => {
+    const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
+    const declared = contract.split('\n').filter((line) => /^ {2}per_plan:/.test(line));
+    expect(declared).toHaveLength(1);
+    expect(declared[0]).toContain('alarm: boolean } | null');
+    // AND THE CALIBRATION IS EXACTLY AS ABSENT AS IT WAS, which is the half a
+    // reader of the shape alone would mistake for the figure arriving. What
+    // lifted is the wire, and `DEP-M6-05` is still owed.
+    expect(readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8')).toContain(
+      'DEP-M6-05',
+    );
+  });
+
+  it('B4 is spent at the migration: the schema records a reconciliation RUN', () => {
+    expect(readdirSync(MIGRATIONS)).toContain('0064_reconciliation_runs.sql');
+    expect(readFileSync(join(MIGRATIONS, '0064_reconciliation_runs.sql'), 'utf8')).toContain(
+      'CREATE TABLE reconciliation_runs',
+    );
+  });
+
+  // AND THE COMPOSITION FILE NO LONGER STATES ANY OF THE FOUR. The four strings
+  // below are the retired clauses in their own spelling, which is the only form
+  // that catches a re-type; a looser pattern would match the paragraph that
+  // RETIRES them and this block would pass on the defect it exists for.
+  it('does not restate any of the four, in the file a reader asks first', () => {
+    const src = index();
+    expect(src).not.toContain('THE REASON IS FOUR BLOCKERS');
+    expect(src).not.toContain('needs `trading_calendar`');
+    expect(src).not.toContain('needs a 30-day window no document states');
+    expect(src).not.toContain('the wire has no absent form for it');
+  });
+
+  // AND IT NAMES THE ONE THAT STANDS, WITH BOTH OF ITS TERMS. A reason that
+  // merely stopped being wrong would leave the next reader with no blocker at
+  // all in front of an uncomposed method, which is worse than a stale one: a
+  // stale reason can be checked and an absent one cannot.
+  it('names B5 instead, with the term that refuses and the term the wire cannot say', () => {
+    const src = index();
+    expect(src).toContain('A FIFTH BLOCKER STANDS');
+    expect(src).toContain('EligibleFoldIo.resolvePinnedPlan');
+    expect(src).toContain('FORECAST');
+    // THE TERM IS ASSERTED UNSUPPLIED AT ITS OWN SOURCE and not only named
+    // here, so the day somebody wires it this case is what goes red.
+    const fold = readFileSync(join(ROOT, 'apps/api/src/admin-source/eligible-next-7d.ts'), 'utf8');
+    expect(fold).toContain('export const UNWIRED_ELIGIBLE_FOLD_IO: EligibleFoldIo');
+    expect(fold).toContain("throw new EligibleFoldUnwired('resolvePinnedPlan')");
+  });
+
+  // AND NO NUMERAL CAME BACK WITH THE REPAIR. The paragraph carried a produced
+  // count over a declared count and a blocked-path count, and every blocker
+  // lift since moved one or both. `admin-source-liability-book.test.ts` derives
+  // all three from `API_CONTRACT` on every run, which is where they are read.
+  it('carries no hand-typed leaf census, on `ADR-034`s remedy', () => {
+    const src = index();
+    expect(src).not.toContain('leaf paths**');
+    expect(src).not.toContain('13 of its own paths');
+    expect(src).toContain('test/admin-source-liability-book.test.ts');
+  });
+});
