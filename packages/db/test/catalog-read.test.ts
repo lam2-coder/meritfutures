@@ -61,8 +61,12 @@ import {
   uniqueKeys,
   type CatalogReadTx,
   type CatalogRow,
+  type FirmDb,
+  type FirmTx,
+  type ScopedDb,
   type ScopedTx,
   type StatementSource,
+  type SystemDb,
   type SystemTx,
 } from '../src/scoped-db.ts';
 
@@ -466,6 +470,53 @@ const ADR_303_TYPE_CASES: readonly [
 ] = [[true, true, true, true, true, true], true, [true, true, true, true], true];
 
 /**
+ * THE SAME LIMIT, ON THE HANDLES IT IS STATED OVER AND WAS NOT WATCHED ON
+ * (ADR-421).
+ *
+ * `CatalogRow`'s docblock states limit 4 as "`rows`, `rowsWhere`, `rowAt`,
+ * `lockAt` AND EVERY `FirmTx` AND `SystemTx` READ still return `unknown`", and
+ * `TheScopedVerbsStillReturnUnknown` above watches `ScopedTx` and nothing else.
+ * So the limit was written over three transaction handles and held on one, which
+ * is the `FM-16` shape the limit itself describes: a predicate stated in more
+ * places than are compared. A row narrowing `SystemTx.rowAt` -- the handle the
+ * operator console is on, and the one ADR-416 took its catalogue slice from --
+ * moved nothing above this line.
+ *
+ * `FirmTx` CARRIES NO `lockAt` AND IS ASSERTED FOR THREE VERBS RATHER THAN
+ * FOUR. That is the interface as declared, not a case left out: a `firm` read
+ * handle has no addressed lock, and asserting one would be asserting a method
+ * into existence.
+ *
+ * THE `Db`-LEVEL `rows` IS HERE TOO, because limit 4's surface is the accessor
+ * and not only its transactions, and `ScopedDb`, `SystemDb` and `FirmDb` each
+ * hand back `unknown[]` from a verb of the same name.
+ */
+type TheLimitHoldsOnTheOtherHandles = [
+  Assert<Same<Awaited<ReturnType<SystemTx['rows']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<SystemTx['rowsWhere']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<SystemTx['rowAt']>>, unknown>>,
+  Assert<Same<Awaited<ReturnType<SystemTx['lockAt']>>, unknown>>,
+  Assert<Same<Awaited<ReturnType<FirmTx['rows']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<FirmTx['rowsWhere']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<FirmTx['rowAt']>>, unknown>>,
+  Assert<Same<Awaited<ReturnType<ScopedDb['rows']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<SystemDb['rows']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<FirmDb['rows']>>, unknown[]>>,
+];
+
+/**
+ * ADR-421's cases, bound separately so ADR-303's tuple is untouched.
+ *
+ * THE TUPLE ABOVE IS NOT EXTENDED AND THAT IS DELIBERATE. ADR-303 section 3
+ * proves its own narrowness by showing BEFORE MINUS AFTER IS EMPTY over this
+ * file, and a later row that rewrites its binding makes that proof unrepeatable
+ * for no gain. A second binding costs one value and leaves the first quotable.
+ */
+const ADR_421_TYPE_CASES: readonly [TheLimitHoldsOnTheOtherHandles] = [
+  [true, true, true, true, true, true, true, true, true, true],
+];
+
+/**
  * The three verbs hand back declared rows AT A CALL SITE, which is the property
  * a caller will actually meet.
  *
@@ -500,6 +551,12 @@ describe('the return is the declared row and no refusal moved (ADR-303)', () => 
     // that stops holding fails `pnpm typecheck` and this line never runs.
     expect(ADR_303_TYPE_CASES.flat(2)).not.toContain(false);
     expect(ADR_303_TYPE_CASES.flat(2).length).toBeGreaterThan(0);
+
+    // ADR-421's cases, read the same way and for the same reason. The limit
+    // they hold is ADR-303's own and the handles are the ones its docblock
+    // names and its cases did not reach.
+    expect(ADR_421_TYPE_CASES.flat(2)).not.toContain(false);
+    expect(ADR_421_TYPE_CASES.flat(2).length).toBeGreaterThan(0);
     expect(typeof theVerbsHandBackDeclaredRows).toBe('function');
   });
 
