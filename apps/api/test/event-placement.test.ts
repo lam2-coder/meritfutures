@@ -671,12 +671,17 @@ describe('the relocation, and the bindings that moved with it', () => {
     //
     // THE SET FAILS ON GOOD NEWS IN BOTH DIRECTIONS: a NEW stale mention lands
     // red here, and so does the day somebody holding that fence repairs one.
+    //
+    // THAT DAY ARRIVED AND THE EXPECTATION ABOVE IS KEPT BESIDE ITS CORRECTION
+    // per `RI-14`. ADR-414 held `apps/worker/**` and repaired ALL THREE: the
+    // refusal message in `detectors/adapter.ts` moved with the suite that reads
+    // it, as the note above says it must. So the set is EMPTY, which is the
+    // strongest form this assertion takes: it still reddens the moment any file
+    // under `apps/worker/test` names the old path again. The three names are
+    // left in the comment above rather than deleted, because a reader who finds
+    // this empty needs to know what it used to hold and who emptied it.
     const stale = tsUnder('apps/worker/test').filter((rel) => read(rel).includes(OLD_PATH));
-    expect(stale).toEqual([
-      'apps/worker/test/detector-census.test.ts',
-      'apps/worker/test/event-sink.test.ts',
-      'apps/worker/test/expiry-adapter.test.ts',
-    ]);
+    expect(stale).toEqual([]);
 
     // THE DECLARATION IS AT THE HOME AND NOT AT THE OLD PATH, both halves, so
     // the three above are green for the reason they state.
