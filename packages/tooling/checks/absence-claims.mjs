@@ -942,7 +942,7 @@ export const ABSENCE_ARTIFACTS = [
       // -- writes the name BACKTICKED inside a string, so it is followed by a
       // backtick and matches neither shape. Measured on the commit that added
       // this artifact: `absent`, with that line present.
-      const producer = 'apps/api/src/events.ts';
+      const producer = 'packages/ledger/src/events.ts';
       for (const rel of files) {
         if (rel === producer) continue;
         const installed = stripComments(readFileSync(join(root, rel), 'utf8'))

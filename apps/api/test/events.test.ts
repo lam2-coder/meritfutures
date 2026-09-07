@@ -1,7 +1,16 @@
 // =============================================================================
 // apps/api/test/events.test.ts -- CI-02, the `unit` project.
 // =============================================================================
-// THE VALIDATING HALF OF `src/events.ts`.
+// THE VALIDATING HALF OF `packages/ledger/src/events.ts`.
+//
+// THAT MODULE WAS `apps/api/src/events.ts` UNTIL ADR-410 AND THIS SUITE DID NOT
+// MOVE WITH IT, WHICH IS A DECISION RATHER THAN AN OVERSIGHT. Its subject is the
+// producer, and its bindings are to `@merit/db`'s `TABLE_KEYS`, to `schema.ts`,
+// to three migrations, to EVENTS and to `apps/worker/src/sweeps/ports.ts`. Not
+// one of those is reachable from `packages/ledger`, which declares no dependency
+// at all, so a suite that followed the module would have had to give up every
+// binding that makes it worth running. It reads the module as TEXT where it
+// reads it at all and imports the rest through `@merit/ledger`.
 //
 // **THE SENTENCE THIS SUITE EXISTS TO MAKE FALSE IS "A NAME NOBODY RULED ON".**
 // ADR-159 clause 1 is the rule -- "a name becomes a row only where every field
@@ -23,7 +32,7 @@
 // -----------------------------------------------------------------------------
 // WHAT THIS SUITE READS RATHER THAN RESTATES
 // -----------------------------------------------------------------------------
-// Every constant `src/events.ts` declares because it cannot import it is BOUND
+// Every constant `packages/ledger/src/events.ts` declares because it cannot import it is BOUND
 // to its source by reading that source as text. A retyped constant that drifts
 // is what these binds exist to catch, and the worst of them is `ACTOR_KINDS`: a
 // fifth member added here and not in the migration is a `23514` on the
@@ -41,7 +50,7 @@
 // -----------------------------------------------------------------------------
 // NOTHING HERE REACHES A DATABASE, AND THAT IS NOT A LIMIT OF THE FIXTURE
 // -----------------------------------------------------------------------------
-// `src/events.ts` reaches none either. Its writer is a port because no writer is
+// `packages/ledger/src/events.ts` reaches none either. Its writer is a port because no writer is
 // COMPOSED and `db.ts` is the one file in this deployable that names `@merit/db`
 // (ADR-120). IT READ "precisely because `events` is not a `TableKey`" until
 // ADR-191 registered that table, and the correction matters to a reader of this
@@ -55,7 +64,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
-// THE ONE IMPORT `src/events.ts` CANNOT HOLD, HELD HERE INSTEAD. That file names
+// THE ONE IMPORT `packages/ledger/src/events.ts` CANNOT HOLD, HELD HERE INSTEAD. That file names
 // no package, so "`events` is a real `TableKey`" and "a `SystemTx` satisfies
 // `EventInsertTx`" are claims it cannot check about itself. This is
 // `admin-source-events.test.ts`'s disposition three files over and its reason:
@@ -89,7 +98,7 @@ import {
   type EventName,
   type EventSink,
   type EventWriter,
-} from '../src/events.ts';
+} from '@merit/ledger';
 
 const read = (relative: string): string =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8');
@@ -101,7 +110,7 @@ const MIGRATION_RISK = read('../../../packages/db/migrations/0008_risk.sql');
 const SCHEMA = read('../../../packages/db/src/schema.ts');
 const EVENTS_MD = read('../../../docs/architecture/EVENTS.md');
 const SWEEP_PORTS = read('../../../apps/worker/src/sweeps/ports.ts');
-const EVENTS_SRC = read('../src/events.ts');
+const EVENTS_SRC = read('../../../packages/ledger/src/events.ts');
 
 /**
  * Every catalogue row in EVENTS, as its four cells.
@@ -270,7 +279,7 @@ const PAYLOADS: Readonly<Record<EventName, Readonly<Record<string, unknown>>>> =
 const CLOCK = new Date('2026-08-27T21:00:00.000Z');
 const at = (name: EventName): EventEnvelope => buildEvent({ name, payload: PAYLOADS[name] }, CLOCK);
 
-/** The catalogue row for a name, as `src/events.ts` records it. */
+/** The catalogue row for a name, as `packages/ledger/src/events.ts` records it. */
 const rowOf = (name: EventName): CatalogueRow => EVENT_CATALOGUE[name];
 
 /**
@@ -1181,7 +1190,7 @@ describe('the sink takes the transaction, which is ADR-006 and not a convenience
 // 7. THE WRITER, AND THE DOOR THAT TURNS OUT TO BE NARROWER THAN THE READ
 // =============================================================================
 // `TRANSACTION_EVENT_WRITER` is the adapter section 6's default refuses for want
-// of. Everything here is one of two claims: that the two strings `src/events.ts`
+// of. Everything here is one of two claims: that the two strings `packages/ledger/src/events.ts`
 // retypes because it holds no import are the strings `packages/db` actually
 // carries, and that the handle the writer demands is the only handle in this
 // workspace whose `insert` reaches this table.
@@ -1690,7 +1699,7 @@ describe('the two rules that together made a money payload unwritable, and ADR-1
   });
 
   test('the rows naming NEITHER tenancy column are 35, and exactly one carries TL', () => {
-    // THE HEADER OF `src/events.ts` AND `assertTenanted` BOTH READ 34 UNTIL THIS
+    // THE HEADER OF `packages/ledger/src/events.ts` AND `assertTenanted` BOTH READ 34 UNTIL THIS
     // CASE WAS WRITTEN. Derived rather than typed from here on, which is the only
     // thing that keeps a count in a comment honest.
     const neither = READABLE_ROWS.filter(
