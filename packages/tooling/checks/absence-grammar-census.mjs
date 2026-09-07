@@ -146,9 +146,31 @@ const SKIP = ['node_modules/', 'dist/', 'build/', 'coverage/', '.next/'];
  * rule and a golden fixture a case, so both nouns are ambiguous in the direction
  * that inflates a floor, and a floor that is not a floor is worse than a wider
  * ceiling.
+ *
+ * `control` WAS ABSENT AND IS ADDED BY ADR-446, WHICH IS THE ONLY EXTENSION THAT
+ * SURVIVED THAT ROW'S RECONCILIATION. It was found by a second census written
+ * blind to this one, and it is not ambiguous the way `rule` and `case` are: this
+ * corpus uses `control` for a check and for nothing else, which
+ * `docs/architecture/SECURITY.md` and `ADR-068`'s *"two controls that happen to
+ * cover one route are not one control written twice"* both show. ADR-446 section
+ * 5 adjudicated ALL of the sentences it adds, EXHAUSTIVELY rather than by
+ * sample, and every one is an absence-of-check claim. The count is not written
+ * here, on this file's own rule below that no count is written into it.
+ *
+ * THREE OTHER EXTENSIONS WERE REFUSED, EACH BY MEASUREMENT RATHER THAN BY TASTE,
+ * and they are named so a later row does not re-propose them without re-deriving.
+ * `fail` as a verification verb: this corpus writes a test failing, a gate
+ * failing and a run failing far more often than it writes "nothing fails", so the
+ * addition is mostly noise even windowed to 25 characters. `name` as a
+ * verification verb: worse, and by an order of magnitude. `not one <mechanism>`
+ * as a fourth subject: it is a FENCE-STATEMENT detector rather than an
+ * absence-claim one, because this estate closes entries with "not one gate was
+ * weakened" and "not one assertion was inverted", which are completeness reports
+ * about a diff and the exact opposite of a defect report. ADR-446 section 5
+ * carries the derivation for all three.
  */
 const MACHINERY =
-  /\bno (check|gate|test|invariant|suite|runner|probe|leg|linter|assertion|checker|reader)s?\b/gi;
+  /\bno (check|gate|test|invariant|suite|runner|probe|leg|linter|assertion|checker|reader|control)s?\b/gi;
 
 /** The universal negatives, which reach the claims `MACHINERY` cannot see. */
 const UNIVERSAL = /\b(nothing|nobody|no one)\b/gi;
@@ -252,6 +274,21 @@ export function units(rel, text) {
       if (line.trim() === '') {
         if (buffer.length > 0) out.push({ line: start, text: buffer.join(' ') });
         buffer = [];
+        return;
+      }
+      // A MARKDOWN TABLE ROW IS ITS OWN UNIT, ADDED BY ADR-446 SECTION 6.
+      // A table carries no blank line, so a paragraph rule makes the WHOLE table
+      // one unit and every claim inside it cites the line the table OPENS on.
+      // That is not a rounding error: ADR-446 section 6 measures 252 of
+      // `ALLOCATION.md`'s sites landing on one line before this branch existed,
+      // and a citation that resolves to a table header is a citation `RI-16`
+      // would reject if it read this instrument's output. Splitting here also
+      // stops a subject in one row borrowing a verb from the next, which the
+      // twelve-word window otherwise permits across a row boundary.
+      if (/^\s*\|/.test(line)) {
+        if (buffer.length > 0) out.push({ line: start, text: buffer.join(' ') });
+        buffer = [];
+        out.push({ line: index + 1, text: line });
         return;
       }
       if (buffer.length === 0) start = index + 1;
