@@ -24,18 +24,11 @@
 // it was given and the compiler checks the COLUMN NAME against the schema.
 //
 // **WHAT DID NOT MOVE IS EVERY REFUSAL.** `ADR-299` section 5.1 item 5: a type derived from a
-// TRANSCRIPTION does not retire a runtime check. So the type buys the guard for a column's
-// EXISTENCE and buys nothing about its VALUE, and not one `throw` below was deleted with the
-// mapping. The evidence this header gave for that ruling was not evidence. It read "ADR-112
-// foreclosure 4 records that nothing in this tree compares a `schema.ts` column type against the
-// DDL." `RI-14` (ADR-441): IS FALSE, and was false when written, and misattributed besides.
-// `scoped-db.test.ts:2728` compares TYPE and NULLABILITY for every column of every registered
-// non-view relation; ADR-112 foreclosure 4 is about ADDRESSABILITY and EXHAUSTIVENESS and says
-// nothing of the kind. THE RULING SURVIVES ON A NARROWER FOOTING, which is why not one refusal
-// came off with the sentence: what is compared is the folded MIGRATION TEXT and not the database,
-// so a transcription and a second transcription agreeing settles nothing about the rows the
-// driver hands back, and DEFAULT is compared nowhere because `TYPE_ENDS_AT` at
-// `scoped-db.test.ts:2520` cuts it off the DDL text before the comparison.
+// TRANSCRIPTION does not retire a runtime check. This read "ADR-112 foreclosure 4 records that
+// nothing in this tree compares a `schema.ts` column type against the DDL." `RI-14` (ADR-444):
+// FALSE when written; stated ONCE at limit 1 of `CatalogRow`
+// (`packages/db/src/scoped-db.ts:3466`). So the type buys the guard for a column's EXISTENCE and
+// buys nothing about its VALUE, and not one `throw` below was deleted with the mapping.
 // =============================================================================
 
 /** Raised when a row crossing a port is not the shape the column declares. */

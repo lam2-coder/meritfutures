@@ -454,6 +454,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-441](ADR-441.md) | the population under `apps/worker` is NINE and not five, the two ADR-440 missed are line-wraps in its own grep, and "no cited line moves" bought room line-neutrality would have refused (2026-09-07, status: proposed) |
 | [ADR-442](ADR-442.md) | the survey says the population is large, diffuse and shares a grammar rather than a probe, so the class gets no control; the one claim that was priced is re-derived at more than twice its price and cannot land green on any tree that carries it (2026-09-07, status: proposed) |
 | [ADR-443](ADR-443.md) | the `GENERATED ALWAYS AS` expression is compared against the DDL for the first time, and ALL FIVE AGREE (2026-09-07, status: proposed) |
+| [ADR-444](ADR-444.md) | a claim about the suite is written ONCE and cited thereafter, because a citation is policed by a shipped invariant and a claim is policed by nothing (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
