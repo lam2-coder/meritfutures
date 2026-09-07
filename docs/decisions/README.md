@@ -451,6 +451,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-438](ADR-438.md) | the `schema.ts` DEFAULT is compared against the DDL for the first time, and THREE COLUMNS DISAGREE (2026-09-07, status: proposed) |
 | [ADR-439](ADR-439.md) | the hole ADR-435 named in `golden` is closed in the shape that entry specified, and re-deriving its numbers corrects one of them (2026-09-07, status: proposed) |
 | [ADR-440](ADR-440.md) | the sentence four documents carry was never STALE, it was FALSE WHEN WRITTEN, and the line-neutral repair preserves the pointer without preserving what it lands on (2026-09-07, status: proposed) |
+| [ADR-442](ADR-442.md) | the survey says the population is large, diffuse and shares a grammar rather than a probe, so the class gets no control; the one claim that was priced is re-derived at more than twice its price and cannot land green on any tree that carries it (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
