@@ -3070,6 +3070,338 @@ describe('the transcription states the DDL type and nullability, not only the co
 });
 
 // =============================================================================
+// ADR-438. THE DEFAULT, WHICH IS THE THIRD TRANSCRIBED FACT AND THE ONE NOTHING
+// COMPARED.
+// =============================================================================
+// EVERYTHING ABOVE THIS LINE COMPARES TYPE AND NULLABILITY, and ADR-437 section
+// 5 measured what that leaves: `TYPE_ENDS_AT` CUTS `DEFAULT` off the DDL text
+// before either comparison reads it, and `the type reader is not degenerate`
+// asserts the cut happened. So the one clause both readers are built to discard
+// is the one clause a WRITE type depends on, and until this block the only
+// `hasDefault` assertion in this repository read ONE column of ONE table
+// (`firm-parameter-vocabulary.test.ts:340`).
+//
+// WHY IT IS THE FACT A WRITE TYPE RESTS ON. `$inferSelect` needs the type and
+// the nullability and nothing else, and both are compared above. `$inferInsert`
+// needs a THIRD fact: whether a column may be OMITTED. A read type never says a
+// column might be absent; a write type says it about every defaulted column, and
+// it says it out of `hasDefault` alone. ADR-437 section 7 reason 4 refused a
+// write-path narrowing on exactly this and asked for this comparison first.
+//
+// WHY IT IS A MONEY QUESTION. Twelve `*_cents` columns carry a default, so
+// twelve MONEY columns are omittable from any narrowed write, and the value the
+// database then chooses is chosen by a clause nothing read. Money is integer
+// cents and no float may enter a financial path, so the money leg below asserts
+// the transcribed default is a `bigint` rather than a number.
+//
+// THE READER IS THE FOLD AND NEVER THE `CREATE`, on ADR-094, for the reason the
+// type reader gives one screen up. The fold applies `DROP NOT NULL`, `TYPE` and
+// `RENAME` and applies no default statement, WHICH IS SOUND HERE RATHER THAN
+// LUCKY: `the migration set carries exactly the ALTER COLUMN statements this
+// fold was ruled against` holds that vocabulary at two shapes over the whole
+// set, so a `SET DEFAULT` or a `DROP DEFAULT` is RED there before it could be
+// silently unfolded here.
+
+/**
+ * WHERE A COLUMN'S DEFAULT EXPRESSION ENDS. The mirror of `TYPE_ENDS_AT`, minus
+ * `DEFAULT` itself and plus nothing: a default expression is followed only by
+ * another column constraint, and the list is the one this DDL actually uses.
+ *
+ * A MISSED KEYWORD FAILS LOUD RATHER THAN QUIET, on the same argument the type
+ * splitter makes: an uncut expression carries `CHECK (...)` or `NOT NULL` in it,
+ * and `the default reader is not degenerate` below refuses exactly that text.
+ */
+const DEFAULT_ENDS_AT =
+  /\s+(?=NOT\s+NULL\b|NULL\b|PRIMARY\s+KEY\b|REFERENCES\b|UNIQUE\b|CHECK\b|CONSTRAINT\b|GENERATED\b|COLLATE\b|DEFERRABLE\b)/i;
+
+/**
+ * AN IDENTITY IS A DEFAULT FOR THE ONLY PURPOSE THIS COMPARISON HAS, and that is
+ * a statement about drizzle-orm rather than about SQL. `GENERATED ALWAYS AS
+ * IDENTITY` writes no `DEFAULT` keyword, yet `.generatedAlwaysAsIdentity()` sets
+ * `hasDefault` to `true` and `$inferInsert` marks the column optional off that
+ * flag. A comparison reading only the `DEFAULT` keyword would call every
+ * identity column in this schema a disagreement and would be reporting its own
+ * reader.
+ *
+ * `BY DEFAULT` IS IN THE PATTERN THOUGH NO MIGRATION WRITES IT, so the strip in
+ * `ddlDefault` cannot be defeated by the one identity spelling that does contain
+ * the word that reader searches for.
+ */
+const DECLARED_IDENTITY = /\bGENERATED\s+(?:ALWAYS|BY\s+DEFAULT)\s+AS\s+IDENTITY\b/i;
+
+/** The DEFAULT expression one folded column declares, or `''` when it declares none. */
+const ddlDefault = (def: string | undefined): string => {
+  const text = (def ?? '').replace(DECLARED_IDENTITY, ' ');
+  const keyword = /\bDEFAULT\b/i.exec(text);
+  if (keyword === null) return '';
+  const rest = text
+    .slice(keyword.index + keyword[0].length)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (rest.split(DEFAULT_ENDS_AT)[0] ?? '').replace(/,\s*$/, '').trim();
+};
+
+/**
+ * WHETHER THE DATABASE SUPPLIES THIS COLUMN'S VALUE WHEN A WRITE OMITS IT, which
+ * is the question `hasDefault` answers on the other side.
+ *
+ * A GENERATED COLUMN IS NOT ONE OF THESE AND THAT IS DELIBERATE. `GENERATED
+ * ALWAYS AS (expr) STORED` supplies a value and REFUSES a written one, and
+ * drizzle-orm records it in `generated` rather than in `hasDefault`, so both
+ * sides read `false` here and agree. ADR-438 section 5 states what that leaves
+ * unproven rather than quietly widening this reader.
+ */
+const declaredDefault = (def: string | undefined): boolean =>
+  ddlDefault(def) !== '' || DECLARED_IDENTITY.test(def ?? '');
+
+/**
+ * THE COLUMNS WHERE THE TRANSCRIPTION AND THE DDL DISAGREE ABOUT A DEFAULT, AND
+ * THIS REGISTER IS THE FINDING OF ADR-438 RATHER THAN AN EXEMPTION FROM IT.
+ *
+ * EVERY ONE IS THE SAME DIRECTION AND IT IS THE FAIL-CLOSED ONE: the DDL
+ * declares `DEFAULT '{}'`, `schema.ts` records none, so a write type derived
+ * from the transcription REQUIRES a value the database would have supplied. The
+ * cost is a required field, never a NULL and never a wrong value. The opposite
+ * direction -- a transcribed default the DDL does not declare -- would let a
+ * narrowed write omit a `NOT NULL` column the database defaults nothing into,
+ * and `every disagreement is the SAFE direction` below holds that population at
+ * ZERO rather than registering it.
+ *
+ * NOTHING IS REPAIRED HERE. `schema.ts` is not this row's to edit and a
+ * migration is nobody's; the register makes the disagreement a MEASURED fact
+ * that the suite re-derives on every run. It is a command in both directions: a
+ * fourth disagreement is RED, and so is repairing one of these three, so the
+ * repair is a diff somebody takes deliberately with this register in front of
+ * them.
+ *
+ *   kyc_verifications.raw_result        0003_kyc.sql:103   schema.ts:1793
+ *   sanctions_screenings.list_refs      0003_kyc.sql:170   schema.ts:1820
+ *   identity_phones.release_evidence    0029_...:139       schema.ts:1900
+ */
+const TRANSCRIPTION_OMITS_DEFAULT: ReadonlyArray<readonly [string, string, string]> = [
+  ['kyc_verifications', 'raw_result', "'{}'"],
+  ['sanctions_screenings', 'list_refs', "'{}'"],
+  ['identity_phones', 'release_evidence', "'{}'"],
+];
+
+const omitsDefault = (sqlName: string, column: string): boolean =>
+  TRANSCRIPTION_OMITS_DEFAULT.some(([table, name]) => table === sqlName && name === column);
+
+/**
+ * THE MONEY POPULATION, WRITTEN OUT AND NOT DERIVED, and it is why this block
+ * was commissioned. Each row is a `*_cents` column a write type derived from
+ * `schema.ts` would mark OPTIONAL, with the DEFAULT expression the migration set
+ * declares for it.
+ *
+ * THE LIST IS A COMMAND IN BOTH DIRECTIONS. The derived set is held equal to it
+ * below, so a thirteenth defaulted money column is RED on the day it lands and
+ * somebody reads ADR-438 section 5 before a narrowed write ships over it.
+ */
+const MONEY_DEFAULT_SENTINELS: ReadonlyArray<readonly [TableKey, string, string]> = [
+  ['purchases', 'discount_cents', '0'],
+  ['purchases', 'wallet_debit_cents', '0'],
+  ['liabilitySnapshots', 'absorbed_corrections_cents', '0'],
+  ['dailyMarks', 'adjustment_cents', '0'],
+  ['ruleStates', 'consistency_best_day_cents', '0'],
+  ['ruleStates', 'consistency_period_profit_cents', '0'],
+  ['ruleStates', 'lifetime_settled_cents', '0'],
+  ['otpSendBudget', 'spend_cents', '0'],
+  ['affiliates', 'balance_cents', '0'],
+  ['roundTrips', 'fee_cents', '0'],
+  ['promotionalCreditGrants', 'consumed_cents', '0'],
+  ['platformEntitlements', 'monthly_cost_cents', '0'],
+];
+
+describe('the transcription states the DDL DEFAULT, which is the fact a WRITE type rests on', () => {
+  for (const [key, sqlName] of DDL_NAMES) {
+    test(`${sqlName}: every column's DEFAULT equals the DDL as of the LAST migration`, () => {
+      const defs = foldTableDefs(sqlName);
+      for (const column of Object.values(columnsOf(key))) {
+        const def = defs.get(column.name);
+        expect(def, `${sqlName}.${column.name} is not a column of the folded table`).toBeDefined();
+
+        // A REGISTERED DISAGREEMENT IS ASSERTED ON BOTH SIDES RATHER THAN
+        // SKIPPED. Either half moving makes the register stale, and a stale
+        // register is exactly the thing that would let this comparison pass
+        // while saying nothing.
+        if (omitsDefault(sqlName, column.name)) {
+          expect(
+            column.hasDefault,
+            `${sqlName}.${column.name} is a REGISTERED disagreement and schema.ts now records a ` +
+              `default for it, so TRANSCRIPTION_OMITS_DEFAULT is stale`,
+          ).toBe(false);
+          expect(
+            declaredDefault(def),
+            `${sqlName}.${column.name} is a REGISTERED disagreement and the migration set no ` +
+              `longer defaults it, so TRANSCRIPTION_OMITS_DEFAULT is stale`,
+          ).toBe(true);
+          continue;
+        }
+
+        expect(
+          column.hasDefault,
+          `${sqlName}.${column.name} is transcribed as ${
+            column.hasDefault ? 'DEFAULTED, so a write may omit it' : 'carrying no default'
+          } and the migration set declares it ${
+            declaredDefault(def) ? `DEFAULT ${ddlDefault(def) || 'AS IDENTITY'}` : 'with no default'
+          }. Its DDL is: ${def ?? ''}`,
+        ).toBe(declaredDefault(def));
+      }
+    });
+  }
+
+  // THE REGISTER IS DERIVED BACK, WHICH IS WHAT STOPS IT GROWING QUIETLY. The
+  // loop above consults it per table and would stay green if a fourth entry were
+  // added to it for a column that agrees. This holds the register equal to the
+  // set the whole registry actually produces, and holds the DIRECTION at the
+  // only one that is safe.
+  test('exactly the registered columns disagree, and every disagreement is the SAFE direction', () => {
+    const disagreeing: string[] = [];
+    const failOpen: string[] = [];
+    for (const [key, sqlName] of DDL_NAMES) {
+      const defs = foldTableDefs(sqlName);
+      for (const column of Object.values(columnsOf(key))) {
+        const def = defs.get(column.name);
+        if (column.hasDefault === declaredDefault(def)) continue;
+        disagreeing.push(`${sqlName}.${column.name}`);
+        // THE DANGEROUS DIRECTION. `schema.ts` says the database supplies a
+        // value and the DDL says it does not, so a narrowed write would offer
+        // the column as omittable and the database would refuse the row or take
+        // a NULL. This population is ZERO and is asserted so rather than
+        // registered.
+        if (column.hasDefault) failOpen.push(`${sqlName}.${column.name}`);
+      }
+    }
+    expect(
+      failOpen,
+      'a column is transcribed with a default the migration set does not declare, so a write ' +
+        'type derived from schema.ts would mark it omittable and the database would supply ' +
+        'nothing for it',
+    ).toEqual([]);
+    expect(
+      disagreeing.sort(),
+      'the DEFAULT disagreements are not the ones ADR-438 measured',
+    ).toEqual(TRANSCRIPTION_OMITS_DEFAULT.map(([table, name]) => `${table}.${name}`).sort());
+    // MONEY IS THE POPULATION THE REGISTER MAY NEVER REACH. ADR-437 section 8
+    // read every `*_cents` column by hand and found no disagreement; this is
+    // that reading taken by the suite, on the DEFAULT leg, on every run.
+    expect(
+      disagreeing.filter((column) => column.endsWith('_cents')),
+      'a MONEY column disagrees about its DEFAULT, which outranks every other finding here',
+    ).toEqual([]);
+    // AND THE REGISTERED EXPRESSIONS ARE WHAT THE DDL SAYS, so the three rows
+    // carry the migration set's own text rather than a remembered one.
+    for (const [table, name, expression] of TRANSCRIPTION_OMITS_DEFAULT) {
+      expect(ddlDefault(foldTableDefs(table).get(name)), `${table}.${name} in the migrations`).toBe(
+        expression,
+      );
+    }
+  });
+
+  // THE SILENT DIRECTION, AND IT IS NOT WHERE THE TYPE COMPARISON'S IS. Both
+  // sides of the per-table loop are BOOLEANS over a fixed population, so a
+  // reader that collapsed onto `false` reddens every defaulted column and one
+  // that collapsed onto `true` reddens every other column: that comparison
+  // cannot degenerate quietly in either direction. What CAN is `ddlDefault`,
+  // which it consumes only as `!== ''`. A splitter that stopped cutting would
+  // return `0 CHECK (discount_cents >= 0)` -- still non-empty, still green above
+  // -- and the money leg would then be comparing against constraint text. So the
+  // expression is asserted to be a real expression for every column the DDL
+  // defaults, and the visited count is held to the transcription's own.
+  test('the default reader is not degenerate: it reads a real DEFAULT expression for every defaulted column', () => {
+    let read = 0;
+    let defaulted = 0;
+    let identities = 0;
+    for (const [, sqlName] of DDL_NAMES) {
+      for (const [name, def] of foldTableDefs(sqlName)) {
+        read++;
+        if (DECLARED_IDENTITY.test(def)) identities++;
+        const expression = ddlDefault(def);
+        if (expression === '') continue;
+        defaulted++;
+        expect(
+          expression,
+          `${sqlName}.${name}: the default reader swallowed constraint text, so it did not cut ` +
+            `where a default expression ends. Its DDL is: ${def}`,
+        ).not.toMatch(/\b(NOT NULL|PRIMARY KEY|REFERENCES|CHECK|UNIQUE|GENERATED|COLLATE)\b/i);
+      }
+    }
+    // OVER THE TABLE HALF, for the reason `the type reader is not degenerate`
+    // gives: a registered VIEW's columns are visited by their own leg below.
+    const declared = DDL_NAMES.reduce((n, [key]) => n + Object.keys(columnsOf(key)).length, 0);
+    expect(read, 'the comparison did not visit every column the transcription declares').toBe(
+      declared,
+    );
+    expect(
+      defaulted,
+      'no registered column declares a DEFAULT expression, so the comparison above is vacuous',
+    ).toBeGreaterThan(0);
+    expect(
+      identities,
+      'no registered column is GENERATED AS IDENTITY, so the identity branch of the reader is a ' +
+        'branch nothing runs',
+    ).toBeGreaterThan(0);
+  });
+
+  // MONEY IS INTEGER CENTS AND THIS IS THE LEG THAT SAYS SO. ADR-437 section 8
+  // is the hand reading this replaces: "that agreement is one reading taken on
+  // one afternoon by one row. It is not a check."
+  test('the money columns a write may OMIT hold exactly the default written here', () => {
+    const derived = DDL_NAMES.flatMap(([key, sqlName]) =>
+      Object.values(columnsOf(key))
+        .filter((column) => column.hasDefault && column.name.endsWith('_cents'))
+        .map((column) => `${sqlName}.${column.name}`),
+    ).sort();
+    expect(
+      derived,
+      'the set of MONEY columns a narrowed write could omit is not the set written here',
+    ).toEqual(MONEY_DEFAULT_SENTINELS.map(([key, name]) => `${SQL_NAME[key]}.${name}`).sort());
+
+    for (const [key, name, expression] of MONEY_DEFAULT_SENTINELS) {
+      const column = Object.values(columnsOf(key)).find((c) => c.name === name);
+      expect(column, `${SQL_NAME[key]}.${name} is not a transcribed column`).toBeDefined();
+      expect(column?.hasDefault, `${SQL_NAME[key]}.${name} in schema.ts`).toBe(true);
+      // NO FLOAT ENTERS A FINANCIAL PATH, and a transcribed default is the one
+      // place a money column could take one without a single call site moving.
+      // `0` and `0n` both render as "0" against the DDL text; only one of them
+      // is integer cents, and `typeof` is what tells them apart.
+      expect(typeof column?.default, `${SQL_NAME[key]}.${name} default in schema.ts`).toBe(
+        'bigint',
+      );
+
+      const def = foldTableDefs(SQL_NAME[key]).get(name);
+      expect(def, `${SQL_NAME[key]}.${name} is not a folded column`).toBeDefined();
+      expect(ddlDefault(def), `${SQL_NAME[key]}.${name} in the migrations`).toBe(expression);
+      expect(String(column?.default), `${SQL_NAME[key]}.${name} across both sides`).toBe(
+        expression,
+      );
+    }
+  });
+
+  // ADR-209's HALF. A view declares no default of its own -- Postgres takes one
+  // only from an `ALTER VIEW ... SET DEFAULT`, which no migration in this set
+  // writes -- and a projected column does NOT inherit the base relation's. So
+  // the whole registered view population is asserted flat, and a transcription
+  // that carried `.default()` across from the base table would be offering an
+  // omittable column on a relation that supplies nothing.
+  test('no registered VIEW column is transcribed with a default, because a view declares none', () => {
+    expect(VIEW_NAMES.length, 'no registered VIEW, so this leg is vacuous').toBeGreaterThan(0);
+    for (const [key, sqlName] of VIEW_NAMES) {
+      for (const column of Object.values(columnsOf(key))) {
+        expect(
+          column.hasDefault,
+          `${sqlName}.${column.name} is transcribed with a default and a view declares none`,
+        ).toBe(false);
+      }
+    }
+    expect(
+      [...allMigrationSql().matchAll(/ALTER\s+VIEW\b/gi)].length,
+      'a migration carries ALTER VIEW, which is how a view acquires a default',
+    ).toBe(0);
+  });
+});
+
+// =============================================================================
 // ADR-157: THE RANGE TERM, THE NULL TERM AND THE ROW LOCK
 // =============================================================================
 // ADR-112 refused a range and an `IS NULL` and named its own way out: "every one
