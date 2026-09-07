@@ -447,6 +447,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-434](ADR-434.md) | a live comment on the money path's own barrel stated two false things about a check, one of them never true, and no leg of that check could ever have said so (2026-09-07, status: proposed) |
 | [ADR-435](ADR-435.md) | a skip is green, the number that would say so was bound to nothing, and an exact control for it exists because the run already produces the number (2026-09-07, status: proposed) |
 | [ADR-436](ADR-436.md) | two live port headers said they imported nothing while importing, and every check that reads those files reads one axis narrower than the sentence claims (2026-09-07, status: proposed) |
+| [ADR-437](ADR-437.md) | the WRITE path is REFUSED on the `breaker` family, and the ruling that stops it is not the one the dispatch named (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
