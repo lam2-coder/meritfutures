@@ -3441,11 +3441,11 @@ export type CatalogTableKey = (typeof CATALOG_TABLE_KEYS)[number];
  *
  *   1. THE RUNTIME GUARDS DO NOT COME OFF ON THE STRENGTH OF THIS TYPE, and `CatalogRow` limit 1
  *      is where ADR-444 rules it STATED ONCE, CITED NOT RESTATED. This read "no check in this
- *      tree compares a `schema.ts` column TYPE against the DDL." `RI-14` (ADR-440): FALSE when
- *      written. `scoped-db.test.ts:2728` compares TYPE and NULLABILITY and `:3217` compares
- *      DEFAULT, per column, every registered relation, against MIGRATION TEXT not a database.
- *      ADR-112 foreclosure 4 still holds, the GENERATION expression is compared nowhere, and a
- *      caller reading money still checks the value.
+ *      tree compares a `schema.ts` column TYPE against the DDL" and "the GENERATION expression
+ *      is compared nowhere". `RI-14`: the first FALSE when written (ADR-440), the second TRUE on
+ *      its branch and FALSE at the merge (ADR-443, same wave). `scoped-db.test.ts:2728` compares
+ *      TYPE and NULLABILITY, `:3217` DEFAULT, `:3667` the GENERATION text, against MIGRATION TEXT
+ *      and not a database. None is EXECUTED (ADR-443 s8). A caller reading money checks the value.
  *   2. IT IS NOT A DECODER. It SHRINKS one. A driver-side caller still writes a
  *      field mapping onto the engine's own row type, once per caller, which is
  *      an accepted `FM-16`. What changes is that both ends are declared: a key
