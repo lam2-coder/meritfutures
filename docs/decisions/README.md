@@ -424,6 +424,9 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-410](ADR-410.md) | the home is `packages/ledger`, the move was refused under the fence as dispatched and taken under one granted for it, and the path the producer vacated turned out to be what three suites, three pointers and one register used to find it (2026-09-07, status: proposed) |
 | [ADR-411](ADR-411.md) | the fifth blocker is real, it cannot be cleared from this fence, and the file the dispatch sent me to was the last one still stating its first term as a refactor that had already happened  (2026-09-07, status: proposed) |
 | [ADR-412](ADR-412.md) | the seed never reaches the table because nothing in this repository reaches a database, the convention already says where a loader goes, and the schema is not what stands in the way (2026-09-07, status: proposed) |
+| [ADR-413](ADR-413.md) | `B5` term 1 is not one export, its home is a `packages/db` door, and the fact every record of it has missed is the handle rather than the fence  (2026-09-07, status: proposed) |
+| [ADR-414](ADR-414.md) | the sixteen reproduce, the address was the smaller half of the defect, and completing the row turns a case RED in a file this row may not write (2026-09-07, status: proposed) |
+| [ADR-415](ADR-415.md) | the `RI-35` register after the producer moved, one repair taken, one refused with its measurement, and a derived figure that was four short the day it was written (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

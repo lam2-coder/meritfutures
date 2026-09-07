@@ -903,18 +903,53 @@ export const ABSENCE_ARTIFACTS = [
     names:
       'an INSTALL of the event producer: a call to `makeEventSink` or a use of ' +
       '`TRANSACTION_EVENT_WRITER` in a value position, under any `src/`, past the module that ' +
-      'declares both. ADR-348. `apps/api/src/events.ts` composed the writer and wired nothing, ' +
-      'so `UNWIRED_EVENT_SINK` is not merely the default sink, it is the only sink any ' +
-      'deployment can reach',
+      'declares both. ADR-348. THE PRODUCER IS `packages/ledger/src/events.ts` SINCE ADR-410 ' +
+      'AND THE OLD ADDRESS IS KEPT BESIDE ITS CORRECTION (`RI-14`): this read ' +
+      '`apps/api/src/events.ts` composed the writer and wired nothing, which was true until ' +
+      'that entry moved the file and is now true of the home instead. What did NOT move is ' +
+      'the absence, so `UNWIRED_EVENT_SINK` is still not merely the default sink, it is the ' +
+      'only sink any deployment can reach',
     needles: [],
     sweptBy:
-      'nothing, on `worker-queue-door-caller`s reason. The two exported names reach exactly ' +
-      'seven lines in the shipped scope: six are the declaring module`s own header and ' +
-      'declarations, and the seventh is `apps/worker/src/batch/adapter.ts`s ' +
-      '`EVENT_SINK_BLOCKER`, which names the writer in order to say this deployable cannot ' +
-      'reach it. A needle on either name would sweep the declaration that this register ' +
-      'already binds and one true sentence about a different artifact, which is the ' +
-      'noise-registering shape ADR-328 forbids',
+      'nothing, on `worker-queue-door-caller`s reason, and the census below is RE-DERIVED ' +
+      'RATHER THAN ADJUSTED. THE INSTRUMENT IS LEG 6`s OWN READER: the two exported names, ' +
+      'matched as plain substrings against RAW lines (leg 6 does not strip, so a header ' +
+      'counts) over the whole swept scope, `shippedSources` plus `scriptSources`. On ' +
+      '`0f89c6ac` that is 23 line(s) over 7 file(s), and `scripts/` contributes ZERO of ' +
+      'them. ELEVEN are the declaring module`s own header and declarations, which the probe ' +
+      'excludes and this register already binds; THREE are `packages/ledger/src/index.ts`, ' +
+      'the barrel that publishes them; THREE are `apps/api/src/events.ts`, the compatibility ' +
+      'module ADR-410 left at the old path; and SIX are four files under `apps/worker/src` ' +
+      'that name the writer in order to say this deployable cannot reach it, ' +
+      '`EVENT_SINK_BLOCKER` among them. So a needle on either name would sweep the ' +
+      'declaration this register already binds, a publication, a compatibility name and six ' +
+      'true sentences about a different artifact, which is the noise-registering shape ' +
+      'ADR-328 forbids, and the case for no needle is STRONGER after ADR-410 than before it. ' +
+      'THE FIGURE IS ANCHORED TO A COMMIT BECAUSE IT IS A FACT ABOUT A MOMENT. It read ' +
+      '"exactly seven lines ... six ... and the seventh" and that partition does not ' +
+      'reproduce under any instrument: at `8d10e86c`, the commit that wrote it, the same ' +
+      'reader returns 11 over 2 files, and the seven counts four header lines plus two ' +
+      'declarations plus one, silently dropping three `{@link}` lines and one refusal string ' +
+      'in the declaring module`s own body. It was four short the day it was written and the ' +
+      'move is not what made it wrong. ' +
+      'AND ONE KNOWN FALSE POSITIVE IS REGISTERED HERE RATHER THAN REPAIRED IN THE PROBE, ' +
+      'which ADR-410 section 7 owed to this file. THE PROBE CANNOT TELL A PUBLICATION FROM ' +
+      'AN INSTALL: its proxy for a value position is `TRANSACTION_EVENT_WRITER` followed by ' +
+      '`.`, `,` or `)`, and a name inside a re-export SPECIFIER LIST is followed by a comma ' +
+      'while being a binding position and not a value position at all. `packages/ledger` ' +
+      'publishes that name on a statement of its own, where the next character is a space ' +
+      'and a brace, so the probe reads `absent`; folding it into the block above would flip ' +
+      'this artifact to `present` and turn leg 2 RED at a sentence that is TRUE. ' +
+      'THAT IS A DEFECT IN THE PROXY AND NOT A PROPERTY OF THE MOVE, and this row agrees ' +
+      'with ADR-410 that it is a finding about the check: nothing about a barrel makes a ' +
+      're-export a value, and the only reason it could not fire before is that the producer ' +
+      'had never been published from a package. IT IS REGISTERED AND NOT REPAIRED BECAUSE ' +
+      'THE REPAIR IS A WIDENING AND THIS ROW WAS FORBIDDEN ONE: excluding the barrel would ' +
+      'be a second exclusion, and reading the specifier list would be a parser. WHAT HOLDS ' +
+      'THE GREEN TODAY IS A LINE BREAK, which is the part worth distrusting: the statement ' +
+      'is short enough that prettier leaves it on one line, and a second name added to it ' +
+      'would be reflowed into a list, put a comma after this one and flip the artifact ' +
+      'without anybody editing this file',
     probe: (root) => {
       const files = shippedSources(root);
       if (files.length === 0) {
@@ -1468,6 +1503,32 @@ export const ABSENCE_CLAIMS = [
   // These two say a rule is unmet, and the day either flips to `present` the red
   // is a session claiming to have met it: leg 2 then makes somebody read the
   // sentence rather than the diff.
+  //
+  // **THE FIRST `site` BELOW IS THE OLD ADDRESS AND MOVING IT IS REFUSED HERE
+  // RATHER THAN LEFT UNSAID.** ADR-410 moved the producer to
+  // `packages/ledger/src/events.ts` and its own section 9 assigns this `site` to
+  // whoever holds this package. The re-anchoring is HONEST and was measured
+  // rather than argued: the registered anchor occurs VERBATIM, on one line and
+  // exactly once, in the producer at its new home, and it is the sentence that
+  // carries the claim there -- the paragraph around it says in words that
+  // `RI-35` turns RED at it the day it stops being true. With the `site` moved,
+  // `RI-35` is GREEN and all 35 invariants hold.
+  //
+  // IT IS REFUSED BECAUSE THE MOVE REDDENS A SUITE THIS ROW MAY NOT WRITE AND
+  // NOBODY THIS WAVE HOLDS. `apps/api/test/event-placement.test.ts` asserts this
+  // register still spells the old path, deliberately, saying so at the
+  // assertion: the day the `site` moves, that expectation is what tells the next
+  // row the sentence may follow it. Moving the `site` alone lands one failing
+  // assertion in that file, which is a red suite bought for a green register.
+  //
+  // **AND THE TREE ALREADY CARRIES THE SENTENCE TWICE, WHICH IS THE FINDING
+  // UNDER THE FINDING.** The compatibility module says the register anchors the
+  // claim to ITS path, which is true today; the producer at the home says
+  // `RI-35` turns red at ITS sentence, which is FALSE today. Only one file can
+  // be the bound one, so the honest fence is three files and not two: this
+  // register, that suite, and the compatibility module whose prose has to stop
+  // claiming an anchor it would no longer hold. Two of the three are `apps/**`.
+  // ADR-415 records the measurement.
   {
     site: 'apps/api/src/events.ts',
     claim: '`makeEventSink` is called by NO file',
@@ -1475,7 +1536,9 @@ export const ABSENCE_CLAIMS = [
     artifact: 'event-sink-caller',
     why:
       'the producer`s own header states the absence it exists inside, and ADR-348 found the ' +
-      'placement that would end it is not either deployable`s to take',
+      'placement that would end it is not either deployable`s to take. THIS SITE IS THE ' +
+      'PRE-ADR-410 ADDRESS and the block above says what it costs to repair and why this row ' +
+      'refused to buy it with a red suite',
   },
   {
     site: 'apps/api/src/routes/payouts.ts',

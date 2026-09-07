@@ -986,7 +986,7 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
     // PREDICTED THIS EDIT. The detector runner's adapter: four of that job's
     // five ports over the same doors, with the event sink REFUSING rather than
     // taken as an argument, because two of the three names it would carry would
-    // be refused by the producer one deployable over even if a sink were
+    // be refused by the producer in `@merit/ledger` even if a sink were
     // reachable. That row's fence carries `apps/worker/test/**`, so this file is
     // inside it and the line is assigned rather than reached for.
     './detectors/adapter.ts',

@@ -888,6 +888,92 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(IMPLEMENTED_ADMIN_READS).not.toContain('readLiability');
   });
 
+  // ---------------------------------------------------------------------------
+  // TERM 1'S HOME, RE-DERIVED RATHER THAN INHERITED (`ADR-413`)
+  // ---------------------------------------------------------------------------
+  // `ADR-411` section 12 item 2 priced this term as ONE EXPORT AND ONE CALL out
+  // of `payout-backend.ts`, and named the FENCE as the only thing in the way of
+  // taking it. **THE FENCE WAS NOT THE ONLY THING IN THE WAY**, and the three
+  // cases below are the measurement that says so rather than a paragraph that
+  // asserts it. The composition that entry named reads through `catalogRowAt`,
+  // `packages/db` declares that accessor on ONE handle, and it is not the handle
+  // an admin read holds. The export would compile and no caller on this path
+  // could produce its first argument.
+  //
+  // **THIS IS `ADR-411` SECTION 8'S OWN LESSON APPLIED TO `ADR-411`.** That
+  // entry's finding was that a clearing condition held against another copy of
+  // itself rots while every check stays green, and its remedy was to assert the
+  // condition's premises AT THEIR PRIMARY SOURCES. The premise it added was
+  // reachability of the DECODER, which is true. The premise it did not add is
+  // reachability of the HANDLE, and that is the one the price turned on.
+  it('TERM 1: `catalogRowAt` is declared on `ScopedTx` and on no other handle', () => {
+    // DERIVED OVER THE DECLARATIONS AND STORING NO HANDLE NAME BUT THE ONE IT
+    // ASSERTS. The day a catalogue accessor lands on a second handle this case
+    // goes red, AND THAT DAY IS THE DAY TERM 1 BECOMES TAKEABLE: the whole of
+    // what stands between this fold and the composition is that the door it
+    // holds cannot hand out a typed catalogue row.
+    const db = readFileSync(join(ROOT, 'packages/db/src/scoped-db.ts'), 'utf8').split('\n');
+    const carriers: string[] = [];
+    let open: string | null = null;
+    let body = '';
+    for (const line of db) {
+      const opened = /^export interface (\w+)[^{]*\{/.exec(line);
+      if (opened !== null) {
+        open = opened[1] ?? null;
+        body = '';
+        continue;
+      }
+      if (open === null) continue;
+      if (line === '}') {
+        if (body.includes('catalogRowAt<')) carriers.push(open);
+        open = null;
+        continue;
+      }
+      body += line;
+    }
+    // NON-VACUITY FIRST, on this suite's own rule: a scan whose pattern stopped
+    // matching reports "nobody declares it" and would pass the assertion below
+    // by finding nothing. The handles this reasons over must have been seen.
+    expect(carriers.length).toBeGreaterThan(0);
+    expect(carriers).toStrictEqual(['ScopedTx']);
+  });
+
+  it('and the composition `ADR-411` priced as one export reads through exactly that', () => {
+    const payoutBackend = readFileSync(join(ROOT, 'apps/api/src/payout-backend.ts'), 'utf8');
+    expect(payoutBackend).toContain("import type { ScopedTx } from '@merit/db';");
+    expect(payoutBackend).toContain('async function planLeg(handle: ScopedTx');
+    expect(payoutBackend).toContain("handle.catalogRowAt('planVersions'");
+    expect(payoutBackend).toContain("handle.catalogRowAt('planVersionSizes'");
+    // AND IT IS STILL NOT EXPORTED, WHICH IS A REFUSAL WITH A MEASUREMENT
+    // BEHIND IT RATHER THAN AN OVERSIGHT. An export whose first argument no
+    // caller on the admin read path can produce is a widened money-path surface
+    // for nothing, and `packages/db`'s own rule is that a primitive admitted
+    // before a caller exists is a primitive nobody can remove.
+    expect(payoutBackend).not.toContain('export async function planLeg');
+    // THE DOOR THE ADMIN READ ACTUALLY HOLDS NAMES NO CATALOGUE ACCESSOR, read
+    // at the declaration so that a widening lands here first.
+    const directory = readFileSync(join(ROOT, 'apps/api/src/admin-source/index.ts'), 'utf8');
+    expect(directory).toContain('operator<T>(fn: (tx: AdminSourceTx) => Promise<T>): Promise<T>;');
+    expect(directory).not.toContain('catalogRowAt');
+  });
+
+  // AND THE ROUTE THAT REMAINS IS THE ONE `ADR-411` SECTION 10 REFUSED. The
+  // rows ARE reachable from the handle an admin read holds -- `planVersions` and
+  // `planVersionSizes` are `FirmTableKey`s and `SystemTx.rowAt` takes any
+  // `TableKey` -- but they come back as `unknown`, so a supplier written here
+  // maps them onto the engine's row type a SECOND time in this deployable.
+  // `ADR-303` limit 2 registers that mapping as a per-caller `FM-16` rather than
+  // forgiving it, and this one fixes every cents threshold a payout is decided
+  // against. THE CENSUS IS THE CONTROL AND IT IS DERIVED, so the refusal is
+  // held by a run rather than by a sentence in an unsigned entry.
+  it('and the second mapping the refusal is about does not exist in this deployable', () => {
+    const mappers = sourceFilesUnder(join(ROOT, 'apps/api/src'))
+      .filter((file) => readFileSync(file, 'utf8').includes('PlanVersionSizeRow = {'))
+      .map((file) => relative(ROOT, file))
+      .sort();
+    expect(mappers).toStrictEqual(['apps/api/src/payout-backend.ts']);
+  });
+
   // **AND `eligible_next_7d` IS THE ONLY GROUP LEFT**, which is the one count
   // worth holding here and is READ OFF THE MODULE rather than written down. The
   // book's `Omit` list was four entries when session 374 measured it.
