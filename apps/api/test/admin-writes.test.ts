@@ -705,8 +705,55 @@ describe.skipIf(DATABASE_URL === undefined || DATABASE_URL === '')(
     /** Ids minted per case so the cases do not share rows. */
     let seeded: { accountId: string; identityId: string; flagId: string };
 
+    /**
+     * THE OPERATOR DIRECTORY ROW `0073` MADE A PRECONDITION AND THIS SUITE
+     * NEVER HAD.
+     *
+     * `admin_actions_actor_is_an_operator` is a foreign key from
+     * `admin_actions.actor` onto `operators(actor)`, declared at
+     * `packages/db/migrations/0073_operator_directory.sql:274-277`. Every actor
+     * this block records an audit row for has to be in the directory FIRST.
+     *
+     * ADR-237 section 12 met this exact refusal on the day `0073` landed and
+     * ruled the remedy in its own words: "The repair is the fixture and never
+     * the constraint. Each probe now inserts the operator it names." That
+     * ruling reached the two `.sql` probes `CI-06h` runs and missed this file,
+     * because no job in this repository runs this file. ADR-429.
+     *
+     * THE CONSTRAINT IS SATISFIED AND NOT HIDDEN. The row is a real directory
+     * entry for the actor the principal actually names. The last case in this
+     * block proves the foreign key still refuses an actor with no row.
+     *
+     * IDEMPOTENT, BECAUSE `operators.actor` IS UNIQUE (`0073:78`) AND THIS
+     * TRANSACTION COMMITS. `seed()` runs per case and its rows outlive it, so a
+     * second unconditional insert would refuse itself with `23505`.
+     *
+     * `idp_issuer` AND `idp_subject` LEFT NULL, which `0073:116-121` defines as
+     * an operator who cannot sign in, and which is ADR-237's own choice for a
+     * database that has no identity provider.
+     */
+    async function ensureOperator(
+      tx: SystemTx,
+      actor: string,
+      role: AdminRole,
+      displayName: string,
+    ): Promise<void> {
+      const existing = await tx.rowsWhere('operators', { actor });
+      if (existing.length > 0) return;
+      await tx.insert('operators', { actor, role, displayName });
+    }
+
     async function seed(): Promise<typeof seeded> {
       return await transaction(systemDb('operator-console'), async (tx: SystemTx) => {
+        // 0073's foreign key, satisfied before any audit row is written. Two
+        // actors and no third: `sso:owner@merit` is what `liveBackend` hands
+        // the route below, and `sso:probe@merit` is written literally by the
+        // empty-reason case. Both carry `owner` because both ACT: a directory
+        // that recorded `readonly` beside an actor its own audit trail shows
+        // acting would be a contradiction this suite invented.
+        await ensureOperator(tx, 'sso:owner@merit', 'owner', 'Live backend owner');
+        await ensureOperator(tx, 'sso:probe@merit', 'owner', 'Empty reason probe');
+
         const stamp = String(Date.now()) + String(Math.round(Math.random() * 1e6));
         const identity = one(await tx.insert('identities', { displayName: `seed ${stamp}` }));
         const user = one(
@@ -798,11 +845,14 @@ describe.skipIf(DATABASE_URL === undefined || DATABASE_URL === '')(
       };
     }
 
-    async function freeze(body: Record<string, unknown>): Promise<{
+    async function freeze(
+      body: Record<string, unknown>,
+      role: AdminRole = 'owner',
+    ): Promise<{
       statusCode: number;
       json: () => unknown;
     }> {
-      useAdminWriteBackend(liveBackend('owner'));
+      useAdminWriteBackend(liveBackend(role));
       const { app } = buildServer({ surface: 'operator', modules: [adminWrites] });
       const response = await app.inject({
         method: 'POST',
@@ -933,6 +983,48 @@ describe.skipIf(DATABASE_URL === undefined || DATABASE_URL === '')(
       });
       expect(written).toHaveLength(1);
       expect((written[0] as Record<string, unknown>)['reason']).toBe('');
+    });
+
+    it('STILL REFUSES an actor the directory does not name, so the seeded rows satisfy 0073 rather than hide it', async () => {
+      // THE OTHER HALF OF THE REPAIR, AND THE HALF THAT MAKES THE FIRST ONE
+      // HONEST. Seeding an operator turns the two success cases green; so
+      // would DROPPING `admin_actions_actor_is_an_operator`, and a suite that
+      // could not tell those apart would be agreeing with its own fixture.
+      // This case tells them apart. `sso:ops@merit` may freeze
+      // (`ACCOUNT_ACTION_ROLES` is `['owner', 'ops']`) and `seed()` writes no
+      // directory row for it, so the write clears every role guard, clears
+      // `NOT NULL` on `reason`, clears 0043's biconditional, reaches the
+      // foreign key, and the foreign key answers. ADR-429.
+      const stranger = 'sso:ops@merit';
+
+      // The precondition, asserted rather than assumed: a later row that seeds
+      // every role would invert this case silently, and this line goes red
+      // instead.
+      const directory = await transaction(systemDb('operator-console'), (tx: SystemTx) =>
+        tx.rowsWhere('operators', { actor: stranger }),
+      );
+      expect(directory).toEqual([]);
+
+      const response = await freeze(
+        {
+          reason: 'ticket 4712: a reason is supplied, so NOT NULL is not what answers',
+          initiative: 'operational',
+          tos_clause: '4.2',
+          flag_ids: [seeded.flagId],
+        },
+        'ops',
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(String((response.json() as { detail: string }).detail)).toContain(
+        'admin_actions_actor_is_an_operator',
+      );
+
+      // AND NOTHING MOVED, on the same reasoning as the no-reason case above:
+      // the audit insert is FIRST, so the transaction rolled back before the
+      // account was touched.
+      expect(await auditRows()).toEqual([]);
+      expect((await accountRow())['payoutsFrozen']).toBe(false);
     });
   },
 );
