@@ -1303,6 +1303,7 @@ export {
 export type {
   Cadence,
   Channel,
+  DeclaredRow,
   DeliveryOutcome,
   Digest,
   DigestAlarmIo,
@@ -1314,7 +1315,6 @@ export type {
   DigestIo,
   DigestReadTable,
   DigestReadTx,
-  DigestRow,
   DigestSendResult,
   DigestTerms,
   DigestTransport,
@@ -1338,7 +1338,6 @@ export {
   readText,
   readTextArray,
   readTradingDay,
-  record,
 } from './digests/rows.ts';
 export {
   DIGEST_ALARM_KINDS,

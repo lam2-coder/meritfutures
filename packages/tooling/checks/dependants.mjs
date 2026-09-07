@@ -84,7 +84,7 @@ const IMPLICIT = ['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.jsx'];
 /**
  * @typedef {'import' | 'path-literal' | 'enumeration' | 'config-glob' | 'prose'} KindId
  * @typedef {{ id: KindId, breaks: 'delete' | 'move' | 'neither', found: string, what: string }} Kind
- * @typedef {{ kind: KindId, file: string, detail: string, dated?: boolean }} Site
+ * @typedef {{ kind: KindId, file: string, detail: string, dated?: boolean, retention?: Retention }} Site
  * @typedef {{ file: string, detail: string, why: string, near: boolean }} Undecided
  */
 
@@ -137,7 +137,14 @@ export const KINDS = [
       'express. IT REPORTS REACH AND NOT RETENTION: a walk that returns the ' +
       'target and whose caller then filters it out by extension is still ' +
       'reported, because dropping a site on a filter that LOOKED like it ' +
-      'excluded the file is the confident short answer this module refuses.',
+      'excluded the file is the confident short answer this module refuses. ' +
+      'ADR-427 ADDS A `retention` TIER RATHER THAN A FILTER: each site carries ' +
+      '`selected`, `excluded`, `unfiltered` or `unreadable`, derived by testing ' +
+      'the target`s real bytes against the CONTENT predicates the reporting ' +
+      'file applies to the walk`s answer. **NO SITE IS DROPPED BY IT AND NO ' +
+      'COUNT MOVES**, and `excluded` means a deletion is not felt through those ' +
+      'predicates while a CHANGE to the target`s bytes would be, which is a ' +
+      'negative dependence and still a dependence.',
   },
   {
     id: 'config-glob',
@@ -199,7 +206,10 @@ export const BLIND = [
       'that names its path nowhere, imports nothing from it, and enumerates no ' +
       'directory holding it. It asserts that every invariant holds, and one ' +
       'invariant reads the register that names the path. `closure()` and the ' +
-      '`--hops=` flag answer this when it is asked for.',
+      '`--hops=` flag answer this when it is asked for, and ADR-427 makes every ' +
+      'ordinary run report HOW MANY files the second hop would add, so a caller ' +
+      'reading the default is told the size of what it is short by rather than ' +
+      'left to infer it is short by nothing.',
   },
   {
     id: 'by-symbol',
@@ -706,6 +716,37 @@ function walksDeep(stripped) {
 }
 
 /**
+ * The value expression beginning at `from`: everything up to the comma or
+ * closing bracket that ends it at depth zero.
+ *
+ * @param {string} text
+ * @param {number} from
+ * @returns {string | null}
+ */
+function expressionAt(text, from) {
+  let depth = 0;
+  let quote = '';
+  for (let i = from; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quote !== '') {
+      if (ch === '\\') i += 1;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) return text.slice(from, i).trim();
+      depth -= 1;
+    } else if (ch === ',' && depth === 0) return text.slice(from, i).trim();
+  }
+  return null;
+}
+
+/**
  * The span of a `{ ... }` block whose opening brace is at or after `from`.
  *
  * @param {string} text
@@ -745,11 +786,19 @@ function blockAt(text, from) {
  * `readdirSync` would report that call undecided and the file`s real subject
  * unseen, which is the same shape of miss the three rows before this one made.
  *
+ * **ADR-427 RECORDS THE EXPRESSION RATHER THAN A POSITION INSIDE IT.** The first
+ * version read only the FIRST argument of a `join`, so a walker spelled
+ * `readdirSync(join(ROOT, dir))` around a parameter `dir` was not recognised at
+ * all and its read was counted against the standing figure for what the kind
+ * cannot aim. Keeping the whole argument expression and folding it at the call
+ * site with the parameter bound to what was passed handles both spellings with
+ * one rule and adds no second reading of any of them.
+ *
  * @param {string} stripped
- * @returns {Map<string, { index: number, start: number, end: number }>}
+ * @returns {Map<string, { param: string, expr: string, decl: number, start: number, end: number }>}
  */
 function walkerFunctions(stripped) {
-  /** @type {Map<string, { index: number, start: number, end: number }>} */
+  /** @type {Map<string, { param: string, expr: string, decl: number, start: number, end: number }>} */
   const out = new Map();
   const decl =
     /(?:function\s+([A-Za-z_$][\w$]*)\s*\(|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\()/g;
@@ -765,22 +814,254 @@ function walkerFunctions(stripped) {
     const body = blockAt(stripped, open + signature.args.length + 2);
     if (body === null) continue;
     const text = stripped.slice(body.start, body.end);
+    let taken = false;
     for (const call of text.matchAll(ENUMERATOR)) {
+      if (taken) break;
       const at = /** @type {number} */ (call.index) + call[0].length - 1;
       const inner = callAt(text, at);
       if (inner === null) continue;
       const first = (splitArgs(inner.args) ?? [])[0];
       if (first === undefined) continue;
-      const head = (first.match(/^(?:path\.)?(?:join|resolve)\s*\(([\s\S]*)\)$/) ?? [])[1];
-      const root = head === undefined ? first : ((splitArgs(head) ?? [])[0] ?? '');
-      const index = params.indexOf(root.trim());
-      if (index !== -1) {
-        out.set(name, { index, start: body.start, end: body.end });
+      // ANY parameter MENTIONED in the directory expression makes this a walker,
+      // wherever in that expression it stands.
+      for (const param of params) {
+        if (param === '' || !new RegExp(`\\b${param}\\b`).test(first)) continue;
+        out.set(name, {
+          param,
+          expr: first.trim(),
+          decl: /** @type {number} */ (m.index),
+          start: body.start,
+          end: body.end,
+        });
+        taken = true;
         break;
       }
     }
   }
   return out;
+}
+
+// -----------------------------------------------------------------------------
+// KIND 3, SECOND REGISTER: WHAT THE CALLER DOES WITH THE WALK'S ANSWER
+// -----------------------------------------------------------------------------
+// ADR-427. ADR-422 section 11 handed on that `enumeration` has a precision of
+// **1 in 18** against the red set on its own test target and that the module
+// offers NO WAY TO TELL REACH FROM RETENTION, and it named modelling the
+// caller's filter as *the first place this module could go quiet*.
+//
+// **THE TIER BELOW IS NOT A FILTER AND THAT DISTINCTION IS THE WHOLE DESIGN.**
+// Nothing here can remove a site, shorten a list or change a count. It attaches
+// a WORD to a site that is reported either way, exactly as the `near` tier
+// attaches one to an `undecided` entry without dropping a single one of the 171.
+// A tier that is wrong costs a reader one wasted look. A filter that is wrong
+// costs a reader the file, and that is the asymmetry ADR-422 was pointing at.
+//
+// **ONLY CONTENT PREDICATES ARE READ, AND THE REASON IS THAT THEY CANNOT BE
+// SELECTION.** A directory walk in this tree selects on an entry's NAME: an
+// extension, a prefix, a skip set. It never selects on an entry's BYTES, because
+// the walk has not opened the file yet. So a predicate over a file's CONTENT is
+// always applied DOWNSTREAM of the walk, to the walk's answer, which is the one
+// place where reach and retention actually differ. Reading name predicates as
+// well would need this module to decide which side of the walk each one sits on,
+// and deciding that wrong in the quiet direction is the failure ADR-422 named.
+//
+// **THE BIAS IS STATED RATHER THAN TUNED: ANYTHING THIS MODULE CANNOT FOLD
+// COUNTS AS SENSITIVE.** A predicate it does not recognise, a target it cannot
+// read, a regular expression it will not build: every one of them yields
+// `unfiltered`, which is the tier that claims the least. `excluded` is reachable
+// only when a predicate WAS folded and the target's real bytes were tested
+// against it and failed.
+// -----------------------------------------------------------------------------
+
+/**
+ * @typedef {'unfiltered' | 'selected' | 'excluded' | 'unreadable'} Retention
+ */
+
+/** Calls that yield a file's TEXT, before any locally declared reader is added. */
+const READERS = ['readFileSync', 'readFile'];
+
+/**
+ * The names in `stripped` that return a file's text: the built-in readers, plus
+ * any locally declared function whose head calls one.
+ *
+ * **A HELPER CALLED `read` IS THE IDIOM THIS TREE WRITES** and a predicate
+ * spelled over it is invisible to a scan that knows only the built-in name.
+ *
+ * @param {string} stripped
+ * @returns {Set<string>}
+ */
+export function readerNames(stripped) {
+  const out = new Set(READERS);
+  const decl =
+    /(?:function\s+([A-Za-z_$][\w$]*)\s*\(|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\(|[A-Za-z_$][\w$]*\s*=>))/g;
+  for (const m of stripped.matchAll(decl)) {
+    const name = m[1] ?? m[2];
+    if (name === undefined || out.has(name)) continue;
+    // **THE DECLARATION'S OWN BODY, AND A SHORT ONE.** A helper that returns a
+    // file's text is one line; a WALKER that happens to read a file somewhere
+    // inside it is not a reader, and calling it one would invent a content
+    // predicate over its result. An invented predicate the target fails is the
+    // one way this tier could claim `excluded` where nothing excludes anything,
+    // so the bound is deliberate and is stated rather than tuned.
+    const body = declarationBody(stripped, /** @type {number} */ (m.index));
+    if (body === null || body.length > 400) continue;
+    if (READERS.some((r) => new RegExp(`\\b${r}\\s*\\(`).test(body))) out.add(name);
+  }
+  return out;
+}
+
+/**
+ * The body of a declaration beginning at `from`: a braced block, or the rest of
+ * the line for an expression arrow. `null` when neither is there.
+ *
+ * @param {string} stripped
+ * @param {number} from
+ * @returns {string | null}
+ */
+function declarationBody(stripped, from) {
+  const open = stripped.indexOf('(', from);
+  const arrow = stripped.indexOf('=>', from);
+  const lineEnd = stripped.indexOf('\n', from);
+  const brace = stripped.indexOf('{', from);
+  if (brace !== -1 && (open === -1 || brace > open) && (lineEnd === -1 || brace < lineEnd)) {
+    const block = blockAt(stripped, brace);
+    if (block !== null) return stripped.slice(block.start, block.end + 1);
+  }
+  if (arrow !== -1 && (lineEnd === -1 || arrow < lineEnd)) {
+    return stripped.slice(arrow, lineEnd === -1 ? stripped.length : lineEnd);
+  }
+  return null;
+}
+
+/**
+ * A regular expression written as a literal, or bound to a name that folds to
+ * one, or `null` when this module will not build it.
+ *
+ * @param {string} token
+ * @param {Map<string, string>} bindings
+ * @param {number} depth
+ * @returns {RegExp | null}
+ */
+export function foldRegExp(token, bindings, depth = 0) {
+  if (depth > 4) return null;
+  const text = token.trim();
+  const literal = text.match(/^\/((?:[^/\\\n[]|\\.|\[(?:[^\]\\]|\\.)*\])+)\/([a-z]*)$/);
+  if (literal !== null) {
+    try {
+      return new RegExp(/** @type {string} */ (literal[1]), /** @type {string} */ (literal[2]));
+    } catch {
+      // A pattern this runtime will not compile is one this module does not fold.
+      return null;
+    }
+  }
+  if (/^[A-Za-z_$][\w$]*$/.test(text) && bindings.has(text)) {
+    return foldRegExp(/** @type {string} */ (bindings.get(text)), bindings, depth + 1);
+  }
+  return null;
+}
+
+/**
+ * Every predicate in `stripped` that tests a FILE'S CONTENT and that this module
+ * can fold, each as a test over the bytes of a candidate file.
+ *
+ * Three shapes, and they are the three this tree writes:
+ *
+ *     RE.test(read(file))            a regular expression over the text
+ *     read(file).includes(LITERAL)   a substring of the text
+ *     read(file).match(RE)           the same question spelled the other way
+ *
+ * A fourth shape is deliberately absent: a predicate whose subject this module
+ * cannot see is not guessed at, it is simply not returned, and a file with no
+ * returned predicates is reported `unfiltered`.
+ *
+ * @param {string} stripped
+ * @param {Map<string, string>} bindings
+ * @param {string} fileDir
+ * @returns {{ source: string, test: (text: string) => boolean }[]}
+ */
+export function contentPredicates(stripped, bindings, fileDir) {
+  const readers = readerNames(stripped);
+  const anyReader = new RegExp(`\\b(?:${[...readers].join('|')})\\s*\\(`);
+  /** @type {{ source: string, test: (text: string) => boolean }[]} */
+  const out = [];
+
+  // `RE.test(<anything that reads a file>)`.
+  for (const m of stripped.matchAll(
+    /(\/(?:[^/\\\n[]|\\.|\[(?:[^\]\\]|\\.)*\])+\/[a-z]*|[A-Za-z_$][\w$]*)\s*\.\s*test\s*\(/g,
+  )) {
+    const open = /** @type {number} */ (m.index) + m[0].length - 1;
+    const call = callAt(stripped, open);
+    if (call === null || !anyReader.test(call.args)) continue;
+    const re = foldRegExp(/** @type {string} */ (m[1]), bindings);
+    if (re === null) continue;
+    out.push({ source: `\`${m[1]}\` over the file`, test: (text) => re.test(text) });
+  }
+
+  // `<read>(...).includes(LITERAL)` and `<read>(...).match(RE)`.
+  for (const name of readers) {
+    for (const m of stripped.matchAll(new RegExp(`\\b${name}\\s*\\(`, 'g'))) {
+      const open = /** @type {number} */ (m.index) + m[0].length - 1;
+      const call = callAt(stripped, open);
+      if (call === null) continue;
+      const after = stripped.slice(open + call.args.length + 2);
+      const chained = after.match(/^\s*\.\s*(includes|match|search)\s*\(/);
+      if (chained === null) continue;
+      const inner = callAt(after, /** @type {number} */ (chained.index) + chained[0].length - 1);
+      if (inner === null) continue;
+      const arg = inner.args.trim();
+      if (chained[1] === 'includes') {
+        const needle = foldFragment(arg, fileDir, bindings, 0);
+        if (needle === null || needle === '') continue;
+        out.push({
+          source: `\`includes(${arg.slice(0, 60)})\``,
+          test: (text) => text.includes(needle),
+        });
+        continue;
+      }
+      const re = foldRegExp(arg, bindings);
+      if (re === null) continue;
+      out.push({ source: `\`${chained[1]}(${arg.slice(0, 60)})\``, test: (text) => re.test(text) });
+    }
+  }
+  return out;
+}
+
+/**
+ * Which side of a file's own content predicates the target falls on.
+ *
+ * **`excluded` DOES NOT MEAN "NOT A DEPENDANT" AND THE CLI SAYS SO ON EVERY
+ * RUN.** It means the walk reaches the target and every content predicate this
+ * file applies to the walk's answer drops it, so a DELETION is not felt through
+ * those predicates while a CHANGE to the target's bytes would be. That is a
+ * negative dependence and it is still a dependence: the assertion under it is
+ * green BECAUSE of what the target does not contain, which is a property a
+ * reader may not assume is stable.
+ *
+ * @param {{ source: string, test: (text: string) => boolean }[]} predicates
+ * @param {string | null} targetText
+ * @returns {Retention}
+ */
+export function retentionOf(predicates, targetText) {
+  if (predicates.length === 0) return 'unfiltered';
+  if (targetText === null) return 'unreadable';
+  return predicates.some((p) => p.test(targetText)) ? 'selected' : 'excluded';
+}
+
+/**
+ * The positional index of a walker's directory parameter in its own signature.
+ *
+ * @param {string} stripped
+ * @param {{ param: string, decl: number }} walker
+ * @returns {number}
+ */
+function walkerParamIndex(stripped, walker) {
+  const open = stripped.indexOf('(', walker.decl);
+  if (open === -1) return -1;
+  const signature = callAt(stripped, open);
+  if (signature === null) return -1;
+  return (splitArgs(signature.args) ?? [])
+    .map((prm) => (prm.split('=')[0] ?? '').replace(/:.*$/, '').trim())
+    .indexOf(walker.param);
 }
 
 /**
@@ -870,6 +1151,109 @@ export function globToRegExp(glob) {
 }
 
 /**
+ * A list of glob patterns computed by an expression, or `null` when this module
+ * will not fold it.
+ *
+ * ADR-427. ADR-422 section 11 handed on that the test runner's configuration
+ * COMPUTES its include lists and that **nothing in this tree can currently say
+ * which files that configuration reaches**. This folds the four spellings that
+ * configuration actually uses and refuses everything else:
+ *
+ *     ['a', 'b']                     an array of literals
+ *     NAME                           a binding holding one of these
+ *     [...A, ...B]                   spreads of bindings
+ *     ARR.map((p) => `${p}/x`)       a map to a template over the element
+ *     f('lit')                       a call to a bound arrow returning one
+ *
+ * **A REFUSAL HERE IS STILL AN UNDECIDED ENTRY AND NEVER AN ABSENCE**, which is
+ * the only property that makes folding safe to attempt at all: a fold that fails
+ * leaves the configuration exactly where ADR-422 left it, named on every run.
+ *
+ * @param {string} expr
+ * @param {Map<string, string>} bindings
+ * @param {number} depth
+ * @returns {string[] | null}
+ */
+export function foldGlobList(expr, bindings, depth = 0) {
+  if (depth > 8) return null;
+  const text = expr.trim();
+
+  const array = text.match(/^\[([\s\S]*)\]$/);
+  if (array !== null) {
+    const parts = splitArgs(/** @type {string} */ (array[1]));
+    if (parts === null) return null;
+    /** @type {string[]} */
+    const out = [];
+    for (const part of parts) {
+      const item = part.trim();
+      if (item === '') continue;
+      const spread = item.match(/^\.\.\.([\s\S]*)$/);
+      const folded =
+        spread !== null
+          ? foldGlobList(/** @type {string} */ (spread[1]), bindings, depth + 1)
+          : (() => {
+              const one = foldFragment(item, '', bindings, 0);
+              return one === null ? null : [one];
+            })();
+      if (folded === null) return null;
+      out.push(...folded);
+    }
+    return out;
+  }
+
+  // `ARR.map((p) => BODY)`, the spelling that made this configuration undecided.
+  const mapped = text.match(/^([\s\S]+?)\s*\.\s*map\s*\(([\s\S]*)\)$/);
+  if (mapped !== null) {
+    const source = foldGlobList(/** @type {string} */ (mapped[1]), bindings, depth + 1);
+    if (source === null) return null;
+    const arrow = /** @type {string} */ (mapped[2]).match(
+      /^\s*(?:\(\s*([A-Za-z_$][\w$]*)[^)]*\)|([A-Za-z_$][\w$]*))\s*=>\s*([\s\S]*)$/,
+    );
+    if (arrow === null) return null;
+    const param = arrow[1] ?? arrow[2];
+    const body = /** @type {string} */ (arrow[3]);
+    if (param === undefined) return null;
+    /** @type {string[]} */
+    const out = [];
+    for (const element of source) {
+      // An element carrying a quote or a newline is not substituted, because the
+      // literal this builds to stand in for it would no longer be one.
+      if (/['"`\n\\]/.test(element)) return null;
+      const scope = new Map(bindings);
+      scope.set(param, `'${element}'`);
+      const one = foldFragment(body, '', scope, 0);
+      if (one === null) return null;
+      out.push(one);
+    }
+    return out;
+  }
+
+  // `f('lit')` where `f` is a bound arrow whose body folds to a list.
+  const call = text.match(/^([A-Za-z_$][\w$]*)\s*\(([\s\S]*)\)$/);
+  if (call !== null && bindings.has(/** @type {string} */ (call[1]))) {
+    const arrow = /** @type {string} */ (bindings.get(/** @type {string} */ (call[1]))).match(
+      /^\s*(?:\(\s*([A-Za-z_$][\w$]*)[^)]*\)|([A-Za-z_$][\w$]*))\s*=>\s*([\s\S]*)$/,
+    );
+    const args = splitArgs(/** @type {string} */ (call[2]));
+    if (arrow !== null && args !== null && args.length === 1) {
+      const param = arrow[1] ?? arrow[2];
+      const argument = foldFragment(/** @type {string} */ (args[0]), '', bindings, 0);
+      if (param !== undefined && argument !== null && !/['"`\n\\]/.test(argument)) {
+        const scope = new Map(bindings);
+        scope.set(param, `'${argument}'`);
+        return foldGlobList(/** @type {string} */ (arrow[3]), scope, depth + 1);
+      }
+    }
+    return null;
+  }
+
+  if (/^[A-Za-z_$][\w$]*$/.test(text) && bindings.has(text)) {
+    return foldGlobList(/** @type {string} */ (bindings.get(text)), bindings, depth + 1);
+  }
+  return null;
+}
+
+/**
  * Glob patterns a configuration file states, each resolved against the
  * directory that configuration is read from.
  *
@@ -955,12 +1339,25 @@ function configGlobs(root, files) {
       const text = readText(root, rel);
       if (text === null) continue;
       const stripped = stripComments(text);
-      if (/include\s*:\s*[A-Za-z_$]/.test(stripped)) {
-        undecided.push({
-          file: rel,
-          detail: 'test.projects[].include',
-          why: 'the include lists are computed from a `SOURCES` array through `.map`, which this module does not fold',
-        });
+      const bindings = bindingsIn(stripped);
+      // ADR-427. EVERY `include` AND `exclude` IS FOLDED OR NAMED, ONE BY ONE.
+      // The old reading asked whether ANY include was computed and declared the
+      // whole configuration undecided on the answer, so a list this module could
+      // read was lost beside one it could not.
+      for (const m of stripped.matchAll(/\b(include|exclude)\s*:\s*/g)) {
+        const field = /** @type {string} */ (m[1]);
+        const from = /** @type {number} */ (m.index) + m[0].length;
+        const value = expressionAt(stripped, from);
+        const folded = value === null ? null : foldGlobList(value, bindings, 0);
+        if (folded === null) {
+          undecided.push({
+            file: rel,
+            detail: `test.projects[].${field}`,
+            why: 'the pattern list is computed by an expression this module does not fold',
+          });
+          continue;
+        }
+        for (const pattern of folded) globs.push({ file: rel, field, pattern, base: '' });
       }
     }
   }
@@ -1024,6 +1421,10 @@ export function dependantsOf(root, target) {
   const present = new Set(files);
   const pkgs = packageDirs(root, files);
   const targetDir = parentOf(normalised);
+  // READ ONCE, HERE. Every content predicate below is tested against the
+  // target's REAL bytes rather than against a guess about them, and a target
+  // this module cannot read yields the tier that claims the least.
+  const targetText = readText(root, normalised);
 
   /** @type {Site[]} */
   const sites = [];
@@ -1059,6 +1460,7 @@ export function dependantsOf(root, target) {
 
       const bindings = bindingsIn(stripped);
       const deep = walksDeep(stripped);
+      const enumFrom = sites.length;
       const walkers = walkerFunctions(stripped);
       /** @type {{ detail: string }[]} */
       const pending = [];
@@ -1096,14 +1498,25 @@ export function dependantsOf(root, target) {
       // The same question asked one call deep: a local walker takes the
       // directory as a parameter, so the directory is at the walker's CALL SITE.
       for (const [name, walker] of walkers) {
+        const paramIndex = walkerParamIndex(stripped, walker);
         for (const call of stripped.matchAll(new RegExp(`\\b${name}\\s*\\(`, 'g'))) {
           const at = /** @type {number} */ (call.index);
           if (at > walker.start && at < walker.end) continue;
+          // THE DECLARATION IS NOT A CALL SITE. Counting it as one reported a
+          // parameter list as a directory read that did not fold, which is a
+          // read that never happened inflating the figure this module publishes
+          // as the size of its own blind spot.
+          if (at <= walker.decl && at + call[0].length > walker.decl) continue;
+          if (at >= walker.decl && at < walker.start) continue;
           const inner = callAt(stripped, at + call[0].length - 1);
           if (inner === null) continue;
-          const passed = (splitArgs(inner.args) ?? [])[walker.index];
+          const passed = paramIndex === -1 ? undefined : (splitArgs(inner.args) ?? [])[paramIndex];
           if (passed === undefined) continue;
-          const dir = foldDir(passed, fileDir, bindings);
+          // Fold the walker's OWN directory expression with its parameter bound
+          // to what this call site passed, so `join(ROOT, dir)` resolves here.
+          const scope = new Map(bindings);
+          scope.set(walker.param, passed);
+          const dir = foldDir(walker.expr, fileDir, scope);
           if (dir === null) {
             unresolvedEnumerations += 1;
             pending.push({ detail: `\`${name}(${passed.slice(0, 60)})\`, a local walker` });
@@ -1118,6 +1531,16 @@ export function dependantsOf(root, target) {
           }
         }
       }
+      // ADR-427. THE TIER IS ATTACHED AFTER BOTH PASSES AND ADDS NO SITE AND
+      // REMOVES NONE. `sites` is the answer; `retention` is advice about how to
+      // read one entry of it, and a reader who ignores it is left exactly where
+      // ADR-422 left them rather than anywhere worse.
+      const mine = sites.slice(enumFrom).filter((site) => site.kind === 'enumeration');
+      if (mine.length > 0) {
+        const tier = retentionOf(contentPredicates(stripped, bindings, fileDir), targetText);
+        for (const site of mine) site.retention = tier;
+      }
+
       if (pending.length > 0) {
         const near =
           sites.some((site) => site.file === rel && site.kind !== 'prose') ||
@@ -1412,7 +1835,18 @@ export function main(argv, emit = console.log, root = REPO_ROOT) {
         `   [breaks on ${kind.breaks}]`,
     );
     for (const s of mine) {
-      emit(`    ${s.dated === true ? '(dated) ' : ''}${s.file}  ${s.detail}`);
+      const tier = s.retention === undefined ? '' : `[${s.retention}] `;
+      emit(`    ${s.dated === true ? '(dated) ' : ''}${tier}${s.file}  ${s.detail}`);
+    }
+    if (kind.id === 'enumeration' && mine.length > 0) {
+      const count = (/** @type {Retention} */ t) => mine.filter((s) => s.retention === t).length;
+      emit(
+        `             retention: ${count('selected')} selected, ${count('excluded')} excluded, ` +
+          `${count('unfiltered')} unfiltered, ${count('unreadable')} unreadable. ` +
+          'A TIER AND NOT A FILTER: every site above is reported whatever its tier, and ' +
+          '`excluded` means a DELETION is not felt through this file`s content predicates ' +
+          'while a CHANGE to the target`s bytes would be.',
+      );
     }
   }
 
@@ -1430,6 +1864,33 @@ export function main(argv, emit = console.log, root = REPO_ROOT) {
       'could be spelled at and none of them resolved here.',
   );
   for (const a of report.aliases) emit(`    ${a}`);
+
+  // ADR-427 DECIDES THE QUESTION ADR-422 SECTION 11 LEFT OPEN, AND DECIDES IT
+  // AGAINST WIDENING THE DEFAULT. A hop-2 entry means something weaker than a
+  // hop-1 entry: "this breaks" against "this breaks for as long as some other
+  // file goes unrepaired". Merging the two into one default list would make
+  // every entry mean the weaker thing, and a list of fifteen where four are
+  // direct teaches its reader to skim, which is how a long list goes quiet
+  // without a single site being dropped.
+  //
+  // **SO THE DEFAULT STAYS AT ONE HOP AND THE RUN STOPS LETTING A CALLER NOT
+  // KNOW THAT.** ADR-422 section 6 measured a file going red that is outside
+  // the one-hop closure and inside the two-hop one, so a caller reading the
+  // default is short by an amount that is DERIVABLE. It is derived here, on
+  // every ordinary run, and named rather than listed. The cost is one further
+  // pass over the population.
+  const near = closure(root, report.target, 1).reached.size;
+  const far = closure(root, report.target, 2).reached.size;
+  emit('');
+  emit(
+    `TRANSITIVE  ${near} file(s) reach it in ONE composing step and ${far} within TWO, so ` +
+      `${far - near} file(s) depend on it only THROUGH another file and are NOT listed above.`,
+  );
+  emit(
+    '            The default is one hop and stays one: a two-hop entry means "red for as long ' +
+      'as some other file is unrepaired", which is weaker than what an entry above means. ' +
+      '`--hops=2` names them.',
+  );
 
   emit('');
   emit(

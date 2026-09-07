@@ -10,11 +10,15 @@ import {
   closure,
   dependantsOf,
   foldDir,
+  foldGlobList,
+  foldRegExp,
   globToRegExp,
   isDatedRecord,
   literals,
+  main,
   normalise,
   population,
+  retentionOf,
   splitArgs,
   REPO_ROOT,
 } from '../checks/dependants.mjs';
@@ -297,6 +301,243 @@ describe('kind `enumeration`: a walk whose answer the target is part of', () => 
 // KIND 4: A GLOB IN A CONFIGURATION. Found here, by nothing that hurt.
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// ADR-427: REACH AND RETENTION, AS A TIER AND NEVER AS A FILTER
+// -----------------------------------------------------------------------------
+// ADR-422 section 11 handed on that `enumeration` has a precision of 1 in 18
+// against the red set on its own test target, that the module offers no way to
+// tell REACH from RETENTION, and that modelling the caller's filter *would be
+// the first place this module could go quiet*.
+//
+// **THE CASE THAT MATTERS MOST IN THIS BLOCK IS THE ONE THAT ASSERTS A SITE IS
+// STILL REPORTED.** Every other case here could be satisfied by a module that
+// had quietly turned its tier into a filter, and that module would be strictly
+// worse than the one ADR-422 shipped. So the tier is watched from both ends:
+// that it distinguishes, and that it removes nothing.
+//
+// The fixtures name `apps/lantern` and `packages/alpha*`, namespaces no tracked
+// file uses, on ADR-422 section 8's finding that a fixture spelling a live path
+// makes its own file a derived dependant of that path.
+// -----------------------------------------------------------------------------
+
+/** A consumer that walks a directory and then filters what it got on CONTENT. */
+function consumer(dir: string, predicate: string): string {
+  return [
+    "import { readdirSync, readFileSync } from 'node:fs';",
+    `const found = readdirSync('${dir}');`,
+    `const kept = found.filter((f) => ${predicate});`,
+    'export const count = kept.length;',
+  ].join('\n');
+}
+
+describe('ADR-427: what the caller does with the walk`s answer', () => {
+  test('a content predicate the target FAILS tiers the site `excluded` and STILL REPORTS IT', () => {
+    const root = tree({
+      'apps/lantern/src/target.ts': 'export const target = 1;\n',
+      'apps/lantern/test/reader.test.ts': consumer(
+        'apps/lantern/src',
+        "readFileSync(f, 'utf8').includes('ABSENT_MARKER')",
+      ),
+    });
+    const sites = dependantsOf(root, 'apps/lantern/src/target.ts').sites.filter(
+      (s) => s.kind === 'enumeration',
+    );
+    // THE SITE IS THE ANSWER AND THE TIER IS ADVICE ABOUT IT. If this length
+    // ever reads 0, the tier has become a filter and this module has gone quiet
+    // in exactly the direction ADR-422 warned the work would go.
+    expect(sites.map((s) => s.file)).toEqual(['apps/lantern/test/reader.test.ts']);
+    expect(sites[0]?.retention).toBe('excluded');
+  });
+
+  test('a content predicate the target SATISFIES tiers the site `selected`', () => {
+    const root = tree({
+      'apps/lantern/src/target.ts': 'export const PRESENT_MARKER = 1;\n',
+      'apps/lantern/test/reader.test.ts': consumer(
+        'apps/lantern/src',
+        "readFileSync(f, 'utf8').includes('PRESENT_MARKER')",
+      ),
+    });
+    const sites = dependantsOf(root, 'apps/lantern/src/target.ts').sites.filter(
+      (s) => s.kind === 'enumeration',
+    );
+    expect(sites[0]?.retention).toBe('selected');
+  });
+
+  test('a walk with no content predicate at all is `unfiltered`, which claims the least', () => {
+    const root = tree({
+      'apps/lantern/src/target.ts': 'export const target = 1;\n',
+      'apps/lantern/test/reader.test.ts':
+        "import { readdirSync } from 'node:fs';\n" +
+        "export const found = readdirSync('apps/lantern/src');\n",
+    });
+    const sites = dependantsOf(root, 'apps/lantern/src/target.ts').sites.filter(
+      (s) => s.kind === 'enumeration',
+    );
+    expect(sites[0]?.retention).toBe('unfiltered');
+  });
+
+  test('a predicate this module CANNOT fold leaves the site `unfiltered`, never `excluded`', () => {
+    // THE BIAS IS THE MECHANISM. An unrecognised predicate must push a site
+    // towards "assume sensitive" and never towards "assume dropped", because the
+    // second direction is the one that costs a reader the file.
+    const root = tree({
+      'apps/lantern/src/target.ts': 'export const target = 1;\n',
+      'apps/lantern/test/reader.test.ts': consumer('apps/lantern/src', 'somebodyElsesOracle(f)'),
+    });
+    const sites = dependantsOf(root, 'apps/lantern/src/target.ts').sites.filter(
+      (s) => s.kind === 'enumeration',
+    );
+    expect(sites[0]?.retention).toBe('unfiltered');
+  });
+
+  test('the tier moves NO count: the same sites are reported whichever way the filter falls', () => {
+    // The two trees differ only in whether the target carries the marker the
+    // consumer filters on, so a tier that had become a filter would report a
+    // different number of sites for one of them.
+    const build = (body: string): number =>
+      dependantsOf(
+        tree({
+          'apps/lantern/src/target.ts': body,
+          'apps/lantern/test/reader.test.ts': consumer(
+            'apps/lantern/src',
+            "readFileSync(f, 'utf8').includes('MARKER')",
+          ),
+        }),
+        'apps/lantern/src/target.ts',
+      ).sites.filter((s) => s.kind === 'enumeration').length;
+    expect(build('export const MARKER = 1;\n')).toBe(1);
+    expect(build('export const other = 1;\n')).toBe(1);
+  });
+
+  test('a local `read` helper is recognised, so a predicate spelled over it is not invisible', () => {
+    const root = tree({
+      'apps/lantern/src/target.ts': 'export const target = 1;\n',
+      'apps/lantern/test/reader.test.ts': [
+        "import { readdirSync, readFileSync } from 'node:fs';",
+        "const read = (p: string): string => readFileSync(p, 'utf8');",
+        "const found = readdirSync('apps/lantern/src');",
+        'export const kept = found.filter((f) => /ABSENT/.test(read(f)));',
+      ].join('\n'),
+    });
+    const sites = dependantsOf(root, 'apps/lantern/src/target.ts').sites.filter(
+      (s) => s.kind === 'enumeration',
+    );
+    expect(sites[0]?.retention).toBe('excluded');
+  });
+
+  test('a regular expression bound to a NAME is folded, as this tree spells its predicates', () => {
+    const bindings = new Map([['SPEC', '/\\bpresent\\b/']]);
+    expect(foldRegExp('SPEC', bindings)?.test('a present word')).toBe(true);
+    expect(foldRegExp('SPEC', bindings)?.test('absent')).toBe(false);
+    // A name bound to something that is not a pattern is not guessed at.
+    expect(foldRegExp('OTHER', new Map([['OTHER', "'a string'"]]))).toBeNull();
+  });
+
+  test('`excluded` is only ever reached by TESTING the target, never by failing to read it', () => {
+    // A target whose bytes cannot be read yields the tier that says so, rather
+    // than the tier that says the filter dropped it.
+    expect(retentionOf([{ source: 'x', test: () => false }], null)).toBe('unreadable');
+    expect(retentionOf([], 'anything')).toBe('unfiltered');
+  });
+});
+
+describe('ADR-427: a computed pattern list is folded, and a refusal is still UNDECIDED', () => {
+  /** The shape the test runner's configuration actually writes. */
+  const computed = [
+    "const SOURCES = ['apps/*', 'packages/*'];",
+    'const UNIT = SOURCES.map((s) => `${s}/test/**/*.test.ts`);',
+    'const suffixed = (suffix: string) => SOURCES.map((s) => `${s}/test/**/*.${suffix}.test.ts`);',
+    'const GOLDEN = suffixed(`golden`);',
+    'export default { test: { projects: [ { test: { name: `unit`, include: UNIT, exclude: [...GOLDEN] } } ] } };',
+  ].join('\n');
+
+  test('a list computed by `.map` over an array of literals reaches the files it reaches', () => {
+    const root = tree({
+      'vitest.config.ts': computed,
+      'packages/alpha/test/one.test.ts': 'export const one = 1;\n',
+    });
+    const report = dependantsOf(root, 'packages/alpha/test/one.test.ts');
+    expect(
+      report.sites
+        .filter((s) => s.kind === 'config-glob' && s.file === 'vitest.config.ts')
+        .map((s) => s.detail),
+    ).toContain('include pattern `packages/*/test/**/*.test.ts`');
+    // AND THE CONFIGURATION IS NO LONGER UNDECIDED ABOUT ITSELF.
+    expect(report.undecided.filter((u) => u.file === 'vitest.config.ts')).toEqual([]);
+  });
+
+  test('a list built by CALLING a bound arrow is folded too, including through a spread', () => {
+    const root = tree({
+      'vitest.config.ts': computed,
+      'packages/alpha/test/one.golden.test.ts': 'export const one = 1;\n',
+    });
+    const details = dependantsOf(root, 'packages/alpha/test/one.golden.test.ts')
+      .sites.filter((s) => s.kind === 'config-glob' && s.file === 'vitest.config.ts')
+      .map((s) => s.detail);
+    expect(details).toContain('exclude pattern `packages/*/test/**/*.golden.test.ts`');
+  });
+
+  test('a list this module will NOT fold is named UNDECIDED and never silently absent', () => {
+    const root = tree({
+      'vitest.config.ts':
+        'export default { test: { projects: [ { test: { include: whateverThisIs() } } ] } };\n',
+      'packages/alpha/test/one.test.ts': 'export const one = 1;\n',
+    });
+    const report = dependantsOf(root, 'packages/alpha/test/one.test.ts');
+    expect(report.undecided.map((u) => u.file)).toContain('vitest.config.ts');
+  });
+
+  test('foldGlobList refuses what it cannot fold rather than returning a short list', () => {
+    const bindings = new Map([['A', "['x/*']"]]);
+    expect(foldGlobList('A', bindings)).toEqual(['x/*']);
+    expect(foldGlobList('[...A, ...A]', bindings)).toEqual(['x/*', 'x/*']);
+    expect(foldGlobList('[...A, ...MISSING]', bindings)).toBeNull();
+    expect(foldGlobList('somethingElse()', bindings)).toBeNull();
+  });
+});
+
+describe('ADR-427: the walker recogniser reads the whole directory expression', () => {
+  test('a walker whose parameter is not the FIRST argument of the join is followed', () => {
+    const root = tree({
+      'packages/alpha/src/target.ts': 'export const target = 1;\n',
+      'packages/alpha/test/w.test.ts': [
+        "import { readdirSync } from 'node:fs';",
+        "import { join } from 'node:path';",
+        "const ROOT = 'packages/alpha';",
+        'function under(sub: string): string[] {',
+        '  return readdirSync(join(ROOT, sub));',
+        '}',
+        "export const found = under('src');",
+      ].join('\n'),
+    });
+    expect(
+      witness('enumeration', found(root, 'packages/alpha/src/target.ts', 'enumeration')),
+    ).toEqual(['packages/alpha/test/w.test.ts']);
+  });
+
+  test('a walker`s DECLARATION is not counted as one of its own call sites', () => {
+    // A parameter list is not a directory read. Counting it as one reported a
+    // read that never happened, and the figure it inflated is the one this
+    // module publishes as the size of what its enumeration kind cannot aim.
+    const root = tree({
+      'packages/alpha/src/target.ts': 'export const target = 1;\n',
+      'packages/alpha/test/w.test.ts': [
+        "import { readdirSync } from 'node:fs';",
+        'function under(dir: string): string[] {',
+        '  return readdirSync(dir);',
+        '}',
+        "export const found = under('packages/alpha/src');",
+      ].join('\n'),
+    });
+    const report = dependantsOf(root, 'packages/alpha/src/target.ts');
+    expect(report.sites.filter((s) => s.kind === 'enumeration').map((s) => s.file)).toEqual([
+      'packages/alpha/test/w.test.ts',
+    ]);
+    expect(report.undecided).toEqual([]);
+    expect(report.unresolvedEnumerations).toBe(0);
+  });
+});
+
 describe('kind `config-glob`: a pattern that reaches the file and names no file', () => {
   test('a `tsconfig.json` include that matches the target is a dependant of the MOVE', () => {
     const root = tree({
@@ -503,6 +744,25 @@ describe('the second hop, asked for and never assumed', () => {
     const two = closure(root, 'apps/lantern/src/producer.ts', 2);
     expect(two.reached.get('tools/runner.mjs')).toBe(1);
     expect(two.reached.get('tools/suite.test.ts')).toBe(2);
+  });
+
+  test('ADR-427: an ORDINARY run reports how many files the second hop would add', () => {
+    // The default is one hop and stays one, so the run has to say how short it
+    // is. ADR-422 section 6 measured a file going red that is outside the
+    // one-hop closure, so "not listed above" is a real quantity on a real
+    // target and a caller who is not told it infers it is zero.
+    const root = tree({
+      'packages/alpha/src/target.ts': 'export const target = 1;\n',
+      'packages/alpha/src/middle.ts': "export * from './target.ts';\n",
+      'packages/alpha/src/outer.ts':
+        "import { target } from './middle.ts';\nexport const o = target;\n",
+    });
+    const lines: string[] = [];
+    main(['packages/alpha/src/target.ts'], (line) => lines.push(line), root);
+    const footer = lines.find((line) => line.startsWith('TRANSITIVE'));
+    expect(footer).toBeDefined();
+    expect(footer).toContain('1 file(s) reach it in ONE composing step and 2 within TWO');
+    expect(footer).toContain('1 file(s) depend on it only THROUGH another file');
   });
 
   test('the closure does NOT compose enumerations, which would return the tree', () => {

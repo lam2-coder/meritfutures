@@ -88,9 +88,10 @@ import {
   PRODUCED_DIGESTS,
   RENDERED_FORMAT,
 } from './ports.ts';
-import { DigestRowError, readInteger, readText, readTextArray, record } from './rows.ts';
+import { DigestRowError, readInteger, readText, readTextArray } from './rows.ts';
 import type {
   Channel,
+  DeclaredRow,
   Digest,
   DigestBody,
   DigestIo,
@@ -438,8 +439,10 @@ export interface ProducerSchedule {
 }
 
 /** Read one schedule for the producer, refusing what `0040` refuses. */
-export function readProducerSchedule(value: unknown, where: string): ProducerSchedule {
-  const row = record(value, where);
+export function readProducerSchedule(
+  row: DeclaredRow<'reportSchedules'>,
+  where: string,
+): ProducerSchedule {
   const digest = readText(row, 'digest', where);
   if (!(DIGESTS as readonly string[]).includes(digest))
     throw new DigestRowError(
@@ -483,11 +486,14 @@ function isProduced(digest: Digest): digest is ProducedDigest {
  * the database on its first retry, and a run that read the table says out loud
  * that it is retrying, which is what that index is for.
  */
-export function nextAttempt(rows: readonly unknown[], where: string): number {
+export function nextAttempt(
+  rows: readonly DeclaredRow<'reportDeliveries'>[],
+  where: string,
+): number {
   let highest = 0;
   for (const [index, value] of rows.entries()) {
     const at = `${where}[${String(index)}]`;
-    const attempt = readInteger(record(value, at), 'attempt', at);
+    const attempt = readInteger(value, 'attempt', at);
     if (attempt > highest) highest = attempt;
   }
   return highest + 1;

@@ -116,6 +116,16 @@
 // the alarm that cannot run saying so instead of returning green.
 // =============================================================================
 
+import type { DeclaredRow } from '../db.ts';
+
+// **RE-EXPORTED RATHER THAN ALIASED (ADR-426).** `alarm.ts` and `produce.ts`
+// import from `./ports.ts` and `./rows.ts` AND NOTHING ELSE, which
+// `test/digests.test.ts` 3.1 asserts by reading the module as text, so the name
+// has to arrive through this file. A LOCAL ALIAS would be the deleted
+// `DigestRow` under another spelling: this line adds no shape and writes no
+// column, it only lets the two callers say the name.
+export type { DeclaredRow };
+
 // -----------------------------------------------------------------------------
 // The vocabulary, transcribed from `0040` and never designed here
 // -----------------------------------------------------------------------------
@@ -304,8 +314,16 @@ export type DigestFilter = Readonly<Record<string, unknown>>;
 /** A set of values to write, by Drizzle property name. */
 export type DigestValues = Readonly<Record<string, unknown>>;
 
-/** One row as this slice sees it. */
-export type DigestRow = Readonly<Record<string, unknown>>;
+// **`DigestRow` WAS HERE AND IS DELETED (ADR-426).** It read
+// `Readonly<Record<string, unknown>>`, which is the accessor's `unknown`
+// written down a second time, and `ADR-421` section 5 names that restatement as
+// "a hand-written mapping's origin". The rows crossing this port now carry the
+// row `schema.ts` declares, so there is nothing left for a local alias to say.
+//
+// THE SENTENCE IT REPLACES IS NOT RESTORED BY A LATER ROW WITHOUT AN ADR. A
+// second alias here would put the mapping back and would make the narrowing in
+// `packages/db/src/scoped-db.ts` buy nothing, which is the exact condition
+// ADR-421 section 8 measured before refusing to spend limit 4 for it.
 
 // -----------------------------------------------------------------------------
 // One open transaction, in two shapes, and the narrower one is the alarm's
@@ -321,8 +339,21 @@ export type DigestRow = Readonly<Record<string, unknown>>;
  * door in and the alarm receives a handle it CANNOT WRITE THROUGH.
  */
 export interface DigestReadTx {
-  /** Rows matching a filter. The READ path is the only place a term may appear. */
-  rowsWhere(key: DigestReadTable, where: DigestFilter): Promise<unknown[]>;
+  /**
+   * Rows matching a filter. The READ path is the only place a term may appear.
+   *
+   * **GENERIC OVER THE KEY SO THE ROW CAN FOLLOW IT (ADR-426).** The member used
+   * to read `(key: DigestReadTable, ...): Promise<unknown[]>`, and that
+   * `unknown` was the second half of the mapping: `packages/db` said `unknown`,
+   * this line said it again, and `rows.ts` then cast its way back to a shape by
+   * hand. `SystemTx.rowsWhere` now hands back {@link DeclaredRow}, so the key
+   * is a type parameter here and the row arrives with it.
+   *
+   * THE UNION IS UNCHANGED AND IS STILL TWO. `K extends DigestReadTable`
+   * narrows exactly as the parameter did, so this port reaches no table it could
+   * not reach before, and a wider handle stays assignable to a narrower shape.
+   */
+  rowsWhere<K extends DigestReadTable>(key: K, where: DigestFilter): Promise<DeclaredRow<K>[]>;
 }
 
 /**

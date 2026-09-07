@@ -435,6 +435,10 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-421](ADR-421.md) | `ADR-303` limit 4 is NOT callerless, the typing was performed rather than argued about, and it is refused because it buys nothing a fenced row can spend  (2026-09-07, status: proposed) |
 | [ADR-422](ADR-422.md) | the population of what depends on a file is DERIVED rather than defined, a fifth kind is registered before it bites anybody, and the retirement is 21 files to read and 6 to watch rather than 5 (2026-09-07, status: proposed) |
 | [ADR-424](ADR-424.md) | the sentence four entries called unrepaired was wrong in both directions, and the half that was really missing is the money path (2026-09-07, status: proposed) |
+| [ADR-425](ADR-425.md) | the retirement is refused a third time, because the derived population is short by a SEVENTH kind that five rows never ran the gate that sees, and the true delete-breaking set is 51 files rather than 21 (2026-09-07, status: proposed) |
+| [ADR-426](ADR-426.md) | `ADR-303` limit 4 is SPENT for one verb on one handle, and the proof is a hand-written mapping deleted in the same commit (2026-09-07, status: proposed) |
+| [ADR-427](ADR-427.md) | the enumeration kind is given a RETENTION TIER rather than a filter, its precision goes from 1 in 18 to 1 in 2 without one site being dropped, a walker spelling nobody folded turns 171 unresolved reads into 137 and finds a dependant no row has named, and the one-hop default is DECIDED and kept (2026-09-07, status: proposed) |
+| [ADR-428](ADR-428.md) | the never-run tests were run, four of nine are green, and the two that are RED were broken by a migration whose own entry found and repaired this exact failure in the two callers CI could see (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -109,7 +109,7 @@
 // =============================================================================
 
 import { atLeast } from '../db.ts';
-import type { WorkerDb } from '../db.ts';
+import type { DeclaredRow, WorkerDb } from '../db.ts';
 
 import type { DigestAlarmIo, DigestFilter, DigestReadTable, DigestReadTx } from './ports.ts';
 
@@ -137,7 +137,10 @@ export type WorkerDigestTx = Parameters<Parameters<WorkerDb['batch']>[0]>[0];
  */
 export function digestAlarmReadTx(tx: WorkerDigestTx): DigestReadTx {
   return {
-    rowsWhere(key: DigestReadTable, where: DigestFilter): Promise<unknown[]> {
+    rowsWhere<K extends DigestReadTable>(key: K, where: DigestFilter): Promise<DeclaredRow<K>[]> {
+      // ADR-426. STILL ONE LINE AND STILL NO CAST. `DigestReadTable` is a subset
+      // of the accessor's key union, so `K` instantiates the accessor's own
+      // generic and the row follows the key across this boundary by itself.
       return tx.rowsWhere(key, where);
     },
   };
