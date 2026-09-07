@@ -26,7 +26,7 @@
 //     mismatches, `apps/api/src/routes/internal.ts` renders them) or a
 //     REGISTRATION (`packages/db/src/scope.ts`, `packages/db/src/schema.ts`).
 //   * NOTHING OUTSIDE THIS DIRECTORY SETS `accounts.recon_blocked`, which is
-//     the scope `test/recon-sweep.test.ts` pins. `recon/sweep.ts:614` sets it.
+//     the scope `test/recon-sweep.test.ts` pins. `recon/sweep.ts:640` sets it.
 //   * `BatchWritePort.raiseReconciliation` IS A DIFFERENT CHANNEL AND IT WOULD
 //     BE EASY TO MISTAKE FOR THIS ONE. `batch/ports.ts` declares it for `DO-3`:
 //     "A failure does not throw: it returns an `AssertionFailure`, the batch
@@ -148,7 +148,7 @@
 //
 // **THE CLEARING PATH DOES NOT EXIST ANYWHERE AND THAT IS REPORTED RATHER THAN
 // BUILT.** No module in this tree CLEARS `recon_blocked` (this file SETS it at
-// `recon/sweep.ts:614`; the broader claim that stood here is retired under
+// `recon/sweep.ts:640`; the broader claim that stood here is retired under
 // `RI-14` by ADR-385), so the first account this sweep blocks stays blocked
 // until somebody writes the operator's endpoint. That is not a reason to weaken
 // the block: a sweep that clears its own findings is the control deleting itself.
