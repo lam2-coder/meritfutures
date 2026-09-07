@@ -314,14 +314,27 @@
 //            statement the other two are owed to.
 //            **WHAT IS ACTUALLY UNSUPPLIED IS SMALLER THAN A REFACTOR AND IS
 //            NOT NOTHING**: the COMPOSITION of that decode with the account's
-//            `plan_version_sizes` read. **IT IS NOT ONE EXPORT, AND `ADR-413`
-//            measured why**: the one composition in this deployable, `planLeg`,
-//            reads through `catalogRowAt`, which `packages/db` declares on
-//            `ScopedTx` ALONE, and an admin read holds `SystemTx`, which has no
-//            catalogue accessor. The rows are reachable there only as `unknown`,
-//            so every route from here restates the engine's `PlanVersionSizeRow`
-//            mapping, the per-caller `FM-16` `ADR-303` limit 2 registers rather
-//            than forgives. Unsupplied, `EligibleFoldUnwired` fires by name.
+//            `plan_version_sizes` read. **THIS TERM IS SPENT (`ADR-416`) AND
+//            THE GROUP IS STILL NOT RETURNED, WHICH IS TERM 2 AND NOT THIS
+//            ONE.** The retired clauses are PARAPHRASED rather than quoted, on
+//            `RI-14`'s rule: it said the term was not one export, and it said
+//            why, that the one composition in this deployable read through
+//            `catalogRowAt`, which `packages/db` declared on `ScopedTx` ALONE,
+//            while an admin read holds `SystemTx`. **THAT MEASUREMENT WAS
+//            CORRECT AND IT NAMED ITS OWN REMEDY**, a typed catalogue read on
+//            the handle `AdminSourceBackend.operator` hands out, and `ADR-416`
+//            held `packages/db` and this directory together and took it.
+//            `catalogRowAt` reaches `SystemTx`, `payout-backend.ts` exports the
+//            composition at the seam `ADR-413` section 7 named as the better of
+//            its two options, and `pinned-plan.ts` supplies the port over the
+//            handle its caller is already inside. **NO SECOND
+//            `PlanVersionSizeRow` MAPPING WAS WRITTEN**: the per-caller `FM-16`
+//            `ADR-303` limit 2 registers is avoided rather than accepted here,
+//            because the second caller reaches the FIRST caller's statement
+//            instead of writing its own, and
+//            `test/admin-source-liability.test.ts` holds that census at one
+//            file. Unsupplied, `EligibleFoldUnwired` still fires by name, which
+//            is the default a deployment that composes nothing still meets.
 //         2. A WIRE THAT CAN SAY THE FIGURE IS A FORECAST. `ADR-204` ruling 7
 //            requires both halves of the figure to be stated wherever it is
 //            shown. `EligibleNext7d` declares `total_cents`, `account_count`

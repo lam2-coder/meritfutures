@@ -3799,6 +3799,77 @@ export interface SystemTx extends TxCommon {
     key: K,
     at: NamesAColumn<K, A>,
   ): Promise<unknown[]>;
+  /**
+   * ONE catalogue row, TYPED. ADR-416. {@link CatalogReadTx} is the shape.
+   *
+   * **APPENDED LAST AND DECLARED INLINE RATHER THAN INHERITED, AND BOTH HALVES
+   * OF THAT ARE DELIBERATE.** `extends TxCommon, CatalogReadTx` would state this
+   * signature once instead of twice and was written that way first. It is not
+   * what shipped: three cases in `apps/worker/test/` anchor on this interface's
+   * OPENING LINE as literal text before asserting what it declares, and one of
+   * them is a non-vacuity guard, so widening the `extends` clause unanchors
+   * three checks in a package this change has no business moving. Appending
+   * rather than inserting is the same discipline one layer down: `RI-15` and
+   * `RI-16` read `file:line` citations into this file from outside it, and the
+   * members above are cited by line.
+   *
+   * **AND THE OPENING LINE IS NOT QUOTED HERE, WHICH IS ITS OWN SMALL LESSON.**
+   * It was, in the first draft of this paragraph, and the unmatched brace in the
+   * quotation broke THREE MORE checks: `packages/ledger`, `packages/enrichment`
+   * and `apps/api/test/admin-wallet-port.test.ts` each read this interface's
+   * body by counting braces from its declaration, and a comment is not exempt
+   * from a brace count. A file read as TEXT by six checks in four packages is a
+   * file where prose is executable.
+   *
+   * **THE COST IS ONE SIGNATURE STATED TWICE AND IT IS HELD BY A COMPILE-TIME
+   * WITNESS RATHER THAN BY THIS PARAGRAPH.** `catalog-read.test.ts` assigns a
+   * `ScopedTx` and a `SystemTx` to {@link CatalogReadTx}, so a declaration that
+   * drifts on either handle is `TS2322` and not a review miss.
+   */
+  catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<CatalogRow<K> | undefined>;
+}
+
+/**
+ * A transaction that can read ONE catalogue row, TYPED. ADR-416.
+ *
+ * THE SHAPE EXISTS BECAUSE THE COMPOSITION HAS TWO CALLERS AND THEY HOLD
+ * DIFFERENT HANDLES. `planLeg` in `apps/api/src/payout-backend.ts` resolves an
+ * account's pinned plan on the payout transaction, which is bound to ONE
+ * identity because a payout is; the admin liability read resolves the same pair
+ * across the whole funded population and holds a `SystemTx`, which is bound to
+ * no identity because that read is bound to none either. ADR-413 measured that
+ * the second caller could not be written while `catalogRowAt` sat on `ScopedTx`
+ * alone, and named this door as the remedy rather than an export.
+ *
+ * IT CARRIES `catalogRowAt` AND NEITHER OF THE OTHER TWO VERBS. `catalogRows`
+ * and `catalogRowsWhere` have no caller holding anything but a `ScopedTx`, and
+ * `ScopedTx`'s own docblock states the rule admitting them here would break: a
+ * primitive admitted before a caller exists is a primitive nobody can remove. A
+ * whole-table catalogue read at the operator reason is a separate admission and
+ * it is not taken here.
+ *
+ * NEITHER HANDLE EXTENDS THIS INTERFACE AND BOTH DECLARE THE MEMBER INLINE,
+ * which is a deliberate shape rather than an oversight and `SystemTx`'s own
+ * member says why: an `extends` clause on either declaration would unanchor
+ * checks that read this file as TEXT, in `apps/worker/test/` and through
+ * `RI-15`. So the signature is stated three times here and the divergence is
+ * held by a COMPILE-TIME WITNESS instead: `packages/db/test/catalog-read.test.ts`
+ * assigns a `ScopedTx` and a `SystemTx` to this type, and a declaration that
+ * drifts on either is `TS2322` rather than a review miss.
+ *
+ * **THE WITNESS IS THE POINT AND THE `extends` WOULD HAVE BEEN THE CONVENIENCE.**
+ * A reader who thinks the repetition is the defect should change the witness
+ * first and the declarations second; a reader who deletes the witness has
+ * removed the only thing making the repetition safe.
+ */
+export interface CatalogReadTx {
+  catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<CatalogRow<K> | undefined>;
 }
 
 /** A transaction over rows that belong to nobody. `FirmTableKey` and nothing else. */
@@ -4071,6 +4142,48 @@ export function systemTx(
         key,
         unscopedWritePredicate(key, at),
       )) as unknown[];
+    },
+    /**
+     * ONE catalogue row, TYPED, at the system authority. ADR-416.
+     *
+     * **IT ADDS NO REACH, AND THAT MEASUREMENT IS THE WHOLE ARGUMENT FOR IT.**
+     * `rowAt` above is generic over `TableKey`; `CatalogTableKey` is a subset of
+     * `FirmTableKey`, which is a subset of `TableKey`. Both methods build their
+     * predicate with `unscopedAddressPredicate`, run it through
+     * `selectStatement` and arbitrate arity with `oneOrNone`, so
+     * `catalogRowAt(key, at)` returns THE ROW `rowAt(key, at)` ALREADY RETURNS
+     * on this handle. What it adds is `refuseUncatalogued`, which NARROWS the
+     * vocabulary from every table in the estate to the five `CATALOG_TABLE_KEYS`
+     * names, and a declared return type where `rowAt` hands back `unknown`.
+     *
+     * **SO THIS IS ADR-303 LIMIT 4 TAKEN FOR ONE VERB ON ONE HANDLE.** That
+     * entry named the `unknown` on every `SystemTx` read as a much larger
+     * surface with real callers and left it unruled. This takes the slice that
+     * has a caller and moves `rows`, `rowsWhere`, `rowAt` and `lockAt` not at
+     * all.
+     *
+     * **THE RUNTIME CHECKS DO NOT COME OFF ON THE STRENGTH OF THE TYPE**, which
+     * is `CatalogRow`'s own limit 1: the shape is derived from a TRANSCRIPTION
+     * of the DDL and nothing in this tree compares a transcribed column type
+     * against the migration. A caller reading money off one of these rows still
+     * checks the value it read.
+     *
+     * `catalog-read.test.ts` drives this method and `rowAt` at the same address
+     * and asserts the SQL and the binds are identical, so "it adds no reach" is
+     * a run rather than this paragraph.
+     */
+    async catalogRowAt<K extends CatalogTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<CatalogRow<K> | undefined> {
+      refuseUncatalogued(key);
+      refuseUnaddressed(key, at);
+      const found = (await selectStatement(
+        source,
+        key,
+        unscopedAddressPredicate(key, at),
+      )) as CatalogRow<K>[];
+      return oneOrNone(key, found) as CatalogRow<K> | undefined;
     },
   };
 }
