@@ -423,6 +423,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-409](ADR-409.md) | four of the runner's five ports are served, a BI event was destroying every `detector_runs` row and is repaired, and the blocker that says every detector declines is false of the one that runs (2026-09-07, status: proposed) |
 | [ADR-410](ADR-410.md) | the home is `packages/ledger`, the move was refused under the fence as dispatched and taken under one granted for it, and the path the producer vacated turned out to be what three suites, three pointers and one register used to find it (2026-09-07, status: proposed) |
 | [ADR-411](ADR-411.md) | the fifth blocker is real, it cannot be cleared from this fence, and the file the dispatch sent me to was the last one still stating its first term as a refactor that had already happened  (2026-09-07, status: proposed) |
+| [ADR-412](ADR-412.md) | the seed never reaches the table because nothing in this repository reaches a database, the convention already says where a loader goes, and the schema is not what stands in the way (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
