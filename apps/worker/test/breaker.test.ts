@@ -1250,3 +1250,93 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // merged tree and nowhere else.
   expect(new Set(legs).size).toBe(36);
 });
+
+// =============================================================================
+// 9. ADR-432. The port hands back the row the key declares, and the mapping is
+//    gone while every refusal is not
+// =============================================================================
+
+/**
+ * The RETURN TYPE one member of `BreakerTx` declares, read as text.
+ *
+ * **IT READS THE MEMBER'S OWN RETURN AND NOT AN `unknown` NEARBY**, which is the
+ * defect ADR-421 section 10 records catching in its own fourth case and ADR-430
+ * section 7 repeats. The risk is live here: `BreakerTx` declares `insert` TWO
+ * LINES BELOW `rowsWhere` and it still returns `Promise<unknown[]>`, so a case
+ * that searched the interface block for the string would pass on the wrong
+ * member. This walks from the member name to the `)` that closes its parameter
+ * list, matching parentheses so a generic parameter cannot end it early, and
+ * takes what follows.
+ */
+function returnOf(source: string, member: string): string {
+  const block = source.slice(source.indexOf('export interface BreakerTx {'));
+  const at = block.indexOf(`${member}`);
+  expect(at, `\`${member}\` is not declared on BreakerTx`).toBeGreaterThan(-1);
+  let index = block.indexOf('(', at);
+  let depth = 0;
+  for (; index < block.length; index++) {
+    if (block[index] === '(') depth++;
+    else if (block[index] === ')') {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  const tail = block.slice(index + 1);
+  return tail.slice(tail.indexOf(':') + 1, tail.indexOf(';')).trim();
+}
+
+test('9.1 the READ port hands back the accessor row and no longer re-states unknown', () => {
+  // ADR-303 limit 4, spent on this family. `rowsWhere` is generic over its key
+  // and returns the row `schema.ts` declares for that key.
+  expect(returnOf(code(PORTS_SOURCE), 'rowsWhere')).toBe('Promise<DeclaredRow<K>[]>');
+  expect(returnOf(code(PORTS_SOURCE), 'rowsWhere')).not.toBe('Promise<unknown[]>');
+
+  // AND THE WRITE PATH IS STILL `unknown`, ASSERTED RATHER THAN LEFT IMPLIED.
+  // ADR-430 section 12 item 4: a write returns what the database made of what
+  // was sent, which is not the same claim as a read. A later row narrowing
+  // `insert` is answering a different question and this case tells it so.
+  expect(returnOf(code(PORTS_SOURCE), 'insert')).toBe('Promise<unknown[]>');
+});
+
+test('9.2 the hand-written mapping is DELETED from the slice, not merely unused', () => {
+  // Swept over CODE and not over the file. `evaluate.ts` QUOTES the deleted
+  // declaration in the docblock that records why it went, and a sweep over the
+  // prose would be red on the sentence that explains why it is green.
+  expect(code(PORTS_SOURCE)).not.toMatch(/export type BreakerRow\b/);
+  expect(code(EVALUATE_SOURCE)).not.toMatch(/\bas BreakerRow\b/);
+  expect(code(EVALUATE_SOURCE)).not.toMatch(/\bBreakerRow\b(?!Error)/);
+  // The barrel cannot re-export a name that no longer exists.
+  expect(code(BARREL)).not.toMatch(/^\s*BreakerRow,\s*$/m);
+});
+
+test('9.3 every VALUE refusal survived the deletion, one for one and by subject', () => {
+  // A COUNT IS REFUSED AS THE INSTRUMENT, for ADR-426 section 7's two reasons: a
+  // count is a derivable number written down (CI-06), and it passes just as
+  // happily when one reader loses its `throw` and another grows a second. Each
+  // refusal is read for its own subject.
+  const source = code(EVALUATE_SOURCE);
+
+  // The row-shape refusal, which ADR-426 and ADR-430 BOTH dropped when they
+  // deleted their mapping. ADR-299 section 5.1 item 5: a type derived from a
+  // TRANSCRIPTION does not retire a runtime check.
+  expect(source).toContain('expected a row and received');
+  // THE MONEY REFUSAL, ASSERTED BY ITS SUBJECT AND BY ITS WHOLE FORM. Eleven
+  // `*_cents` columns cross this family and this is the guard between a float
+  // and the denominator of a loss ratio.
+  //
+  // **THE FORM IS ASSERTED WHOLE BECAUSE A SUBSTRING IS NOT ENOUGH, AND THAT
+  // WAS MEASURED RATHER THAN REASONED.** This case first read only
+  // `toContain("typeof value === 'bigint'")`, and the falsification that was
+  // supposed to prove it fires DID NOT: widening the guard to
+  // `typeof value === 'number' || typeof value === 'bigint'` retires the refusal
+  // on a money column while leaving that substring intact. A check that passes
+  // on a WIDENED guard is a check that watches the wrong half of the defect.
+  expect(source).toContain("if (typeof value === 'bigint') return value;");
+  expect(source).not.toMatch(/typeof value === 'number'[^\n]*return value/);
+  expect(source).toContain('expected a bigint and received');
+  expect(source).toContain('expected text and received');
+  expect(source).toContain('expected a Date or null and received');
+  expect(source).toContain('YYYY-MM-DD exchange');
+  expect(source).toContain("which 0016's CHECK does not admit");
+  expect(source).toContain('past Number.MAX_SAFE_INTEGER');
+});
