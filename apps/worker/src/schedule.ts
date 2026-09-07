@@ -301,14 +301,14 @@
 // WITHDRAWAL ROW AS PORTS NOTHING INHABITS.** Both are inhabited, by a refusing
 // default: `UNWIRED_LIVE_INGEST_IO` (`live/ports.ts:565`) and
 // `UNWIRED_WITHDRAWAL_APPROVAL_IO` (`withdrawals/ports.ts:329`), **and this
-// header counts both among its own eleven** while reserving no value at all, not
-// even a refusing one, for `ExpiryEventPort` alone. **SO THE FILE DRAWS THE
-// DISTINCTION IN ONE PARAGRAPH AND COLLAPSES IT IN THE NEXT.** What is true of
-// those two rows is the narrower thing their OWN rows below already say in the
-// precise words, and `CRON_INVENTORY` says in the same words: each refusing
-// default is THE ONLY value of its port type in the tree. The clause is kept
-// beside this correction rather than deleted, and the census it contradicts
-// stands in this same header.
+// header counts both among its own eleven** while reserving no value at all, not even a refusing one, for
+// `ExpiryEventPort` alone. **SO THE FILE DRAWS THE DISTINCTION IN ONE PARAGRAPH AND COLLAPSES IT IN THE NEXT.** What
+// is true of those two rows is the narrower thing their OWN rows below already say in the precise words, and
+// `CRON_INVENTORY` says in the same words: each refusing default is THE ONLY value of its port type in the tree. The
+// clause is kept beside this correction rather than deleted, and the census it contradicts stands in this same header.
+// **ADR-397 RETIRES THE EXCEPTION THIS PARAGRAPH MAKES FOR `ExpiryEventPort`, NAMED NOT REPRODUCED (`RI-14`, ADR-367):
+// `UNWIRED_EXPIRY_SWEEP_IO` composes a refusing one INLINE in `sweeps/ports.ts`, and `test/expiry-adapter.test.ts`
+// passes that member to `expirySweepIo` and gets it back. THE VERDICT DOES NOT MOVE AND NOTHING IS WIRED.**
 //
 // **THIS IS ADR-371 SECTION 6 ITEM 4's MECHANISM AT A SECOND SITE.** That entry
 // found the same collapse in ADR-370's own section 3.1 and recorded it rather
@@ -325,14 +325,14 @@
 // two rows down already used, with the marker, the switch and the S1 all left
 // exactly where they were. **NEITHER DISPOSITION MOVES AND NOTHING IS WIRED.**
 //
-// **AND THE EXPIRY CONSTRUCTOR IS STILL UNCALLABLE AND THAT IS NOT THIS ROW'S TO
-// REPAIR.** `expirySweepIo` still takes the sink as a required positional
-// argument with no default, re-derived at its own declaration. The only repair
-// that does not wire anything is a refusing `ExpiryEventPort` default, which the
-// expiry row argues against in its own words and which case `6.1` asserts the
-// ABSENCE of, on the ground that an hourly job releasing nothing while the S1
-// switch reports it present is worse than the unscheduled state. **A ROW THAT
-// REPAIRED IT WOULD BE FAILING A CASE WRITTEN TO CATCH EXACTLY THAT REPAIR.**
+// **AND THE EXPIRY CONSTRUCTOR IS STILL UNCALLABLE AND THAT IS NOT THIS ROW'S TO REPAIR.** `expirySweepIo` still takes
+// the sink as a required positional argument with no default, re-derived at its own declaration. The only repair that
+// does not wire anything is a refusing `ExpiryEventPort` default, which the expiry row argues against in its own words
+// and which case `6.1` asserts the ABSENCE of, on the ground that an hourly job releasing nothing while the S1 switch
+// reports it present is worse than the unscheduled state. **A ROW THAT REPAIRED IT WOULD BE FAILING A CASE WRITTEN TO
+// CATCH EXACTLY THAT REPAIR.** **ADR-397 RETIRES THE ABSOLUTE THIS PARAGRAPH OPENS WITH, NAMED NOT REPRODUCED (`RI-14`,
+// ADR-367): the constructor IS called by `test/expiry-adapter.test.ts`, one case passing `UNWIRED_EXPIRY_SWEEP_IO.events`
+// and asserting it back. What is unwritten is a call under `src/`. THE BAR AND THE VERDICT ARE UNCHANGED.**
 // =============================================================================
 
 /** Whether a job runs on a clock in a deployment, or does not. */
