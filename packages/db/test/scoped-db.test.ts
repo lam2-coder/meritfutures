@@ -18,7 +18,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getTableColumns, getTableName } from 'drizzle-orm';
+import { getTableColumns, getTableName, type SQL } from 'drizzle-orm';
 import { PgDialect, type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
 import { drizzle as proxyDrizzle } from 'drizzle-orm/pg-proxy';
 import type { PoolClient } from 'pg';
@@ -3398,6 +3398,466 @@ describe('the transcription states the DDL DEFAULT, which is the fact a WRITE ty
       [...allMigrationSql().matchAll(/ALTER\s+VIEW\b/gi)].length,
       'a migration carries ALTER VIEW, which is how a view acquires a default',
     ).toBe(0);
+  });
+});
+
+// =============================================================================
+// ADR-443. THE GENERATED EXPRESSION, WHICH IS THE FOURTH TRANSCRIBED FACT AND
+// THE ONE NOTHING COMPARED.
+// =============================================================================
+// ADR-438 section 8 item 4 is this block's commission and it is quoted rather
+// than paraphrased: the DEFAULT comparison one screen up "does not compare the
+// `GENERATED ALWAYS AS` expression ... A transcription that dropped
+// `.generatedAlwaysAs()` would make a REFUSED column look writable, and nothing
+// in this file would notice. One of the five is a money column."
+//
+// WHY IT IS A FOURTH FACT AND NOT A CORNER OF THE THIRD. `hasDefault` is FALSE
+// on a generated column on BOTH sides, and correctly so: drizzle-orm records a
+// generated expression in `generated` and never in `hasDefault`, and Postgres
+// SUPPLIES the value while REFUSING a written one. So the DEFAULT comparison
+// reads `false === false` on all five of these columns and agrees, for the
+// wrong reason -- it is the reason its own reader's comment gives. `$inferInsert`
+// omits a generated column from the write type ENTIRELY, which is a stronger
+// statement than optional, and it makes it off `generated` alone.
+//
+// THE TWO DIRECTIONS FAIL DIFFERENTLY AND ONLY ONE OF THEM IS SILENT.
+//   DDL generated, transcription NOT: the write type offers a column the
+//     database refuses, and Postgres rejects the row with `cannot insert into
+//     column`. LOUD, at the database, on the first write. This is the direction
+//     ADR-438 section 8 item 4 names.
+//   Transcription generated, DDL NOT: the write type OMITS a column the database
+//     expects a value for. On a `NOT NULL` column with no default that is a
+//     refused row; on a NULLABLE one it is a SILENT NULL. This is the direction
+//     with no witness, and `every disagreement is the LOUD direction` below
+//     holds its population at ZERO rather than registering it.
+//
+// WHY IT IS A MONEY QUESTION. `reconciliations.delta_cents` is one of the five
+// and it is the difference of two money columns computed by the database, which
+// is what makes the three of them unable to disagree. MONEY IS INTEGER CENTS AND
+// NO FLOAT MAY ENTER A FINANCIAL PATH, so the money leg asserts the transcribed
+// column's `dataType` is `bigint`: `bigint({ mode: 'number' })` reads the same
+// `bigint` DDL spelling the type comparison above compares, passes every leg in
+// this file, and hands JavaScript a float64.
+//
+// THE READER IS THE FOLD AND NEVER THE `CREATE`, on ADR-094, and here that is
+// load-bearing rather than ceremonial: `notification_kinds.rate_limit_exempt` is
+// added by `ALTER TABLE ... ADD COLUMN` in `0029` and is invisible to every
+// reader that stops at the CREATE.
+
+/**
+ * ONE FOLDED COLUMN'S GENERATION CLAUSE, or two empty strings when it declares
+ * none.
+ *
+ * IT IS A PAREN WALK AND NOT A REGEX, and the difference matters on exactly one
+ * of the five: `reserve_coverage_snapshots.rcr_bp` is `AS ((reserve_cents *
+ * 10000) / NULLIF(cvar99_cents, 0)) STORED`, so a lazy `\(([^)]*)\)` stops at
+ * the first inner `)` and a greedy one swallows the `STORED`. The walk tracks
+ * depth and skips single-quoted text, so a future expression carrying a paren
+ * inside a literal reads correctly too.
+ *
+ * `storage` IS READ RATHER THAN ASSUMED. Postgres 15 accepts only `STORED`, and
+ * the word is what separates a materialised column from a `VIRTUAL` one that
+ * would be recomputed on read. It is compared against drizzle-orm's own `mode`
+ * below rather than merely asserted here.
+ *
+ * AN IDENTITY IS NOT ONE OF THESE. `GENERATED ALWAYS AS IDENTITY` writes no
+ * `(`, so the opener cannot match it, and drizzle-orm records an identity in
+ * `generatedIdentity` rather than in `generated`. Both sides read EMPTY for all
+ * twenty identity columns, and `the generation reader is not degenerate` counts
+ * them to prove the pass over them was real rather than absent.
+ */
+const DDL_GENERATED_AS = /\bGENERATED\s+ALWAYS\s+AS\s*\(/i;
+
+const ddlGenerated = (
+  def: string | undefined,
+  where: string,
+): { readonly expression: string; readonly storage: string } => {
+  const text = def ?? '';
+  const opener = DDL_GENERATED_AS.exec(text);
+  if (opener === null) return { expression: '', storage: '' };
+  const from = opener.index + opener[0].length - 1;
+  let depth = 0;
+  let quoted = false;
+  for (let i = from; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === "'") quoted = false;
+      continue;
+    }
+    if (ch === "'") quoted = true;
+    else if (ch === '(') depth++;
+    else if (ch === ')') {
+      depth--;
+      if (depth > 0) continue;
+      return {
+        expression: canonicalExpression(text.slice(from + 1, i)),
+        storage: (/^\s*([a-z]+)/i.exec(text.slice(i + 1))?.[1] ?? '').toUpperCase(),
+      };
+    }
+  }
+  throw new Error(`${where}: GENERATED ALWAYS AS ( is never closed. Its DDL is: ${text}`);
+};
+
+/**
+ * THE ONE NORMALISATION EITHER SIDE NEEDS, AND IT IS TWO REWRITES.
+ *
+ * WHITESPACE, because the DDL writes `report_schedules.cadence` as an indented
+ * eight-line `CASE` and the transcription writes it on one.
+ *
+ * QUOTED IDENTIFIERS, because `schema.ts:2458` builds that same expression with
+ * `sql.identifier('digest')` and drizzle-orm renders it `"digest"` where the
+ * migration writes `digest`. The two spell one column and Postgres reads them
+ * identically. The rewrite is narrow on purpose -- only a `"` pair wrapping a
+ * bare lower-case identifier -- and `the generation reader is not degenerate`
+ * asserts NO `"` survives it on either side, so a rewrite that stopped covering
+ * this estate is red rather than quietly partial.
+ *
+ * NOTHING ELSE IS NORMALISED. Case is not folded, parentheses are not
+ * rebalanced and commas are not respaced, because every one of those would make
+ * a real disagreement compare equal, which is the failure this whole block
+ * exists to prevent.
+ */
+const canonicalExpression = (text: string): string =>
+  text
+    .replace(/"([a-z_][a-z0-9_]*)"/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** The GENERATED expression `schema.ts` transcribes for one column, or `''`. */
+const transcribedGenerated = (column: PgColumn): string => {
+  const config = (column as unknown as { generated?: { as: unknown } }).generated;
+  if (config === undefined) return '';
+  const as = typeof config.as === 'function' ? (config.as as () => unknown)() : config.as;
+  return canonicalExpression(new PgDialect().sqlToQuery(as as SQL).sql);
+};
+
+/** drizzle-orm's own record of HOW the column is generated, or `undefined`. */
+const transcribedGeneration = (
+  column: PgColumn,
+): { readonly type?: string; readonly mode?: string } | undefined =>
+  (column as unknown as { generated?: { type?: string; mode?: string } }).generated;
+
+/**
+ * THE FIVE GENERATED COLUMNS, WRITTEN OUT AND THEN DERIVED BACK AGAINST BOTH
+ * SIDES, which is the idiom `MONEY_DEFAULT_SENTINELS` one screen up establishes.
+ *
+ * ADR-443 DERIVED THIS POPULATION RATHER THAN INHERITING IT. ADR-438 section 4
+ * says five and five is what walking `TABLES` and the fold produces, so the
+ * sibling's number is CONFIRMED rather than quoted. The register is a command in
+ * both directions: a sixth generated column is RED on the day it lands, and so
+ * is deleting one of these five.
+ *
+ * ZERO OF THE FIVE DISAGREE, which is why there is no disagreement register
+ * beside this one. ADR-438 carries `TRANSCRIPTION_OMITS_DEFAULT` because its
+ * first run went red on three columns; this one went green on all five, and
+ * writing an empty exemption list would be furniture rather than a measurement.
+ * The disagreeing population is ASSERTED empty below instead, in both
+ * directions, so the first arrival is red rather than registrable.
+ *
+ *   notification_kinds.mutable             0019_...:56    schema.ts:1545
+ *   notification_kinds.rate_limit_exempt   0029_...:695   schema.ts:1552
+ *   report_schedules.cadence               0040_...:190   schema.ts:2457
+ *   reconciliations.delta_cents            0014_marks:168 schema.ts:4141
+ *   reserve_coverage_snapshots.rcr_bp      0049_...:192   schema.ts:754
+ */
+const GENERATED_ALWAYS_AS: ReadonlyArray<readonly [TableKey, string, string]> = [
+  ['notificationKinds', 'mutable', "class IN ('account_state', 'marketing')"],
+  ['notificationKinds', 'rate_limit_exempt', "class IN ('security', 'money')"],
+  [
+    'reportSchedules',
+    'cadence',
+    "CASE digest WHEN 'daily_liability' THEN 'daily' WHEN 'weekly_loss_ratio_cusum' THEN " +
+      "'weekly' WHEN 'weekly_flag_queue' THEN 'weekly' WHEN 'monthly_revenue_cohort' THEN " +
+      "'monthly' END",
+  ],
+  ['reconciliations', 'delta_cents', 'our_balance_cents - platform_balance_cents'],
+  ['reserveCoverageSnapshots', 'rcr_bp', '(reserve_cents * 10000) / NULLIF(cvar99_cents, 0)'],
+];
+
+/**
+ * THE MONEY COLUMN THE DATABASE COMPUTES, AND THE TWO IT COMPUTES IT FROM.
+ *
+ * `delta_cents = our_balance_cents - platform_balance_cents` is a SIGNED
+ * INTEGER-CENT difference of two integer-cent columns, and the money leg holds
+ * all three at `bigint` on both sides. That is the whole no-float claim: a
+ * `bigint` column read as a JavaScript `number` is a float64, and `0014` writes
+ * the same word `bigint` whichever mode the transcription chose.
+ */
+const MONEY_GENERATED_OPERANDS: readonly string[] = ['our_balance_cents', 'platform_balance_cents'];
+
+/**
+ * THE GENERATED MONEY COLUMN THIS COMPARISON CANNOT REACH, NAMED SO THAT ITS
+ * ABSENCE IS A MEASURED FACT RATHER THAN AN OVERSIGHT.
+ *
+ * `live_account_state` is CREATED by `0050` and transcribed NOWHERE, which is
+ * ADR-112 foreclosure 4 and ADR-438 section 8 item 2. It carries a SIXTH
+ * `GENERATED ALWAYS AS` column and that column is `*_cents`, so the migration
+ * set's generated money population is TWO and this block's is ONE. The leg below
+ * asserts the arithmetic rather than leaving it in prose.
+ */
+const UNREGISTERED_GENERATED_TABLE = 'live_account_state';
+const UNREGISTERED_GENERATED_COLUMN = 'intraday_movement_cents';
+
+describe('the transcription states the DDL GENERATED expression, which is the fact that REFUSES a write', () => {
+  for (const [key, sqlName] of DDL_NAMES) {
+    test(`${sqlName}: every column's GENERATED expression equals the DDL as of the LAST migration`, () => {
+      const defs = foldTableDefs(sqlName);
+      for (const column of Object.values(columnsOf(key))) {
+        const def = defs.get(column.name);
+        expect(def, `${sqlName}.${column.name} is not a column of the folded table`).toBeDefined();
+        const declared = ddlGenerated(def, `${sqlName}.${column.name}`).expression;
+        expect(
+          transcribedGenerated(column),
+          `${sqlName}.${column.name} is transcribed as ${
+            transcribedGenerated(column) === ''
+              ? 'an ordinary WRITABLE column'
+              : 'GENERATED, so a write may not name it'
+          } and the migration set declares it ${
+            declared === '' ? 'writable' : `GENERATED ALWAYS AS (${declared})`
+          }. Its DDL is: ${def ?? ''}`,
+        ).toBe(declared);
+      }
+    });
+  }
+
+  // THE REGISTER IS DERIVED BACK FROM BOTH SIDES, which is what stops it growing
+  // quietly: the loop above consults no list, so a sixth generated column that
+  // AGREED would pass every case of it and change nothing here unless this leg
+  // held the population itself.
+  test('exactly the five registered columns are GENERATED, and every disagreement is the LOUD direction', () => {
+    const transcribed: string[] = [];
+    const declared: string[] = [];
+    const silent: string[] = [];
+    for (const [key, sqlName] of DDL_NAMES) {
+      const defs = foldTableDefs(sqlName);
+      for (const column of Object.values(columnsOf(key))) {
+        const ddl = ddlGenerated(defs.get(column.name), `${sqlName}.${column.name}`).expression;
+        const mine = transcribedGenerated(column);
+        if (mine !== '') transcribed.push(`${sqlName}.${column.name}`);
+        if (ddl !== '') declared.push(`${sqlName}.${column.name}`);
+        // THE SILENT DIRECTION. `schema.ts` says the database computes this
+        // column and the DDL says it does not, so `$inferInsert` omits it from
+        // the write type and the database is offered nothing: a refused row on a
+        // NOT NULL column and a SILENT NULL on a nullable one.
+        if (mine !== '' && ddl === '') silent.push(`${sqlName}.${column.name}`);
+      }
+    }
+    expect(
+      silent,
+      'a column is transcribed GENERATED where the migration set declares an ordinary writable ' +
+        'column, so a write type derived from schema.ts would omit it and the database would ' +
+        'take a NULL',
+    ).toEqual([]);
+    const registered = GENERATED_ALWAYS_AS.map(([key, name]) => `${SQL_NAME[key]}.${name}`).sort();
+    expect(
+      transcribed.sort(),
+      'the GENERATED columns schema.ts transcribes are not the ones ADR-443 measured',
+    ).toEqual(registered);
+    expect(
+      declared.sort(),
+      'the GENERATED columns the migration set declares are not the ones ADR-443 measured',
+    ).toEqual(registered);
+
+    // AND THE REGISTERED EXPRESSIONS ARE WHAT BOTH DOCUMENTS SAY, so the five
+    // rows carry text re-read from the migration set and from the transcription
+    // rather than a remembered one. `storage` is compared against drizzle-orm's
+    // own `mode` here: `STORED` materialises the value and a `VIRTUAL` column
+    // recomputes it on every read, which is a different promise about a money
+    // column than the one `0014` makes.
+    for (const [key, name, expression] of GENERATED_ALWAYS_AS) {
+      const column = Object.values(columnsOf(key)).find((c) => c.name === name);
+      expect(column, `${SQL_NAME[key]}.${name} is not a transcribed column`).toBeDefined();
+      expect(
+        transcribedGenerated(column as PgColumn),
+        `${SQL_NAME[key]}.${name} in schema.ts`,
+      ).toBe(expression);
+      const read = ddlGenerated(foldTableDefs(SQL_NAME[key]).get(name), `${SQL_NAME[key]}.${name}`);
+      expect(read.expression, `${SQL_NAME[key]}.${name} in the migrations`).toBe(expression);
+      expect(read.storage, `${SQL_NAME[key]}.${name} storage in the migrations`).toBe('STORED');
+      expect(
+        transcribedGeneration(column as PgColumn)?.mode,
+        `${SQL_NAME[key]}.${name} storage in schema.ts`,
+      ).toBe('stored');
+      expect(
+        (column as PgColumn).hasDefault,
+        `${SQL_NAME[key]}.${name} is GENERATED, so drizzle-orm must record no default for it`,
+      ).toBe(false);
+    }
+  });
+
+  // THE SILENT DIRECTION OF THE READER ITSELF, and it is the paren walk rather
+  // than the comparison. Both sides of the loop above are TEXT, so a reader that
+  // collapsed onto `''` would report every one of the five as an ordinary
+  // writable column -- which the census above reddens -- but a reader that cut
+  // in the WRONG PLACE would still be non-empty and would still compare against
+  // whatever it swallowed. So the expression is asserted to be a real expression
+  // and nothing else: no `STORED`, no trailing constraint text, no surviving
+  // quoted identifier, on both sides.
+  test('the generation reader is not degenerate: it reads a real expression and cuts where one ends', () => {
+    let read = 0;
+    let generated = 0;
+    let identities = 0;
+    for (const [, sqlName] of DDL_NAMES) {
+      for (const [name, def] of foldTableDefs(sqlName)) {
+        read++;
+        if (DECLARED_IDENTITY.test(def)) identities++;
+        const { expression } = ddlGenerated(def, `${sqlName}.${name}`);
+        if (expression === '') continue;
+        generated++;
+        expect(
+          expression,
+          `${sqlName}.${name}: the generation reader swallowed the clause that FOLLOWS the ` +
+            `expression, so it did not cut where one ends. Its DDL is: ${def}`,
+        ).not.toMatch(/\b(STORED|VIRTUAL|NOT NULL|PRIMARY KEY|REFERENCES|CHECK|UNIQUE)\b/i);
+        expect(
+          expression,
+          `${sqlName}.${name}: the generation reader left a quoted identifier, so the two sides ` +
+            `are being compared as different spellings of one column`,
+        ).not.toContain('"');
+      }
+    }
+    for (const [key, sqlName] of DDL_NAMES) {
+      for (const column of Object.values(columnsOf(key))) {
+        expect(
+          transcribedGenerated(column),
+          `${sqlName}.${column.name}: schema.ts's expression still carries a quoted identifier ` +
+            `after canonicalisation`,
+        ).not.toContain('"');
+      }
+    }
+    // OVER THE TABLE HALF, for the reason the two readers above give: a
+    // registered VIEW's columns are visited by their own leg below.
+    const declared = DDL_NAMES.reduce((n, [key]) => n + Object.keys(columnsOf(key)).length, 0);
+    expect(read, 'the comparison did not visit every column the transcription declares').toBe(
+      declared,
+    );
+    expect(
+      generated,
+      'no registered column is GENERATED ALWAYS AS an expression, so the comparison above is ' +
+        'vacuous',
+    ).toBe(GENERATED_ALWAYS_AS.length);
+    // AND THE TWENTY IDENTITY COLUMNS WERE WALKED PAST RATHER THAN MISSED. They
+    // read EMPTY on both sides, and this is what says the pass over them was
+    // real: an opener that started matching `AS IDENTITY` would call all twenty
+    // a disagreement, and one that stopped being reached would make this zero.
+    expect(
+      identities,
+      'no registered column is GENERATED AS IDENTITY, so the reader was never asked to ignore one',
+    ).toBeGreaterThan(0);
+  });
+
+  // MONEY IS INTEGER CENTS AND THIS IS THE LEG THAT SAYS SO. ADR-438 section 6
+  // reports `reconciliations.delta_cents` as omittable "correctly and for the
+  // wrong reason", because both of its sides read `hasDefault: false`. This is
+  // the right reason asserted.
+  test('the MONEY column the database COMPUTES holds exactly the expression written here, in integer cents', () => {
+    const derived = DDL_NAMES.flatMap(([key, sqlName]) =>
+      Object.values(columnsOf(key))
+        .filter((column) => transcribedGenerated(column) !== '' && column.name.endsWith('_cents'))
+        .map((column) => `${sqlName}.${column.name}`),
+    ).sort();
+    expect(
+      derived,
+      'the set of GENERATED MONEY columns is not the set ADR-443 measured, and a money column ' +
+        'joining or leaving it outranks every other finding here',
+    ).toEqual(
+      GENERATED_ALWAYS_AS.filter(([, name]) => name.endsWith('_cents'))
+        .map(([key, name]) => `${SQL_NAME[key]}.${name}`)
+        .sort(),
+    );
+
+    for (const [key, name] of GENERATED_ALWAYS_AS.filter(([, n]) => n.endsWith('_cents'))) {
+      const columns = columnsOf(key);
+      const column = Object.values(columns).find((c) => c.name === name);
+      expect(column, `${SQL_NAME[key]}.${name} is not a transcribed column`).toBeDefined();
+      // NO FLOAT ENTERS A FINANCIAL PATH, and a generated money column is a
+      // place one could without a single call site moving. `bigint` and
+      // `bigint({ mode: 'number' })` transcribe the SAME DDL word and the type
+      // comparison above cannot tell them apart; `dataType` is what does, and
+      // `number` here is a float64 holding cents.
+      expect(column?.dataType, `${SQL_NAME[key]}.${name} in schema.ts is integer cents`).toBe(
+        'bigint',
+      );
+      const defs = foldTableDefs(SQL_NAME[key]);
+      expect(defs.get(name), `${SQL_NAME[key]}.${name} in the migrations`).toMatch(/\bbigint\b/i);
+      // AND THE TWO COLUMNS THE DATABASE SUBTRACTS ARE INTEGER CENTS TOO, on
+      // both sides. A signed difference of two integers is an integer; a
+      // difference of two float64s is not money.
+      for (const operand of MONEY_GENERATED_OPERANDS) {
+        expect(
+          ddlGenerated(defs.get(name), `${SQL_NAME[key]}.${name}`).expression,
+          `${SQL_NAME[key]}.${name} does not compute over ${operand}`,
+        ).toContain(operand);
+        const source = Object.values(columns).find((c) => c.name === operand);
+        expect(source?.dataType, `${SQL_NAME[key]}.${operand} in schema.ts is integer cents`).toBe(
+          'bigint',
+        );
+        expect(defs.get(operand), `${SQL_NAME[key]}.${operand} in the migrations`).toMatch(
+          /\bbigint\b/i,
+        );
+      }
+    }
+  });
+
+  // ADR-209's HALF. A view column is not GENERATED: Postgres has no such thing
+  // on a view, and a projected column does not inherit the base relation's
+  // generation. So the whole registered view population is asserted flat, and a
+  // transcription that carried `.generatedAlwaysAs()` across from a base table
+  // would be refusing writes on a relation nothing writes through.
+  test('no registered VIEW column is transcribed GENERATED, because a view declares no generation', () => {
+    expect(VIEW_NAMES.length, 'no registered VIEW, so this leg is vacuous').toBeGreaterThan(0);
+    for (const [key, sqlName] of VIEW_NAMES) {
+      for (const column of Object.values(columnsOf(key))) {
+        expect(
+          transcribedGenerated(column),
+          `${sqlName}.${column.name} is transcribed GENERATED and a view declares no generation`,
+        ).toBe('');
+      }
+    }
+  });
+
+  // THE SIXTH ONE, AND IT IS MONEY. This block compares five columns and the
+  // migration set declares SIX; the difference is one column on a table
+  // `schema.ts` does not transcribe, so no accessor can address it and no leg
+  // above can see it. ADR-112 foreclosure 4 and ADR-438 section 8 item 2 are the
+  // standing record; this is the arithmetic asserted rather than written down,
+  // so the day `live_account_state` is transcribed the count moves here first.
+  test('the migration set declares SIX generated columns and the sixth is a MONEY column nothing transcribes', () => {
+    const inMigrations = [...allMigrationSql().matchAll(/\bGENERATED\s+ALWAYS\s+AS\s*\(/gi)].length;
+    expect(
+      inMigrations - GENERATED_ALWAYS_AS.length,
+      'the migration set and the transcription no longer differ by exactly one GENERATED column, ' +
+        'so either a table was transcribed or a generated column landed',
+    ).toBe(1);
+    expect(
+      ALL_REGISTERED.some(([, sqlName]) => sqlName === UNREGISTERED_GENERATED_TABLE),
+      `${UNREGISTERED_GENERATED_TABLE} is registered now, so the sixth generated column is ` +
+        `reachable and belongs in GENERATED_ALWAYS_AS`,
+    ).toBe(false);
+    const def = ddlColumnDefs(allMigrationSql(), UNREGISTERED_GENERATED_TABLE).get(
+      UNREGISTERED_GENERATED_COLUMN,
+    );
+    expect(
+      def,
+      `${UNREGISTERED_GENERATED_TABLE}.${UNREGISTERED_GENERATED_COLUMN} is not a column of the ` +
+        `table the migrations create`,
+    ).toBeDefined();
+    const read = ddlGenerated(
+      def,
+      `${UNREGISTERED_GENERATED_TABLE}.${UNREGISTERED_GENERATED_COLUMN}`,
+    );
+    expect(read.expression, 'the sixth generated column is not the one ADR-443 measured').toBe(
+      'equity_cents - opening_equity_cents',
+    );
+    expect(read.storage).toBe('STORED');
+    // AND IT IS MONEY, WHICH IS WHY IT IS NAMED HERE RATHER THAN COUNTED. The
+    // migration set's generated MONEY population is TWO and this block reaches
+    // ONE of them.
+    expect(
+      UNREGISTERED_GENERATED_COLUMN.endsWith('_cents'),
+      'the unreachable generated column is no longer a money column',
+    ).toBe(true);
+    expect(def, `${UNREGISTERED_GENERATED_COLUMN} in the migrations`).toMatch(/\bbigint\b/i);
   });
 });
 
