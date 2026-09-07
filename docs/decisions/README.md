@@ -450,6 +450,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-437](ADR-437.md) | the WRITE path is REFUSED on the `breaker` family, and the ruling that stops it is not the one the dispatch named (2026-09-07, status: proposed) |
 | [ADR-438](ADR-438.md) | the `schema.ts` DEFAULT is compared against the DDL for the first time, and THREE COLUMNS DISAGREE (2026-09-07, status: proposed) |
 | [ADR-439](ADR-439.md) | the hole ADR-435 named in `golden` is closed in the shape that entry specified, and re-deriving its numbers corrects one of them (2026-09-07, status: proposed) |
+| [ADR-440](ADR-440.md) | the sentence four documents carry was never STALE, it was FALSE WHEN WRITTEN, and the line-neutral repair preserves the pointer without preserving what it lands on (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

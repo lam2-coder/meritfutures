@@ -3439,13 +3439,13 @@ export type CatalogTableKey = (typeof CATALOG_TABLE_KEYS)[number];
  *
  * FOUR LIMITS, STATED HERE RATHER THAN DISCOVERED LATER (ADR-299 section 5.1):
  *
- *   1. THE RUNTIME GUARDS DO NOT COME OFF ON THE STRENGTH OF THIS TYPE, and
- *      that is the limit this file exists to carry rather than the ADR. A type
- *      derived from `schema.ts` is a type derived from a TRANSCRIPTION, and
- *      ADR-112 foreclosure 4 records that nothing yet makes that transcription
- *      complete: no check in this tree compares a `schema.ts` column TYPE
- *      against the DDL. A caller that reads money off one of these rows still
- *      checks the value it read.
+ *   1. THE RUNTIME GUARDS DO NOT COME OFF ON THE STRENGTH OF THIS TYPE, and that is the
+ *      limit this file exists to carry rather than the ADR. This read "no check in this
+ *      tree compares a `schema.ts` column TYPE against the DDL." `RI-14` (ADR-440): FALSE
+ *      when written. `scoped-db.test.ts:2728` compares TYPE and NULLABILITY for every
+ *      column of every registered non-view relation. ADR-112 foreclosure 4 still holds,
+ *      what is compared is MIGRATION TEXT and not the database, DEFAULT is compared nowhere,
+ *      and a caller that reads money off one of these rows still checks the value it read.
  *   2. IT IS NOT A DECODER. It SHRINKS one. A driver-side caller still writes a
  *      field mapping onto the engine's own row type, once per caller, which is
  *      an accepted `FM-16`. What changes is that both ends are declared: a key
@@ -4568,14 +4568,14 @@ export async function transaction<T>(
  * is the `FM-16` shape limit 4 itself describes, and ADR-421 found that shape
  * operating on this very limit's decision record.
  *
- * **ALL FOUR OF `CatalogRow`'s LIMITS TRAVEL WITH IT AND THE FIRST IS THE ONE
- * THAT MATTERS HERE.** A type derived from `schema.ts` is derived from a
- * TRANSCRIPTION, and ADR-112 foreclosure 4 records that no check in this tree
- * compares a `schema.ts` column type against the DDL. So a caller reading a
- * value off one of these rows STILL CHECKS THE VALUE. What the type retires is
- * the guard for a column's EXISTENCE, and `ADR-299` section 5.1 item 5 is the
- * ruling that draws that line. `apps/worker/src/digests/rows.ts` is the first
- * consumer to spend it and it deleted its existence mapping and kept every one
- * of its refusals.
+ * **ALL FOUR OF `CatalogRow`'s LIMITS TRAVEL WITH IT AND THE FIRST IS THE ONE THAT MATTERS
+ * HERE.** A type derived from `schema.ts` is derived from a TRANSCRIPTION. This read "ADR-112
+ * foreclosure 4 records that no check in this tree compares a `schema.ts` column type against
+ * the DDL." `RI-14` (ADR-440): FALSE when written, and foreclosure 4 is about EXHAUSTIVENESS.
+ * `scoped-db.test.ts:2728` compares TYPE and NULLABILITY for every column of every registered
+ * non-view relation, against MIGRATION TEXT and not the database, DEFAULT compared nowhere. So
+ * a caller reading a value off one of these rows STILL CHECKS THE VALUE. What the type retires
+ * is the guard for a column's EXISTENCE, `ADR-299` section 5.1 item 5 is the ruling that draws
+ * it, and `apps/worker/src/digests/rows.ts` spent it, deleting a mapping and keeping refusals.
  */
 export type DeclaredRow<K extends TableKey> = (typeof TABLES)[K]['$inferSelect'];
