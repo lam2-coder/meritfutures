@@ -108,8 +108,40 @@ jobs:
       # assertions are the ones P1 section 2.2 names, and the verbose output
       # also prints every test NAME, so the three `against the real engine`
       # cases appear in the log as skipped by name rather than as a count.
+      #
+      # ADR-439. `--reporter=json` IS AN ADDITION AND NOT A REPLACEMENT, and
+      # `verbose` stays named beside it for exactly the reason the block above
+      # gives: passing `--reporter=json` alone would take the coverage statement
+      # and the per-name skip list out of this log in exchange for a file, which
+      # is the one thing `--reporter=verbose` is here to prevent. The report goes
+      # to `RUNNER_TEMP` rather than the workspace so that no step after this one
+      # sees a dirty tree. THE PASS/FAIL OF THIS STEP IS UNCHANGED BY EITHER
+      # FLAG, and the project, the includes and the assertions are untouched.
       - name: Golden fixtures
-        run: pnpm exec vitest run --project golden --reporter=verbose
+        run: >-
+          pnpm exec vitest run --project golden --reporter=verbose
+          --reporter=json
+          --outputFile="$RUNNER_TEMP/ci-03-golden-report.json"
+
+      # ADR-439, closing the hole ADR-435 section 10 named. A SKIP IS GREEN, so
+      # the number of them is bound to a register, and until this step existed
+      # `golden` was the one stage bound by nothing: ADR-435 wired CI-02 and
+      # CI-04 and could not reach this file, which was outside its fence.
+      #
+      # NO REGISTER ROW NAMES A `golden` FILE TODAY, so what this asserts is that
+      # the stage skips nothing at all, and it is red the first time one does.
+      # That is not hypothetical here: `packages/golden-loader/test/fixtures.golden.test.ts:248`
+      # is a `describe.runIf(declaration.holds)`, so the day the declaration stops
+      # holding this stage acquires skips, and before this step nothing said so.
+      #
+      # IT RUNS NO SUITE. It reads the report the step above already produced.
+      #
+      # It is a step of CI-03 rather than a gate in `gates.mjs` for the reason
+      # ADR-435 gives at `ci.yml:277-286`: every `CI-06` gate is static and this
+      # needs a number only a RUN can produce. No `CI-06` letter is spent and no
+      # `RI-nn` is minted.
+      - name: The skipped-case register still matches the run
+        run: node packages/tooling/checks/skipped-tests.mjs "$RUNNER_TEMP/ci-03-golden-report.json"
 
       # THE LOADER'S OWN RULES, WATCHED FAILING ON A SEEDED VIOLATION. P1
       # section 6: "Every gate any of these sessions wires ships with a seeded
@@ -123,5 +155,24 @@ jobs:
       # the fixtures, and it runs HERE as well as in CI-02 because a CI-03 whose
       # loader has quietly stopped refusing anything is a green stage that
       # checks nothing.
+      #
+      # ADR-439. `--reporter=json` beside `--reporter=default`, never instead of
+      # it, so this log keeps its run. Unlike the selection above, THIS ONE
+      # ALREADY CARRIES A REGISTERED SKIP: `packages/golden-loader/test/determinism.test.ts`
+      # holds `test.skipIf(!stubbed)` at line 191 and the register states 1 for
+      # it, so this report exercises the comparison in both directions rather
+      # than only asserting a zero.
       - name: The loader fails on a seeded violation
-        run: pnpm exec vitest run --project unit packages/golden-loader
+        run: >-
+          pnpm exec vitest run --project unit packages/golden-loader
+          --reporter=default --reporter=json
+          --outputFile="$RUNNER_TEMP/ci-03-loader-report.json"
+
+      # ADR-439, over this selection's slice. The register's own row for
+      # `determinism.test.ts` is checked here as well as in CI-02, which is the
+      # same argument the step above this one makes about running the loader
+      # suite in two stages: a CI-03 whose loader has quietly stopped refusing
+      # anything is a green stage that checks nothing, and a CI-03 whose loader
+      # has quietly stopped RUNNING a case is the same stage in the same colour.
+      - name: The skipped-case register still matches this selection
+        run: node packages/tooling/checks/skipped-tests.mjs "$RUNNER_TEMP/ci-03-loader-report.json"
