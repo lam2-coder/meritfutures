@@ -2,14 +2,23 @@
 // apps/worker/src/breaker/ports.ts
 // =============================================================================
 // THE BREAKER EVALUATOR'S I/O BOUNDARY. `SD-M6-02`'s daily producer, declared
-// structurally, importing nothing.
+// structurally over ONE TYPE-ONLY IMPORT.
+//
+// IT READ "declared structurally, importing nothing" AND THAT IS NOW FALSE, so
+// it is quoted here rather than deleted. `ADR-432` narrowed
+// {@link BreakerTx.rowsWhere} to the row the key declares, and the name of that
+// row is `DeclaredRow`, which has to be imported to be spelled. The import is
+// `import type` and is ERASED, so the emitted module still imports nothing.
 //
 // `detectors/ports.ts`, `sweeps/ports.ts`, `batch/ports.ts` and
 // `provisioning/ports.ts` are the idiom and `ADR-165` is the reason it is
 // REQUIRED rather than merely conventional: one door and one acquisition point,
 // `src/db.ts`, checked by `grep -rlE "from '@merit/db'" apps/worker/src`
 // printing that file AND NOTHING ELSE. `@merit/db`'s `SystemTx` is assignable
-// to {@link BreakerTx} with no import in either direction.
+// to {@link BreakerTx}, and the one import below reaches `src/db.ts` and NOT
+// `@merit/db`, so the grep above still prints that file AND NOTHING ELSE. It
+// read "with no import in either direction": `@merit/db` still imports nothing
+// from here, and this file now names one type through the one door.
 //
 // NOTHING HERE ADDS A `SqlExecutorReason` MEMBER, ADDS A `SystemReason` MEMBER,
 // IMPORTS `pg`, OR CASTS PAST A KEY TYPE (`P7` section 11 rule 10, `ADR-157`
@@ -89,6 +98,8 @@
 // `DetectorDeclined`'s shape one directory over and its reason: a breaker
 // running without a floor is `AS-M6-02` produced deliberately.
 // =============================================================================
+
+import type { DeclaredRow } from '../db.ts';
 
 // -----------------------------------------------------------------------------
 // The tables, and no others
@@ -215,9 +226,6 @@ export type BreakerFilter = Readonly<Record<string, unknown>>;
 /** A set of values to write, by Drizzle property name. */
 export type BreakerValues = Readonly<Record<string, unknown>>;
 
-/** One row as the evaluation sees it. */
-export type BreakerRow = Readonly<Record<string, unknown>>;
-
 // -----------------------------------------------------------------------------
 // One open transaction, as an evaluation needs to see it
 // -----------------------------------------------------------------------------
@@ -241,7 +249,7 @@ export type BreakerRow = Readonly<Record<string, unknown>>;
  */
 export interface BreakerTx {
   /** Rows matching a filter. The READ path is the only place a term may appear. */
-  rowsWhere(key: BreakerReadTable, where: BreakerFilter): Promise<unknown[]>;
+  rowsWhere<K extends BreakerReadTable>(key: K, where: BreakerFilter): Promise<DeclaredRow<K>[]>;
   /** Write one row, returning it. */
   insert(key: BreakerWriteTable, values: BreakerValues): Promise<unknown[]>;
 }

@@ -1193,7 +1193,6 @@ export type {
   BreakerFilterTerm,
   BreakerIo,
   BreakerReadTable,
-  BreakerRow,
   BreakerState,
   BreakerStateChanged,
   BreakerTerms,
