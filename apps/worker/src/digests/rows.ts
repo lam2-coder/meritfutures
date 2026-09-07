@@ -27,8 +27,15 @@
 // TRANSCRIPTION does not retire a runtime check. This read "ADR-112 foreclosure 4 records that
 // nothing in this tree compares a `schema.ts` column type against the DDL." `RI-14` (ADR-444):
 // FALSE when written; stated ONCE at limit 1 of `CatalogRow`
-// (`packages/db/src/scoped-db.ts:3466`). So the type buys the guard for a column's EXISTENCE and
-// buys nothing about its VALUE, and not one `throw` below was deleted with the mapping.
+// (`packages/db/src/scoped-db.ts:3466`), which is where the legs and their limits are kept
+// current. So the type buys the guard for a column's EXISTENCE and buys nothing about its VALUE,
+// and not one `throw` below was deleted with the mapping.
+//
+// THE EVIDENCE THIS HEADER FIRST GAVE WAS ITSELF WRONG, which `ADR-441` found: ADR-112
+// foreclosure 4 is about ADDRESSABILITY and EXHAUSTIVENESS and says nothing about comparing a
+// column type. THE RULING SURVIVES ON A NARROWER FOOTING and that is why no refusal came off
+// with it: what is compared is the folded MIGRATION TEXT and not the database, so a
+// transcription and a second transcription agreeing settles nothing about the rows the driver hands back.
 // =============================================================================
 
 /** Raised when a row crossing a port is not the shape the column declares. */

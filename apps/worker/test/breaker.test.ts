@@ -362,11 +362,12 @@ function stateRow(
 /**
  * A row PostgreSQL could not produce, built on purpose and cast EXACTLY ONCE.
  *
- * **THIS IS WHAT `ADR-432`'s NARROWING MADE HARDER, AND THE COST IS CHARGED HERE RATHER THAN AT
- * EVERY SITE THAT PAYS IT.** Two cases exist to watch `readCents` refuse a `number` in a
- * `*_cents` column. Under the narrowed port both columns ARE `bigint`, so `{ ...purchase('p-1',
- * 1n), amountPaidCents: 9_900 }` is now a COMPILE ERROR and the input those cases exist to watch
- * is no longer expressible without casting past the type.
+ * **THIS IS WHAT `ADR-432`'s NARROWING MADE HARDER, AND THE COST IS CHARGED HERE
+ * RATHER THAN AT EVERY SITE THAT PAYS IT.** Two cases exist to watch
+ * `readCents` refuse a `number` in a `*_cents` column. Under the narrowed port
+ * both columns ARE `bigint`, so `{ ...purchase('p-1', 1n), amountPaidCents:
+ * 9_900 }` is now a COMPILE ERROR and the input those cases exist to watch is no
+ * longer expressible without casting past the type.
  *
  * **THE CAST STAYS, THE CASES STAY, AND THE REFUSAL STAYS.** The type says "this cannot happen"
  * on the authority of a TRANSCRIPTION. This read "`ADR-112` foreclosure 4 records that no check

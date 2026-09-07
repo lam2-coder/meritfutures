@@ -127,10 +127,11 @@ export class BreakerRowError extends Error {
 /**
  * Refuse a value that is not a row, and return it UNCHANGED and UNCAST.
  *
- * **THIS USED TO BE THE MAPPING AND IT IS NOW ONLY THE REFUSAL.** It read `record(value:
- * unknown, where: string): BreakerRow` and ended `return value as BreakerRow`, which is the
- * hand-written mapping `ADR-421` section 9 priced and `ADR-426` deleted one family over. The
- * cast is gone because {@link BreakerTx.rowsWhere} now hands back the row the key declares.
+ * **THIS USED TO BE THE MAPPING AND IT IS NOW ONLY THE REFUSAL.** It read
+ * `record(value: unknown, where: string): BreakerRow` and ended `return value as
+ * BreakerRow`, which is the hand-written mapping `ADR-421` section 9 priced and
+ * `ADR-426` deleted one family over. The cast is gone because
+ * {@link BreakerTx.rowsWhere} now hands back the row the key declares.
  *
  * **THE `throw` STAYS, AND IT STAYS ON A RULING RATHER THAN ON TASTE.** `ADR-299` section 5.1
  * item 5: a type derived from a TRANSCRIPTION does not retire a runtime check. This read
