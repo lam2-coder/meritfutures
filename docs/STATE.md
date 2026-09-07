@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->378<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->379<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13614,3 +13614,29 @@ Counts derived at reporting time off each runner's own last line: suite **336 fi
 **Next.** The founder's `E2` read of [ADR-394](decisions/ADR-394.md) and the three decisions its approval block names, of which the first is whether a repaired pointer should ever be a coordinate again.
 
 Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `c5648f00` **before the first edit** of **336 / 8,107 / 10 / 0**, delta **ZERO on every axis**; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean.
+
+---
+
+## 2026-09-06 - Session 590: the gate leg ADR-392 wrote out and could not land, derived from the file rather than pasted, and the duplicate-note case its written form reports clean ([ADR-395](decisions/ADR-395.md), proposed)
+
+**[ADR-392](decisions/ADR-392.md) section 11 item 1 wrote this predicate out in full and could not commit it**, because [`gates.mjs`](../scripts/corpus/gates.mjs) was read-only to every row that wave. This row lands it as a **fifth assertion inside `CI-06l`** rather than a gate of its own, so `GATES.length` is unchanged, the `gate_count` span did not move, and gates are **33 of 33 DERIVED** rather than assumed on a wave in which rows edit that file. It is the other half of [ADR-389](decisions/ADR-389.md) section 12 item 2.
+
+**EVERY PART OF THE PREDICATE WAS RE-DERIVED FROM THE FILE AS IT STANDS RATHER THAN PASTED**, which is what the dispatch asked for and what found the defect. Both section anchors occur **exactly once**, so `indexOf` is unambiguous. The 21 scheduled cells and the 21 note headings normalise through `normJob` to the same 21 strings, with **both set differences empty**. `/\n## /` cannot match `\n### `, so the notes sit inside a section that still terminates at the next peer heading, at **29,634 characters**.
+
+**THE WRITTEN PREDICATE IS RIGHT ABOUT ITS TWO DIRECTIONS AND BLIND IN A THIRD.** Run verbatim against a page carrying **22 note headings collapsing to 21 keys**, one job holding `S3` and `S1` at once, it reports **0 findings**, because `Map.set` keeps the last write. What shipped keeps the notes as a **list** and reports the duplicate. **Its other two directions are sound and that is said as plainly as the defect**: verbatim it reports 1 finding on the emptied-note seed and 0 on the pristine page, which is exactly right. The defect is in the direction it did not know it needed.
+
+**FIVE SEEDS, EVERY RESTORE VERIFIED BYTE-IDENTICAL UNDER `sha256sum -c` AND NONE TAKEN WITH `git checkout --`.** An emptied note body goes **RED at 32 of 33**, closing [ADR-389](decisions/ADR-389.md)'s seed A, which was green at 33 of 33 and 35 of 35 for two consecutive rows. A table row with no note is red. **A one-character misspelling of a note heading fires both directions as two different sentences**, and it is the seed that would have caught a leg wired to the wrong key. The duplicate is red here and clean under the written form. **The severity heading removed, which is the notes folding back under the table, now ERRORs at exit 3** where [ADR-392](decisions/ADR-392.md)'s seed E2 measured a silent 33 of 33.
+
+**THE CITATION REPAIR IS SEPARATED BY MEASUREMENT RATHER THAN ASSUMED.** The diff moves every line of `gates.mjs` from **2,525** onward by **88**. There are **47 citation sites** at or after it, and **13 coordinate tokens over 6 subjects in 3 files were exact at `ebc21238` and are repaired**; the rest were already wrong before this diff and are left, which is [ADR-393](decisions/ADR-393.md)'s 84-over-44-files finding applied to this row's own diff. **`RI-15` caught 2 of the 13 at 34 of 35**, the identical result [ADR-390](decisions/ADR-390.md) records one wave earlier in the same file, and the other eleven were found by measurement rather than by the control.
+
+**ONE INHERITED CLAIM IS REFUTED BY READING THE REGISTER IT NAMES.** [ADR-334](decisions/ADR-334.md), [ADR-335](decisions/ADR-335.md) and [ADR-336](decisions/ADR-336.md) claim `sites: 7` where the register entry reads **`sites: 10`**, so that pointer was already wrong and is not this diff's to repair.
+
+**NOTHING IS OWED ON [`CRON_INVENTORY.md`](ops/runbooks/CRON_INVENTORY.md).** It was read-only to all three rows this wave and the leg needed **no edit to it**, the document already satisfying the predicate at 21 against 21. This is recorded because the dispatch asked for the owed edit if there was one, and the answer is that there is none.
+
+**Owed.** [STRATEGY](testing/STRATEGY.md) section 4.4's `CI-06l` row now under-describes the gate, and the exact clause is written out in [ADR-395](decisions/ADR-395.md) section 8 item 1. No gate goes red on it, because `CI-06p` checks letter uniqueness and gaplessness and never the prose. The `sites: 7` claim in three ADRs is named and not repaired.
+
+**Next.** The founder's `E2` read of [ADR-395](decisions/ADR-395.md) and the three decisions its approval block names, of which the first is whether a gate may check more than its inventory row specifies, and the third is that this is the third consecutive wave a row has spent real time separating its own stale pointers from ones that were already wrong.
+
+**NOTHING WAS WIDENED AND NOTHING WAS MINTED.** No invariant number, no gate added or weakened, no `CI-06` letter spent, no migration taken or reserved, no test skipped, disabled or quarantined. `pnpm run verify` and [`falsify.mjs`](../scripts/corpus/falsify.mjs) were **not run**, both forbidden to this row. **The clone is shallow and the container arrived with no clone at all, for the third consecutive wave.**
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,109 passed / 10 skipped / 0 failed**, against a base reproduced on `ebc21238` **before the first edit** of **336 / 8,109 / 10 / 0**, a **delta of zero on every axis**, and zero attributed by removal because nothing was removed; gates **33 of 33**, invariants **35 of 35**, typecheck, lint and `format:check` clean.

@@ -2522,7 +2522,9 @@ const ci06k = {
 // in CRON_INVENTORY's coverage table, or appears on that document's written
 // exemption list with a reason.
 //
-// FOUR ASSERTIONS, and the last two are the ones an allowlist decays through:
+// FIVE ASSERTIONS. Assertions 3 and 4 are the ones an allowlist decays through,
+// and assertion 5 is the one the severity notes needed the moment they left the
+// table:
 //
 //   1. Every expiry column is covered, by exactly one of the two lists. A
 //      column on neither is the finding the gate is named for.
@@ -2536,6 +2538,19 @@ const ci06k = {
 //   4. A named release job EXISTS as a row of the scheduled table. A coverage
 //      row pointing at a job nobody scheduled is the original failure wearing
 //      the fix's clothing, and it is one rename away at all times.
+//   5. EVERY SCHEDULED ROW HAS A SEVERITY NOTE AND EVERY NOTE HAS A SCHEDULED
+//      ROW, no note body is empty, and no job is named by two notes. The
+//      severity, the runbook to open and what is known about whether the job
+//      exists yet live under CRON_SEVERITY rather than in a fifth column of the
+//      scheduled table, because a fifth column a human scrolls past is a column
+//      nobody reads at 03:00. THE TABLE'S OWN SHAPE HAD BEEN PROVIDING THIS FOR
+//      FREE AND THE SPLIT SPENT IT: ADR-389's seed A emptied a note body and
+//      nothing in this repository noticed. The two directions fail differently.
+//      A row with no note is a job whose severity nobody can look up; a note
+//      with no row reads as coverage for a job that is no longer scheduled,
+//      which is assertion 4's defect one section down. And a job named TWICE is
+//      a page carrying two severities for one job while the register still
+//      reads clean, because a Map keeps the last write.
 //
 // WHY `*_expires_at` AND NOT EVERY CLOCK. `identity_restriction_episodes.
 // sla_due_at` is a real clock this gate cannot see, and CRON_INVENTORY says so
@@ -2547,6 +2562,7 @@ const CRON_DOC = 'docs/ops/runbooks/CRON_INVENTORY.md';
 const CRON_SCHEDULED = '## Scheduled work';
 const CRON_COVERAGE = '## Expiry columns and their release jobs';
 const CRON_EXEMPT = '## The expiry exemption list';
+const CRON_SEVERITY = '## Severity if absent, by job';
 
 // Rows of one `##` section, as [cells]. Bounded to its own section for the same
 // reason negativeAuthzRows is: unbounded, this runs on into the next table and
@@ -2586,6 +2602,38 @@ const normJob = (cell) =>
     .trim()
     .toLowerCase();
 
+// The `### <job>` notes of CRON_SEVERITY, as [job, body] IN DOCUMENT ORDER,
+// keyed through normJob so a note and the scheduled row it belongs to are
+// compared on one spelling. Bounded to its own section exactly as cronRows is
+// and for the same reason; `\n## ` stops at the next peer heading and cannot
+// match the `### ` notes themselves, which is why the notes have to be a peer
+// `##` section rather than a subsection of the scheduled table.
+//
+// A LIST RATHER THAN A MAP, ON PURPOSE. `Map.set` keeps the last write, so a
+// job carrying two notes would collapse to one entry and assertion 5 would
+// report a page with two severities for one job as clean.
+function severityNotes(body) {
+  const start = body.indexOf(CRON_SEVERITY);
+  if (start === -1) throw new Error(`${CRON_DOC}: section not found: "${CRON_SEVERITY}"`);
+  const after = body.slice(start + CRON_SEVERITY.length);
+  const end = after.search(/\n## /);
+  const notes = [];
+  let job = null;
+  let lines = [];
+  for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
+    const heading = /^### (.+)$/.exec(line);
+    if (heading) {
+      if (job !== null) notes.push([job, lines.join('\n').trim()]);
+      job = normJob(heading[1]);
+      lines = [];
+      continue;
+    }
+    if (job !== null) lines.push(line);
+  }
+  if (job !== null) notes.push([job, lines.join('\n').trim()]);
+  return notes;
+}
+
 // `table.column` out of a cell, and nothing else. Anchored so a cell of prose
 // mentioning a column in passing is not read as a list entry: an entry is a
 // cell that IS the identifier, optionally in a code span.
@@ -2615,6 +2663,9 @@ const ci06l = {
     `${CRON_DOC}, either in the coverage table with a release job that is itself a row of ` +
     'the scheduled table, or on the written exemption list with a reason. Stale entries in ' +
     'either list are findings, which is the direction an allowlist decays in. ' +
+    'And every row of that scheduled table carries a non-empty severity note under the same ' +
+    "document's `## Severity if absent, by job`, keyed the same way, with no note naming a job " +
+    'that has no row and no job named by two notes. ' +
     'THREE THINGS IT DOES NOT DO. It does not check that the named job RUNS, which is what ' +
     'the dead-man switch is for and needs the estate. It does not read any clock whose ' +
     'column is not named `*_expires_at`, so `identity_restriction_episodes.sla_due_at` is ' +
@@ -2638,6 +2689,43 @@ const ci06l = {
     );
     if (scheduled.size === 0) {
       throw new Error(`${CRON_DOC}: the scheduled table parsed to zero jobs; the gate cannot run`);
+    }
+
+    // Assertion 5, both directions, on the set built one line up. It is here
+    // rather than in a gate of its own because it is the same key, the same
+    // document and the same failure as assertion 4 read from the other end.
+    const noted = new Set();
+    for (const [job, note] of severityNotes(body)) {
+      if (noted.has(job)) {
+        findings.push(
+          `${CRON_DOC}: severity note "${job}" is written twice under "${CRON_SEVERITY}". Two ` +
+            'notes for one job is two severities for one job, and a reader at 03:00 gets ' +
+            'whichever one they scrolled to first',
+        );
+        continue;
+      }
+      noted.add(job);
+      if (!scheduled.has(job)) {
+        findings.push(
+          `${CRON_DOC}: severity note "${job}" has no row in the scheduled table. A note for a ` +
+            'job nobody schedules reads as coverage for a job that no longer exists, which is ' +
+            "assertion 4's defect one section down",
+        );
+      } else if (note === '') {
+        findings.push(
+          `${CRON_DOC}: severity note "${job}" is empty. The heading is the part that survives ` +
+            'an edit; the body is the severity and the runbook somebody has to open',
+        );
+      }
+    }
+    for (const job of scheduled) {
+      if (!noted.has(job)) {
+        findings.push(
+          `${CRON_DOC}: scheduled job "${job}" has no severity note under "${CRON_SEVERITY}". ` +
+            'A job whose severity nobody can look up is a page that answers the 03:00 question ' +
+            'with silence',
+        );
+      }
     }
 
     // `.slice(1)` drops the header row of each table. A header whose first cell
