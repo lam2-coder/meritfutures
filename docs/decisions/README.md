@@ -427,6 +427,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-413](ADR-413.md) | `B5` term 1 is not one export, its home is a `packages/db` door, and the fact every record of it has missed is the handle rather than the fence  (2026-09-07, status: proposed) |
 | [ADR-414](ADR-414.md) | the sixteen reproduce, the address was the smaller half of the defect, and completing the row turns a case RED in a file this row may not write (2026-09-07, status: proposed) |
 | [ADR-415](ADR-415.md) | the `RI-35` register after the producer moved, one repair taken, one refused with its measurement, and a derived figure that was four short the day it was written (2026-09-07, status: proposed) |
+| [ADR-417](ADR-417.md) | `RI-35`'s register carried eleven derived figures and nothing derived any of them, so the arithmetic is made checkable and the integers are deleted (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

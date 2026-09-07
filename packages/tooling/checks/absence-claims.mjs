@@ -155,17 +155,58 @@ import { stripComments } from './strip-comments.mjs';
  */
 
 /**
+ * WHERE AN ARTIFACT'S NAMES LAND, WRITTEN AS PLACES AND NEVER AS A COUNT.
+ *
+ * ADR-417. `sweptBy` is prose, and a `sweptBy` that states how many lines a
+ * name reaches is a DERIVED FIGURE NOBODY DERIVES: ADR-415 measured two of them
+ * wrong, one from the commit that wrote it, and this row measured the class.
+ * ADR-034's remedy has exactly two branches, GENERATE the value or DELETE it and
+ * point at the source. This field is the second branch made checkable.
+ *
+ * IT CARRIES NO INTEGER AND THAT IS THE WHOLE DESIGN. What is written down is
+ * the set of PLACES the entry accounts for; leg 7 derives the line count of each
+ * place and the total at the same moment and asserts they agree. A reader who
+ * wants the numbers gets them from the run rather than from a sentence somebody
+ * typed on a day that has passed.
+ *
+ * `names` are matched as PLAIN SUBSTRINGS against lines, which is leg 6's own
+ * reader and not a second one. `strip` says whether the entry's instrument reads
+ * code or raw text, because two registered entries name different ones and a
+ * census that quietly picked one would be measuring something the entry does not
+ * claim.
+ *
+ * A `where` ending in `/` is a directory prefix and anything else is one file.
+ * FIRST MATCH WINS, so a file named outright before the prefix that contains it
+ * is attributed to the file; the identity leg 7 asserts is unaffected by the
+ * order, because every reached line lands in exactly one place either way.
+ *
+ * @typedef {object} Census
+ * @property {string[]} names      the names this entry's figure was about
+ * @property {'shipped' | 'swept'} scope   `shippedSources`, or that plus `scripts/`
+ * @property {boolean} [strip]     read code rather than raw text
+ * @property {{ where: string, is: string }[]} places
+ */
+
+/**
  * One artifact a claim can name.
  *
  * `needles` drives the sweep in leg 6 and MAY be empty. An artifact registered
  * with no needle is bound to the sites the register names and to no others, and
  * the `sweptBy` field says why in words a reader can argue with.
  *
+ * `census` is OPTIONAL AND OPT-IN, which is a limit stated rather than hidden.
+ * An entry whose `sweptBy` states a figure and carries no census is a figure
+ * still unchecked, and ADR-417 names every one of them. IT IS NOT MADE
+ * MANDATORY BY PARSING THE PROSE, on this file's own header rule: a check that
+ * tries to decide which sentences it can read misses the ones it cannot,
+ * silently, which is the defect one layer down.
+ *
  * @typedef {object} Artifact
  * @property {string} key
  * @property {string} names        what the artifact IS, in one sentence
  * @property {RegExp[]} needles    line patterns that name this artifact
  * @property {string} sweptBy      why those needles, or why none
+ * @property {Census} [census]     where its names land, for leg 7
  * @property {(root: string) => Presence} probe
  */
 
@@ -681,9 +722,32 @@ export const ABSENCE_ARTIFACTS = [
       'declares it. ADR-333 wrote the door and wired nothing',
     needles: [],
     sweptBy:
-      'nothing, on `provisioning-saga-caller`s reason: the door`s two exported names reach ' +
-      'three lines in the shipped scope and all three are its own declaration, so a needle on ' +
-      'them would sweep the register that already binds them',
+      'nothing, on `provisioning-saga-caller`s reason: a needle on the door`s two exported ' +
+      'names would sweep the register that already binds them. **THE FIGURE THAT USED TO ' +
+      'CARRY THAT ARGUMENT IS DELETED RATHER THAN CORRECTED, WHICH IS ADR-034`s SECOND ' +
+      'BRANCH AND ADR-417`s WHOLE SUBJECT.** It read that the two names "reach three lines in ' +
+      'the shipped scope and all three are its own declaration", and ADR-415 found that it ' +
+      'does not reproduce: the declaring module holds three of them and two further files ' +
+      'hold the rest. A REPLACEMENT INTEGER WOULD HAVE BEEN THE SAME DEFECT WITH A FRESHER ' +
+      'DATE, so the `census` below writes the PLACES and leg 7 derives the arithmetic at the ' +
+      'moment it is read. The conclusion is unchanged and is now stronger: every line the ' +
+      'names reach is a registered claim, a declaration, or the adapter that hands the door ' +
+      'to a factory, which is the install `RI-35` already reports through the probe',
+    census: {
+      names: ['LIVE_QUEUE', 'workerQueue'],
+      scope: 'shipped',
+      places: [
+        { where: 'apps/worker/src/queue.ts', is: 'the declaring module, which the probe excludes' },
+        {
+          where: 'apps/worker/src/provisioning/queue-adapter.ts',
+          is: 'the adapter that hands the door to a factory, which is why the probe reads `present`',
+        },
+        {
+          where: 'apps/worker/src/index.ts',
+          is: 'the deployable naming the door in order to say no adapter over it has a caller',
+        },
+      ],
+    },
     probe: (root) => {
       const files = shippedSources(root);
       if (files.length === 0) {
@@ -911,27 +975,37 @@ export const ABSENCE_ARTIFACTS = [
       'only sink any deployment can reach',
     needles: [],
     sweptBy:
-      'nothing, on `worker-queue-door-caller`s reason, and the census below is RE-DERIVED ' +
-      'RATHER THAN ADJUSTED. THE INSTRUMENT IS LEG 6`s OWN READER: the two exported names, ' +
-      'matched as plain substrings against RAW lines (leg 6 does not strip, so a header ' +
-      'counts) over the whole swept scope, `shippedSources` plus `scriptSources`. On ' +
-      '`0f89c6ac` that is 23 line(s) over 7 file(s), and `scripts/` contributes ZERO of ' +
-      'them. ELEVEN are the declaring module`s own header and declarations, which the probe ' +
-      'excludes and this register already binds; THREE are `packages/ledger/src/index.ts`, ' +
-      'the barrel that publishes them; THREE are `apps/api/src/events.ts`, the compatibility ' +
-      'module ADR-410 left at the old path; and SIX are four files under `apps/worker/src` ' +
-      'that name the writer in order to say this deployable cannot reach it, ' +
-      '`EVENT_SINK_BLOCKER` among them. So a needle on either name would sweep the ' +
-      'declaration this register already binds, a publication, a compatibility name and six ' +
-      'true sentences about a different artifact, which is the noise-registering shape ' +
-      'ADR-328 forbids, and the case for no needle is STRONGER after ADR-410 than before it. ' +
-      'THE FIGURE IS ANCHORED TO A COMMIT BECAUSE IT IS A FACT ABOUT A MOMENT. It read ' +
-      '"exactly seven lines ... six ... and the seventh" and that partition does not ' +
-      'reproduce under any instrument: at `8d10e86c`, the commit that wrote it, the same ' +
-      'reader returns 11 over 2 files, and the seven counts four header lines plus two ' +
-      'declarations plus one, silently dropping three `{@link}` lines and one refusal string ' +
-      'in the declaring module`s own body. It was four short the day it was written and the ' +
-      'move is not what made it wrong. ' +
+      'nothing, on `worker-queue-door-caller`s reason, and WHERE THE NAMES LAND IS THE ' +
+      '`census` BELOW RATHER THAN A SENTENCE. THE INSTRUMENT IS LEG 6`s OWN READER: the two ' +
+      'exported names, matched as plain substrings against RAW lines (leg 6 does not strip, ' +
+      'so a header counts) over the whole swept scope, `shippedSources` plus `scriptSources`, ' +
+      'which is what `census.scope` says and leg 7 runs. A needle on either name would ' +
+      'sweep the declaration this register already binds, a publication, a compatibility ' +
+      'name and a body of true sentences about a different artifact, which is the ' +
+      'noise-registering shape ADR-328 forbids, and the case for no needle is STRONGER after ' +
+      'ADR-410 than before it. ' +
+      '**THIS FIELD CARRIED AN ANCHORED INTEGER AND ADR-417 DELETED IT, WHICH IS THE MOST ' +
+      'USEFUL THING EITHER ROW MEASURED.** It read that on `0f89c6ac` the names reach "23 ' +
+      'line(s) over 7 file(s)", partitioned eleven, three, three and six. THAT IS EXACT AT ' +
+      'THE COMMIT IT NAMES AND WAS ALREADY WRONG AT THE HEAD OF THE WAVE IT LANDED ON, two ' +
+      'commits later, where the same reader returns a larger census over more files under ' +
+      '`apps/worker/src`. ANCHORING A FIGURE TO A MOMENT MAKES IT HONEST AND DOES NOT MAKE ' +
+      'IT CHECKED, and a register that decays inside one wave decays faster than any reader ' +
+      'checks it. The places survive that motion and the integers do not, so the places are ' +
+      'what is written. ' +
+      'THE PARTITION IS ALSO INDEPENDENT OF A REPAIR THIS ROW DOES NOT OWN. ADR-415 found ' +
+      'that `apps/api/src/events.ts` and `packages/ledger/src/events.ts` both claim to carry ' +
+      'the anchored sentence and one of them is false; BOTH are accounted places below, so ' +
+      'whichever way that is resolved -- the sentence moving, a copy going, the ' +
+      'compatibility module being deleted outright -- no reached line leaves an accounted ' +
+      'place and leg 7 is silent. ' +
+      'THE OLD FIGURE`S OWN HISTORY IS KEPT BESIDE ITS CORRECTION under `RI-14`, because it ' +
+      'is a fact about a moment properly stated. It read "exactly seven lines ... six ... ' +
+      'and the seventh" and that partition does not reproduce under any instrument: at ' +
+      '`8d10e86c`, the commit that wrote it, the same reader returns 11 over 2 files, and ' +
+      'the seven counts four header lines plus two declarations plus one, silently dropping ' +
+      'three `{@link}` lines and one refusal string in the declaring module`s own body. It ' +
+      'was four short the day it was written and the move is not what made it wrong. ' +
       'AND ONE KNOWN FALSE POSITIVE IS REGISTERED HERE RATHER THAN REPAIRED IN THE PROBE, ' +
       'which ADR-410 section 7 owed to this file. THE PROBE CANNOT TELL A PUBLICATION FROM ' +
       'AN INSTALL: its proxy for a value position is `TRANSACTION_EVENT_WRITER` followed by ' +
@@ -950,6 +1024,25 @@ export const ABSENCE_ARTIFACTS = [
       'is short enough that prettier leaves it on one line, and a second name added to it ' +
       'would be reflowed into a list, put a comma after this one and flip the artifact ' +
       'without anybody editing this file',
+    census: {
+      names: ['makeEventSink', 'TRANSACTION_EVENT_WRITER'],
+      scope: 'swept',
+      places: [
+        {
+          where: 'packages/ledger/src/events.ts',
+          is: 'the declaring module, which the probe excludes and this register already binds',
+        },
+        { where: 'packages/ledger/src/index.ts', is: 'the barrel that publishes the pair' },
+        {
+          where: 'apps/api/src/events.ts',
+          is: 'the compatibility module ADR-410 left at the old path',
+        },
+        {
+          where: 'apps/worker/src/',
+          is: 'the deployable naming the writer in order to say it cannot reach it, `EVENT_SINK_BLOCKER` among them',
+        },
+      ],
+    },
     probe: (root) => {
       const files = shippedSources(root);
       if (files.length === 0) {
@@ -1043,12 +1136,33 @@ export const ABSENCE_ARTIFACTS = [
       'that member and no deployment can deliver a digest at all',
     needles: [],
     sweptBy:
-      'nothing, on `event-sink-caller`s reason. The type name reaches four lines in the shipped ' +
-      'scope with comments stripped: the interface declaration and the `DigestIo` member ' +
-      'declaration, both in the module this probe already excludes, and two type-only re-export ' +
-      'entries in `apps/worker/src/index.ts` that assert nothing about this tree. A needle on ' +
-      'the name would sweep the declaration this register already binds and two barrel lines ' +
-      'about no artifact, which is the noise-registering shape ADR-328 forbids',
+      'nothing, on `event-sink-caller`s reason. A needle on the type name would sweep the ' +
+      'declaration this register already binds and a barrel entry about no artifact, which ' +
+      'is the noise-registering shape ADR-328 forbids. **THE FIGURE THAT USED TO CARRY THAT ' +
+      'ARGUMENT IS DELETED RATHER THAN CORRECTED, AND ADR-417 FOUND IT: IT IS THE THIRD ' +
+      'ENTRY OF THIS REGISTER MEASURED WRONG AND THE FIRST ONE NEITHER ADR-410 NOR ADR-415 ' +
+      'NAMED.** It read that the name "reaches four lines in the shipped scope with comments ' +
+      'stripped", partitioned as the interface declaration, the `DigestIo` member ' +
+      'declaration and "two type-only re-export entries in `apps/worker/src/index.ts`". ' +
+      'UNDER THE INSTRUMENT ITS OWN WORDS NAME the barrel carries ONE such entry and not ' +
+      'two, so the total is three. The argument is unharmed and the arithmetic was never ' +
+      'checked, which is the whole of ADR-417`s finding. ' +
+      'IT IS THE ENTRY THAT SHOWS THE CENSUS CARRIES AN INSTRUMENT AND NOT ONLY A SCOPE: ' +
+      'this one reads CODE where `event-sink-caller` reads RAW text, which is why ' +
+      '`census.strip` is written down rather than assumed. A census that quietly picked one ' +
+      'reader would be measuring something these two entries do not both claim',
+    census: {
+      names: ['DigestTransport'],
+      scope: 'shipped',
+      strip: true,
+      places: [
+        {
+          where: 'apps/worker/src/digests/ports.ts',
+          is: 'the declaring module, which the probe excludes: the interface and the `DigestIo` member',
+        },
+        { where: 'apps/worker/src/index.ts', is: 'the barrel`s type-only re-export' },
+      ],
+    },
     probe: (root) => {
       const files = shippedSources(root);
       if (files.length === 0) {
@@ -1866,6 +1980,102 @@ export function checkAbsenceClaims(root, register) {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // LEG 7. THE REGISTER'S OWN ARITHMETIC, DERIVED ON BOTH SIDES.
+  //
+  // ADR-417. `sweptBy` is the field where this register argues for a needle or
+  // against one, and the argument is routinely a COUNT: how many lines a name
+  // reaches, and where they are. NOTHING DERIVED ANY OF THEM. ADR-415 measured
+  // two and both were wrong, one of them from the commit that wrote it, and
+  // every wave since had read a number that was never true.
+  //
+  // THE REPAIR IS NOT A FRESHER NUMBER. A figure typed into a comment decays at
+  // the rate the tree moves, and this row has the proof in its own base:
+  // ADR-415's replacement figure is exact at the commit it names and already
+  // wrong at the head of the wave it landed on, two commits later. ANCHORING A
+  // FIGURE TO A MOMENT MAKES IT HONEST AND DOES NOT MAKE IT CHECKED.
+  //
+  // SO THE ENTRY WRITES NO INTEGER AT ALL. It writes the PLACES it accounts
+  // for, and this leg derives, at one moment and with one reader, the total the
+  // names reach and the part each place holds. THE ASSERTION IS THE IDENTITY:
+  //
+  //     total reached  ===  sum of the accounted parts
+  //
+  // which fails exactly when a reached line lands somewhere the entry does not
+  // account for.
+  //
+  // **AND THAT IS WHY IT CANNOT REDDEN ON A PRETTIER REFLOW, WHICH IS THE ONE
+  // THING THIS LEG WAS FORBIDDEN TO REPRODUCE.** Leg 1 compares a WRITTEN
+  // substring against file TEXT, so a rewording or a rewrap moves it; ADR-415
+  // found the estate already holding a green on a formatter's line-width
+  // heuristic. A written integer is worse in the same direction: rewrapping one
+  // comment under an accounted file changes the derived count and reddens a leg
+  // at a diff that changed no meaning. THIS LEG HOLDS NEITHER. Both sides come
+  // from the same walk at the same moment, so a rewrap that adds a line to an
+  // accounted file adds one to that part AND one to the total, and the identity
+  // is invariant under every change that keeps lines where the register says
+  // they are. The only thing that breaks it is a name arriving in a NEW place,
+  // which is a fact about the tree rather than about its formatting.
+  //
+  // IT IS NOT A SECOND INSTALL DETECTOR AND MUST NOT BE READ AS ONE. Leg 2 is
+  // what fails on good news; this leg fails on an ACCOUNT going out of date. A
+  // place written as a directory prefix therefore does not blind anything: an
+  // install landing inside it is still the probe's to report, and conflating
+  // the two would give a weaker version of each.
+  //
+  // A WRITTEN PLACE THAT REACHES ZERO LINES IS DELIBERATELY NOT A FINDING, and
+  // the reason is a row rather than a principle. A place empties when the thing
+  // in it is REMOVED, which is somebody else's repair landing correctly; making
+  // it red would hand a neighbour a failure for doing the work they were sent to
+  // do, and the register loses nothing by carrying an account of a place that
+  // has gone quiet. ADR-417 names the row this would have caught out.
+  // ---------------------------------------------------------------------------
+  for (const artifact of artifacts) {
+    const census = artifact.census;
+    if (census === undefined) continue;
+    const files = census.scope === 'swept' ? sweptSources(root) : shippedSources(root);
+    if (files.length === 0) {
+      throw new Error(
+        `RI-35 found no file in the \`${census.scope}\` scope while deriving the census for ` +
+          `\`${artifact.key}\`. Zero means the layout moved, and the identity below would hold ` +
+          'trivially over an empty walk while reporting nothing about this tree',
+      );
+    }
+    /** @type {Map<string, number>} */
+    const parts = new Map(census.places.map((place) => [place.where, 0]));
+    /** @type {string[]} */
+    const unaccounted = [];
+    let total = 0;
+    for (const rel of files) {
+      const body = readFileSync(join(root, rel), 'utf8');
+      const reached = (census.strip === true ? stripComments(body) : body)
+        .split('\n')
+        .filter((line) => census.names.some((name) => line.includes(name))).length;
+      if (reached === 0) continue;
+      total += reached;
+      const place = census.places.find(({ where }) =>
+        where.endsWith('/') ? rel.startsWith(where) : rel === where,
+      );
+      if (place === undefined) unaccounted.push(`${rel} (${String(reached)} line(s))`);
+      else parts.set(place.where, (parts.get(place.where) ?? 0) + reached);
+    }
+    const accounted = [...parts.values()].reduce((sum, part) => sum + part, 0);
+    if (accounted === total) continue;
+    findings.push(
+      `the census for \`${artifact.key}\` does not add up: its names reach ` +
+        `${String(total)} line(s) in the \`${census.scope}\` scope and the places it accounts ` +
+        `for hold ${String(accounted)} of them. Unaccounted: ${unaccounted.join(', ')}. ` +
+        'Derived: ' +
+        census.places
+          .map(({ where, is }) => `${where} ${String(parts.get(where) ?? 0)} (${is})`)
+          .join('; ') +
+        '. A name reaching a place this entry does not account for means the account is out ' +
+        'of date, which is the drift a written figure used to hide: either the new place ' +
+        'belongs in the census beside what it is, or it is the artifact arriving and leg 2 ' +
+        'is the leg that says so',
+    );
+  }
+
   return findings;
 }
 
@@ -1877,7 +2087,7 @@ export const ri35 = {
     'ADR-328. A SHIPPED SENTENCE SAYING SOMETHING DOES NOT EXIST IS BOUND TO THE ARTIFACT ' +
     'IT NAMES, AND THE ARTIFACT IS ASSERTED STILL ABSENT. Four occurrences are on record ' +
     '(ADR-324, ADR-326, ADR-327) and each was repaired by hand; this is the binding written ' +
-    'once. SIX LEGS. (1) Every registered site exists and carries its sentence EXACTLY ONCE, ' +
+    'once. SEVEN LEGS. (1) Every registered site exists and carries its sentence EXACTLY ONCE, ' +
     'so a register entry cannot outlive the prose it names. (2) A `live` claim`s artifact ' +
     'must be ABSENT, which is the leg that FAILS ON GOOD NEWS: the day somebody lands it, ' +
     'this goes red AT THE SENTENCE THAT IS NOW LYING. (3) A `retired` claim, quoted as ' +
@@ -1899,6 +2109,26 @@ export const ri35 = {
     'that reaches the directory but not the file shape reproduces the blind spot one level ' +
     'down, and any directory named `test` excluded on the reason `apps/*/src` gets ' +
     'structurally: a case asserting a refusal quotes it. ' +
+    '(7) THE REGISTER`S OWN ARITHMETIC, WHICH IS ADR-417 AND IS A CONTROL OVER THIS FILE ' +
+    'RATHER THAN OVER THE TREE. `sweptBy` argues for a needle or against one and the ' +
+    'argument is routinely a COUNT of the lines a name reaches; NOTHING DERIVED ANY OF THEM, ' +
+    'and ADR-415 measured two wrong, one of them from the commit that wrote it. The repair ' +
+    'is not a fresher number: ADR-415`s own replacement is exact at the commit it names and ' +
+    'already wrong at the head of the wave it landed on, so ANCHORING A FIGURE MAKES IT ' +
+    'HONEST AND DOES NOT MAKE IT CHECKED. An entry may therefore carry a `census` that ' +
+    'writes NO INTEGER AT ALL, only the PLACES it accounts for, and this leg derives both ' +
+    'the total its names reach and the part each place holds, at one moment with one reader, ' +
+    'and asserts they are equal. IT CANNOT REDDEN ON A PRETTIER REFLOW, which is the defect ' +
+    'it was forbidden to reproduce: leg 1 compares a WRITTEN substring against file TEXT and ' +
+    'a written integer would compare a WRITTEN number against a derived one, while both ' +
+    'sides of this identity come from the same walk, so a rewrap that adds a line to an ' +
+    'accounted file adds one to that part AND one to the total. It is NOT a second install ' +
+    'detector -- leg 2 is what fails on good news -- and a written place reaching ZERO lines ' +
+    'is deliberately not a finding, because a place empties when somebody else`s repair ' +
+    'lands correctly. IT IS OPT-IN AND THAT IS A LIMIT RATHER THAN A DEFAULT: an entry whose ' +
+    'prose states a figure and carries no census is a figure still unchecked, ADR-417 names ' +
+    'every one of them, and it is not made mandatory by PARSING the prose, on this file`s ' +
+    'own rule that a check deciding which sentences it can read misses the ones it cannot. ' +
     'BOTH REGISTERS ARE WRITTEN AND NEVER COMPUTED, on CI-06/gate-inventory`s rule for its ' +
     'own probe table. WHAT IT DOES NOT DO, and each of these is a real hole rather than a ' +
     'modesty clause. IT SWEEPS ONLY REGISTERED NEEDLES: an absence claim about an artifact ' +
