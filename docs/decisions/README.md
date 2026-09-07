@@ -411,6 +411,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-397](ADR-397.md) | there is NO fourth outcome, ADR-388's three partition the population and admit no fourth cell, and what ADR-393 found is a missing PRECONDITION on outcome one's remedy that changes not one verdict in 420 (2026-09-06, status: proposed) |
 | [ADR-398](ADR-398.md) | nothing in those three entries was ever wrong, the register's value and its coordinate falsify at different commits, the wave that certified the coordinate sound broke it in the same diff, and the prose gate is refused because 30 of 33 `covers` strings mix limitations with assertions (2026-09-07, status: proposed) |
 | [ADR-399](ADR-399.md) | the eight are CLASS ONE and every one of them is repaired, `G2` holds on all eight at the commit that wrote them, four waves recorded them as blocked on a founder question that was never in the way, and ADR-392's one judgment call dissolves at the right tree (2026-09-07, status: proposed) |
+| [ADR-400](ADR-400.md) | `G2` is NOT enforced, and the reason [ADR-388](ADR-388.md) gave for refusing it does not hold: `RI-15` reads no dated record at all, the reachable red set is NINE, every one of the nine is ALREADY a registered finding, and two defensible instruments disagree about their class on 23 of 493; and `G1` is read by a PERSON, at 56 of 60 against the binder's 3.8 percent (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
