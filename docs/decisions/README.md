@@ -406,6 +406,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-392](ADR-392.md) | option (d), taken with the four-fence ADR-389 specified, and the citation-repair right it turns out to earn nothing for (2026-09-06, status: proposed) |
 | [ADR-393](ADR-393.md) | the pointers into `gates.mjs` are 84 and not 36, ADR-330's five are class one and are repaired, and two pointers pass BOTH of ADR-388's gates and are still not repairable because the thing they name was deleted (2026-09-06, status: proposed) |
 | [ADR-394](ADR-394.md) | one retired clause repaired at the site nobody had been given, two drifted pointers repaired to NAMES rather than to numbers because both targets move again this wave, one class-two pointer confirmed wrong for the third time and left, and the dispatch's "four documents" is five or seven and never four (2026-09-06, status: proposed) |
+| [ADR-397](ADR-397.md) | there is NO fourth outcome, ADR-388's three partition the population and admit no fourth cell, and what ADR-393 found is a missing PRECONDITION on outcome one's remedy that changes not one verdict in 420 (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

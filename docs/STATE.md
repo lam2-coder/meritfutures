@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->378<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->379<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13614,3 +13614,35 @@ Counts derived at reporting time off each runner's own last line: suite **336 fi
 **Next.** The founder's `E2` read of [ADR-394](decisions/ADR-394.md) and the three decisions its approval block names, of which the first is whether a repaired pointer should ever be a coordinate again.
 
 Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `c5648f00` **before the first edit** of **336 / 8,107 / 10 / 0**, delta **ZERO on every axis**; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean.
+
+---
+
+## 2026-09-06 - Session 592: no fourth outcome, a missing precondition on outcome one's remedy priced at zero over every pointer the corpus can decide, and both `schedule.ts` header clauses repaired without moving a line ([ADR-397](decisions/ADR-397.md), proposed)
+
+**[ADR-393](decisions/ADR-393.md) section 9 item 4 asked for a FOURTH OUTCOME or an explicit statement that there is none, and said amending a ruling is a row and not a paragraph.** This is that row. The row is [ADR-397](decisions/ADR-397.md), `proposed` and UNSIGNED, MONEY-ADJACENT, ADR-003 strict, `E2` read owed.
+
+**RULED: THERE IS NO FOURTH OUTCOME, AND THE REASON IS STRUCTURAL RATHER THAN EMPIRICAL.** [ADR-388](decisions/ADR-388.md)'s classification is a function of two gates. `G1` holds or fails; where it holds, `G2` holds, fails, or cannot be measured, and that entry already folds the third into the undecidable bucket in its own words. **Four leaves, three verdicts, and no pair of gate values can reach a fifth branch.**
+
+**AND [ADR-393](decisions/ADR-393.md) IS NOT WRONG. IT FOUND A REAL DEFECT AND MISNAMED IT.** Outcome one states a permission and a remedy in one breath and the remedy carries a precondition the permission never stated: *only the coordinate moves* presumes a coordinate to move to, and where the named subject has left the cited file there is none. **The permission is then EMPTY, the pointer is left, and the finding beside it records an entry that was TRUE about its own day rather than a check that did not check.** That is the same ACTION as outcome two's and the opposite MEANING, which is the whole reason it is worth writing down. It is amended into [ADR-388](decisions/ADR-388.md) at outcome one's own line, one line replaced by one longer line, with the original sentence kept whole.
+
+**THE PRICE IS ZERO AND IT IS THE NUMBER THAT DECIDES THE RULING.** Over the **420** pointers this corpus can decide, being 290 named pointers in dated records plus 130 in source files, the precondition fails **8 times**, **all 8 where `G2` has already failed** so repair was forbidden before the precondition was reached, and **NOT ONCE in outcome one**. **Nothing moves between classes.**
+
+**[ADR-388](decisions/ADR-388.md) SECTION 4's TABLE REPRODUCES FIGURE FOR FIGURE ON A DIFFERENT BASE**, 169 true-then-true-now, 76 drifted, 42 born wrong and 2 true by coincidence over 290, derived through an independently built copy of the same reader placed OUTSIDE the repository, because `packages/tooling/**` is another row's this wave. Its **363** named citations under `docs/`, its **393** source citations and its **130** named among them all reproduce exactly as well.
+
+**[ADR-393](decisions/ADR-393.md)'s TWO INSTANCES RE-DERIVE AT PRIMARY SOURCE AND BOTH SIT OUTSIDE THE 420.** [ADR-098](decisions/ADR-098.md)'s `build`-key probe and [ADR-119](decisions/ADR-119.md)'s register literal were both exact at the commits that wrote their citing lines and are both gone from the file today, and the binder returns **no name at all** for either, so both live in the 8,101 [ADR-388](decisions/ADR-388.md) calls undecidable while being outcome ONE under that ruling's own words. **That is that entry's own section 17 caveat with two instances attached, and it is why the amendment ships and the class does not.**
+
+**RULED: A WRONG FIGURE IN A DATED RECORD IS ANNOTATED AND NEVER OVERWRITTEN, AND THE ANNOTATION GOES AT THE SITE.** [ADR-391](decisions/ADR-391.md)'s clause says the figure was derived there, so replacing the number would leave a sentence claiming a derivation nobody performed, which is [ADR-388](decisions/ADR-388.md) section 2's second outcome applied to a count instead of a coordinate. The figure is wrong under **all six readings** taken at three commits, [ADR-394](decisions/ADR-394.md)'s five and seven both reproduce exactly, and the annotation is written at the site because three rows once derived one verdict and left no trace of any of them.
+
+**BOTH `ADR-376` HEADER CLAUSES IN [`schedule.ts`](../apps/worker/src/schedule.ts) ARE REPAIRED AND NEITHER VERDICT MOVES.** The exception reserving nothing at all for `ExpiryEventPort` is refuted by a refusing one composed inline in `sweeps/ports.ts`, and *still uncallable* is refuted by a test that calls the constructor and passes that very member to it. Each original is kept whole and what is retired is NAMED rather than reproduced.
+
+**THE EDIT IS STRICTLY LINE-COUNT NEUTRAL AND THAT WAS DERIVED RATHER THAN PREFERRED.** **33 pointers aim below that block at SEVEN distinct lines, all seven are EXACT on this base, and five of them sit inside `packages/tooling/`**, which no citation-repair right reaches while that directory is another row's. A one-line insertion would have broken all 33. The cost is that both paragraphs are re-wrapped to at most 122 columns against the file's habit of about 78, with every word kept.
+
+**SIX CITATIONS OUTSIDE THIS FENCE ARE MOVED BY THIS ROW'S OWN THREE ALLOCATION ROWS, ALL SIX ARE REPAIRED TO NAMES, AND ALL SIX ARE LISTED.** Four in [ADR-312](decisions/ADR-312.md) and one each in [ADR-275](decisions/ADR-275.md) and [session 466](sessions/2026-08-30-session-466.md); the ten retired coordinates and the class-two `RI-37` pointer below that point are LEFT. **AND THAT ANSWERS [ADR-394](decisions/ADR-394.md)'s FIRST APPROVAL QUESTION WITH A RECEIPT RATHER THAN AN OPINION.** The same six were repaired by [ADR-389](decisions/ADR-389.md) to one coordinate and by [ADR-393](decisions/ADR-393.md) to another, and **each repair was falsified by the repairing wave's OWN registry rows**, three waves running, with the retirement list growing inside the pointer each time. A fourth coordinate is refused.
+
+**THE STANDING BAR IS UNTOUCHED and this is the SEVENTH consecutive row to leave it standing.** No port wired, no job scheduled, no sink passed, no default parameter added to `expirySweepIo`, and no cron expression, interval, batch size, concurrency, retry count, backoff or timeout invented. No invariant minted, no `RI-` reserved, no `CI-06` letter spent, no gate added, widened or weakened, no register grown, no test skipped, disabled or quarantined, no migration taken or reserved.
+
+**Owed.** A human `G1` is the only thing that can give the precondition a population, and the corpus has not decided whether `G1` is read by a person or by `citationsIn`; the two give 0 and at-least-2 for the same question. [ADR-393](decisions/ADR-393.md) section 9 items 1, 2, 3 and 5 are untouched. And the container still arrives with no repository.
+
+**Next.** The founder's `E2` read of [ADR-397](decisions/ADR-397.md) and the three questions its approval block names.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,109 passed / 10 skipped / 0 failed**, against a base reproduced on `ebc21238` **before the first edit** of **336 / 8,109 / 10 / 0**, delta zero on every axis; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean.
