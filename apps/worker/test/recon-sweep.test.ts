@@ -205,21 +205,21 @@ function reconciliation(
 /**
  * A row the DATABASE COULD NOT PRODUCE, seeded on purpose.
  *
- * **THIS IS THE PRICE `ADR-430` SECTION 9 CHARGES AND IT IS CHARGED ONCE, HERE,
- * RATHER THAN AT EVERY CASE THAT PAYS IT.** Two cases below exist to watch a
- * VALUE refusal fire: `reconciliations.id` arriving as a `number`, and a
- * `*_cents` column arriving as a `number` when money is integer cents. Under
- * the narrowed port those columns ARE `bigint`, so the input each case exists
- * to watch is no longer expressible without casting past the type.
+ * **THIS IS `ADR-430` SECTION 9's PRICE, CHARGED ONCE RATHER THAN AT EVERY CASE THAT PAYS IT.**
+ * Two cases below watch a VALUE refusal fire: `reconciliations.id` as a `number`, and a `*_cents`
+ * column as a `number` when money is integer cents. Under the narrowed port both ARE `bigint`, so
+ * the input each case watches is no longer expressible without a cast past the type.
  *
- * **THE CAST STAYS AND SO DOES EVERY REFUSAL, AND THAT IS RULED RATHER THAN
- * PREFERRED.** `ADR-299` section 5.1 item 5: a type derived from a
- * TRANSCRIPTION does not retire a runtime check, and `ADR-112` foreclosure 4
- * records that nothing here compares a `schema.ts` column type against the DDL.
- * The type says "this cannot happen" on an authority nothing verifies. Deleting
- * the cast would delete the case; deleting the refusal would trade a guard that
- * FIRES for a claim nothing checks. **On this slice the guard being traded away
- * would be the one standing between a float and a balance.**
+ * **THE CAST STAYS AND SO DOES EVERY REFUSAL, AND THAT IS RULED RATHER THAN PREFERRED.**
+ * `ADR-299` section 5.1 item 5: a type derived from a TRANSCRIPTION does not retire a runtime
+ * check. This read "`ADR-112` foreclosure 4 records that nothing here compares a `schema.ts`
+ * column type against the DDL." `RI-14` (ADR-441): IS FALSE, and was false when written;
+ * foreclosure 4 is about EXHAUSTIVENESS. `scoped-db.test.ts:2728` compares TYPE and NULLABILITY
+ * for every column of every registered non-view relation, against MIGRATION TEXT, DEFAULT
+ * nowhere. So the type says "this cannot happen" on a SECOND TRANSCRIPTION and still not on the
+ * database. Deleting the cast would delete the case; deleting the refusal would trade a guard
+ * that FIRES for a claim nothing checks. **On this slice the guard being traded away would be the
+ * one standing between a float and a balance.**
  */
 function malformed<R extends object>(row: R, overrides: Readonly<Record<string, unknown>>): R {
   return { ...row, ...overrides } as R;
@@ -769,10 +769,14 @@ describe('7. the handle that can reach both tables', () => {
 //
 // WHAT IS DELETED IS THE EXISTENCE MAPPING AND NOT ONE REFUSAL. `ADR-299`
 // section 5.1 item 5 rules it: "a type derived from a transcription does not
-// retire a runtime check", and `ADR-112` foreclosure 4 records that nothing in
-// this tree compares a `schema.ts` column type against the DDL. So `asRow()`
-// goes, and every VALUE refusal stays. On this slice one of those refusals is
-// the only thing standing between a `number` and a balance.
+// retire a runtime check". This block then read "`ADR-112` foreclosure 4 records that nothing in
+// this tree compares a `schema.ts` column type against the DDL." `RI-14` (ADR-441): IS FALSE, and
+// was false when written. `scoped-db.test.ts:2728` compares TYPE and NULLABILITY for every column
+// of every registered non-view relation, against the folded MIGRATION TEXT and not the database;
+// DEFAULT is compared nowhere; and `ADR-112` foreclosure 4 is about ADDRESSABILITY and
+// EXHAUSTIVENESS and says nothing of the kind. THE RULING SURVIVES ON THAT NARROWER FOOTING, and
+// that is why `asRow()` goes and every VALUE refusal stays. On this slice one of those refusals
+// is the only thing standing between a `number` and a balance.
 
 const PORTS_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'ports.ts'), 'utf8');
 const SWEEP_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'sweep.ts'), 'utf8');
@@ -825,11 +829,14 @@ test('8.2 the hand-written existence mapping is DELETED from the slice', () => {
 });
 
 test('8.3 every VALUE refusal survived the deletion, one for one', () => {
-  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a
-  // guard for its EXISTENCE; it buys nothing about the VALUE, because
-  // `schema.ts` is a transcription and nothing compares it to the DDL. A row
-  // that deleted these along with the mapping would be trading a refusal that
-  // fires for a type that cannot -- and here, on money.
+  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a guard for its
+  // EXISTENCE; it buys nothing about the VALUE. This read "`schema.ts` is a transcription and
+  // nothing compares it to the DDL." `RI-14` (ADR-441): IS FALSE, and was false when written.
+  // `scoped-db.test.ts:2728` compares that transcription's TYPE and NULLABILITY column by column
+  // against the folded MIGRATION TEXT, which is a second transcription and not the database, and
+  // DEFAULT is compared nowhere. So the ruling holds on a narrower footing: a row that deleted
+  // these along with the mapping would still be trading a refusal that fires for a type that
+  // cannot -- and here, on money.
   const code = stripComments(SWEEP_SOURCE, { literals: 'blank' });
   const READERS = ['requireString', 'optionalString', 'requireCents'] as const;
   for (const reader of READERS) {
