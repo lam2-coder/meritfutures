@@ -58,7 +58,7 @@
 //
 //    THE VALUES OBJECT NAMES EVERY COLUMN THE TABLE DECLARES, and that is the
 //    point rather than an overreach. `WriteValues` is
-//    `Readonly<Record<string, unknown>>` at `packages/db/src/scoped-db.ts:506`,
+//    `Readonly<Record<string, unknown>>` at `packages/db/src/scoped-db.ts:507`,
 //    so NO type refuses a caller that names a generated column, and what this
 //    leg asks is the only question worth asking of a builder: handed the most a
 //    caller could hand it, does the statement it builds name one? For an INSERT
@@ -70,7 +70,7 @@
 //    carries a DML verb must not mention a member of the set. This leg exists
 //    because leg B is blind by construction to a statement that never reaches a
 //    Drizzle builder, and this tree has one: `LIVE_CACHE_UPSERT_SQL` at
-//    `apps/worker/src/live/ports.ts:303` is a hand-written upsert into the very
+//    `apps/worker/src/live/ports.ts:302` is a hand-written upsert into the very
 //    table that carries `intraday_movement_cents`, and its docblock's claim
 //    that the column "is named nowhere" was held by prose and by nothing else
 //    until this leg.

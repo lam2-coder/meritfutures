@@ -9,6 +9,7 @@ import {
   builtStatements,
   literalLines,
   literalStatements,
+  run,
   updateTargets,
 } from '../checks/generated-column-writes.mjs';
 
@@ -226,6 +227,36 @@ describe('leg C, the hand-written statements', () => {
     const lines = literalLines('const q = `\nINSERT INTO t\n  (a)\n`;\n');
     expect(lines[1]).toContain('INSERT INTO t');
     expect(lines[0]?.trim()).toBe('');
+  });
+});
+
+// =============================================================================
+// THIS SUITE IS THE CHECK'S WIRING, WHICH IS WHY THE ENTRY POINT IS A CASE
+// =============================================================================
+// `.github/workflows/ci.yml` is not edited by the row that wrote this and
+// ADR-445 section 7 derives why: 20 of the 28 distinct lines of that file cited
+// by line number elsewhere in this tree sit below any insertion point in CI-01,
+// and the constraint on a widely cited file is that NO CITED LINE MOVES.
+//
+// SO THE COVERAGE IS THIS FILE'S. `vitest run` is CI-02, the three cases above
+// that read the REAL tree are what make the property blocking, and the case
+// below runs the command line itself so that no part of the check is reachable
+// only by a hand somebody remembers to use. That is the same wiring
+// `packages/tooling/checks/api-contract-endpoints.mjs` and `dependants.mjs`
+// already have and it is stated here rather than inherited quietly.
+// =============================================================================
+describe('the command line', () => {
+  test('passes over this tree, and says what it derived', async () => {
+    const lines: string[] = [];
+    const code = await run([], (line) => lines.push(line));
+    expect(lines.join('\n')).toContain('PASS');
+    expect(code).toBe(0);
+  });
+
+  test('takes no argument, because every input it has comes off the tree', async () => {
+    const lines: string[] = [];
+    expect(await run(['--set', 'rcr_bp'], (line) => lines.push(line))).toBe(2);
+    expect(lines[0]).toContain('usage:');
   });
 });
 
