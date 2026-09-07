@@ -431,8 +431,9 @@ const BLOCKED: Readonly<Record<string, string>> = {
     '(`packages/rules-engine/src/plan/rules-codec.ts:472`) is declared there and re-exported ' +
     'from the engine`s index, this deployable ' +
     'has declared `@merit/rules-engine` since session 252, AND IT ALREADY CALLS THE DECODER -- ' +
-    '`planLeg` (`apps/api/src/payout-backend.ts:415`) decodes the blob and resolves the plan ' +
-    'on the payout transaction (ADR-308). The one-place half was wrong in the other direction ' +
+    '`resolvePinnedPlan` (`apps/api/src/payout-backend.ts:435`) decodes the blob and resolves ' +
+    'the plan, and `planLeg` is its `accounts`-row caller on the payout transaction (ADR-308, ' +
+    'ADR-416). The one-place half was wrong in the other direction ' +
     'too: the predicate is stated THREE times in this tree, by the engine, by ' +
     '`toPublishedRules` in `apps/worker` and by `decodeRules` in `apps/site`, and ' +
     '`test/rule-state-producibility.test.ts` link 7 holds that census at exactly three. ' +
@@ -441,12 +442,19 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'FM-16 on the money path, and the engine`s is the statement the other two are owed to. ' +
     'WHAT THE FIGURE ACTUALLY WAITS ON IS SMALLER AND IS NOT A MOVE. The term is still ' +
     '`EligibleFoldIo.resolvePinnedPlan`, injected, whose unwired default throws ' +
-    '`EligibleFoldUnwired` by name, and NOTHING under any `src/` in this deployable supplies ' +
-    'it, so the fold refuses exactly as it did. THE PRICE HAS NOW MOVED TWICE. A ruling nobody had ' +
-    'taken became a composition, and `ADR-413` then measured that the composition is `ScopedTx`-bound ' +
-    'through `catalogRowAt`, so its home is a `packages/db` door and not an export one file over. ' +
+    '`EligibleFoldUnwired` by name. THE PRICE MOVED THREE TIMES AND IT IS SPENT NOW. A ruling ' +
+    'nobody had taken became a composition; `ADR-413` measured that the composition is ' +
+    '`ScopedTx`-bound through `catalogRowAt` and that its home is a `packages/db` door rather ' +
+    'than an export one file over; `ADR-416` held both fences and took the door. ' +
+    '`catalogRowAt` reaches `SystemTx` now, `payout-backend.ts` exports the composition at the ' +
+    'seam `ADR-413` section 7 named, and `src/admin-source/pinned-plan.ts` supplies the port ' +
+    'over the handle its caller is already inside. NO SECOND `PlanVersionSizeRow` MAPPING WAS ' +
+    'WRITTEN and `test/admin-source-liability.test.ts` holds that census at one file. ' +
     'NO PORT IS WIRED BY ANY OF THAT and `readLiability` is still the one name missing from ' +
-    '`IMPLEMENTED_ADMIN_READS`. ' +
+    '`IMPLEMENTED_ADMIN_READS`. TERM 1 IS SPENT AND TERM 2 IS NOT: `EligibleNext7d` still ' +
+    'declares no measured term, `RI-18` binds that shape across three copies, and a founder ' +
+    'directs that move rather than a row. THE GROUP GOES WHOLE OR NOT AT ALL (EC-074), so one ' +
+    'term spent returns no figure. ' +
     'SO `readLiability` IS STILL NOT COMPOSED, AND COMPOSING IT WOULD BE A LIVE-LOOKING FIGURE ' +
     'IN FRONT OF AN ARM THAT CANNOT ANSWER (`usePayoutBackend`s rule). ' +
     'AND THE FIGURE IS A FORECAST RATHER THAN A MEASUREMENT, WHICH THE WIRE TYPE CANNOT SAY: ' +

@@ -1595,3 +1595,295 @@ describe('ADR-415: the `event-sink-caller` register after the producer moved', (
     expect(entry.probe(wrapped)).toBe('present');
   });
 });
+
+// =============================================================================
+// ADR-417: LEG 7, THE REGISTER'S OWN ARITHMETIC
+// =============================================================================
+// `sweptBy` argues for a needle or against one, and the argument is routinely a
+// COUNT. NOTHING DERIVED ANY OF THEM. ADR-415 measured two wrong, one of them
+// from the commit that wrote it, and ADR-417 measured the class.
+//
+// THE CASES BELOW BIND THE PROPERTY THAT MADE THE FIX HARD RATHER THAN ONLY THE
+// FIX. A control over derived figures must not become a control that reddens
+// when prettier rewraps a comment: that is the defect ADR-415 found the estate
+// already holding a green on, and reproducing it in a new leg would be shipping
+// the thing this row was sent to fix. `stays green under a reflow` is that
+// property, watched over a fixture where the reflow really does change the
+// derived total.
+// =============================================================================
+describe('ADR-417: leg 7 derives both sides of the register`s arithmetic', () => {
+  const NAMES = ['LIVE_QUEUE'];
+
+  /** A tree with the door named in two places, and a census over it. */
+  const doorTree = (): string => {
+    const root = bareTree();
+    write(root, 'apps/worker/src/queue.ts', 'export const LIVE_QUEUE = 1;\nuse(LIVE_QUEUE);\n');
+    write(root, 'apps/worker/src/adapter.ts', 'import { LIVE_QUEUE } from "./queue.ts";\n');
+    return root;
+  };
+
+  const withCensus = (places: { where: string; is: string }[], over = {}) => [
+    {
+      ...artifact('pgboss-job-store-migration'),
+      census: { names: NAMES, scope: 'shipped' as const, places },
+      ...over,
+    },
+  ];
+
+  const claim = {
+    site: 'apps/worker/src/queue.ts',
+    claim: 'export const LIVE_QUEUE = 1;',
+    disposition: 'live' as const,
+    artifact: 'pgboss-job-store-migration',
+    why: 'a synthetic claim, so leg 7 is the only leg with anything to say',
+  };
+
+  // THE SEED IS THE DEFECT'S OWN SHAPE: an account that names one place while
+  // the names reach two. This is what `worker-queue-door-caller` carried in
+  // prose for two waves and what nothing in this package would have reported.
+  test('a place the names reach and the census does not account for is a finding', () => {
+    const root = doorTree();
+    const findings = checkAbsenceClaims(root, {
+      artifacts: withCensus([{ where: 'apps/worker/src/queue.ts', is: 'the declaring module' }]),
+      claims: [claim],
+    });
+    expect(findings.join('\n')).toContain('does not add up');
+    expect(findings.join('\n')).toContain('reach 3 line(s)');
+    expect(findings.join('\n')).toContain('hold 2 of them');
+    expect(findings.join('\n')).toContain('apps/worker/src/adapter.ts (1 line(s))');
+  });
+
+  test('the same tree with the second place accounted for is green', () => {
+    const root = doorTree();
+    const findings = checkAbsenceClaims(root, {
+      artifacts: withCensus([
+        { where: 'apps/worker/src/queue.ts', is: 'the declaring module' },
+        { where: 'apps/worker/src/adapter.ts', is: 'the importer' },
+      ]),
+      claims: [claim],
+    });
+    expect(findings).toEqual([]);
+  });
+
+  // **THE HARD CONSTRAINT, BOUND RATHER THAN ASSERTED.** The reflow below is a
+  // real one: the same three mentions, rewrapped so the file holds FOUR lines
+  // carrying a name instead of three. A leg holding a written integer would go
+  // red here at a diff that changed no meaning. This one derives both sides
+  // from the same walk, so the rewrap moves the total and the part together.
+  test('a reflow that changes the derived total leaves leg 7 green', () => {
+    const root = doorTree();
+    const places = [
+      { where: 'apps/worker/src/queue.ts', is: 'the declaring module' },
+      { where: 'apps/worker/src/adapter.ts', is: 'the importer' },
+    ];
+    const before = checkAbsenceClaims(root, { artifacts: withCensus(places), claims: [claim] });
+    expect(before).toEqual([]);
+    const reachedBefore = Number(
+      /reach (\d+) line\(s\)/.exec(
+        checkAbsenceClaims(root, {
+          artifacts: withCensus([places[0] as { where: string; is: string }]),
+          claims: [claim],
+        }).join('\n'),
+      )?.[1] ?? '0',
+    );
+    expect(reachedBefore).toBeGreaterThan(0);
+
+    // The rewrap: one more line in an ACCOUNTED file carrying the name.
+    write(
+      root,
+      'apps/worker/src/adapter.ts',
+      'import {\n  LIVE_QUEUE,\n} from "./queue.ts";\nconst q = LIVE_QUEUE;\n',
+    );
+    const after = checkAbsenceClaims(root, { artifacts: withCensus(places), claims: [claim] });
+    expect(after).toEqual([]);
+
+    // AND THE REFLOW REALLY DID MOVE THE NUMBER, which is what makes the case
+    // above evidence rather than a tautology. THE TWO TOTALS ARE DERIVED RATHER
+    // THAN TYPED, on this row's own subject: a case asserting the integer would
+    // be the defect ADR-417 exists about, reproduced inside its own suite.
+    // Dropping the accounted place makes leg 7 report the total it derived.
+    const reachedBy = (body: string): number =>
+      Number(/reach (\d+) line\(s\)/.exec(body)?.[1] ?? '0');
+    const expose = (): number =>
+      reachedBy(
+        checkAbsenceClaims(root, {
+          artifacts: withCensus([places[0] as { where: string; is: string }]),
+          claims: [claim],
+        }).join('\n'),
+      );
+    expect(expose()).toBeGreaterThan(reachedBefore);
+  });
+
+  // A NEIGHBOUR'S CORRECT REPAIR IS NOT A FINDING. A place empties when the
+  // thing in it is removed, and reddening on that would hand the next row a
+  // failure for doing the work it was sent to do.
+  test('an accounted place that reaches zero lines is not a finding', () => {
+    const root = doorTree();
+    const findings = checkAbsenceClaims(root, {
+      artifacts: withCensus([
+        { where: 'apps/worker/src/queue.ts', is: 'the declaring module' },
+        { where: 'apps/worker/src/adapter.ts', is: 'the importer' },
+        { where: 'apps/worker/src/gone.ts', is: 'a place whose contents were removed' },
+      ]),
+      claims: [claim],
+    });
+    expect(findings).toEqual([]);
+  });
+
+  // `strip` IS READ AND NOT ASSUMED, because two shipped entries name different
+  // instruments and a census that quietly picked one would measure something
+  // neither of them claims.
+  test('`strip` decides whether a mention in a comment counts', () => {
+    const root = bareTree();
+    write(root, 'apps/worker/src/queue.ts', 'export const LIVE_QUEUE = 1;\n');
+    write(root, 'apps/worker/src/prose.ts', '// this file never touches LIVE_QUEUE\n');
+    const places = [{ where: 'apps/worker/src/queue.ts', is: 'the declaring module' }];
+    const raw = checkAbsenceClaims(root, {
+      artifacts: withCensus(places),
+      claims: [{ ...claim }],
+    });
+    expect(raw.join('\n')).toContain('apps/worker/src/prose.ts (1 line(s))');
+
+    const stripped = checkAbsenceClaims(root, {
+      artifacts: [
+        {
+          ...artifact('pgboss-job-store-migration'),
+          census: { names: NAMES, scope: 'shipped' as const, strip: true, places },
+        },
+      ],
+      claims: [{ ...claim }],
+    });
+    expect(stripped).toEqual([]);
+  });
+
+  // A DIRECTORY PREFIX ACCOUNTS FOR WHAT IS UNDER IT, which is how
+  // `event-sink-caller` accounts for a deployable that names the writer in
+  // order to say it cannot reach it.
+  test('a place ending in `/` accounts for the files under it', () => {
+    const root = doorTree();
+    write(root, 'apps/worker/src/deep/nested.ts', 'const a = LIVE_QUEUE;\n');
+    const findings = checkAbsenceClaims(root, {
+      artifacts: withCensus([
+        { where: 'apps/worker/src/queue.ts', is: 'the declaring module' },
+        { where: 'apps/worker/src/', is: 'everything else in the deployable' },
+      ]),
+      claims: [claim],
+    });
+    expect(findings).toEqual([]);
+  });
+
+  // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. An empty scope would
+  // make the identity hold trivially, which is the runner's rule 2 and the one
+  // failure mode this leg shares with every probe above it.
+  test('an empty scope throws rather than holding the identity vacuously', () => {
+    const root = mkdtempSync(join(tmpdir(), 'merit-absence-'));
+    seeded.push(root);
+    write(root, 'packages/db/migrations/0001_init.sql', 'CREATE TABLE identities (id uuid);\n');
+    expect(() =>
+      checkAbsenceClaims(root, {
+        artifacts: withCensus([{ where: 'apps/worker/src/queue.ts', is: 'the declaring module' }]),
+        claims: [],
+      }),
+    ).toThrow(/found no file in the `shipped` scope/);
+  });
+});
+
+// =============================================================================
+// ADR-417: THE SHIPPED CENSUSES, ON THIS REPOSITORY
+// =============================================================================
+describe('ADR-417: the shipped censuses hold, and the old sentences do not', () => {
+  const withCensus = ABSENCE_ARTIFACTS.filter((a) => a.census !== undefined);
+
+  // NON-VACUITY FIRST. Leg 7 is a no-op over a register with no census, so the
+  // cases below would pass over an empty one. The bound is a floor rather than
+  // an equality so a later row adding a census is not a test failure.
+  test('the register carries censuses for leg 7 to derive', () => {
+    expect(withCensus.length).toBeGreaterThanOrEqual(3);
+  });
+
+  // NO CENSUS WRITES AN INTEGER, which is ADR-034's second branch and the whole
+  // of why this leg cannot go stale. A count typed into the data would decay at
+  // the rate the tree moves, exactly as the prose it replaced did.
+  //
+  // THE INSTRUMENT IS THE FIELDS LEG 7 READS, and it is narrowed to those on
+  // purpose. `is` is prose for a reader and carries ADR citations, which are
+  // addresses rather than counts; scanning it for digits would fail this case
+  // on a reference. What must hold no number is what the mechanism consumes.
+  test('no census carries a count in any field leg 7 reads', () => {
+    for (const entry of withCensus) {
+      const census = entry.census;
+      if (census === undefined) throw new Error(`${entry.key} lost its census`);
+      const read = [census.scope, ...census.names, ...census.places.map((p) => p.where)];
+      expect({ key: entry.key, numeric: read.filter((value) => /\d/.test(value)) }).toEqual({
+        key: entry.key,
+        numeric: [],
+      });
+      const values = [...read, census.strip].filter((value) => typeof value === 'number');
+      expect({ key: entry.key, numbers: values.length }).toEqual({ key: entry.key, numbers: 0 });
+    }
+  });
+
+  // EVERY CENSUS IS MEASURED AGAINST SOMETHING. A census whose names reach no
+  // line at all would satisfy the identity while asserting nothing, which is
+  // the vacuous pass this file refuses everywhere else.
+  test('every census reaches lines on this repository', () => {
+    for (const entry of withCensus) {
+      const found = checkAbsenceClaims(REPO_ROOT, {
+        artifacts: [{ ...entry, census: { ...entry.census!, places: [] } }],
+        claims: ABSENCE_CLAIMS.filter((c) => c.artifact === entry.key),
+      });
+      expect({
+        key: entry.key,
+        measured: found.some((f) => f.includes('does not add up')),
+      }).toEqual({ key: entry.key, measured: true });
+    }
+  });
+
+  // **THE OLD SENTENCE, AS DATA, WATCHED RED AGAINST THE REAL TREE.**
+  // `worker-queue-door-caller` read that the door's two names "reach three
+  // lines in the shipped scope and all three are its own declaration". That is
+  // the census below, and this repository says otherwise.
+  test('`worker-queue-door-caller`s deleted figure is red as a census', () => {
+    const entry = artifact('worker-queue-door-caller');
+    const findings = checkAbsenceClaims(REPO_ROOT, {
+      artifacts: [
+        {
+          ...entry,
+          census: {
+            names: ['LIVE_QUEUE', 'workerQueue'],
+            scope: 'shipped' as const,
+            places: [{ where: 'apps/worker/src/queue.ts', is: 'the declaring module' }],
+          },
+        },
+      ],
+      claims: ABSENCE_CLAIMS.filter((c) => c.artifact === 'worker-queue-door-caller'),
+    });
+    expect(findings.join('\n')).toContain('does not add up');
+    expect(findings.join('\n')).toContain('apps/worker/src/provisioning/queue-adapter.ts');
+  });
+
+  // **AND THE PARTITION DOES NOT DEPEND ON A REPAIR THIS ROW DOES NOT OWN.**
+  // ADR-415 found `apps/api/src/events.ts` and `packages/ledger/src/events.ts`
+  // both claiming to carry the anchored sentence, one of them falsely, and a
+  // later row is resolving it. BOTH are accounted places, so the identity holds
+  // whichever way that goes: this case drops each in turn and asserts leg 7
+  // stays silent, which is the claim `sweptBy` makes in words.
+  test('`event-sink-caller`s census survives either events.ts going away', () => {
+    const entry = artifact('event-sink-caller');
+    const claims = ABSENCE_CLAIMS.filter((c) => c.artifact === 'event-sink-caller');
+    for (const dropped of ['apps/api/src/events.ts', 'packages/ledger/src/events.ts']) {
+      const places = entry.census!.places.filter((place) => place.where !== dropped);
+      const findings = checkAbsenceClaims(REPO_ROOT, {
+        artifacts: [{ ...entry, census: { ...entry.census!, places } }],
+        claims,
+      });
+      // Dropping a place is not the same as the file going away: what this
+      // asserts is that the file is ACCOUNTED, so its lines are named in the
+      // finding rather than silently folded into a neighbour.
+      expect({ dropped, named: findings.join('\n').includes(dropped) }).toEqual({
+        dropped,
+        named: true,
+      });
+    }
+  });
+});

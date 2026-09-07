@@ -116,7 +116,7 @@
 // `= 'active'` precisely so a fourth arriving later fails CLOSED.
 // =============================================================================
 
-import type { ScopedTx } from '@merit/db';
+import type { CatalogReadTx, ScopedTx } from '@merit/db';
 import {
   decodeCapScheduleCents,
   decodePlanRules,
@@ -124,6 +124,7 @@ import {
   resolvePlan,
 } from '@merit/rules-engine';
 import type {
+  Cents,
   ExternalGates,
   PlanVersionSizeRow,
   ResolvedPlan,
@@ -363,7 +364,26 @@ async function stateLeg(handle: ScopedTx, accountId: string): Promise<RuleState>
 }
 
 /**
- * `PayoutSubject.plan`, WHOLE. ADR-287 SLICES 4 AND 5.
+ * `resolvePlan` OVER AN ACCOUNT'S PINNED VERSION AT ITS OWN SIZE.
+ * `PayoutSubject.plan`, WHOLE. ADR-287 SLICES 4 AND 5, ADR-416.
+ *
+ * **IT IS EXPORTED AND ITS HANDLE IS A CAPABILITY RATHER THAN A DOOR, WHICH IS
+ * THE WHOLE OF WHAT ADR-416 CHANGED.** The parameter is `CatalogReadTx`: the one
+ * thing this function needs of a transaction is the ability to read one
+ * catalogue row, and `ScopedTx` and `SystemTx` both satisfy that shape since
+ * that entry. So the payout transaction and the operator console reach ONE
+ * statement of this composition, and neither writes the `PlanVersionSizeRow`
+ * mapping below a second time. `apps/worker`'s `resolvePinnedPlan` is the same
+ * shape one deployable over and is the precedent this signature follows rather
+ * than a shape invented here.
+ *
+ * **THE SECOND CALLER IS WHY IT IS EXPORTED, AND IT EXISTS.**
+ * `EligibleFoldIo.resolvePinnedPlan` in `admin-source/eligible-next-7d.ts` is a
+ * port that was declared with a refusing default because nothing in this
+ * deployable could supply it; `admin-source/pinned-plan.ts` supplies it by
+ * calling this function. `packages/db`'s rule that a primitive admitted before a
+ * caller exists is a primitive nobody can remove is honoured rather than
+ * excepted: the caller lands in the same commit as the export.
  *
  * **THE BLOB HALF IS ADR-283's AND THE SIZE HALF IS THIS ROW'S.**
  * `plan_versions.rules` is decoded by the ENGINE's `decodePlanRules`, because
@@ -412,10 +432,11 @@ async function stateLeg(handle: ScopedTx, accountId: string): Promise<RuleState>
  * a cap schedule that disagrees with the codec that reads it is Merit's records
  * disagreeing with Merit's engine, and no retry fixes it.
  */
-async function planLeg(handle: ScopedTx, account: Record<string, unknown>): Promise<ResolvedPlan> {
-  const planVersionId = text(account, 'planVersionId', 'accounts');
-  const sizeCents = centsOf(account['sizeCents'], 'accounts.size_cents');
-
+export async function resolvePinnedPlan(
+  handle: CatalogReadTx,
+  planVersionId: string,
+  sizeCents: Cents,
+): Promise<ResolvedPlan> {
   const version = await handle.catalogRowAt('planVersions', { id: planVersionId });
   if (version === undefined)
     throw new PayoutRowError(
@@ -501,6 +522,42 @@ async function planLeg(handle: ScopedTx, account: Record<string, unknown>): Prom
   // value is COPIED from the size row, so the marketing page and the engine
   // agree to the cent. Nothing in this file multiplies a money value by a rate.
   return resolvePlan(rules, sizeRow);
+}
+
+/**
+ * {@link resolvePinnedPlan} OVER AN `accounts` ROW, which is the payout path's
+ * own way in and is the whole of what this function still does.
+ *
+ * **THE SPLIT IS `ADR-413` SECTION 7's OWN NAMED WINNER, EXECUTED ONCE ITS
+ * OBJECTION WAS ANSWERED.** That entry weighed exporting this function as it
+ * stood against splitting it here, ruled the split the better of the two, and
+ * then refused BOTH on one ground: either form takes a `ScopedTx`, a `ScopedTx`
+ * is bound to one identity, and the admin liability read resolves no identity to
+ * open one against. `ADR-416` moved that ground rather than argued with it. The
+ * composition above now takes a `CatalogReadTx`, which `ScopedTx` and `SystemTx`
+ * both satisfy, so the seam is the one place the two callers differ and the
+ * mapping below it is reached by both.
+ *
+ * **WHAT THE SEAM IS FOR IS THAT THE TWO CALLERS HOLD THE PAIR DIFFERENTLY.**
+ * The payout path decodes `plan_version_id` and `size_cents` out of an `accounts`
+ * row it has already read; the fold in `admin-source/eligible-next-7d.ts` has
+ * decoded the same pair with its own `text` and `centsOf` before it calls its
+ * port, and `EligibleFoldIo.resolvePinnedPlan` takes the two values and no
+ * transaction. A shared function over the ROW would make the second caller
+ * synthesise a record to fit a signature and decode the pair twice through an
+ * `unknown` hop, and the second decode's refusals would name a row nobody read.
+ * So the shared half starts BELOW the row and this function is the adapter.
+ *
+ * **NO SECOND MAPPING WAS WRITTEN AND THAT IS THE POINT OF THE SHAPE.**
+ * `PlanVersionSizeRow` is stated once in this deployable, above, and
+ * `test/admin-source-liability.test.ts` holds that census as a run.
+ */
+async function planLeg(handle: ScopedTx, account: Record<string, unknown>): Promise<ResolvedPlan> {
+  return resolvePinnedPlan(
+    handle,
+    text(account, 'planVersionId', 'accounts'),
+    centsOf(account['sizeCents'], 'accounts.size_cents'),
+  );
 }
 
 /**

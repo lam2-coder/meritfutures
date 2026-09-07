@@ -1197,22 +1197,65 @@ describe('what this directory does not do', () => {
    * accessor in prose to explain why it does not import it. A control that reds
    * on a comment is a control somebody deletes the comment to satisfy.
    */
-  function importsIn(file: string): readonly string[] {
+  function importsIn(file: string): readonly { specifier: string; typeOnly: boolean }[] {
     return [
-      ...read(file).matchAll(/(?:^|\n)\s*(?:import|export)(?:\s+type)?[\s\S]*?from\s+'([^']+)'/g),
-    ].map((match) => match[1] ?? '');
+      ...read(file).matchAll(/(?:^|\n)\s*(?:import|export)(\s+type)?[\s\S]*?from\s+'([^']+)'/g),
+    ].map((match) => ({ specifier: match[2] ?? '', typeOnly: match[1] !== undefined }));
   }
 
-  it('takes nothing off the accessor, so test/db.test.ts pinned map does not move', () => {
+  it('takes no VALUE off the accessor, so test/db.test.ts pinned map does not move', () => {
     // `src/db.ts`'s property, extended to a directory that did not exist when it
-    // was written. A `@merit/db` import here would be a second file in this
-    // deployable able to open a connection, and `db.test.ts` pins that map to
-    // two files.
+    // was written: a file here that could open a connection would be a second
+    // door in this deployable, and `db.test.ts` pins that map by name.
+    //
+    // **THE CASE READ `not.toContain('@merit/db')` OVER EVERY IMPORT AND IT WAS
+    // BROADER THAN THE REASON ABOVE IT AND BROADER THAN THE AUTHORITY IT CITES.**
+    // `db.test.ts` rules the distinction in its own words: a type-only import is
+    // deliberately not pinned, "because a type buys no capability -- `import
+    // type { SystemTx }` cannot open anything, and a case that failed on one
+    // would be asserting a house style rather than an authority". Its own map is
+    // built with `!entry.typeOnly` for exactly that reason, so this case was
+    // enforcing something the file it defers to declines to enforce.
+    //
+    // **THAT IS THIS CASE'S OWN CORRECTION TAKEN ONE STEP FURTHER.** The reader
+    // above records that the FIRST draft asserted the WORD `@merit/db` was
+    // absent and failed on a comment, and the lesson written down was that a
+    // control which reds on a comment is a control somebody deletes the comment
+    // to satisfy. A control that reds on a TYPE is the same defect one layer in:
+    // `ADR-416` needed `import type { CatalogReadTx }` in `pinned-plan.ts` to
+    // name the handle its supplier takes, and no wording of that import opens
+    // anything.
+    //
+    // SO THE PROPERTY WITH TEETH IS ASSERTED AS ITSELF AND IS UNCHANGED.
     for (const name of FILES)
       expect(
-        importsIn(join(APP, 'src', 'admin-source', name)),
-        `${name} imports the accessor`,
+        importsIn(join(APP, 'src', 'admin-source', name))
+          .filter((entry) => !entry.typeOnly)
+          .map((entry) => entry.specifier),
+        `${name} takes a value off the accessor`,
       ).not.toContain('@merit/db');
+  });
+
+  it('and every type-only accessor import in the directory is a decision, listed', () => {
+    // THE NARROWING ABOVE IS PAIRED WITH A MAP, on `db.test.ts`'s own shape: the
+    // half with teeth is asserted first so its failure names the file, and the
+    // map is the broader net so a SECOND type import is a line a reviewer sees
+    // rather than one that lands with a feature. Benign is not the same as
+    // invisible.
+    const named: string[] = [];
+    for (const name of FILES)
+      if (
+        importsIn(join(APP, 'src', 'admin-source', name)).some(
+          (entry) => entry.typeOnly && entry.specifier === '@merit/db',
+        )
+      )
+        named.push(name);
+    // `pinned-plan.ts` NAMES `CatalogReadTx` AND NOTHING ELSE, which is the
+    // handle `ADR-416` put the catalogue read on. Every other module in this
+    // directory declares its handle STRUCTURALLY over `unknown` and needs no
+    // import to do it; this one is handed a TYPED row and a caller that may not
+    // name the row it was handed is a caller that writes its own shape for it.
+    expect(named).toStrictEqual(['pinned-plan.ts']);
   });
 
   it('installs no read source, so the {declared, wired, blocked} triple is unchanged', () => {
