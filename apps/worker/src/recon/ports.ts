@@ -90,6 +90,8 @@
 // inherited.
 // =============================================================================
 
+import type { DeclaredRow } from '../db.ts';
+
 // -----------------------------------------------------------------------------
 // The tables, and no others
 // -----------------------------------------------------------------------------
@@ -249,8 +251,14 @@ export type ReconFilter = Readonly<Record<string, unknown>>;
 /** A set of values to write, by Drizzle property name. */
 export type ReconValues = Readonly<Record<string, unknown>>;
 
-/** One row as the sweep sees it. */
-export type ReconRow = Readonly<Record<string, unknown>>;
+// **`ReconRow` STOOD HERE AND IS DELETED (`ADR-430`).** It read
+// `Readonly<Record<string, unknown>>`, which is the accessor's `unknown`
+// written down a second time, and `sweep.ts` cast back out of it through
+// `asRow`. `SystemTx.rowsWhere` has handed back {@link DeclaredRow} since
+// `ADR-426`, so the mapping had nothing left to do and the readers take the
+// declared row instead. **`ReconFilter` AND `ReconValues` ABOVE ARE NOT THE
+// SAME SHAPE AND STAY:** a filter is an ADDRESS and `insert`/`updateAt` are
+// the WRITE path, which this row does not spend.
 
 // -----------------------------------------------------------------------------
 // One open transaction, as a reconciliation sweep needs to see it
@@ -275,7 +283,7 @@ export interface ReconTx {
    * Rows matching a filter. MANY rows, and the READ path is the only place a
    * term may appear (`ADR-157`).
    */
-  rowsWhere(key: ReconReadTable, where: ReconFilter): Promise<unknown[]>;
+  rowsWhere<K extends ReconReadTable>(key: K, where: ReconFilter): Promise<DeclaredRow<K>[]>;
   /** Write one row, returning it. */
   insert(key: ReconWriteTable, values: ReconValues): Promise<unknown[]>;
   /** Write ONE row. The address must name a unique key. */

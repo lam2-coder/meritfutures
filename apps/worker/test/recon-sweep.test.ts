@@ -35,6 +35,7 @@ import {
   ReconSweepUnwired,
   UNWIRED_RECON_SWEEP_IO,
 } from '../src/recon/ports.ts';
+import type { DeclaredRow } from '../src/db.ts';
 import type {
   ReconFilter,
   ReconFilterTerm,
@@ -63,6 +64,9 @@ const ACCOUNT_A = '11111111-1111-4111-8111-111111111111';
 const ACCOUNT_B = '22222222-2222-4222-8222-222222222222';
 const FILE_ONE = '33333333-3333-4333-8333-333333333333';
 
+/** A fixed instant, for the reason the recorder's clock is a counter. */
+const COMPUTED_AT = new Date(Date.UTC(2026, 7, 26, 0, 0, 0));
+
 // -----------------------------------------------------------------------------
 // The recorder
 // -----------------------------------------------------------------------------
@@ -84,11 +88,16 @@ interface Recorder {
 
 const IS_NULL: ReconFilterTerm = { term: 'is-null' };
 
+// **THE STORE HOLDS DECLARED ROWS NOW, AND THAT IS THE HALF OF `ADR-430` THE
+// SUITE PAYS FOR.** It held `ReconValues[]`, which is `Record<string, unknown>`:
+// a fixture missing a column, or carrying one under a name no migration ever
+// created, compiled, and the suite went green over a row PostgreSQL cannot
+// produce. `mark({ closingBalanceCentss: 1n })` was a passing test.
 interface RecorderOptions {
-  readonly marks: readonly ReconValues[];
-  readonly states: readonly ReconValues[];
+  readonly marks: readonly DeclaredRow<'dailyMarks'>[];
+  readonly states: readonly DeclaredRow<'ruleStates'>[];
   /** Rows already on `reconciliations` for the day, keyed by account. */
-  readonly existing?: Readonly<Record<string, ReconValues>>;
+  readonly existing?: Readonly<Record<string, DeclaredRow<'reconciliations'>>>;
   /** Throw on the Nth transaction, counting from one. */
   readonly dieOnTransaction?: number;
 }
@@ -136,18 +145,118 @@ function recorder(options: RecorderOptions): Recorder {
   };
 }
 
-function mark(overrides: ReconValues = {}): ReconValues {
+/**
+ * One `daily_marks` row, WHOLE.
+ *
+ * **EVERY COLUMN `0014` DECLARES IS HERE, NOT ONLY THE FOUR THE SWEEP READS.**
+ * That is the cost `ADR-430` section 9 prices: the digests fixtures one
+ * directory over already carried every column, and these carried four of
+ * eighteen. What it buys is that a typo in an override is now a compile error
+ * instead of a silent `undefined`.
+ */
+function mark(overrides: Partial<DeclaredRow<'dailyMarks'>> = {}): DeclaredRow<'dailyMarks'> {
   return {
+    id: 1n,
     accountId: ACCOUNT_A,
-    source: 'report',
+    tradingDay: DAY,
+    openingBalanceCents: 5_000_000n,
     closingBalanceCents: 5_000_000n,
+    highBalanceCents: 5_000_000n,
+    lowBalanceCents: 5_000_000n,
+    realizedPnlCents: 0n,
+    fillCount: 0,
+    tradedDay: false,
+    winDay: false,
+    adjustmentCents: 0n,
+    sourceHash: new Uint8Array(),
+    source: 'report',
     ingestFileId: FILE_ONE,
+    supersededBy: null,
+    computedAt: COMPUTED_AT,
+    createdAt: COMPUTED_AT,
     ...overrides,
   };
 }
 
-function state(overrides: ReconValues = {}): ReconValues {
-  return { accountId: ACCOUNT_A, balanceCents: 5_000_000n, ...overrides };
+/** One `reconciliations` row, WHOLE, for {@link mark}'s reason. */
+function reconciliation(
+  overrides: Partial<DeclaredRow<'reconciliations'>> = {},
+): DeclaredRow<'reconciliations'> {
+  return {
+    id: 7n,
+    accountId: ACCOUNT_A,
+    tradingDay: DAY,
+    ourBalanceCents: 5_000_000n,
+    platformBalanceCents: 5_000_000n,
+    deltaCents: 0n,
+    status: 'match',
+    resolvedBy: null,
+    resolutionNote: null,
+    sourceIngestFileId: FILE_ONE,
+    ourSource: RECON_SOURCE,
+    createdAt: COMPUTED_AT,
+    updatedAt: COMPUTED_AT,
+    ...overrides,
+  };
+}
+
+/**
+ * A row the DATABASE COULD NOT PRODUCE, seeded on purpose.
+ *
+ * **THIS IS THE PRICE `ADR-430` SECTION 9 CHARGES AND IT IS CHARGED ONCE, HERE,
+ * RATHER THAN AT EVERY CASE THAT PAYS IT.** Two cases below exist to watch a
+ * VALUE refusal fire: `reconciliations.id` arriving as a `number`, and a
+ * `*_cents` column arriving as a `number` when money is integer cents. Under
+ * the narrowed port those columns ARE `bigint`, so the input each case exists
+ * to watch is no longer expressible without casting past the type.
+ *
+ * **THE CAST STAYS AND SO DOES EVERY REFUSAL, AND THAT IS RULED RATHER THAN
+ * PREFERRED.** `ADR-299` section 5.1 item 5: a type derived from a
+ * TRANSCRIPTION does not retire a runtime check, and `ADR-112` foreclosure 4
+ * records that nothing here compares a `schema.ts` column type against the DDL.
+ * The type says "this cannot happen" on an authority nothing verifies. Deleting
+ * the cast would delete the case; deleting the refusal would trade a guard that
+ * FIRES for a claim nothing checks. **On this slice the guard being traded away
+ * would be the one standing between a float and a balance.**
+ */
+function malformed<R extends object>(row: R, overrides: Readonly<Record<string, unknown>>): R {
+  return { ...row, ...overrides } as R;
+}
+
+/** One `rule_states` row, WHOLE, for {@link mark}'s reason. */
+function state(overrides: Partial<DeclaredRow<'ruleStates'>> = {}): DeclaredRow<'ruleStates'> {
+  return {
+    id: 1n,
+    accountId: ACCOUNT_A,
+    tradingDay: DAY,
+    phase: 'funded',
+    floorCents: 0n,
+    floorLocked: false,
+    floorOpenCents: 0n,
+    highWaterBalanceCents: 5_000_000n,
+    balanceCents: 5_000_000n,
+    withdrawableCents: 0n,
+    tradedDaysCount: 0,
+    winDaysCount: 0,
+    consistencyBestDayCents: 0n,
+    consistencyPeriodProfitCents: 0n,
+    consistencyPeriodStartDay: null,
+    payoutsSettledCount: 0,
+    payoutAnchorDay: null,
+    cadenceAnchorDay: null,
+    engineEligible: true,
+    engineGates: {},
+    contextGates: {},
+    stateHash: new Uint8Array(),
+    engineVersion: 'test',
+    computedAt: COMPUTED_AT,
+    createdAt: COMPUTED_AT,
+    calendarRevisionId: null,
+    lifetimeSettledCents: 0n,
+    breached: false,
+    breachKind: null,
+    ...overrides,
+  };
 }
 
 function candidate(overrides: Partial<ReconCandidate> = {}): ReconCandidate {
@@ -493,7 +602,9 @@ describe('4. the finding and its consequence', () => {
     const [, rec] = await sweep({
       marks: [mark({ closingBalanceCents: 1n })],
       states: [state()],
-      existing: { [ACCOUNT_A]: { id: 7n, status: 'resolved', resolvedBy: 'ops@merit.test' } },
+      existing: {
+        [ACCOUNT_A]: reconciliation({ status: 'resolved', resolvedBy: 'ops@merit.test' }),
+      },
     });
     for (const call of rec.calls) {
       for (const field of ['deltaCents', 'resolvedBy', 'resolutionNote', 'createdAt']) {
@@ -512,7 +623,7 @@ describe('5. a redelivered day updates rather than duplicates', () => {
     const [, rec] = await sweep({
       marks: [mark({ closingBalanceCents: 4_999_950n })],
       states: [state()],
-      existing: { [ACCOUNT_A]: { id: 7n } },
+      existing: { [ACCOUNT_A]: reconciliation() },
     });
     expect(rec.calls.some((c) => c.op === 'insert' && c.key === 'reconciliations')).toBe(false);
     const update = rec.calls.find((c) => c.op === 'updateAt' && c.key === 'reconciliations');
@@ -529,7 +640,7 @@ describe('5. a redelivered day updates rather than duplicates', () => {
     const rec = recorder({
       marks: [mark()],
       states: [state()],
-      existing: { [ACCOUNT_A]: { id: 7 } },
+      existing: { [ACCOUNT_A]: malformed(reconciliation(), { id: 7 }) },
     });
     const report = await runReconciliationSweep({ tradingDay: DAY, batchRunId: BATCH_RUN }, rec.io);
     expect(report.outcomes[0]).toMatchObject({ kind: 'failed' });
@@ -561,7 +672,10 @@ describe('6. what the sweep will not write', () => {
   });
 
   test('a number where cents are expected is refused, never coerced', async () => {
-    const rec = recorder({ marks: [mark({ closingBalanceCents: 5_000_000 })], states: [state()] });
+    const rec = recorder({
+      marks: [malformed(mark(), { closingBalanceCents: 5_000_000 })],
+      states: [state()],
+    });
     await expect(
       runReconciliationSweep({ tradingDay: DAY, batchRunId: BATCH_RUN }, rec.io),
     ).rejects.toThrow(ReconRowError);

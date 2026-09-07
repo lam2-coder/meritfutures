@@ -158,7 +158,6 @@ import {
   PLATFORM_STATED_MARK_SOURCES,
   RECON_SOURCE,
   type PlatformStatedMarkSource,
-  type ReconRow,
   type ReconRunStatus,
   type ReconStatus,
   type ReconSweepIo,
@@ -373,14 +372,23 @@ export function compareBalances(candidate: ReconCandidate): ReconVerdict {
 // balance
 // -----------------------------------------------------------------------------
 
-function asRow(key: string, value: unknown): ReconRow {
-  if (typeof value !== 'object' || value === null) {
-    throw new ReconRowError(`${key} returned a row that is not an object`);
-  }
-  return value as ReconRow;
-}
-
-function requireString(key: string, row: ReconRow, field: string): string {
+/**
+ * **THE HAND-WRITTEN EXISTENCE MAPPING IS GONE (`ADR-430`).** `asRow` stood
+ * here, casting the accessor's `unknown` back into a `ReconRow` that re-stated
+ * `Record<string, unknown>`, and it is DELETED with the type it produced.
+ * `ReconTx.rowsWhere` hands back the row the key declares, so the three readers
+ * below take that row directly.
+ *
+ * **`field` IS `keyof R & string` AND THAT IS THE WHOLE PURCHASE.** A column
+ * name used to be any string at all and reached the row through an index
+ * signature; `tsc` now checks each one against `schema.ts`. **IT CHECKS THE
+ * NAME AND NOTHING ELSE.** `ADR-299` section 5.1 item 5 rules that a type
+ * derived from a TRANSCRIPTION retires no runtime check, and `ADR-112`
+ * foreclosure 4 records that nothing in this tree compares a `schema.ts` column
+ * type against the DDL. So every refusal below is unchanged, and on this slice
+ * that matters more than it did one directory over: these rows carry money.
+ */
+function requireString<R extends object>(key: string, row: R, field: keyof R & string): string {
   const value = row[field];
   if (typeof value !== 'string' || value.length === 0) {
     throw new ReconRowError(`${key}.${field} is not a non-empty string`);
@@ -388,7 +396,11 @@ function requireString(key: string, row: ReconRow, field: string): string {
   return value;
 }
 
-function optionalString(key: string, row: ReconRow, field: string): string | null {
+function optionalString<R extends object>(
+  key: string,
+  row: R,
+  field: keyof R & string,
+): string | null {
   const value = row[field];
   if (value === null || value === undefined) return null;
   if (typeof value !== 'string') {
@@ -405,7 +417,7 @@ function optionalString(key: string, row: ReconRow, field: string): string | nul
  * already have lost digits. Money is integer cents and nothing in this path may
  * see a float.
  */
-function requireCents(key: string, row: ReconRow, field: string): bigint {
+function requireCents<R extends object>(key: string, row: R, field: keyof R & string): bigint {
   const value = row[field];
   if (typeof value !== 'bigint') {
     throw new ReconRowError(
@@ -448,8 +460,7 @@ async function readPopulation(
   const stateRows = await tx.rowsWhere('ruleStates', { tradingDay });
 
   const ours = new Map<string, bigint>();
-  for (const raw of stateRows) {
-    const row = asRow('ruleStates', raw);
+  for (const row of stateRows) {
     ours.set(
       requireString('ruleStates', row, 'accountId'),
       requireCents('ruleStates', row, 'balanceCents'),
@@ -457,8 +468,7 @@ async function readPopulation(
   }
 
   const candidates: ReconCandidate[] = [];
-  for (const raw of markRows) {
-    const row = asRow('dailyMarks', raw);
+  for (const row of markRows) {
     const accountId = requireString('dailyMarks', row, 'accountId');
     candidates.push({
       accountId,
@@ -513,7 +523,12 @@ async function openRun(tx: ReconTx, values: OpenRunValues): Promise<string> {
   if (typeof row !== 'object' || row === null) {
     throw new ReconRowError('reconciliation_runs insert returned no row');
   }
-  const id = (row as ReconRow)['id'];
+  // **SPELLED HERE RATHER THAN IMPORTED, BECAUSE `insert` IS UNSPENT.** This is
+  // the WRITE path: `ReconTx.insert` still returns `Promise<unknown[]>`, so the
+  // shape has to come from somewhere and `ReconRow` is deleted. A write returns
+  // what the database made of what was sent, which is a different claim from a
+  // read's, and `ADR-426` section 12 item 3 leaves it open on purpose.
+  const id = (row as Readonly<Record<string, unknown>>)['id'];
   if (typeof id !== 'string' || id.length === 0) {
     throw new ReconRowError(
       'reconciliation_runs insert returned no id. Every later write in this sweep addresses the ' +
@@ -586,7 +601,18 @@ async function recordComparison(
         'reconciliations_account_day_uq forbids. The sweep refuses rather than picking one.',
     );
   }
-  const id = asRow('reconciliations', existing[0])['id'];
+  // **THE ARRAY BOUND IS NOT WHAT THE NARROWING BOUGHT, SO ITS REFUSAL STAYS.**
+  // `DeclaredRow` says what a row IS and says nothing about how many arrived;
+  // `noUncheckedIndexedAccess` is `tsc` agreeing. The two branches above make
+  // this unreachable by argument, and an argument is not a check.
+  const row = existing[0];
+  if (row === undefined) {
+    throw new ReconRowError(
+      'reconciliations returned a sparse row for one account-day. The sweep refuses rather ' +
+        'than addressing a row it cannot see.',
+    );
+  }
+  const id = row['id'];
   if (typeof id !== 'bigint') {
     throw new ReconRowError(
       `reconciliations.id is ${typeof id} and the column is bigint GENERATED ALWAYS AS IDENTITY.`,
