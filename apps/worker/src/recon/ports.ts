@@ -1,13 +1,37 @@
 // =============================================================================
 // apps/worker/src/recon/ports.ts
 // =============================================================================
-// THE RECONCILIATION SWEEP'S I/O BOUNDARY. `detectors/ports.ts`,
-// `sweeps/ports.ts`, `batch/ports.ts` and `provisioning/ports.ts` are the idiom
-// and the reason is `ADR-165`'s: it rules ONE door and ONE acquisition point,
-// `src/db.ts`, and `test/db.test.ts` walks this deployable's `src/` tree to
-// assert that `@merit/db` occurs in that one file. So every shape here is
-// DECLARED structurally and SATISFIED structurally: `@merit/db`'s `SystemTx` is
-// assignable to {@link ReconTx} with no import in either direction.
+// THE RECONCILIATION SWEEP'S I/O BOUNDARY, declared structurally over ONE
+// TYPE-ONLY IMPORT. `detectors/ports.ts`, `sweeps/ports.ts`, `batch/ports.ts`
+// and `provisioning/ports.ts` are the idiom and the reason is `ADR-165`'s: it
+// rules ONE door and ONE acquisition point, `src/db.ts`, and `test/db.test.ts`
+// section 3 parses import SPECIFIERS across this deployable's `src/` tree and
+// expects exactly `['src/db.ts']`.
+//
+// IT READ "every shape here is DECLARED structurally and SATISFIED
+// structurally" AND THAT IS NOW FALSE, so it is quoted here rather than
+// deleted. `ADR-430` made {@link ReconTx.rowsWhere} generic over the key and
+// deleted the `ReconRow` mapping, and the row it hands back instead is
+// `DeclaredRow`, which has to be imported to be spelled. THE SAME COMMIT ADDED
+// THE IMPORT BELOW AND LEFT THIS SENTENCE STANDING, while at `ReconRow`'s
+// deletion note further down it wrote the superseded form out in full: the
+// idiom was practised in this file, in that commit, on the type and not on the
+// header. `ADR-432` section 10 item 3 found it and `ADR-436` is the repair. The
+// import is `import type` and is ERASED, so the emitted module still imports
+// nothing.
+//
+// `@merit/db`'s `SystemTx` is assignable to {@link ReconTx}, and the one import
+// below reaches `src/db.ts` and NOT `@merit/db`. It read "with no import in
+// either direction": THAT CLAUSE IS NARROWLY TRUE AND IS CORRECTED ANYWAY.
+// `@merit/db` imports nothing from here and is imported nowhere here, but the
+// clause closed the sentence above and read as "this file imports nothing".
+//
+// **THIS HEADER CANNOT QUOTE THE GREP `ADR-165` STATES THE RULE IN, and that is
+// a fact about the check rather than about the rule.** Case 7 of
+// `test/recon-sweep.test.ts` asserts this file's RAW TEXT does not contain the
+// accessor's import clause as a substring, so a header that spelled the pattern
+// in order to explain it would turn that case red. `digests/ports.ts` sits
+// under a SPECIFIER-parsing case instead and therefore may quote it, and does.
 //
 // NOTHING HERE ADDS A `SystemReason` MEMBER, ADDS A `SqlExecutorReason` MEMBER,
 // IMPORTS `pg`, OR CASTS PAST A KEY TYPE.
