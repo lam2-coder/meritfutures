@@ -707,6 +707,60 @@ describe('the relocation, and the bindings that moved with it', () => {
     expect(read(OLD_PATH)).toContain('`makeEventSink` is called by NO file');
   });
 
+  test('exactly one of the two copies of the anchored sentence claims to be the bound one', () => {
+    // **THE TREE CARRIES THE ANCHORED SENTENCE TWICE AND ONLY ONE COPY IS
+    // BOUND.** ADR-415 section 4.3 found it by reading both files and recorded
+    // that NO LEG OF `RI-35` CAN SEE IT: leg 1 reads only the site it is told
+    // about, leg 6 sweeps only registered needles and this artifact registers
+    // none, so a second copy of a bound sentence is outside every leg by
+    // construction. ADR-418 is the row that resolves it, and this case is what
+    // keeps it resolved.
+    //
+    // THE INSTRUMENT IS A MARKER AND NOT THE PROSE AROUND IT, because prose is
+    // what drifted in the first place. Whichever file the register names writes
+    // `RI-35 BINDS THIS COPY` beside its copy and the other one must not, so
+    // "which file claims the binding" becomes a fact a runner can read rather
+    // than a sentence two headers can both assert.
+    //
+    // IT FAILS ON GOOD NEWS AND IT IS THE SECOND HALF OF THE CASE ABOVE. The
+    // day `packages/tooling` moves the `site` to the home, the case above goes
+    // red at the register and THIS one goes red at the marker, so the row that
+    // moves it is told both that the sentence may follow and that the marker
+    // must follow with it. Neither can move alone and leave a green suite.
+    const ANCHOR = '`makeEventSink` is called by NO file';
+    const MARKER = 'RI-35 BINDS THIS COPY';
+    const register = read('packages/tooling/checks/absence-claims.mjs');
+
+    // WHICH FILE THE REGISTER BINDS, READ OUT OF THE REGISTER rather than
+    // typed here, so this case cannot disagree with the one above by being
+    // edited on its own. A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED:
+    // an anchor the register no longer spells would make every expectation
+    // below vacuous, so the lookup is asserted before it is used.
+    const claimAt = register.indexOf(`claim: '${ANCHOR}'`);
+    expect(claimAt).toBeGreaterThan(-1);
+    const before = register.slice(0, claimAt);
+    const boundSite = /^site: '([^']+)'/.exec(before.slice(before.lastIndexOf("site: '")))?.[1];
+    expect(boundSite).toBeDefined();
+
+    // BOTH FILES CARRY THE SENTENCE, ONCE EACH, which is the state this case is
+    // about. Zero at either would mean the copy was deleted rather than
+    // resolved, and the resolution ADR-418 took deliberately keeps both: the
+    // producer's copy is a true sentence about the tree and only its claim to
+    // be the bound one was false.
+    for (const rel of [OLD_PATH, HOME]) {
+      const hits = read(rel)
+        .split('\n')
+        .filter((line) => line.includes(ANCHOR));
+      expect({ rel, hits: hits.length }).toEqual({ rel, hits: 1 });
+    }
+
+    // AND EXACTLY ONE OF THEM CLAIMS THE BINDING, AND IT IS THE ONE THE
+    // REGISTER NAMES. Two claimants is the state ADR-415 found; zero is the
+    // state where nobody can tell which copy leg 1 reads.
+    const claiming = [OLD_PATH, HOME].filter((rel) => read(rel).includes(MARKER));
+    expect(claiming).toEqual([boundSite]);
+  });
+
   test('the compatibility module publishes what one outside consumer takes, and no more', () => {
     // A MODULE IN THE DEPLOYABLE THAT CANNOT INSTALL A SINK MUST NOT PUBLISH THE
     // INSTALL PAIR. `apps/api` opens five doors and not one of them yields the
