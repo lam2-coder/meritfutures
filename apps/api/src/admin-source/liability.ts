@@ -288,19 +288,40 @@
 //       zero liability, and it carries the basis of every term it reports.
 //
 //       **CLEARING CONDITION, ALL TWO TERMS, AND THE GROUP NEEDS BOTH:**
-//         1. A `PlanRulesJson` DECODER THIS FENCE CAN REACH. `resolvePlan` is
-//            exported by the engine and its first argument is not:
-//            `plan_versions.rules` decodes in exactly one place in this
-//            repository, `toPublishedRules` in
-//            `apps/worker/src/batch/adapter.ts`, and this deployable cannot
-//            import that one. A second decoder written on the read side is
-//            `FM-16` on the blob that fixes every cents value and every gate
-//            threshold a payout is decided against, which is a worse trade than
-//            the figure is worth. `ADR-239` slice A rules the shared home is
-//            `packages/rules-engine`, beside `gates-codec.ts`, and that move is
-//            a money-path refactor of a merged adapter rather than a liability
-//            read. Until it lands the term is
-//            `EligibleFoldIo.resolvePinnedPlan`, injected and refusing by name.
+//         1. A SUPPLIER OF `EligibleFoldIo.resolvePinnedPlan`, WHICH IS A
+//            COMPOSITION AND IS NO LONGER A MOVE. **THIS ITEM PRICED A
+//            MONEY-PATH REFACTOR THAT HAD ALREADY HAPPENED, AND ITS RETIRED
+//            CLAUSES ARE PARAPHRASED RATHER THAN QUOTED** on `RI-14`'s rule
+//            that a sentence reproduced verbatim reads as live to every grep.
+//            It said the blob decoded in exactly one place in this repository,
+//            named that place in `apps/worker`, said this deployable could not
+//            import it, and priced the term as a `packages/rules-engine` move
+//            that had not landed. **EVERY ONE OF THOSE IS FALSE AND EACH IS
+//            FALSE BY MEASUREMENT.** `ADR-283` landed the shared statement:
+//            `decodePlanRules` is declared in `packages/rules-engine` and
+//            re-exported from its index, this deployable has declared that
+//            package since session 252, and `planLeg` in `payout-backend.ts`
+//            already calls it on the payout transaction (`ADR-308`). The
+//            one-place clause was wrong in the other direction as well, because
+//            the predicate is stated THREE times in this tree -- by the engine,
+//            by `toPublishedRules` in `apps/worker` and by `decodeRules` in
+//            `apps/site` -- and `test/rule-state-producibility.test.ts` holds
+//            that census rather than this comment.
+//            **THE `FM-16` GROUND SURVIVES ALL OF THAT AND IS WHY THIS FENCE
+//            STILL MAY NOT WRITE ONE.** A second decoder of the blob that fixes
+//            every cents value and every gate threshold a payout is decided
+//            against is `FM-16` on the money path, and the engine's is the
+//            statement the other two are owed to.
+//            **WHAT IS ACTUALLY UNSUPPLIED IS SMALLER THAN A REFACTOR AND IS
+//            NOT NOTHING**: the COMPOSITION of that decode with the account's
+//            `plan_version_sizes` read, on a transaction this fold holds.
+//            `LiabilityTx` offers `rows` and `rowsWhere` and no
+//            `catalogRowAt`, so the read half is not addressable from this
+//            module today, and the mapping onto the engine's
+//            `PlanVersionSizeRow` is a per-caller `FM-16` `ADR-303` limit 2
+//            registers rather than forgives. Nothing under any `src/` in this
+//            deployable supplies the port, so `UNWIRED_ELIGIBLE_FOLD_IO` throws
+//            `EligibleFoldUnwired` by name and the fold refuses.
 //         2. A WIRE THAT CAN SAY THE FIGURE IS A FORECAST. `ADR-204` ruling 7
 //            requires both halves of the figure to be stated wherever it is
 //            shown. `EligibleNext7d` declares `total_cents`, `account_count`

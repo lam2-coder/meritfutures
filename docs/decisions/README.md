@@ -421,6 +421,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-407](ADR-407.md) | all four blockers the dispatch names are spent, a fifth stands that it does not name, and the composition file is the one place the four outlived their measurement  (2026-09-07, status: proposed) |
 | [ADR-408](ADR-408.md) | the producer exists and was built five rows ago, what has no producer is the HANDLE, the refusal told its reader the blocker backwards, and the relocation nobody priced costs no manifest edge because three packages already sit in both arrows (2026-09-07, status: proposed) |
 | [ADR-409](ADR-409.md) | four of the runner's five ports are served, a BI event was destroying every `detector_runs` row and is repaired, and the blocker that says every detector declines is false of the one that runs (2026-09-07, status: proposed) |
+| [ADR-411](ADR-411.md) | the fifth blocker is real, it cannot be cleared from this fence, and the file the dispatch sent me to was the last one still stating its first term as a refactor that had already happened  (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
