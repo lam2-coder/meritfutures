@@ -431,6 +431,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-417](ADR-417.md) | `RI-35`'s register carried eleven derived figures and nothing derived any of them, so the arithmetic is made checkable and the integers are deleted (2026-09-07, status: proposed) |
 | [ADR-418](ADR-418.md) | the compatibility module is NOT retired, because its second dependant is not an import, and the anchored sentence carried by two files is resolved at the one that was lying (2026-09-07, status: proposed) |
 | [ADR-419](ADR-419.md) | the compatibility module is NOT retired because ADR-418 priced four of its five files, and the eight unbound figures are re-derived through the leg that reads them, two bound and five deleted (2026-09-07, status: proposed) |
+| [ADR-420](ADR-420.md) | the gap cause for an unwired producer is not a gap cause, and the two holes that are real were never the one four entries named  (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -49,8 +49,9 @@ import type {
   EligibleNext7dFigure,
   EligibleNext7dOutcome,
 } from '../src/admin-source/eligible-next-7d.ts';
+import { AdminSourceNotComposed } from '../src/admin-source/index.ts';
 import type { TradingCalendarTx } from '../src/admin-source/liability.ts';
-import { AdminReadError } from '../src/routes/admin-reads.ts';
+import { AdminReadError, LIABILITY_GAP_CAUSES } from '../src/routes/admin-reads.ts';
 
 import type { BasisPoints, Cents, PlanVersionId, ResolvedPlan } from '@merit/rules-engine';
 
@@ -830,5 +831,152 @@ describe('the refusal vocabulary', () => {
       expect(term.source).not.toBe('');
       expect(['measured', 'projected']).toContain(term.basis);
     }
+  });
+});
+
+// =============================================================================
+// 9. THE MAPPING ONTO THE WIRE, WHICH IS UNWRITTEN, AND THE LAYER RULE THAT SAYS
+//    WHY ONE OF ITS HOLES IS NOT A HOLE
+// =============================================================================
+// `ADR-420`. Four entries recorded "the gap cause for an unwired producer is
+// unruled" ([ADR-407](../../../docs/decisions/ADR-407.md) section 11 item 1, and
+// again in `ADR-411`, `ADR-413` and `ADR-416`) without writing down what the
+// choices were. Derived here rather than inherited, the position is:
+//
+//   1. THE UNWIRED PRODUCER NEEDS NO WIRE CAUSE AT ALL. It is a THROW
+//      (`EligibleFoldUnwired`) at the layer whose supplier is missing, in
+//      `AdminSourceNotComposed`'s idiom and for its reason, and this tree
+//      answers deployment-incompleteness that way at every layer it can arise.
+//      A cause vocabulary describes what the ESTATE cannot answer.
+//   2. TWO REAL HOLES EXIST AND NEITHER IS THAT ONE. `no_folded_state` and
+//      `projection_refused` are reachable on a FULLY WIRED deployment and
+//      neither has an honest image among the two causes `ADR-203` ruling 8 and
+//      `ADR-204` ruling 9 fix for this field.
+//
+// `toWireEligibleNext7d` takes the `folded` arm ALONE, so no function in this
+// tree maps a refusal onto a `gaps` entry and these cases hold the arithmetic
+// that a mapping would have to satisfy.
+
+describe('the fold`s refusals against the wire`s vocabulary', () => {
+  /** Every refusal arm, reached by executing the fold rather than by hand. */
+  const everyRefusal = async (): Promise<
+    ReadonlyMap<string, { readonly awaiting: string | null; readonly detail: string }>
+  > => {
+    const reached = new Map<string, { awaiting: string | null; detail: string }>();
+    const record = (outcome: EligibleNext7dOutcome): void => {
+      if (outcome.kind !== 'refused') throw new Error('expected a refusal');
+      reached.set(outcome.cause, { awaiting: outcome.awaiting, detail: outcome.detail });
+    };
+
+    record(await fold(twoEligible(), calendarHandle({ loads: [] })));
+    record(
+      await fold(
+        twoEligible(),
+        calendarHandle({
+          loads: [{ coverageStartDay: '2026-11-02', coverageEndDay: '2026-11-17' }],
+        }),
+      ),
+    );
+    record(await fold({ ...twoEligible(), ruleStates: [] }));
+    record(
+      await fold({
+        ...twoEligible(),
+        accounts: [account(ACCOUNT_A, IDENTITY_A)],
+        ruleStates: [eligibleNowRow(ACCOUNT_A, { cadenceAnchorDay: '2026-10-01' })],
+      }),
+    );
+    return reached;
+  };
+
+  it('reaches every declared cause, and exactly one of them carries an `awaiting`', async () => {
+    const reached = await everyRefusal();
+    // Derived from the executed arms rather than restated, so a fifth cause
+    // nobody reaches here is a red case and not a silent hole.
+    expect([...reached.keys()].sort()).toEqual([...ELIGIBLE_FOLD_REFUSAL_CAUSES].sort());
+    for (const [, entry] of reached) expect(entry.detail.trim()).not.toBe('');
+
+    const carryAnAwaiting = [...reached]
+      .filter(([, entry]) => entry.awaiting !== null)
+      .map(([cause]) => cause);
+    expect(carryAnAwaiting).toEqual(['no_folded_state']);
+  });
+
+  it('leaves TWO of the four with no honest `LiabilityGapCause`, and they are named', async () => {
+    const reached = await everyRefusal();
+
+    // `ADR-203` ruling 8 and `ADR-204` ruling 9 fix THIS FIELD's causes at two,
+    // both with `awaiting` null, because the absence they rule is a HORIZON with
+    // no answer. The third member of the wire vocabulary is not available to
+    // `eligible_next_7d` even though the TYPE would accept it, which is the
+    // whole of `ADR-407` section 6.
+    const ruledForThisField = ['estate_uncovered', 'insufficient_history'] as const;
+    for (const cause of ruledForThisField) expect(LIABILITY_GAP_CAUSES).toContain(cause);
+    expect(LIABILITY_GAP_CAUSES).toContain('awaiting_dependency');
+
+    // `assertLiabilityGapsPaired` makes `awaiting` non-null EXACTLY when the
+    // cause is `awaiting_dependency`, so a fold refusal carrying an `awaiting`
+    // FORCES the one cause this field may not take. That is a contradiction
+    // between two live rulings and not a gap in a vocabulary.
+    const unmappable = [...reached]
+      .filter(([cause, entry]) => entry.awaiting !== null || cause === 'projection_refused')
+      .map(([cause]) => cause)
+      .sort();
+    expect(unmappable).toEqual(['no_folded_state', 'projection_refused']);
+
+    // And the other two map cleanly, which is what makes the residue two rather
+    // than four.
+    const mappable = [...reached]
+      .filter(([cause, entry]) => entry.awaiting === null && cause !== 'projection_refused')
+      .map(([cause]) => cause)
+      .sort();
+    expect(mappable).toEqual(['calendar_uncovered', 'horizon_exhausted']);
+  });
+
+  it('has no function that maps a refusal onto the wire, which is the hole itself', () => {
+    // `toWireEligibleNext7d` narrows the FIGURE. Its parameter is the `folded`
+    // arm and not the outcome union, so the refusal side reaches no wire at all
+    // and a reader looking for the mapping finds nothing rather than a wrong one.
+    const src = read('apps/api/src/admin-source/eligible-next-7d.ts');
+    expect(src).toContain('export function toWireEligibleNext7d(figure: EligibleNext7dFigure)');
+    expect(src).not.toContain('EligibleFoldRefused): LiabilityGap');
+  });
+});
+
+// =============================================================================
+// 10. THE LAYER RULE, WHICH IS `ADR-420`'s RULING
+// =============================================================================
+
+describe('deployment incompleteness is a throw at every layer and never a cause', () => {
+  it('is an Error where the supplier is missing, at both layers this figure crosses', () => {
+    // THE FOLD LAYER. The port is a required positional parameter with no
+    // default, so a deployment supplies it or names `UNWIRED_ELIGIBLE_FOLD_IO`
+    // deliberately; either way an absent supplier is a throw.
+    expect(() => UNWIRED_ELIGIBLE_FOLD_IO.resolvePinnedPlan(PLAN_VERSION, SIZE_CENTS)).toThrow(
+      EligibleFoldUnwired,
+    );
+
+    // THE METHOD LAYER, one level up and the same answer.
+    expect(new AdminSourceNotComposed('readLiability')).toBeInstanceOf(Error);
+    expect(new AdminSourceNotComposed('readLiability').message).toContain(
+      'deployment which has not been finished',
+    );
+  });
+
+  it('appears in NEITHER absence vocabulary, which is `ADR-420`s ruling', () => {
+    // The members of both vocabularies name kinds of absence IN THE ESTATE.
+    // `SystemReason`'s rule one vocabulary over (`ADR-165`) is the authority:
+    // it "DOES NOT NAME SERVICES, IT NAMES KINDS OF ACCESS". An uninstalled
+    // producer affords the panel's reader NO ACT, and `apps/admin`'s
+    // `GAP_CAUSE_REMEDY` is a total map from cause to what the reader DOES, so a
+    // fourth member would carry a remedy reading "there is nothing you can do",
+    // which is the bare null the vocabulary exists to refuse.
+    const wiring = /unwired|unsupplied|not_?composed|uninstalled|undeployed|no_?producer/;
+    for (const cause of LIABILITY_GAP_CAUSES) expect(cause).not.toMatch(wiring);
+    for (const cause of ELIGIBLE_FOLD_REFUSAL_CAUSES) expect(cause).not.toMatch(wiring);
+
+    // Closed at three and four respectively, so a member minted for a wire that
+    // this ruling says needs none is a red case here and a diff on `ADR-420`.
+    expect(LIABILITY_GAP_CAUSES).toHaveLength(3);
+    expect(ELIGIBLE_FOLD_REFUSAL_CAUSES).toHaveLength(4);
   });
 });
