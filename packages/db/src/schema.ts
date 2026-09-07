@@ -5341,6 +5341,22 @@ export const firmParameters = pgTable(
 // process that is to P6-b and P6-g. A key here would be a permission claim this
 // package cannot honour, so the transcription lands WITHOUT one.
 //
+// THIS IS THE FIRST RELATION IN THIS FILE WITH NO KEY IN `scope.ts`, DERIVED
+// AND NOT ASSUMED: before it, 116 relations were declared here and all 116 were
+// registered. THE SAFETY PROPERTY IS UNCHANGED AND IS ASSERTED RATHER THAN
+// ARGUED. `scopedDb`, `firmDb` and `systemDb` all take `TableKey`, which is
+// `keyof typeof TABLES`, so naming this relation at a call site is a COMPILE
+// error exactly as it was when the relation was not declared at all, and `the
+// table is NOT registered` in `test/scoped-db.test.ts` is its runtime shadow.
+// WHAT IS NOW IMPRECISE IS ONE EXPLANATORY CLAUSE IN THIS FILE'S HEADER, at
+// `schema.ts:6`: "`SCOPE_RULES` is total over the keys of this file". It is
+// stated of the DECLARATIONS here and this declaration is outside it. IT IS NOT
+// REPAIRED IN THIS DIFF AND THE REASON IS MEASURED: 62 distinct lines of this
+// file are cited from elsewhere in the tree, 6 of them inside the header
+// itself, and an edit up there moves every one of them. ADR-447 section 9 owes
+// the repair with the citation on it, which is ADR-386:169's rule that a
+// pointer in a dated record is NAMED rather than left to be noticed.
+//
 // WHAT THAT COSTS IS THE FOUR COMPARISONS, AND THEY ARE PAID FOR BY NAME. The
 // drift, type, nullability and DEFAULT loops in `test/scoped-db.test.ts` all
 // iterate `DDL_NAMES`, which is derived from `TABLE_KEYS`, so an unregistered
