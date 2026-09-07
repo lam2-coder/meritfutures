@@ -254,8 +254,38 @@ jobs:
       # a project emptied by a bad glob fails here rather than reporting green
       # for having looked at nothing. That is not configured; it is the default,
       # and `--passWithNoTests` must never be added to this line.
+      #
+      # `--reporter=json` IS AN ADDITION AND NOT A REPLACEMENT, and `default` is
+      # named beside it for that reason: passing `--reporter=json` alone would
+      # take the human-readable run out of this log in exchange for a file. The
+      # JSON goes to `RUNNER_TEMP` rather than the workspace so that no step
+      # after this one sees a dirty tree.
+      #
+      # THE PASS/FAIL OF THIS STEP IS UNCHANGED BY EITHER FLAG. The report is an
+      # output, and the step that reads it is the next one.
       - name: Unit and property suites
-        run: pnpm exec vitest run --project unit --project property
+        run: >-
+          pnpm exec vitest run --project unit --project property
+          --reporter=default --reporter=json
+          --outputFile="$RUNNER_TEMP/ci-02-report.json"
+
+      # ADR-435. A SKIP IS GREEN, SO THE NUMBER OF THEM IS BOUND TO A REGISTER.
+      # `packages/tooling/checks/skipped-tests.mjs` compares the per-file
+      # skipped counts of the run above against the one place the corpus states
+      # them, in both directions: a case that stopped running and a case that
+      # started are equally red, because a control that fires only on the first
+      # has encoded somebody's idea of which skips are legitimate.
+      #
+      # IT RUNS NO SUITE. It reads the report the step above already produced,
+      # so the cost of this control is a Node start-up.
+      #
+      # IT IS A STEP OF CI-02 RATHER THAN A GATE IN `gates.mjs`, AND THAT IS
+      # FORCED. Every `CI-06` gate is static: it reads the tree and derives. This
+      # one needs a number only a RUN can produce, and ADR-429 section 10 rules
+      # out the static approximation of it by name. So no `CI-06` letter is spent
+      # and no `RI-nn` is minted; the assertion lives where the run is.
+      - name: The skipped-case register still matches the run
+        run: node packages/tooling/checks/skipped-tests.mjs "$RUNNER_TEMP/ci-02-report.json"
 
       - name: Gates are falsifiable
         run: node scripts/ci/falsify-ci.mjs CI-02
@@ -643,8 +673,23 @@ jobs:
       # only thing standing between this stage and reporting green for having
       # looked at nothing, which is precisely the state CI-04 was in before
       # ADR-085: a declared project no workflow selected.
+      #
+      # `--reporter=json` for the reason CI-02's step gives, and the same
+      # `default` beside it so this log keeps its run.
       - name: Integration suite
-        run: pnpm exec vitest run --project integration
+        run: >-
+          pnpm exec vitest run --project integration
+          --reporter=default --reporter=json
+          --outputFile="$RUNNER_TEMP/ci-04-report.json"
+
+      # ADR-435, over CI-04's slice. NO REGISTER ROW NAMES AN INTEGRATION FILE
+      # TODAY, so what this asserts is that `integration` skips nothing at all,
+      # and it is red the first time one does. That is the cheaper half of the
+      # control and it is the half that has never been true of a stage before it
+      # was checked: CI-04 was a declared project no workflow selected until
+      # ADR-085, which is a stage reporting green for having looked at nothing.
+      - name: The skipped-case register still matches the run
+        run: node packages/tooling/checks/skipped-tests.mjs "$RUNNER_TEMP/ci-04-report.json"
 
       - name: Gates are falsifiable
         run: node scripts/ci/falsify-ci.mjs CI-04
