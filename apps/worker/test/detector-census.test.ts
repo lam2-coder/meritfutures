@@ -297,26 +297,45 @@ describe('the census, derived by running every detector against its own row', ()
 // =============================================================================
 // Section 2 ran against a sink that resolves, which no deployment has. This
 // section swaps in `UNWIRED_DETECTOR_EVENT_SINK`, the value
-// `postgresDetectorRunnerIo` installs when it is called the way `src/` calls it,
-// and the result is the sentence this slice most needs on the record:
+// `postgresDetectorRunnerIo` installs when it is called the way `src/` calls it.
 //
-//   **THE ONE DETECTOR THAT RUNS TODAY WRITES NOTHING EITHER.**
+// **THE SENTENCE THAT STOOD HERE IS KEPT BESIDE ITS CORRECTION (`RI-14`).** It
+// read: *"THE ONE DETECTOR THAT RUNS TODAY WRITES NOTHING EITHER"*, because
+// `runner.ts` emitted `detector.run_completed` first and unconditionally inside
+// the write transaction and the refusal rolled the run row back.
 //
-// `runner.ts` emits inside the write transaction and emits unconditionally, so
-// the refusal rolls back the `detector_runs` row that was inserted before it.
-// That is honest and it is also a useless run, and both halves are the ruling
-// ADR-349 recorded for one detector. Here it is watched for all of them.
+// **ADR-409 RULES THAT A DEFECT AND REPAIRS IT**, on the ground that no rule
+// binds the BI point to the run row and `INV-M7-07` requires the row. So the
+// population now RECORDS under the sink this deployment installs, and what it
+// still cannot do is PAGE. **Both halves are asserted, because the second is the
+// control**: a degraded run whose page cannot be written must still take its row
+// down with it, and a suite that stopped checking that would have bought
+// `INV-M7-07` with `AS-M7-05`.
 
 describe('the sink this deployment installs, over every detector at once', () => {
-  it('every outcome comes back unrecorded, the one that runs included', async () => {
+  it('every run is now RECORDED, and every one still reports the refusal', async () => {
     const run = fake(UNWIRED_DETECTOR_EVENT_SINK);
     const report = await runAll(run.io);
 
-    expect([...report.unrecorded].sort()).toEqual(IMPLEMENTED_IDS);
-    for (const outcome of report.outcomes) expect(outcome.recorded).toBe(false);
-    // THE ROLLBACK IS THE POINT, and the fake stages rather than commits so it
-    // can be read: nothing survived the unit of work.
-    expect(run.writes).toEqual([]);
+    // INV-M7-07 over the whole population, under the sink that actually ships.
+    expect(report.unrecorded).toEqual([]);
+    for (const outcome of report.outcomes) expect(outcome.recorded).toBe(true);
+    expect(run.writes.filter((each) => each.table === 'detectorRuns')).toHaveLength(
+      IMPLEMENTED.length,
+    );
+    // AND NOTHING WAS SWALLOWED TO BUY THAT. Every outcome names the refusal.
+    for (const outcome of report.outcomes) {
+      expect(outcome.error).toContain('DetectorAdapterUnwired');
+    }
+  });
+
+  it('none of the fourteen is degraded today, which is why none of them rolls back', async () => {
+    // THE PRECONDITION OF THE CASE ABOVE, ASSERTED RATHER THAN ASSUMED. If a
+    // detector ever became degraded under the seed, its row would roll back and
+    // the case above would be reading a different population than it thinks.
+    const run = fake(UNWIRED_DETECTOR_EVENT_SINK);
+    const report = await runAll(run.io);
+    expect(report.degraded).toEqual([]);
   });
 
   it('the refusal names the blocker rather than only failing', async () => {
@@ -332,6 +351,25 @@ describe('the sink this deployment installs, over every detector at once', () =>
     expect(runs?.error).toContain('apps/api/src/events.ts');
     expect(runs?.error).toContain('detector.run_degraded');
     expect(runs?.error).toContain('detector_run_id');
+  });
+
+  it('a DEGRADED run still takes its run row down with its unwritable page', async () => {
+    // THE CONTROL. `ports.ts` binds `detector.run_degraded` to the run row under
+    // `ADR-006`, and ADR-409 changed the BI point's handling and NOT this one.
+    // A detector that reads nothing cannot find the canary it seeded.
+    const run = fake(UNWIRED_DETECTOR_EVENT_SINK);
+    const blind: Detector = {
+      id: 'D-02',
+      streams: () => [],
+      canaries: (mint) => [mint.hedgedPair('D-02', 0)],
+      scan: () => ({ findings: [] }),
+    };
+    const report = await runDetectors([blind], { tradingDay: TRADING_DAY }, run.io);
+
+    expect(report.outcomes[0]?.status).toBe('degraded');
+    expect(report.unrecorded).toEqual(['D-02']);
+    expect(report.outcomes[0]?.recorded).toBe(false);
+    expect(run.writes).toEqual([]);
   });
 });
 

@@ -54,6 +54,7 @@ import { canaryNonce, isCanaryId } from '../src/detectors/canary.ts';
 import { fillClusteringNightly } from '../src/detectors/fills.ts';
 import { DETECTOR_READ_TABLES, DETECTOR_WRITE_TABLES } from '../src/detectors/ports.ts';
 import type {
+  Detector,
   DetectorEvent,
   DetectorEventPort,
   DetectorRow,
@@ -210,16 +211,33 @@ describe('the composed value serves four ports and refuses the fifth', () => {
 });
 
 // =============================================================================
-// 2. THE FINDING: the composed default records NOTHING, and says so
+// 2. THE FINDING, AMENDED: the composed default now RECORDS and still cannot PAGE
 // =============================================================================
-// **THIS IS THE CASE THE ROW WAS DISPATCHED TO WRITE AND IT PASSES BY FAILING.**
-// `runner.ts` calls `emitRunEvents` inside the write transaction and calls it
-// unconditionally, so the refusal above rolls back the `detector_runs` row that
-// was inserted three statements earlier. A deployment holding
+// **THE SENTENCE THAT STOOD HERE IS KEPT BESIDE ITS CORRECTION (`RI-14`).** It
+// read: *"`runner.ts` calls `emitRunEvents` inside the write transaction and
+// calls it unconditionally, so the refusal above rolls back the `detector_runs`
+// row that was inserted three statements earlier. A deployment holding
 // `postgresDetectorRunnerIo(LIVE_DB)` therefore writes no run row at all, which
-// is why ADR-349 rules the job still unscheduled.
+// is why ADR-349 rules the job still unscheduled."*
+//
+// **THAT WAS TRUE AND IT WAS A DEFECT RATHER THAN A DESIGN, AND ADR-409 RULES
+// IT.** The unconditional emit was `detector.run_completed`, a BI point that no
+// rule in `M07`, in `EVENTS` or in this deployable binds to the run row. The one
+// event that IS bound is `detector.run_degraded`, and `ports.ts` says so in its
+// own words citing `ADR-006`. So a BI event was able to make every run in the
+// estate unrecorded, `ok` runs included, against `INV-M7-07`.
+//
+// **AND THE ARGUMENT THAT ALLOWED IT DID NOT COVER THE RUNS IT DESTROYED**: a
+// row committed without its page is `AS-M7-05`'s dashboard with an extra step
+// only where there IS a page, and a non-degraded run has none.
+//
+// **WHAT THE COMPOSED DEFAULT DOES NOW IS BOTH HALVES AT ONCE**, which is why
+// this section asserts two cases rather than one: a non-degraded run is
+// RECORDED and carries the refusal in its own error, and a DEGRADED run still
+// takes its row down with its page. The second case is the control, and losing
+// it would be the no-op sink arriving by another door.
 
-test('a deployment holding the composed default writes no detector_runs row', async () => {
+test('a non-degraded run is RECORDED and still reports that the sink refused', async () => {
   const rec = recorder({ fills: [], accounts: [], detectorDefinitions: [D01_DEFINITION] });
   const report = await runDetectors(
     [fillClusteringNightly],
@@ -227,16 +245,42 @@ test('a deployment holding the composed default writes no detector_runs row', as
     postgresDetectorRunnerIo(rec.db),
   );
 
+  // INV-M7-07. The run produced an answer and the estate keeps it.
+  expect(report.unrecorded).toEqual([]);
+  expect(report.outcomes[0]?.recorded).toBe(true);
+  expect(report.outcomes[0]?.status).not.toBe('degraded');
+  // AND THE REFUSAL IS REPORTED RATHER THAN SWALLOWED, which is the difference
+  // between this and a sink that returns. The caller learns the BI point was
+  // lost, by name, on the outcome it already reads.
+  expect(report.outcomes[0]?.error).toContain('DetectorAdapterUnwired');
+  expect(report.outcomes[0]?.error).toContain('events.emit');
+  expect(rec.writes.map((w) => w.table)).toContain('detectorRuns');
+  expect(report.outcomes[0]?.flagsRaised).toBe(0);
+});
+
+test('a DEGRADED run still takes its run row down with its unwritable page', async () => {
+  // The battery is minted from the run's nonce and this detector's scan sees no
+  // rows at all, so it finds none of its own canaries and the run is degraded.
+  // That is the one shape `ports.ts` binds to the run row under `ADR-006`.
+  const rec = recorder({ fills: [], accounts: [], detectorDefinitions: [D01_DEFINITION] });
+  const blind: Detector = {
+    id: 'D-01',
+    streams: () => [],
+    canaries: (mint) => [mint.sameSecondFillCluster('D-01', 0)],
+    scan: () => ({ findings: [] }),
+  };
+  const report = await runDetectors(
+    [blind],
+    { tradingDay: TRADING_DAY },
+    postgresDetectorRunnerIo(rec.db),
+  );
+
+  expect(report.outcomes[0]?.status).toBe('degraded');
+  // THE CONTROL. The page cannot be written, so neither is the row, and the
+  // criterion ports.ts states is preserved exactly as it was.
   expect(report.unrecorded).toEqual(['D-01']);
   expect(report.outcomes[0]?.recorded).toBe(false);
   expect(report.outcomes[0]?.error).toContain('DetectorAdapterUnwired');
-  // THE ROLLBACK IS THE POINT. The insert reached the recorder, because the
-  // recorder is not a database and cannot roll back; what the runner reports is
-  // `recorded: false`, and a real transaction would have discarded every row
-  // below. Both facts are asserted so a reader cannot mistake the recorder's
-  // memory for a commit.
-  expect(rec.writes.map((w) => w.table)).toContain('detectorRuns');
-  expect(report.outcomes[0]?.flagsRaised).toBe(0);
 });
 
 // =============================================================================
