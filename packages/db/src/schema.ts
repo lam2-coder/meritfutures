@@ -5318,3 +5318,94 @@ export const firmParameters = pgTable(
     unique('firm_parameters_approval_is_spent_once').on(table.dualControlApprovalId),
   ],
 );
+
+// -----------------------------------------------------------------------------
+// live_account_state -- 0050_live_cache_and_role.sql. ADR-020 tier 2, ADR-164,
+// SD-M2-07. TRANSCRIBED AND DELIBERATELY NOT REGISTERED IN `scope.ts`.
+// -----------------------------------------------------------------------------
+// WHICH MIGRATIONS BUILD THIS TABLE WAS DERIVED AND NOT ASSUMED. `grep -rniI
+// 'live_account_state' packages/db/migrations` matches ONE file, `0050`, so the
+// `CREATE TABLE` body IS the column set as of the last migration: no `ADD
+// COLUMN`, no `ALTER COLUMN`, nothing for the fold to replay. It is
+// `reserve_coverage_snapshots`' position in that respect and `events`'.
+//
+// THIS TABLE IS NOT IN `TABLES` AND THE REASON IS A GRANT RATHER THAN A TASTE.
+// `0050` REVOKEs ALL on it from `merit_app` and from PUBLIC, and its own header
+// item 3 says why the revoke is `ALL` and not `UPDATE, DELETE`: FM-M12-08 ("the
+// stats worker holds no read grant on the live cache") is a statement about
+// READING, and the API and the worker both run as `merit_app`. Every door in
+// `scoped-db.ts` opens on the pool `client.ts` builds from one `DATABASE_URL`,
+// which is `merit_app`, so registering this key would publish a `scopedDb`
+// door onto a relation the database is REQUIRED to refuse. The live tier is a
+// process that connects as `merit_live` and `0050` header item 4 leaves which
+// process that is to P6-b and P6-g. A key here would be a permission claim this
+// package cannot honour, so the transcription lands WITHOUT one.
+//
+// WHAT THAT COSTS IS THE FOUR COMPARISONS, AND THEY ARE PAID FOR BY NAME. The
+// drift, type, nullability and DEFAULT loops in `test/scoped-db.test.ts` all
+// iterate `DDL_NAMES`, which is derived from `TABLE_KEYS`, so an unregistered
+// relation is reached by none of them. `live_account_state: the transcription
+// is compared against `0050`' in that file runs all four against this table by
+// name, and a fifth over the generation clause, so this declaration is checked
+// mechanically rather than read once.
+//
+// THREE `*_cents` COLUMNS, ALL `bigint`, ONE OF THEM GENERATED. INV-02 makes
+// cents the money type at every boundary and `0050`'s own column comment says a
+// tick narrowed to a float "would be the one place in the package where a cents
+// value could silently lose precision, on the surface a trader watches". No
+// float enters this declaration and none enters the DDL.
+//
+// NEITHER EQUITY CARRIES A NON-NEGATIVE CHECK AND THAT IS `0050`'s RULING, not
+// an omission here: an account's equity can go through zero and a constraint
+// refusing it would drop exactly the ticks a trader most needs to see. CHECK
+// constraints are not expressible in this file in any case, which is why
+// `live_account_state_sequence_is_positive` and `..._is_indicative` are left to
+// the database like every other table's.
+export const liveAccountState = pgTable('live_account_state', {
+  // THE GRAIN. `PRIMARY KEY` and not a separate `NOT NULL`, which is the DDL's
+  // spelling; the FK is declared INLINE in the `CREATE TABLE` body and
+  // `accounts` is a table of this file, so this is one of the cases the header
+  // admits `.references()` for. `ON DELETE RESTRICT` is the database's and is
+  // not claimed here, on the same rule that leaves `ADD CONSTRAINT` alone.
+  accountId: uuid('account_id')
+    .primaryKey()
+    .references(() => accounts.id),
+  // The tick's trading day. Carried because `LiveAccountTick.sequence` is
+  // 1-based PER ACCOUNT PER DAY, so a sequence without its day is not an
+  // ordinal, and because yesterday's leftover row must be distinguishable from
+  // a quiet market today.
+  tradingDay: date('trading_day').notNull(),
+  // 1-based, in delivery order. ADR-020 rule 3 makes feed loss a first-class
+  // state: without the ordinal the only way to notice a gap is a timestamp
+  // comparison, which cannot tell a lost tick from a quiet market.
+  sequence: integer('sequence').notNull(),
+  // THE DAY'S FIRST TICK EQUITY AND THE LATEST. Integer cents in bigint, both.
+  openingEquityCents: bigint('opening_equity_cents', { mode: 'bigint' }).notNull(),
+  equityCents: bigint('equity_cents', { mode: 'bigint' }).notNull(),
+  // GENERATED, AND THEREFORE NULLABLE HERE, which is `rcr_bp`'s position on
+  // `reserve_coverage_snapshots` exactly: `0050` declares no `NOT NULL` on it
+  // and drizzle records a generated column in `generated` rather than in
+  // `hasDefault`, so both halves of the DEFAULT comparison read false and agree
+  // (ADR-438 section 5). API_CONTRACT section 8's
+  // `terms.intraday_movement_cents`, SIGNED, computed by the database on
+  // `0049`'s precedent: a figure the database computes cannot disagree with the
+  // two numbers stored beside it and a movement written by the ingest could.
+  // INTEGER SUBTRACTION ON bigint CENTS. No float enters the live path.
+  intradayMovementCents: bigint('intraday_movement_cents', { mode: 'bigint' }).generatedAlwaysAs(
+    sql`equity_cents - opening_equity_cents`,
+  ),
+  // `LiveFreshness.feed`. NO CHECK OVER A VALUE LIST, which is `0050`'s ruling:
+  // V-M2-16 is unanswered and a merged CHECK naming today's feeds could never
+  // be corrected.
+  feed: text('feed').notNull(),
+  // `LiveFreshness.as_of_instant`. OUR clock, set on write, because ADR-152
+  // clause 1 makes staleness the SERVER's answer and the instant it is measured
+  // from has to be one a lagging or lying feed cannot move.
+  asOfInstant: timestamp('as_of_instant', { withTimezone: true }).notNull().defaultNow(),
+  // THE LABEL, ON THE ROW. Constant TRUE by construction and that is the point:
+  // `LiveAccountTick` carries `indicative: true` as a REQUIRED LITERAL so a
+  // consumer destructuring a tick cannot fail to see it, and INV-M4-11 is that
+  // "a label in a page footer is not a label on a number."
+  indicative: boolean('indicative').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
