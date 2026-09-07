@@ -2,14 +2,38 @@
 // apps/worker/src/digests/ports.ts
 // =============================================================================
 // THE SCHEDULED DIGEST'S I/O BOUNDARY, and the boundary of the alarm that
-// watches it. `SD-M6-07`'s producers, declared structurally, importing nothing.
+// watches it. `SD-M6-07`'s producers, declared structurally over ONE TYPE-ONLY
+// IMPORT.
+//
+// IT READ "declared structurally, importing nothing" AND THAT IS NOW FALSE, so
+// it is quoted here rather than deleted. `ADR-426` made
+// {@link DigestReadTx.rowsWhere} generic over the key so the row could follow
+// it, and the name of that row is `DeclaredRow`, which has to be imported to be
+// spelled. THE SAME COMMIT ADDED THE IMPORT AND LEFT THIS SENTENCE STANDING,
+// `ADR-432` section 10 item 3 found it, and `ADR-436` is the repair. The import
+// is `import type` and is ERASED, so the emitted module still imports nothing.
 //
 // `breaker/ports.ts`, `detectors/ports.ts`, `sweeps/ports.ts`, `batch/ports.ts`
 // and `provisioning/ports.ts` are the idiom and `ADR-165` is the reason it is
 // REQUIRED rather than merely conventional: one door and one acquisition point,
-// `src/db.ts`, checked by `grep -rlE "from '@merit/db'" apps/worker/src`
-// printing that file AND NOTHING ELSE. `@merit/db`'s `SystemTx` is assignable to
-// {@link DigestTx} with no import in either direction.
+// `src/db.ts`.
+//
+// THE GREP THIS HEADER USED TO SPELL IS QUOTED RATHER THAN RESTATED, BECAUSE AS
+// WRITTEN IT IS FALSE. It read: `grep -rlE "from '@merit/db'" apps/worker/src`
+// "printing that file AND NOTHING ELSE". Measured on this commit that command
+// prints SEVEN files, and six of them match only because they QUOTE the pattern
+// inside a comment, this header included. The property holds on the CODE
+// reading and only there, which is where it is actually asserted:
+// `test/db.test.ts` section 3 parses import SPECIFIERS and expects exactly
+// `['src/db.ts']`, and that file's own note records a substring draft of the
+// same case failing on `provisioning/ports.ts` for this identical reason.
+//
+// `@merit/db`'s `SystemTx` is assignable to {@link DigestTx}, and the one
+// import below reaches `src/db.ts` and NOT `@merit/db`. It read "with no import
+// in either direction": THAT CLAUSE IS NARROWLY TRUE AND IS CORRECTED ANYWAY.
+// `@merit/db` imports nothing from here and is imported nowhere here, but the
+// clause sat beside the sentence above and read as "this file imports nothing".
+// This file now names one type, through the one door.
 //
 // NOTHING HERE ADDS A `SqlExecutorReason` MEMBER, ADDS A `SystemReason` MEMBER,
 // IMPORTS `pg`, OR CASTS PAST A KEY TYPE (`P7` section 11 rule 10, `ADR-157`
