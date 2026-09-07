@@ -442,9 +442,9 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'WHAT THE FIGURE ACTUALLY WAITS ON IS SMALLER AND IS NOT A MOVE. The term is still ' +
     '`EligibleFoldIo.resolvePinnedPlan`, injected, whose unwired default throws ' +
     '`EligibleFoldUnwired` by name, and NOTHING under any `src/` in this deployable supplies ' +
-    'it, so the fold refuses exactly as it did. What changed is the PRICE: a ruling nobody had ' +
-    'taken became a call somebody writes on this port`s own composition, and this entry says so ' +
-    'rather than letting a reader meet the retired sentence and size a money-path refactor. ' +
+    'it, so the fold refuses exactly as it did. THE PRICE HAS NOW MOVED TWICE. A ruling nobody had ' +
+    'taken became a composition, and `ADR-413` then measured that the composition is `ScopedTx`-bound ' +
+    'through `catalogRowAt`, so its home is a `packages/db` door and not an export one file over. ' +
     'NO PORT IS WIRED BY ANY OF THAT and `readLiability` is still the one name missing from ' +
     '`IMPLEMENTED_ADMIN_READS`. ' +
     'SO `readLiability` IS STILL NOT COMPOSED, AND COMPOSING IT WOULD BE A LIVE-LOOKING FIGURE ' +

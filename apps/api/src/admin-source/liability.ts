@@ -314,14 +314,14 @@
 //            statement the other two are owed to.
 //            **WHAT IS ACTUALLY UNSUPPLIED IS SMALLER THAN A REFACTOR AND IS
 //            NOT NOTHING**: the COMPOSITION of that decode with the account's
-//            `plan_version_sizes` read, on a transaction this fold holds.
-//            `LiabilityTx` offers `rows` and `rowsWhere` and no
-//            `catalogRowAt`, so the read half is not addressable from this
-//            module today, and the mapping onto the engine's
-//            `PlanVersionSizeRow` is a per-caller `FM-16` `ADR-303` limit 2
-//            registers rather than forgives. Nothing under any `src/` in this
-//            deployable supplies the port, so `UNWIRED_ELIGIBLE_FOLD_IO` throws
-//            `EligibleFoldUnwired` by name and the fold refuses.
+//            `plan_version_sizes` read. **IT IS NOT ONE EXPORT, AND `ADR-413`
+//            measured why**: the one composition in this deployable, `planLeg`,
+//            reads through `catalogRowAt`, which `packages/db` declares on
+//            `ScopedTx` ALONE, and an admin read holds `SystemTx`, which has no
+//            catalogue accessor. The rows are reachable there only as `unknown`,
+//            so every route from here restates the engine's `PlanVersionSizeRow`
+//            mapping, the per-caller `FM-16` `ADR-303` limit 2 registers rather
+//            than forgives. Unsupplied, `EligibleFoldUnwired` fires by name.
 //         2. A WIRE THAT CAN SAY THE FIGURE IS A FORECAST. `ADR-204` ruling 7
 //            requires both halves of the figure to be stated wherever it is
 //            shown. `EligibleNext7d` declares `total_cents`, `account_count`

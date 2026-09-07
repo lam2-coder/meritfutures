@@ -243,15 +243,15 @@ export interface EligibleFoldIo {
    *
    * **IT IS NOT `resolvePlan` ITSELF.** The engine's resolver takes a decoded
    * `PlanRulesJson` and a decoded `PlanVersionSizeRow`, so the port is drawn
-   * around the read and the decode together and a supplier satisfies it with
-   * `apps/worker`'s `resolvePinnedPlan` unchanged.
+   * around the read and the decode together, and `apps/worker`'s
+   * `resolvePinnedPlan` has that SHAPE on a handle no caller here can hold.
    *
    * **THE CLAUSE NAMING WHAT WAS MISSING IS FALSE AND IS QUOTED RATHER THAN
    * DELETED (`ADR-283`).** It read that "what is missing in `apps/api` is the
    * DECODING". `decodePlanRules` is exported from `@merit/rules-engine`, this
    * deployable declares that package, and `payout-backend.ts` calls it. What is
-   * missing is a COMPOSITION of the decode with the size read on a transaction
-   * this fold holds, which is a slice and not a move.
+   * missing is a COMPOSITION of the decode with the size read, and `ADR-413`
+   * measures its home as a `packages/db` door rather than an export one file over.
    */
   resolvePinnedPlan(planVersionId: string, sizeCents: Cents): Promise<ResolvedPlan>;
 }
