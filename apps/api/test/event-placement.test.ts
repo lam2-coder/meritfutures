@@ -52,6 +52,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 import {
+  EVENT_CATALOGUE,
   EventError,
   TRANSACTION_EVENT_WRITER,
   UNWIRED_EVENT_SINK,
@@ -395,5 +396,138 @@ describe('the remedy address, measured rather than asserted', () => {
     await expect(
       UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
     ).rejects.toThrow(/SO IT IS A FILE ON DISK RATHER THAN A DEPLOYMENT DECISION/);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 5. What the producer would DO with what its callers actually emit
+// -----------------------------------------------------------------------------
+// THIS IS THE ONE MEASUREMENT ONLY THIS SIDE OF THE FENCE CAN TAKE, AND IT IS
+// WHY IT IS HERE RATHER THAN BESIDE THE CALL SITES. `apps/worker/test/
+// event-sink.test.ts` establishes the shape of this gap across three ports and
+// is the closest thing in this tree to a specification of this file's subject,
+// but `RI-04` forbids it the import, so it can compare NAMES against the
+// catalogue parsed as text and can assert two payload properties by reading
+// source. It cannot run `buildEvent`. This suite already imports it.
+//
+// SO THE NAME SPLIT IS NOT RE-ASSERTED HERE. That is section 4 of that file and
+// re-stating it would be two copies of one claim drifting apart. What is
+// asserted is the thing neither file has ever composed: **of the names this
+// estate emits, how many would BUILD if the sink were installed tomorrow.**
+//
+// THE ANSWER IS THREE OF NINE AND THE SIX REFUSALS ARE FOUR DIFFERENT KINDS,
+// which is the finding rather than the number. Two names have no row in EVENTS
+// at all and need an amendment to a frozen document before any producer may
+// carry them. Two are rows of EVENTS that were never transcribed here. One is
+// accepted at the name and refused at tenancy. One is accepted at the name and
+// refused at the subject. **A ROW THAT WIRED THE SINK AND STOPPED WOULD HAVE
+// DELIVERED A THIRD OF THIS ESTATE'S EMITS**, and nothing in either tree would
+// have said so, because each half of the obstruction is asserted in a different
+// deployable and neither one multiplies them out.
+describe('the vocabulary, run against the payloads the callers actually spell', () => {
+  /** A uuid-shaped value, so a field the catalogue reads as a uuid parses. */
+  const UUID = '11111111-1111-4111-8111-111111111111';
+
+  /**
+   * The payload literal's own top-level keys, bounded by brace matching.
+   *
+   * A REGEX TO THE FIRST `};` WAS TRIED AND OVER-CAPTURED, folding a nested
+   * evidence object's keys into the top level. That direction is silent: a
+   * superset of the real keys makes a MISSING field look present, which is the
+   * one thing this section exists to detect. It throws on an unbalanced literal
+   * rather than returning what it managed to read.
+   */
+  function payloadKeys(module: string, name: string): string[] {
+    const text = read(`apps/worker/src/${module}`);
+    const at = text.indexOf(`name: '${name}'`);
+    if (at === -1) throw new Error(`${module} does not spell \`${name}\` at a call site`);
+    const opens = text.indexOf('payload: {', at);
+    if (opens === -1) throw new Error(`\`${name}\` in ${module} carries no payload literal`);
+    let depth = 0;
+    let end = -1;
+    for (let i = text.indexOf('{', opens); i < text.length; i += 1) {
+      if (text[i] === '{') depth += 1;
+      else if (text[i] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    if (end === -1) throw new Error(`\`${name}\`'s payload literal in ${module} is unbalanced`);
+    const body = text.slice(text.indexOf('{', opens) + 1, end);
+    const keys: string[] = [];
+    let nest = 0;
+    for (const line of body.split('\n')) {
+      const key = /^\s{2,}([a-z_][a-z0-9_]*):/.exec(line);
+      if (key !== null && nest === 0 && key[1] !== undefined) keys.push(key[1]);
+      nest += (line.match(/[{[]/g) ?? []).length - (line.match(/[}\]]/g) ?? []).length;
+    }
+    return keys;
+  }
+
+  /** The five names the catalogue admits that are spelled at a call site. */
+  const ADMITTED: readonly (readonly [string, string])[] = [
+    ['payout.hold_released', 'sweeps/expiry.ts'],
+    ['wallet.withdrawal_halt_released', 'sweeps/expiry.ts'],
+    ['payout.freeze_expiring', 'sweeps/expiry.ts'],
+    ['detector.run_completed', 'detectors/runner.ts'],
+    ['flag.raised', 'detectors/runner.ts'],
+  ];
+
+  test('every payload literal is found and bounded, so the outcomes below are measured', () => {
+    // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. An extractor that
+    // returned nothing would report every name as refused for a missing field,
+    // which reads exactly like the finding this section reports.
+    for (const [name, module] of ADMITTED) {
+      expect({ name, keys: payloadKeys(module, name).length > 0 }).toEqual({ name, keys: true });
+    }
+    // AND THE BRACE MATCHER IS PINNED AGAINST THE ONE PAYLOAD THAT DEFEATED THE
+    // REGEX, so a future rewrite that reintroduces the over-capture is red here.
+    expect(payloadKeys('detectors/runner.ts', 'flag.raised')).toContain('evidence_summary');
+    expect(payloadKeys('detectors/runner.ts', 'flag.raised')).not.toContain('window_days');
+  });
+
+  test('three of the estate`s nine emitted names would build, and the other six would not', () => {
+    const built: string[] = [];
+    const refused: Record<string, string> = {};
+    for (const [name, module] of ADMITTED) {
+      // THE VALUES ARE SYNTHESISED AND THE FIELD LIST IS NOT, which is the whole
+      // design of this case: a uuid where the catalogue reads a uuid, so the
+      // only thing that can fail is a field the call site does not spell. This
+      // measures the SHAPE the caller sends and never its run-time values.
+      const payload: Record<string, unknown> = {};
+      for (const key of payloadKeys(module, name)) payload[key] = key.endsWith('_id') ? UUID : 'x';
+      const row = (EVENT_CATALOGUE as Record<string, { actorFrom?: { field: string } }>)[name];
+      const decides = row?.actorFrom?.field;
+      if (decides !== undefined && decides in payload) payload[decides] = 'expiry';
+      try {
+        buildEvent({ name, payload } as EmitSpec, CLOCK);
+        built.push(name);
+      } catch (err) {
+        const message = (err as Error).message;
+        refused[name] = /reaches neither/.test(message) ? 'tenancy' : 'subject';
+      }
+    }
+
+    // THE THREE THAT WOULD WRITE. A wiring row may quote this list and no more.
+    expect(built.sort()).toEqual([
+      'flag.raised',
+      'payout.hold_released',
+      'wallet.withdrawal_halt_released',
+    ]);
+
+    // AND THE TWO THE CATALOGUE ADMITS AND THE PRODUCER STILL REFUSES, each
+    // naming which gate stopped it. `payout.freeze_expiring` is ADR-191 section
+    // 9's registered open item and its repair is EVENTS'; `detector.run_completed`
+    // is ADR-205 section 7's and its repair is one field at a call site in a
+    // deployable this fence does not hold. NEITHER IS REPAIRED HERE and neither
+    // is a reason to widen anything: admitting them would write rows that fall
+    // out of every scoped read of an append-only table.
+    expect(refused).toEqual({
+      'payout.freeze_expiring': 'tenancy',
+      'detector.run_completed': 'subject',
+    });
   });
 });
