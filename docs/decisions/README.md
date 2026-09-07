@@ -433,6 +433,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-419](ADR-419.md) | the compatibility module is NOT retired because ADR-418 priced four of its five files, and the eight unbound figures are re-derived through the leg that reads them, two bound and five deleted (2026-09-07, status: proposed) |
 | [ADR-420](ADR-420.md) | the gap cause for an unwired producer is not a gap cause, and the two holes that are real were never the one four entries named  (2026-09-07, status: proposed) |
 | [ADR-421](ADR-421.md) | `ADR-303` limit 4 is NOT callerless, the typing was performed rather than argued about, and it is refused because it buys nothing a fenced row can spend  (2026-09-07, status: proposed) |
+| [ADR-422](ADR-422.md) | the population of what depends on a file is DERIVED rather than defined, a fifth kind is registered before it bites anybody, and the retirement is 21 files to read and 6 to watch rather than 5 (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
