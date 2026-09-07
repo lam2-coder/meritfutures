@@ -403,6 +403,9 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-389](ADR-389.md) | option (d) is right about the page and is not takeable by a row that owns the runbook, because the fifth column is read out of the table row by eleven assertions in files no such row may write (2026-09-06, status: proposed) |
 | [ADR-390](ADR-390.md) | a title that dates a document dates all of it, which is 286 pointers in 16 documents and costs none of the 73 the checks actually assert on; a claimed table row must close; and 40 of the 41 pointers into `gates.mjs` this diff moved were already wrong before it (2026-09-06, status: proposed) |
 | [ADR-391](ADR-391.md) | five findings that no fence covered, four repaired and one repair refused, priced with the runner ADR-386 said a row needs and did not have (2026-09-06, status: proposed) |
+| [ADR-392](ADR-392.md) | option (d), taken with the four-fence ADR-389 specified, and the citation-repair right it turns out to earn nothing for (2026-09-06, status: proposed) |
+| [ADR-393](ADR-393.md) | the pointers into `gates.mjs` are 84 and not 36, ADR-330's five are class one and are repaired, and two pointers pass BOTH of ADR-388's gates and are still not repairable because the thing they name was deleted (2026-09-06, status: proposed) |
+| [ADR-394](ADR-394.md) | one retired clause repaired at the site nobody had been given, two drifted pointers repaired to NAMES rather than to numbers because both targets move again this wave, one class-two pointer confirmed wrong for the third time and left, and the dispatch's "four documents" is five or seven and never four (2026-09-06, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

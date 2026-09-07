@@ -152,6 +152,27 @@ const SCHEMA_TS = read('packages/db/src/schema.ts');
 const M07 = read('docs/plans/M07-risk-abuse.md');
 const EVENTS = read('docs/architecture/EVENTS.md');
 const CRON = read('docs/ops/runbooks/CRON_INVENTORY.md');
+
+/**
+ * One job's `### <job>` note out of `CRON_INVENTORY`'s peer
+ * `## Severity if absent, by job` section.
+ *
+ * **ADR-392 CUT COLUMN FIVE OUT OF THE SCHEDULED TABLE**, where its prose used
+ * to sit on the row line and be readable with the same `toContain` as the
+ * schedule and the alarm. The four operational columns stayed; the severity,
+ * the runbook to open and the wiring markers are notes now. Returns the empty
+ * string for a job with no note, so a lost note fails the caller rather than
+ * silently satisfying it.
+ */
+const severityNote = (document: string, job: string): string => {
+  const marker = `\n### ${job}\n`;
+  const start = document.indexOf(marker);
+  if (start === -1) return '';
+  const after = document.slice(start + marker.length);
+  const end = after.search(/\n#{2,3} /);
+  return (end === -1 ? after : after.slice(0, end)).trim();
+};
+
 const SEED_ROWS = JSON.parse(read('packages/db/src/seed/detectors/m07-detectors-v1.rows.json')) as {
   rows: { detector: string; version: string; parameters: Record<string, unknown> }[];
 };
@@ -496,8 +517,12 @@ describe('the constants this deployable retypes are bound to their sources', () 
   it('CRON_INVENTORY’s detector-runs row alarms on canaries not found', () => {
     const row = CRON.split('\n').find((line) => line.startsWith('| **Detector runs**'));
     expect(row).toBeDefined();
+    // The dead-man alert is column four and is still the row's own cell.
     expect(row).toContain('canaries not found');
-    expect(row).toContain('GS-122');
+    // **THE SEVERITY IS NO LONGER A CELL.** ADR-392 cut column five into a peer
+    // `## Severity if absent, by job` section, so the scenario that makes a
+    // canary-less run `degraded` is asserted of this job's note.
+    expect(severityNote(CRON, 'Detector runs')).toContain('GS-122');
   });
 
   it('P7-d’s seed carries a row for every detector this runner could be given', () => {

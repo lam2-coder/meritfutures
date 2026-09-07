@@ -44,6 +44,24 @@ const MIGRATION = 'packages/db/migrations/0039_economic_calendar.sql';
 const M04 = 'docs/plans/M04-trader-portal.md';
 const CRON = 'docs/ops/runbooks/CRON_INVENTORY.md';
 
+/**
+ * One job's `### <job>` note out of `CRON_INVENTORY`'s peer
+ * `## Severity if absent, by job` section.
+ *
+ * **ADR-392 CUT COLUMN FIVE OUT OF THE SCHEDULED TABLE.** The severity prose
+ * used to sit on the row line, where the same `toContain` read it as read the
+ * schedule. Returns the empty string when a job has no note, so a lost note
+ * fails its caller instead of quietly passing.
+ */
+const severityNote = (document: string, job: string): string => {
+  const marker = `\n### ${job}\n`;
+  const start = document.indexOf(marker);
+  if (start === -1) return '';
+  const after = document.slice(start + marker.length);
+  const end = after.search(/\n#{2,3} /);
+  return (end === -1 ? after : after.slice(0, end)).trim();
+};
+
 /** The migration, minus `--` comments, so prose in the header cannot satisfy a DDL assertion. */
 function ddl(): string {
   const body = read(MIGRATION);
@@ -251,11 +269,18 @@ describe('GS-287: a stale calendar declines rather than firing on wrong windows'
       .split('\n')
       .find((line) => /economic calendar staleness/i.test(line) && line.startsWith('|'));
     expect(row, 'CRON_INVENTORY has no economic calendar staleness row').toBeDefined();
-    expect(row).toContain('FM-M7-08');
+    // **THE ROW IS STILL WHERE THE JOB IS DECLARED AND THE SEVERITY IS NOT ON
+    // IT.** ADR-392 cut column five into a peer `## Severity if absent, by job`
+    // section, so the row proves the job is inventoried and the note carries
+    // what the page says about it. A job with a note and no row is still a job
+    // that does not exist, which is why both halves are read.
+    const note = severityNote(body, 'Tier-1 economic calendar staleness check');
+    expect(note, 'CRON_INVENTORY has no severity note for the staleness check').not.toBe('');
+    expect(note).toContain('FM-M7-08');
     // ADR-040's idiom, and the reason this is not a smoke test: the alarm asserts
     // the query independently of whether any loader reported success. A job that
     // reports success is not evidence that the work happened.
-    expect(row).toMatch(/asserts the query, not the job/i);
+    expect(note).toMatch(/asserts the query, not the job/i);
   });
 
   test('the declining behaviour is pinned in writing, not left to the detector author', () => {
@@ -263,10 +288,9 @@ describe('GS-287: a stale calendar declines rather than firing on wrong windows'
     // evidence against a trader, so "decline" is a ruling rather than an
     // implementation preference, and it has to survive the session that
     // eventually writes D-04.
-    const row = read(CRON)
-      .split('\n')
-      .find((line) => /economic calendar staleness/i.test(line) && line.startsWith('|'));
-    expect(row).toMatch(/decline/i);
-    expect(row).toMatch(/manufactures evidence against a trader/i);
+    const note = severityNote(read(CRON), 'Tier-1 economic calendar staleness check');
+    expect(note, 'CRON_INVENTORY has no severity note for the staleness check').not.toBe('');
+    expect(note).toMatch(/decline/i);
+    expect(note).toMatch(/manufactures evidence against a trader/i);
   });
 });

@@ -1245,14 +1245,27 @@ describe('ADR-384: the one `docs/` site the register admits', () => {
   // THE ANCHOR IS UNIQUE IN THE FILE IT NAMES, which is leg 1's own demand read
   // at the shipped site. Zero would mean the runbook was reworded without the
   // register; two would mean the disposition is about a line nobody chose.
-  test('the anchor occurs exactly once in the runbook, on the row it is about', () => {
-    const lines = readFileSync(join(REPO_ROOT, 'docs/ops/runbooks/CRON_INVENTORY.md'), 'utf8')
-      .split('\n')
+  test('the anchor occurs exactly once in the runbook, in the note it is about', () => {
+    const body = readFileSync(join(REPO_ROOT, 'docs/ops/runbooks/CRON_INVENTORY.md'), 'utf8');
+    const all = body.split('\n');
+    const lines = all
       .map((line, index) => ({ line, at: index + 1 }))
       .filter(({ line }) => line.includes('nothing under any `src/` calls `runReplayAudit`'));
     expect(lines).toHaveLength(1);
-    expect(lines[0]?.line).toContain('**Replay self-audit**');
     expect(lines[0]?.line).toContain('`RI-35` registers the caller clause below');
+
+    // **AND IT IS FILED UNDER THE JOB IT NAMES.** Before ADR-392 the whole row
+    // was one line and `**Replay self-audit**` was on it, so containment said
+    // this. The severity prose is a `### Replay self-audit` note now, and the
+    // heading the anchor sits under is what says the same thing about the shape
+    // the page actually has. **THE REGISTER DID NOT MOVE AND COULD NOT**: it
+    // stores this substring with no line number, which is why it survived a
+    // restructure of the whole page untouched.
+    const heading = all
+      .slice(0, lines[0]?.at ?? 0)
+      .reverse()
+      .find((line) => line.startsWith('### '));
+    expect(heading).toBe('### Replay self-audit');
   });
 });
 

@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->375<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->378<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13533,3 +13533,84 @@ Counts derived at reporting time off each runner's own last line: suite **336 fi
 **Next.** The founder's `E2` read of [ADR-391](decisions/ADR-391.md) and the three decisions its approval block names, of which the first is whether the DISPATCH is now the binding constraint on this build: six rows found one defect and none could repair it, a wrong repair stood published for three waves because the file was never handed to anybody who could test it, and every row involved did its job.
 
 Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `3b664fcf` **before the first edit** of **336 / 8,107 / 10 / 0**, a delta of **ZERO on every axis**, which is the expected result for a comments-only diff; gates **33 of 33** after `generate`, invariants **35 of 35**, typecheck, lint and `format:check` clean. `pnpm run verify` and `scripts/corpus/falsify.mjs` **NOT run**, both forbidden by the row.
+
+---
+
+## 2026-09-06 - Session 587: option (d) taken with the four fences it needed, the eleven repaired where they live, and a citation-repair right that earns nothing
+
+**[ADR-392](decisions/ADR-392.md), `status: proposed`, approval line UNSIGNED. CONTROL OVER AN OPERATIONS DOCUMENT A HUMAN READS UNDER PRESSURE. MONEY-ADJACENT, ADR-003 STRICT, `E2` READ OWED.** [ADR-389](decisions/ADR-389.md) built this restructure, measured it, watched the suite go RED at eleven assertions in seven files across three deployables, and reverted [`CRON_INVENTORY.md`](ops/runbooks/CRON_INVENTORY.md) byte-identical because none of the eleven was in its fence. **This row is the four-fence row it specified.**
+
+**THE PAGE IS RESTRUCTURED AND THE SPECIFICATION WAS EXACT.** Column five becomes a peer `## Severity if absent, by job` section of **21** `### <job>` notes keyed the way [`gates.mjs`](../scripts/corpus/gates.mjs)'s `normJob` keys the table's first cell. Body rows fall from **31,301 characters to 2,700** and from **324 rendered lines to 34**; the tallest row from **47 wrapped lines to 5**; rows over 2,000 characters from **9 to 0**. **Columns one to four are BYTE-IDENTICAL and all 21 note bodies are byte-identical to the cells they came from**, both asserted by parsing the two blobs rather than by reading. Every structural figure [ADR-389](decisions/ADR-389.md) published reproduces at the character on this base, its `91.2 percent` included.
+
+**THE ELEVEN REPRODUCE ONE FOR ONE AND ARE REPAIRED WHERE THEY LIVE.** The restructured page alone took the suite to **336 / 8,096 / 10 / 11 FAILED** across seven files, matching that entry's enumeration exactly, including which case in `schedule.test.ts` and which assertion inside it. **FOUR OF THE ELEVEN ASSERTED COLUMN-FOUR PHRASES**, not column five: `canaries not found`, `wallet_withdrawals`, `replay.audit_completed` and `report_deliveries`. Those stay asserted of the ROW. `scheduledRows` returns `{job, line, note}` as **three fields rather than one concatenation**, because concatenating would have turned all eleven green in one line and thrown away the only thing the split buys.
+
+**THE ELEVENTH IS STRENGTHENED RATHER THAN WEAKENED.** [ADR-384](decisions/ADR-384.md)'s `RI-35` register stores its anchor with no line number and survived the whole restructure untouched, but its TEST asserted something stronger, that the anchor sits on the row it is about. **The anchor's containing `### ` heading now says that**, and seed F moved the sentence intact into another job's note: **`RI-35` stayed GREEN at 35 of 35 and that case alone went RED.**
+
+**THE LEG IS HALF LANDED AND THE OTHER HALF IS OWED WITH ITS PREDICATE WRITTEN OUT.** [ADR-389](decisions/ADR-389.md) seed A reproduces: with the notes in place and no leg, emptying a note body leaves gates at 33 of 33 and invariants at 35 of 35. Cases **`4.4`** and **`4.5`** in [`schedule.test.ts`](../apps/worker/test/schedule.test.ts) bind notes to rows in both directions, refuse an empty body, and require the scheduled section to terminate before the notes. **`gates.mjs` is nobody's this wave**, so the gate assertion is reported as owed rather than landed.
+
+**THE CITATION-REPAIR RIGHT EARNS ZERO REPAIRS, AND THAT IS THE ROW'S FINDING.** The dispatch called it real work on a known citation graph. Fifteen pointers re-derived from **21 raw tokens** less four `:23-40` ranges less two specimen tokens on one line. **The three `:27` were EXACT at `c5648f00` and line 27 is byte-identical after the move.** **All eight class-one pointers were ALREADY between four and six lines short at this base**, so under [ADR-390](decisions/ADR-390.md) section 9's rule none of them is this diff's to repair, even though this diff moves every one of their subjects by ninety lines. The four class-two `:35` are left, and **the move of their subject from line 37 to line 125 is disclosed rather than counted as a fix**.
+
+**SIX SEEDS, FIVE RED WHERE PREDICTED, EVERY RESTORE VERIFIED WITH `sha256sum -c` AGAINST A THREE-FILE MANIFEST AND NONE BY `git checkout --`.** [ADR-389](decisions/ADR-389.md)'s seed E is confirmed independently on a tree that ships: the same rename plus one pipe-leading note line is **GREEN at 33 of 33 with the notes as a `###` subsection** and **RED at 32 of 33 with them as a peer `##`**. A row that had read the heading level as a style note would have shipped a page that can disarm `CI-06l` over its own table with one stray pipe.
+
+**THE CONTAINER ARRIVED WITH NO CLONE AT ALL, FOR THE SECOND CONSECUTIVE WAVE**, and `git rev-parse --is-shallow-repository` reports **`true`**. Nothing in the entry rests on history by construction: the citation audit compares **two blobs** and uses no `git blame`, `git log`, `git rev-list` or commit range anywhere. The four class-two verdicts are **inherited from [ADR-389](decisions/ADR-389.md) and labelled as inherited**, because re-deriving them needs history this clone does not have.
+
+**NOTHING WAS WIDENED AND NOTHING WAS MINTED.** No invariant number, no `RI-` reserved, no gate added, widened or weakened, no register grown, no test skipped, disabled or quarantined, no `CI-06` letter spent, no migration taken or reserved. **The standing bar is UNTOUCHED and this is the sixth consecutive row to leave it standing**: no port wired, no job scheduled, no sink passed, no default parameter added to `expirySweepIo`, no schedule parameter invented, and **no file under any `src/` directory written at all**, so the `apps/worker/**` right was spent entirely on test files.
+
+**Next.** The founder's `E2` read of [ADR-392](decisions/ADR-392.md) and the three decisions its approval block names, of which the first is whether the page is actually better for the person who gets paged at 03:00, which no seed in this repository can settle.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,109 passed / 10 skipped / 0 failed**, against a base reproduced on `c5648f00` **before the first edit** of **336 files / 8,107 passed / 10 skipped / 0 failed**, **plus two by ADDITION** (`4.4` and `4.5`) and zero on every other axis; gates **33 of 33**; invariants **35 of 35**; `typecheck`, `lint` and `format:check` all exit 0.
+
+---
+
+
+---
+
+## 2026-09-06 - Session 588: the pointers into `gates.mjs` counted corpus-wide rather than inherited, ADR-330's five repaired, and two that pass both gates of ADR-388 and still cannot be repaired ([ADR-393](decisions/ADR-393.md), proposed)
+
+**THE ROW IS [ADR-393](decisions/ADR-393.md), `status: proposed`, approval line UNSIGNED. NON-MONEY, TOOLING AND CONTROL OVER THE CORPUS'S OWN POINTERS, `E2` READ OWED.** Two items were dispatched, both are here, and the second refuted the population it was handed.
+
+**THE ENVIRONMENT DID NOT MATCH THE DISPATCH AND THAT WAS ESTABLISHED BEFORE ANYTHING WAS DERIVED.** `git rev-parse --is-shallow-repository` returned **`true`** at **one** reachable commit with `main` the only ref present, and there was no checkout of this repository on the container at all. The clone was made by this session, the base branch fetched bounded rather than unshallowed, and the check re-run: **`false`**, **4,300** commits reachable. **A G2 verdict is a history question and a shallow clone answers one wrongly rather than refusing**, which is [ADR-389](decisions/ADR-389.md) section 7's rule applied rather than quoted.
+
+**THE DISPATCHED POPULATION IS REFUTED AND IT IS LARGER, NOT SMALLER.** Derived on `c5648f00` through the checks' own citation grammar: **115** citations resolve to [`gates.mjs`](../scripts/corpus/gates.mjs) over **61** files at **52** distinct coordinates, of which **84 over 44 files no longer hold what they held at the commit that wrote the citing line** and **31** are still exact. The **36** handed down is not wrong, it is a window: [ADR-390](decisions/ADR-390.md) counted only the pointers above its own first insertion and says so in its own words. **Eleven of the 115 carry no path inside the citation token**, a form the first pass of this row's own reader missed before it was rebuilt to the grammar `citationsIn` uses.
+
+**[ADR-330](decisions/ADR-330.md)'s FIVE ARE CLASS ONE AND ARE REPAIRED.** G1 holds on all five, each subject being a searchable token. G2 was derived rather than inherited: at `54c6179a`, the commit `git blame -w` gives for all three citing lines, every one of the five coordinates carried exactly its subject and the file ENDED at the guard's closing line. **All five are uniformly 186 lines out on this base**, which reproduces that entry's 129 plus the 57 its own diff added, and a single uniform offset is what a class-one drift looks like.
+
+**AND [ADR-388](decisions/ADR-388.md)'s THREE CLASSES DO NOT COVER THIS POPULATION, WHICH IS THIS ROW'S FINDING.** [ADR-098](decisions/ADR-098.md)'s pointer and [ADR-119](decisions/ADR-119.md)'s pass G1 **and** G2 and are still not repairable, because the `build`-key probe and the register entry they name were **DELETED from the file**. The ruling's remedy is *only the coordinate moves* and there is nowhere to move it to; moving either to the nearest surviving thing would be this row inventing a reading nobody took. **The corpus already holds the notice that one of those subjects was retired, in [ADR-182](decisions/ADR-182.md), and nothing connects the two documents.**
+
+**THREE ARE CLASS TWO AND STAY WRONG, TWO OF THEM INSIDE [ADR-330](decisions/ADR-330.md) ITSELF.** Both point at a source comment and both are marked as checked; `54c6179a` **never touched that file**, at the commit or at its parent, so there is no reading under which either was true on its day. The third is a coordinate COPIED into the `ALLOCATION.md` row for `185` from [ADR-185](decisions/ADR-185.md), where it was exact when written. **One number, two documents, one class one and one class two**, which is why G2 is per pointer and never per subject.
+
+**24 COORDINATE TOKENS REPAIRED ACROSS 8 FILES, EVERY ONE RE-READ AT PRIMARY SOURCE AFTER THE EDIT.** Each retired coordinate is kept in backticks beside the new one and is never re-cited with its path. **Four pointers were already exact and were left untouched.** One repair deliberately leads a reader to a line that now disagrees with the record's own dated figure: the coordinate is repaired and the figure is NOT, because the figure is what that entry measured on its day.
+
+**SIX FURTHER REPAIRS WERE FORCED BY THIS ROW'S OWN THREE REGISTRY ROWS AND ALL SIX ARE LISTED.** Adding three rows to [`ALLOCATION.md`](decisions/ALLOCATION.md) moves every line below them, and thirteen pointers cite lines below that point. Two were exact and are repaired outside the fence under the citation-repair exception; the rest were already wrong or cite the coordinate as the SUBJECT of a finding, where a repair would falsify the finding. **The two generated registries take their new rows at the END of their spans and the session section is appended at the END of this file, so not one pointer into those three moved**, which was derived before the rows were written rather than after.
+
+**NOTHING WAS MINTED AND NOTHING WAS WIDENED.** No invariant number, no `RI-` reservation, no `CI-06` letter, no gate added, widened or weakened, no register grown, no test skipped, disabled or quarantined, no migration taken or reserved, no port wired. **`scripts/corpus/**` and `packages/tooling/checks/**` were READ and never opened for writing, so the file this row repairs pointers into is byte-identical to its base.** `pnpm run verify` and `scripts/corpus/falsify.mjs` were never run. **A gate went RED once, at `32 of 33`, on a markdown link this row wrote by accident into a registry cell; the corpus was repaired and the gate was not touched.**
+
+**Next.** The founder's `E2` read of [ADR-393](decisions/ADR-393.md) and the three decisions its approval block names, of which the first is whether pointer repair is worth doing at this scale at all: this row repaired 24 coordinates and left **63 wrong pointers standing in 35 files it did not hold**, nine of them in ADRs no entry before this one has named.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `c5648f00` **before the first edit** of **336 / 8,107 / 10 / 0**, a delta of **ZERO on every axis**, which is the expected result for a documents-only diff; gates **33 of 33**, invariants **35 of 35**, typecheck, lint and `format:check` clean.
+
+---
+
+## 2026-09-06 - Session 589: the retired clause repaired at the site nobody had been given, two pointers repaired to names because both targets move again this wave, and one class-two pointer confirmed and left ([ADR-394](decisions/ADR-394.md), proposed)
+
+**Four items, three of them carrying verdicts already derived elsewhere, all four re-derived and all four verdicts surviving.** The row is [ADR-394](decisions/ADR-394.md), `proposed` and UNSIGNED. MONEY-ADJACENT, ADR-003 STRICT, `E2` READ OWED.
+
+**THE RETIRED SINK CLAUSE IS REPAIRED AT [ADR-376](decisions/ADR-376.md) LINE 92.** [ADR-385](decisions/ADR-385.md) section 9 item 4 raised it as a new finding and no row had ever been given that file; [ADR-391](decisions/ADR-391.md) named it again and could not take it. The false absolute and the false consequence drawn from it are kept whole beside their correction under `RI-14`, named rather than reproduced per [ADR-367](decisions/ADR-367.md), and the verdict does not move. **The falsification was re-derived at the tree and is sharper than the published one**: `test/expiry-adapter.test.ts` PASSES `UNWIRED_EXPIRY_SWEEP_IO`'s refusing `ExpiryEventPort` to `expirySweepIo` and asserts the same value back, so a claim that nothing in the tree can be passed is refuted by a green test in the tree that passes something.
+
+**RULED: A REPAIR MINTS A NEW POINTER, SO A REPAIR IS BOUND BY [ADR-388](decisions/ADR-388.md)'s RULE FOR NEW POINTERS.** Both class-one pointers are repaired to the NAME of their subject rather than to a fresh coordinate, because both targets move again inside this wave and one moves inside this row's own diff. **A pointer repaired to a coordinate its own diff invalidates is the defect re-armed with a fresher date.**
+
+**[ADR-337](decisions/ADR-337.md) line 70 is CLASS TWO, re-derived a THIRD time and left wrong.** At the commit that wrote it the cited coordinate held the `RI-36` row and `RI-37` sat one line below, so it was off by one on the day it was written. **The finding is now written beside the pointer**, which [ADR-388](decisions/ADR-388.md) requires and no row had done, so a fourth row does not spend itself confirming it again.
+
+**THE GENERATOR COUPLING WAS VERIFIED AT THE GENERATOR AND THEN WATCHED.** `session_entries` copies a session file's own `<!--index:` text verbatim; [`split-sessions.mjs`](../scripts/corpus/split-sessions.mjs) is not the mechanism and cannot run, because `docs/SESSION_LOG.md` does not exist. One repair moved exactly one line of the sessions README.
+
+**THE DISPATCH'S INHERITED FIGURE DOES NOT REPRODUCE.** [ADR-391](decisions/ADR-391.md) calls `ADR-376 line 92` a positional reference in four documents and says it derived that: it is **five** at the parent of its own commit, **seven** at that commit, and seven on `c5648f00`. Every edit here is line-count neutral in consequence, and nothing outside this fence went stale.
+
+**THE CLONE WAS SHALLOW ON ARRIVAL AND WAS DEEPENED BEFORE ANY HISTORY WAS READ**, since three of the four items are decided by `git blame`, which a truncated graph answers wrongly rather than refusing.
+
+**NOTHING WAS WIDENED AND NOTHING WAS MINTED.** No invariant number, no gate added or widened, no register grown, no test skipped, disabled or quarantined, no `CI-06` letter spent, no migration taken or reserved, no port wired, no sink passed, no default parameter added to `expirySweepIo`. The standing bar stands for the sixth consecutive row. **Not one executable line changed, nothing outside `docs/` was written, and no citation moved.**
+
+**Owed.** The `ADR-376` header clause in `apps/worker/src/schedule.ts`, plus a SECOND clause in the same header carrying the same defect, both named without a coordinate because that file is another row's this wave. [ADR-394](decisions/ADR-394.md) section 4 carries the exact replacement.
+
+**Next.** The founder's `E2` read of [ADR-394](decisions/ADR-394.md) and the three decisions its approval block names, of which the first is whether a repaired pointer should ever be a coordinate again.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,107 passed / 10 skipped / 0 failed**, against a base reproduced on `c5648f00` **before the first edit** of **336 / 8,107 / 10 / 0**, delta **ZERO on every axis**; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean.
