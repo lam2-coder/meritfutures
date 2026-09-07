@@ -554,13 +554,15 @@ describe('5. nothing constructs the io, which is why the row is still unschedule
   });
 
   it('and the reason is a port with nothing to pass it, not a line nobody wrote', () => {
-    // THE EVENT SINK, MEASURED. `apps/api/src/events.ts` is the only producer in
-    // this repository and this deployable cannot name it: `test/db.test.ts`
-    // section 4 pins the bare specifiers to four names and none is `@merit/api`,
-    // and `test/event-sink.test.ts` section 3 refuses a relative specifier that
-    // escapes the app. Neither is restated here. What IS asserted here is the
-    // consequence at this file: the adapter names no sink of its own, so there
-    // is no value in this module a wiring row could reach for.
+    // THE EVENT SINK, MEASURED. `TRANSACTION_EVENT_WRITER` is the only producer
+    // in this repository, `@merit/ledger` publishes it, and this deployable CAN
+    // name it since ADR-410. `test/db.test.ts` section 4 pins the bare
+    // specifiers to five names and `@merit/ledger` is one of them; the pin still
+    // excludes `@merit/api`, and `test/event-sink.test.ts` section 3 still
+    // refuses a relative specifier that escapes the app. Neither is restated
+    // here. What IS asserted here is the consequence at this file, WHICH THE
+    // MOVE DID NOT CHANGE: the adapter names no sink of its own, so there is no
+    // value in this module a wiring row could reach for.
     const body = stripComments(
       readFileSync(
         fileURLToPath(new URL('../src/sweeps/expiry-adapter.ts', import.meta.url)),

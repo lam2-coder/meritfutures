@@ -523,11 +523,11 @@ export type {
 // job that releases nothing while a dead-man switch watching for the job's
 // ABSENCE reports it present, which is `ADR-239`'s defect with a clock in
 // front of it. The only event producer in this repository is
-// `apps/api/src/events.ts`, `RI-04` and `node-linker=isolated` put it out of
-// reach of this deployable, and the producer's own header measures that
-// `SystemTx` is the one handle in this workspace that can write `events` while
-// `apps/api` opens no system door. So the handle and the producer are each in
-// the deployable the other cannot import, no `ExpirySweepIo` is constructed,
+// `TRANSACTION_EVENT_WRITER` and `@merit/ledger` publishes it. **THIS SAID IT
+// WAS ONE DEPLOYABLE OVER, BEHIND `RI-04` AND `node-linker=isolated`; ADR-410
+// MOVED IT INTO A PACKAGE THIS ONE DECLARES AND BOTH ARE RETIRED** (`RI-14`).
+// The handle and the producer are on the same side now, `apps/api` still opens
+// no system door, no `ExpirySweepIo` is constructed all the same,
 // and `runExpirySweep` stays `unscheduled` in `schedule.ts`. **THE CONSEQUENCE
 // HERE IS RETIRED (`RI-14`, ADR-385): the call is unwritten, not untypable.**
 export { EXPIRY_TERMS, expirySweepIo } from './sweeps/expiry-adapter.ts';
@@ -590,10 +590,10 @@ export type {
 // `terms` is served; `expirySweepIo` calls `recordExpiryTransaction` inside
 // `WorkerDb.batch`'s callback, so `EXPIRY_LEDGER` now recognises the handle it
 // is given rather than refusing every one. **WHAT IS STILL TRUE IS THE HALF
-// THAT KEEPS THE JOB OFF A CLOCK**: `events` needs the PRODUCER `P5-n` has not
-// written, the only one in this repository is `apps/api/src/events.ts`, and
-// `RI-04` plus `node-linker=isolated` put it out of reach, so `expirySweepIo`
-// TAKES THE SINK AS A REQUIRED ARGUMENT and nothing constructs one. **THAT TRUE
+// THAT KEEPS THE JOB OFF A CLOCK, ON A REASON ADR-410 REPLACED** (`RI-14`):
+// this read that `P5-n` had not written the producer and that `RI-04` plus
+// `node-linker=isolated` put the only one out of reach. IT IS WRITTEN AND
+// PUBLISHED BY `@merit/ledger`; `expirySweepIo` still requires the sink. **THAT TRUE
 // CLAUSE, DROPPED UNRECORDED BY ADR-385, IS BACK (ADR-391, `RI-14`).**
 // **AND SLICE 7 PUT A SECOND PORT BEHIND THE SAME DOOR (ADR-325).**
 // `ApprovalLedgerPort` is `LT-06`, and its adapter is in `sweeps/ledger.ts`
