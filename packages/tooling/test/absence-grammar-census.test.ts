@@ -83,6 +83,52 @@ describe('the grammar, sentence by sentence', () => {
     expect(grammarOf('The `folded` arm, so no case reads through a union.')).toBeNull();
   });
 
+  test('`control` IS inside NARROW, added by ADR-446 as the one extension that survived', () => {
+    // FOUND BY A SECOND CENSUS WRITTEN BLIND TO THIS ONE. Unlike `rule` and
+    // `case` above, this corpus uses `control` for a check and nothing else, and
+    // ADR-446 section 5 adjudicated every sentence the addition reaches.
+    expect(grammarOf('No control here detects a hedge whose other leg sits at another firm.')).toBe(
+      'machinery',
+    );
+    expect(grammarOf('a discipline the corpus depends on and no control enforces')).toBe(
+      'machinery',
+    );
+    expect(grammarOf('no control that reads one branch can see it')).toBe('machinery');
+  });
+
+  test('`control` obeys the same window and the same verb requirement as every other noun', () => {
+    expect(grammarOf('There is no control at the end of the corridor.')).toBeNull();
+  });
+
+  describe('the three extensions ADR-446 REFUSED stay refused, each pinned by the case that refused it', () => {
+    // A refusal nobody can re-run is an opinion. These are the sentences the
+    // measurement turned on, so a later row re-proposing any of the three has to
+    // delete a case that says why, rather than simply not know.
+
+    test('`fail` is NOT a verification verb: this corpus fails tests, gates and runs', () => {
+      expect(grammarOf('so nothing fails on it, and it is outside a fence')).toBeNull();
+      expect(
+        grammarOf('a vacated number reserves nothing and an early renumber fails the gate'),
+      ).toBeNull();
+    });
+
+    test('`name` is NOT a verification verb, and it is worse than `fail` by an order of magnitude', () => {
+      expect(
+        grammarOf('collapsing it into that column is nothing like the named mistake'),
+      ).toBeNull();
+    });
+
+    test('`not one <mechanism>` is a FENCE statement, which is the opposite of a defect report', () => {
+      // This estate closes entries with these. They report what a diff did NOT
+      // touch, are true by construction, and would be counted as coverage holes.
+      expect(grammarOf('NOT ONE GATE WAS WEAKENED, NOT ONE TEST WAS SKIPPED.')).toBeNull();
+      expect(grammarOf('six comments, in three files, and not one assertion changed')).toBeNull();
+      expect(
+        grammarOf('Two controls that happen to cover one route are not one control written twice.'),
+      ).toBeNull();
+    });
+  });
+
   test('the verb has to be within the window, so a subject does not borrow a later clause', () => {
     const near = 'no gate compares them';
     const far = `no gate ${'x '.repeat(WORD_WINDOW + 4)}compares them`;
@@ -150,6 +196,41 @@ describe('the sentence is the unit and the line is not', () => {
     expect(commentBody('-- a')).toBe('a');
     expect(commentBody('# a')).toBe('a');
     expect(commentBody('const a = 1;')).toBeNull();
+  });
+});
+
+describe('a markdown table row is its own unit, so its citation resolves (ADR-446 section 6)', () => {
+  test('two table rows are two units carrying their own line numbers', () => {
+    const table = ['| a | nothing checks it |', '| b | no gate reads it |'].join('\n');
+    const found = units('docs/x.md', table);
+    expect(found).toHaveLength(2);
+    expect(found[0]?.line).toBe(1);
+    expect(found[1]?.line).toBe(2);
+  });
+
+  test('a subject in one row cannot borrow a verb from the next', () => {
+    // BEFORE THIS BRANCH the whole table was one unit, so `nothing` on the first
+    // row sat within the twelve-word window of `compares` on the second and the
+    // pair was counted as one claim. ADR-446 section 6 measures the population
+    // this removed.
+    const table = ['| the count is nothing |', '| the gate compares them |'].join('\n');
+    for (const unit of units('docs/x.md', table)) {
+      expect(grammarOf(unit.text)).toBeNull();
+    }
+  });
+
+  test('prose paragraphs are still paragraphs, so the split did not replace the old rule', () => {
+    const prose = ['No gate', 'in this tree', 'compares the two.'].join('\n');
+    const found = units('docs/x.md', prose);
+    expect(found).toHaveLength(1);
+    expect(grammarOf(found[0]?.text ?? '')).toBe('machinery');
+  });
+
+  test('a table sitting under a paragraph closes the paragraph rather than joining it', () => {
+    const mixed = ['Some prose here.', '| nothing checks it |'].join('\n');
+    const found = units('docs/x.md', mixed);
+    expect(found).toHaveLength(2);
+    expect(found[1]?.line).toBe(2);
   });
 });
 
