@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->381<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->382<!--/gen--> ADRs. <!--gen:ec_count-->158<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 
 
@@ -13696,3 +13696,29 @@ Counts derived at reporting time off each runner's own last line: suite **336 fi
 **Next.** The founder's `E2` read of [ADR-397](decisions/ADR-397.md) and the three questions its approval block names.
 
 Counts derived at reporting time off each runner's own last line: suite **336 files / 8,109 passed / 10 skipped / 0 failed**, against a base reproduced on `ebc21238` **before the first edit** of **336 / 8,109 / 10 / 0**, delta zero on every axis; gates **33 of 33**, invariants **35 of 35**, `typecheck`, `lint` and `format:check` clean.
+
+---
+
+## 2026-09-07 - Session 595: `G2` is not enforced, the reason on record could never have applied, every pointer a check could redden is already a registered finding, and `G1` is ruled to be the person's read ([ADR-400](decisions/ADR-400.md), proposed)
+
+**[ADR-388](decisions/ADR-388.md) SECTION 16 QUESTION 1 IS ANSWERED AFTER THREE ROWS DEFERRED IT. RULED: `G2` IS NOT ENFORCED BY A CHECK, AND THE REASON ON RECORD FOR REFUSING IT IS REFUTED RATHER THAN REPEATED.** That entry refused option (c), a failing leg on `RI-15`, because it *"would go red on 42 dated records nobody may repair"*. **`RI-15`'s input is 754 SOURCE FILES and NOT ONE `.md`**, derived from the walk, and its own `covers` line says it reads `docs/decisions` *"NOT AT ALL, deliberately"*; `RI-16` excludes a dated record by shape. **A leg on either can go red on none of them.**
+
+**THE REACHABLE RED SET IS NINE AND IT BUYS NOTHING.** Of the **203** named pointers in both checks' scopes, **18 occurrences are wrong today**, being **16 distinct keys**, and **every one of the 16 is already an entry in its host check's own exemption register**, nine in `RI-16`'s and seven in `RI-15`'s, reconciled key by key with nothing left over on either side. **A `G2` leg detects nothing those checks do not already flag**, because `G2` is a second question about a citation that has already failed the first one. Its only contribution is a class label.
+
+**AND THE LABEL IS NOT COMPUTABLE TWICE THE SAME WAY, WHICH IS [ADR-396](decisions/ADR-396.md) SECTION 7's OWN ASK TAKEN CORPUS-WIDE FOR THE FIRST TIME.** Over all **493** named pointers, `git blame -w` and `git log -S` name a **different commit on 57** and give a **different verdict on 23**. Born wrong is **52** under one and **46** under the other, and undecidable rises from **1** to **14**. That entry measured 5 of 46 and 1 of 46 inside its own fence; the first rate reproduces and the second doubles.
+
+**THE CLASS IS NOT STABLE UNDER A SIBLING'S DIFF EITHER.** [Session 478](sessions/2026-08-30-session-478.md) line 9, citing `scope.ts:840` for `root`, is outcome ONE at [ADR-397](decisions/ADR-397.md)'s base and outcome TWO at this one. The cause is `8fe77a65`, **row 396's own repair commit**, one insertion and one deletion in that file, repairing a different pointer on the same line. **The row that discovered the instrument was unsound produced a fresh instance of the defect in the commit that named it.**
+
+**AND THE JOB THAT WOULD RUN THE LEG HAS ONE COMMIT OF HISTORY.** [`ci.yml`](../.github/workflows/ci.yml) line 194 runs `repo-invariants.mjs` after a bare `actions/checkout@v4`. A depth-1 clone of this base was made and **`git blame` does not error there; it answers**, attributing every line to the single commit. Run there the leg reports **18** born wrong where there are **9**, outcome ONE becomes unreachable by construction, and all nine extras are repairable pointers reported as ones whose repair would manufacture evidence. **This repository already writes `fetch-depth: 0` twice, for `VG-1` and `CI-06f`, each with a comment saying the gate would otherwise *"pass by being unable to look"*.**
+
+**RULED ON [ADR-397](decisions/ADR-397.md) SECTION 12 ITEM 2: `G1` IS READ BY A PERSON AND NOT BY `citationsIn`.** The binder binds **290 of 7,665** dated-record pointers, 3.8 percent, and binds exactly two shapes: a name plus at most one glue word before the pointer, and a name inside the token where a link states the path. **A name in FRONT of a markdown link never binds at any distance, because `[` is not in `IDENTIFIER_GLUE`.** A systematic one-in-123 sample of **60** drawn from the 7,375 it reads no name for finds **56** that name a subject a later reader could search the cited file for. **So the population under a human `G1` is about twenty-five times the one every figure in this corpus has been priced against**, and [ADR-397](decisions/ADR-397.md)'s two instances reproduce inside the gap, both binding no name and both subjects gone from the cited file.
+
+**THE PREMISE THAT DID NOT SURVIVE IS ONE THIS ROW WAS RELYING ON.** [ADR-377](decisions/ADR-377.md) section 6's binding instability, which [ADR-388](decisions/ADR-388.md) section 7 also rests on, is **REPAIRED**: one backtick prepended to the top of every file moves **0 of 493** named verdicts and **0 of 9,336** unnamed ones. `citedIdentifier` reads the two backticks immediately before the citation and no longer walks a pairing from the start of the file. **The binder is stable and narrow, not flaky, and the refusal above does not use the old argument.** [ADR-397](decisions/ADR-397.md)'s six census figures reproduce exactly; its 42 does not, being 43 here and 39 under the corrected instrument.
+
+**NOTHING WAS MINTED.** No invariant number, no gate added, widened or weakened, no leg written, no register grown, no `CI-06` letter spent, no migration number taken or reserved, no `status` field moved, no test skipped, disabled or quarantined, no port wired. **`scripts/corpus/**` was never opened for writing and `packages/tooling/**` was read only, though this row holds it.** No check belongs in [`gates.mjs`](../scripts/corpus/gates.mjs), so no predicate is owed there.
+
+**Owed.** Whether the annotation convention [ADR-397](decisions/ADR-397.md) section 7 ruled for a wrong FIGURE reaches a wrong non-numeric claim, which now has an instance. [ADR-396](decisions/ADR-396.md) section 7's corrected instrument is priced here and its two known holes are still unmeasured over the corpus. [ADR-388](decisions/ADR-388.md) section 16 questions 2 and 3, and question 3 is heavier now that the 43 is a floor over one twenty-fifth of the population.
+
+**Next.** The founder's `E2` read of [ADR-400](decisions/ADR-400.md) and the three questions its approval block names, of which the third decides everything downstream: whether `G1` means what a person can read or what `citationsIn` can bind.
+
+Counts derived at reporting time off each runner's own last line: suite **336 files / 8,109 passed / 10 skipped / 0 failed**, against a base reproduced on `c219c0d1` before the first edit of **336 / 8,109 / 10 / 0**, delta ZERO on every axis; gates **33 of 33**; invariants **35 of 35**. `pnpm run verify` and `falsify.mjs` were not run.
