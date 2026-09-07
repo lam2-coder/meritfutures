@@ -427,6 +427,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-413](ADR-413.md) | `B5` term 1 is not one export, its home is a `packages/db` door, and the fact every record of it has missed is the handle rather than the fence  (2026-09-07, status: proposed) |
 | [ADR-414](ADR-414.md) | the sixteen reproduce, the address was the smaller half of the defect, and completing the row turns a case RED in a file this row may not write (2026-09-07, status: proposed) |
 | [ADR-415](ADR-415.md) | the `RI-35` register after the producer moved, one repair taken, one refused with its measurement, and a derived figure that was four short the day it was written (2026-09-07, status: proposed) |
+| [ADR-418](ADR-418.md) | the compatibility module is NOT retired, because its second dependant is not an import, and the anchored sentence carried by two files is resolved at the one that was lying (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

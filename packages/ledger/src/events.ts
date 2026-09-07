@@ -63,15 +63,41 @@
 // `TRANSACTION_EVENT_WRITER`, so a sixth door lands red rather than lands
 // quietly.
 //
-// AND THE ADAPTER STILL HAS NO CALLER, WHICH IS ADR-348's SUBJECT AND IS BOUND
-// FROM THIS COMMIT RATHER THAN ONLY STATED. `makeEventSink` is called by NO file
+// AND THE ADAPTER STILL HAS NO CALLER, WHICH IS ADR-348's SUBJECT AND IS STATED
+// HERE WHILE IT IS BOUND ELSEWHERE. `makeEventSink` is called by NO file
 // under `apps/*/src` or `packages/*/src`, and every call to it in this tree is
 // in a suite. So `UNWIRED_EVENT_SINK` is not merely the DEFAULT sink, it is the
 // only sink any deployment could reach, and EVENTS' universal rule 1 is
 // unsatisfied by every transition this estate performs rather than by some of
-// them. `RI-35` registers that absence as `event-sink-caller` and turns RED at
-// this sentence the day it stops being true, which is the leg that fails on
-// good news and is the reason the sentence is worth writing at all.
+// them. `RI-35` registers that absence as `event-sink-caller`.
+//
+// **THIS COPY IS NOT THE BOUND ONE, AND THE CLAUSE THAT SAID IT WAS IS KEPT
+// BESIDE ITS CORRECTION** (`RI-14`). The paragraph above opened "AND IS BOUND
+// FROM THIS COMMIT RATHER THAN ONLY STATED" and closed "and turns RED at this
+// sentence the day it stops being true, which is the leg that fails on good
+// news and is the reason the sentence is worth writing at all". **BOTH CLAUSES
+// ARE FALSE ABOUT THIS FILE** and both have been false since ADR-410 moved the
+// module here. `RI-35`'s leg 1 reads the ONE path the claim's `site` names and
+// that path is the compatibility module at the old address; leg 6 sweeps
+// registered needles and this artifact registers none. So a rewording of the
+// sentence above is invisible to every leg of the check, and the copy the check
+// actually turns RED at is the other one.
+//
+// **THE SENTENCE STAYS AND ONLY ITS CLAIM TO THE BINDING GOES, WHICH IS THE
+// WHOLE DISTINCTION.** It is a true statement about this tree and this is the
+// module it is about, so deleting it would take a reader's reason to distrust
+// `UNWIRED_EVENT_SINK` out of the file that ships it. What it may not do is
+// claim a binding it does not hold, because two files claiming one anchor is a
+// state `RI-35` cannot be right about and no leg of `RI-35` can see. ADR-415
+// section 4.3 found the pair by reading both files and priced the fence at
+// three; ADR-418 holds two of those three and resolves the contradiction here,
+// in the file whose sentence was the false one.
+//
+// **THE ANCHOR WOULD READ BETTER AT THIS ADDRESS AND MOVING IT IS STILL NOT
+// THIS FILE'S TO TAKE.** The `site` string lives in `packages/tooling`, which
+// ADR-418 was forbidden, so the marker the compatibility module carries moves
+// the day the `site` does and `apps/api/test/event-placement.test.ts` reddens
+// on both halves until it does.
 //
 // WHERE THE CALLER COULD LIVE WAS ESTABLISHED BEFORE ANY WIRING WAS ATTEMPTED,
 // AND THE ANSWER IS NOWHERE IN THIS TREE TODAY. The two halves are one

@@ -157,6 +157,19 @@ export {
 // install is untouched by this line: a file that calls `makeEventSink(...)` or
 // passes this value is still caught wherever it is written. ADR-410 section 7
 // records the repair as a `sweptBy`-style registration in
-// `packages/tooling/checks/absence-claims.mjs`, which is owed to whoever holds
-// that package and which this row was not granted.
+// `packages/tooling/checks/absence-claims.mjs`.
+//
+// **THAT REGISTRATION IS LANDED AND THE SENTENCE SAYING IT WAS OWED IS KEPT
+// BESIDE ITS CORRECTION** (`RI-14`). It read that the registration "is owed to
+// whoever holds that package and which this row was not granted", which was
+// true when ADR-410 wrote it and stopped being true one wave later: ADR-415
+// took it, and the entry now carries the false positive in its own words and
+// four cases that FIRE it -- this name inside a re-export list reads `present`,
+// the same name on a statement of its own reads `absent`, the factory name in
+// that list reads `absent` because its shape is a call, and a real install is
+// still caught through both shapes. **WHAT HOLDS THE GREEN IS THIS LINE BREAK**
+// and the register says so: the statement below is short enough that prettier
+// leaves it on one line, so the next character after the name is a space, and a
+// second name added to it would be reflowed into a list and flip the artifact
+// with nobody having edited the check, the probe or the register.
 export { TRANSACTION_EVENT_WRITER } from './events.ts';
