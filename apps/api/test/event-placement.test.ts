@@ -531,3 +531,115 @@ describe('the vocabulary, run against the payloads the callers actually spell', 
     });
   });
 });
+
+// -----------------------------------------------------------------------------
+// 6. The relocation's price, which is a FENCE and not a manifest edge (ADR-410)
+// -----------------------------------------------------------------------------
+// SECTION 4 PRICED THE MOVE AT NO MANIFEST EDGE AND THAT REMAINS TRUE. Row 410
+// re-derived it from both manifests and reproduced it exactly: three packages
+// sit in both dependency sets and no `VG-12` admission is owed. THE PRICE IS
+// SOMEWHERE ELSE AND NOTHING IN EITHER TREE COUNTED IT.
+//
+// `apps/api/src/events.ts` IS NOT ONLY WHERE THE PRODUCER LIVES, IT IS THE
+// ADDRESS OTHER FENCES NAME. Row 410 performed the move into `packages/ledger`
+// and ran the suite rather than predicting the outcome: 7 files and 12 cases
+// went red, and 5 files and 7 cases of that are outside every fence this wave
+// hands out. Three suites under `apps/worker/test` recover the catalogue by
+// searching this file's TEXT for `export const EVENT_CATALOGUE`, so a
+// re-exporting module at the same path satisfies none of them; three `file:line`
+// pointers in `apps/worker/src/schedule.ts` resolve into it and `RI-15` reads
+// every one; and `RI-35`'s register names this path as the declaring module to
+// exclude, so the moved module's own refusal message reads as an INSTALL.
+//
+// THE THREE POPULATIONS ARE DERIVED HERE AND NOT TYPED, and each case FAILS ON
+// GOOD NEWS, which is section 4's discipline pointed at the obstruction instead
+// of at the remedy. The day the last of them stops naming this path, the
+// relocation is unblocked and the row that unblocked it is the row that gets
+// told, rather than a later row rediscovering the price by running the move.
+//
+// WHAT THIS SECTION DOES NOT CLAIM. It does not say the move is wrong, and it
+// does not choose the destination: ADR-410 rules `packages/ledger` on the
+// writer's shape and states why `@merit/db` and `@merit/rules-engine` lose.
+// Every binding below keys on the SOURCE path, so the count is the same for all
+// three destinations and this section is silent about which.
+describe('the relocation`s price, which is a fence rather than a manifest edge', () => {
+  /** Every `.ts` under one repo-relative directory, repo-relative and sorted. */
+  function tsUnder(dir: string): string[] {
+    return readdirSync(join(ROOT, dir), { recursive: true, encoding: 'utf8' })
+      .map((entry) => `${dir}/${String(entry).split('\\').join('/')}`)
+      .filter((rel) => rel.endsWith('.ts'))
+      .sort();
+  }
+
+  test('both walks reach files, so the three counts below are measured', () => {
+    // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. An empty walk would
+    // make every population below empty, which is the value the cases treat as
+    // good news, so the guard has to come first.
+    expect(tsUnder('apps/worker/src').length).toBeGreaterThan(0);
+    expect(tsUnder('apps/worker/test').length).toBeGreaterThan(0);
+  });
+
+  test('every `file:line` pointer into this file resolves today, and a move strands them all', () => {
+    // BOTH POINTER SHAPES ARE READ, because `RI-15` reads both: a full path with
+    // a line, and a BARE pointer inheriting the nearest path. `schedule.ts`
+    // writes one of each on one line, so the derivation is per LINE rather than
+    // per match, and it recovers the same three pointers that invariant reports.
+    const total = EVENTS_TS.split('\n').length;
+    const pointers: string[] = [];
+    for (const rel of tsUnder('apps/worker/src')) {
+      read(rel)
+        .split('\n')
+        .forEach((line, index) => {
+          if (!line.includes('apps/api/src/events.ts:')) return;
+          for (const match of line.matchAll(/(?:events\.ts|`):(\d+)`/g))
+            pointers.push(`${rel}:${index + 1} -> :${match[1] ?? ''}`);
+        });
+    }
+
+    // THEY RESOLVE ON THIS TREE, which is what makes them live pointers rather
+    // than the stale ones `RI-15` exists to catch.
+    for (const pointer of pointers) {
+      const cited = Number(pointer.slice(pointer.lastIndexOf(':') + 1));
+      expect(cited).toBeGreaterThan(0);
+      expect(cited).toBeLessThanOrEqual(total);
+    }
+
+    // AND THE POPULATION IS NOT EMPTY, which is the half that fails on good
+    // news. `apps/worker/**` is in no fence this wave, so the repair is a later
+    // row's and is named in ADR-410 rather than taken here.
+    expect(pointers.length).toBeGreaterThan(0);
+  });
+
+  test('three suites outside this deployable recover the catalogue from this file`s TEXT', () => {
+    // THE SHAPE IS THE SEARCH STRING AND NOT THE PATH, and the difference is the
+    // whole finding. A module left at this path that RE-EXPORTS the producer
+    // keeps every import working and satisfies none of these three, because what
+    // they look for is the declaration itself. `RI-04` is why they read text at
+    // all: that deployable may not import this one.
+    const parsers = tsUnder('apps/worker/test').filter((rel) =>
+      read(rel).includes('export const EVENT_CATALOGUE'),
+    );
+    expect(parsers).toEqual([
+      'apps/worker/test/breaker-adapter.test.ts',
+      'apps/worker/test/event-sink.test.ts',
+      'apps/worker/test/schedule.test.ts',
+    ]);
+
+    // AND THE DECLARATION THEY SEARCH FOR IS STILL HERE, so all three are green
+    // for the reason they say and not by accident.
+    expect(EVENTS_TS).toContain('export const EVENT_CATALOGUE');
+  });
+
+  test('the absence register names this path as the module to exclude, so the move trips it', () => {
+    // `RI-35`'s `event-sink-caller` probe skips ONE file by name while it looks
+    // for an install, and the name is written into the runner. This module's own
+    // refusal message quotes `makeEventSink({ writer: TRANSACTION_EVENT_WRITER,
+    // clock })`, which is exactly the shape the probe treats as an install, so
+    // the exclusion is what keeps that artifact `absent`. Move the module and
+    // the exclusion no longer covers it. Row 410 observed that RED rather than
+    // predicting it.
+    const register = read('packages/tooling/checks/absence-claims.mjs');
+    expect(register).toContain("const producer = 'apps/api/src/events.ts';");
+    expect(EVENTS_TS).toContain('makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock })');
+  });
+});
