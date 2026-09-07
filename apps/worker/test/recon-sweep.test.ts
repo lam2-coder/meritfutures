@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import {
   PLATFORM_STATED_MARK_SOURCES,
   RECON_READ_TABLES,
@@ -752,4 +754,106 @@ describe('7. the handle that can reach both tables', () => {
       expect(text).not.toContain("from '@merit/db'");
     }
   });
+});
+
+// =============================================================================
+// 8. `ADR-303` LIMIT 4, SPENT ON THIS FAMILY, AND THE MAPPING IT DELETES
+//    (ADR-430)
+// =============================================================================
+// [ADR-421](docs/decisions/ADR-421.md) section 9 priced the shape and
+// [ADR-426](docs/decisions/ADR-426.md) landed it once, on the digest slice: a
+// narrowing no reader can see buys nothing, and what makes limit 4 takeable is
+// a row that shows a HAND-WRITTEN MAPPING DELETED in the same commit. This
+// section is that proof for the reconciliation slice, which is the cheapest
+// family still available and the FIRST one whose rows carry money.
+//
+// WHAT IS DELETED IS THE EXISTENCE MAPPING AND NOT ONE REFUSAL. `ADR-299`
+// section 5.1 item 5 rules it: "a type derived from a transcription does not
+// retire a runtime check", and `ADR-112` foreclosure 4 records that nothing in
+// this tree compares a `schema.ts` column type against the DDL. So `asRow()`
+// goes, and every VALUE refusal stays. On this slice one of those refusals is
+// the only thing standing between a `number` and a balance.
+
+const PORTS_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'ports.ts'), 'utf8');
+const SWEEP_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'sweep.ts'), 'utf8');
+
+test('8.1 the read port hands back the accessor row and no longer re-states `unknown`', () => {
+  // THE MEMBER'S OWN RETURN, and not an `unknown` NEARBY. `ReconTx` declares
+  // `insert` and `updateAt` two lines below, both still `Promise<unknown[]>`,
+  // so a case reading the block for the string would pass on the wrong member.
+  const start = PORTS_SOURCE.indexOf('export interface ReconTx {');
+  expect(start, '`ReconTx` was not found in `ports.ts`').toBeGreaterThan(-1);
+  const block = PORTS_SOURCE.slice(start, PORTS_SOURCE.indexOf('\n}', start));
+  const own = /rowsWhere[^)]*\)\s*:\s*(Promise<[^;{]*?)[;{]/.exec(block);
+  expect(own?.[1], '`ReconTx.rowsWhere` has no readable return').toBeDefined();
+  expect(own?.[1]?.trim()).not.toBe('Promise<unknown[]>');
+
+  // AND THE KEY IS STILL THE NARROW UNION OF THREE. This row spends limit 4's
+  // RETURN and widens no key vocabulary, which is the half
+  // [ADR-424](docs/decisions/ADR-424.md) section 7 watches.
+  expect(block).toContain('K extends ReconReadTable');
+  expect([...RECON_READ_TABLES]).toEqual(['dailyMarks', 'ruleStates', 'reconciliations']);
+
+  // THE WRITE PATH IS UNSPENT AND SAYS SO OUT LOUD. A later row narrowing
+  // `insert` or `updateAt` is answering a DIFFERENT question -- what the
+  // database made of what was sent -- and this case is what tells it so.
+  expect(block).toContain('insert(key: ReconWriteTable, values: ReconValues): Promise<unknown[]>;');
+});
+
+test('8.2 the hand-written existence mapping is DELETED from the slice', () => {
+  const code = (text: string): string => stripComments(text, { literals: 'blank' });
+
+  // THE ALIAS THAT WROTE `unknown` DOWN A SECOND TIME.
+  expect(code(PORTS_SOURCE)).not.toMatch(/export type ReconRow\b/);
+
+  // THE FUNCTION THAT CAST BACK OUT OF IT. `asRow(` is the mapping
+  // [ADR-421](docs/decisions/ADR-421.md) section 5 calls "a second place the
+  // `unknown` is written down", gone from the module and from all three callers.
+  expect(code(SWEEP_SOURCE)).not.toMatch(/\basRow\b/);
+
+  // AND THE BARREL NO LONGER OFFERS THE NAME.
+  const barrel = readFileSync(join(HERE, '..', 'src', 'index.ts'), 'utf8');
+  expect(code(barrel)).not.toMatch(/\bReconRow\b(?!Error)/);
+
+  // WHAT THE DELETION BOUGHT, asserted rather than described: a column name is
+  // checked by `tsc` now because `field` is keyed to the row. A reader that
+  // took a bare `string` would compile with a column no migration ever created.
+  for (const reader of ['requireString', 'optionalString', 'requireCents'])
+    expect(code(SWEEP_SOURCE), `${reader} still takes an unchecked column name`).toContain(
+      `field: keyof R & string`,
+    );
+});
+
+test('8.3 every VALUE refusal survived the deletion, one for one', () => {
+  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a
+  // guard for its EXISTENCE; it buys nothing about the VALUE, because
+  // `schema.ts` is a transcription and nothing compares it to the DDL. A row
+  // that deleted these along with the mapping would be trading a refusal that
+  // fires for a type that cannot -- and here, on money.
+  const code = stripComments(SWEEP_SOURCE, { literals: 'blank' });
+  const READERS = ['requireString', 'optionalString', 'requireCents'] as const;
+  for (const reader of READERS) {
+    expect(code, `${reader} was deleted along with the mapping`).toContain(`function ${reader}`);
+    const start = code.indexOf(`function ${reader}`);
+    const body = code.slice(start, code.indexOf('\n}', start));
+    expect(body, `${reader} no longer refuses anything`).toContain('throw new ReconRowError(');
+  }
+
+  // A COUNT IS REFUSED AS THE INSTRUMENT, for the two reasons
+  // [ADR-426](docs/decisions/ADR-426.md) section 7 gives: it is a derivable
+  // number written down (`CI-06`), and it passes just as happily when one
+  // reader loses its `throw` and another grows a second. The property is "each
+  // refusal is still reachable", so each is read.
+  //
+  // THE MONEY ONE IS ASSERTED BY ITS SUBJECT AND NOT ONLY BY ITS PRESENCE.
+  // `requireCents` refusing a `number` is what keeps a float out of a balance,
+  // and the narrowed port makes its input harder to seed rather than safer.
+  //
+  // READ WITH LITERALS INTACT, and the difference is the point: `literals:
+  // 'blank'` is the mode for a check hunting for a CALL, and this one hunts for
+  // a string. Comments are still stripped, so the paragraph explaining the
+  // refusal cannot be the thing that satisfies it.
+  const kept = stripComments(SWEEP_SOURCE);
+  const cents = kept.slice(kept.indexOf('function requireCents'));
+  expect(cents.slice(0, cents.indexOf('\n}'))).toContain("typeof value !== 'bigint'");
 });
