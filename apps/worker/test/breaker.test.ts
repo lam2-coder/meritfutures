@@ -1340,3 +1340,87 @@ test('9.3 every VALUE refusal survived the deletion, one for one and by subject'
   expect(source).toContain("which 0016's CHECK does not admit");
   expect(source).toContain('past Number.MAX_SAFE_INTEGER');
 });
+
+// =============================================================================
+// 10. ADR-437. The WRITE path was measured and refused, and this is what a later
+//     row has to move before it can take it
+// =============================================================================
+// **THE READ NARROWING IS SPENT AND THE WRITE ONE IS NOT, AND SECTION 9 ALREADY
+// SAYS THE FIRST HALF OF THAT.** Case 9.1 asserts `insert` still RETURNS
+// `unknown`. What it does not say is why a row that narrowed it anyway would
+// have bought nothing, and that reason is a fact about this slice rather than an
+// opinion about writes: the one call site DISCARDS the value. Case 10.2 is that
+// fact, asserted, so the next row reads it instead of re-deriving it.
+//
+// Case 10.3 is the money half. `plan_breaker_state` is the ONE table this port
+// may write and two of its columns are `*_cents`. A values parameter derived
+// from `schema.ts` would mark a column OPTIONAL wherever the transcription
+// records a default, and nothing in this tree compares a `schema.ts` default
+// against the DDL. These two columns carry none on either side, and this case is
+// what makes that a checked fact rather than a sentence in an entry.
+
+const SCHEMA_SOURCE = readFileSync(join(ROOT, 'packages/db/src/schema.ts'), 'utf8');
+const ADAPTER_SUITE = readFileSync(join(ROOT, 'apps/worker/test/breaker-adapter.test.ts'), 'utf8');
+
+test('10.1 the write path is unnarrowed on BOTH halves, and TWO controls freeze it', () => {
+  // The signature entire, return and parameters together. Case 9.1 reads the
+  // return alone, which a row narrowing only the VALUES would pass.
+  expect(code(PORTS_SOURCE)).toContain(
+    'insert(key: BreakerWriteTable, values: BreakerValues): Promise<unknown[]>;',
+  );
+  // AND NO SCHEMA-DERIVED WRITE TYPE REACHED THIS FILE. `DeclaredRow` is the
+  // read side's and is imported; its write-side counterpart does not exist in
+  // this tree and naming one here would be the narrowing without the argument.
+  expect(code(PORTS_SOURCE)).not.toMatch(/DeclaredInsert|\$inferInsert/);
+
+  // **TWO CONTROLS, NOT ONE, AND THE SECOND IS THE ONE THAT READS THE RETURN.**
+  // ADR-432 section 10 item 1 names only the adapter suite's, so a row that met
+  // that one and moved the signature would still be red here and would not know
+  // why until it ran. Both are named, by their text, in one place.
+  expect(ADAPTER_SUITE).toContain(
+    "expect(ports).toContain('insert(key: BreakerWriteTable, values: BreakerValues)');",
+  );
+  expect(ADAPTER_SUITE).toContain("expect(ports).not.toContain('onConflict');");
+});
+
+test('10.2 nothing reads what `insert` returns, which is why narrowing it buys nothing', () => {
+  const source = code(EVALUATE_SOURCE);
+  // ONE call site, counted rather than assumed. A second one is a second reader
+  // to check and this case should be re-derived when it appears.
+  expect([...source.matchAll(/\btx\.insert\(/g)]).toHaveLength(1);
+  // IT IS A STATEMENT. `await tx.insert(...)` at the head of its own line, with
+  // nothing on the left of it.
+  expect(source).toMatch(/^\s*await tx\.insert\(/m);
+  // AND IT IS NOT BOUND, RETURNED OR CHAINED. ADR-430 section 4 found a
+  // narrowing absorbed by a mapping that took `unknown`; here there is no
+  // mapping on the return at all, because there is no value taken.
+  expect(source).not.toMatch(/\b(?:const|let|var|return)\b[^\n]*\btx\.insert\(/);
+  expect(source).not.toMatch(/\btx\.insert\([^\n]*\)\s*\./);
+});
+
+test('10.3 the two money columns of the one writable table are required on BOTH sides', () => {
+  // THE TRANSCRIPTION. `bigint` with `mode: 'bigint'` is what makes a float
+  // inexpressible; `mode: 'number'` on the same column would be a money value
+  // the type reports as safe and JavaScript rounds.
+  const table = SCHEMA_SOURCE.slice(
+    SCHEMA_SOURCE.indexOf('export const planBreakerState = pgTable'),
+  );
+  const body = table.slice(0, table.indexOf('primaryKey('));
+  for (const property of ['numeratorCents', 'denominatorCents']) {
+    const at = body.indexOf(`${property}:`);
+    expect(at, `${property} is not a transcribed column`).toBeGreaterThan(-1);
+    const decl = body.slice(at, body.indexOf('\n', body.indexOf('.notNull()', at)));
+    expect(decl).toContain("{ mode: 'bigint' }");
+    expect(decl).toContain('.notNull()');
+    // NO DEFAULT, WHICH IS THE HALF NOTHING IN THIS TREE CHECKS. A values type
+    // derived from this file marks a defaulted column OPTIONAL, and the only
+    // `hasDefault` assertion in the repository reads ONE column of ONE table.
+    expect(decl).not.toContain('.default');
+  }
+
+  // AND THE DDL, WHICH IS THE AUTHORITY THE TRANSCRIPTION ANSWERS TO.
+  // ADR-112 foreclosure 4: nothing makes the transcription complete, so the
+  // comparison is taken here for the two columns that carry money.
+  expect(MIGRATION).toMatch(/^\s*numerator_cents\s+bigint NOT NULL,\s*$/m);
+  expect(MIGRATION).toMatch(/^\s*denominator_cents\s+bigint NOT NULL,\s*$/m);
+});
