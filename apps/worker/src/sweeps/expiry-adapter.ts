@@ -54,29 +54,32 @@
 // CLAUSE THAT CLOSED HERE IS RETIRED, NAMED NOT QUOTED (`RI-14`, ADR-385).**
 //
 // -----------------------------------------------------------------------------
-// WHY THERE IS NO PRODUCER TO SUPPLY ONE, MEASURED RATHER THAN ASSERTED
+// WHY NO PRODUCER IS INSTALLED HERE, WHICH IS NO LONGER WHY ONE COULD NOT BE
 // -----------------------------------------------------------------------------
-// `apps/api/src/events.ts` holds `EVENT_CATALOGUE`, `buildEvent`,
-// `makeEventSink` and `TRANSACTION_EVENT_WRITER`, and it is the ONLY event
-// producer in this repository: nothing under `packages/**` carries one.
-// `apps/worker` cannot reach it. `RI-04` refuses a deployable that depends on a
+// `packages/ledger` holds `EVENT_CATALOGUE`, `buildEvent`, `makeEventSink` and
+// `TRANSACTION_EVENT_WRITER`, publishes all four from its barrel, and is a
+// package `apps/worker/package.json` already declares. **THIS PARAGRAPH READ
+// THAT `apps/api` HELD THEM AND THAT NOTHING UNDER `packages/**` CARRIED ONE,
+// AND ADR-410 FALSIFIED BOTH HALVES** (kept beside its correction, `RI-14`). It
+// closed on three refusals: `RI-04` refuses a deployable that depends on a
 // deployable, `.npmrc`'s `node-linker=isolated` means an undeclared specifier
 // resolves at neither run time nor build time, and `test/event-sink.test.ts`
 // section 3 asserts that no relative specifier under `apps/worker/src` resolves
-// outside this app. Three independent refusals, and none of them is a line this
-// row may edit.
+// outside this app. **ALL THREE ARE STILL TRUE AND NOT ONE OF THEM SPEAKS TO A
+// DECLARED PACKAGE**, so none of them now stands between this file and the
+// producer.
 //
-// **AND THE PRODUCER IS ON THE WRONG SIDE OF THE FENCE FROM THE HANDLE, WHICH IS
-// THE FINDING RATHER THAN THE INCONVENIENCE.** `apps/api/src/events.ts` states
-// it against itself: `events` is an `either`-class row, `ScopedTx.insert` is
-// generic over `OwnedTableKey` and `FirmTx.insert` over `FirmTableKey`, so
-// "`SystemTx` is the ONE handle in this workspace that can write this table",
-// and `apps/api` opens only `scoped` and `firm` doors. **THE ONE DEPLOYABLE
-// HOLDING A `SystemTx` IS THIS ONE**, and `WorkerDb.batch` hands one to the
-// callback four lines below. So the producer has no handle and the handle has no
-// producer, each in the deployable the other cannot import, and the repair is a
-// package both arrows already reach rather than an import either side could
-// write. That is `P5-n`'s slice and it is not this row's fence.
+// **AND THE FINDING THIS BLOCK WAS WRITTEN FOR WAS ANSWERED RATHER THAN
+// OVERTAKEN, WHICH IS WHY IT IS KEPT.** It read that the producer was on the
+// wrong side of the fence from the handle: `events` is an `either`-class row,
+// `ScopedTx.insert` is generic over `OwnedTableKey` and `FirmTx.insert` over
+// `FirmTableKey`, so "`SystemTx` is the ONE handle in this workspace that can
+// write this table", and `apps/api` opens only `scoped` and `firm` doors. **THE
+// ONE DEPLOYABLE HOLDING A `SystemTx` IS STILL THIS ONE**, and `WorkerDb.batch`
+// hands one to the callback four lines below. The paragraph named its own
+// repair, "a package both arrows already reach rather than an import either side
+// could write", and ADR-410 took exactly that. **WHAT IS LEFT IS THE INSTALL,
+// UNWRITTEN**, which is a smaller thing than the fence this block described.
 //
 // **THE SWEEP WOULD STILL LOSE ONE OF ITS THREE NAMES ON THE DAY THE SINK
 // ARRIVES, AND THAT IS SAID HERE SO NOBODY READS THIS FILE AS THE LAST

@@ -116,10 +116,10 @@
 // **AND THE DETECTOR ROW STAYS `unscheduled` FOR A REASON THAT IS NOT THE
 // ADAPTER, WHICH IS WHY THE OPENING CLAUSE SURVIVES BEING FALSIFIED A THIRD
 // TIME.** That adapter serves FOUR of `DetectorRunnerIo`'s five members. The
-// fifth is the EVENT SINK and this deployable can reach no sink at all:
+// fifth is the EVENT SINK and this deployable INSTALLS none:
 // `test/event-sink.test.ts` establishes the shape of that gap across three ports
 // at once, and two of the detector runner's three event names would be refused
-// by the producer one deployable over even if the import were legal. **THAT
+// by the producer in `@merit/ledger` even if one were installed. **THAT
 // FIGURE IS WRONG BY ONE AND THE DETECTOR ROW BELOW CARRIES THE CORRECTION**,
 // which is kept here rather than edited away per `RI-14`. `runner.ts`
 // emits inside the write transaction and emits UNCONDITIONALLY, so the composed
@@ -229,8 +229,8 @@
 // rather than a fact, and it is the one number in this header nothing had ever
 // contradicted precisely because five separate rows each re-derived it the same
 // wrong way. **THE TWO THE SUFFIX MISSES ARE THE EVENT SINKS**:
-// `UNWIRED_BREAKER_EVENT_SINK` (`breaker/adapter.ts:207`) and
-// `UNWIRED_DETECTOR_EVENT_SINK` (`detectors/adapter.ts:217`), both of them a
+// `UNWIRED_BREAKER_EVENT_SINK` (`breaker/adapter.ts`) and
+// `UNWIRED_DETECTOR_EVENT_SINK` (`detectors/adapter.ts`), both of them a
 // refusing default living in an ADAPTER file rather than a `ports.ts`. **SO THE
 // CENSUS THIS HEADER HAS REPEATED FIVE TIMES EXCLUDED EXACTLY THE BLOCKER IT
 // MOST OFTEN NAMES**: the sink is blocker ONE on the breaker row and blocker ONE
@@ -259,7 +259,7 @@
 // neither has an inhabitant under any `src/` in this workspace. **A FOURTH ROW
 // FAILS IN A FOURTH WAY WITHOUT FALSIFYING THE CLAIM AND IS SAID HERE SO IT IS
 // NOT COUNTED TWICE**: `ExpirySweepIo` HAS a constructor and NOTHING CALLS IT.
-// `expirySweepIo` (`sweeps/expiry-adapter.ts:193`) takes the sink as a required
+// `expirySweepIo` (`sweeps/expiry-adapter.ts`) takes the sink as a required
 // argument with no default. **THE CLAUSE THAT FOLLOWED IS RETIRED, NAMED NOT
 // QUOTED (`RI-14`, ADR-385): the call is unwritten, not untypable.**
 //
@@ -462,7 +462,7 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'THREE. The row already said so in its own second clause and that clause is unchanged and ' +
       'is now blocker two. ' +
       'ONE, `postgresBreakerIo` serves FOUR of `BreakerIo`s five members; the fifth is `events` ' +
-      'and no sink is reachable from this deployable at all (RI-04, node-linker=isolated), while ' +
+      'and no sink is INSTALLED here, though ADR-410 made one reachable (RI-14), while ' +
       'the name `breaker.state_changed` is in none of `EVENT_CATALOGUE`s ten and would be refused ' +
       'by the producer under ADR-159 clause 1 even if one were. AND THE COST IS THE WHOLE RUN ' +
       'RATHER THAN ONE PLAN: `evaluate.ts` holds ONE transaction for every plan (ADR-006) and ' +
@@ -491,15 +491,15 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'AND ADR-349 WROTE THE SECOND ONE, so the sentence is kept beside its correction (RI-14) ' +
       'and the disposition does not move, because THE ADAPTER WAS NEVER THE ONLY BLOCKER AND ' +
       'THERE ARE THREE. (1) `postgresDetectorRunnerIo` serves four of `DetectorRunnerIo`s five ' +
-      'members; the fifth is `events` and no sink is reachable from this deployable at all ' +
-      '(RI-04, node-linker=isolated), while two of the runners three event names would be ' +
+      'members; the fifth is `events` and no sink is INSTALLED in this deployable, though ' +
+      'ADR-410 made one reachable (RI-14), while two of the runners three event names would be ' +
       'refused by the producer even if one were. THAT FIGURE IS WRONG BY ONE AND IS KEPT BESIDE ' +
       'ITS CORRECTION per RI-14, NAMED RATHER THAN RE-QUOTED (ADR-367): the retired figure is ' +
       'the TWO. `DetectorEventName` (`detectors/ports.ts:527`) is three names and EXACTLY ONE ' +
       'of them, `detector.run_degraded`, is absent from the ten `EVENT_CATALOGUE` carries ' +
       '(`packages/ledger/src/events.ts`), which is what `buildEvent` refuses on under ' +
       'ADR-159 clause 1. `flag.raised` and `detector.run_completed` are both rows. THE BLOCKER ' +
-      'DOES NOT MOVE, because no sink is reachable from here at all and the count only ever ' +
+      'DOES NOT MOVE, because no sink is INSTALLED here and the count only ever ' +
       'mattered to the counterfactual. `runner.ts` emits INSIDE the write transaction ' +
       'and emits UNCONDITIONALLY, so a deployment holding the composed value writes no ' +
       '`detector_runs` row and every outcome comes back `unrecorded`. (2) `detector_definitions` ' +
@@ -534,7 +534,7 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'WORSE THAN SILENCE, because a green metric is read as evidence. SECOND, A RAISED FINDING ' +
       'REACHES NOBODY: `DigestAlarmReport` and `DigestAlarmFinding` have no consumer under any ' +
       '`src/`, both metric names appear in no `src/` file outside `alarm.ts`s own comments, ' +
-      'alarm.ts emits no event and no sink is reachable from this deployable (RI-04), and this ' +
+      'alarm.ts emits no event and no sink is INSTALLED in this deployable, and this ' +
       'row IS the dead-man switch rather than a job one watches, so there is no completion ' +
       'signal whose absence would page. THIRD, WHETHER A FINDING SHOULD FAIL THE PROCESS IS A ' +
       'NUMBER NOBODY HAS STATED: the inventory row is S2 and S1 in effect for the two MUST ' +
@@ -677,14 +677,19 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'this deployable`s own doors: `transact` over `WorkerDb.batch`, `terms` over the ' +
       'accessor`s two read-path constructors, `ledger` over `EXPIRY_LEDGER` and `now` over the ' +
       'process clock. FOUR PORTS OF FIVE. THE LAST SENTENCE IS UNCHANGED AND THE FIFTH PORT IS ' +
-      'WHY: this deployable has no event sink and cannot reach one. The only producer in this ' +
-      'repository is `apps/api/src/events.ts`; RI-04 refuses a deployable depending on a ' +
-      'deployable, `node-linker=isolated` means an undeclared specifier resolves at neither run ' +
-      'time nor build time, and `test/event-sink.test.ts` case 3 asserts no relative specifier ' +
-      'under this `src/` escapes the app. AND THE FENCE RUNS THE WRONG WAY ROUND THE HANDLE: ' +
+      'WHY: this deployable has no event sink INSTALLED. The only producer in this ' +
+      'repository is `TRANSACTION_EVENT_WRITER` and `@merit/ledger` publishes it, which this ' +
+      'deployable declares. THE CLAUSE HERE SAID IT COULD NOT REACH ONE, on RI-04 refusing a ' +
+      'deployable depending on a deployable, `node-linker=isolated` meaning an undeclared ' +
+      'specifier resolves at neither run time nor build time, and `test/event-sink.test.ts` ' +
+      'case 3 asserting no relative specifier under this `src/` escapes the app. ALL THREE ' +
+      'STILL HOLD AND NOT ONE OF THEM REACHES A DECLARED PACKAGE, so ADR-410 retired the ' +
+      'CONCLUSION and the premises are kept beside it per RI-14. ' +
+      'AND THE FENCE THAT RAN THE WRONG WAY ROUND THE HANDLE WENT WITH IT: ' +
       'that producer`s own header measures `SystemTx` as the one handle in this workspace that ' +
       'can write `events`, and `apps/api` opens only `scoped` and `firm` doors, so the producer ' +
-      'has no handle and the handle has no producer. `expirySweepIo` therefore takes the sink ' +
+      'had no handle and the handle had no producer until the producer moved into a package ' +
+      'both of them reach. `expirySweepIo` therefore takes the sink ' +
       'as a REQUIRED argument with no default, and nothing in this tree can be passed for it, ' +
       'so the blocker is a call that does not compile rather than a sentence. A REFUSING ' +
       'DEFAULT WAS REFUSED: every leg of this sweep emits inside its own release transaction, ' +

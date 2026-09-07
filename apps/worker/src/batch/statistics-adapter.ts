@@ -234,10 +234,13 @@ export const WITHDRAWAL_SETTLEMENTS_BLOCKER =
  * `raiseStatisticsHalt`'s blocker, and it is the batch's blocker unchanged.
  *
  * `M12` section 5 gives the halt `stats.run_halted` and the event PAGES.
- * `apps/worker` holds every `emit` call site in this workspace and holds NO
- * producer; `apps/api/src/events.ts` is the only composed writer and this
- * deployable declares `@merit/db` and `@merit/rules-engine` and nothing else, so
- * under `node-linker=isolated` an import of it does not resolve at all.
+ * `apps/worker` holds every `emit` call site in this workspace and INSTALLS no
+ * producer; `TRANSACTION_EVENT_WRITER` is the only composed writer and
+ * `@merit/ledger` publishes it, which this deployable declares alongside
+ * `@merit/db`, `@merit/queue` and `@merit/rules-engine`. **THIS READ THAT THE
+ * WRITER SAT ONE DEPLOYABLE OVER, THAT THE MANIFEST CARRIED TWO NAMES AND THAT
+ * `node-linker=isolated` LEFT THE IMPORT UNRESOLVABLE; ADR-410 AND THE MANIFEST
+ * FALSIFY ALL THREE** (kept beside their correction, `RI-14`).
  * `test/event-sink.test.ts` measures both halves.
  *
  * **AND WIRING THE SINK WOULD NOT MAKE THIS ONE WRITE.** `buildEvent` refuses a
@@ -247,9 +250,9 @@ export const WITHDRAWAL_SETTLEMENTS_BLOCKER =
  * names this deployable already emits.
  */
 export const STATISTICS_HALT_SINK_BLOCKER =
-  'the halt is an EVENT and this deployable has no writer for one. `apps/api/src/events.ts` is ' +
-  'the only composed writer in this tree, `apps/worker` declares `@merit/db` and ' +
-  '`@merit/rules-engine` and nothing else, and `stats.run_halted` is not a row of ' +
+  'the halt is an EVENT and this deployable INSTALLS no writer for one. ' +
+  '`TRANSACTION_EVENT_WRITER` is the only composed writer in this tree and `@merit/ledger` ' +
+  'publishes it, which `apps/worker` declares, and `stats.run_halted` is not a row of ' +
   'EVENT_CATALOGUE, so wiring a sink would leave this emit refused by name. M12 section 5 says ' +
   'the event PAGES, and a channel that swallowed it would be the silence FM-M12-02 exists to end';
 

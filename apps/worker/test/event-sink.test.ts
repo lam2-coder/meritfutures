@@ -23,17 +23,21 @@
 // WHAT IS ASSERTED HERE AND WHAT IS ASSERTED SOMEWHERE ELSE
 // -----------------------------------------------------------------------------
 // `db.test.ts` ALREADY PINS THE BARE SPECIFIERS this deployable may import, to
-// exactly `@merit/db`, `@merit/rules-engine` and `node:crypto`, so an
-// `@merit/api` line in the manifest is caught there and is NOT re-asserted here.
-// What that case cannot see is a RELATIVE specifier: `../../api/src/events.ts`
-// is not a bare name, resolves with no manifest line at all, and is the exact
-// move a wiring session under pressure reaches for. Section 3 closes that.
+// exactly `@merit/db`, `@merit/ledger`, `@merit/queue`, `@merit/rules-engine`
+// and `node:crypto`, so an `@merit/api` line in the manifest is caught there and
+// is NOT re-asserted here. What that case cannot see is a RELATIVE specifier
+// that climbs out of this app into another one: such a path is not a bare name,
+// resolves with no manifest line at all, and is the exact move a wiring session
+// under pressure reaches for. Section 3 closes that. **THE TEMPTATION IS
+// SMALLER THAN IT WAS AND THE FENCE IS NOT**: ADR-410 put the producer in
+// `@merit/ledger`, which the pin above already permits, so the legal spelling is
+// now also the easy one and section 3 keeps watching the illegal one anyway.
 //
 // The three ports' unwired defaults are asserted in `breaker.test.ts`,
 // `detector-runner.test.ts` and `expiry.test.ts`, each beside the job it serves.
 // This file asserts the SHAPE OF THE GAP ACROSS ALL THREE, which no per-job
 // suite can see: how many call sites there are, which names they carry, and how
-// many of those names the producer one deployable over would actually accept.
+// many of those names the producer in `@merit/ledger` would actually accept.
 //
 // -----------------------------------------------------------------------------
 // THE FINDING SECTION 4 EXISTS FOR
@@ -233,7 +237,7 @@ function catalogueNames(): string[] {
   return names;
 }
 
-test('the producer one deployable over would accept five of these nine names', () => {
+test('the producer in @merit/ledger would accept five of these nine names', () => {
   const catalogue = catalogueNames();
   // The parse, checked before anything rests on it.
   expect(catalogue).toHaveLength(10);
@@ -271,7 +275,7 @@ test('the producer one deployable over would accept five of these nine names', (
   // `wallet.withdrawal_approved` AND `wallet.debited` ARE THE OTHER KIND AND THE
   // DIFFERENCE MATTERS (ADR-325). BOTH ARE ALREADY ROWS OF EVENTS, at 6.2 and
   // 6.1, so nothing frozen has to move for them: what is missing is a
-  // transcription into `apps/api/src/events.ts`, exactly as `flag.raised` and
+  // transcription into `EVENT_CATALOGUE`, exactly as `flag.raised` and
   // `detector.run_completed` were missing until sessions 382 and 205 transcribed
   // theirs. AND BOTH ROWS NAME `apps/api` AS THE PRODUCER, WHICH ADR-316 SECTION
   // 8 FINDING 1 FINDS IS WRONG: ADR-305 section 4 holds that the approval edge

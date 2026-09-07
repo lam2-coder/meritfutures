@@ -14,11 +14,17 @@
 // serves FOUR of them. The fifth is `events`, and it is not an adapter that is
 // missing:
 //
-//   1. `RI-04` forbids importing `apps/api`, `node-linker=isolated` makes an
+//   1. `TRANSACTION_EVENT_WRITER` is the workspace's only composed writer and
+//      `@merit/ledger` publishes it, so the missing thing is the INSTALL and no
+//      longer the reach. **THIS CLAUSE READ "and it is one deployable over",
+//      WHICH WAS TRUE AND IS NOT** (kept beside its correction, `RI-14`):
+//      `RI-04` forbade importing `apps/api`, `node-linker=isolated` made an
 //      undeclared specifier unresolvable, and `test/event-sink.test.ts` section
-//      3 asserts that no relative specifier under `src` escapes this deployable.
-//      `TRANSACTION_EVENT_WRITER` is the workspace's only composed writer and it
-//      is one deployable over.
+//      3 still asserts that no relative specifier under `src` escapes this
+//      deployable. ADR-410 moved the producer into a package this deployable
+//      already declares and `test/db.test.ts` already permits, so none of the
+//      three bites the writer any more. What is left is that no file under this
+//      `src` composes a sink over it.
 //   2. Of the runner's three event names, `detector.run_degraded` is a row in NO
 //      version of `EVENTS.md` at all (`M07` section 5 carries it, marked NEW),
 //      so `buildEvent` would refuse the NAME under `ADR-159` clause 1.
@@ -195,15 +201,18 @@ export class DetectorAdapterUnwired extends Error {
 
 /** The event sink's blocker, in the three parts the header enumerates. */
 const EVENT_SINK_BLOCKER =
-  'the only composed event writer in this workspace is TRANSACTION_EVENT_WRITER in ' +
-  'apps/api/src/events.ts, RI-04 forbids the import and node-linker=isolated makes an ' +
-  'undeclared specifier unresolvable, so no sink is reachable from apps/worker at all. AND ' +
+  'the only composed event writer in this workspace is TRANSACTION_EVENT_WRITER and ' +
+  '@merit/ledger publishes it, so this deployable can NAME the writer: RI-04 forbade the ' +
+  'import while it sat in another deployable and ADR-410 moved it to a package apps/worker ' +
+  'already declares. What is missing is the INSTALL, because no file under this src composes ' +
+  'a sink over it. AND ' +
   'WIRING ONE WOULD NOT MAKE THESE THREE NAMES WRITE: detector.run_degraded is a row in no ' +
   'version of EVENTS.md (M07 section 5 carries it, marked NEW) so buildEvent would refuse the ' +
   'name under ADR-159 clause 1, and detector.run_completed is a catalogue row whose ' +
   'subjectField reads detector_run_id, which runner.ts does not put in the payload ' +
-  '(test/event-sink.test.ts section 4b is the pin). Two of the three blockers are outside ' +
-  'apps/worker entirely';
+  '(test/event-sink.test.ts section 4b is the pin). ONE of the three blockers is inside ' +
+  'apps/worker now and the other two are not, which is what ADR-410 changed about this ' +
+  'sentence';
 
 /**
  * The sink this deployment installs, which refuses.

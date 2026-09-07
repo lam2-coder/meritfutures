@@ -212,10 +212,10 @@ export class BatchPortUnwired extends Error {
 
 /** The blocker both event channels share. */
 const EVENT_SINK_BLOCKER =
-  'both findings are EVENTS and this deployable has no writer for one. `TRANSACTION_EVENT_WRITER` ' +
-  'in `apps/api/src/events.ts` is the only composed writer in this tree, `apps/worker` declares ' +
-  '`@merit/db` and `@merit/rules-engine` and nothing else, and under `node-linker=isolated` an ' +
-  'undeclared import does not resolve at all. `EVENTS.md:194` names ' +
+  'both findings are EVENTS and this deployable INSTALLS no writer for one. `TRANSACTION_EVENT_WRITER` ' +
+  'is the only composed writer in this tree and `@merit/ledger` publishes it, which this ' +
+  'deployable declares. THIS SAID IT SAT ONE DEPLOYABLE OVER BEHIND AN UNRESOLVABLE IMPORT; ' +
+  'ADR-410 MOVED IT AND RI-14 KEEPS THAT HERE. `EVENTS.md:194` names ' +
   '`replay.divergence_detected` one of the two events that must never be quiet, so a channel ' +
   'that swallowed a finding here would be the quiet this deployable exists to end';
 
@@ -231,10 +231,10 @@ const EVENT_SINK_BLOCKER =
  * THE THREE ARE ORDERED CHEAPEST FIRST AND THE THIRD IS THE RULING.
  *
  *   1. THE SINK, which is the shared blocker above and is re-derived rather
- *      than inherited: `EVENT_CATALOGUE` in `apps/api/src/events.ts` carries ten
- *      names and not one of them begins `replay.`, so `buildEvent` would refuse
- *      this name on `ADR-159` clause 1 even if the fence between the two
- *      deployables did not exist. `event-sink.test.ts` holds the fence.
+ *      than inherited: `EVENT_CATALOGUE`, which `@merit/ledger` publishes,
+ *      carries ten names and not one of them begins `replay.`, so `buildEvent`
+ *      would refuse this name on `ADR-159` clause 1 whether or not a sink is
+ *      ever installed here. `event-sink.test.ts` holds the relative fence.
  *   2. THE MODE IS NOT ON THE FINDING. `ReplayDivergenceFinding` carries an
  *      account, a day, an engine version and the fields that moved, and NOT
  *      `ReplayAuditConfig.mode`, so an adapter cannot tell `B.4` step 1's
@@ -258,9 +258,9 @@ const EVENT_SINK_BLOCKER =
  */
 const REPLAY_DIVERGENCE_BLOCKER =
   'THE FINDING HAS THREE BLOCKERS AND ONLY THE FIRST IS THE EVENT SINK (ADR-346). (1) THE ' +
-  'SINK: `EVENT_CATALOGUE` in `apps/api/src/events.ts` carries ten names and none of them ' +
-  'begins `replay.`, so the only composed writer in this tree would refuse this name on ' +
-  'ADR-159 clause 1 before the fence between the deployables was even reached. (2) THE MODE ' +
+  'SINK: `EVENT_CATALOGUE`, which `@merit/ledger` publishes, carries ten names and none of ' +
+  'them begins `replay.`, so the only composed writer in this tree would refuse this name on ' +
+  'ADR-159 clause 1 whether or not a sink is ever installed here. (2) THE MODE ' +
   'IS NOT ON THE FINDING: `ReplayDivergenceFinding` carries no `ReplayMode`, so this adapter ' +
   "cannot tell B.4 step 1's nightly detection from B.4 step 2's dry run, which is the run " +
   'that writes NOTHING, and a halt on every finding would halt the whole book on the first ' +

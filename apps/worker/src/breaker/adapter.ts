@@ -16,13 +16,19 @@
 // `BreakerIo` has FIVE members and this file serves FOUR of them. The fifth is
 // `events`, and it is not an adapter that was never written:
 //
-//   1. `TRANSACTION_EVENT_WRITER` in `apps/api/src/events.ts` is the workspace's
-//      only composed event writer. `RI-04` forbids one deployable depending on
+//   1. `TRANSACTION_EVENT_WRITER` is the workspace's only composed event writer
+//      and `@merit/ledger` publishes it. **THIS CLAUSE PUT THAT WRITER IN
+//      `apps/api` AND THAT IS NO LONGER WHERE IT IS** (kept beside its
+//      correction, `RI-14`). `RI-04` forbids one deployable depending on
 //      another, `apps/worker/package.json` declares `@merit/db`,
 //      `@merit/ledger`, `@merit/queue` and `@merit/rules-engine` and no `apps/*`
 //      package at all, and under `node-linker=isolated` an undeclared specifier
-//      resolves at neither run time nor build time. `test/event-sink.test.ts`
-//      section 3 holds the fence.
+//      resolves at neither run time nor build time. **ALL THREE STILL HOLD AND
+//      NONE OF THEM BITES THE WRITER NOW**, because ADR-410 moved the producer
+//      into the SECOND NAME ON THAT LIST, which is why the list is left standing
+//      rather than repointed: it is the evidence. `test/event-sink.test.ts`
+//      section 3 still holds the fence against a RELATIVE escape, which is a
+//      different move and is still refused.
 //   2. AND THE NAME WOULD BE REFUSED EVEN IF THE FENCE DID NOT EXIST.
 //      `EVENT_CATALOGUE` carries TEN names, derived by counting them, and not
 //      one of them begins `breaker.`. `ADR-159` clause 1 makes the registry the
@@ -186,10 +192,12 @@ export class BreakerAdapterUnwired extends Error {
 
 /** The event sink's blocker, in the two parts the header enumerates. */
 const EVENT_SINK_BLOCKER =
-  'the only composed event writer in this workspace is TRANSACTION_EVENT_WRITER in ' +
-  'apps/api/src/events.ts, RI-04 forbids one deployable depending on another and ' +
-  'node-linker=isolated makes an undeclared specifier unresolvable, so no sink is reachable ' +
-  'from apps/worker at all. AND THE NAME WOULD BE REFUSED ANYWAY: EVENT_CATALOGUE carries ten ' +
+  'the only composed event writer in this workspace is TRANSACTION_EVENT_WRITER and ' +
+  '@merit/ledger publishes it. RI-04 forbids one deployable depending on another and ' +
+  'node-linker=isolated makes an undeclared specifier unresolvable, which is why the writer ' +
+  'could not stay in another deployable and why ADR-410 moved it to a package apps/worker ' +
+  'already declares. So the writer is reachable and no file under this src installs it. ' +
+  'AND THE NAME WOULD BE REFUSED ANYWAY: EVENT_CATALOGUE carries ten ' +
   'names and none of them begins `breaker.`, so buildEvent would throw at the name under ' +
   'ADR-159 clause 1 before it read the payload';
 

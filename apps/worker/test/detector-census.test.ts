@@ -342,13 +342,17 @@ describe('the sink this deployment installs, over every detector at once', () =>
     const run = fake(UNWIRED_DETECTOR_EVENT_SINK);
     const report = await runAll(run.io);
     const runs = report.outcomes.find((one) => one.detector === 'D-02');
-    // Named at its source: RI-04, the writer that exists and where, and the two
-    // catalogue blockers that would stand even if the import were legal. Cited
-    // by name and not by line, because `apps/api/src/events.ts` is another row's
-    // file this wave.
+    // Named at its source: RI-04, the writer that exists and the package that
+    // publishes it, and the two catalogue blockers that would stand even if the
+    // install were written. **PINNED BY NAME AND BY PACKAGE RATHER THAN BY
+    // PATH**, which is a strengthening and not a relaxation: ADR-410 moved this
+    // producer once and the assertion that broke was the one naming a file. A
+    // declared name and a manifest specifier are what a reader of this refusal
+    // actually needs, and neither moves when the file does.
     expect(runs?.error).toContain('DetectorAdapterUnwired');
     expect(runs?.error).toContain('RI-04');
-    expect(runs?.error).toContain('apps/api/src/events.ts');
+    expect(runs?.error).toContain('TRANSACTION_EVENT_WRITER');
+    expect(runs?.error).toContain('@merit/ledger');
     expect(runs?.error).toContain('detector.run_degraded');
     expect(runs?.error).toContain('detector_run_id');
   });
