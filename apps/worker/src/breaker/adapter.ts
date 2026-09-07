@@ -104,7 +104,7 @@
 
 import { anchorLastClosedDay } from '../batch/adapter.ts';
 import { atLeast, atMost } from '../db.ts';
-import type { WorkerDb } from '../db.ts';
+import type { DeclaredRow, WorkerDb } from '../db.ts';
 import { BREAKER_READ_TABLES, BREAKER_WRITE_TABLES } from './ports.ts';
 import type {
   BreakerEventPort,
@@ -252,14 +252,22 @@ function refuseUnknownTable(kind: 'read' | 'write', key: string): void {
  */
 function breakerTx(tx: WorkerBreakerTx): BreakerTx {
   return {
-    rowsWhere(key: BreakerReadTable, where: BreakerFilter): Promise<unknown[]> {
+    rowsWhere<K extends BreakerReadTable>(key: K, where: BreakerFilter): Promise<DeclaredRow<K>[]> {
       refuseUnknownTable('read', key);
       // THE CAST, AND THE HEADER OF `detectors/adapter.ts` IS ITS ARGUMENT. The
       // key is checked twice, once by the type alias above at compile time and
       // once by the line above at run time; the FILTER is checked by the
       // accessor, which throws on a property that is not a column and on an
       // empty filter.
-      return tx.rowsWhere(key as never, where as never);
+      //
+      // **THE RETURN CAST IS `ADR-432`'s AND IT IS ONE RATHER THAN FIVE.** `key
+      // as never` resolves the accessor's own key parameter to `never`, so what
+      // comes back is `DeclaredRow<never>[]` and not `DeclaredRow<K>[]`. This
+      // adapter reaches the accessor ONCE, through a single call rather than
+      // through a `switch` with a branch per table, so the whole cost of the
+      // narrowing on this side is this one expression. It is the SAME cast that
+      // was already here on the key, now also spelled on the result.
+      return tx.rowsWhere(key as never, where as never) as unknown as Promise<DeclaredRow<K>[]>;
     },
     insert(key: BreakerWriteTable, values: BreakerValues): Promise<unknown[]> {
       refuseUnknownTable('write', key);
