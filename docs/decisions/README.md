@@ -451,6 +451,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-438](ADR-438.md) | the `schema.ts` DEFAULT is compared against the DDL for the first time, and THREE COLUMNS DISAGREE (2026-09-07, status: proposed) |
 | [ADR-439](ADR-439.md) | the hole ADR-435 named in `golden` is closed in the shape that entry specified, and re-deriving its numbers corrects one of them (2026-09-07, status: proposed) |
 | [ADR-440](ADR-440.md) | the sentence four documents carry was never STALE, it was FALSE WHEN WRITTEN, and the line-neutral repair preserves the pointer without preserving what it lands on (2026-09-07, status: proposed) |
+| [ADR-446](ADR-446.md) | the absence grammar does not mean the same thing in a document, and the reason bites one level earlier than truth: a document quotes by rule, so REPAIRING a source sentence GROWS the document population (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
