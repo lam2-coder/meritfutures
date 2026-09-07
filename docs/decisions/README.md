@@ -443,6 +443,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-430](ADR-430.md) | `ADR-303` limit 4 is SPENT on the `recon` family, the mapping is deleted, and this is the first such row whose rows carry money (2026-09-07, status: proposed) |
 | [ADR-431](ADR-431.md) | `RI-35`'s caller probes read a specifier list as a value, the line break was never the trigger, and the repair is priced by what it stops catching (2026-09-07, status: proposed) |
 | [ADR-432](ADR-432.md) | `ADR-303` limit 4 is SPENT on the `breaker` family, the mapping is deleted, and this is the first such row that keeps the refusal its two precedents dropped (2026-09-07, status: proposed) |
+| [ADR-433](ADR-433.md) | the value-position proxy learns assignment, the widening is stated rather than smuggled, and its false-positive surface is measured over the tree (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

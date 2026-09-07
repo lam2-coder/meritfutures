@@ -399,6 +399,90 @@ function withoutBindingLists(body) {
 }
 
 /**
+ * A regular expression matching NAME in ASSIGNMENT POSITION: the name preceded
+ * by a single `=` and nothing but whitespace.
+ *
+ * ADR-433. THE TWO CALLER PROBES BELOW PROXY A VALUE POSITION WITH `.`, `,` AND
+ * `)`, AND AN ASSIGNMENT MATCHES NONE OF THE THREE. `const sink =
+ * TRANSACTION_EVENT_WRITER;` is an install of the writer into a deployable, and
+ * the next character after the name is a semicolon. ADR-431 section 10 found it,
+ * recorded that it was invisible before that row behind a single-name import and
+ * invisible after it in every case, and did not repair it because closing it
+ * WIDENS WHAT THE PROBE ASSERTS rather than repairing how the probe reads
+ * formatting. This is that widening, taken on its own row so it is priced rather
+ * than smuggled.
+ *
+ * IT WAS DEMONSTRATED MISSING BEFORE IT WAS WIDENED, because a miss nobody can
+ * show is a miss nobody can show fixed. A file under `apps/worker/src` importing
+ * the writer on a statement of its own and assigning it to an exported binding
+ * left `event-sink-caller` reporting `absent` and `RI-35` reporting NOTHING,
+ * with a real install standing in the tree. THE COUNTERFACTUAL IS ONE
+ * CHARACTER: writing `.write` after the same name in the same file turned the
+ * artifact `present` and leg 2 RED, so the seed was in scope and the probe read
+ * it. ADR-431's account re-derived exactly, including its own statement that the
+ * multi-name import no longer catches the assignment by accident.
+ *
+ * WHAT THIS ASSERTS THAT THE PROXY DID NOT. Before: the name is installed if a
+ * member access, an argument separator or a closing parenthesis follows it.
+ * After: that, OR the name is the whole right-hand side of an assignment. It
+ * adds one shape to the value-position class and removes none.
+ *
+ * **THE `=` IS THE PROXY AND THE SEMICOLON IS NOT, WHICH IS THE NARROWER OF THE
+ * TWO AND THE DIFFERENCE IS NOT COSMETIC.** `replay-audit-src-caller` three
+ * artifacts down already admits `;` and end-of-line, so it catches assignment
+ * through a STATEMENT-END proxy; reaching for the same here would also admit
+ * `export type W = typeof TRANSACTION_EVENT_WRITER;`, which is a TYPE position
+ * and installs nothing, and any prose line that happens to end on the name.
+ * `=` names the thing being asserted. Measured over the shipped scope at the
+ * moment this landed, both readers report the same ZERO files, so the choice
+ * costs nothing today and is made on what it will admit rather than on what it
+ * admits now.
+ *
+ * WHAT THE LOOKBEHIND BUYS, MEASURED RATHER THAN ASSERTED. `[=!<>]` before the
+ * `=` is `==`, `===`, `!=`, `!==`, `<=` and `>=`: a COMPARISON against the name
+ * asserts nothing is installed and is frequently the line saying so. The shipped
+ * scope carries 2,223 comparisons against a bare identifier, 50 of them against
+ * a SCREAMING_CASE name, and NONE against these two names today. `=>` is
+ * excluded structurally rather than by the lookbehind, since `>` is not
+ * whitespace, and the scope carries 936 arrow bodies returning a bare
+ * identifier. A COMPOUND assignment -- `||=`, `??=`, `+=` -- is admitted on
+ * purpose: it is an assignment.
+ *
+ * IT IS READ OVER THE WHOLE BODY AND NEVER PER LINE, AND THAT IS ADR-431'S
+ * LESSON APPLIED AHEAD OF THE CASE RATHER THAN AFTER IT. Prettier breaks after
+ * the `=` when the statement passes `printWidth`, which was watched happening:
+ * a 102-character `export const ... = TRANSACTION_EVENT_WRITER;` came back from
+ * `prettier --write` as two lines with the name alone on the second. A
+ * line-scoped assignment test would ship the exact formatting sensitivity the
+ * row before this one was sent to remove. `\s` spans the newline, and only
+ * whitespace is admitted between the two, so nothing else is reached by it.
+ *
+ * WHAT IT NOW CATCHES THAT IT ARGUABLY SHOULD NOT, STATED RATHER THAN
+ * DISCOVERED. A STRING LITERAL SPELLING AN ASSIGNMENT. `stripComments` cannot
+ * remove a string, ADR-431 measured five files under `apps/worker/src` whose
+ * refusal strings NAME the writer in order to deny it, and a sixth writing
+ * `sink = TRANSACTION_EVENT_WRITER` inside its prose would be read as the
+ * install it denies. Measured over the shipped scope: those five files spell
+ * `is TRANSACTION_EVENT_WRITER` and backticked prose, ZERO of them spell an
+ * assignment, and across all 350 files ZERO of the 175 assignments to a
+ * SCREAMING_CASE name sit inside a string literal. The surface is real, it is
+ * empty today, and it is the reason the probe was NOT widened to the statement
+ * end, which would have opened the same door wider.
+ *
+ * @param {string} name  an identifier, written in this file and never derived
+ * @returns {RegExp}
+ */
+function assignmentTo(name) {
+  return new RegExp(String.raw`(?<![=!<>])=\s*\b${name}\b`);
+}
+
+/** ADR-433. `const q = LIVE_QUEUE;` installs the door. */
+const ASSIGNS_THE_DOOR = assignmentTo('LIVE_QUEUE');
+
+/** ADR-433. `const sink = TRANSACTION_EVENT_WRITER;` installs the writer. */
+const ASSIGNS_THE_WRITER = assignmentTo('TRANSACTION_EVENT_WRITER');
+
+/**
  * Every `.sql` file in the migration set, as `{ file, body }`.
  *
  * THROWS ON BOTH FAILURES A PROBE CAN HAVE HERE, and they are different facts.
@@ -869,13 +953,22 @@ export const ABSENCE_ARTIFACTS = [
       const door = 'apps/worker/src/queue.ts';
       for (const rel of files) {
         if (rel === door) continue;
-        const called = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')))
-          .split('\n')
-          .some(
-            (line) =>
-              /\bLIVE_QUEUE\s*[.,)]/.test(line) ||
-              (/\bworkerQueue\s*\(/.test(line) && !/function\s+workerQueue/.test(line)),
-          );
+        const body = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')));
+        // ADR-433: AND AN ASSIGNMENT, WHICH IS A FOURTH SHAPE AND NOT A FOURTH
+        // MECHANISM. `const q = LIVE_QUEUE;` hands the door to a module-level
+        // binding and matches none of `.`, `,`, `)`. It is read over the WHOLE
+        // body rather than per line, because prettier breaks after the `=` on a
+        // long statement and a line-scoped test would carry the formatting
+        // sensitivity ADR-431 was sent to remove.
+        const called =
+          ASSIGNS_THE_DOOR.test(body) ||
+          body
+            .split('\n')
+            .some(
+              (line) =>
+                /\bLIVE_QUEUE\s*[.,)]/.test(line) ||
+                (/\bworkerQueue\s*\(/.test(line) && !/function\s+workerQueue/.test(line)),
+            );
         if (called) return 'present';
       }
       return 'absent';
@@ -1263,13 +1356,21 @@ export const ABSENCE_ARTIFACTS = [
       const producer = 'packages/ledger/src/events.ts';
       for (const rel of files) {
         if (rel === producer) continue;
-        const installed = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')))
-          .split('\n')
-          .some(
-            (line) =>
-              (/\bmakeEventSink\s*\(/.test(line) && !/function\s+makeEventSink/.test(line)) ||
-              /\bTRANSACTION_EVENT_WRITER\s*[.,)]/.test(line),
-          );
+        const body = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')));
+        // ADR-433: AND A THIRD SHAPE, THE ONE ADR-431 SECTION 10 LEFT. `const
+        // sink = TRANSACTION_EVENT_WRITER;` is an install of the writer into a
+        // deployable and the next character is a semicolon, so the punctuation
+        // proxy read it as nothing at all. Whole body and not per line, on
+        // `worker-queue-door-caller`s written reason.
+        const installed =
+          ASSIGNS_THE_WRITER.test(body) ||
+          body
+            .split('\n')
+            .some(
+              (line) =>
+                (/\bmakeEventSink\s*\(/.test(line) && !/function\s+makeEventSink/.test(line)) ||
+                /\bTRANSACTION_EVENT_WRITER\s*[.,)]/.test(line),
+            );
         if (installed) return 'present';
       }
       return 'absent';
