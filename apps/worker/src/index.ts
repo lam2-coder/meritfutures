@@ -592,9 +592,9 @@ export type {
 // is given rather than refusing every one. **WHAT IS STILL TRUE IS THE HALF
 // THAT KEEPS THE JOB OFF A CLOCK**: `events` needs the PRODUCER `P5-n` has not
 // written, the only one in this repository is `apps/api/src/events.ts`, and
-// `RI-04` plus `node-linker=isolated` put it out of reach. No `ExpirySweepIo`
-// is constructed here or anywhere. **THE CLAUSE THAT STOOD HERE IS RETIRED
-// (`RI-14`, ADR-385): the call is unwritten, not untypable.**
+// `RI-04` plus `node-linker=isolated` put it out of reach, so `expirySweepIo`
+// TAKES THE SINK AS A REQUIRED ARGUMENT and nothing constructs one. **THAT TRUE
+// CLAUSE, DROPPED UNRECORDED BY ADR-385, IS BACK (ADR-391, `RI-14`).**
 // **AND SLICE 7 PUT A SECOND PORT BEHIND THE SAME DOOR (ADR-325).**
 // `ApprovalLedgerPort` is `LT-06`, and its adapter is in `sweeps/ledger.ts`
 // rather than beside the driver because the manifest's own

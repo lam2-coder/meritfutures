@@ -152,7 +152,7 @@ describe('link 1: CLOSED. The worker deployable runs its job and fails loudly wh
 
   test('a deployable calls the batch now, and a failed batch leaves a NON-ZERO status', () => {
     // `runNightlyBatch` is `writeRuleStateVia`'s only caller and the writer is
-    // the only site in the tree that inserts a `rule_states` row. THIS TEST READ
+    // the only site in the tree that inserts a `rule_states` row. **FALSE AND KEPT BESIDE ITS CORRECTION (ADR-391, `RI-14`; ADR-387 found it): SIX files under `scripts/db` carry an uncommented `INSERT INTO rule_states`, and `0065` says so already. The writer is the only such site under any `src/`, which is the scope `deployableSources` below actually walks.** THIS TEST READ
     // "nothing under any `src/` calls the batch, so no deployment ever folds a
     // day" and counted THREE namers: the module declaring it, the barrel
     // exporting it, and the API reason that names it inside a string literal.
@@ -660,7 +660,7 @@ describe('link 6: the READER exists, and the DAY it selects by now has a door', 
     // reasoning: a file that NAMES `RuleState` is usually declaring a parameter.
     // A rebuilt state must carry `engineGates`, and `ADR-250` put the only
     // decoding of that column in the engine, so `decodeEngineGates(` finds every
-    // rebuilder in the tree and finds nothing else.
+    // rebuilder in the tree and finds nothing else. **FALSE OF THE TREE AND KEPT BESIDE ITS CORRECTION (ADR-391, `RI-14`): eight tracked files carry the needle and this sweep reads only the three under a `src/`.**
     const rebuilders = deployableSources()
       .filter((path) => codeOf(path).includes('decodeEngineGates('))
       .map(rel)

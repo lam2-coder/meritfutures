@@ -122,7 +122,7 @@ const MIGRATION_SQL: ReadonlyMap<string, string> = new Map(
 describe('the sign convention, ASSERTED and not assumed', () => {
   test('posting.ts writes +amountCents on the debit and -amountCents on the credit', () => {
     // `packages/ledger/src/posting.ts`, in `entriesOf`. Two lines, adjacent, and
-    // they are the only place in this repository a sign is written.
+    // they are the only place in this repository a sign is written. **FALSE AND KEPT BESIDE ITS CORRECTION (ADR-391, `RI-14`; ADR-387 found it): four test files write a literal negative `amountCents`. It is true of shipped source, and the case three below asserts something far narrower, five named files under `packages/rail/src`.**
     expect(POSTING).toContain(
       'entries.push({ account: t.debit, amountCents: t.amountCents, memo: t.memo });',
     );
