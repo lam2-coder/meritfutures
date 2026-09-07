@@ -1175,24 +1175,34 @@ export const ABSENCE_ARTIFACTS = [
       'the seven counts four header lines plus two declarations plus one, silently dropping ' +
       'three `{@link}` lines and one refusal string in the declaring module`s own body. It ' +
       'was four short the day it was written and the move is not what made it wrong. ' +
-      'AND ONE KNOWN FALSE POSITIVE IS REGISTERED HERE RATHER THAN REPAIRED IN THE PROBE, ' +
-      'which ADR-410 section 7 owed to this file. THE PROBE CANNOT TELL A PUBLICATION FROM ' +
-      'AN INSTALL: its proxy for a value position is `TRANSACTION_EVENT_WRITER` followed by ' +
-      '`.`, `,` or `)`, and a name inside a re-export SPECIFIER LIST is followed by a comma ' +
-      'while being a binding position and not a value position at all. `packages/ledger` ' +
-      'publishes that name on a statement of its own, where the next character is a space ' +
-      'and a brace, so the probe reads `absent`; folding it into the block above would flip ' +
-      'this artifact to `present` and turn leg 2 RED at a sentence that is TRUE. ' +
-      'THAT IS A DEFECT IN THE PROXY AND NOT A PROPERTY OF THE MOVE, and this row agrees ' +
-      'with ADR-410 that it is a finding about the check: nothing about a barrel makes a ' +
-      're-export a value, and the only reason it could not fire before is that the producer ' +
-      'had never been published from a package. IT IS REGISTERED AND NOT REPAIRED BECAUSE ' +
-      'THE REPAIR IS A WIDENING AND THIS ROW WAS FORBIDDEN ONE: excluding the barrel would ' +
-      'be a second exclusion, and reading the specifier list would be a parser. WHAT HOLDS ' +
-      'THE GREEN TODAY IS A LINE BREAK, which is the part worth distrusting: the statement ' +
-      'is short enough that prettier leaves it on one line, and a second name added to it ' +
-      'would be reflowed into a list, put a comma after this one and flip the artifact ' +
-      'without anybody editing this file',
+      '**THE FALSE POSITIVE THIS FIELD REGISTERED IS REPAIRED BY ADR-431, AND THE ' +
+      'REGISTRATION IS KEPT BESIDE ITS CORRECTION** (`RI-14`). It read that the probe ' +
+      'CANNOT TELL A PUBLICATION FROM AN INSTALL, that its proxy for a value position is ' +
+      '`TRANSACTION_EVENT_WRITER` followed by `.`, `,` or `)` while a name inside a ' +
+      're-export SPECIFIER LIST is followed by a comma and is a binding position, and that ' +
+      'it was REGISTERED AND NOT REPAIRED because every repair on offer was a widening ' +
+      'ADR-415 was forbidden. That was exactly true when ADR-410 section 7 raised it and ' +
+      'when ADR-415 wrote it down. The probes now blank every `import` and `export` ' +
+      'specifier list before reading a line, which is neither of the two widenings that ' +
+      'entry priced: it excludes no file by path and parses nothing. ' +
+      '**AND THE HALF OF THAT ACCOUNT THAT WAS WRONG IS NAMED RATHER THAN QUIETLY DROPPED.** ' +
+      'It read WHAT HOLDS THE GREEN TODAY IS A LINE BREAK, and the barrel carries a comment ' +
+      'asking the next reader not to add a second name to one export statement. ADR-431 ' +
+      'demonstrated the defect firing and the line break is not the trigger: the comma the ' +
+      'proxy reads is the SEPARATOR, so the ONE-LINE form of a two-name list fires with no ' +
+      'reflow at all, and a list ENDING in the writer stayed green however it was wrapped, ' +
+      'because a brace followed the name. What held the green was that the list had exactly ' +
+      'one name. Prettier reached the same red from the other side, since `trailingComma: ' +
+      '"all"` puts a comma after the last name of any list long enough to wrap, so the ' +
+      'formatter was one route in rather than the mechanism. ' +
+      'WHAT THE REPAIR NO LONGER CATCHES IS STATED IN THE PROBE`s OWN DOCBLOCK and is one ' +
+      'accident: a file importing the name in a MULTI-NAME list and installing it in a ' +
+      'shape the proxy does not recognise used to read `present` off the import`s comma. ' +
+      'The proxy already missed that shape behind a single-name import, so the hole predates ' +
+      'the repair. Dropping the proxy altogether to close it was MEASURED AND REFUSED: it ' +
+      'reports `present` on five files under `apps/worker/src` whose refusal strings name ' +
+      'the writer in order to say this deployable installs none, and `stripComments` cannot ' +
+      'remove a string literal',
     census: {
       names: ['makeEventSink', 'TRANSACTION_EVENT_WRITER'],
       scope: 'swept',
