@@ -383,8 +383,10 @@ export function compareBalances(candidate: ReconCandidate): ReconVerdict {
  * type derived from a TRANSCRIPTION retires no runtime check. This read "`ADR-112` foreclosure 4
  * records that nothing in this tree compares a `schema.ts` column type against the DDL." `RI-14`
  * (ADR-444): FALSE when written; stated ONCE at limit 1 of `CatalogRow`
- * (`packages/db/src/scoped-db.ts:3466`). So every refusal below is unchanged, and on this slice
- * that matters more than it did one directory over: these rows carry money.
+ * (`packages/db/src/scoped-db.ts:3466`). The evidence this block first gave was itself wrong:
+ * foreclosure 4 is about ADDRESSABILITY and EXHAUSTIVENESS and says nothing of the kind, which
+ * `ADR-441` found. So every refusal below is unchanged, and on this slice that matters more
+ * than it did one directory over: these rows carry money.
  */
 function requireString<R extends object>(key: string, row: R, field: keyof R & string): string {
   const value = row[field];
