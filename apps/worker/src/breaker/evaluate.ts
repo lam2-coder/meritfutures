@@ -127,22 +127,22 @@ export class BreakerRowError extends Error {
 /**
  * Refuse a value that is not a row, and return it UNCHANGED and UNCAST.
  *
- * **THIS USED TO BE THE MAPPING AND IT IS NOW ONLY THE REFUSAL.** It read
- * `record(value: unknown, where: string): BreakerRow` and ended `return value as
- * BreakerRow`, which is the hand-written mapping `ADR-421` section 9 priced and
- * `ADR-426` deleted one family over. The cast is gone because
- * {@link BreakerTx.rowsWhere} now hands back the row the key declares.
+ * **THIS USED TO BE THE MAPPING AND IT IS NOW ONLY THE REFUSAL.** It read `record(value:
+ * unknown, where: string): BreakerRow` and ended `return value as BreakerRow`, which is the
+ * hand-written mapping `ADR-421` section 9 priced and `ADR-426` deleted one family over. The
+ * cast is gone because {@link BreakerTx.rowsWhere} now hands back the row the key declares.
  *
- * **THE `throw` STAYS, AND IT STAYS ON A RULING RATHER THAN ON TASTE.**
- * `ADR-299` section 5.1 item 5: a type derived from a TRANSCRIPTION does not
- * retire a runtime check, and `ADR-112` foreclosure 4 records that nothing in
- * this tree compares a `schema.ts` column type against the DDL. `DeclaredRow`
- * buys the column's EXISTENCE and buys nothing about the row's ARRIVAL: the
- * adapter reaches the accessor through `key as never`, and a driver or a fake
- * that handed back `null` would reach {@link readCents} and raise a `TypeError`
- * on a money column instead of a refusal that names the row. **`ADR-426` and
- * `ADR-430` both dropped this check when they deleted their mapping. This row
- * keeps it**, because what it guards here is the denominator of a loss ratio.
+ * **THE `throw` STAYS, AND IT STAYS ON A RULING RATHER THAN ON TASTE.** `ADR-299` section 5.1
+ * item 5: a type derived from a TRANSCRIPTION does not retire a runtime check. This read
+ * "`ADR-112` foreclosure 4 records that nothing in this tree compares a `schema.ts` column type
+ * against the DDL." `RI-14` (ADR-441): IS FALSE, and was false when written; foreclosure 4 is
+ * about EXHAUSTIVENESS. `scoped-db.test.ts:2728` compares TYPE and NULLABILITY for every column
+ * of every registered non-view relation, against MIGRATION TEXT and not the database, DEFAULT
+ * compared nowhere. `DeclaredRow` buys the column's EXISTENCE and buys nothing about the row's
+ * ARRIVAL: the adapter reaches the accessor through `key as never`, and a driver or a fake
+ * handing back `null` would reach {@link readCents} and raise a `TypeError` on a money column
+ * rather than a refusal naming the row. **`ADR-426` and `ADR-430` both dropped this check with
+ * their mapping. This row keeps it**, because what it guards here is a loss ratio's denominator.
  */
 function requireRow<R extends object>(value: R, where: string): R {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
