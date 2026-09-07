@@ -4,7 +4,7 @@
 // THE DEPLOYABLE THAT HOLDS THE PRODUCER HOLDS NO HANDLE THAT CAN CARRY THE
 // WRITE, ASSERTED OVER EVERY DOOR RATHER THAN OVER THE TWO SOMEBODY REMEMBERED.
 //
-// `src/events.ts`'s header states the finding and `events.test.ts` proves two
+// `packages/ledger/src/events.ts`'s header states the finding and `events.test.ts` proves two
 // instances of it: a `ScopedTx` is refused and a `FirmTx` is refused. **THOSE
 // ARE TWO OF FIVE AND THEY ARE WRITTEN OUT BY HAND**, so the sentence "THIS
 // DEPLOYABLE HOLDS NO TRANSACTION THAT CAN CARRY AN EVENT" rested on a
@@ -57,8 +57,8 @@ import {
   TRANSACTION_EVENT_WRITER,
   UNWIRED_EVENT_SINK,
   buildEvent,
-} from '../src/events.ts';
-import type { EmitSpec } from '../src/events.ts';
+} from '@merit/ledger';
+import type { EmitSpec } from '@merit/ledger';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..');
@@ -73,7 +73,7 @@ function read(rel: string): string {
 }
 
 const DB_TS = read('apps/api/src/db.ts');
-const EVENTS_TS = read('apps/api/src/events.ts');
+const EVENTS_TS = read('packages/ledger/src/events.ts');
 const SCOPED_DB = read('packages/db/src/scoped-db.ts');
 
 /** The clock this suite injects. Never the database's, which is `recorded_at`'s. */
@@ -171,7 +171,7 @@ function brandOf(handle: string): string {
 function insertBrand(): string {
   const match = /^const EVENT_INSERT_BRAND = '(\w+)';$/m.exec(EVENTS_TS);
   if (match === null)
-    throw new Error('`apps/api/src/events.ts` declares no `EVENT_INSERT_BRAND` to read');
+    throw new Error('`packages/ledger/src/events.ts` declares no `EVENT_INSERT_BRAND` to read');
   return match[1] ?? '';
 }
 
@@ -310,7 +310,7 @@ describe('the producer`s own deployable emits nothing', () => {
 // -----------------------------------------------------------------------------
 // 4. The address the refusal names, which was prose until ADR-408
 // -----------------------------------------------------------------------------
-// `src/events.ts` and `apps/worker/src/sweeps/expiry-adapter.ts` BOTH conclude
+// `packages/ledger/src/events.ts` and `apps/worker/src/sweeps/expiry-adapter.ts` BOTH conclude
 // that the repair is "a package both arrows already reach", and until this
 // section neither half of that sentence was bound to anything. It is two
 // separable claims and they fail in opposite directions, so they are two cases:
@@ -361,12 +361,28 @@ describe('the remedy address, measured rather than asserted', () => {
     expect(shared).toContain('@merit/ledger');
   });
 
-  test('no `packages/*` composes a sink today, which is what makes the finding a finding', () => {
+  test('exactly one `packages/*` module carries the producer, and it is the ruled home', () => {
+    // THIS LEG WAS WRITTEN TO FAIL ON GOOD NEWS AND THE GOOD NEWS ARRIVED
+    // (ADR-410). It read *"no `packages/*` composes a sink today, which is what
+    // makes the finding a finding"* and it was true until the relocation. It is
+    // UPDATED RATHER THAN DELETED, and it is not weaker for being updated: an
+    // absence over every package is one bit, and this pins the carrier set to a
+    // SINGLETON and names which file it is, so a SECOND producer minted anywhere
+    // under `packages/*/src` still lands red here with its path in the message.
+    // That was the property the old wording was protecting and it survives.
+    //
     // THE SHAPE IS THE PRODUCER'S OWN TWO NAMES. A package that imported or
-    // declared either one would be a second producer, and the header sentence
-    // "the ONLY event producer in this repository" would be false with nobody
-    // told. It walks `src` only: a suite under `packages/*/test` that stubs a
-    // sink is not a producer and must not turn this red.
+    // declared either one and is not the ruled home would be a second producer,
+    // and the sentence "the ONLY event producer in this repository" would be
+    // false with nobody told. It walks `src` only: a suite under
+    // `packages/*/test` that stubs a sink is not a producer and must not turn
+    // this red.
+    //
+    // THE BARREL IS EXPECTED AND IS THE HALF THAT MAKES THE MOVE WORTH ANYTHING.
+    // `packages/ledger`'s `package.json` publishes `.` and nothing else, so a
+    // module both deployables can reach is a module the barrel names. A home
+    // that no barrel published would be a relocation that moved the file and not
+    // the reachability.
     const carriers: string[] = [];
     for (const pkg of readdirSync(join(ROOT, 'packages'), { withFileTypes: true })) {
       if (!pkg.isDirectory()) continue;
@@ -385,12 +401,21 @@ describe('the remedy address, measured rather than asserted', () => {
         if (/\bmakeEventSink\b|\bTRANSACTION_EVENT_WRITER\b/.test(read(rel))) carriers.push(rel);
       }
     }
-    expect(carriers).toEqual([]);
+    expect(carriers.sort()).toEqual([
+      'packages/ledger/src/events.ts',
+      'packages/ledger/src/index.ts',
+    ]);
+
+    // AND THE HOME IS ONE OF THE THREE ADDRESSES BOTH ARROWS ALREADY NAME, which
+    // is what makes it a relocation rather than a package a founder must admit.
+    // Derived from the manifests above rather than typed beside them.
+    const shared = meritDeps('api').filter((name) => meritDeps('worker').includes(name));
+    expect(shared).toContain('@merit/ledger');
   });
 
   test('the refusal names the address rather than sending its reader at a deployment', async () => {
     // THE CLAUSE THIS REPLACES READ `a decision about a deployment rather than a
-    // file on disk` AND WAS BACKWARDS ON BOTH HALVES, which `src/events.ts`'s
+    // file on disk` AND WAS BACKWARDS ON BOTH HALVES, which `packages/ledger/src/events.ts`'s
     // header records. A wiring session reads this message first, so the message
     // is where the correction has to land for it to be worth anything.
     await expect(
@@ -533,36 +558,35 @@ describe('the vocabulary, run against the payloads the callers actually spell', 
 });
 
 // -----------------------------------------------------------------------------
-// 6. The relocation's price, which is a FENCE and not a manifest edge (ADR-410)
+// 6. The relocation, and the bindings that had to move with it (ADR-410)
 // -----------------------------------------------------------------------------
-// SECTION 4 PRICED THE MOVE AT NO MANIFEST EDGE AND THAT REMAINS TRUE. Row 410
-// re-derived it from both manifests and reproduced it exactly: three packages
-// sit in both dependency sets and no `VG-12` admission is owed. THE PRICE IS
-// SOMEWHERE ELSE AND NOTHING IN EITHER TREE COUNTED IT.
+// THIS SECTION WAS WRITTEN AS A REFUTATION AND IT IS NOW A RECORD OF THE MOVE.
+// Its first version derived three populations that all named `apps/api/src/
+// events.ts` and asserted each was NOT empty, because the producer could not
+// leave that path while they did. Every one of them has moved and every case is
+// UPDATED RATHER THAN DELETED, on section 4's rule one section up.
 //
-// `apps/api/src/events.ts` IS NOT ONLY WHERE THE PRODUCER LIVES, IT IS THE
-// ADDRESS OTHER FENCES NAME. Row 410 performed the move into `packages/ledger`
-// and ran the suite rather than predicting the outcome: 7 files and 12 cases
-// went red, and 5 files and 7 cases of that are outside every fence this wave
-// hands out. Three suites under `apps/worker/test` recover the catalogue by
-// searching this file's TEXT for `export const EVENT_CATALOGUE`, so a
-// re-exporting module at the same path satisfies none of them; three `file:line`
-// pointers in `apps/worker/src/schedule.ts` resolve into it and `RI-15` reads
-// every one; and `RI-35`'s register names this path as the declaring module to
-// exclude, so the moved module's own refusal message reads as an INSTALL.
+// WHY THE OLD PATH IS NOT MERELY A HOME. Three suites under `apps/worker/test`
+// recover `EVENT_CATALOGUE` by searching a file's TEXT, because `RI-04` forbids
+// that deployable the import and text is the only instrument left to it. Two
+// `file:line` pointers in `apps/worker/src/schedule.ts` resolved into the file
+// and `RI-15` reads both shapes. `RI-35`'s register named the path as the one
+// module its install probe must skip. **NONE OF THOSE IS AN IMPORT, SO NONE OF
+// THEM IS SATISFIED BY A MODULE LEFT BEHIND THAT RE-EXPORTS**, which is the
+// finding the first version of this section was written to carry and which is
+// why the move needed a fence spanning three areas rather than one.
 //
-// THE THREE POPULATIONS ARE DERIVED HERE AND NOT TYPED, and each case FAILS ON
-// GOOD NEWS, which is section 4's discipline pointed at the obstruction instead
-// of at the remedy. The day the last of them stops naming this path, the
-// relocation is unblocked and the row that unblocked it is the row that gets
-// told, rather than a later row rediscovering the price by running the move.
+// WHAT SURVIVES AT THE OLD PATH AND WHY IT IS NARROW. `apps/api/src/events.ts`
+// is a compatibility name for exactly one consumer outside this fence,
+// `apps/worker/test/replay-adapter.test.ts`, which reaches it by relative path
+// for `EVENT_NAMES`. It publishes that and nothing else: a module in the
+// deployable that CANNOT install a sink must not re-export the install pair,
+// and case 5 below holds that shut so a later row cannot widen it into a second
+// producer surface by accident.
 //
-// WHAT THIS SECTION DOES NOT CLAIM. It does not say the move is wrong, and it
-// does not choose the destination: ADR-410 rules `packages/ledger` on the
-// writer's shape and states why `@merit/db` and `@merit/rules-engine` lose.
-// Every binding below keys on the SOURCE path, so the count is the same for all
-// three destinations and this section is silent about which.
-describe('the relocation`s price, which is a fence rather than a manifest edge', () => {
+// EVERY CASE HERE STILL FAILS ON GOOD NEWS, pointed at the new arrangement
+// rather than at the old obstruction.
+describe('the relocation, and the bindings that moved with it', () => {
   /** Every `.ts` under one repo-relative directory, repo-relative and sorted. */
   function tsUnder(dir: string): string[] {
     return readdirSync(join(ROOT, dir), { recursive: true, encoding: 'utf8' })
@@ -571,51 +595,45 @@ describe('the relocation`s price, which is a fence rather than a manifest edge',
       .sort();
   }
 
+  const OLD_PATH = 'apps/api/src/events.ts';
+  const HOME = 'packages/ledger/src/events.ts';
+
   test('both walks reach files, so the three counts below are measured', () => {
     // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. An empty walk would
-    // make every population below empty, which is the value the cases treat as
-    // good news, so the guard has to come first.
+    // make every population below empty, which is the value two of these cases
+    // now treat as correct, so the guard has to come first.
     expect(tsUnder('apps/worker/src').length).toBeGreaterThan(0);
     expect(tsUnder('apps/worker/test').length).toBeGreaterThan(0);
   });
 
-  test('every `file:line` pointer into this file resolves today, and a move strands them all', () => {
-    // BOTH POINTER SHAPES ARE READ, because `RI-15` reads both: a full path with
-    // a line, and a BARE pointer inheriting the nearest path. `schedule.ts`
-    // writes one of each on one line, so the derivation is per LINE rather than
-    // per match, and it recovers the same three pointers that invariant reports.
-    const total = EVENTS_TS.split('\n').length;
+  test('no `file:line` pointer names the compatibility module, which declares nothing to cite', () => {
+    // THE REPAIR WAS TO DROP THE COORDINATE AND NOT TO PREDICT A NEW ONE, which
+    // is ADR-404's rule: a pointer repaired to a value its own wave invalidates
+    // is the defect re-armed with a fresher date. This case holds that shut.
+    // A coordinate into this module would be a pointer at a re-export, and the
+    // thing it named would be in another package.
+    //
+    // IT READS BOTH SHAPES because `RI-15` does: a full path with a line, and a
+    // BARE pointer inheriting the nearest path, which `schedule.ts` used to
+    // write one of each on one line. The derivation is per LINE for that reason.
     const pointers: string[] = [];
-    for (const rel of tsUnder('apps/worker/src')) {
+    for (const rel of [...tsUnder('apps/worker/src'), ...tsUnder('apps/api/src')]) {
       read(rel)
         .split('\n')
         .forEach((line, index) => {
-          if (!line.includes('apps/api/src/events.ts:')) return;
+          if (!line.includes(`${OLD_PATH}:`)) return;
           for (const match of line.matchAll(/(?:events\.ts|`):(\d+)`/g))
             pointers.push(`${rel}:${index + 1} -> :${match[1] ?? ''}`);
         });
     }
-
-    // THEY RESOLVE ON THIS TREE, which is what makes them live pointers rather
-    // than the stale ones `RI-15` exists to catch.
-    for (const pointer of pointers) {
-      const cited = Number(pointer.slice(pointer.lastIndexOf(':') + 1));
-      expect(cited).toBeGreaterThan(0);
-      expect(cited).toBeLessThanOrEqual(total);
-    }
-
-    // AND THE POPULATION IS NOT EMPTY, which is the half that fails on good
-    // news. `apps/worker/**` is in no fence this wave, so the repair is a later
-    // row's and is named in ADR-410 rather than taken here.
-    expect(pointers.length).toBeGreaterThan(0);
+    expect(pointers).toEqual([]);
   });
 
-  test('three suites outside this deployable recover the catalogue from this file`s TEXT', () => {
-    // THE SHAPE IS THE SEARCH STRING AND NOT THE PATH, and the difference is the
-    // whole finding. A module left at this path that RE-EXPORTS the producer
-    // keeps every import working and satisfies none of these three, because what
-    // they look for is the declaration itself. `RI-04` is why they read text at
-    // all: that deployable may not import this one.
+  test('the three text parsers read the producer`s home, and the old path holds no catalogue', () => {
+    // THE SHAPE IS THE SEARCH STRING AND NOT THE PATH, and that is the whole
+    // reason this move needed those three files in its fence. What they look
+    // for is the DECLARATION, so a re-exporting module at the old path keeps
+    // every import working and satisfies none of them.
     const parsers = tsUnder('apps/worker/test').filter((rel) =>
       read(rel).includes('export const EVENT_CATALOGUE'),
     );
@@ -625,21 +643,113 @@ describe('the relocation`s price, which is a fence rather than a manifest edge',
       'apps/worker/test/schedule.test.ts',
     ]);
 
-    // AND THE DECLARATION THEY SEARCH FOR IS STILL HERE, so all three are green
-    // for the reason they say and not by accident.
-    expect(EVENTS_TS).toContain('export const EVENT_CATALOGUE');
+    // AND EACH ONE NAMES THE HOME. `event-sink.test.ts` builds its path out of
+    // segments, so the assertion is on the package directory rather than on a
+    // string any of the three might have spelled differently.
+    for (const rel of parsers) {
+      expect(read(rel), `${rel} does not name the producer's package`).toContain('ledger');
+    }
+
+    // THREE SUITES STILL SPELL THE OLD PATH AND ALL THREE ARE REGISTERED RATHER
+    // THAN REPAIRED, because ADR-410's fence over `apps/worker/test` is three
+    // PATH CONSTANTS and nothing else. Not one of them breaks: each is a claim
+    // about where the producer lives, and each is now one word out of date.
+    //
+    //   `event-sink.test.ts`      says what two untranscribed names are missing
+    //                             is "a transcription into `apps/api/src/
+    //                             events.ts`". That transcription is owed into
+    //                             the home now
+    //   `detector-census.test.ts` asserts a REFUSAL MESSAGE built in
+    //                             `apps/worker/src/detectors/adapter.ts` still
+    //                             names that path. Repairing the suite without
+    //                             the message it reads would turn it red, so the
+    //                             two are owed to one row together
+    //   `expiry-adapter.test.ts`  says that path "is the only producer in this
+    //                             repository", which is the sentence this move
+    //                             makes false and which several files under
+    //                             `apps/worker/src` also carry
+    //
+    // THE SET FAILS ON GOOD NEWS IN BOTH DIRECTIONS: a NEW stale mention lands
+    // red here, and so does the day somebody holding that fence repairs one.
+    const stale = tsUnder('apps/worker/test').filter((rel) => read(rel).includes(OLD_PATH));
+    expect(stale).toEqual([
+      'apps/worker/test/detector-census.test.ts',
+      'apps/worker/test/event-sink.test.ts',
+      'apps/worker/test/expiry-adapter.test.ts',
+    ]);
+
+    // THE DECLARATION IS AT THE HOME AND NOT AT THE OLD PATH, both halves, so
+    // the three above are green for the reason they state.
+    expect(read(HOME)).toContain('export const EVENT_CATALOGUE');
+    expect(read(OLD_PATH)).not.toContain('export const EVENT_CATALOGUE');
   });
 
-  test('the absence register names this path as the module to exclude, so the move trips it', () => {
+  test('the absence register skips the producer`s home, and the old path still carries the claim', () => {
     // `RI-35`'s `event-sink-caller` probe skips ONE file by name while it looks
-    // for an install, and the name is written into the runner. This module's own
-    // refusal message quotes `makeEventSink({ writer: TRANSACTION_EVENT_WRITER,
-    // clock })`, which is exactly the shape the probe treats as an install, so
-    // the exclusion is what keeps that artifact `absent`. Move the module and
-    // the exclusion no longer covers it. Row 410 observed that RED rather than
-    // predicting it.
+    // for an install, because the producer's own refusal message quotes the
+    // install and `stripComments` does not remove a string literal. The address
+    // moved and the constant moved with it; the probe's intent is untouched.
     const register = read('packages/tooling/checks/absence-claims.mjs');
-    expect(register).toContain("const producer = 'apps/api/src/events.ts';");
-    expect(EVENTS_TS).toContain('makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock })');
+    expect(register).toContain(`const producer = '${HOME}';`);
+    expect(read(HOME)).toContain('makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock })');
+
+    // AND THE CLAIM THAT REGISTER ANCHORS IS STILL AT THE SITE IT NAMES. That
+    // `site` is `apps/api/src/events.ts` and moving it was outside ADR-410's
+    // fence, so the sentence stays at the old path while the register does.
+    // The day the register's site moves, this expectation is what tells the row
+    // that the sentence may follow it.
+    expect(register).toContain("site: 'apps/api/src/events.ts'");
+    expect(read(OLD_PATH)).toContain('`makeEventSink` is called by NO file');
+  });
+
+  test('the compatibility module publishes what one outside consumer takes, and no more', () => {
+    // A MODULE IN THE DEPLOYABLE THAT CANNOT INSTALL A SINK MUST NOT PUBLISH THE
+    // INSTALL PAIR. `apps/api` opens five doors and not one of them yields the
+    // brand the writer admits, which sections 1 and 2 above derive; re-exporting
+    // `makeEventSink` or `TRANSACTION_EVENT_WRITER` from here would say
+    // otherwise to every reader and to `RI-35`'s probe at once.
+    const shim = read(OLD_PATH);
+    const exported = /export \{([^}]*)\}/.exec(shim)?.[1] ?? '';
+    expect(exported).toContain('EVENT_NAMES');
+    expect(exported).not.toContain('makeEventSink');
+    expect(exported).not.toContain('TRANSACTION_EVENT_WRITER');
+
+    // AND THE ONE CONSUMER IS REAL, derived rather than remembered. It is the
+    // reason this module exists at all, and the day it stops naming this path
+    // the module has no consumer left and should go.
+    const takers = tsUnder('apps/worker/test').filter((rel) =>
+      read(rel).includes("'../../api/src/events.ts'"),
+    );
+    expect(takers).toEqual(['apps/worker/test/replay-adapter.test.ts']);
+  });
+
+  test('both deployables can now name the producer, which is the whole deliverable', () => {
+    // THE MOVE IS ONLY WORTH SOMETHING IF THE BARREL PUBLISHES THE INSTALL PAIR,
+    // because `packages/ledger`'s manifest publishes `.` and nothing else. This
+    // is the assertion that separates a relocation from a file that changed
+    // directory.
+    const barrel = read('packages/ledger/src/index.ts');
+    expect(barrel).toContain("} from './events.ts';");
+    expect(barrel).toContain("export { TRANSACTION_EVENT_WRITER } from './events.ts';");
+    expect(barrel).toContain('makeEventSink');
+
+    // AND BOTH ARROWS ALREADY REACH IT, re-derived from the manifests rather
+    // than carried from ADR-408 section 6. A wave that severed either edge would
+    // strand the producer again and nothing else in this tree would notice.
+    const manifest = (app: string): string[] => {
+      const parsed: unknown = JSON.parse(read(`apps/${app}/package.json`));
+      const { dependencies = {} } = parsed as { dependencies?: Record<string, string> };
+      return Object.keys(dependencies);
+    };
+    expect(manifest('api')).toContain('@merit/ledger');
+    expect(manifest('worker')).toContain('@merit/ledger');
+
+    // AND `apps/worker` IS STILL NOT WIRED, which ADR-410 declined on purpose:
+    // installing the sink is a slice with its own verification. This is the leg
+    // that fails on good news for the NEXT row rather than for this one.
+    const installs = tsUnder('apps/worker/src').filter((rel) =>
+      /\bmakeEventSink\s*\(/.test(read(rel)),
+    );
+    expect(installs).toEqual([]);
   });
 });

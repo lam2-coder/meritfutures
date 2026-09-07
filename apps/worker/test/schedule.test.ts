@@ -792,7 +792,7 @@ test('6.3 exactly one of the detector runner`s three event names is outside the 
     .sort();
   expect(names, 'the declared union of detector event names changed shape').toHaveLength(3);
 
-  const catalogue = readFileSync(join(ROOT, 'apps/api/src/events.ts'), 'utf8');
+  const catalogue = readFileSync(join(ROOT, 'packages/ledger/src/events.ts'), 'utf8');
   const start = catalogue.indexOf('export const EVENT_CATALOGUE = {');
   expect(start).toBeGreaterThan(-1);
   const block = catalogue.slice(start, catalogue.indexOf('\n} as const satisfies', start));

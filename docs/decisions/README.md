@@ -421,7 +421,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-407](ADR-407.md) | all four blockers the dispatch names are spent, a fifth stands that it does not name, and the composition file is the one place the four outlived their measurement  (2026-09-07, status: proposed) |
 | [ADR-408](ADR-408.md) | the producer exists and was built five rows ago, what has no producer is the HANDLE, the refusal told its reader the blocker backwards, and the relocation nobody priced costs no manifest edge because three packages already sit in both arrows (2026-09-07, status: proposed) |
 | [ADR-409](ADR-409.md) | four of the runner's five ports are served, a BI event was destroying every `detector_runs` row and is repaired, and the blocker that says every detector declines is false of the one that runs (2026-09-07, status: proposed) |
-| [ADR-410](ADR-410.md) | the shared address is real and the home is `packages/ledger`, but the relocation is blocked by a FENCE rather than by a price, because `apps/api/src/events.ts` is an ADDRESS eight bindings outside that deployable name (2026-09-07, status: proposed) |
+| [ADR-410](ADR-410.md) | the home is `packages/ledger`, the move was refused under the fence as dispatched and taken under one granted for it, and the path the producer vacated turned out to be what three suites, three pointers and one register used to find it (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
