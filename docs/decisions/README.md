@@ -409,6 +409,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-395](ADR-395.md) | the gate leg ADR-392 wrote out and could not land, checked against the file rather than pasted, and the one case its written form could not see (2026-09-06, status: proposed) |
 | [ADR-396](ADR-396.md) | there was no clone to be shallow, the fence holds 46 wrong pointers and not 63, 38 are repaired and 8 are refused in four shapes, and `git blame -w` is not sufficient to decide `ADR-388`'s second gate (2026-09-07, status: proposed) |
 | [ADR-397](ADR-397.md) | there is NO fourth outcome, ADR-388's three partition the population and admit no fourth cell, and what ADR-393 found is a missing PRECONDITION on outcome one's remedy that changes not one verdict in 420 (2026-09-06, status: proposed) |
+| [ADR-398](ADR-398.md) | nothing in those three entries was ever wrong, the register's value and its coordinate falsify at different commits, the wave that certified the coordinate sound broke it in the same diff, and the prose gate is refused because 30 of 33 `covers` strings mix limitations with assertions (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
