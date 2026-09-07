@@ -105,12 +105,12 @@ import {
 import type {
   BreakerEvent,
   BreakerIo,
-  BreakerRow,
   BreakerState,
   BreakerTx,
   LossRatioPolicy,
   PolicyNumber,
 } from './ports.ts';
+import type { DeclaredRow } from '../db.ts';
 
 // -----------------------------------------------------------------------------
 // Row reading, and it refuses rather than coercing
@@ -124,10 +124,30 @@ export class BreakerRowError extends Error {
   }
 }
 
-function record(value: unknown, where: string): BreakerRow {
+/**
+ * Refuse a value that is not a row, and return it UNCHANGED and UNCAST.
+ *
+ * **THIS USED TO BE THE MAPPING AND IT IS NOW ONLY THE REFUSAL.** It read
+ * `record(value: unknown, where: string): BreakerRow` and ended `return value as
+ * BreakerRow`, which is the hand-written mapping `ADR-421` section 9 priced and
+ * `ADR-426` deleted one family over. The cast is gone because
+ * {@link BreakerTx.rowsWhere} now hands back the row the key declares.
+ *
+ * **THE `throw` STAYS, AND IT STAYS ON A RULING RATHER THAN ON TASTE.**
+ * `ADR-299` section 5.1 item 5: a type derived from a TRANSCRIPTION does not
+ * retire a runtime check, and `ADR-112` foreclosure 4 records that nothing in
+ * this tree compares a `schema.ts` column type against the DDL. `DeclaredRow`
+ * buys the column's EXISTENCE and buys nothing about the row's ARRIVAL: the
+ * adapter reaches the accessor through `key as never`, and a driver or a fake
+ * that handed back `null` would reach {@link readCents} and raise a `TypeError`
+ * on a money column instead of a refusal that names the row. **`ADR-426` and
+ * `ADR-430` both dropped this check when they deleted their mapping. This row
+ * keeps it**, because what it guards here is the denominator of a loss ratio.
+ */
+function requireRow<R extends object>(value: R, where: string): R {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     throw new BreakerRowError(`${where}: expected a row and received ${JSON.stringify(value)}`);
-  return value as BreakerRow;
+  return value;
 }
 
 /**
@@ -137,8 +157,8 @@ function record(value: unknown, where: string): BreakerRow {
  * become `[object Object]` and be written into a plan id, which is a row that
  * describes a plan that does not exist.
  */
-function readText(row: BreakerRow, key: string, where: string): string {
-  const value = row[key];
+function readText<R extends object>(row: R, key: keyof R & string, where: string): string {
+  const value: unknown = row[key];
   if (typeof value !== 'string')
     throw new BreakerRowError(`${where}.${key}: expected text and received ${typeof value}`);
   return value;
@@ -153,8 +173,8 @@ function readText(row: BreakerRow, key: string, where: string): string {
  * the whole fold on floating point without a single float literal in the diff.
  * A `number` is refused BY NAME rather than converted.
  */
-function readCents(row: BreakerRow, key: string, where: string): bigint {
-  const value = row[key];
+function readCents<R extends object>(row: R, key: keyof R & string, where: string): bigint {
+  const value: unknown = row[key];
   if (typeof value === 'bigint') return value;
   throw new BreakerRowError(
     `${where}.${key}: expected a bigint and received ${typeof value}. Money is integer cents and ` +
@@ -165,8 +185,8 @@ function readCents(row: BreakerRow, key: string, where: string): bigint {
 }
 
 /** A `timestamptz` column that may be null. */
-function readInstant(row: BreakerRow, key: string, where: string): Date | null {
-  const value = row[key];
+function readInstant<R extends object>(row: R, key: keyof R & string, where: string): Date | null {
+  const value: unknown = row[key];
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value;
   throw new BreakerRowError(
@@ -177,7 +197,7 @@ function readInstant(row: BreakerRow, key: string, where: string): Date | null {
 /** A `date` column, as the `YYYY-MM-DD` the trading-day rule requires. */
 const TRADING_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-function readTradingDay(row: BreakerRow, key: string, where: string): string {
+function readTradingDay<R extends object>(row: R, key: keyof R & string, where: string): string {
   const value = readText(row, key, where);
   if (!TRADING_DAY.test(value))
     throw new BreakerRowError(
@@ -260,11 +280,14 @@ export interface WindowFold {
 }
 
 /** Fold one plan's purchase and payout rows into the window's four terms. */
-export function foldWindow(purchases: readonly unknown[], payouts: readonly unknown[]): WindowFold {
+export function foldWindow(
+  purchases: readonly DeclaredRow<'purchases'>[],
+  payouts: readonly DeclaredRow<'payoutRequests'>[],
+): WindowFold {
   let denominatorCents = 0n;
   for (const [index, value] of purchases.entries())
     denominatorCents += readCents(
-      record(value, `purchases[${String(index)}]`),
+      requireRow(value, `purchases[${String(index)}]`),
       'amountPaidCents',
       `purchases[${String(index)}]`,
     );
@@ -272,7 +295,7 @@ export function foldWindow(purchases: readonly unknown[], payouts: readonly unkn
   let numeratorCents = 0n;
   for (const [index, value] of payouts.entries())
     numeratorCents += readCents(
-      record(value, `payoutRequests[${String(index)}]`),
+      requireRow(value, `payoutRequests[${String(index)}]`),
       'approvedCents',
       `payoutRequests[${String(index)}]`,
     );
@@ -692,11 +715,14 @@ function windowStart(now: Date, windowDays: number): Date {
   return new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
 }
 
-function latestPrevious(rows: readonly unknown[], evaluatedOn: string): PreviousEvaluation | null {
+function latestPrevious(
+  rows: readonly DeclaredRow<'planBreakerState'>[],
+  evaluatedOn: string,
+): PreviousEvaluation | null {
   let best: PreviousEvaluation | null = null;
   for (const [index, value] of rows.entries()) {
     const where = `planBreakerState[${String(index)}]`;
-    const row = record(value, where);
+    const row = requireRow(value, where);
     const day = readTradingDay(row, 'evaluatedOn', where);
     if (day >= evaluatedOn) continue;
     if (best !== null && day <= best.evaluatedOn) continue;
@@ -753,7 +779,7 @@ export async function evaluateBreaker(
 
     for (const [index, value] of (await tx.rowsWhere('plans', { isActive: true })).entries()) {
       const where = `plans[${String(index)}]`;
-      const plan = record(value, where);
+      const plan = requireRow(value, where);
       const planId = readText(plan, 'id', where);
       const planCode = readText(plan, 'code', where);
 
@@ -761,11 +787,11 @@ export async function evaluateBreaker(
       // carries a `plan_id`, so the bridge is `plan_versions` and the join is
       // here rather than in the accessor.
       const versions = await tx.rowsWhere('planVersions', { planId });
-      const purchases: unknown[] = [];
-      const payouts: unknown[] = [];
+      const purchases: DeclaredRow<'purchases'>[] = [];
+      const payouts: DeclaredRow<'payoutRequests'>[] = [];
       for (const [vIndex, vValue] of versions.entries()) {
         const vWhere = `planVersions[${String(vIndex)}]`;
-        const planVersionId = readText(record(vValue, vWhere), 'id', vWhere);
+        const planVersionId = readText(requireRow(vValue, vWhere), 'id', vWhere);
         purchases.push(
           ...(await tx.rowsWhere('purchases', {
             planVersionId,

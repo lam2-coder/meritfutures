@@ -145,31 +145,59 @@ export {
 // forever, and `UNWIRED_EVENT_SINK` above is the correct value for any
 // deployment that has not made that decision.
 //
-// AND THERE IS A SECOND REASON, STATED RATHER THAN LEFT TO BE DISCOVERED.
-// `RI-35`'s `event-sink-caller` probe looks for this name followed by `.`, `,`
-// or `)` under any `src/`, as its proxy for a VALUE POSITION, and it excludes
-// exactly one file, the module that declares it. A name inside a re-export LIST
-// satisfies that proxy and is not a value position at all, so a barrel that
-// published it in the block above would be read as an INSTALL and the register
-// would report an artifact that does not exist. **THE PROBE CANNOT TELL A
-// PUBLICATION FROM AN INSTALL**, which nothing had asked of it before, because
-// the producer had never been published from a package. Its power over a REAL
-// install is untouched by this line: a file that calls `makeEventSink(...)` or
-// passes this value is still caught wherever it is written. ADR-410 section 7
-// records the repair as a `sweptBy`-style registration in
-// `packages/tooling/checks/absence-claims.mjs`.
+// AND THERE WAS A SECOND REASON. **IT IS SPENT, AND ITS TWO EMPHASISED CLAIMS
+// ARE KEPT BESIDE THEIR CORRECTION (`RI-14`) RATHER THAN DELETED, BECAUSE A
+// FALSE SENTENCE DELETED LEAVES NOTHING FOR THE NEXT READER TO CHECK.**
 //
-// **THAT REGISTRATION IS LANDED AND THE SENTENCE SAYING IT WAS OWED IS KEPT
-// BESIDE ITS CORRECTION** (`RI-14`). It read that the registration "is owed to
-// whoever holds that package and which this row was not granted", which was
-// true when ADR-410 wrote it and stopped being true one wave later: ADR-415
-// took it, and the entry now carries the false positive in its own words and
-// four cases that FIRE it -- this name inside a re-export list reads `present`,
-// the same name on a statement of its own reads `absent`, the factory name in
-// that list reads `absent` because its shape is a call, and a real install is
-// still caught through both shapes. **WHAT HOLDS THE GREEN IS THIS LINE BREAK**
-// and the register says so: the statement below is short enough that prettier
-// leaves it on one line, so the next character after the name is a space, and a
-// second name added to it would be reflowed into a list and flip the artifact
-// with nobody having edited the check, the probe or the register.
+// IT READ, and its first half was true when ADR-410 section 7 raised it and
+// when ADR-415 section 6 wrote it down:
+//
+//     "`RI-35`'s `event-sink-caller` probe looks for this name followed by
+//     `.`, `,` or `)` under any `src/`, as its proxy for a VALUE POSITION, and
+//     it excludes exactly one file, the module that declares it. A name inside
+//     a re-export LIST satisfies that proxy and is not a value position at all,
+//     so a barrel that published it in the block above would be read as an
+//     INSTALL and the register would report an artifact that does not exist.
+//     **THE PROBE CANNOT TELL A PUBLICATION FROM AN INSTALL** [...] **WHAT
+//     HOLDS THE GREEN IS THIS LINE BREAK** and the register says so: the
+//     statement below is short enough that prettier leaves it on one line, so
+//     the next character after the name is a space, and a second name added to
+//     it would be reflowed into a list and flip the artifact with nobody having
+//     edited the check, the probe or the register."
+//
+// **THE FIRST OF THOSE IS FALSE SINCE ADR-431. THE SECOND WAS NEVER TRUE.**
+//
+// THE PROBE CAN TELL A PUBLICATION FROM AN INSTALL. It blanks every `import`
+// and `export` specifier list before it reads a line -- `BINDING_LIST` and
+// `withoutBindingLists` in `packages/tooling/checks/absence-claims.mjs`,
+// applied at that probe`s own read -- and a name inside a specifier list is a
+// binding position by TypeScript`s own grammar. The punctuation proxy and the
+// single exclusion are exactly as quoted above; what changed is what the line
+// looks like by the time the proxy reads it.
+//
+// AND THE LINE BREAK WAS NEVER WHAT HELD THE GREEN, which ADR-434 re-derived
+// against the pre-repair check rather than taking on report. Seven spellings of
+// this publication were run through both: `export { TRANSACTION_EVENT_WRITER,
+// makeEventSink } from './events.ts';` on ONE line, with no reflow anywhere,
+// read `present` on the old check, while the same two names with the writer
+// LAST and no comma after it read `absent` whether wrapped or not. The comma
+// the proxy reads is the SEPARATOR, so it arrives with the second name rather
+// than with the wrap. Prettier was one route in, through the trailing comma
+// `trailingComma: "all"` puts after the last name of a list long enough to
+// wrap, and it was never the mechanism.
+//
+// **SO THE REQUEST THIS COMMENT USED TO MAKE OF THE NEXT READER IS WITHDRAWN.**
+// Adding a second name to the statement below flips nothing: all seven
+// publication shapes read `absent` under the shipped probe, and a real install
+// still reads `present` through a call, through an argument and through a
+// member access. The writer is published on its own for the FIRST reason above,
+// which is about what it is, and that reason is untouched by any of this.
+//
+// **AND NOTHING IN THIS TREE WATCHES THIS PARAGRAPH, WHICH IS WHY THE FALSE
+// SENTENCES SURVIVED A WAVE.** ADR-434 derives it leg by leg: this file is not
+// a registered absence-claim site, so legs 1 to 5 never open it; leg 6 does
+// sweep it and stays silent because `event-sink-caller` registers no needle and
+// none of the register`s other needles reaches this window; leg 7 does read
+// this file and counts lines rather than reading them. The correction above
+// landed because a row was sent to make it, not because anything went red.
 export { TRANSACTION_EVENT_WRITER } from './events.ts';

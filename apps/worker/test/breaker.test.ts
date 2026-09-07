@@ -28,6 +28,7 @@ import {
   stateChangedEvent,
   toBreakerStateRow,
 } from '../src/index.ts';
+import type { DeclaredRow } from '../src/db.ts';
 import type {
   BreakerFilter,
   BreakerFilterTerm,
@@ -100,12 +101,24 @@ function code(source: string): string {
 // The fixture: an in-memory tx that honours the filter it is given
 // -----------------------------------------------------------------------------
 
+/**
+ * The store, and it now holds THE ROW THE KEY DECLARES.
+ *
+ * **THIS IS `ADR-432`'s FIXTURE COST AND IT IS THE LARGEST SINGLE PRICE THE ROW
+ * PAID.** Every member was `Record<string, unknown>[]`, which is a store that
+ * accepts a row no migration can produce: `purchase({ amountPaidCentss: 1n })`
+ * was a PASSING test over a misspelled column. It is now a compile error.
+ *
+ * `ADR-430` section 9 paid 41 fixture columns for the same property on `recon`
+ * and predicted this family would cost more, because `purchases` alone carries
+ * thirty. The base rows below are what that prediction cost in the end.
+ */
 interface Fixture {
-  readonly plans?: readonly Record<string, unknown>[];
-  readonly planVersions?: readonly Record<string, unknown>[];
-  readonly purchases?: readonly Record<string, unknown>[];
-  readonly payoutRequests?: readonly Record<string, unknown>[];
-  readonly planBreakerState?: readonly Record<string, unknown>[];
+  readonly plans?: readonly DeclaredRow<'plans'>[];
+  readonly planVersions?: readonly DeclaredRow<'planVersions'>[];
+  readonly purchases?: readonly DeclaredRow<'purchases'>[];
+  readonly payoutRequests?: readonly DeclaredRow<'payoutRequests'>[];
+  readonly planBreakerState?: readonly DeclaredRow<'planBreakerState'>[];
 }
 
 interface Recorded {
@@ -118,9 +131,9 @@ function isTerm(value: unknown): value is BreakerFilterTerm {
   return typeof value === 'object' && value !== null && 'term' in value;
 }
 
-function matches(row: Record<string, unknown>, where: BreakerFilter): boolean {
+function matches(row: object, where: BreakerFilter): boolean {
   for (const [key, expected] of Object.entries(where)) {
-    const actual = row[key];
+    const actual: unknown = (row as Record<string, unknown>)[key];
     if (isTerm(expected)) {
       if (expected.term === 'is-null') {
         if (actual !== null && actual !== undefined) return false;
@@ -153,10 +166,13 @@ function ioOf(
   const recorded: Recorded = { inserts: [], events: [], reads: [] };
   const now = options.now ?? new Date('2026-08-28T12:00:00.000Z');
   const tx: BreakerTx = {
-    rowsWhere: (key: BreakerReadTable, where: BreakerFilter) => {
+    rowsWhere: <K extends BreakerReadTable>(key: K, where: BreakerFilter) => {
       recorded.reads.push({ key, where });
-      const table = fixture[key] ?? [];
-      return Promise.resolve(table.filter((row) => matches(row, where)));
+      const table: readonly object[] = fixture[key] ?? [];
+      // THE ONE CAST ON THE READ SIDE OF THE FAKE. `fixture[key]` over an
+      // unresolved `K` is the union of the five stores, and narrowing it needs a
+      // `switch` whose five branches would each say what this line says once.
+      return Promise.resolve(table.filter((row) => matches(row, where)) as DeclaredRow<K>[]);
     },
     insert: (key: BreakerWriteTable, values: BreakerValues) => {
       if (String(key) !== 'planBreakerState')
@@ -210,28 +226,164 @@ function policyWith(minSample: number, minSettledPayouts: number | null = null):
   };
 }
 
-const PLAN = { id: 'plan-1', code: 'CORE-25K', isActive: true };
-const VERSION = { id: 'ver-1', planId: 'plan-1' };
+const EPOCH = new Date('2026-08-01T00:00:00.000Z');
 const IN_WINDOW = new Date('2026-08-20T00:00:00.000Z');
 
-function purchase(id: string, cents: bigint): Record<string, unknown> {
+// -----------------------------------------------------------------------------
+// The base rows, which carry EVERY column because the store now demands it
+// -----------------------------------------------------------------------------
+//
+// **NOTHING BELOW IS READ BY A CASE EXCEPT THE FIELDS THE OLD BUILDERS ALREADY
+// SET.** They are here so the store cannot hold a row `0016` and `0002` could
+// not produce, which is `ADR-430` section 9's trade taken a second time at a
+// higher price. The columns each builder's caller actually varies stay in the
+// parameter list; everything else is a constant nobody reads.
+
+const PLAN: DeclaredRow<'plans'> = {
+  id: 'plan-1',
+  code: 'CORE-25K',
+  name: 'Core 25K',
+  isActive: true,
+  sortOrder: 0,
+  createdAt: EPOCH,
+  updatedAt: EPOCH,
+};
+
+const VERSION: DeclaredRow<'planVersions'> = {
+  id: 'ver-1',
+  planId: 'plan-1',
+  version: 1,
+  status: 'published',
+  rules: {},
+  copyBlocks: {},
+  publicSlug: 'core-25k',
+  publicVisible: true,
+  publishedAt: EPOCH,
+  retiredAt: null,
+  createdBy: 'fixture',
+  createdAt: EPOCH,
+  feeBackRepeats: false,
+  decidedOnSimulationRunId: null,
+  simulationWaiverReason: null,
+};
+
+function purchase(id: string, cents: bigint): DeclaredRow<'purchases'> {
   return {
     id,
+    identityId: 'ident-1',
+    userId: 'user-1',
     planVersionId: 'ver-1',
+    sizeCents: 2_500_000n,
+    kind: 'evaluation',
+    parentAccountId: null,
+    listPriceCents: cents,
+    discountCents: 0n,
+    amountPaidCents: cents,
+    currency: 'USD',
+    couponId: null,
+    affiliateId: null,
+    psp: null,
+    pspReference: null,
+    midReference: null,
     status: 'paid',
     paidAt: IN_WINDOW,
-    amountPaidCents: cents,
+    ip: null,
+    refundableUntil: null,
+    firstTradeAt: null,
+    checkoutIpCountry: null,
+    cardCountry: null,
+    geoDecision: null,
+    paymentMethod: 'psp',
+    walletDebitCents: 0n,
+    walletLedgerTransactionId: null,
+    ruleDiffAcknowledgedAt: null,
+    createdAt: EPOCH,
+    updatedAt: EPOCH,
   };
 }
 
-function settledPayout(id: string, cents: bigint): Record<string, unknown> {
+function settledPayout(id: string, cents: bigint): DeclaredRow<'payoutRequests'> {
   return {
     id,
-    planVersionId: 'ver-1',
-    status: 'settled',
-    settledAt: IN_WINDOW,
+    accountId: 'acct-1',
+    identityId: 'ident-1',
+    requestedCents: cents,
     approvedCents: cents,
+    traderCents: cents,
+    firmCents: 0n,
+    basisTradingDay: '2026-08-19',
+    planVersionId: 'ver-1',
+    eligibilitySnapshot: {},
+    status: 'settled',
+    idempotencyKey: `idem-${id}`,
+    payoutOrdinal: 1,
+    approvedAt: EPOCH,
+    settledAt: IN_WINDOW,
+    settledTradingDay: '2026-08-20',
+    effectiveTradingDay: '2026-08-20',
+    frozenAt: null,
+    freezeFlagId: null,
+    freezeExpiresAt: null,
+    balanceReflectionStatus: 'pending',
+    reflectedOnTradingDay: null,
+    createdAt: EPOCH,
+    updatedAt: EPOCH,
+    heldAt: null,
+    holdFlagId: null,
+    holdExpiresAt: null,
+    holdTosClause: null,
+    holdReason: null,
   };
+}
+
+/** One `plan_breaker_state` row, complete, with the fields a case varies on top. */
+function stateRow(
+  overrides: Partial<DeclaredRow<'planBreakerState'>>,
+): DeclaredRow<'planBreakerState'> {
+  return {
+    planId: 'plan-1',
+    evaluatedOn: '2026-08-27',
+    metric: 'loss_ratio_30d',
+    numeratorCents: 0n,
+    denominatorCents: 0n,
+    sampleSize: 0,
+    ratioBp: 0,
+    thresholdBp: 6000,
+    minSample: 20,
+    state: 'armed',
+    overrideReason: null,
+    overrideExpiresAt: null,
+    changedBy: null,
+    createdAt: EPOCH,
+    ...overrides,
+  };
+}
+
+/**
+ * A row PostgreSQL could not produce, built on purpose and cast EXACTLY ONCE.
+ *
+ * **THIS IS WHAT `ADR-432`'s NARROWING MADE HARDER, AND THE COST IS CHARGED HERE
+ * RATHER THAN AT EVERY SITE THAT PAYS IT.** Two cases exist to watch
+ * `readCents` refuse a `number` in a `*_cents` column. Under the narrowed port
+ * both columns ARE `bigint`, so `{ ...purchase('p-1', 1n), amountPaidCents:
+ * 9_900 }` is now a COMPILE ERROR and the input those cases exist to watch is no
+ * longer expressible without casting past the type.
+ *
+ * **THE CAST STAYS, THE CASES STAY, AND THE REFUSAL STAYS.** The type says "this
+ * cannot happen" on the authority of a TRANSCRIPTION that nothing verifies:
+ * `ADR-112` foreclosure 4 records that no check in this tree compares a
+ * `schema.ts` column type against the DDL. Deleting the cast would delete the
+ * case; deleting the refusal would trade a guard that FIRES for a claim nothing
+ * checks. **The guard being traded away here is the one standing between a float
+ * and the denominator of a loss ratio**, which is `evaluate.ts`'s own stated
+ * reason: a `number` arriving there "is a driver or a fake that widened the
+ * type, and accepting it would put the whole fold on floating point without a
+ * single float literal in the diff".
+ *
+ * One helper, one cast, so a future case cannot quietly acquire a bare `as`.
+ */
+function malformed<R extends object>(row: R, overrides: Readonly<Record<string, unknown>>): R {
+  return { ...row, ...overrides } as R;
 }
 
 function baseFixture(purchases: number, payoutCents: bigint, feeCents = 9_900n): Fixture {
@@ -549,12 +701,14 @@ test('4.3 a zero denominator is NULL and never zero, and it is insufficient_data
 });
 
 test('4.4 a `number` in a cents column is REFUSED BY NAME rather than converted', () => {
-  expect(() => foldWindow([{ ...purchase('p-1', 1n), amountPaidCents: 9_900 }], [])).toThrow(
-    BreakerRowError,
-  );
-  expect(() => foldWindow([], [{ ...settledPayout('r-1', 1n), approvedCents: 1.5 }])).toThrow(
-    /expected a bigint/,
-  );
+  expect(() =>
+    foldWindow([malformed(purchase('p-1', 1n), { amountPaidCents: 9_900 })], []),
+  ).toThrow(BreakerRowError);
+  // A FLOAT, and it is the reason this case is worth its cast: 1.5 cents is not
+  // a quantity `bigint` can hold, and the refusal is what keeps it out.
+  expect(() =>
+    foldWindow([], [malformed(settledPayout('r-1', 1n), { approvedCents: 1.5 })]),
+  ).toThrow(/expected a bigint/);
 });
 
 test('4.5 cents past MAX_SAFE_INTEGER fold exactly, which a number could not have', () => {
@@ -720,9 +874,9 @@ test('5.5 the previous plan-day is read and the state change is measured against
   const { io, recorded } = ioOf({
     ...baseFixture(25, 150_000n),
     planBreakerState: [
-      { planId: 'plan-1', evaluatedOn: '2026-08-27', state: 'armed' },
+      stateRow({ evaluatedOn: '2026-08-27', state: 'armed' }),
       // A LATER row must not be read as "previous".
-      { planId: 'plan-1', evaluatedOn: '2026-08-29', state: 'paused' },
+      stateRow({ evaluatedOn: '2026-08-29', state: 'paused' }),
     ],
   });
   const report = await evaluateBreaker(io, policyWith(20));
@@ -734,7 +888,7 @@ test('5.5 the previous plan-day is read and the state change is measured against
 test('5.6 no event is emitted when the state did not change', async () => {
   const { io, recorded } = ioOf({
     ...baseFixture(25, 150_000n),
-    planBreakerState: [{ planId: 'plan-1', evaluatedOn: '2026-08-27', state: 'paused' }],
+    planBreakerState: [stateRow({ evaluatedOn: '2026-08-27', state: 'paused' })],
   });
   const report = await evaluateBreaker(io, policyWith(20));
   expect(report.eventsEmitted).toBe(0);
@@ -1095,4 +1249,94 @@ test('8.1 every leg of the barrel is still re-exported, so a keep-both merge can
   // is the whole lesson and is why the number below is read off the regex on the
   // merged tree and nowhere else.
   expect(new Set(legs).size).toBe(36);
+});
+
+// =============================================================================
+// 9. ADR-432. The port hands back the row the key declares, and the mapping is
+//    gone while every refusal is not
+// =============================================================================
+
+/**
+ * The RETURN TYPE one member of `BreakerTx` declares, read as text.
+ *
+ * **IT READS THE MEMBER'S OWN RETURN AND NOT AN `unknown` NEARBY**, which is the
+ * defect ADR-421 section 10 records catching in its own fourth case and ADR-430
+ * section 7 repeats. The risk is live here: `BreakerTx` declares `insert` TWO
+ * LINES BELOW `rowsWhere` and it still returns `Promise<unknown[]>`, so a case
+ * that searched the interface block for the string would pass on the wrong
+ * member. This walks from the member name to the `)` that closes its parameter
+ * list, matching parentheses so a generic parameter cannot end it early, and
+ * takes what follows.
+ */
+function returnOf(source: string, member: string): string {
+  const block = source.slice(source.indexOf('export interface BreakerTx {'));
+  const at = block.indexOf(`${member}`);
+  expect(at, `\`${member}\` is not declared on BreakerTx`).toBeGreaterThan(-1);
+  let index = block.indexOf('(', at);
+  let depth = 0;
+  for (; index < block.length; index++) {
+    if (block[index] === '(') depth++;
+    else if (block[index] === ')') {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  const tail = block.slice(index + 1);
+  return tail.slice(tail.indexOf(':') + 1, tail.indexOf(';')).trim();
+}
+
+test('9.1 the READ port hands back the accessor row and no longer re-states unknown', () => {
+  // ADR-303 limit 4, spent on this family. `rowsWhere` is generic over its key
+  // and returns the row `schema.ts` declares for that key.
+  expect(returnOf(code(PORTS_SOURCE), 'rowsWhere')).toBe('Promise<DeclaredRow<K>[]>');
+  expect(returnOf(code(PORTS_SOURCE), 'rowsWhere')).not.toBe('Promise<unknown[]>');
+
+  // AND THE WRITE PATH IS STILL `unknown`, ASSERTED RATHER THAN LEFT IMPLIED.
+  // ADR-430 section 12 item 4: a write returns what the database made of what
+  // was sent, which is not the same claim as a read. A later row narrowing
+  // `insert` is answering a different question and this case tells it so.
+  expect(returnOf(code(PORTS_SOURCE), 'insert')).toBe('Promise<unknown[]>');
+});
+
+test('9.2 the hand-written mapping is DELETED from the slice, not merely unused', () => {
+  // Swept over CODE and not over the file. `evaluate.ts` QUOTES the deleted
+  // declaration in the docblock that records why it went, and a sweep over the
+  // prose would be red on the sentence that explains why it is green.
+  expect(code(PORTS_SOURCE)).not.toMatch(/export type BreakerRow\b/);
+  expect(code(EVALUATE_SOURCE)).not.toMatch(/\bas BreakerRow\b/);
+  expect(code(EVALUATE_SOURCE)).not.toMatch(/\bBreakerRow\b(?!Error)/);
+  // The barrel cannot re-export a name that no longer exists.
+  expect(code(BARREL)).not.toMatch(/^\s*BreakerRow,\s*$/m);
+});
+
+test('9.3 every VALUE refusal survived the deletion, one for one and by subject', () => {
+  // A COUNT IS REFUSED AS THE INSTRUMENT, for ADR-426 section 7's two reasons: a
+  // count is a derivable number written down (CI-06), and it passes just as
+  // happily when one reader loses its `throw` and another grows a second. Each
+  // refusal is read for its own subject.
+  const source = code(EVALUATE_SOURCE);
+
+  // The row-shape refusal, which ADR-426 and ADR-430 BOTH dropped when they
+  // deleted their mapping. ADR-299 section 5.1 item 5: a type derived from a
+  // TRANSCRIPTION does not retire a runtime check.
+  expect(source).toContain('expected a row and received');
+  // THE MONEY REFUSAL, ASSERTED BY ITS SUBJECT AND BY ITS WHOLE FORM. Eleven
+  // `*_cents` columns cross this family and this is the guard between a float
+  // and the denominator of a loss ratio.
+  //
+  // **THE FORM IS ASSERTED WHOLE BECAUSE A SUBSTRING IS NOT ENOUGH, AND THAT
+  // WAS MEASURED RATHER THAN REASONED.** This case first read only
+  // `toContain("typeof value === 'bigint'")`, and the falsification that was
+  // supposed to prove it fires DID NOT: widening the guard to
+  // `typeof value === 'number' || typeof value === 'bigint'` retires the refusal
+  // on a money column while leaving that substring intact. A check that passes
+  // on a WIDENED guard is a check that watches the wrong half of the defect.
+  expect(source).toContain("if (typeof value === 'bigint') return value;");
+  expect(source).not.toMatch(/typeof value === 'number'[^\n]*return value/);
+  expect(source).toContain('expected a bigint and received');
+  expect(source).toContain('expected text and received');
+  expect(source).toContain('expected a Date or null and received');
+  expect(source).toContain('YYYY-MM-DD exchange');
+  expect(source).toContain("which 0016's CHECK does not admit");
+  expect(source).toContain('past Number.MAX_SAFE_INTEGER');
 });
