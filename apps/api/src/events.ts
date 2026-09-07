@@ -927,6 +927,42 @@ export interface EventSink {
   emit(tx: object, event: EmitSpec): Promise<void>;
 }
 
+// -----------------------------------------------------------------------------
+// ADR-408: THE REMEDY IS COSTED, AND THE REFUSAL HAD THE BLOCKER BACKWARDS
+// -----------------------------------------------------------------------------
+// THIS BLOCK IS HERE AND NOT IN THE HEADER, AND THE PLACEMENT IS THE RULE RATHER
+// THAN A PREFERENCE. `apps/worker/src/schedule.ts` cites this file at TWO exact
+// coordinates and both are above `buildEvent`, so a header insertion of any size
+// breaks a live pointer in a file ADR-408's row may not write and the
+// citation-repair exception cannot reach. ADR-397 bought neutrality in a source
+// file for this reason and this is the second time. Everything below is under
+// the last cited line, so nothing this entry adds moves a pointer.
+//
+// THE THIRD ADDRESS IS PRICED RATHER THAN ONLY NAMED. The header says a
+// `packages/*` library is legal and is not that session's to take, and both
+// halves stand; what nobody measured is what the move would COST, and the answer
+// is no manifest edge at all. `apps/api` and `apps/worker` already share THREE
+// workspace dependencies, `@merit/db`, `@merit/ledger` and
+// `@merit/rules-engine`, so an address both arrows reach EXISTS TODAY rather
+// than being a package a founder must first admit through `VG-12`, and
+// `packages/ledger` is ADR-104's own precedent for exactly this shape. THE
+// RELOCATION IS STILL NOT TAKEN AND STILL NOT THIS FENCE'S, because
+// `packages/**` and both manifests sit outside it. What changes is that the next
+// row inherits a costed move instead of an open question, and
+// `test/event-placement.test.ts` section 4 binds the measurement so a wave that
+// severs the shared dependency lands red rather than quietly making this
+// paragraph false.
+//
+// AND THE REFUSAL BELOW TOLD ITS READER THE WRONG KIND OF BLOCKER.
+// `EventSinkUnwired` said what is missing "is a decision about a deployment
+// rather than a file on disk", and that clause IS FALSE in both directions: no
+// deployment in this tree can take the decision, because an install needs one
+// caller holding this module AND a `SystemTx` and no deployable holds both, and
+// the thing actually missing IS a file on disk. That sentence is the first thing
+// a wiring session reads, and it sends that session looking for a deployment to
+// configure instead of an address to move a file to. It is corrected in place
+// and kept beside its correction, on `RI-14`'s rule.
+
 /** Raised by a sink that is not installed. */
 export class EventSinkUnwired extends Error {
   constructor() {
@@ -936,8 +972,19 @@ export class EventSinkUnwired extends Error {
         'scope class `either` for it after all five earlier members were tried against the shape ' +
         'and each was refused by a mechanical assertion or silently lossy. A composed WRITER now ' +
         'exists as well: install `makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock })` and ' +
-        'this rejection goes away. What is missing is the INSTALL, which is a decision about a ' +
-        'deployment rather than a file on disk. Refusing is the ' +
+        'this rejection goes away. What is missing is the INSTALL. THE CLAUSE THAT FOLLOWED, ' +
+        '`which is a decision about a deployment rather than a file on disk`, IS FALSE AND IS ' +
+        'KEPT HERE BESIDE ITS CORRECTION (ADR-408): no deployment in this tree can take that ' +
+        'decision, because an install needs ONE caller holding this module AND a `SystemTx`, and ' +
+        'no deployable holds both. `apps/api` opens five doors and not one of them is a system ' +
+        'door, which ADR-171 clause 1 refused and whose section 9 condition no slice has met; ' +
+        '`apps/worker` is the ONLY non-test source in this workspace that takes `systemDb`, and ' +
+        'RI-04, `node-linker=isolated` and its own `test/event-sink.test.ts` each refuse it this ' +
+        'module. SO IT IS A FILE ON DISK RATHER THAN A DEPLOYMENT DECISION, and the file is an ' +
+        'address under `packages/` that both arrows already reach: `@merit/db`, `@merit/ledger` ' +
+        'and `@merit/rules-engine` are each already a dependency of BOTH deployables, so the ' +
+        'remedy needs no new manifest edge, which is ADR-104 ruling `packages/ledger` when two ' +
+        'deployables had to post and RI-04 forbade an app depending on an app. Refusing is the ' +
         'correct outcome: the state change is inside the same ' +
         'transaction (ADR-006), so a sink that swallowed the event would roll the fact back with ' +
         "it, and a sink that returned quietly would commit a transition EVENTS' universal rule 1 " +

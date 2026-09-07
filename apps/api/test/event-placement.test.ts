@@ -51,7 +51,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
-import { EventError, TRANSACTION_EVENT_WRITER, buildEvent } from '../src/events.ts';
+import {
+  EventError,
+  TRANSACTION_EVENT_WRITER,
+  UNWIRED_EVENT_SINK,
+  buildEvent,
+} from '../src/events.ts';
 import type { EmitSpec } from '../src/events.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -298,5 +303,97 @@ describe('the producer`s own deployable emits nothing', () => {
     // deliberately not given one.
     const callers = sources().filter((rel) => /\.emit\s*\(/.test(read(rel)));
     expect(callers).toEqual([]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 4. The address the refusal names, which was prose until ADR-408
+// -----------------------------------------------------------------------------
+// `src/events.ts` and `apps/worker/src/sweeps/expiry-adapter.ts` BOTH conclude
+// that the repair is "a package both arrows already reach", and until this
+// section neither half of that sentence was bound to anything. It is two
+// separable claims and they fail in opposite directions, so they are two cases:
+// that no `packages/*` holds a producer today, which is the ABSENCE the finding
+// rests on, and that a shared address EXISTS, which is what makes the remedy a
+// relocation rather than a new package a founder must admit through `VG-12`.
+//
+// THE FIRST CASE FAILS ON GOOD NEWS AND THAT IS ITS PURPOSE. The day a
+// `packages/*` module composes a sink, this deployable's header stops being true
+// and the row that made it true is the row that should be told, which is
+// `RI-35`'s `event-sink-caller` discipline applied to the OTHER side of the
+// fence. The second fails on bad news: a wave that drops the last shared
+// workspace dependency turns a costed relocation back into an unpriced one, and
+// nothing else in this tree would notice.
+describe('the remedy address, measured rather than asserted', () => {
+  /** One deployable's `@merit/*` dependencies, both kinds, read from its manifest. */
+  function meritDeps(app: string): string[] {
+    const manifest: unknown = JSON.parse(read(`apps/${app}/package.json`));
+    const { dependencies = {}, devDependencies = {} } = manifest as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    return Object.keys({ ...dependencies, ...devDependencies })
+      .filter((name) => name.startsWith('@merit/'))
+      .sort();
+  }
+
+  test('the manifests are read, so the intersection below is measured', () => {
+    // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. Two empty lists
+    // intersect to an empty list, which would make the next case fail for a
+    // reason that has nothing to do with the finding.
+    expect(meritDeps('api')).toContain('@merit/db');
+    expect(meritDeps('worker')).toContain('@merit/db');
+  });
+
+  test('a package BOTH deployables already name exists, so the remedy costs no manifest edge', () => {
+    // THE PRODUCER HAS NO HANDLE AND THE HANDLE HAS NO PRODUCER, and the two
+    // sit in deployables neither of which may import the other (`RI-04`). The
+    // only address that can hold both is one under `packages/`, and this case
+    // says that address is already in both dependency sets rather than being a
+    // package somebody must first admit.
+    const shared = meritDeps('api').filter((name) => meritDeps('worker').includes(name));
+    expect(shared.length).toBeGreaterThan(0);
+    // AND `packages/ledger` IS NAMED because ADR-104 ruled this exact shape for
+    // it: two deployables had to post and `RI-04` forbade an app depending on an
+    // app. Naming it here is a precedent and never a proposal about where the
+    // producer should go, which is `packages/**`'s fence and not this one.
+    expect(shared).toContain('@merit/ledger');
+  });
+
+  test('no `packages/*` composes a sink today, which is what makes the finding a finding', () => {
+    // THE SHAPE IS THE PRODUCER'S OWN TWO NAMES. A package that imported or
+    // declared either one would be a second producer, and the header sentence
+    // "the ONLY event producer in this repository" would be false with nobody
+    // told. It walks `src` only: a suite under `packages/*/test` that stubs a
+    // sink is not a producer and must not turn this red.
+    const carriers: string[] = [];
+    for (const pkg of readdirSync(join(ROOT, 'packages'), { withFileTypes: true })) {
+      if (!pkg.isDirectory()) continue;
+      let src: string[];
+      try {
+        src = readdirSync(join(ROOT, 'packages', pkg.name, 'src'), {
+          recursive: true,
+          encoding: 'utf8',
+        });
+      } catch {
+        continue;
+      }
+      for (const entry of src) {
+        const rel = `packages/${pkg.name}/src/${String(entry)}`;
+        if (!rel.endsWith('.ts')) continue;
+        if (/\bmakeEventSink\b|\bTRANSACTION_EVENT_WRITER\b/.test(read(rel))) carriers.push(rel);
+      }
+    }
+    expect(carriers).toEqual([]);
+  });
+
+  test('the refusal names the address rather than sending its reader at a deployment', async () => {
+    // THE CLAUSE THIS REPLACES READ `a decision about a deployment rather than a
+    // file on disk` AND WAS BACKWARDS ON BOTH HALVES, which `src/events.ts`'s
+    // header records. A wiring session reads this message first, so the message
+    // is where the correction has to land for it to be worth anything.
+    await expect(
+      UNWIRED_EVENT_SINK.emit({}, { name: 'payout.requested', payload: {} }),
+    ).rejects.toThrow(/SO IT IS A FILE ON DISK RATHER THAN A DEPLOYMENT DECISION/);
   });
 });

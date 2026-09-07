@@ -418,6 +418,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-404](ADR-404.md) | the 80 reproduce exactly and 53 of them are repaired with the occurrence named; `ADR-398`'s seam has ZERO surviving instances because a sibling row repaired the last one 19 minutes before the entry that recorded it as owed; and an owed list cannot see inside its own wave (2026-09-07, status: proposed) |
 | [ADR-405](ADR-405.md) | `clause 2` is the NAMING convention and [ADR-402](ADR-402.md) ruled on a different clause, so the text awaiting a founder does not carry the rule it was written for; question 3's premise is false at 7 of 42 rather than 42 of 42; and the `CLAUDE.md` home is measured for the first time at 368 of 387 (2026-09-07, status: proposed) |
 | [ADR-406](ADR-406.md) | the census the dispatch says was never re-run was re-run three rows ago and reproduces at 74 against 39, hole one is 43 pointers and not 55 and retires on a corrected key, hole two is CLOSED at a cost of four pointers and no dated one, and a pointer into a dependency is undecidable rather than born wrong (2026-09-07, status: proposed) |
+| [ADR-408](ADR-408.md) | the producer exists and was built five rows ago, what has no producer is the HANDLE, the refusal told its reader the blocker backwards, and the relocation nobody priced costs no manifest edge because three packages already sit in both arrows (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
