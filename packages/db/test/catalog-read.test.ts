@@ -61,6 +61,7 @@ import {
   uniqueKeys,
   type CatalogReadTx,
   type CatalogRow,
+  type DeclaredRow,
   type FirmDb,
   type FirmTx,
   type ScopedDb,
@@ -490,10 +491,25 @@ const ADR_303_TYPE_CASES: readonly [
  * THE `Db`-LEVEL `rows` IS HERE TOO, because limit 4's surface is the accessor
  * and not only its transactions, and `ScopedDb`, `SystemDb` and `FirmDb` each
  * hand back `unknown[]` from a verb of the same name.
+ *
+ * **ONE OF THE TEN FLIPPED, AND ADR-426 IS WHY. THE CASE IS INVERTED RATHER
+ * THAN DELETED.** `SystemTx.rowsWhere` returns {@link DeclaredRow} now, so the
+ * assertion that it returns `unknown[]` would be a false statement about the
+ * door and dropping it would leave the member watched by nothing at all. It is
+ * REPLACED BY ITS OPPOSITE, which is the stronger reading: the verb is now
+ * pinned to the row the key declares, so a later row that widens it BACK to
+ * `unknown` meets this line exactly as a row narrowing it met the old one.
+ *
+ * **THE OTHER NINE ARE UNTOUCHED, WHICH IS WHAT MAKES THIS ONE VERB ON ONE
+ * HANDLE RATHER THAN A LIMIT ABANDONED.** `rows`, `rowAt` and `lockAt` are
+ * still `unknown` everywhere they are declared, and `rowsWhere` is still
+ * `unknown` on `ScopedTx` and on `FirmTx`. ADR-421 section 8 measured what
+ * moving ALL of them buys and the answer was nothing; ADR-426 moved the one a
+ * port followed.
  */
 type TheLimitHoldsOnTheOtherHandles = [
   Assert<Same<Awaited<ReturnType<SystemTx['rows']>>, unknown[]>>,
-  Assert<Same<Awaited<ReturnType<SystemTx['rowsWhere']>>, unknown[]>>,
+  Assert<Same<Awaited<ReturnType<SystemTx['rowsWhere']>>, DeclaredRow<TableKey>[]>>,
   Assert<Same<Awaited<ReturnType<SystemTx['rowAt']>>, unknown>>,
   Assert<Same<Awaited<ReturnType<SystemTx['lockAt']>>, unknown>>,
   Assert<Same<Awaited<ReturnType<FirmTx['rows']>>, unknown[]>>,
@@ -523,6 +539,21 @@ const ADR_421_TYPE_CASES: readonly [TheLimitHoldsOnTheOtherHandles] = [
  * THIS FUNCTION IS NEVER CALLED AND THAT IS THE POINT: it is compiled and not
  * run, and every line in it is an assignment `unknown` would refuse.
  */
+async function theSystemFilteredReadHandsBackDeclaredRows(tx: SystemTx): Promise<void> {
+  // ADR-426. THE COLUMN IS READ WITHOUT A CAST AND WITHOUT A GUARD FOR ITS
+  // EXISTENCE, and that is the whole of what `apps/worker/src/digests` spends
+  // the narrowing on: `record()` and `DigestRow` are deleted there because
+  // these two lines compile. What it does NOT buy is the guard on the VALUE,
+  // which is ADR-299 section 5.1 item 5 and is why every refusal in that
+  // slice's `rows.ts` is still where it was.
+  const schedules = await tx.rowsWhere('reportSchedules', { enabled: true });
+  const digests: readonly string[] = schedules.map((row) => row.digest);
+  const deliveries = await tx.rowsWhere('reportDeliveries', { attempt: 1 });
+  const due: readonly Date[] = deliveries.map((row) => row.dueAt);
+  void digests;
+  void due;
+}
+
 async function theVerbsHandBackDeclaredRows(tx: ScopedTx): Promise<void> {
   const many: readonly PlanVersionSizeCatalogRow[] = await tx.catalogRows('planVersionSizes');
   const filtered: readonly CatalogRow<'coupons'>[] = await tx.catalogRowsWhere('coupons', {
@@ -558,6 +589,7 @@ describe('the return is the declared row and no refusal moved (ADR-303)', () => 
     expect(ADR_421_TYPE_CASES.flat(2)).not.toContain(false);
     expect(ADR_421_TYPE_CASES.flat(2).length).toBeGreaterThan(0);
     expect(typeof theVerbsHandBackDeclaredRows).toBe('function');
+    expect(typeof theSystemFilteredReadHandsBackDeclaredRows).toBe('function');
   });
 
   test('`catalogRowAt` hands back `undefined` where nothing matched', async () => {

@@ -103,8 +103,8 @@
 // =============================================================================
 
 import { CADENCE_BY_DIGEST, CADENCE_PERIOD_MS, DIGESTS } from './ports.ts';
-import { DigestRowError, readBoolean, readInstant, readText, record } from './rows.ts';
-import type { Cadence, Digest, DigestAlarmIo, DigestReadTx, DigestRow } from './ports.ts';
+import { DigestRowError, readBoolean, readInstant, readText } from './rows.ts';
+import type { Cadence, DeclaredRow, Digest, DigestAlarmIo, DigestReadTx } from './ports.ts';
 
 // -----------------------------------------------------------------------------
 // The findings
@@ -196,8 +196,10 @@ function isDigest(value: string): value is Digest {
  * two cannot disagree; anything that reaches this branch is a fake or a driver
  * that has widened the shape, and either is a reason to stop.
  */
-export function readAlarmSchedule(value: unknown, where: string): AlarmSchedule {
-  const row: DigestRow = record(value, where);
+export function readAlarmSchedule(
+  row: DeclaredRow<'reportSchedules'>,
+  where: string,
+): AlarmSchedule {
   const digest = readText(row, 'digest', where);
   if (!isDigest(digest))
     throw new DigestRowError(
@@ -247,14 +249,16 @@ export interface WindowFold {
  * accident, which is the right answer for the wrong reason and would go on being
  * the right answer until the day somebody added a value meaning "delivered".
  */
-export function foldWindows(rows: readonly unknown[], where: string): readonly WindowFold[] {
+export function foldWindows(
+  rows: readonly DeclaredRow<'reportDeliveries'>[],
+  where: string,
+): readonly WindowFold[] {
   const byWindow = new Map<
     number,
     { dueAt: Date; attempts: number; delivered: boolean; failed: number }
   >();
-  for (const [index, value] of rows.entries()) {
+  for (const [index, row] of rows.entries()) {
     const at = `${where}[${String(index)}]`;
-    const row = record(value, at);
     const dueAt = readInstant(row, 'dueAt', at);
     const outcome = readText(row, 'outcome', at);
     if (outcome !== 'delivered' && outcome !== 'failed')
@@ -419,7 +423,7 @@ export async function findUndeliveredWindows(
       // is a promise about a read and this is the predicate the whole alarm's
       // subject set rests on. A disabled schedule alarming forever is how an
       // operator learns to ignore this page.
-      if (!readBoolean(record(value, where), 'enabled', where)) continue;
+      if (!readBoolean(value, 'enabled', where)) continue;
       const schedule = readAlarmSchedule(value, where);
       schedulesEvaluated += 1;
 

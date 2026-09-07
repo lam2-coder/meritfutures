@@ -3,6 +3,8 @@ import { join } from 'node:path';
 
 import { expect, test } from 'vitest';
 
+import { stripComments } from '../../../packages/tooling/checks/strip-comments.mjs';
+
 import {
   CADENCES,
   CADENCE_BY_DIGEST,
@@ -40,6 +42,7 @@ import {
 import type {
   AlarmSchedule,
   BreakerEvaluationReport,
+  DeclaredRow,
   DigestAlarmIo,
   DigestBody,
   DigestFilter,
@@ -130,16 +133,26 @@ function text(artifact: Uint8Array): string {
 // A store, and it is the only thing either run may believe
 // -----------------------------------------------------------------------------
 
+// **THE STORE HOLDS THE ROWS `schema.ts` DECLARES NOW, AND THAT IS ADR-426's
+// STRENGTHENING RATHER THAN ITS COST.** It read `Record<string, unknown>[]`,
+// which let a fake stand in for the driver while agreeing with nothing: a
+// fixture missing a column, or carrying one under a name no migration ever
+// created, compiled and the suite went green on a row PostgreSQL cannot
+// produce. Both fixtures below already carried every column, so what this
+// costs is one `id` on `delivery()` and what it buys is that the next one
+// cannot forget.
 interface Store {
-  reportSchedules: Record<string, unknown>[];
-  reportDeliveries: Record<string, unknown>[];
+  reportSchedules: DeclaredRow<'reportSchedules'>[];
+  reportDeliveries: DeclaredRow<'reportDeliveries'>[];
 }
 
 function emptyStore(): Store {
   return { reportSchedules: [], reportDeliveries: [] };
 }
 
-function schedule(over: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function schedule(
+  over: Partial<DeclaredRow<'reportSchedules'>> = {},
+): DeclaredRow<'reportSchedules'> {
   return {
     id: 'sched-loss',
     digest: 'weekly_loss_ratio_cusum',
@@ -155,8 +168,16 @@ function schedule(over: Partial<Record<string, unknown>> = {}): Record<string, u
   };
 }
 
-function delivery(over: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function delivery(
+  over: Partial<DeclaredRow<'reportDeliveries'>> = {},
+): DeclaredRow<'reportDeliveries'> {
   return {
+    // `bigint` AND NOT A NUMBER. `0040` declares this column
+    // `generatedAlwaysAsIdentity` over `bigint`, and the accessor pins
+    // `{ mode: 'bigint' }`, so the row the driver hands back carries a `bigint`
+    // here. The fixture said nothing at all before this row, which is the
+    // silence the typed store above closes.
+    id: 1n,
     scheduleId: 'sched-loss',
     dueAt: new Date('2026-08-24T00:00:00.000Z'),
     attempt: 1,
@@ -181,16 +202,17 @@ function atLeast(value: NonNullable<unknown>): DigestFilterTerm {
   return { term: 'at-least', value };
 }
 
-function matches(row: Record<string, unknown>, where: DigestFilter): boolean {
+function matches(row: object, where: DigestFilter): boolean {
+  const columns = row as Record<string, unknown>;
   return Object.entries(where).every(([column, expected]) => {
     if (typeof expected === 'object' && expected !== null && 'term' in expected) {
       const term = expected as DigestFilterTerm;
-      const actual = row[column];
+      const actual = columns[column];
       if (term.term !== 'at-least' || !(actual instanceof Date) || !(term.value instanceof Date))
         return false;
       return actual.getTime() >= term.value.getTime();
     }
-    const actual = row[column];
+    const actual = columns[column];
     if (actual instanceof Date && expected instanceof Date)
       return actual.getTime() === expected.getTime();
     return actual === expected;
@@ -199,8 +221,13 @@ function matches(row: Record<string, unknown>, where: DigestFilter): boolean {
 
 function readTxOver(store: Store): DigestReadTx {
   return {
-    rowsWhere: (key: DigestReadTable, where: DigestFilter) =>
-      Promise.resolve(store[key].filter((row) => matches(row, where))),
+    // THE FAKE IS GENERIC FOR THE REASON THE PORT IS. `store[key]` is a union of
+    // the two row arrays until `K` pins it, and the cast is where a recorder
+    // stands in for the driver: the accessor resolves the key to one table and
+    // this fake resolves it to one array, and nothing in TypeScript relates the
+    // two indexes.
+    rowsWhere: <K extends DigestReadTable>(key: K, where: DigestFilter) =>
+      Promise.resolve(store[key].filter((row) => matches(row, where)) as DeclaredRow<K>[]),
   };
 }
 
@@ -224,11 +251,15 @@ interface ProducerOptions {
 function producerIo(store: Store, options: ProducerOptions = {}): DigestIo {
   const now = options.now ?? NOW;
   const tx: DigestTx = {
-    rowsWhere: (key: DigestReadTable, where: DigestFilter) =>
-      Promise.resolve(store[key].filter((row) => matches(row, where))),
+    rowsWhere: <K extends DigestReadTable>(key: K, where: DigestFilter) =>
+      Promise.resolve(store[key].filter((row) => matches(row, where)) as DeclaredRow<K>[]),
     insert: (key: DigestWriteTable, values: DigestValues) => {
       if (options.swallowWrites === true) return Promise.resolve([values]);
-      store[key].push({ ...values });
+      // `insert` IS NOT PART OF ADR-426's SPEND. The write verb still crosses as
+      // `DigestValues`, so what the producer appends is a partial row and the
+      // store has to be told so. Narrowing the write path is a different row and
+      // is named in ADR-426 section 9.
+      store[key].push({ ...values } as DeclaredRow<'reportDeliveries'>);
       return Promise.resolve([values]);
     },
   };
@@ -616,7 +647,8 @@ test('4.13 an adapter that ignores the filter still cannot enrol a disabled sche
   const blind: DigestAlarmIo = {
     read: (fn) =>
       fn({
-        rowsWhere: (key: DigestReadTable) => Promise.resolve(store[key]),
+        rowsWhere: <K extends DigestReadTable>(key: K) =>
+          Promise.resolve(store[key] as DeclaredRow<K>[]),
       }),
     terms: { atLeast },
     now: () => NOW,
@@ -643,9 +675,22 @@ test('4.15 an outcome 0040 does not admit is refused rather than counted as not-
   );
 });
 
+// **THIS CASE NOW NEEDS A CAST TO SAY WHAT IT ALWAYS SAID, AND THAT IS ADR-426's
+// SHARPEST FINDING RATHER THAN A NUISANCE.** Under the narrowed port `dueAt` IS
+// a `Date`, so a string in that slot is a compile error and the malformed input
+// this case exists to watch is no longer expressible without casting past the
+// type. The cast stays and the case stays, because the type says "this cannot
+// happen" on the authority of a TRANSCRIPTION: `ADR-112` foreclosure 4 records
+// that no check in this tree compares a `schema.ts` column type against the DDL,
+// and `ADR-299` section 5.1 item 5 rules that such a type does not retire a
+// runtime check. Deleting either the cast or the refusal would be trading a
+// guard that fires for a claim nothing verifies.
 test('4.16 a `due_at` that is not a Date is refused, because Invalid Date compares false', () => {
   expect(() =>
-    foldWindows([delivery({ dueAt: '2026-08-24T00:00:00.000Z' })], 'reportDeliveries'),
+    foldWindows(
+      [delivery({ dueAt: '2026-08-24T00:00:00.000Z' as unknown as Date })],
+      'reportDeliveries',
+    ),
   ).toThrow(/Invalid Date/);
   expect(() => foldWindows([delivery({ dueAt: new Date('nope') })], 'reportDeliveries')).toThrow(
     /Invalid Date/,
@@ -1349,4 +1394,100 @@ test('10.4 a ratio the breaker had no opinion about stays null and does not beco
   const dataRow = rendered.split('\n').at(-2) ?? '';
   expect(dataRow).toContain(',,');
   expect(dataRow).not.toContain('"0"');
+});
+
+// =============================================================================
+// 11. `ADR-303` LIMIT 4, SPENT FOR ONE VERB ON ONE HANDLE, AND THE MAPPING IT
+//     DELETES (ADR-426)
+// =============================================================================
+// [ADR-421](docs/decisions/ADR-421.md) section 9 priced this: a narrowing that
+// no reader can see buys nothing, and what makes limit 4 takeable is a row that
+// holds the accessor AND a port family together and can show a HAND-WRITTEN
+// MAPPING DELETED in the same commit. This section is that proof for the digest
+// slice, which is the deployable's smallest read surface: two tables, twenty-one
+// columns, one verb, and no money column on either table.
+//
+// WHAT IS DELETED IS THE EXISTENCE MAPPING AND NOT ONE REFUSAL. `ADR-299`
+// section 5.1 item 5 is quoted in `packages/db/test/catalog-read.test.ts` and
+// rules it: "a type derived from a transcription does not retire a runtime
+// check". So `record()` -- whose whole content was `unknown` written down a
+// second time -- goes, and every value refusal in `rows.ts` stays where it is.
+
+const ROWS_SOURCE = readFileSync(join(ROOT, 'apps/worker/src/digests/rows.ts'), 'utf8');
+
+test('11.1 the read port hands back the accessor row and no longer re-states `unknown`', () => {
+  // THE MEMBER'S OWN RETURN, read the way `limit-4-census.test.ts` reads the
+  // door: the first `Promise<` after this signature's parameter list closes.
+  // Reading "an `unknown` nearby" is the defect that entry recorded catching in
+  // its own fourth case, and it is not repeated here.
+  const start = PORTS_SOURCE.indexOf('export interface DigestReadTx {');
+  expect(start, '`DigestReadTx` was not found in `ports.ts`').toBeGreaterThan(-1);
+  const block = PORTS_SOURCE.slice(start, PORTS_SOURCE.indexOf('\n}', start));
+  const own = /rowsWhere[^)]*\)\s*:\s*(Promise<[^;{]*?)[;{]/.exec(block);
+  expect(own?.[1], '`DigestReadTx.rowsWhere` has no readable return').toBeDefined();
+  expect(own?.[1]?.trim()).not.toBe('Promise<unknown[]>');
+
+  // AND THE KEY IS STILL THE NARROW UNION. The row spends limit 4's RETURN and
+  // widens no key vocabulary, which is the half [ADR-424](docs/decisions/ADR-424.md)
+  // section 7 watches: a `SystemTx` whose key vocabulary narrowed stops
+  // satisfying `LiabilityTx` and `AdminSourceTx`, and nothing here touches it.
+  expect(block).toContain('K extends DigestReadTable');
+});
+
+test('11.2 the hand-written existence mapping is DELETED from the slice', () => {
+  const code = (source: string): string => stripComments(source, { literals: 'blank' });
+
+  // THE ALIAS THAT WROTE `unknown` DOWN A SECOND TIME.
+  expect(code(PORTS_SOURCE)).not.toContain('Readonly<Record<string, unknown>>;\n\n// ----');
+  expect(code(PORTS_SOURCE)).not.toMatch(/export type DigestRow\b/);
+
+  // THE FUNCTION THAT CAST IT. `record(` is the mapping [ADR-421](docs/decisions/ADR-421.md)
+  // section 5 calls "a second place the `unknown` is written down", and it is
+  // gone from the module that declared it and from both callers.
+  expect(code(ROWS_SOURCE)).not.toMatch(/export function record\b/);
+  for (const [name, source] of [
+    ['alarm.ts', ALARM_SOURCE],
+    ['produce.ts', PRODUCE_SOURCE],
+  ] as const)
+    expect(code(source), `${name} still calls the deleted mapping`).not.toMatch(/\brecord\(/);
+});
+
+test('11.3 every value refusal in `rows.ts` survived the deletion, one for one', () => {
+  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a
+  // guard for its EXISTENCE; it buys nothing about the VALUE, because
+  // `schema.ts` is a transcription and no check in this tree compares it to the
+  // DDL. A row that deleted these along with the mapping would be trading a
+  // refusal that fires for a type that cannot.
+  const code = stripComments(ROWS_SOURCE, { literals: 'blank' });
+  const READERS = [
+    'readText',
+    'readNullableText',
+    'readInstant',
+    'readBoolean',
+    'readInteger',
+    'readTextArray',
+    'readTradingDay',
+  ] as const;
+  for (const reader of READERS)
+    expect(code, `${reader} was deleted along with the mapping`).toContain(
+      `export function ${reader}`,
+    );
+  // AND EVERY ONE OF THEM STILL REFUSES, ASSERTED PER READER RATHER THAN BY A
+  // TOTAL. A count would have been the wrong instrument twice over: it is a
+  // derivable number written down (`CI-06`), and it passes just as happily when
+  // one reader loses its `throw` and another grows a second one. The property is
+  // "each reader can still refuse", so each reader is read.
+  for (const reader of READERS) {
+    const start = code.indexOf(`export function ${reader}`);
+    const body = code.slice(start, code.indexOf('\n}', start));
+    // A REFUSAL REACHED THROUGH A DELEGATE COUNTS, AND THE FIRST FORM OF THIS
+    // CASE DID NOT SAY SO. It demanded a `throw` in every body and went RED on
+    // `readNullableText`, which has never had one: it returns `null` for an
+    // absent value and hands everything else to `readText`. That is the reader
+    // refusing through the one it delegates to, so the case reads for either.
+    const refuses =
+      body.includes('throw new DigestRowError(') ||
+      READERS.some((other) => other !== reader && body.includes(`${other}(`));
+    expect(refuses, `${reader} can no longer refuse, so the type retired a check`).toBe(true);
+  }
 });

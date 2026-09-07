@@ -3457,13 +3457,13 @@ export type CatalogTableKey = (typeof CATALOG_TABLE_KEYS)[number];
  *      is correct rather than an omission: a JSON document is not a column value
  *      and the type system has nothing to read. The one divergence this value
  *      has actually produced is inside that blob.
- *   4. IT MOVES THREE VERBS AND NOT THE ACCESSOR. `rows`, `rowsWhere`, `rowAt`,
- *      `lockAt` and every `FirmTx` and `SystemTx` read still return `unknown`.
- *      Whether the same treatment is owed to them is NAMED here and NOT RULED:
- *      that is a much larger surface, it has real callers, and it is a separate
- *      row.
+ *   4. IT MOVED THREE VERBS AND NOT THE ACCESSOR, AND ADR-426 THEN MOVED A FOURTH.
+ *      This read "`rows`, `rowsWhere`, `rowAt`, `lockAt` and every `FirmTx` and `SystemTx`
+ *      read still return `unknown`. Whether the same treatment is owed to them is NAMED
+ *      here and NOT RULED: that is a much larger surface, it has real callers, and it is a
+ *      separate row." `RI-14`. `SystemTx.rowsWhere` alone moved; its docblock is the why.
  */
-export type CatalogRow<K extends CatalogTableKey> = (typeof TABLES)[K]['$inferSelect'];
+export type CatalogRow<K extends CatalogTableKey> = DeclaredRow<K>;
 
 /**
  * The runtime half of the narrowness, and it exists because the compile half is
@@ -3771,10 +3771,28 @@ export interface SystemTx extends TxCommon {
   readonly reason: SystemReason;
   rows<K extends TableKey>(key: K): Promise<unknown[]>;
   insert<K extends TableKey>(key: K, values: WriteValues): Promise<unknown[]>;
+  /**
+   * Rows matching a filter, as the rows the key DECLARES (ADR-426).
+   *
+   * **THIS IS `ADR-303` LIMIT 4, SPENT FOR ONE VERB ON ONE HANDLE.** The other
+   * eleven declarations of the four verbs still return `unknown` and
+   * `packages/db/test/limit-4-census.test.ts` watches every one of them. It is
+   * spent here because a PORT followed it in the same commit
+   * (`apps/worker/src/digests/ports.ts`) and a hand-written mapping was deleted
+   * behind it, which is the admission rule ADR-416 set and ADR-421 section 9
+   * priced.
+   *
+   * **THE KEY VOCABULARY IS UNTOUCHED AND THAT IS DELIBERATE.** `K extends
+   * TableKey` is what it always was. ADR-424 section 7 watches a `SystemTx`
+   * whose key vocabulary narrows, because that is the change that stops this
+   * handle satisfying `LiabilityTx` and `AdminSourceTx`; a RETURN that narrows
+   * is assignable to every port that declared `Promise<unknown[]>`, so no
+   * consumer is asked to move.
+   */
   rowsWhere<K extends TableKey, F extends RowFilter<K>>(
     key: K,
     where: NamesAColumn<K, F>,
-  ): Promise<unknown[]>;
+  ): Promise<DeclaredRow<K>[]>;
   rowAt<K extends TableKey, A extends RowAddress<K>>(
     key: K,
     at: NamesAColumn<K, A>,
@@ -4094,8 +4112,16 @@ export function systemTx(
     async rowsWhere<K extends TableKey, F extends RowFilter<K>>(
       key: K,
       where: NamesAColumn<K, F>,
-    ): Promise<unknown[]> {
-      return (await selectStatement(source, key, unscopedFilterPredicate(key, where))) as unknown[];
+    ): Promise<DeclaredRow<K>[]> {
+      // THE CAST MOVED AND DID NOT APPEAR. It read `as unknown[]` on this line
+      // and now reads the row the key declares, which is where `catalogRows`
+      // already puts it: the builder has no projection and no alias, so
+      // Drizzle's select model for `TABLES[key]` IS the row.
+      return (await selectStatement(
+        source,
+        key,
+        unscopedFilterPredicate(key, where),
+      )) as DeclaredRow<K>[];
     },
     async rowAt<K extends TableKey, A extends RowAddress<K>>(
       key: K,
@@ -4514,3 +4540,42 @@ export async function transaction<T>(
     conn.release();
   }
 }
+
+// =============================================================================
+// THE ROW A KEY DECLARES, AND WHY IT IS AT THE FOOT OF A 4,500-LINE FILE
+// =============================================================================
+// **IT BELONGS BESIDE `CatalogRow` AND IT IS HERE INSTEAD, WHICH IS A FINDING
+// AND NOT A PREFERENCE (ADR-426 section 8).** 367 citations of the form
+// `scoped-db.ts:NNNN` stand in this repository over 140 files, `RI-15` and
+// `RI-16` resolve five of them by SYMBOL against this file, and four of those
+// five live under `apps/api/**`. So a line added above `export interface
+// SystemTx` moves a symbol somebody cites and turns two invariants RED in a
+// directory ADR-426's fence forbids it to repair. Appending below the last
+// cited line moves nothing.
+//
+// **THAT IS THE COUPLING WORTH READING RATHER THAN THE PLACEMENT.** A fence may
+// hold `packages/db/src/**` in full and still be unable to add a SENTENCE to
+// the top of this file, because the gate that would fire is satisfiable only in
+// a directory the same fence excludes. ADR-426 section 8 reports it and repairs
+// nothing.
+// =============================================================================
+
+/**
+ * The row a table key declares, for the whole key space.
+ *
+ * {@link CatalogRow} is this type restricted to {@link CatalogTableKey} and is
+ * DEFINED IN TERMS OF IT rather than beside it: two spellings of one expression
+ * is the `FM-16` shape limit 4 itself describes, and ADR-421 found that shape
+ * operating on this very limit's decision record.
+ *
+ * **ALL FOUR OF `CatalogRow`'s LIMITS TRAVEL WITH IT AND THE FIRST IS THE ONE
+ * THAT MATTERS HERE.** A type derived from `schema.ts` is derived from a
+ * TRANSCRIPTION, and ADR-112 foreclosure 4 records that no check in this tree
+ * compares a `schema.ts` column type against the DDL. So a caller reading a
+ * value off one of these rows STILL CHECKS THE VALUE. What the type retires is
+ * the guard for a column's EXISTENCE, and `ADR-299` section 5.1 item 5 is the
+ * ruling that draws that line. `apps/worker/src/digests/rows.ts` is the first
+ * consumer to spend it and it deleted its existence mapping and kept every one
+ * of its refusals.
+ */
+export type DeclaredRow<K extends TableKey> = (typeof TABLES)[K]['$inferSelect'];

@@ -436,6 +436,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-422](ADR-422.md) | the population of what depends on a file is DERIVED rather than defined, a fifth kind is registered before it bites anybody, and the retirement is 21 files to read and 6 to watch rather than 5 (2026-09-07, status: proposed) |
 | [ADR-424](ADR-424.md) | the sentence four entries called unrepaired was wrong in both directions, and the half that was really missing is the money path (2026-09-07, status: proposed) |
 | [ADR-425](ADR-425.md) | the retirement is refused a third time, because the derived population is short by a SEVENTH kind that five rows never ran the gate that sees, and the true delete-breaking set is 51 files rather than 21 (2026-09-07, status: proposed) |
+| [ADR-426](ADR-426.md) | `ADR-303` limit 4 is SPENT for one verb on one handle, and the proof is a hand-written mapping deleted in the same commit (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
