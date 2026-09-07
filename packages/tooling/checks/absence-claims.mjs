@@ -328,6 +328,66 @@ const SWEPT_SCRIPTS = /\.(ts|tsx|mts|mjs|js|sql)$/;
 const SWEEP_WINDOW = 2;
 
 /**
+ * Every `import` and `export` SPECIFIER LIST in a source, emptied.
+ *
+ * ADR-431. THE TWO CALLER PROBES BELOW PROXY A VALUE POSITION WITH PUNCTUATION
+ * -- the name followed by `.`, `,` or `)` -- AND A NAME IN A SPECIFIER LIST IS
+ * FOLLOWED BY A COMMA WHILE BEING A BINDING POSITION AND NOT A VALUE POSITION
+ * AT ALL. ADR-410 section 7 raised it, ADR-415 registered it in `sweptBy` and
+ * was forbidden the repair, and this is the repair.
+ *
+ * IT WAS DEMONSTRATED FIRING BEFORE IT WAS REPAIRED, twice and by two different
+ * routes, because a defect nobody can show firing is a defect nobody can show
+ * fixed. Publishing `TRANSACTION_EVENT_WRITER` from `packages/ledger/src/index.ts`
+ * in a list rather than on a statement of its own turned `event-sink-caller` to
+ * `present` and leg 2 RED at a sentence that is TRUE, with no call added, no
+ * binding published that was not published before, and nobody having edited this
+ * file, the register or the claim site.
+ *
+ * **AND THE LINE BREAK IS NOT THE TRIGGER, WHICH IS WHERE THIS DIFFERS FROM THE
+ * ACCOUNT IT INHERITS.** ADR-415 and the barrel's own comment both say the green
+ * is held by prettier leaving that statement on one line. Measured: the ONE-LINE
+ * form of the same list fires too, because the comma that satisfies the proxy is
+ * the SEPARATOR and arrives with the second name whether or not the statement
+ * wraps. What holds the green is that the list has exactly ONE name. Prettier
+ * reaches the same red from the other side -- a list long enough to wrap gets a
+ * trailing comma under `trailingComma: "all"` -- so the formatter is one route in
+ * and not the only one.
+ *
+ * WHY THIS AND NOT THE OBVIOUS ALTERNATIVES, EACH OF WHICH WAS PRICED. Excluding
+ * the barrel by path is a second exclusion and blinds the probe to a real install
+ * written in a barrel. DROPPING THE PUNCTUATION PROXY ALTOGETHER -- treating any
+ * surviving occurrence as a value, which is tempting because after comments and
+ * specifier lists are gone an identifier really is either a value or a
+ * declaration -- WAS MEASURED AND REFUSED: it reports `present` on FIVE files
+ * under `apps/worker/src` whose refusal strings NAME the writer in order to say
+ * this deployable installs none, and `stripComments` cannot remove a string
+ * literal. That is the same false red arriving through a wider door.
+ *
+ * WHAT IT NO LONGER CATCHES, STATED RATHER THAN DISCOVERED. A file that imports
+ * the name in a MULTI-NAME list and then installs it in a shape the proxy does
+ * not recognise used to read `present` off the import's own comma, by accident;
+ * it now reads `absent`. That backstop was never aimed: the proxy already misses
+ * `const sink = TRANSACTION_EVENT_WRITER;` in a file whose import is on a
+ * statement of its own, so the hole predates this repair and this narrows the
+ * accident rather than the intent. Every install the probes were WRITTEN to
+ * catch -- a call of the factory, the name in an argument, the name under a
+ * member access -- is untouched, and the case below watches all three.
+ *
+ * THE SPAN IS THE BRACE AND NEVER THE LINE, which matters on one line the shipped
+ * tree does not yet carry: an import and an install written as one statement.
+ * Blanking the line would lose the install; blanking the braces cannot.
+ *
+ * @param {string} body  source with its comments already stripped
+ * @returns {string}
+ */
+const BINDING_LIST = /\b(?:import|export)\b(?:\s+type)?\s*(?:[A-Za-z_$][\w$]*\s*,\s*)?\{[^{}]*\}/g;
+
+function withoutBindingLists(body) {
+  return body.replace(BINDING_LIST, (clause) => clause.replace(/\{[^{}]*\}/, '{}'));
+}
+
+/**
  * Every `.sql` file in the migration set, as `{ file, body }`.
  *
  * THROWS ON BOTH FAILURES A PROBE CAN HAVE HERE, and they are different facts.
@@ -798,7 +858,7 @@ export const ABSENCE_ARTIFACTS = [
       const door = 'apps/worker/src/queue.ts';
       for (const rel of files) {
         if (rel === door) continue;
-        const called = stripComments(readFileSync(join(root, rel), 'utf8'))
+        const called = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')))
           .split('\n')
           .some(
             (line) =>
@@ -1182,7 +1242,7 @@ export const ABSENCE_ARTIFACTS = [
       const producer = 'packages/ledger/src/events.ts';
       for (const rel of files) {
         if (rel === producer) continue;
-        const installed = stripComments(readFileSync(join(root, rel), 'utf8'))
+        const installed = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')))
           .split('\n')
           .some(
             (line) =>
