@@ -456,6 +456,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-443](ADR-443.md) | the `GENERATED ALWAYS AS` expression is compared against the DDL for the first time, and ALL FIVE AGREE (2026-09-07, status: proposed) |
 | [ADR-444](ADR-444.md) | a claim about the suite is written ONCE and cited thereafter, because a citation is policed by a shipped invariant and a claim is policed by nothing (2026-09-07, status: proposed) |
 | [ADR-445](ADR-445.md) | the property is TRUE of every INSERT this tree builds, STRUCTURALLY, and FALSE of every UPDATE, and only building the statements could tell them apart (2026-09-07, status: proposed) |
+| [ADR-446](ADR-446.md) | two censuses of one property, written blind to each other, agree to 92 sentences in 169,365, and the one extension that survives adjudication catches the sentence describing why this row was written twice (2026-09-07, status: proposed) |
 | [ADR-447](ADR-447.md) | `live_account_state` is transcribed from `0050`, compared by name because the registry loops cannot reach it, and NOT registered, because `merit_app` holds nothing on it (2026-09-07, status: proposed) |
 <!--/gen-->
 
