@@ -415,6 +415,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-401](ADR-401.md) | the uniqueness condition on `G1` is REFUSED as a gate at 442 of 495 and TAKEN as a condition on the repair at 80; it is NOT the same seam as `ADR-398`'s sub-token defect, which reaches 0 of the named population; the dated census under `git log -S` is 74 repairable against 39 born wrong; and `git log -S` does not name a commit until it names a traversal (2026-09-07, status: proposed) |
 | [ADR-402](ADR-402.md) | the `covers` structuring slice is REFUSED, because it costs 64 pointers nobody may repair to buy a gate whose every finding is false; the 30 of 33 reproduces and is a FLOOR; and `gates.mjs` is not one of the two most cited files in this repository, it is the eighteenth (2026-09-07, status: proposed) |
 | [ADR-403](ADR-403.md) | the four `:35` pointers are CLASS TWO for the second time and the finding is now written beside all four, `CI-06a` has been checking the runbook links all along so nothing binds them because something already does, and `ADR-337:202` is CLASS ONE and repaired to a name (2026-09-07, status: proposed) |
+| [ADR-406](ADR-406.md) | the census the dispatch says was never re-run was re-run three rows ago and reproduces at 74 against 39, hole one is 43 pointers and not 55 and retires on a corrected key, hole two is CLOSED at a cost of four pointers and no dated one, and a pointer into a dependency is undecidable rather than born wrong (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
