@@ -63,6 +63,20 @@ import type {
 //   schedule whose window closed with no `delivered` row is the finding,
 //   evaluated independently of whether any run reported success.
 //
+// ADR-403: THE POINTER ABOVE IS WRONG AND IT IS DELIBERATELY LEFT WRONG.
+// At the commit that wrote this comment, coordinate thirty-five of that
+// runbook held the Tier-1 economic calendar staleness check row, and the
+// Scheduled digest delivery row this slice is about sat one line below it.
+// The pointer was one short on the day it was written. Both rows carry the
+// same house phrase, "It asserts the query, not the job", which occurs five
+// times in that file then and now, so the wrong line read exactly like the
+// claim being made. G1 holds and G2 fails, which is ADR-388 class two, and
+// repair is forbidden: moving the number would convert a record of a check
+// that did not check into a record of one that did. The rule quoted above
+// is unaffected and still true. Only the claim about where it was read is
+// false. The retired coordinate is spelled in words rather than written in
+// backticks, per ADR-388 section 4, so no check reads it as a live pointer.
+//
 // WHAT THIS SUITE IS FOR, ONE SENTENCE PER SECTION.
 //
 //   1. THE BINDS. Every constant is a transcription of `0040` or of an approved
