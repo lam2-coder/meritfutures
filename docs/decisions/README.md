@@ -437,6 +437,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-424](ADR-424.md) | the sentence four entries called unrepaired was wrong in both directions, and the half that was really missing is the money path (2026-09-07, status: proposed) |
 | [ADR-425](ADR-425.md) | the retirement is refused a third time, because the derived population is short by a SEVENTH kind that five rows never ran the gate that sees, and the true delete-breaking set is 51 files rather than 21 (2026-09-07, status: proposed) |
 | [ADR-426](ADR-426.md) | `ADR-303` limit 4 is SPENT for one verb on one handle, and the proof is a hand-written mapping deleted in the same commit (2026-09-07, status: proposed) |
+| [ADR-428](ADR-428.md) | the never-run tests were run, four of nine are green, and the two that are RED were broken by a migration whose own entry found and repaired this exact failure in the two callers CI could see (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
