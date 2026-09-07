@@ -420,6 +420,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-406](ADR-406.md) | the census the dispatch says was never re-run was re-run three rows ago and reproduces at 74 against 39, hole one is 43 pointers and not 55 and retires on a corrected key, hole two is CLOSED at a cost of four pointers and no dated one, and a pointer into a dependency is undecidable rather than born wrong (2026-09-07, status: proposed) |
 | [ADR-407](ADR-407.md) | all four blockers the dispatch names are spent, a fifth stands that it does not name, and the composition file is the one place the four outlived their measurement  (2026-09-07, status: proposed) |
 | [ADR-408](ADR-408.md) | the producer exists and was built five rows ago, what has no producer is the HANDLE, the refusal told its reader the blocker backwards, and the relocation nobody priced costs no manifest edge because three packages already sit in both arrows (2026-09-07, status: proposed) |
+| [ADR-409](ADR-409.md) | four of the runner's five ports are served, a BI event was destroying every `detector_runs` row and is repaired, and the blocker that says every detector declines is false of the one that runs (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
