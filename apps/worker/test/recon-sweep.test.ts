@@ -212,14 +212,14 @@ function reconciliation(
  * the narrowed port those columns ARE `bigint`, so the input each case exists
  * to watch is no longer expressible without casting past the type.
  *
- * **THE CAST STAYS AND SO DOES EVERY REFUSAL, AND THAT IS RULED RATHER THAN
- * PREFERRED.** `ADR-299` section 5.1 item 5: a type derived from a
- * TRANSCRIPTION does not retire a runtime check, and `ADR-112` foreclosure 4
- * records that nothing here compares a `schema.ts` column type against the DDL.
- * The type says "this cannot happen" on an authority nothing verifies. Deleting
- * the cast would delete the case; deleting the refusal would trade a guard that
- * FIRES for a claim nothing checks. **On this slice the guard being traded away
- * would be the one standing between a float and a balance.**
+ * **THE CAST STAYS AND SO DOES EVERY REFUSAL, AND THAT IS RULED RATHER THAN PREFERRED.**
+ * `ADR-299` section 5.1 item 5: a type derived from a TRANSCRIPTION does not retire a runtime
+ * check. This read "`ADR-112` foreclosure 4 records that nothing here compares a `schema.ts`
+ * column type against the DDL." `RI-14` (ADR-444): FALSE when written; stated ONCE at limit 1 of
+ * `CatalogRow` (`packages/db/src/scoped-db.ts:3466`). The type says "this cannot happen" on an
+ * authority stated there. Deleting the cast would delete the case; deleting the refusal would
+ * trade a guard that FIRES for a claim nothing checks. **On this slice the guard being traded
+ * away would be the one standing between a float and a balance.**
  */
 function malformed<R extends object>(row: R, overrides: Readonly<Record<string, unknown>>): R {
   return { ...row, ...overrides } as R;
@@ -767,12 +767,12 @@ describe('7. the handle that can reach both tables', () => {
 // section is that proof for the reconciliation slice, which is the cheapest
 // family still available and the FIRST one whose rows carry money.
 //
-// WHAT IS DELETED IS THE EXISTENCE MAPPING AND NOT ONE REFUSAL. `ADR-299`
-// section 5.1 item 5 rules it: "a type derived from a transcription does not
-// retire a runtime check", and `ADR-112` foreclosure 4 records that nothing in
-// this tree compares a `schema.ts` column type against the DDL. So `asRow()`
-// goes, and every VALUE refusal stays. On this slice one of those refusals is
-// the only thing standing between a `number` and a balance.
+// WHAT IS DELETED IS THE EXISTENCE MAPPING AND NOT ONE REFUSAL. `ADR-299` section 5.1 item 5
+// rules it: "a type derived from a transcription does not retire a runtime check". This read
+// "`ADR-112` foreclosure 4 records that nothing in this tree compares a `schema.ts` column type
+// against the DDL." `RI-14` (ADR-444): FALSE when written; stated ONCE at limit 1 of `CatalogRow`
+// (`packages/db/src/scoped-db.ts:3466`). So `asRow()` goes, and every VALUE refusal stays. On
+// this slice one of those refusals is the only thing standing between a `number` and a balance.
 
 const PORTS_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'ports.ts'), 'utf8');
 const SWEEP_SOURCE = readFileSync(join(HERE, '..', 'src', 'recon', 'sweep.ts'), 'utf8');
@@ -825,11 +825,11 @@ test('8.2 the hand-written existence mapping is DELETED from the slice', () => {
 });
 
 test('8.3 every VALUE refusal survived the deletion, one for one', () => {
-  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a
-  // guard for its EXISTENCE; it buys nothing about the VALUE, because
-  // `schema.ts` is a transcription and nothing compares it to the DDL. A row
-  // that deleted these along with the mapping would be trading a refusal that
-  // fires for a type that cannot -- and here, on money.
+  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a guard for its
+  // EXISTENCE; it buys nothing about the VALUE. This read "`schema.ts` is a transcription and
+  // nothing compares it to the DDL." `RI-14` (ADR-444): FALSE when written; stated ONCE at limit
+  // 1 of `CatalogRow` (`packages/db/src/scoped-db.ts:3466`). A row that deleted these would trade
+  // a refusal that fires for a type that cannot, on money.
   const code = stripComments(SWEEP_SOURCE, { literals: 'blank' });
   const READERS = ['requireString', 'optionalString', 'requireCents'] as const;
   for (const reader of READERS) {

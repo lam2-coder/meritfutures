@@ -1244,12 +1244,12 @@ describe('subject() resolves `plan` at the account s OWN size, through the engin
   });
 
   it('READS THE ROW AND NEVER CASTS IT: every money column is checked at run time', async () => {
-    // **ADR-303 LIMIT 1, WHICH IS THAT DOOR'S OWN SENTENCE AND NOT THIS FILE'S
-    // CAUTION**: `CatalogRow<K>` is derived from `schema.ts`, which is a
-    // TRANSCRIPTION of the DDL, and ADR-112 foreclosure 4 records that nothing in
-    // this tree compares a transcribed column TYPE against the migration. "A
-    // caller that reads money off one of these rows still checks the value it
-    // read." A `number` on a payout basis has already been through a float.
+    // **ADR-303 LIMIT 1, THAT DOOR'S OWN SENTENCE AND NOT THIS FILE'S CAUTION.** This read
+    // "ADR-112 foreclosure 4 records that nothing in this tree compares a transcribed column TYPE
+    // against the migration." `RI-14` (ADR-444): FALSE when written; stated ONCE at limit 1 of
+    // `CatalogRow` (`packages/db/src/scoped-db.ts:3466`). "A caller that reads money off one of
+    // these rows still checks the value it read." A `number` on a payout basis has already been
+    // through a float.
     const { answer } = await subjectOn(
       wholeSeed({ planVersionSize: storedSizeRow({ bufferCents: 50000 }) }),
     );

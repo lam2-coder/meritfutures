@@ -369,16 +369,16 @@ function stateRow(
  * 9_900 }` is now a COMPILE ERROR and the input those cases exist to watch is no
  * longer expressible without casting past the type.
  *
- * **THE CAST STAYS, THE CASES STAY, AND THE REFUSAL STAYS.** The type says "this
- * cannot happen" on the authority of a TRANSCRIPTION that nothing verifies:
- * `ADR-112` foreclosure 4 records that no check in this tree compares a
- * `schema.ts` column type against the DDL. Deleting the cast would delete the
- * case; deleting the refusal would trade a guard that FIRES for a claim nothing
- * checks. **The guard being traded away here is the one standing between a float
- * and the denominator of a loss ratio**, which is `evaluate.ts`'s own stated
- * reason: a `number` arriving there "is a driver or a fake that widened the
- * type, and accepting it would put the whole fold on floating point without a
- * single float literal in the diff".
+ * **THE CAST STAYS, THE CASES STAY, AND THE REFUSAL STAYS.** The type says "this cannot happen"
+ * on the authority of a TRANSCRIPTION. This read "`ADR-112` foreclosure 4 records that no check
+ * in this tree compares a `schema.ts` column type against the DDL." `RI-14` (ADR-444): FALSE when
+ * written; stated ONCE at limit 1 of `CatalogRow` (`packages/db/src/scoped-db.ts:3466`) and not
+ * restated here. Deleting the cast would delete the case; deleting the refusal would trade a
+ * guard that FIRES for a claim nothing checks. **The guard being traded away here is the one
+ * standing between a float and the denominator of a loss ratio**, which is `evaluate.ts`'s own
+ * stated reason: a `number` arriving there "is a driver or a fake that widened the type, and
+ * accepting it would put the whole fold on floating point without a single float literal in the
+ * diff".
  *
  * One helper, one cast, so a future case cannot quietly acquire a bare `as`.
  */
@@ -1352,12 +1352,12 @@ test('9.3 every VALUE refusal survived the deletion, one for one and by subject'
 // opinion about writes: the one call site DISCARDS the value. Case 10.2 is that
 // fact, asserted, so the next row reads it instead of re-deriving it.
 //
-// Case 10.3 is the money half. `plan_breaker_state` is the ONE table this port
-// may write and two of its columns are `*_cents`. A values parameter derived
-// from `schema.ts` would mark a column OPTIONAL wherever the transcription
-// records a default, and nothing in this tree compares a `schema.ts` default
-// against the DDL. These two columns carry none on either side, and this case is
-// what makes that a checked fact rather than a sentence in an entry.
+// Case 10.3 is the money half. `plan_breaker_state` is the ONE table this port may write and two
+// of its columns are `*_cents`. A values parameter derived from `schema.ts` would mark a column
+// OPTIONAL wherever the transcription records a default. This read "nothing in this tree compares
+// a `schema.ts` default against the DDL." `RI-14` (ADR-444): FALSE when written;
+// `scoped-db.test.ts:3217` compares it and it is stated ONCE at limit 1 of `CatalogRow`
+// (`packages/db/src/scoped-db.ts:3466`). These two columns carry none on either side.
 
 const SCHEMA_SOURCE = readFileSync(join(ROOT, 'packages/db/src/schema.ts'), 'utf8');
 const ADAPTER_SUITE = readFileSync(join(ROOT, 'apps/worker/test/breaker-adapter.test.ts'), 'utf8');

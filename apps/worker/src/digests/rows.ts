@@ -23,12 +23,12 @@
 // hands back the row `schema.ts` declares, so every reader below takes the row
 // it was given and the compiler checks the COLUMN NAME against the schema.
 //
-// **WHAT DID NOT MOVE IS EVERY REFUSAL.** `ADR-299` section 5.1 item 5:
-// a type derived from a TRANSCRIPTION does not retire a runtime check, and
-// ADR-112 foreclosure 4 records that nothing in this tree compares a
-// `schema.ts` column type against the DDL. So the type buys the guard for a
-// column's EXISTENCE and buys nothing about its VALUE, and not one `throw`
-// below was deleted with the mapping.
+// **WHAT DID NOT MOVE IS EVERY REFUSAL.** `ADR-299` section 5.1 item 5: a type derived from a
+// TRANSCRIPTION does not retire a runtime check. This read "ADR-112 foreclosure 4 records that
+// nothing in this tree compares a `schema.ts` column type against the DDL." `RI-14` (ADR-444):
+// FALSE when written; stated ONCE at limit 1 of `CatalogRow`
+// (`packages/db/src/scoped-db.ts:3466`). So the type buys the guard for a column's EXISTENCE and
+// buys nothing about its VALUE, and not one `throw` below was deleted with the mapping.
 // =============================================================================
 
 /** Raised when a row crossing a port is not the shape the column declares. */

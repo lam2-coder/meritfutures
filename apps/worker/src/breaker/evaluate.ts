@@ -133,16 +133,16 @@ export class BreakerRowError extends Error {
  * `ADR-426` deleted one family over. The cast is gone because
  * {@link BreakerTx.rowsWhere} now hands back the row the key declares.
  *
- * **THE `throw` STAYS, AND IT STAYS ON A RULING RATHER THAN ON TASTE.**
- * `ADR-299` section 5.1 item 5: a type derived from a TRANSCRIPTION does not
- * retire a runtime check, and `ADR-112` foreclosure 4 records that nothing in
- * this tree compares a `schema.ts` column type against the DDL. `DeclaredRow`
- * buys the column's EXISTENCE and buys nothing about the row's ARRIVAL: the
- * adapter reaches the accessor through `key as never`, and a driver or a fake
- * that handed back `null` would reach {@link readCents} and raise a `TypeError`
- * on a money column instead of a refusal that names the row. **`ADR-426` and
- * `ADR-430` both dropped this check when they deleted their mapping. This row
- * keeps it**, because what it guards here is the denominator of a loss ratio.
+ * **THE `throw` STAYS, AND IT STAYS ON A RULING RATHER THAN ON TASTE.** `ADR-299` section 5.1
+ * item 5: a type derived from a TRANSCRIPTION does not retire a runtime check. This read
+ * "`ADR-112` foreclosure 4 records that nothing in this tree compares a `schema.ts` column type
+ * against the DDL." `RI-14` (ADR-444): FALSE when written; what this tree compares is stated ONCE
+ * at limit 1 of `CatalogRow` (`packages/db/src/scoped-db.ts:3466`) and is not restated here.
+ * `DeclaredRow` buys the column's EXISTENCE and buys nothing about the row's ARRIVAL: the adapter
+ * reaches the accessor through `key as never`, and a driver or a fake that handed back `null`
+ * would reach {@link readCents} and raise a `TypeError` on a money column instead of a refusal
+ * that names the row. **`ADR-426` and `ADR-430` both dropped this check when they deleted their
+ * mapping. This row keeps it**, because what it guards here is the denominator of a loss ratio.
  */
 function requireRow<R extends object>(value: R, where: string): R {
   if (typeof value !== 'object' || value === null || Array.isArray(value))

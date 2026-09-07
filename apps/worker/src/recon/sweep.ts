@@ -379,13 +379,13 @@ export function compareBalances(candidate: ReconCandidate): ReconVerdict {
  * `ReconTx.rowsWhere` hands back the row the key declares, so the three readers
  * below take that row directly.
  *
- * **`field` IS `keyof R & string` AND THAT IS THE WHOLE PURCHASE.** A column
- * name used to be any string at all and reached the row through an index
- * signature; `tsc` now checks each one against `schema.ts`. **IT CHECKS THE
- * NAME AND NOTHING ELSE.** `ADR-299` section 5.1 item 5 rules that a type
- * derived from a TRANSCRIPTION retires no runtime check, and `ADR-112`
- * foreclosure 4 records that nothing in this tree compares a `schema.ts` column
- * type against the DDL. So every refusal below is unchanged, and on this slice
+ * **`field` IS `keyof R & string` AND THAT IS THE WHOLE PURCHASE.** A column name used to be any
+ * string at all and reached the row through an index signature; `tsc` now checks each one against
+ * `schema.ts`. **IT CHECKS THE NAME AND NOTHING ELSE.** `ADR-299` section 5.1 item 5 rules that a
+ * type derived from a TRANSCRIPTION retires no runtime check. This read "`ADR-112` foreclosure 4
+ * records that nothing in this tree compares a `schema.ts` column type against the DDL." `RI-14`
+ * (ADR-444): FALSE when written; stated ONCE at limit 1 of `CatalogRow`
+ * (`packages/db/src/scoped-db.ts:3466`). So every refusal below is unchanged, and on this slice
  * that matters more than it did one directory over: these rows carry money.
  */
 function requireString<R extends object>(key: string, row: R, field: keyof R & string): string {

@@ -675,16 +675,16 @@ test('4.15 an outcome 0040 does not admit is refused rather than counted as not-
   );
 });
 
-// **THIS CASE NOW NEEDS A CAST TO SAY WHAT IT ALWAYS SAID, AND THAT IS ADR-426's
-// SHARPEST FINDING RATHER THAN A NUISANCE.** Under the narrowed port `dueAt` IS
-// a `Date`, so a string in that slot is a compile error and the malformed input
-// this case exists to watch is no longer expressible without casting past the
-// type. The cast stays and the case stays, because the type says "this cannot
-// happen" on the authority of a TRANSCRIPTION: `ADR-112` foreclosure 4 records
-// that no check in this tree compares a `schema.ts` column type against the DDL,
-// and `ADR-299` section 5.1 item 5 rules that such a type does not retire a
-// runtime check. Deleting either the cast or the refusal would be trading a
-// guard that fires for a claim nothing verifies.
+// **THIS CASE NOW NEEDS A CAST TO SAY WHAT IT ALWAYS SAID, AND THAT IS ADR-426's SHARPEST FINDING
+// RATHER THAN A NUISANCE.** Under the narrowed port `dueAt` IS a `Date`, so a string in that slot
+// is a compile error and the malformed input this case exists to watch is no longer expressible
+// without casting past the type. The cast stays and the case stays, because the type says "this
+// cannot happen" on the authority of a TRANSCRIPTION. This read "`ADR-112` foreclosure 4 records
+// that no check in this tree compares a `schema.ts` column type against the DDL." `RI-14`
+// (ADR-444): FALSE when written; stated ONCE at limit 1 of `CatalogRow`
+// (`packages/db/src/scoped-db.ts:3466`). `ADR-299` section 5.1 item 5 rules that such a type does
+// not retire a runtime check, and deleting either the cast or the refusal would trade a guard
+// that fires for a claim nothing verifies.
 test('4.16 a `due_at` that is not a Date is refused, because Invalid Date compares false', () => {
   expect(() =>
     foldWindows(
@@ -1453,11 +1453,11 @@ test('11.2 the hand-written existence mapping is DELETED from the slice', () => 
 });
 
 test('11.3 every value refusal in `rows.ts` survived the deletion, one for one', () => {
-  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a
-  // guard for its EXISTENCE; it buys nothing about the VALUE, because
-  // `schema.ts` is a transcription and no check in this tree compares it to the
-  // DDL. A row that deleted these along with the mapping would be trading a
-  // refusal that fires for a type that cannot.
+  // `ADR-299` SECTION 5.1 ITEM 5. The narrowing buys reading a column without a guard for its
+  // EXISTENCE; it buys nothing about the VALUE. This read "`schema.ts` is a transcription and no
+  // check in this tree compares it to the DDL." `RI-14` (ADR-444): FALSE when written; stated
+  // ONCE at limit 1 of `CatalogRow` (`packages/db/src/scoped-db.ts:3466`). A row that deleted
+  // these along with the mapping would trade a refusal that fires for a type that cannot.
   const code = stripComments(ROWS_SOURCE, { literals: 'blank' });
   const READERS = [
     'readText',
