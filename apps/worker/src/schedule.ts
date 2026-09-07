@@ -416,7 +416,7 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'that the repair is a read on `packages/db` and is owed BEFORE this audit runs nightly. ' +
       'FOUR, THE DEAD-MAN SWITCH WOULD HAVE NOTHING TO WATCH. CRON_INVENTORY`s row for this ' +
       'job fires on `replay.audit_completed` absent, and that name is in neither the ten-name ' +
-      '`EVENT_CATALOGUE` (`apps/api/src/events.ts:382`) nor EVENTS.md, so a scheduled run`s ' +
+      '`EVENT_CATALOGUE` (`packages/ledger/src/events.ts`) nor EVENTS.md, so a scheduled run`s ' +
       'completion would be invisible to an S1 switch that gates payout eligibility and M12 ' +
       'publication both. ' +
       'AND THE CLAUSE THAT STOOD HERE REPORTED THE INVENTORY UNREPAIRED AND OUTSIDE THE FENCE, ' +
@@ -497,7 +497,7 @@ export const WORKER_JOB_ENTRY_POINTS: readonly WorkerJobEntryPoint[] = [
       'ITS CORRECTION per RI-14, NAMED RATHER THAN RE-QUOTED (ADR-367): the retired figure is ' +
       'the TWO. `DetectorEventName` (`detectors/ports.ts:527`) is three names and EXACTLY ONE ' +
       'of them, `detector.run_degraded`, is absent from the ten `EVENT_CATALOGUE` carries ' +
-      '(`apps/api/src/events.ts:382`), which is what `buildEvent` (`:692`) refuses on under ' +
+      '(`packages/ledger/src/events.ts`), which is what `buildEvent` refuses on under ' +
       'ADR-159 clause 1. `flag.raised` and `detector.run_completed` are both rows. THE BLOCKER ' +
       'DOES NOT MOVE, because no sink is reachable from here at all and the count only ever ' +
       'mattered to the counterfactual. `runner.ts` emits INSIDE the write transaction ' +

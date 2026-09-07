@@ -525,7 +525,7 @@ describe('6. what this adapter does NOT discharge', () => {
   it('6.2 the event name this code emits is in NO catalogue and NO registry row', () => {
     // **THE DIVERGENCE, PINNED AS AN ASSERTION RATHER THAN ONLY AS PROSE.**
     // ADR-352 section 5 names it and does not rule it.
-    const catalogue = read('apps/api/src/events.ts');
+    const catalogue = read('packages/ledger/src/events.ts');
     const body = catalogue.slice(catalogue.indexOf('export const EVENT_CATALOGUE'));
     const names = [...body.matchAll(/^ {2}'([a-z_]+\.[a-z_]+)':/gm)].map((m) => m[1] ?? '');
     // TEN, DERIVED AT THE MOMENT THIS RUNS rather than carried from a prior run.

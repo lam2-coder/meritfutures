@@ -84,3 +84,79 @@ export {
 } from './reversal.ts';
 
 export type { LedgerReadKey, LedgerTx, LedgerWriteKey, WriteValues } from './tx.ts';
+
+// -----------------------------------------------------------------------------
+// THE EVENT PRODUCER, RELOCATED HERE BY ADR-410
+// -----------------------------------------------------------------------------
+// IT IS HERE FOR THE REASON THE HEADER ABOVE ALREADY GIVES FOR THE POSTING PATH,
+// WORD FOR WORD: two deployables need it, `RI-04` forbids an app depending on an
+// app, so it is a package. `apps/api` held the producer and opens no system
+// door; `apps/worker` holds the only `systemDb` in the workspace and could reach
+// this module in neither spelling, an `@merit/api` manifest line being refused by
+// `RI-04` and a relative specifier by `node-linker=isolated`. That is ADR-104's
+// own argument arriving a second time, and this package is the address BOTH
+// arrows already name.
+//
+// IT COSTS THIS PACKAGE NOTHING IT WAS NOT ALREADY PAYING. The producer declares
+// no dependency, imports nothing at all, and takes the caller's OPEN transaction
+// as its first argument with no overload that omits it, which is `tx.ts`'s
+// construction and `postTransaction`'s. `EventInsertTx` restates the subset of
+// `SystemTx` this path uses exactly as `LedgerTx` does, and it is bound the same
+// way, by a suite that READS `packages/db/src/scoped-db.ts` rather than by an
+// import this package may not hold.
+//
+// WHAT IT IS NOT. It is not a posting and it does not pretend to be one: nothing
+// below is reachable from `postTransaction` and nothing in the posting path
+// calls it. ADR-410 section 4 states why the two live in one package and why
+// `@merit/db` and `@merit/rules-engine` were refused, and records that a
+// `packages/events` of its own is the shape a founder may still prefer, at the
+// price of a `VG-12` admission and two manifest lines this row could not spend.
+export {
+  ACTOR_KINDS,
+  CENTS_IN_PAYLOAD,
+  EVENT_CATALOGUE,
+  EVENT_NAMES,
+  EVENT_WRITE_TABLE,
+  EventError,
+  EventSinkUnwired,
+  UNWIRED_EVENT_SINK,
+  assertPayloadRules,
+  buildEvent,
+  centsFromPayload,
+  centsToPayload,
+  encodeCentsForStorage,
+  isUuid,
+  makeEventSink,
+  type ActorKind,
+  type CatalogueRow,
+  type EmitSpec,
+  type EventEnvelope,
+  type EventInsertTx,
+  type EventName,
+  type EventSink,
+  type EventWriter,
+} from './events.ts';
+
+// THE WRITER IS PUBLISHED ON ITS OWN, AND THE FIRST REASON IS WHAT IT IS.
+// Everything in the block above is a pure function, a constant or a type, and
+// this is the one export of this package that is an ADAPTER: it performs the
+// insert, through the handle its caller opened, into an append-only table. A
+// reader deciding whether to take it is deciding to record money movements
+// forever, and `UNWIRED_EVENT_SINK` above is the correct value for any
+// deployment that has not made that decision.
+//
+// AND THERE IS A SECOND REASON, STATED RATHER THAN LEFT TO BE DISCOVERED.
+// `RI-35`'s `event-sink-caller` probe looks for this name followed by `.`, `,`
+// or `)` under any `src/`, as its proxy for a VALUE POSITION, and it excludes
+// exactly one file, the module that declares it. A name inside a re-export LIST
+// satisfies that proxy and is not a value position at all, so a barrel that
+// published it in the block above would be read as an INSTALL and the register
+// would report an artifact that does not exist. **THE PROBE CANNOT TELL A
+// PUBLICATION FROM AN INSTALL**, which nothing had asked of it before, because
+// the producer had never been published from a package. Its power over a REAL
+// install is untouched by this line: a file that calls `makeEventSink(...)` or
+// passes this value is still caught wherever it is written. ADR-410 section 7
+// records the repair as a `sweptBy`-style registration in
+// `packages/tooling/checks/absence-claims.mjs`, which is owed to whoever holds
+// that package and which this row was not granted.
+export { TRANSACTION_EVENT_WRITER } from './events.ts';

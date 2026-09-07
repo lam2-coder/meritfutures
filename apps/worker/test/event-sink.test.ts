@@ -57,7 +57,7 @@
 // 4b IS WHAT DID NOT MOVE: this deployable's own emit is a field short of the
 // amended row, so the name is accepted and the emit would still be refused.
 //
-//   apps/api/src/events.ts               EVENT_CATALOGUE's keys, read as text
+//   packages/ledger/src/events.ts        EVENT_CATALOGUE's keys, read as text
 //   apps/worker/src/**                   the call sites and the specifiers
 //
 // Both are read rather than restated, which is `expiry.test.ts`'s idiom two
@@ -78,7 +78,7 @@ import type { ApprovalEventName } from '../src/withdrawals/ports.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '..', 'src');
-const API_EVENTS_TS = resolve(HERE, '..', '..', 'api', 'src', 'events.ts');
+const PRODUCER_TS = resolve(HERE, '..', '..', '..', 'packages', 'ledger', 'src', 'events.ts');
 
 /** Every `.ts` file under this deployable's `src`, by absolute path. */
 function sources(dir: string = SRC): string[] {
@@ -219,7 +219,7 @@ test('no relative specifier under src resolves outside apps/worker', () => {
 // than blinding the assertion below it.
 
 function catalogueNames(): string[] {
-  const text = readFileSync(API_EVENTS_TS, 'utf8');
+  const text = readFileSync(PRODUCER_TS, 'utf8');
   const start = text.indexOf('export const EVENT_CATALOGUE = {');
   expect(start).toBeGreaterThan(-1);
   const end = text.indexOf('\n} as const satisfies', start);
