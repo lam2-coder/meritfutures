@@ -244,14 +244,22 @@ export interface EligibleFoldIo {
    * **IT IS NOT `resolvePlan` ITSELF.** The engine's resolver takes a decoded
    * `PlanRulesJson` and a decoded `PlanVersionSizeRow`, so the port is drawn
    * around the read and the decode together, and `apps/worker`'s
-   * `resolvePinnedPlan` has that SHAPE on a handle no caller here can hold.
+   * `resolvePinnedPlan` has that SHAPE, and since `ADR-416` so does this
+   * deployable's own, on a handle a caller here CAN hold.
    *
    * **THE CLAUSE NAMING WHAT WAS MISSING IS FALSE AND IS QUOTED RATHER THAN
    * DELETED (`ADR-283`).** It read that "what is missing in `apps/api` is the
    * DECODING". `decodePlanRules` is exported from `@merit/rules-engine`, this
    * deployable declares that package, and `payout-backend.ts` calls it. What is
-   * missing is a COMPOSITION of the decode with the size read, and `ADR-413`
-   * measures its home as a `packages/db` door rather than an export one file over.
+   * missing was a COMPOSITION of the decode with the size read, `ADR-413`
+   * measured its home as a `packages/db` door rather than an export one file
+   * over, and `ADR-416` took that door. **THE PORT SURVIVES ITS OWN SUPPLIER AND
+   * IS NOT REPLACED BY A CALL**, which is the shape decision worth keeping:
+   * `pinned-plan.ts` satisfies this interface for a deployment that composes it,
+   * and a deployment that composes nothing still meets
+   * {@link EligibleFoldUnwired} by name rather than a plausible plan. Injecting
+   * it also keeps the unit of work the SUPPLIER's, which is why this signature
+   * takes no transaction.
    */
   resolvePinnedPlan(planVersionId: string, sizeCents: Cents): Promise<ResolvedPlan>;
 }

@@ -57,10 +57,13 @@ import {
 } from '../src/index.ts';
 import {
   scopedTx,
+  systemTx,
   uniqueKeys,
+  type CatalogReadTx,
   type CatalogRow,
   type ScopedTx,
   type StatementSource,
+  type SystemTx,
 } from '../src/scoped-db.ts';
 
 const IDENTITY = 'i-buyer' as IdentityId;
@@ -530,5 +533,137 @@ describe('the return is the declared row and no refusal moved (ADR-303)', () => 
       await expect(run, verb).rejects.toThrow(/is not a table a scoped transaction may read/);
       expect(sent, `${verb} built a statement`).toHaveLength(0);
     }
+  });
+});
+
+// =============================================================================
+// THE SECOND HANDLE, AND THE MEASUREMENT THAT SAYS IT REACHES NOTHING NEW
+// (ADR-416)
+// =============================================================================
+// `ADR-413` measured that `catalogRowAt` sat on `ScopedTx` ALONE, that an admin
+// read holds a `SystemTx`, and that the consequence was a composition on the
+// money path with a caller that could not produce its first argument. It named
+// the remedy as a `packages/db` door rather than an export and did not take it,
+// because that package was not in its fence.
+//
+// **THE DOOR IS TAKEN HERE AND THE ARGUMENT FOR IT IS A MEASUREMENT RATHER THAN
+// A PREFERENCE.** `SystemTx.rowAt` is generic over `TableKey`, every
+// `CatalogTableKey` is a `FirmTableKey` and every `FirmTableKey` is a
+// `TableKey`, so both `planVersions` and `plan_version_sizes` were ALREADY
+// readable on this handle. What was missing was never the reach. It was the
+// RETURN TYPE, and the price of the missing type was that every reader on this
+// side wrote the engine's `PlanVersionSizeRow` mapping again, which `ADR-303`
+// limit 2 registers as a per-caller `FM-16` on the blob that fixes every cents
+// threshold a payout is decided against.
+//
+// SO THE TWO CASES BELOW ARE THE TWO HALVES OF ONE CLAIM: the new method reads
+// exactly what the old one read (no reach added), and it refuses exactly what
+// the old one accepted (vocabulary narrowed).
+
+/**
+ * BOTH HANDLES SATISFY THE SHAPE, CHECKED BY `tsc` AND NOT BY A SENTENCE.
+ *
+ * `SystemTx` gets the member by extending {@link CatalogReadTx} and `ScopedTx`
+ * declares it inline, which is an asymmetry `scoped-db.ts` states a reason for.
+ * The cost of that asymmetry is that ONE signature could drift into TWO, and
+ * this is what stops it: a `ScopedTx` that stopped satisfying the shape is
+ * `TS2322` here.
+ */
+const BOTH_HANDLES_READ_THE_CATALOGUE: readonly [
+  (tx: ScopedTx) => CatalogReadTx,
+  (tx: SystemTx) => CatalogReadTx,
+] = [(tx) => tx, (tx) => tx];
+
+/**
+ * The system handle hands back the DECLARED ROW, at a call site.
+ *
+ * Compiled and never called, on `theVerbsHandBackDeclaredRows`' own reason: every
+ * line is an assignment `unknown` would refuse. This is the whole of what the
+ * door buys a caller, so it is asserted in the form a caller meets it.
+ */
+async function theSystemHandleReadsDeclaredRows(tx: SystemTx): Promise<void> {
+  const one: PlanVersionSizeCatalogRow | undefined = await tx.catalogRowAt('planVersionSizes', {
+    planVersionId: 'pv-1',
+    sizeCents: 5_000_000n,
+  });
+  const cents: bigint | undefined = one?.drawdownCents;
+  // AND `rowAt` ON THE SAME HANDLE AND THE SAME ADDRESS IS STILL `unknown`,
+  // which is `ADR-303` limit 4 standing exactly where it stood: this row took
+  // ONE verb and left the other four alone.
+  const untyped: unknown = await tx.rowAt('planVersionSizes', {
+    planVersionId: 'pv-1',
+    sizeCents: 5_000_000n,
+  });
+  void cents;
+  void untyped;
+}
+
+describe('the catalogue read reaches a second handle, and adds no reach (ADR-416)', () => {
+  test('the type cases above are compiled, and this test says so out loud', () => {
+    expect(BOTH_HANDLES_READ_THE_CATALOGUE).toHaveLength(2);
+    expect(typeof theSystemHandleReadsDeclaredRows).toBe('function');
+  });
+
+  test('`catalogRowAt` and `rowAt` issue the SAME statement on a system handle', async () => {
+    // THE CLAIM WITH THE TEETH, AND IT IS DERIVED OVER EVERY MEMBER RATHER THAN
+    // SAMPLED AT ONE. If these two ever diverge, the docblock's argument for
+    // admitting the method -- that it narrows an existing read instead of
+    // opening a new one -- has stopped being true, and a reader deciding whether
+    // this door widened the operator console needs to find that out here.
+    let compared = 0;
+    for (const key of CATALOG_TABLE_KEYS) {
+      const at = addressFor(key);
+      if (at === undefined) continue;
+      const typed = recording();
+      const untyped = recording();
+      await systemTx(typed.source, stubConn(), 'operator-console').catalogRowAt(key, at as never);
+      await systemTx(untyped.source, stubConn(), 'operator-console').rowAt(key, at as never);
+      expect(typed.sent, key).toHaveLength(1);
+      expect(untyped.sent, key).toHaveLength(1);
+      expect(typed.sent[0]?.sql, key).toBe(untyped.sent[0]?.sql);
+      expect(typed.sent[0]?.params, key).toStrictEqual(untyped.sent[0]?.params);
+      compared += 1;
+    }
+    // NON-VACUITY, on this suite's own rule: a loop whose body never ran reports
+    // agreement it never checked.
+    expect(compared).toBe(CATALOG_TABLE_KEYS.length);
+  });
+
+  test('and it REFUSES every key outside the list that `rowAt` accepts', async () => {
+    // THE OTHER HALF. `refuseUncatalogued` is the one thing the new method adds
+    // at run time, and what it adds is a REFUSAL: a `SystemTx` may still read
+    // `treasury_balances` through `rowAt`, and may not reach it through this
+    // verb. A door that narrowed nothing would pass the case above and fail
+    // this one.
+    let refused = 0;
+    const catalogue = new Set<string>(CATALOG_TABLE_KEYS);
+    for (const key of TABLE_KEYS) {
+      if (catalogue.has(key)) continue;
+      const { source, sent } = recording();
+      const tx = systemTx(source, stubConn(), 'operator-console');
+      await expect(
+        tx.catalogRowAt(key as CatalogTableKey, { id: 'x' } as never),
+        key,
+      ).rejects.toThrow(/is not a table a scoped transaction may read/);
+      // AND IT BUILT NOTHING, so the refusal is before the statement rather
+      // than after it.
+      expect(sent, `${key} built a statement`).toHaveLength(0);
+      refused += 1;
+    }
+    expect(refused).toBe(TABLE_KEYS.length - CATALOG_TABLE_KEYS.length);
+    expect(refused).toBeGreaterThan(0);
+  });
+
+  test('the system handle carries ONE catalogue verb and not the other two', () => {
+    // `catalogRows` AND `catalogRowsWhere` ARE ABSENT RATHER THAN UNUSED, which
+    // is `ScopedTx`'s own rule applied to this admission: a primitive admitted
+    // before a caller exists is a primitive nobody can remove. A whole-table
+    // catalogue read at `'operator-console'` is a separate decision and this
+    // case is where somebody taking it will land.
+    const tx = systemTx(recording().source, stubConn(), 'operator-console');
+    const verbs = Object.keys(tx)
+      .filter((name) => name.startsWith('catalog'))
+      .sort();
+    expect(verbs).toStrictEqual(['catalogRowAt']);
   });
 });

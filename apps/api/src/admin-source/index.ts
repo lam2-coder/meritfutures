@@ -179,15 +179,31 @@
 //   creates `reconciliation_runs`, session 387 wrote its first producer, and
 //   `readRecon` dates the leaf off the newest completed run
 //
-// **A FIFTH BLOCKER STANDS AND IT IS WHY THE COMPOSITION BELOW IS UNCHANGED.**
-// `liability.ts`'s `B5` is `eligible_next_7d`'s per-account half, and its two
-// terms are `EligibleFoldIo.resolvePinnedPlan`, injected and refusing by name
-// because nothing under any `src/` in this deployable supplies it, and a wire
-// that can say the figure is a FORECAST, which `EligibleNext7d` cannot because
-// `total_cents`, `account_count` and `by_day` are the whole of its declaration.
-// The group goes whole or not at all (`EC-074`), so neither term alone suffices.
+// **A FIFTH BLOCKER STANDS, ONE OF ITS TWO TERMS IS SPENT, AND THE COMPOSITION
+// BELOW IS UNCHANGED BECAUSE THE OTHER IS NOT.** `liability.ts`'s `B5` is
+// `eligible_next_7d`'s per-account half. Term 1 was
+// `EligibleFoldIo.resolvePinnedPlan`, injected and refusing by name because
+// nothing under any `src/` supplied it; `ADR-416` supplied it in
+// `pinned-plan.ts`, over the `packages/db` door `ADR-413` named and the export
+// `payout-backend.ts` now carries at `ADR-413` section 7's own seam. Term 2 is a
+// wire that can say the figure is a FORECAST, which `EligibleNext7d` cannot
+// because `total_cents`, `account_count` and `by_day` are the whole of its
+// declaration, and it is bound in the three copies `RI-18` holds, so it moves
+// atomically and by a founder's ruling rather than by this directory.
+// **THE GROUP GOES WHOLE OR NOT AT ALL (`EC-074`), SO ONE TERM SPENT RETURNS NO
+// FIGURE**, and a `readLiability` composed now would answer a 500 where
+// `composeAdminReadSource` already answers a named, synchronous refusal.
 // `test/admin-source-liability.test.ts` holds that condition with both terms and
 // `RI-19` compares it against the module's copy in both directions.
+//
+// **`pinned-plan.ts` IS IN THIS DIRECTORY AND IS NOT AN ARM OF THE COMPOSITION
+// BELOW.** It implements no `AdminReadSource` method; it supplies a PORT that
+// the `eligible_next_7d` fold takes, and the fold itself is still called by
+// nothing here. So {@link IMPLEMENTED_ADMIN_READS} does not move, the three-line
+// append this header describes is not taken, and the wiring triple is untouched.
+// A module in this directory that is not a read is a shape worth naming, because
+// the next reader counting files against that array will otherwise find one
+// more file than names.
 //
 // **THE FOUR SPENT BLOCKERS WERE NOT CLEARED BY THIS FENCE AND NEITHER IS THE
 // FIFTH THIS FENCE'S TO CLEAR**, so the composition below is unchanged: a method

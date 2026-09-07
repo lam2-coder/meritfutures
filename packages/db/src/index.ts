@@ -199,6 +199,21 @@ export {
 // nobody can enumerate is a narrowness nobody can watch shrink.
 export { CATALOG_TABLE_KEYS, type CatalogTableKey } from './scoped-db.ts';
 
+// AND THE HANDLE SHAPE THAT READ SITS ON, WHICH IS ADR-416 AND IS NOT A SIXTH
+// DOOR EITHER.
+//
+// `CatalogReadTx` NAMES A CAPABILITY AND YIELDS NO CONNECTION, so it is a type
+// in the sense `apps/api/test/db.test.ts` measures: "a type buys no capability
+// ... a case that failed on one would be asserting a house style rather than an
+// authority". `ScopedTx` and `SystemTx` both satisfy it, which is what lets ONE
+// composition serve the payout transaction and the operator console without
+// either of them restating the mapping the other already holds.
+//
+// `CatalogRow` TRAVELS WITH IT because a caller that may not name the row it was
+// handed is a caller that writes its own shape for it, and a second shape for
+// one catalogue row is the `FM-16` this door exists to avoid.
+export type { CatalogReadTx, CatalogRow } from './scoped-db.ts';
+
 export { atLeast, atMost, isFilterTerm, isNull, type FilterTerm } from './scoped-db.ts';
 
 export {

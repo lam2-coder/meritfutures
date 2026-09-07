@@ -759,7 +759,7 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   // `EligibleNext7d` cannot because `total_cents`, `account_count` and
   // `by_day` are the whole of its declaration. Either one alone leaves this
   // group unproducible, and the group goes whole or not at all (EC-074).
-  it('CLEARING CONDITION: a supplier of `resolvePinnedPlan`, and a wire that says forecast', () => {
+  it('CLEARING CONDITION: term 1 is SPENT, term 2 STANDS, and the group is not returned', () => {
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
     );
@@ -843,15 +843,27 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(payoutBackend).toContain('decodePlanRules(version.rules,');
     expect(payoutBackend).toContain('return resolvePlan(rules, sizeRow);');
 
-    // SO THE TERM IS THE COMPOSITION AND NOT THE DECODER, AND IT IS UNSUPPLIED.
-    // Asserted as a CENSUS over this deployable's own source rather than at one
-    // file, because the port is satisfied by whoever composes the fold and a
-    // one-file read would miss a supplier written anywhere else under `src/`.
+    // **TERM 1 IS SPENT AND THE CENSUS IS WHERE THAT IS RECORDED (`ADR-416`).**
+    // It read exactly one file, the fold's own port and its refusing default,
+    // and its comment said a supplier "would have to read the size row, and the
+    // handle this module holds cannot address one". That is no longer true and
+    // the reason is one door: `catalogRowAt` reaches `SystemTx` since `ADR-416`,
+    // `payout-backend.ts` exports the composition at the seam `ADR-413` named,
+    // and `admin-source/pinned-plan.ts` hands it the handle its caller is
+    // already inside.
+    //
+    // STILL A CENSUS AND STILL DERIVED, because the property worth holding has
+    // inverted rather than disappeared: it used to be "nobody supplies this" and
+    // it is now "these three files and no fourth". A second supplier is the
+    // shape that would put a second `PlanVersionSizeRow` mapping in this
+    // deployable, which the case below this one refuses as a run.
     const suppliers = sourceFilesUnder(join(ROOT, 'apps/api/src')).filter((file) =>
       /resolvePinnedPlan\s*[:(]/.test(readFileSync(file, 'utf8')),
     );
     expect(suppliers.map((file) => relative(ROOT, file)).sort()).toStrictEqual([
       'apps/api/src/admin-source/eligible-next-7d.ts',
+      'apps/api/src/admin-source/pinned-plan.ts',
+      'apps/api/src/payout-backend.ts',
     ]);
 
     const foldModule = readFileSync(
@@ -859,11 +871,27 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
       'utf8',
     );
     expect(foldModule).toContain('resolvePinnedPlan(planVersionId: string, sizeCents: Cents)');
-    // THE ONE OCCURRENCE IS THE PORT AND ITS REFUSING DEFAULT, never a body
-    // that resolves a plan. A supplier would have to read the size row, and the
-    // handle this module holds cannot address one.
+    // THE REFUSING DEFAULT SURVIVES THE SUPPLIER AND IS NOT DELETED BY IT. A
+    // deployment that composes no supplier still meets `EligibleFoldUnwired` by
+    // name rather than a plausible plan, which is the property that protects
+    // every deployment except the one that wired it.
     expect(foldModule).toContain('throw new EligibleFoldUnwired');
+    // AND THE FOLD STILL DECODES NOTHING, which is what the port was drawn
+    // around. `schema_version` is the first key of the stored blob and its
+    // absence here is the module not having grown a decoder.
     expect(foldModule).not.toContain('schema_version');
+    // THE SUPPLIER IS A DELEGATION AND STATES NO ROW OF ITS OWN, asserted at the
+    // file rather than inferred from the census: it names the payout path's
+    // composition, and it does not name the engine's row type at all.
+    const supplier = readFileSync(join(ROOT, 'apps/api/src/admin-source/pinned-plan.ts'), 'utf8');
+    expect(supplier).toContain("import { resolvePinnedPlan } from '../payout-backend.ts';");
+    // READ AT THE MAPPING AND NOT AT THE WORD, which is this suite's own rule
+    // one file over: the header of that module NAMES `PlanVersionSizeRow` in
+    // order to say it does not write one, and a control that reds on a comment
+    // is a control somebody deletes the comment to satisfy. `PlanVersionSizeRow = {`
+    // is the mapping itself and is the marker the census below uses.
+    expect(supplier).not.toContain('PlanVersionSizeRow = {');
+    expect(supplier).not.toContain('decodePlanRules(');
     // READ AT THE DECLARATION AND NOT OVER THE FILE, because the term above
     // NAMES `catalogRowAt` in prose and a whole-file read would be asserting
     // against its own sentence.
@@ -906,12 +934,17 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   // condition's premises AT THEIR PRIMARY SOURCES. The premise it added was
   // reachability of the DECODER, which is true. The premise it did not add is
   // reachability of the HANDLE, and that is the one the price turned on.
-  it('TERM 1: `catalogRowAt` is declared on `ScopedTx` and on no other handle', () => {
-    // DERIVED OVER THE DECLARATIONS AND STORING NO HANDLE NAME BUT THE ONE IT
-    // ASSERTS. The day a catalogue accessor lands on a second handle this case
-    // goes red, AND THAT DAY IS THE DAY TERM 1 BECOMES TAKEABLE: the whole of
-    // what stands between this fold and the composition is that the door it
-    // holds cannot hand out a typed catalogue row.
+  it('TERM 1, SPENT: `catalogRowAt` reaches the handle an admin read holds', () => {
+    // **THIS CASE WENT RED ON GOOD NEWS AND THAT WAS ITS WHOLE DESIGN.**
+    // `ADR-413` wrote it asserting `['ScopedTx']` and said so in terms: "the day
+    // a catalogue accessor lands on a second handle this case goes red, AND
+    // THAT DAY IS THE DAY TERM 1 BECOMES TAKEABLE". `ADR-416` is that day. The
+    // assertion is MOVED rather than deleted, because what it watches is still
+    // worth watching: it now names every handle that can hand out a typed
+    // catalogue row, so a fourth carrier is a decision somebody sees.
+    //
+    // DERIVED OVER THE DECLARATIONS AND STORING NO HANDLE NAME BUT THE ONES IT
+    // ASSERTS.
     const db = readFileSync(join(ROOT, 'packages/db/src/scoped-db.ts'), 'utf8').split('\n');
     const carriers: string[] = [];
     let open: string | null = null;
@@ -935,23 +968,64 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     // matching reports "nobody declares it" and would pass the assertion below
     // by finding nothing. The handles this reasons over must have been seen.
     expect(carriers.length).toBeGreaterThan(0);
-    expect(carriers).toStrictEqual(['ScopedTx']);
+    // `CatalogReadTx` IS THE SHAPE AND THE OTHER TWO ARE THE HANDLES THAT
+    // SATISFY IT. It is in this list rather than exempt from it because it is
+    // where the signature is stated for a reader, and a fourth name appearing
+    // here is either a new handle carrying the read or a second shape competing
+    // to describe it. Both are decisions and neither should be silent.
+    // SORTED, so the assertion is about WHICH handles carry the read and not
+    // about where they sit in a 4400-line file. `ADR-413`'s version asserted a
+    // one-element list where order could not arise.
+    expect([...carriers].sort()).toStrictEqual(['CatalogReadTx', 'ScopedTx', 'SystemTx']);
+    // AND THE WIDENING STOPPED AT ONE VERB, which is the half a carrier list
+    // cannot see. `SystemTx` carries the ADDRESSED read and neither whole-table
+    // verb, so the operator console gained the ability to resolve ONE pinned
+    // plan and not the ability to sweep the catalogue. `packages/db`'s own
+    // suite holds this as a run over the handle; this reads the declaration,
+    // because a widening lands here first.
+    const whole = db.join('\n');
+    const systemBlock = whole.slice(
+      whole.indexOf('export interface SystemTx extends TxCommon {'),
+      whole.indexOf('export interface FirmTx extends TxCommon {'),
+    );
+    expect(systemBlock).toContain('catalogRowAt<');
+    expect(systemBlock).not.toContain('catalogRows<');
+    expect(systemBlock).not.toContain('catalogRowsWhere<');
   });
 
-  it('and the composition `ADR-411` priced as one export reads through exactly that', () => {
+  it('and the composition is EXPORTED at the seam, on the handle both callers hold', () => {
+    // **`ADR-413` SECTION 7 NAMED THIS EXACT SHAPE AS THE WINNER AND THEN
+    // REFUSED IT, ON A GROUND `ADR-416` MOVED RATHER THAN ARGUED WITH.** That
+    // entry weighed exporting `planLeg` as it stood against splitting it at its
+    // own first seam, ruled the split better because the port holds a PAIR and
+    // `planLeg`'s parameter was an `accounts` row, and then refused both:
+    // either form takes a `ScopedTx`, a `ScopedTx` is bound to one identity, and
+    // the liability read resolves no identity to open one against. The handle is
+    // a `CatalogReadTx` now, so the seam is takeable and it is taken.
     const payoutBackend = readFileSync(join(ROOT, 'apps/api/src/payout-backend.ts'), 'utf8');
-    expect(payoutBackend).toContain("import type { ScopedTx } from '@merit/db';");
-    expect(payoutBackend).toContain('async function planLeg(handle: ScopedTx');
+    expect(payoutBackend).toContain("import type { CatalogReadTx, ScopedTx } from '@merit/db';");
+    // THE PARAMETER IS THE CAPABILITY AND NOT THE DOOR, which is the whole of
+    // what makes one statement serve two callers. A signature that narrowed
+    // back to `ScopedTx` would compile, would keep the payout path green, and
+    // would silently un-supply the admin fold; this line is what sees that.
+    expect(payoutBackend).toContain('export async function resolvePinnedPlan(');
+    expect(payoutBackend).toContain('  handle: CatalogReadTx,');
     expect(payoutBackend).toContain("handle.catalogRowAt('planVersions'");
     expect(payoutBackend).toContain("handle.catalogRowAt('planVersionSizes'");
-    // AND IT IS STILL NOT EXPORTED, WHICH IS A REFUSAL WITH A MEASUREMENT
-    // BEHIND IT RATHER THAN AN OVERSIGHT. An export whose first argument no
-    // caller on the admin read path can produce is a widened money-path surface
-    // for nothing, and `packages/db`'s own rule is that a primitive admitted
-    // before a caller exists is a primitive nobody can remove.
+    // AND `planLeg` SURVIVES AS THE `accounts`-ROW ADAPTER AND IS STILL NOT
+    // EXPORTED. `ADR-413`'s objection to exporting THAT function is untouched by
+    // this row and is still correct: its parameter is a row, the port holds a
+    // pair, and a caller that synthesised a record to fit it would decode the
+    // pair twice through an `unknown` hop and refuse in the name of a row nobody
+    // read. What was exported is the half BELOW that seam.
+    expect(payoutBackend).toContain('async function planLeg(handle: ScopedTx');
     expect(payoutBackend).not.toContain('export async function planLeg');
-    // THE DOOR THE ADMIN READ ACTUALLY HOLDS NAMES NO CATALOGUE ACCESSOR, read
-    // at the declaration so that a widening lands here first.
+    // THE DOOR THE ADMIN READ HOLDS IS UNCHANGED AND STILL NAMES NO ACCESSOR,
+    // which is the property that had to survive the widening: `AdminSourceTx` is
+    // an intersection of module handles, `SystemTx` satisfies it structurally,
+    // and nothing in this directory's own composition file reaches a catalogue.
+    // The supplier takes the handle its caller is inside; it does not put one on
+    // the door.
     const directory = readFileSync(join(ROOT, 'apps/api/src/admin-source/index.ts'), 'utf8');
     expect(directory).toContain('operator<T>(fn: (tx: AdminSourceTx) => Promise<T>): Promise<T>;');
     expect(directory).not.toContain('catalogRowAt');
