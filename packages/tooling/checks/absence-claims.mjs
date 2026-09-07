@@ -328,6 +328,77 @@ const SWEPT_SCRIPTS = /\.(ts|tsx|mts|mjs|js|sql)$/;
 const SWEEP_WINDOW = 2;
 
 /**
+ * Every `import` and `export` SPECIFIER LIST in a source, emptied.
+ *
+ * ADR-431. THE TWO CALLER PROBES BELOW PROXY A VALUE POSITION WITH PUNCTUATION
+ * -- the name followed by `.`, `,` or `)` -- AND A NAME IN A SPECIFIER LIST IS
+ * FOLLOWED BY A COMMA WHILE BEING A BINDING POSITION AND NOT A VALUE POSITION
+ * AT ALL. ADR-410 section 7 raised it, ADR-415 registered it in `sweptBy` and
+ * was forbidden the repair, and this is the repair.
+ *
+ * IT WAS DEMONSTRATED FIRING BEFORE IT WAS REPAIRED, twice and by two different
+ * routes, because a defect nobody can show firing is a defect nobody can show
+ * fixed. Publishing `TRANSACTION_EVENT_WRITER` from `packages/ledger/src/index.ts`
+ * in a list rather than on a statement of its own turned `event-sink-caller` to
+ * `present` and leg 2 RED at a sentence that is TRUE, with no call added, no
+ * binding published that was not published before, and nobody having edited this
+ * file, the register or the claim site.
+ *
+ * **AND THE LINE BREAK IS NOT THE TRIGGER, WHICH IS WHERE THIS DIFFERS FROM THE
+ * ACCOUNT IT INHERITS.** ADR-415 and the barrel's own comment both say the green
+ * is held by prettier leaving that statement on one line. Measured: the ONE-LINE
+ * form of the same list fires too, because the comma that satisfies the proxy is
+ * the SEPARATOR and arrives with the second name whether or not the statement
+ * wraps. What holds the green is that the list has exactly ONE name. Prettier
+ * reaches the same red from the other side -- a list long enough to wrap gets a
+ * trailing comma under `trailingComma: "all"` -- so the formatter is one route in
+ * and not the only one.
+ *
+ * WHY THIS AND NOT THE OBVIOUS ALTERNATIVES, EACH OF WHICH WAS PRICED. Excluding
+ * the barrel by path is a second exclusion and blinds the probe to a real install
+ * written in a barrel. DROPPING THE PUNCTUATION PROXY ALTOGETHER -- treating any
+ * surviving occurrence as a value, which is tempting because after comments and
+ * specifier lists are gone an identifier really is either a value or a
+ * declaration -- WAS MEASURED AND REFUSED: it reports `present` on FIVE files
+ * under `apps/worker/src` whose refusal strings NAME the writer in order to say
+ * this deployable installs none, and `stripComments` cannot remove a string
+ * literal. That is the same false red arriving through a wider door.
+ *
+ * WHAT IT NO LONGER CATCHES, STATED RATHER THAN DISCOVERED. A file that imports
+ * the name in a MULTI-NAME list and then installs it in a shape the proxy does
+ * not recognise used to read `present` off the import's own comma, by accident;
+ * it now reads `absent`. That backstop was never aimed: the proxy already misses
+ * `const sink = TRANSACTION_EVENT_WRITER;` in a file whose import is on a
+ * statement of its own, so the hole predates this repair and this narrows the
+ * accident rather than the intent. Every install the probes were WRITTEN to
+ * catch -- a call of the factory, the name in an argument, the name under a
+ * member access -- is untouched, and the case below watches all three.
+ *
+ * THE SPAN IS THE BRACE AND NEVER THE LINE, which matters on one line the shipped
+ * tree does not yet carry: an import and an install written as one statement.
+ * Blanking the line would lose the install; blanking the braces cannot.
+ *
+ * ONLY AN OPTIONAL `type` AND AN OPTIONAL DEFAULT BINDING ARE ADMITTED BETWEEN
+ * THE KEYWORD AND THE BRACE, which is what keeps this off a function body:
+ * `export default function f(a) {`, `export const x = {`, `export type X = {`,
+ * `export class C {` and `export interface I {` all fail to match. Validated over
+ * the shipped scope at the moment this landed: 1,393 spans, longest 2,235
+ * characters, and ZERO carrying a statement keyword, an arrow or a semicolon
+ * inside the braces.
+ */
+const BINDING_LIST = /\b(?:import|export)\b(?:\s+type)?\s*(?:[A-Za-z_$][\w$]*\s*,\s*)?\{[^{}]*\}/g;
+
+/**
+ * @param {string} body  source with its comments already stripped
+ * @returns {string}
+ */
+function withoutBindingLists(body) {
+  return body.replace(BINDING_LIST, (/** @type {string} */ clause) =>
+    clause.replace(/\{[^{}]*\}/, '{}'),
+  );
+}
+
+/**
  * Every `.sql` file in the migration set, as `{ file, body }`.
  *
  * THROWS ON BOTH FAILURES A PROBE CAN HAVE HERE, and they are different facts.
@@ -798,7 +869,7 @@ export const ABSENCE_ARTIFACTS = [
       const door = 'apps/worker/src/queue.ts';
       for (const rel of files) {
         if (rel === door) continue;
-        const called = stripComments(readFileSync(join(root, rel), 'utf8'))
+        const called = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')))
           .split('\n')
           .some(
             (line) =>
@@ -1115,24 +1186,34 @@ export const ABSENCE_ARTIFACTS = [
       'the seven counts four header lines plus two declarations plus one, silently dropping ' +
       'three `{@link}` lines and one refusal string in the declaring module`s own body. It ' +
       'was four short the day it was written and the move is not what made it wrong. ' +
-      'AND ONE KNOWN FALSE POSITIVE IS REGISTERED HERE RATHER THAN REPAIRED IN THE PROBE, ' +
-      'which ADR-410 section 7 owed to this file. THE PROBE CANNOT TELL A PUBLICATION FROM ' +
-      'AN INSTALL: its proxy for a value position is `TRANSACTION_EVENT_WRITER` followed by ' +
-      '`.`, `,` or `)`, and a name inside a re-export SPECIFIER LIST is followed by a comma ' +
-      'while being a binding position and not a value position at all. `packages/ledger` ' +
-      'publishes that name on a statement of its own, where the next character is a space ' +
-      'and a brace, so the probe reads `absent`; folding it into the block above would flip ' +
-      'this artifact to `present` and turn leg 2 RED at a sentence that is TRUE. ' +
-      'THAT IS A DEFECT IN THE PROXY AND NOT A PROPERTY OF THE MOVE, and this row agrees ' +
-      'with ADR-410 that it is a finding about the check: nothing about a barrel makes a ' +
-      're-export a value, and the only reason it could not fire before is that the producer ' +
-      'had never been published from a package. IT IS REGISTERED AND NOT REPAIRED BECAUSE ' +
-      'THE REPAIR IS A WIDENING AND THIS ROW WAS FORBIDDEN ONE: excluding the barrel would ' +
-      'be a second exclusion, and reading the specifier list would be a parser. WHAT HOLDS ' +
-      'THE GREEN TODAY IS A LINE BREAK, which is the part worth distrusting: the statement ' +
-      'is short enough that prettier leaves it on one line, and a second name added to it ' +
-      'would be reflowed into a list, put a comma after this one and flip the artifact ' +
-      'without anybody editing this file',
+      '**THE FALSE POSITIVE THIS FIELD REGISTERED IS REPAIRED BY ADR-431, AND THE ' +
+      'REGISTRATION IS KEPT BESIDE ITS CORRECTION** (`RI-14`). It read that the probe ' +
+      'CANNOT TELL A PUBLICATION FROM AN INSTALL, that its proxy for a value position is ' +
+      '`TRANSACTION_EVENT_WRITER` followed by `.`, `,` or `)` while a name inside a ' +
+      're-export SPECIFIER LIST is followed by a comma and is a binding position, and that ' +
+      'it was REGISTERED AND NOT REPAIRED because every repair on offer was a widening ' +
+      'ADR-415 was forbidden. That was exactly true when ADR-410 section 7 raised it and ' +
+      'when ADR-415 wrote it down. The probes now blank every `import` and `export` ' +
+      'specifier list before reading a line, which is neither of the two widenings that ' +
+      'entry priced: it excludes no file by path and parses nothing. ' +
+      '**AND THE HALF OF THAT ACCOUNT THAT WAS WRONG IS NAMED RATHER THAN QUIETLY DROPPED.** ' +
+      'It read WHAT HOLDS THE GREEN TODAY IS A LINE BREAK, and the barrel carries a comment ' +
+      'asking the next reader not to add a second name to one export statement. ADR-431 ' +
+      'demonstrated the defect firing and the line break is not the trigger: the comma the ' +
+      'proxy reads is the SEPARATOR, so the ONE-LINE form of a two-name list fires with no ' +
+      'reflow at all, and a list ENDING in the writer stayed green however it was wrapped, ' +
+      'because a brace followed the name. What held the green was that the list had exactly ' +
+      'one name. Prettier reached the same red from the other side, since `trailingComma: ' +
+      '"all"` puts a comma after the last name of any list long enough to wrap, so the ' +
+      'formatter was one route in rather than the mechanism. ' +
+      'WHAT THE REPAIR NO LONGER CATCHES IS STATED IN THE PROBE`s OWN DOCBLOCK and is one ' +
+      'accident: a file importing the name in a MULTI-NAME list and installing it in a ' +
+      'shape the proxy does not recognise used to read `present` off the import`s comma. ' +
+      'The proxy already missed that shape behind a single-name import, so the hole predates ' +
+      'the repair. Dropping the proxy altogether to close it was MEASURED AND REFUSED: it ' +
+      'reports `present` on five files under `apps/worker/src` whose refusal strings name ' +
+      'the writer in order to say this deployable installs none, and `stripComments` cannot ' +
+      'remove a string literal',
     census: {
       names: ['makeEventSink', 'TRANSACTION_EVENT_WRITER'],
       scope: 'swept',
@@ -1182,7 +1263,7 @@ export const ABSENCE_ARTIFACTS = [
       const producer = 'packages/ledger/src/events.ts';
       for (const rel of files) {
         if (rel === producer) continue;
-        const installed = stripComments(readFileSync(join(root, rel), 'utf8'))
+        const installed = withoutBindingLists(stripComments(readFileSync(join(root, rel), 'utf8')))
           .split('\n')
           .some(
             (line) =>

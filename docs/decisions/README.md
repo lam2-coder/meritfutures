@@ -441,6 +441,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-428](ADR-428.md) | the never-run tests were run, four of nine are green, and the two that are RED were broken by a migration whose own entry found and repaired this exact failure in the two callers CI could see (2026-09-07, status: proposed) |
 | [ADR-429](ADR-429.md) | the two reds are repaired at the fixture and not at the constraint, the repair is proved to still be under the foreign key it satisfies, and the reason a test could stay red in silence is that the only job with a database runs no vitest (2026-09-07, status: proposed) |
 | [ADR-430](ADR-430.md) | `ADR-303` limit 4 is SPENT on the `recon` family, the mapping is deleted, and this is the first such row whose rows carry money (2026-09-07, status: proposed) |
+| [ADR-431](ADR-431.md) | `RI-35`'s caller probes read a specifier list as a value, the line break was never the trigger, and the repair is priced by what it stops catching (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
