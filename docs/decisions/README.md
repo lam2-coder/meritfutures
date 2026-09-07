@@ -449,6 +449,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-436](ADR-436.md) | two live port headers said they imported nothing while importing, and every check that reads those files reads one axis narrower than the sentence claims (2026-09-07, status: proposed) |
 | [ADR-437](ADR-437.md) | the WRITE path is REFUSED on the `breaker` family, and the ruling that stops it is not the one the dispatch named (2026-09-07, status: proposed) |
 | [ADR-438](ADR-438.md) | the `schema.ts` DEFAULT is compared against the DDL for the first time, and THREE COLUMNS DISAGREE (2026-09-07, status: proposed) |
+| [ADR-439](ADR-439.md) | the hole ADR-435 named in `golden` is closed in the shape that entry specified, and re-deriving its numbers corrects one of them (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
