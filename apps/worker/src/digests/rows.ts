@@ -16,10 +16,20 @@
 // alarm and the producer stays absent. `test/digests.test.ts` asserts that
 // absence by reading `alarm.ts` as text.
 //
-// IT IMPORTS ONLY TYPES, FROM `ports.ts`, AND NOTHING ELSE AT ALL.
+// **IT NOW IMPORTS NOTHING AT ALL, AND THAT IS ADR-426's DELETION SHOWING
+// THROUGH.** It used to import `DigestRow` from `ports.ts`, which was
+// `Readonly<Record<string, unknown>>`: the accessor's `unknown` written down a
+// second time so that a cast could get back out of it. `SystemTx.rowsWhere` now
+// hands back the row `schema.ts` declares, so every reader below takes the row
+// it was given and the compiler checks the COLUMN NAME against the schema.
+//
+// **WHAT DID NOT MOVE IS EVERY REFUSAL.** `ADR-299` section 5.1 item 5:
+// a type derived from a TRANSCRIPTION does not retire a runtime check, and
+// ADR-112 foreclosure 4 records that nothing in this tree compares a
+// `schema.ts` column type against the DDL. So the type buys the guard for a
+// column's EXISTENCE and buys nothing about its VALUE, and not one `throw`
+// below was deleted with the mapping.
 // =============================================================================
-
-import type { DigestRow } from './ports.ts';
 
 /** Raised when a row crossing a port is not the shape the column declares. */
 export class DigestRowError extends Error {
@@ -29,29 +39,26 @@ export class DigestRowError extends Error {
   }
 }
 
-/** A value that is a row, or a refusal that shows what arrived instead. */
-export function record(value: unknown, where: string): DigestRow {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new DigestRowError(`${where}: expected a row and received ${JSON.stringify(value)}`);
-  return value as DigestRow;
-}
-
 /**
  * A `uuid` or `text` column.
  *
  * A refusal rather than `String(value)`. See this file's header: the coercion
  * produces a plausible identifier for a row nobody can find again.
  */
-export function readText(row: DigestRow, key: string, where: string): string {
-  const value = row[key];
+export function readText<R extends object>(row: R, key: keyof R & string, where: string): string {
+  const value: unknown = row[key];
   if (typeof value !== 'string')
     throw new DigestRowError(`${where}.${key}: expected text and received ${typeof value}`);
   return value;
 }
 
 /** A nullable `text` column. */
-export function readNullableText(row: DigestRow, key: string, where: string): string | null {
-  const value = row[key];
+export function readNullableText<R extends object>(
+  row: R,
+  key: keyof R & string,
+  where: string,
+): string | null {
+  const value: unknown = row[key];
   if (value === null || value === undefined) return null;
   return readText(row, key, where);
 }
@@ -64,8 +71,8 @@ export function readNullableText(row: DigestRow, key: string, where: string): st
  * `Invalid Date` whose every comparison is `false`, which would make a closed
  * window read as an open one and the alarm silently pass.
  */
-export function readInstant(row: DigestRow, key: string, where: string): Date {
-  const value = row[key];
+export function readInstant<R extends object>(row: R, key: keyof R & string, where: string): Date {
+  const value: unknown = row[key];
   if (!(value instanceof Date))
     throw new DigestRowError(
       `${where}.${key}: expected a Date and received ${typeof value}. A timestamptz parsed from a ` +
@@ -78,8 +85,12 @@ export function readInstant(row: DigestRow, key: string, where: string): Date {
 }
 
 /** A `boolean NOT NULL` column. */
-export function readBoolean(row: DigestRow, key: string, where: string): boolean {
-  const value = row[key];
+export function readBoolean<R extends object>(
+  row: R,
+  key: keyof R & string,
+  where: string,
+): boolean {
+  const value: unknown = row[key];
   if (typeof value !== 'boolean')
     throw new DigestRowError(
       `${where}.${key}: expected a boolean and received ${typeof value}. \`enabled\` decides ` +
@@ -90,8 +101,12 @@ export function readBoolean(row: DigestRow, key: string, where: string): boolean
 }
 
 /** An `integer NOT NULL` column, as a safe integer. */
-export function readInteger(row: DigestRow, key: string, where: string): number {
-  const value = row[key];
+export function readInteger<R extends object>(
+  row: R,
+  key: keyof R & string,
+  where: string,
+): number {
+  const value: unknown = row[key];
   if (typeof value !== 'number' || !Number.isSafeInteger(value))
     throw new DigestRowError(
       `${where}.${key}: expected a safe integer and received ${JSON.stringify(value)}`,
@@ -100,8 +115,12 @@ export function readInteger(row: DigestRow, key: string, where: string): number 
 }
 
 /** A `text[] NOT NULL` column. */
-export function readTextArray(row: DigestRow, key: string, where: string): readonly string[] {
-  const value = row[key];
+export function readTextArray<R extends object>(
+  row: R,
+  key: keyof R & string,
+  where: string,
+): readonly string[] {
+  const value: unknown = row[key];
   if (!Array.isArray(value))
     throw new DigestRowError(`${where}.${key}: expected an array and received ${typeof value}`);
   return value.map((element, index) => {

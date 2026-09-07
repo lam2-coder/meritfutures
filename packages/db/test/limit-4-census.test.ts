@@ -184,7 +184,7 @@ describe('`ADR-303` limit 4 names a surface with real callers, and here they are
     expect([...files].some((f) => f.startsWith(ADMIN_SOURCE))).toBe(true);
   });
 
-  test('limit 4 is UNSPENT in the door itself: every declaration still returns `unknown`', () => {
+  test('limit 4 is spent for ONE VERB ON ONE HANDLE and unspent everywhere else', () => {
     const door = CODE.get('packages/db/src/scoped-db.ts') ?? '';
     expect(door, '`scoped-db.ts` was not walked').not.toBe('');
 
@@ -207,7 +207,9 @@ describe('`ADR-303` limit 4 names a surface with real callers, and here they are
       return found;
     };
 
-    for (const verb of LIMIT_4_VERBS) {
+    // THE THREE VERBS ADR-426 DID NOT SPEND. Unchanged, and this is the half of
+    // the case that still reads exactly as ADR-421 wrote it.
+    for (const verb of LIMIT_4_VERBS.filter((v) => v !== 'rowsWhere')) {
       const returns = returnsOf(verb);
 
       // THE DECLARATIONS EXIST. A verb this case cannot find is a case that has
@@ -227,5 +229,38 @@ describe('`ADR-303` limit 4 names a surface with real callers, and here they are
           `being SPENT, which is a decision an ADR has to carry rather than a tidy-up.`,
       ).toEqual([]);
     }
+
+    // AND `rowsWhere`, WHICH IS SPENT FOR ONE HANDLE AND STILL HELD ON TWO.
+    // THE CASE IS NARROWED TO WHAT IS STILL TRUE AND IS NOT LOOSENED: it used to
+    // say "none of the six" and now says "exactly the two `SystemTx` sites and no
+    // other", which refuses a move in BOTH directions. A row narrowing
+    // `ScopedTx.rowsWhere` meets this line, and so does a row putting
+    // `SystemTx.rowsWhere` back to `unknown` and leaving ADR-426's port stranded.
+    const rowsWhereReturns = returnsOf('rowsWhere');
+    expect(rowsWhereReturns.length, 'no rowsWhere signature found in the door').toBe(6);
+    const spent = rowsWhereReturns.filter((r) => r === 'Promise<DeclaredRow<K>[]>');
+    const held = rowsWhereReturns.filter((r) => r === 'Promise<unknown[]>');
+    expect(
+      { spent: spent.length, held: held.length },
+      `\`rowsWhere\` returns ${rowsWhereReturns.join(', ')}. ADR-426 spends \`ADR-303\` limit 4 for ` +
+        `ONE VERB ON ONE HANDLE, which is two sites: \`SystemTx\`'s declaration and its ` +
+        `implementation. Any other split is a limit moving without an entry behind it.`,
+    ).toEqual({ spent: 2, held: 4 });
+
+    // THE TWO THAT MOVED ARE `SystemTx`'s, DERIVED FROM THE INTERFACE BLOCKS
+    // RATHER THAN FROM THEIR ORDER IN THE FILE. Reading position two and four of
+    // a list is how a case starts agreeing with a reformat.
+    const ownReturn = /rowsWhere[\s\S]*?\)\s*:\s*(Promise<[^;{]*?)[;{]/;
+    const blockOf = (name: string): string => {
+      const start = door.indexOf(`export interface ${name} extends TxCommon {`);
+      expect(start, `\`${name}\` was not found in the door`).toBeGreaterThan(-1);
+      return door.slice(start, door.indexOf('\n}', start));
+    };
+    for (const handle of ['ScopedTx', 'FirmTx'])
+      expect(
+        ownReturn.exec(blockOf(handle))?.[1]?.trim(),
+        `\`${handle}.rowsWhere\` moved, and ADR-426 spends the limit on \`SystemTx\` alone`,
+      ).toBe('Promise<unknown[]>');
+    expect(ownReturn.exec(blockOf('SystemTx'))?.[1]?.trim()).toBe('Promise<DeclaredRow<K>[]>');
   });
 });

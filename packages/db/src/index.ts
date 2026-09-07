@@ -212,7 +212,15 @@ export { CATALOG_TABLE_KEYS, type CatalogTableKey } from './scoped-db.ts';
 // `CatalogRow` TRAVELS WITH IT because a caller that may not name the row it was
 // handed is a caller that writes its own shape for it, and a second shape for
 // one catalogue row is the `FM-16` this door exists to avoid.
-export type { CatalogReadTx, CatalogRow } from './scoped-db.ts';
+//
+// `DeclaredRow` TRAVELS WITH BOTH, AND FOR THE SAME REASON ONE KEY SPACE OVER
+// (ADR-426). `SystemTx.rowsWhere` hands back the row its key declares, and a
+// consumer that may not NAME that row is a consumer that writes its own shape
+// for it. That second shape is the hand-written mapping `ADR-303` limit 4
+// describes, so withholding the name here would leave every port re-stating
+// `unknown` and would make the narrowing above buy nothing, which is exactly
+// what ADR-421 measured and refused.
+export type { CatalogReadTx, CatalogRow, DeclaredRow } from './scoped-db.ts';
 
 export { atLeast, atMost, isFilterTerm, isNull, type FilterTerm } from './scoped-db.ts';
 

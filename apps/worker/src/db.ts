@@ -120,12 +120,33 @@
 import { atLeast, atMost, isNull } from '@merit/db';
 import { closeClient, poolSqlExecutor, systemDb, transaction } from '@merit/db';
 import type {
+  DeclaredRow,
   PoolSqlExecutorReason,
   SqlExecutor,
   SystemDb,
   SystemReason,
   SystemTx,
 } from '@merit/db';
+
+/**
+ * The row a table key declares, re-exported through the ONE DOOR (ADR-426).
+ *
+ * **IT IS HERE FOR THE REASON `atLeast`, `atMost` AND `isNull` ARE, AND THE
+ * ARGUMENT AT THE FOOT OF THIS FILE IS RE-RUN RATHER THAN CITED.** ADR-165's
+ * pattern is ONE FILE PER PACKAGE, so a name reaching this deployable from
+ * `@merit/db` arrives through this file; the alternative is a `ports.ts`
+ * importing the accessor and `test/db.test.ts` section 3 becoming a two-element
+ * list, which is the assertion ADR-333 already declined to loosen.
+ *
+ * **AND IT IS NOT A DOOR IN ADR-165 CLAUSE 2's SENSE, BECAUSE A TYPE REACHES NO
+ * TABLE.** It has no `rows`, no `insert`, no `updateAt`, no key vocabulary and
+ * no scope predicate. ADR-424 finding 9 already ruled the general case: "a
+ * type-only witness needs NO door, and `ADR-171` clause 1 is untouched by one".
+ * No value of this type is constructed anywhere below; it is the name a port
+ * needs so that it does not have to WRITE THE ROW OUT BY HAND, which is the
+ * mapping `ADR-303` limit 4 exists to describe.
+ */
+export type { DeclaredRow };
 
 /**
  * The one reason this deployable ever runs at, spelled once.

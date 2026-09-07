@@ -144,7 +144,7 @@
 // =============================================================================
 
 import { atLeast } from '../db.ts';
-import type { WorkerDb } from '../db.ts';
+import type { DeclaredRow, WorkerDb } from '../db.ts';
 import { anchorLastClosedDay } from '../batch/adapter.ts';
 import type {
   DigestFilter,
@@ -312,17 +312,23 @@ export const DIGEST_TERMS: DigestTerms = { atLeast: digestAtLeast };
  */
 export function digestTxOver(tx: DigestDbTx): DigestTx {
   return {
-    async rowsWhere(key: DigestReadTable, where: DigestFilter): Promise<unknown[]> {
+    async rowsWhere<K extends DigestReadTable>(
+      key: K,
+      where: DigestFilter,
+    ): Promise<DeclaredRow<K>[]> {
       requireExactColumns(key, where, DIGEST_READ_FILTERS[key]);
       switch (key) {
         case 'reportSchedules': {
           const enabled = filterValue(key, where, 'enabled');
-          return await tx.rowsWhere('reportSchedules', { enabled });
+          return (await tx.rowsWhere('reportSchedules', { enabled })) as DeclaredRow<K>[];
         }
         case 'reportDeliveries': {
           const scheduleId = filterValue(key, where, 'scheduleId');
           const dueAt = filterValue(key, where, 'dueAt');
-          return await tx.rowsWhere('reportDeliveries', { scheduleId, dueAt });
+          return (await tx.rowsWhere('reportDeliveries', {
+            scheduleId,
+            dueAt,
+          })) as DeclaredRow<K>[];
         }
       }
     },
