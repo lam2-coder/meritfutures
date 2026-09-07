@@ -416,6 +416,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-402](ADR-402.md) | the `covers` structuring slice is REFUSED, because it costs 64 pointers nobody may repair to buy a gate whose every finding is false; the 30 of 33 reproduces and is a FLOOR; and `gates.mjs` is not one of the two most cited files in this repository, it is the eighteenth (2026-09-07, status: proposed) |
 | [ADR-403](ADR-403.md) | the four `:35` pointers are CLASS TWO for the second time and the finding is now written beside all four, `CI-06a` has been checking the runbook links all along so nothing binds them because something already does, and `ADR-337:202` is CLASS ONE and repaired to a name (2026-09-07, status: proposed) |
 | [ADR-404](ADR-404.md) | the 80 reproduce exactly and 53 of them are repaired with the occurrence named; `ADR-398`'s seam has ZERO surviving instances because a sibling row repaired the last one 19 minutes before the entry that recorded it as owed; and an owed list cannot see inside its own wave (2026-09-07, status: proposed) |
+| [ADR-405](ADR-405.md) | `clause 2` is the NAMING convention and [ADR-402](ADR-402.md) ruled on a different clause, so the text awaiting a founder does not carry the rule it was written for; question 3's premise is false at 7 of 42 rather than 42 of 42; and the `CLAUDE.md` home is measured for the first time at 368 of 387 (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
