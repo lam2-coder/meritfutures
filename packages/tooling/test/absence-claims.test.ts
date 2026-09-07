@@ -25,7 +25,7 @@
 // that already existed rather than by a migration arriving.
 // =============================================================================
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -1410,5 +1410,188 @@ describe('ADR-387: the runbook`s absence, stated twice more in the deployable', 
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('apps/worker/src/index.ts');
     expect(findings[0]).toContain('EXISTS');
+  });
+});
+
+// =============================================================================
+// ADR-415: THE `event-sink-caller` ENTRY AFTER ADR-410 MOVED THE PRODUCER
+// =============================================================================
+// ADR-410 moved the producer to `packages/ledger` and repaired the ONE constant
+// the probe reads. It left the register's own prose behind, and the prose is
+// where this artifact keeps its argument: `needles` is empty, so `sweptBy` is
+// the whole of the case for binding this artifact to named sites and to no
+// others.
+//
+// **THE INTEGER IS NOT WHAT THESE CASES BIND, AND THAT IS A CHOICE WITH A
+// REASON.** The entry's census is anchored to a commit because it is a fact
+// about a moment; a case asserting it against the live tree would go red the
+// day any row rewraps a comment in `apps/worker/src`, and a case that fires on
+// a rewrap is a case somebody deletes rather than answers. What has to stay
+// true is the ARGUMENT -- that every line a needle would reach is already
+// bound, published, left behind, or true about a different artifact -- and that
+// is what is asserted here. It still FAILS ON GOOD NEWS, and on a narrower
+// signal than a number would: a reached line in a FIFTH place is a needle
+// arriving somewhere the entry does not account for, which is the shape of a
+// real install landing.
+//
+// AND THE FALSE POSITIVE THE ENTRY REGISTERS IS WATCHED RATHER THAN CLAIMED.
+// ADR-410 section 7 found that the probe cannot tell a publication from an
+// install, answered it in the barrel, and left the registration owed to this
+// package. A registered false positive nobody has seen fire is a paragraph.
+// These cases fire it, hold the counterfactual open beside it, and hold the
+// probe's power over a REAL install open beside both, so the registration
+// cannot be read as an argument for widening anything.
+// =============================================================================
+
+describe('ADR-415: the `event-sink-caller` register after the producer moved', () => {
+  const HOME = 'packages/ledger/src/events.ts';
+  const BARREL = 'packages/ledger/src/index.ts';
+  const OLD_PATH = 'apps/api/src/events.ts';
+  const NAMES = ['makeEventSink', 'TRANSACTION_EVENT_WRITER'];
+
+  const entry = artifact('event-sink-caller');
+  const claims = ABSENCE_CLAIMS.filter((c) => c.artifact === 'event-sink-caller');
+
+  /**
+   * Every `.ts`, `.tsx`, `.mts`, `.mjs` and `.js` under `apps/*&#47;src` and
+   * `packages/*&#47;src`, repo-relative.
+   *
+   * IT REPRODUCES `shippedSources` RATHER THAN IMPORTING IT, because that
+   * function is not exported and widening its module's surface to reach it
+   * would be an edit to the check in service of a case. The extension list and
+   * the two parents are the check's own.
+   */
+  function shipped(): string[] {
+    const out: string[] = [];
+    for (const parent of ['apps', 'packages']) {
+      for (const entryName of readdirSync(join(REPO_ROOT, parent)).sort()) {
+        const src = `${parent}/${entryName}/src`;
+        let listing: string[];
+        try {
+          listing = readdirSync(join(REPO_ROOT, src), { recursive: true, encoding: 'utf8' });
+        } catch {
+          continue;
+        }
+        for (const rel of listing) {
+          const path = `${src}/${String(rel).split('\\').join('/')}`;
+          if (path.includes('/node_modules/')) continue;
+          if (/\.(ts|tsx|mts|mjs|js)$/.test(path)) out.push(path);
+        }
+      }
+    }
+    return out.sort();
+  }
+
+  test('one claim names this artifact, live, and it is the registered anchor', () => {
+    expect(claims).toHaveLength(1);
+    expect(claims[0]?.disposition).toBe('live');
+    expect(claims[0]?.claim).toBe('`makeEventSink` is called by NO file');
+  });
+
+  // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED. An empty walk would make
+  // the census below vacuously true, which is the value the next case treats as
+  // the good outcome, so the guard comes first.
+  test('the walk reaches files, so the census below is measured', () => {
+    expect(shipped().length).toBeGreaterThan(0);
+  });
+
+  // THE ARGUMENT, ASSERTED. `sweptBy` says a needle on either name would sweep
+  // the declaration this register already binds, a publication, a compatibility
+  // name and true sentences about a different artifact. Those are four places.
+  // A fifth is a line the entry does not account for, and the likeliest fifth
+  // is the one this artifact exists to catch.
+  test('every line the two names reach is in one of the four places the entry accounts for', () => {
+    const stray: string[] = [];
+    for (const rel of shipped()) {
+      if (rel === HOME || rel === BARREL || rel === OLD_PATH) continue;
+      if (rel.startsWith('apps/worker/src/')) continue;
+      readFileSync(join(REPO_ROOT, rel), 'utf8')
+        .split('\n')
+        .forEach((line, index) => {
+          if (NAMES.some((name) => line.includes(name))) stray.push(`${rel}:${index + 1}`);
+        });
+    }
+    expect(stray).toEqual([]);
+  });
+
+  // **THE ANCHOR IS CARRIED BY TWO FILES AND THE REGISTER BINDS ONE.** Leg 1
+  // reads only the site it is told about, so nothing in the shipped check
+  // reports this. The compatibility module says the register anchors the claim
+  // to ITS path, which is true while the `site` says so; the producer at the
+  // home says `RI-35` turns RED at ITS sentence, which is FALSE today. This is
+  // what tells the row that moves the `site` that the second sentence is not a
+  // spare copy: two files claim to be the bound one and exactly one can be.
+  test('the registered sentence occurs once at the old path and once at the home', () => {
+    const anchor = claims[0]?.claim ?? '';
+    for (const rel of [OLD_PATH, HOME]) {
+      const hits = readFileSync(join(REPO_ROOT, rel), 'utf8')
+        .split('\n')
+        .filter((line) => line.includes(anchor));
+      expect({ rel, hits: hits.length }).toEqual({ rel, hits: 1 });
+    }
+    expect(claims[0]?.site).toBe(OLD_PATH);
+  });
+
+  // ---------------------------------------------------------------------------
+  // THE REGISTERED FALSE POSITIVE, FIRED.
+  // ---------------------------------------------------------------------------
+  /** A tree with the producer at its home and a barrel publishing `exported`. */
+  function ledgerTree(exported: string): string {
+    const root = bareTree();
+    write(
+      root,
+      HOME,
+      'export function makeEventSink(deps) {\n  return deps;\n}\n' +
+        'export const TRANSACTION_EVENT_WRITER = { write() {} };\n',
+    );
+    write(root, BARREL, exported);
+    return root;
+  }
+
+  const OWN_STATEMENT = "export { TRANSACTION_EVENT_WRITER } from './events.ts';\n";
+  const IN_A_LIST =
+    'export {\n  makeEventSink,\n  TRANSACTION_EVENT_WRITER,\n} from ' + "'./events.ts';\n";
+
+  test('RED: the writer inside a re-export list is read as an INSTALL', () => {
+    expect(entry.probe(ledgerTree(IN_A_LIST))).toBe('present');
+  });
+
+  // THE COUNTERFACTUAL, AND IT IS THE LINE ADR-410 ACTUALLY WROTE. The same
+  // barrel, the same package, the same name published: the only difference is
+  // that the next character is a space rather than a comma. A green that turns
+  // on one character is a green worth writing down, which is why the entry says
+  // so rather than leaving the arrangement to look deliberate on its own.
+  test('GREEN: the same name published on a statement of its own reads absent', () => {
+    expect(entry.probe(ledgerTree(OWN_STATEMENT))).toBe('absent');
+  });
+
+  // AND THE FACTORY NAME IS SAFE IN A LIST WHILE THE WRITER IS NOT, which is the
+  // asymmetry the proxy creates: one shape is a CALL and the other is three
+  // punctuation marks. This is why the block above may carry `makeEventSink`.
+  test('GREEN: the factory name in the same list is not an install', () => {
+    expect(entry.probe(ledgerTree("export { makeEventSink } from './events.ts';\n"))).toBe(
+      'absent',
+    );
+  });
+
+  // THE PROBE'S POWER OVER A REAL INSTALL IS UNTOUCHED, asserted beside the
+  // false positive so the registration cannot be read as a case for widening
+  // or for narrowing. Both shapes, because either alone is the arrival.
+  test('RED: a real install is still caught, through the factory and through the writer', () => {
+    const composed = ledgerTree(OWN_STATEMENT);
+    write(
+      composed,
+      'apps/worker/src/install.ts',
+      'export const sink = makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock });\n',
+    );
+    expect(entry.probe(composed)).toBe('present');
+
+    const wrapped = ledgerTree(OWN_STATEMENT);
+    write(
+      wrapped,
+      'apps/worker/src/install.ts',
+      'export const sink = { write: (e) => TRANSACTION_EVENT_WRITER.write(e) };\n',
+    );
+    expect(entry.probe(wrapped)).toBe('present');
   });
 });
