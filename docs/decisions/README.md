@@ -413,6 +413,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-399](ADR-399.md) | the eight are CLASS ONE and every one of them is repaired, `G2` holds on all eight at the commit that wrote them, four waves recorded them as blocked on a founder question that was never in the way, and ADR-392's one judgment call dissolves at the right tree (2026-09-07, status: proposed) |
 | [ADR-400](ADR-400.md) | `G2` is NOT enforced, and the reason [ADR-388](ADR-388.md) gave for refusing it does not hold: `RI-15` reads no dated record at all, the reachable red set is NINE, every one of the nine is ALREADY a registered finding, and two defensible instruments disagree about their class on 23 of 493; and `G1` is read by a PERSON, at 56 of 60 against the binder's 3.8 percent (2026-09-07, status: proposed) |
 | [ADR-401](ADR-401.md) | the uniqueness condition on `G1` is REFUSED as a gate at 442 of 495 and TAKEN as a condition on the repair at 80; it is NOT the same seam as `ADR-398`'s sub-token defect, which reaches 0 of the named population; the dated census under `git log -S` is 74 repairable against 39 born wrong; and `git log -S` does not name a commit until it names a traversal (2026-09-07, status: proposed) |
+| [ADR-402](ADR-402.md) | the `covers` structuring slice is REFUSED, because it costs 64 pointers nobody may repair to buy a gate whose every finding is false; the 30 of 33 reproduces and is a FLOOR; and `gates.mjs` is not one of the two most cited files in this repository, it is the eighteenth (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
