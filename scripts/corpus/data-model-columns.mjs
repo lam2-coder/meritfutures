@@ -54,13 +54,13 @@
 //    `columnCatalogue()` that answers exactly this question, and OQ-P1-04's
 //    ruling is one parser called twice rather than two expressions of one parse.
 //    IT CAN NOW BE IMPORTED, AND THE BLOCKER THIS PARAGRAPH NAMED IS SPENT.
-//    `gates.mjs:9304` reads `export const GATES = [`, and `:9510` opens the
-//    guard `const invokedDirectly = ...` closed at `:9513` by
+//    `gates.mjs:9392` reads `export const GATES = [`, and `:9598` opens the
+//    guard `const invokedDirectly = ...` closed at `:9601` by
 //    `if (invokedDirectly) process.exit(main());`, under a comment reading
 //    "Importable by the suite that reads this report, runnable by CI-06". That
 //    guard landed in `55824c62` on 2026-08-30 for ADR-294, three sessions after
-//    this header was written, and the same file also exports `EXIT` at `:9388`
-//    and `runGates` at `:9413`. So the duplication below is now a DEFERRAL WITH
+//    this header was written, and the same file also exports `EXIT` at `:9476`
+//    and `runGates` at `:9501`. So the duplication below is now a DEFERRAL WITH
 //    NO BLOCKER rather than a blocked repair, and its remedy clause at the foot
 //    of this paragraph is available and unclaimed.
 //
@@ -81,6 +81,15 @@
 //    lines up will break, TWO CONCURRENT BRANCHES WILL BREAK DIFFERENTLY, and
 //    `RI-15` catching it every time is the control that makes that cost
 //    affordable rather than an argument that the pointers are safe.
+//
+//    AND THEY MOVED A THIRD TIME ON 2026-09-06, WHICH IS THE SENTENCE ABOVE
+//    BEING PAID RATHER THAN QUOTED. ADR-395 added assertion 5 to `CI-06l`, 89
+//    insertions against one deletion and so a net 88 lines above every one of
+//    these five, and `RI-15` named two of them in the same run that created the
+//    drift exactly as it did on 2026-09-05. They read `:9304`, `:9510`, `:9513`,
+//    `:9388` and `:9413` before that edit. The values above are re-derived
+//    against this tree by grepping for each declaration, which is still the only
+//    resolution a conflict between two sets of line numbers has.
 //
 //    **THIS PARAGRAPH READ "IT CANNOT BE IMPORTED: `gates.mjs` ends in
 //    `process.exit(main())` at module scope with no direct-invocation guard, so
