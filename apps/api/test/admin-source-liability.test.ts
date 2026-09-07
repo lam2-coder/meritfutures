@@ -110,8 +110,8 @@
 // groups depend on, one of which (`funded_accounts`) exists only as an `ALTER`.
 // =============================================================================
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -127,6 +127,25 @@ import {
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const MIGRATIONS = join(ROOT, 'packages/db/migrations');
+
+/**
+ * Every TypeScript file under `dir`, recursively, as absolute paths.
+ *
+ * A CENSUS OVER A DEPLOYABLE'S SOURCE IS THE ONLY HONEST FORM OF "NOTHING
+ * SUPPLIES THIS", which is why `B5` term 1 is asserted this way rather than at
+ * one file. A supplier of an injected port may be written anywhere the
+ * composition can reach, so a case that reads a single file passes on the tree
+ * where the port was quietly wired somewhere else.
+ */
+function sourceFilesUnder(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) out.push(...sourceFilesUnder(path));
+    else if (name.endsWith('.ts')) out.push(path);
+  }
+  return out.sort();
+}
 
 /**
  * Every column name any migration declares, as data read at run time.
@@ -731,15 +750,16 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   // stands between a row and a rendered number. The module states the
   // replacement once and this case restates it.
   //
-  // CLEARING CONDITION, ALL TWO TERMS: a `PlanRulesJson` decoder this fence can
-  // reach, which today is `toPublishedRules` in
-  // `apps/worker/src/batch/adapter.ts` and becomes reachable only once
-  // `ADR-239` slice A moves it beside `gates-codec.ts` in
-  // `packages/rules-engine`, AND a wire that can say the figure is a forecast,
-  // which `EligibleNext7d` cannot because `total_cents`, `account_count` and
+  // CLEARING CONDITION, ALL TWO TERMS: a supplier of
+  // `EligibleFoldIo.resolvePinnedPlan`, which is the composition of
+  // `decodePlanRules` with the account's `plan_version_sizes` read and NOT the
+  // `packages/rules-engine` move this restatement used to price, because
+  // `ADR-283` landed that and `planLeg` in `payout-backend.ts` already calls
+  // the decoder, AND a wire that can say the figure is a forecast, which
+  // `EligibleNext7d` cannot because `total_cents`, `account_count` and
   // `by_day` are the whole of its declaration. Either one alone leaves this
   // group unproducible, and the group goes whole or not at all (EC-074).
-  it('CLEARING CONDITION: a PlanRulesJson decoder this fence can reach, and a wire that says forecast', () => {
+  it('CLEARING CONDITION: a supplier of `resolvePinnedPlan`, and a wire that says forecast', () => {
     expect(readFileSync(join(ROOT, 'apps/worker/src/batch/ports.ts'), 'utf8')).toContain(
       'writeRuleState(row: RuleStateRow): Promise<void>;',
     );
@@ -800,20 +820,58 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(readFileSync(join(ROOT, 'docs/decisions/ADR-208.md'), 'utf8')).toContain(
       'GET /admin/eligible-forecast',
     );
-    // TERM 1 OF THE CONDITION THAT REPLACES THEM. The single decoder is in the
-    // worker; this deployable declares none, and the port that stands in for it
-    // refuses by name. BOTH HALVES ARE ASSERTED, because a case that only read
-    // the worker would pass on a tree where `apps/api` had quietly grown a
-    // second decoder, which is the FM-16 the port exists to refuse.
-    expect(readFileSync(join(ROOT, 'apps/worker/src/batch/adapter.ts'), 'utf8')).toContain(
-      'function toPublishedRules(',
+    // TERM 1, AND IT IS ASSERTED AGAINST THE TREE RATHER THAN AGAINST ITS OWN
+    // RESTATEMENT, WHICH IS SESSION 606's FINDING. This block used to read the
+    // worker's decoder and conclude the term was a `packages/rules-engine`
+    // move. `ADR-283` had already made that move, and BOTH statements of the
+    // condition went stale together, so `RI-19` compared two drifted copies and
+    // held: it binds the module to the case and neither to the world. THE
+    // POSITIVE READS BELOW ARE THAT REPAIR. They fail if the reachability they
+    // record regresses, which is the direction that matters.
+    //
+    // THE DECODER IS REACHABLE: declared once, in the engine, exported from its
+    // index, and this deployable declares the package.
+    expect(readFileSync(join(ROOT, 'packages/rules-engine/src/index.ts'), 'utf8')).toContain(
+      "export { decodePlanRules, PlanRulesCodecError } from './plan/rules-codec.ts';",
     );
+    expect(readFileSync(join(ROOT, 'apps/api/package.json'), 'utf8')).toContain(
+      '"@merit/rules-engine": "workspace:*"',
+    );
+    // AND THIS DEPLOYABLE ALREADY CALLS IT, so "cannot import that one" cannot
+    // be written here again without this line going red.
+    const payoutBackend = readFileSync(join(ROOT, 'apps/api/src/payout-backend.ts'), 'utf8');
+    expect(payoutBackend).toContain('decodePlanRules(version.rules,');
+    expect(payoutBackend).toContain('return resolvePlan(rules, sizeRow);');
+
+    // SO THE TERM IS THE COMPOSITION AND NOT THE DECODER, AND IT IS UNSUPPLIED.
+    // Asserted as a CENSUS over this deployable's own source rather than at one
+    // file, because the port is satisfied by whoever composes the fold and a
+    // one-file read would miss a supplier written anywhere else under `src/`.
+    const suppliers = sourceFilesUnder(join(ROOT, 'apps/api/src')).filter((file) =>
+      /resolvePinnedPlan\s*[:(]/.test(readFileSync(file, 'utf8')),
+    );
+    expect(suppliers.map((file) => relative(ROOT, file)).sort()).toStrictEqual([
+      'apps/api/src/admin-source/eligible-next-7d.ts',
+    ]);
+
     const foldModule = readFileSync(
       join(ROOT, 'apps/api/src/admin-source/eligible-next-7d.ts'),
       'utf8',
     );
     expect(foldModule).toContain('resolvePinnedPlan(planVersionId: string, sizeCents: Cents)');
+    // THE ONE OCCURRENCE IS THE PORT AND ITS REFUSING DEFAULT, never a body
+    // that resolves a plan. A supplier would have to read the size row, and the
+    // handle this module holds cannot address one.
+    expect(foldModule).toContain('throw new EligibleFoldUnwired');
     expect(foldModule).not.toContain('schema_version');
+    // READ AT THE DECLARATION AND NOT OVER THE FILE, because the term above
+    // NAMES `catalogRowAt` in prose and a whole-file read would be asserting
+    // against its own sentence.
+    const book = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
+    const handle = book.split('export interface LiabilityTx {')[1]?.split('}')[0] ?? '';
+    expect(handle).toContain('rows(key: LiabilityReadTable)');
+    expect(handle).toContain('rowsWhere(key: LiabilityReadTable');
+    expect(handle).not.toContain('catalogRowAt');
 
     // TERM 2. `EligibleNext7d` declares three members and not one of them is a
     // measurement, so ADR-204 ruling 7's "both halves wherever it is shown"
@@ -838,6 +896,106 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
     expect(book).toContain(
       "export type LiabilityBook = Omit<LiabilityResponse, 'eligible_next_7d'>;",
     );
+  });
+});
+
+// =============================================================================
+// HOW MANY BLOCKERS THERE ARE, DERIVED FROM THE FILE RATHER THAN FROM AN ENTRY
+// =============================================================================
+// **TWO BLOCKER LISTS IN A ROW WERE SHORT AND NEITHER WAS SHORT BY ACCIDENT.**
+// The four-item list `ADR-407` was dispatched against was drawn before `B5`
+// existed, and `B5` did not arrive as a fifth numbered item: it was written as
+// PROSE, after the list, by the sessions that lifted the others, and it sat in
+// this file for four sessions while three readers counted four. A reader who
+// trusts an entry inherits the count that entry was given.
+//
+// **SO THE COUNT IS DERIVED HERE AND STORED NOWHERE**, on `RI-05`'s rule that a
+// stored copy is a hand-maintained count in a different costume. Nothing below
+// names a blocker, an identifier or a number. The file states its own count in
+// a heading and enumerates its own items, and these cases ask whether those two
+// agree and whether anything outside the enumeration claims to be one of them.
+//
+// **THE THIRD CASE IS THE ONE THAT WOULD HAVE CAUGHT `B5`.** A blocker
+// mentioned by label anywhere in the file, with no numbered item to open it, is
+// exactly the shape `B5` arrived in, and it is invisible to a reader counting
+// items and to a reader counting the heading.
+describe('the blocker enumeration counts itself, which is how a sixth would be found', () => {
+  const source = () => readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
+
+  /** The count word the enumeration heading spells, as a number. */
+  const WORDS = new Map([
+    ['ONE', 1],
+    ['TWO', 2],
+    ['THREE', 3],
+    ['FOUR', 4],
+    ['FIVE', 5],
+    ['SIX', 6],
+    ['SEVEN', 7],
+    ['EIGHT', 8],
+  ]);
+
+  it('spells a count in its heading that this suite can read', () => {
+    const headings = source()
+      .split('\n')
+      .filter((line) => /^\/\/ THE\s+[A-Z]+\s+BLOCKERS\b/.test(line));
+    // EXACTLY ONE, because two headings would make "the count" ambiguous and
+    // this suite would be reading whichever it met first.
+    expect(headings).toHaveLength(1);
+    const word = /^\/\/ THE\s+([A-Z]+)\s+BLOCKERS\b/.exec(headings[0] ?? '')?.[1];
+    expect(WORDS.get(word ?? '')).toBeDefined();
+  });
+
+  it('enumerates exactly as many items as its heading spells, contiguously from one', () => {
+    const lines = source().split('\n');
+    const word = /^\/\/ THE\s+([A-Z]+)\s+BLOCKERS\b/.exec(
+      lines.find((line) => /^\/\/ THE\s+[A-Z]+\s+BLOCKERS\b/.test(line)) ?? '',
+    )?.[1];
+    const spelled = WORDS.get(word ?? '');
+
+    const ids = lines
+      .map((line) => /^\/\/\s{2,}B(\d+)\.\s/.exec(line)?.[1])
+      .filter((id): id is string => id !== undefined)
+      .map(Number);
+
+    // (1) THE HEADING AND THE ITEMS AGREE. This is `RI-04`'s own failure and
+    // `ADR-034`'s remedy case: a spelled count beside the thing it counts.
+    expect(ids).toHaveLength(spelled ?? -1);
+    // (2) AND THE LABELS ARE A CONTIGUOUS RUN FROM ONE, so a `B7` beside a `B5`
+    // cannot be read as five blockers by anybody counting items.
+    expect(ids).toStrictEqual(Array.from({ length: ids.length }, (unused, i) => i + 1));
+  });
+
+  it('carries no blocker LABEL the enumeration does not open, which is how B5 arrived', () => {
+    const lines = source().split('\n');
+    const opened = new Set(
+      lines
+        .map((line) => /^\/\/\s{2,}B(\d+)\.\s/.exec(line)?.[1])
+        .filter((id): id is string => id !== undefined),
+    );
+
+    /** Every `Bn` label the file mentions anywhere, with where it first does. */
+    const mentioned = new Map<string, number>();
+    lines.forEach((line, index) => {
+      for (const hit of line.matchAll(/\bB(\d{1,2})\b/g)) {
+        const id = hit[1] ?? '';
+        if (!mentioned.has(id)) mentioned.set(id, index + 1);
+      }
+    });
+
+    // A LABEL MENTIONED AND NEVER OPENED IS A BLOCKER WITH NO ITEM. The finding
+    // is reported with its line so the next reader goes to it rather than
+    // re-deriving this, which is the whole complaint against the entry-inherited
+    // count.
+    const orphans = [...mentioned]
+      .filter(([id]) => !opened.has(id))
+      .map(([id, line]) => `B${id} first mentioned at liability.ts:${String(line)}`)
+      .sort();
+    expect(
+      orphans,
+      'a blocker label is used in `liability.ts` that its enumeration never opens with a ' +
+        'numbered item. That is the shape `B5` arrived in and sat in for four sessions: give ' +
+        'it an item and move the heading count, or stop calling it one',
+    ).toStrictEqual([]);
   });
 });
 
