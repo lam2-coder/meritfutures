@@ -135,25 +135,66 @@
 // the narrowing rather than editing it.**
 //
 // **AND `readLiability` IS NOW MEASURED RATHER THAN ASSERTED, AND THE ENTRY'S
-// REASON IS MEASURED FALSE FOR IT TOO.** `liability.ts` produces **27 of
-// `LiabilityResponse`'s 40 leaf paths** from live rows, through the same keyed
-// accessor, with no join, no aggregate and no `sqlExecutor`: eight `TableKey`s,
-// two whole-table folds where the accessor offers no `ORDER BY`, and two typed
-// equalities. So "a live adapter today would have to reach `sqlExecutor`" is
-// false for a FOURTH method and the entry is `wiring.test.ts`'s to repair.
+// REASON IS MEASURED FALSE FOR IT TOO.** `liability.ts` produces most of
+// `LiabilityResponse`'s leaf paths from live rows, through the same keyed
+// accessor, with no join, no aggregate and no `sqlExecutor`: whole-table folds
+// where the accessor offers no `ORDER BY`, and typed equalities. So "a live
+// adapter today would have to reach `sqlExecutor`" is false for a FOURTH method.
+// **THAT REPAIR IS DONE AND IS NOT OWED**: `wiring.test.ts`'s
+// `setAdminReadSource` entry states the narrowing itself today, so this
+// paragraph reports a measurement rather than a debt.
 //
-// **THE METHOD IS STILL NOT COMPOSED AND THE REASON IS FOUR BLOCKERS, NONE OF
-// THEM A COLUMN.** `eligible_next_7d` needs `trading_calendar`, which is not a
-// `TableKey`; `payout_velocity` needs a 30-day window no document states;
-// `per_plan[].cusum` is ruled ABSENT by ADR-167 clause 5 until `DEP-M6-05`, and
-// the wire has no absent form for it; `integrations.recon.last_run_at` names a
-// reconciliation RUN nothing in this schema records.
-// `test/admin-source-liability.test.ts` holds each with its own clearing
-// condition and `test/admin-source-liability-book.test.ts` checks the
-// subtraction against API_CONTRACT, so the day one lifts a case goes red and
-// names it. **None of the four is this fence's to clear**, so the composition
-// below is unchanged: a method that cannot fill 13 of its own paths would answer
-// a 500 where it answers a named, synchronous "this deployment is not finished".
+// **THE CENSUS CARRIED TWO HAND-TYPED NUMERALS AND BOTH WENT STALE, WHICH IS
+// `ADR-034`'s REMEDY ARRIVING ON THIS FILE.** They read as a produced count over
+// a declared count, and as the paths a composed method could not fill. Every
+// blocker that lifted since moved one or both of them, and a numeral copied out
+// of a derivation is the derivation's reader believing the comment, which is the
+// defect `liability.ts`'s own header refuses a numeral for.
+// `test/admin-source-liability-book.test.ts` DERIVES declared, blocked and
+// produced from `API_CONTRACT` on every run and asserts all three, so the count
+// is read there and is not restated here.
+//
+// **THE METHOD IS STILL NOT COMPOSED AND THE FOUR BLOCKERS THIS PARAGRAPH USED
+// TO NAME ARE ALL SPENT.** It named four, none of them a column, and each is now
+// measured false at its own primary source. The retired clauses are PARAPHRASED
+// AND NOT QUOTED, on `RI-14`'s rule that a sentence reproduced verbatim reads as
+// live to every grep:
+//
+//   it said the seven-day horizon's calendar was not a `TableKey`. It is one:
+//   `packages/db`'s scope registry carries `tradingCalendar` and
+//   `LIABILITY_READ_TABLES` names it. Session 377 registered it under `ADR-103`
+//   clause 2 and `readTradingHorizon` is the read that spends it
+//
+//   it said `payout_velocity`'s window was stated by no document. `ADR-201`
+//   ruling 2 states it, `evaluatePayoutVelocity` produces the group, and
+//   `ADR-203` gave the wire a way to decline when the estate cannot supply it
+//
+//   it said the wire had no absent form for `per_plan[].cusum`. `ADR-202`
+//   ruling 3 ruled the nullable form and `ADR-203` transcribed it across the
+//   three copies `RI-18` binds, so the field is `{...} | null` and `readGaps`
+//   writes the reason once on the body. The CALIBRATION is exactly as absent as
+//   it was and `DEP-M6-05` is still owed; what lifted is the shape
+//
+//   it said nothing in this schema recorded a reconciliation run. `0064`
+//   creates `reconciliation_runs`, session 387 wrote its first producer, and
+//   `readRecon` dates the leaf off the newest completed run
+//
+// **A FIFTH BLOCKER STANDS AND IT IS WHY THE COMPOSITION BELOW IS UNCHANGED.**
+// `liability.ts`'s `B5` is `eligible_next_7d`'s per-account half, and its two
+// terms are `EligibleFoldIo.resolvePinnedPlan`, injected and refusing by name
+// because nothing under any `src/` in this deployable supplies it, and a wire
+// that can say the figure is a FORECAST, which `EligibleNext7d` cannot because
+// `total_cents`, `account_count` and `by_day` are the whole of its declaration.
+// The group goes whole or not at all (`EC-074`), so neither term alone suffices.
+// `test/admin-source-liability.test.ts` holds that condition with both terms and
+// `RI-19` compares it against the module's copy in both directions.
+//
+// **THE FOUR SPENT BLOCKERS WERE NOT CLEARED BY THIS FENCE AND NEITHER IS THE
+// FIFTH THIS FENCE'S TO CLEAR**, so the composition below is unchanged: a method
+// that cannot fill the paths `B5` holds would answer a 500 where
+// `composeAdminReadSource` already answers a named, synchronous "this deployment
+// is not finished". **THAT REFUSAL IS THE DELIVERABLE RATHER THAN A PLACEHOLDER**
+// and `AdminSourceNotComposed('readLiability')` is where it is written.
 //
 // **`listEvents` IS THE THIRD INSTANCE AND IT IS NOW WRITTEN RATHER THAN ONLY
 // PREDICTED.** ADR-184 section 3 measured it as a keyed range read over ONE
