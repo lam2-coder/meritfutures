@@ -435,6 +435,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-421](ADR-421.md) | `ADR-303` limit 4 is NOT callerless, the typing was performed rather than argued about, and it is refused because it buys nothing a fenced row can spend  (2026-09-07, status: proposed) |
 | [ADR-422](ADR-422.md) | the population of what depends on a file is DERIVED rather than defined, a fifth kind is registered before it bites anybody, and the retirement is 21 files to read and 6 to watch rather than 5 (2026-09-07, status: proposed) |
 | [ADR-424](ADR-424.md) | the sentence four entries called unrepaired was wrong in both directions, and the half that was really missing is the money path (2026-09-07, status: proposed) |
+| [ADR-428](ADR-428.md) | the never-run tests were run, four of nine are green, and the two that are RED were broken by a migration whose own entry found and repaired this exact failure in the two callers CI could see (2026-09-07, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
