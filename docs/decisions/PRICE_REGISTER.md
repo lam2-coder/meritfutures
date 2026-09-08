@@ -146,6 +146,13 @@ entry is.
 | 63  | `ADR-465:255` | 10.4  | OPEN       | UNASSESSED  | -                             | a `testTimeout` on that one case, or on the three `REPO_ROOT` probes in that ... |
 | 64  | `ADR-465:257` | 10.5  | OPEN       | UNASSESSED  | -                             | a decision, not a row. It contributes 4 of 105 and produces the commonest ... |
 | 65  | `ADR-465:259` | 10.6  | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for. |
+| 66  | `ADR-466:271` | 10.1  | OPEN       | UNASSESSED  | -                             | the same one-argument change this row made, in four more files, with the ... |
+| 67  | `ADR-466:273` | 10.2  | OPEN       | UNASSESSED  | -                             | an `RI-nn` over the test files, on `RI-35` leg 6's own idiom, asserting that a ... |
+| 68  | `ADR-466:275` | 10.3  | OPEN       | UNASSESSED  | -                             | a check with a derived expectation and a stated tolerance, over the swept ... |
+| 69  | `ADR-466:277` | 10.4  | OPEN       | UNASSESSED  | -                             | none, until the swept scope actually doubles, at which point the real ... |
+| 70  | `ADR-466:279` | 10.5  | OPEN       | UNASSESSED  | -                             | none. A rate over two days is reported as a rate over two days and is not ... |
+| 71  | `ADR-466:281` | 10.6  | OPEN       | UNASSESSED  | -                             | none. It is a dated record and `ADR-386`:169 governs: the pointer is named ... |
+| 72  | `ADR-466:283` | 10.7  | OPEN       | UNASSESSED  | -                             | the seven rows appended at integration as OPEN / UNASSESSED with no basis, ... |
 
 ## What this register does not cover, stated as a bound
 
