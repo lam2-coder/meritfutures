@@ -157,6 +157,12 @@ entry is.
 | 74  | `ADR-468:379` | 10.2  | OPEN       | UNASSESSED  | -                             | a check that times the shipped scans against the tree, compares them ... |
 | 75  | `ADR-468:381` | 10.3  | OPEN       | UNASSESSED  | -                             | a recorded figure for what the CI runner actually costs on the binding ... |
 | 76  | `ADR-468:383` | 10.4  | OPEN       | UNASSESSED  | -                             | a measurement of the worst spawn cost under load on the CI runner, and a ... |
+| 77  | `ADR-470:321` | 10.1  | OPEN       | UNASSESSED  | -                             | a decision about whether the fence widens to the workspace, and the measurement that ... |
+| 78  | `ADR-470:323` | 10.2  | OPEN       | UNASSESSED  | -                             | an assertion that each rostered walker actually enumerates, taken by running it ... |
+| 79  | `ADR-470:325` | 10.3  | OPEN       | UNASSESSED  | -                             | a `CI-01`-adjacent step running `tree-input-budget.mjs`, and a decision about ... |
+| 80  | `ADR-470:327` | 10.4  | OPEN       | UNASSESSED  | -                             | the published derivation command for this figure is replaced by the checker, whose ... |
+| 81  | `ADR-471:135` | 9.1   | OPEN       | UNASSESSED  | -                             | an eligibility pass over any `file:line` list a decision entry publishes as ... |
+| 82  | `ADR-471:139` | 9.2   | OPEN       | UNASSESSED  | -                             | a decision about seeding, and the mechanism that follows from it. Either fast-check ... |
 
 ## What this register does not cover, stated as a bound
 

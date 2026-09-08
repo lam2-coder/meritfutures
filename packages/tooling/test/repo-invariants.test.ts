@@ -1989,7 +1989,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
 
   test('RI-15 catches a pointer that lands on a blank line or a bare closing bracket, with no name at all', () => {
     // THE HALF THAT NEEDS NO NAME, and three of the five wrong `scope.ts`
-    // pointers on `origin/main` were this shape: `:1307` and `:911` are both
+    // pointers on `origin/main` were this shape: each of them landed on a bare
     // `},`, the close of some other entry. A pointer that lands on nothing reads
     // as verified exactly as loudly as one that lands on the claim.
     const root = cleanTree();
@@ -2016,9 +2016,9 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   });
 
   test('RI-15 reads a comma list as one citation per number, where it read the whole token as none', () => {
-    // `packages/db/src/scope.ts:644,649` AND `:675,684` ARE REAL POINTERS ON
+    // TWO COMMA-LIST POINTERS INTO `packages/db/src/scope.ts` WERE REAL ON
     // `origin/main` AND BOTH WERE UNREAD. The tail expression was anchored at
-    // the end of the token, so `:644,649` matched nothing and the token fell
+    // the end of the token, so a `path:N,M` matched nothing and the token fell
     // through as prose -- including its FIRST number, which on its own would
     // have resolved. Two of the five citations session 399 measured wrong were
     // green for that reason and not because a window admitted them.
@@ -2301,7 +2301,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     // THE SHAPE MARKDOWN ACTUALLY WRITES, AND THE ONE THIS CHECK WAS BLIND TO.
     // `WAVE-06` section 4.1 carried
     // ``[`setAdminReadSource:706`](../../apps/api/src/routes/admin-reads.ts)``
-    // against a declaration at :739 and RI-16 was GREEN on it. Seeded with
+    // against a declaration it missed and RI-16 was GREEN on it. Seeded with
     // `:99999`, the same citation turned it RED, so the pointer WAS in scope and
     // the RANGE half worked; what did not reach it is the NAME half, which bound
     // only a backticked name written IN FRONT of the pointer. There is nothing in
