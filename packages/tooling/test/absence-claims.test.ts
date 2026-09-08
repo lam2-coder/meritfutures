@@ -38,6 +38,72 @@ import {
 } from '../checks/absence-claims.mjs';
 import { REPO_ROOT } from '../checks/repo-invariants.mjs';
 
+// =============================================================================
+// THE BUDGET FOR A CASE WHOSE INPUT IS THE WHOLE TREE. ADR-466.
+// =============================================================================
+// SEVEN CASES IN THIS FILE SCAN THE REAL REPOSITORY AND THE OTHER HUNDRED READ A
+// TWO-FILE FIXTURE. Every one of them ran under Vitest's 5000ms default, which
+// is a number nobody in this repository chose: there is no `testTimeout` in
+// `vitest.config.ts` and there never has been.
+//
+// ADR-465 section 8 finding 1 watched `the widening moves no verdict over this
+// repository` ABORT at 6183ms in one full-suite run and PASS in the next, with
+// the verdict identical in both. The failure mode is not a flaky assertion. It
+// is a fixed budget over an input that grows, so it reddens on its own schedule
+// and it reddens whichever pull request happens to be open when it crosses.
+//
+// THIS CONSTANT RAISES A BUDGET AND TOUCHES NO ASSERTION. What each of the seven
+// reads, what it compares and what it concludes are byte-identical either side
+// of this change. A timeout is not a control over the tree; it is the wall that
+// stops a hang from wedging CI, and 30 seconds stops a hang exactly as well as 5
+// does. The thing a 5000ms budget was catching here was the size of this
+// repository, which is not a defect.
+//
+// MEASURED 2026-09-08 at `c20550b`, 4 CPU, 404 swept file(s) / 9,314,992 byte(s)
+// of swept source. Left column: full suite, no artificial load. Right column:
+// the same full suite with four background CPU spinners on four cores.
+//
+//   the widening moves no verdict over this repository   2858ms   4590ms
+//   RI-35 finds nothing                                  2640ms   4700ms
+//   every census reaches lines on this repository        1904ms   3358ms
+//   every shipped probe answers on this tree ...         1067ms   2102ms
+//   both answers occur on this tree ...                  1014ms   2041ms
+//   `event-sink-caller`s census survives ...              499ms    991ms
+//   `worker-queue-door-caller`s deleted figure ...        328ms    662ms
+//
+// THE 30000 IS A PRODUCT OF FOUR MEASURED FACTORS RATHER THAN A ROUND NUMBER
+// PICKED FOR COMFORT. 2858ms observed, TIMES 1.61 for contention (the same case
+// at 4590ms under the load above), TIMES 2.0 for the machine (ADR-465's
+// container reported 6183ms in the position where this one reports 2858ms, and
+// 6183 is an ABORT rather than a completion, so the true factor is worse than
+// 2.16), TIMES 3.2 for growth (the shipped `ri35.run` costs 2571ms over 9.31MB
+// of swept source and 8180ms over 52.0MB, measured against a scaled copy of this
+// tree, so a swept scope five times today's buys a factor of about 3.2).
+// 2858 x 1.61 x 2.0 x 3.2 = 29,450, and this is that rounded up.
+//
+// THE GROWTH ASSUMPTION, WRITTEN OUT SO A LATER READER CAN FALSIFY IT RATHER
+// THAN GUESS AT IT: this budget holds until the SWEPT scope reaches about five
+// times its 9.31MB, on a container twice as slow as this one and fully
+// contended. The swept scope is `apps/*&#47;src`, `packages/*&#47;src` and
+// `scripts/`, and it EXCLUDES `docs/` by construction (`shippedSources` says so
+// in words). So ADR-465's stated mechanism, "the corpus gains an ADR file per
+// row", is not what moves this number: the swept scope grew 185,066 byte(s)
+// across the 105 ADR file(s) between ADR-343 and ADR-448, which at the measured
+// ceiling of 280ms per swept megabyte is under half a millisecond of scan per
+// ADR. WHAT MOVES THIS NUMBER IS APPLICATION SOURCE, which is what P1 and P2 are
+// about to add, and the conclusion (a fixed budget over a growing input) is
+// unaffected by the correction.
+//
+// IT IS PER CASE AND NOT PER FILE, AND THE SPLIT IS MEASURED RATHER THAN
+// ASSERTED. Six OTHER cases here touch `REPO_ROOT` and none of them walks the
+// tree: they read named files, and they cost 0ms to 44ms across both runs above.
+// A file-wide budget would hand a 30-second wall to a hundred fixture cases
+// whose honest budget is a hundred milliseconds, and for those the only thing a
+// timeout does is bound a hang. The budget belongs to the INPUT, so it is
+// spelled at each case whose input is the tree.
+// =============================================================================
+const CORPUS_SCAN_MS = 30_000;
+
 const seeded: string[] = [];
 afterEach(() => {
   for (const dir of seeded.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -623,9 +689,13 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
 // =============================================================================
 
 describe('the shipped register holds on this repository', () => {
-  test('RI-35 finds nothing', () => {
-    expect(ri35.run(REPO_ROOT)).toEqual([]);
-  });
+  test(
+    'RI-35 finds nothing',
+    () => {
+      expect(ri35.run(REPO_ROOT)).toEqual([]);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // NON-VACUITY, AND IT IS THE CASE THIS CHECK WOULD BE DECORATION WITHOUT.
   // A register of zero claims passes every leg, so the shape has to be
@@ -704,19 +774,27 @@ describe('the shipped register holds on this repository', () => {
   // EVERY PROBE IS WATCHED RETURNING BOTH VALUES SOMEWHERE IN THIS FILE OR
   // HERE. A probe that can only ever answer one way is a leg that cannot fail,
   // which is the defect one layer under the one this check is about.
-  test('every shipped probe answers on this tree without throwing', () => {
-    for (const a of ABSENCE_ARTIFACTS) {
-      expect({ key: a.key, answer: a.probe(REPO_ROOT) }).toEqual({
-        key: a.key,
-        answer: expect.stringMatching(/^(present|absent)$/) as unknown as string,
-      });
-    }
-  });
+  test(
+    'every shipped probe answers on this tree without throwing',
+    () => {
+      for (const a of ABSENCE_ARTIFACTS) {
+        expect({ key: a.key, answer: a.probe(REPO_ROOT) }).toEqual({
+          key: a.key,
+          answer: expect.stringMatching(/^(present|absent)$/) as unknown as string,
+        });
+      }
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('both answers occur on this tree, so neither branch is unreachable', () => {
-    const answers = new Set(ABSENCE_ARTIFACTS.map((a) => a.probe(REPO_ROOT)));
-    expect([...answers].sort()).toEqual(['absent', 'present']);
-  });
+  test(
+    'both answers occur on this tree, so neither branch is unreachable',
+    () => {
+      const answers = new Set(ABSENCE_ARTIFACTS.map((a) => a.probe(REPO_ROOT)));
+      expect([...answers].sort()).toEqual(['absent', 'present']);
+    },
+    CORPUS_SCAN_MS,
+  );
 });
 
 // =============================================================================
@@ -1996,11 +2074,15 @@ describe('ADR-433: the caller probes read an ASSIGNMENT, and still refuse what t
   // spells `sink = TRANSACTION_EVENT_WRITER`, this case goes red and names the
   // file, which is the whole of the surface this row opened.
   // ---------------------------------------------------------------------------
-  test('the widening moves no verdict over this repository', () => {
-    expect(artifact('event-sink-caller').probe(REPO_ROOT)).toBe('absent');
-    expect(artifact('worker-queue-door-caller').probe(REPO_ROOT)).toBe('present');
-    expect(ri35.run(REPO_ROOT)).toEqual([]);
-  });
+  test(
+    'the widening moves no verdict over this repository',
+    () => {
+      expect(artifact('event-sink-caller').probe(REPO_ROOT)).toBe('absent');
+      expect(artifact('worker-queue-door-caller').probe(REPO_ROOT)).toBe('present');
+      expect(ri35.run(REPO_ROOT)).toEqual([]);
+    },
+    CORPUS_SCAN_MS,
+  );
 });
 
 // =============================================================================
@@ -2233,41 +2315,49 @@ describe('ADR-417: the shipped censuses hold, and the old sentences do not', () 
   // EVERY CENSUS IS MEASURED AGAINST SOMETHING. A census whose names reach no
   // line at all would satisfy the identity while asserting nothing, which is
   // the vacuous pass this file refuses everywhere else.
-  test('every census reaches lines on this repository', () => {
-    for (const entry of withCensus) {
-      const found = checkAbsenceClaims(REPO_ROOT, {
-        artifacts: [{ ...entry, census: { ...entry.census!, places: [] } }],
-        claims: ABSENCE_CLAIMS.filter((c) => c.artifact === entry.key),
-      });
-      expect({
-        key: entry.key,
-        measured: found.some((f) => f.includes('does not add up')),
-      }).toEqual({ key: entry.key, measured: true });
-    }
-  });
+  test(
+    'every census reaches lines on this repository',
+    () => {
+      for (const entry of withCensus) {
+        const found = checkAbsenceClaims(REPO_ROOT, {
+          artifacts: [{ ...entry, census: { ...entry.census!, places: [] } }],
+          claims: ABSENCE_CLAIMS.filter((c) => c.artifact === entry.key),
+        });
+        expect({
+          key: entry.key,
+          measured: found.some((f) => f.includes('does not add up')),
+        }).toEqual({ key: entry.key, measured: true });
+      }
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // **THE OLD SENTENCE, AS DATA, WATCHED RED AGAINST THE REAL TREE.**
   // `worker-queue-door-caller` read that the door's two names "reach three
   // lines in the shipped scope and all three are its own declaration". That is
   // the census below, and this repository says otherwise.
-  test('`worker-queue-door-caller`s deleted figure is red as a census', () => {
-    const entry = artifact('worker-queue-door-caller');
-    const findings = checkAbsenceClaims(REPO_ROOT, {
-      artifacts: [
-        {
-          ...entry,
-          census: {
-            names: ['LIVE_QUEUE', 'workerQueue'],
-            scope: 'shipped' as const,
-            places: [{ where: 'apps/worker/src/queue.ts', is: 'the declaring module' }],
+  test(
+    '`worker-queue-door-caller`s deleted figure is red as a census',
+    () => {
+      const entry = artifact('worker-queue-door-caller');
+      const findings = checkAbsenceClaims(REPO_ROOT, {
+        artifacts: [
+          {
+            ...entry,
+            census: {
+              names: ['LIVE_QUEUE', 'workerQueue'],
+              scope: 'shipped' as const,
+              places: [{ where: 'apps/worker/src/queue.ts', is: 'the declaring module' }],
+            },
           },
-        },
-      ],
-      claims: ABSENCE_CLAIMS.filter((c) => c.artifact === 'worker-queue-door-caller'),
-    });
-    expect(findings.join('\n')).toContain('does not add up');
-    expect(findings.join('\n')).toContain('apps/worker/src/provisioning/queue-adapter.ts');
-  });
+        ],
+        claims: ABSENCE_CLAIMS.filter((c) => c.artifact === 'worker-queue-door-caller'),
+      });
+      expect(findings.join('\n')).toContain('does not add up');
+      expect(findings.join('\n')).toContain('apps/worker/src/provisioning/queue-adapter.ts');
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // **AND THE PARTITION DOES NOT DEPEND ON A REPAIR THIS ROW DOES NOT OWN.**
   // ADR-415 found `apps/api/src/events.ts` and `packages/ledger/src/events.ts`
@@ -2275,22 +2365,26 @@ describe('ADR-417: the shipped censuses hold, and the old sentences do not', () 
   // later row is resolving it. BOTH are accounted places, so the identity holds
   // whichever way that goes: this case drops each in turn and asserts leg 7
   // stays silent, which is the claim `sweptBy` makes in words.
-  test('`event-sink-caller`s census survives either events.ts going away', () => {
-    const entry = artifact('event-sink-caller');
-    const claims = ABSENCE_CLAIMS.filter((c) => c.artifact === 'event-sink-caller');
-    for (const dropped of ['apps/api/src/events.ts', 'packages/ledger/src/events.ts']) {
-      const places = entry.census!.places.filter((place) => place.where !== dropped);
-      const findings = checkAbsenceClaims(REPO_ROOT, {
-        artifacts: [{ ...entry, census: { ...entry.census!, places } }],
-        claims,
-      });
-      // Dropping a place is not the same as the file going away: what this
-      // asserts is that the file is ACCOUNTED, so its lines are named in the
-      // finding rather than silently folded into a neighbour.
-      expect({ dropped, named: findings.join('\n').includes(dropped) }).toEqual({
-        dropped,
-        named: true,
-      });
-    }
-  });
+  test(
+    '`event-sink-caller`s census survives either events.ts going away',
+    () => {
+      const entry = artifact('event-sink-caller');
+      const claims = ABSENCE_CLAIMS.filter((c) => c.artifact === 'event-sink-caller');
+      for (const dropped of ['apps/api/src/events.ts', 'packages/ledger/src/events.ts']) {
+        const places = entry.census!.places.filter((place) => place.where !== dropped);
+        const findings = checkAbsenceClaims(REPO_ROOT, {
+          artifacts: [{ ...entry, census: { ...entry.census!, places } }],
+          claims,
+        });
+        // Dropping a place is not the same as the file going away: what this
+        // asserts is that the file is ACCOUNTED, so its lines are named in the
+        // finding rather than silently folded into a neighbour.
+        expect({ dropped, named: findings.join('\n').includes(dropped) }).toEqual({
+          dropped,
+          named: true,
+        });
+      }
+    },
+    CORPUS_SCAN_MS,
+  );
 });
