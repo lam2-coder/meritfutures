@@ -1999,7 +1999,8 @@ const ci06h = {
       // computes are asserted only by spelling, and `probe_reserve_coverage.sql`
       // would again be the only file that has ever executed one of them.
       //
-      // THREE OF THE SIX ARE INTEGER CENTS AND ONE IS ON THE LIVE PANEL.
+      // TWO OF THE SIX ARE INTEGER CENTS, A THIRD IS A BASIS-POINT RATIO OVER
+      // TWO CENTS OPERANDS, AND ONE OF THE TWO IS ON THE LIVE PANEL.
       // SUCCESS 2 is the only assertion anywhere that
       // `intraday_movement_cents` is `equity - opening` rather than the swap,
       // which computes an equally plausible number and renders every winning day

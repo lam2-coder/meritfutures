@@ -929,8 +929,9 @@ jobs:
       # did not then transcribe; a probe that asks the database has no such
       # blind spot.
       #
-      # MONEY FIRST, AND THE ORDERING IS DELIBERATE. Three of the six are
-      # integer cents. `intraday_movement_cents` is the figure API_CONTRACT
+      # MONEY FIRST, AND THE ORDERING IS DELIBERATE. Two of the six are integer
+      # cents and a third is a basis-point ratio over two cents operands.
+      # `intraday_movement_cents` is the figure API_CONTRACT
       # renders to a trader and NO probe in this repository had ever executed
       # it; `delta_cents` is the reconciliation difference that blocks
       # eligibility; `rcr_bp` is the ratio that pauses new sales. SUCCESS 6 and

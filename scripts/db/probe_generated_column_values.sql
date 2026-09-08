@@ -14,10 +14,14 @@
 -- row would satisfy an inventory of refusals. The claim here is that these six
 -- expressions COMPUTE something, so the computed values come first.
 --
--- MONEY FIRST, AND THE ORDER IS THE ARGUMENT. Three of the six are integer
--- cents. A generated money column computing something other than what the
--- corpus believes is the worst defect this file could find, so SUCCESS 2
--- through SUCCESS 6 are the money columns and the booleans follow them.
+-- MONEY FIRST, AND THE ORDER IS THE ARGUMENT. TWO of the six are integer
+-- cents, `intraday_movement_cents` and `delta_cents`, and a third, `rcr_bp`,
+-- is a ratio in basis points over two cents operands. It is counted with them
+-- here because it is money-derived and it pauses new sales, and it is NOT
+-- called a cents column, which `attname LIKE '%_cents'` over the installed
+-- catalog answers as TWO. A generated money column computing something other
+-- than what the corpus believes is the worst defect this file could find, so
+-- SUCCESS 2 through SUCCESS 6 are those three and the booleans follow them.
 -- Integer cents throughout: no float is written, read or asserted here.
 --
 -- THE POPULATION IS DERIVED FROM THE CATALOG RATHER THAN FROM PROSE, which is
