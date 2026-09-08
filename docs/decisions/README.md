@@ -459,6 +459,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-446](ADR-446.md) | two censuses of one property, written blind to each other, agree to 92 sentences in 169,365, and the one extension that survives adjudication catches the sentence describing why this row was written twice (2026-09-07, status: proposed) |
 | [ADR-447](ADR-447.md) | `live_account_state` is transcribed from `0050`, compared by name because the registry loops cannot reach it, and NOT registered, because `merit_app` holds nothing on it (2026-09-07, status: proposed) |
 | [ADR-448](ADR-448.md) | the guard the sibling priced could not go where it was priced, the property it was priced against does not exist, and the widening beside it costs two files nobody owns (2026-09-07, status: proposed) |
+| [ADR-449](ADR-449.md) | the `schema.ts` header's census is ASSERTED rather than corrected a fourth time, the header edit is line-neutral because a non-neutral one is not satisfiable inside this fence, and the narrow generation comparison is KEPT because the general one provably cannot reach its table (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
