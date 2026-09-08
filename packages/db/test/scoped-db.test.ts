@@ -4915,4 +4915,284 @@ describe('the schema.ts header states a census a run RECOMPUTES', () => {
       inWords(TABLE_KEYS.length),
     );
   });
+
+  // ---------------------------------------------------------------------------
+  // THE FOLD PARAGRAPH, WHICH ADR-449 SECTION 9 ITEM 1 LEFT UNBOUND, AND THE
+  // `either` PARAGRAPH'S SEVEN, WHICH ITS ITEM 4 LEFT UNBOUND. ADR-453.
+  //
+  // THESE READ THE HEADER FLATTENED RATHER THAN RAW, and the five cases above
+  // deliberately do not. Their regexes pin line breaks because the sentences
+  // they bind are short and the break is part of what they assert. The
+  // sentences below WRAP wherever the header's line budget puts them, and that
+  // budget is forced: the header is line-neutral by necessity (ADR-386, and
+  // ADR-453 section 5 derives the population again on its own base), so a leg
+  // that pinned a break would go red on a reflow that changed no figure.
+  // ---------------------------------------------------------------------------
+
+  /** The header with comment markers and line breaks removed. */
+  const flat = (): string =>
+    header()
+      .split('\n')
+      .map((line) => line.replace(/^\/\/ ?/, ''))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  /**
+   * The tables the migration set gives a LATER column, and the names it gives
+   * them. DERIVED the way ADR-449 derived the figure it did not bind: every
+   * `ALTER TABLE <t> ... ADD COLUMN` in the set, `--` comments removed first.
+   */
+  const addColumnCarriers = (): Map<string, string[]> => {
+    const out = new Map<string, string[]>();
+    for (const file of migrationFiles()) {
+      const text = readFileSync(join(MIGRATIONS, file), 'utf8').replace(/--[^\n]*/g, '');
+      for (const statement of text.split(';')) {
+        const named = /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?([a-z_][a-z0-9_]*)"?\s/i.exec(
+          statement,
+        );
+        if (named === null) continue;
+        const table = (named[1] as string).toLowerCase();
+        for (const added of statement.matchAll(
+          /\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-z_][a-z0-9_]*)"?/gi,
+        )) {
+          const names = out.get(table) ?? [];
+          names.push((added[1] as string).toLowerCase());
+          out.set(table, names);
+        }
+      }
+    }
+    return out;
+  };
+
+  /** How many statements of one shape the whole migration set carries. */
+  const statementsMatching = (shape: RegExp): string[] => {
+    const found: string[] = [];
+    for (const file of migrationFiles()) {
+      const text = readFileSync(join(MIGRATIONS, file), 'utf8').replace(/--[^\n]*/g, '');
+      for (const statement of text.split(';')) {
+        if (/ALTER\s+TABLE\b/i.test(statement) && shape.test(statement)) {
+          found.push(`${file}: ${statement.trim().replace(/\s+/g, ' ')}`);
+        }
+      }
+    }
+    return found;
+  };
+
+  /**
+   * The relations THIS FILE declares with both an `identities` edge and an
+   * `accounts` edge, off drizzle's own foreign-key metadata rather than off the
+   * SQL. The distinction is the whole of case 9: the header rules that a column
+   * carries `.references()` here ONLY when the `CREATE TABLE` body declares the
+   * FK inline, so this population and the DDL's differ by every FK an
+   * `ALTER TABLE ... ADD CONSTRAINT` added.
+   */
+  const bothEdgeDeclarations = async (): Promise<
+    Map<string, { readonly identity: readonly string[]; readonly allNotNull: boolean }>
+  > => {
+    const [{ is }, pgCore, schema] = await Promise.all([
+      import('drizzle-orm'),
+      import('drizzle-orm/pg-core'),
+      import('../src/schema.ts'),
+    ]);
+    const out = new Map<
+      string,
+      { readonly identity: readonly string[]; readonly allNotNull: boolean }
+    >();
+    for (const value of Object.values(schema)) {
+      if (!is(value, pgCore.PgTable)) continue;
+      const table = value as PgTable;
+      const identity: string[] = [];
+      const account: string[] = [];
+      for (const key of pgCore.getTableConfig(table).foreignKeys) {
+        const reference = key.reference();
+        const target = getTableName(reference.foreignTable as PgTable);
+        for (const column of reference.columns) {
+          if (target === 'identities') identity.push((column as PgColumn).name);
+          if (target === 'accounts') account.push((column as PgColumn).name);
+        }
+      }
+      if (identity.length === 0 || account.length === 0) continue;
+      const columns = Object.values(getTableColumns(table)) as PgColumn[];
+      const allNotNull = identity.every(
+        (name) => columns.find((column) => column.name === name)?.notNull === true,
+      );
+      out.set(getTableName(table), { identity, allNotNull });
+    }
+    return out;
+  };
+
+  // THE CARRIERS AND THE DENOMINATOR. The sentence read "ELEVEN of the 109" and
+  // both figures were stale; ADR-449 derived FIFTEEN and named the four it does
+  // not name, and left the sentence unbound because it is a claim about the
+  // FOLD rather than a census entry. It is bound here, and the NAMES are bound
+  // beside the count: a sentence that said FIFTEEN and listed eleven would pass
+  // a count-only leg.
+  test('the fold paragraph names the carriers a run RECOMPUTES', async () => {
+    const text = flat();
+    const carriers = addColumnCarriers();
+    expect(
+      carriers.size,
+      'no table carries a later column, so this leg is vacuous',
+    ).toBeGreaterThan(0);
+
+    const stated =
+      /\b([A-Z]+) of the (\d+) DECLARED below carry later columns: ([^.]+)\. NONE OF THE/.exec(
+        text,
+      );
+    expect(stated, 'the header no longer carries the fold paragraph this leg binds').not.toBe(null);
+    const read = stated as RegExpExecArray;
+    expect(read[1], 'the carrier count the header spells out').toBe(inWords(carriers.size));
+    expect(Number(read[2]), 'the denominator, which is the count DECLARED below').toBe(
+      await declaredRelations(),
+    );
+
+    // THE NAMES, AS A SET. Order is the header's business and not this leg's.
+    const named = [...(read[3] as string).matchAll(/`([a-z_][a-z0-9_]*)`/g)].map(
+      (hit) => hit[1] as string,
+    );
+    expect(new Set(named).size, 'the header names a carrier twice').toBe(named.length);
+    expect([...named].sort()).toEqual([...carriers.keys()].sort());
+  });
+
+  // THE ARGUMENT UNDER THE FIGURE, WHICH IS THE HALF ADR-449 SAID A ROW TAKING
+  // THIS OWES. "None of them could be registered at all before ADR-094" is a
+  // counterfactual about the SUPERSEDED rule -- read a table as of its
+  // `CREATE TABLE` -- and it is true of a table exactly when the CREATE body is
+  // a PROPER SUBSET of the declaration and the difference is what the later
+  // `ADD COLUMN`s add. That is derived here per table rather than restated.
+  test('every carrier disagrees with its own CREATE TABLE body, which is the argument', () => {
+    const carriers = addColumnCarriers();
+    const sql = allMigrationSql();
+    const keyOf = new Map(ALL_REGISTERED.map(([key, sqlName]) => [sqlName, key] as const));
+
+    for (const [table, added] of carriers) {
+      const key = keyOf.get(table);
+      expect(key, `${table} carries a later column and no rule registers it`).toBeDefined();
+      const declared = sqlNames(key as TableKey);
+      const created = ddlColumns(sql, table);
+      const missing = declared.filter((name) => !created.includes(name));
+      const extra = created.filter((name) => !declared.includes(name));
+
+      expect(
+        extra,
+        `${table}: its CREATE TABLE body carries a column the declaration does not`,
+      ).toEqual([]);
+      expect(
+        missing.length,
+        `${table}: its CREATE TABLE body already agrees with the declaration, so the fold is ` +
+          'not what makes it registerable and the header argument does not hold of it',
+      ).toBeGreaterThan(0);
+      expect(
+        [...missing].sort(),
+        `${table}: the gap between the CREATE body and the declaration is not the set of names ` +
+          'the later ADD COLUMNs add',
+      ).toEqual([...new Set(added)].sort());
+    }
+
+    // AND THE HEADER STATES THAT ARGUMENT rather than only the figure, which is
+    // what stops the next row correcting a numeral and leaving the claim.
+    expect(flat()).toContain('PROPER SUBSET of the declaration');
+  });
+
+  // THE FOLD'S VOCABULARY, WHICH THE HEADER HAS NOW NAMED WRONG THREE TIMES.
+  // It read "`ALTER COLUMN` stays an offender" until ADR-106 and "`RENAME`
+  // stays an offender" until ADR-453, and each spelling named a REGISTERED
+  // table as one that cannot be registered. The refusal that survives is
+  // `DROP COLUMN`, and its instance count is bound so the day one lands the
+  // sentence is red rather than merely wrong.
+  test('the header refuses the shapes the fold refuses and no others', () => {
+    const text = flat();
+    const drops = statementsMatching(/\bDROP\s+COLUMN\b/i);
+    const renames = statementsMatching(/\bRENAME\b/i);
+
+    expect(
+      drops,
+      'a DROP COLUMN landed, so the header sentence about it needs re-deriving',
+    ).toEqual([]);
+    expect(
+      renames.length,
+      'the RENAME count the header and ADR-278 were both ruled against',
+    ).toBeGreaterThan(0);
+    expect(renames.join(' ')).toContain('simulation_runs');
+
+    expect(
+      text,
+      'the header calls `RENAME` an offender while ADR-278 folds it and `0075` is one',
+    ).not.toMatch(/`DROP COLUMN` and `RENAME` stay offenders/);
+    expect(text, 'the header no longer states the vocabulary width').toContain(
+      'FOUR MEMBERS WIDE NOW',
+    );
+    expect(text, 'the header no longer names `DROP COLUMN` as the surviving refusal').toMatch(
+      /`DROP COLUMN` is the only offender left and it has ZERO instances/,
+    );
+
+    // THE TWO CARRIERS OF AN `ALTER COLUMN` AMONG THE FIFTEEN, which was ONE
+    // until `0067` retyped `rule_states.phase` under ADR-216.
+    const carriers = addColumnCarriers();
+    const altered = [...carriers.keys()]
+      .filter((table) =>
+        statementsMatching(/\bALTER\s+COLUMN\b/i).some((statement) =>
+          new RegExp(`ALTER TABLE ${table}\\b`, 'i').test(statement),
+        ),
+      )
+      .sort();
+    expect(altered, 'the carriers that also take an ALTER COLUMN').toEqual([
+      'otp_challenges',
+      'rule_states',
+    ]);
+    expect(text).toContain('`otp_challenges` AND `rule_states` ARE THE TWO OF THE FIFTEEN');
+  });
+
+  // THE `either` PARAGRAPH'S SEVEN, WHICH IS ADR-449 SECTION 9 ITEM 4. That row
+  // narrowed the sentence's population from 115 to 116 "without evidence either
+  // way" and did not derive the seven. Both halves are settled here, and the
+  // answer to which population it is about is the reason the count is seven and
+  // not eight: `purchases` carries an identities edge and an accounts edge in
+  // the SQL, and its accounts FK is added by `0007` with
+  // `ALTER TABLE ... ADD CONSTRAINT`, so this file declares no `.references()`
+  // for it and it is outside the population the sentence counts.
+  test('the seven others are the ones THIS FILE declares, and the eighth is in the SQL', async () => {
+    const text = flat();
+    const both = await bothEdgeDeclarations();
+    expect(both.has('events'), '`events` no longer carries both edges in this file').toBe(true);
+    const others = [...both.keys()].filter((name) => name !== 'events').sort();
+    expect(others.length, 'no others carry both edges, so this leg is vacuous').toBeGreaterThan(0);
+
+    const shape = /the only table of that shape in the (\d+): ([a-z]+) others/.exec(text);
+    expect(shape, 'the `either` paragraph no longer states its population').not.toBe(null);
+    expect(Number((shape as RegExpExecArray)[1])).toBe(TABLE_KEYS.length);
+    expect((shape as RegExpExecArray)[2], 'the `others` count the header spells out').toBe(
+      inWords(others.length).toLowerCase(),
+    );
+
+    // EVERY ONE OF THE SEVEN DECLARES ITS IDENTITY COLUMN NOT NULL, which is the
+    // clause that makes them `owned` with no disjunction to write.
+    for (const name of others) {
+      expect(
+        (both.get(name) as { allNotNull: boolean }).allNotNull,
+        `${name} carries both edges and declares a NULLABLE identity column, so it is a second ` +
+          'table of the shape `events` has and the `either` paragraph is wrong',
+      ).toBe(true);
+    }
+
+    // AND THE POPULATION IS THIS FILE'S AND NOT THE DDL's, which is the part
+    // ADR-449 narrowed without evidence. `purchases` is the witness.
+    expect(both.has('purchases'), '`purchases` now declares an accounts `.references()` here').toBe(
+      false,
+    );
+    const sql = allMigrationSql();
+    expect(
+      ddlColumns(sql, 'purchases'),
+      '`purchases` no longer carries the column the SQL points at `accounts`',
+    ).toContain('parent_account_id');
+    expect(
+      statementsMatching(
+        /ADD\s+CONSTRAINT[\s\S]*FOREIGN\s+KEY\s*\(\s*parent_account_id\s*\)/i,
+      ).join(' '),
+      'the SQL no longer adds `purchases.parent_account_id` -> `accounts` by ALTER TABLE, so the ' +
+        'header sentence about an EIGHTH in the SQL needs re-deriving',
+    ).toContain('accounts');
+    expect(text).toContain('`purchases` IS AN EIGHTH IN THE SQL');
+  });
 });
