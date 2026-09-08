@@ -466,6 +466,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-453](ADR-453.md) | the fold paragraph's ARGUMENT is checked and holds of all fifteen, two further sentences beside it are FALSE about this tree, and the `either` paragraph's seven are this file's `.references()` rather than the DDL's (2026-09-08, status: proposed) |
 | [ADR-454](ADR-454.md) | the SQLSTATE the corpus states for a stored generated column is `42601`, a real PostgreSQL says `428C9`, and the live source is repaired line-neutrally (2026-09-08, status: proposed) |
 | [ADR-455](ADR-455.md) | the six generated expressions are EXECUTED against a live database, and all six compute what the corpus says they mean (2026-09-08, status: proposed) |
+| [ADR-456](ADR-456.md) | the two accessor docblocks argue a distinction the database does not make, the SQLSTATE is `428C9` on all four halves, and the three registry figures re-derive unchanged (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -995,15 +995,15 @@ describe('the pool the transaction needs is reachable and is a pool', () => {
 /**
  * Does the DATABASE write this column rather than the caller?
  *
- * BOTH PROPERTIES, because they are two different refusals. `generated` is
- * `GENERATED ALWAYS AS (...) STORED` and PostgreSQL answers `42601`;
- * `generatedIdentity` is `GENERATED ALWAYS AS IDENTITY` and it answers `428C9`.
+ * BOTH PROPERTIES, because they are two different refusals. THEY ARE NOT TWO
+ * SQLSTATES, THOUGH THIS BLOCK SAID THEY WERE: `428C9` answers `generated`,
+ * which is `GENERATED ALWAYS AS (...) STORED`, and `generatedIdentity`, which
+ * is `GENERATED ALWAYS AS IDENTITY`, on INSERT and on UPDATE alike. `42601`
+ * is `syntax_error` and answers neither. They part on the DETAIL line and on
+ * OVERRIDING SYSTEM VALUE, which lifts the identity refusal only. ADR-456.
  *
- * `isGenerated` IS NOT READ BECAUSE IT DOES NOT EXIST. ADR-445 section 8 item 1
- * priced a guard against that name, ADR-448 section 4 found it undefined on every
- * column, and session 646 re-derived it on the pinned `drizzle-orm` rather than
- * inheriting the finding: `'isGenerated' in column` is false on all 1367 columns
- * the registry exposes. The two properties read here are the two that exist.
+ * `isGenerated` IS NOT READ BECAUSE IT DOES NOT EXIST: ADR-445 section 8 item 1
+ * priced a guard, and ADR-456 re-derives it false on all 1367 registry columns.
  */
 function databaseWrites(column: PgColumn): boolean {
   return column.generated !== undefined || column.generatedIdentity !== undefined;
