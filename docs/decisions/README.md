@@ -468,6 +468,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-455](ADR-455.md) | the six generated expressions are EXECUTED against a live database, and all six compute what the corpus says they mean (2026-09-08, status: proposed) |
 | [ADR-456](ADR-456.md) | the two accessor docblocks argue a distinction the database does not make, the SQLSTATE is `428C9` on all four halves, and the three registry figures re-derive unchanged (2026-09-08, status: proposed) |
 | [ADR-457](ADR-457.md) | the sixth generated column is transcribed and NOT registered, both halves of the arithmetic survive, and one leg of the block is vacuous (2026-09-08, status: proposed) |
+| [ADR-458](ADR-458.md) | the three guards are the whole set, the assertion that says so is a matrix rather than a list, and one builder's absence has no reason behind it (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
