@@ -8,6 +8,7 @@ import {
   BUDGET,
   ENUMERATORS,
   MEASURE_CHILD,
+  PLANTED_EXTENSIONS,
   REPO_ROOT,
   ROUNDS,
   SELF,
@@ -16,6 +17,7 @@ import {
   carriersOf,
   census,
   enumerates,
+  enumeratesUnread,
   exportedSurface,
   foldPath,
   functions,
@@ -27,15 +29,19 @@ import {
   legMeasurementIsReal,
   legRosterIsComplete,
   legRosterIsMeasured,
+  legSuffixesAreDerived,
   measure,
   measuredSummary,
   measuredVerdicts,
   measurementPatch,
   measurementPlan,
+  plantedExtensions,
   readSource,
+  roundsFor,
   run,
+  suffixLiterals,
 } from '../checks/tree-input-budget.mjs';
-import type { Verdict } from '../checks/tree-input-budget.mjs';
+import type { Suffixes, Verdict } from '../checks/tree-input-budget.mjs';
 import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
@@ -883,6 +889,285 @@ describe('the measured roster on this repository', () => {
       expect(run([MEASURE_CHILD], (line) => lines.push(line))).toBe(2);
       expect(lines[0]).toContain('usage:');
       expect(lines.join('\n')).not.toContain(MEASURE_CHILD);
+    },
+    CORPUS_SCAN_MS,
+  );
+});
+
+// =============================================================================
+// THE PLANTED EXTENSION SET, READ OUT OF THE CHECKERS (`ADR-474`)
+// =============================================================================
+// `ADR-472` section 10 item 4. The planted tree knew eight extensions and they
+// were written down, so a checker filtering on a ninth enumerated a directory
+// whose every name it rejected. THE VERDICT STAYED CORRECT AND THE READ
+// COMPARISON WENT AWAY, which is a failure that reports PASS.
+//
+// THE CONTROL IS THE WHOLE POINT AND IT IS BELOW IN BOTH DIRECTIONS. One
+// fixture walker, one extension the floor does not carry, measured twice: once
+// against the written floor, where it enumerates and reads nothing, and once
+// against the set derived from its own source, where the comparison comes back.
+// A fix nobody can watch the absence of is a fix nobody can trust.
+//
+// AND THE PARSE IS WATCHED REFUSING RATHER THAN LOSING. `ADR-470` section 7
+// holds four parsing defects open and every one of them failed SILENTLY by
+// dropping something. The cases here assert the three ways this parse declines
+// to decide, and that each of them is COUNTED where a reader can see it.
+// =============================================================================
+
+/** The suffix derivation over one fixture checker, which is the only file in it. */
+function suffixesOf(source: string): Suffixes {
+  const { suite, checks } = fixture({ 'checks/fixture-checker.mjs': source });
+  return suffixLiterals(census(suite, checks).mods, checks);
+}
+
+describe('the suffix derivation reads the checkers own literals', () => {
+  test('a suffix test in a checker puts its literal in the planted set', () => {
+    const seen = suffixesOf(`
+export function derived(root = '${DIR}') {
+  return readdirSync(root).filter((name) => name.endsWith('.zzz'));
+}
+`);
+    expect(seen.derived).toContain('.zzz');
+    expect(seen.refused).toEqual([]);
+    expect(seen.unfolded).toBe(0);
+  });
+
+  test('and a checker with no suffix test derives nothing, which is the other direction', () => {
+    // THE SMALLEST EDIT THAT TAKES IT OUT. The same walker, reading every name
+    // instead of filtering it, and the set is empty. Without this the case
+    // above passes over a derivation that returns everything it is shown.
+    const seen = suffixesOf(`
+export function derived(root = '${DIR}') {
+  return readdirSync(root).filter((name) => name.length > 0);
+}
+`);
+    expect(seen.derived).toEqual([]);
+  });
+
+  test('a literal no filename can carry is REFUSED AND NAMED, never dropped in silence', () => {
+    // `absence-claims.mjs` tests a relative PATH for a trailing separator. No
+    // directory can hold a file whose name ends in one, so the candidate has to
+    // go; the defect would be it going quietly. It is named in `--list` and
+    // counted in the report, which is the difference between this parse and the
+    // four `ADR-470` section 7 holds open.
+    const seen = suffixesOf(`
+export function derived(root = '${DIR}') {
+  return readdirSync(root).filter((name) => name.endsWith('/'));
+}
+`);
+    expect(seen.refused).toEqual(['/']);
+    expect(seen.derived).toEqual([]);
+  });
+
+  test('an argument that is not a literal is COUNTED, being the class this parse cannot see through', () => {
+    const seen = suffixesOf(`
+const wanted = ['.a', '.b'].join('');
+export function derived(root = '${DIR}') {
+  return readdirSync(root).filter((name) => name.endsWith(wanted));
+}
+`);
+    expect(seen.unfolded).toBe(1);
+    expect(seen.derived).toEqual([]);
+    expect(seen.refused).toEqual([]);
+  });
+
+  test('a candidate this parse cannot rule out is PLANTED rather than judged', () => {
+    // `endsWith('_at')` is a column name in `repo-invariants.mjs` and
+    // `endsWith('package.json')` is a whole filename in `dependants.mjs`.
+    // Neither is an extension and both are planted, because a name carrying a
+    // suffix nothing filters on costs one file, while a name MISSING a suffix
+    // something does filter on costs the read comparison. The asymmetry is the
+    // design and it is asserted rather than described.
+    const seen = suffixesOf(`
+export function derived(root = '${DIR}') {
+  return readdirSync(root).filter((name) => name.endsWith('_at') || name.endsWith('package.json'));
+}
+`);
+    expect(seen.derived).toEqual(['_at', 'package.json']);
+  });
+
+  test('the derivation ADDS to the written floor and never subtracts from it', () => {
+    // THE FLOOR IS A FLOOR. Nothing under `packages/tooling/checks/` spells
+    // `.yml` or `.txt` in a suffix test at all, so a set that REPLACED the
+    // written list would plant fewer kinds of name than the list it replaced.
+    // That is the same silent thinning, arriving from the other side.
+    const { suite, checks } = fixture({
+      'checks/fixture-checker.mjs': `
+export function derived(root = '${DIR}') {
+  return readdirSync(root).filter((name) => name.endsWith('.zzz'));
+}
+`,
+    });
+    const ext = plantedExtensions(census(suite, checks).mods, checks);
+    for (const one of PLANTED_EXTENSIONS) expect(ext).toContain(one);
+    expect(ext).toContain('.zzz');
+    expect(ext.length).toBe(PLANTED_EXTENSIONS.length + 1);
+  });
+
+  test('a parse that decides NOTHING throws instead of falling back to the floor in silence', () => {
+    // LEG A, APPLIED TO THIS DERIVATION. A total parse failure that quietly
+    // reverted to the eight written extensions would report a figure a reader
+    // cannot tell from a working one, which is the defect and not the remedy.
+    expect(() => {
+      legSuffixesAreDerived({ derived: [], refused: ['/'], unfolded: 3 });
+    }).toThrow(/reads nothing/);
+    expect(() => {
+      legSuffixesAreDerived({ derived: ['.sql'], refused: [], unfolded: 0 });
+    }).not.toThrow();
+  });
+});
+
+describe('a round is sized against the extension set and not written as a number', () => {
+  test('the small round plants at least one file per extension, so the last one is reached', () => {
+    // `plant` CYCLES THE EXTENSIONS. A round planting fewer files than there
+    // are extensions never reaches the last of them, so with the set written as
+    // eight and the small round written as 8, a ninth extension would have been
+    // planted in the LARGE round only and the comparison it exists to make
+    // possible would have compared nothing against nothing.
+    expect(roundsFor(['.a', '.b', '.c']).map((one) => one.perDir)).toEqual([3, 9]);
+    expect(roundsFor(['.a']).map((one) => one.perDir)).toEqual([1, 3]);
+  });
+
+  test('and at the written floor they are the 8 and 24 they were written as', () => {
+    expect(ROUNDS.map((one) => one.perDir)).toEqual([
+      PLANTED_EXTENSIONS.length,
+      PLANTED_EXTENSIONS.length * 3,
+    ]);
+    expect(ROUNDS.map((one) => one.perDir)).toEqual([8, 24]);
+  });
+});
+
+/** One walker, filtering on an extension the written floor does not carry. */
+const NINTH = `
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+export function filtersOnANinth(root = '${DIR}') {
+  let total = 0;
+  for (const name of readdirSync(root)) {
+    if (!name.endsWith('.ninth')) continue;
+    total += readFileSync(join(root, name), 'utf8').length;
+  }
+  return total;
+}
+`;
+
+/** That walker, measured against whichever extension set it is handed. */
+function measureNinth(ext: string[]): Verdict {
+  const module = checkerFixture(NINTH);
+  const verdicts = measuredVerdicts(
+    measure([{ module, name: 'filtersOnANinth', rostered: true, args: ['default'] }], SELF, ext),
+  );
+  return named(verdicts, 'filtersOnANinth');
+}
+
+describe('the ninth extension, watched taking the read comparison away and giving it back', () => {
+  test('against the written floor it enumerates, reads NOTHING, and is still a correct verdict', () => {
+    // THIS IS `ADR-472` SECTION 10 ITEM 4, REPRODUCED. The walker walks. Leg
+    // D is satisfied and says so. Every name the planted tree offers is
+    // rejected by a filter the planted tree knows nothing about, so the read
+    // column is [0,0] in both rounds and the comparison between them is not a
+    // comparison. NOTHING HERE IS RED, which is exactly why it needed a case.
+    const v = measureNinth(PLANTED_EXTENSIONS);
+    expect(enumerates(v)).toBe(true);
+    expect(legRosterIsMeasured(new Map([['m#filtersOnANinth', v]]))).toEqual([]);
+    expect(v.read).toEqual([0, 0]);
+    expect(grewWithTheTree(v)).toBe(false);
+    expect(enumeratesUnread(v)).toBe(true);
+  });
+
+  test('and against the set derived from its own source the comparison comes back', () => {
+    // THE SAME WALKER, THE SAME MEASUREMENT, ONE INPUT CHANGED. The extension
+    // is read out of the fixture's own `endsWith` literal, so the planted
+    // tree carries a name it accepts and the two rounds differ again.
+    const { suite, checks } = fixture({ 'checks/fixture-checker.mjs': NINTH });
+    const ext = plantedExtensions(census(suite, checks).mods, checks);
+    expect(ext).toContain('.ninth');
+
+    const v = measureNinth(ext);
+    expect(enumerates(v)).toBe(true);
+    expect(v.read[0]).toBeGreaterThan(0);
+    expect(v.read[1]).toBeGreaterThan(v.read[0] as number);
+    expect(grewWithTheTree(v)).toBe(true);
+    expect(enumeratesUnread(v)).toBe(false);
+  });
+
+  test('and the count does not over-fire on a walker that reads what it enumerates', () => {
+    // WITHOUT THIS, `enumeratesUnread` could be true of everything and the
+    // two cases above would still pass. `walks` reads every name it is given.
+    expect(enumeratesUnread(named(measureShapes(), 'walks'))).toBe(false);
+  });
+});
+
+describe('what the derivation still cannot serve, measured rather than parsed', () => {
+  test('a filter that requires a name PREFIX rejects every planted name whatever its extension', () => {
+    // EXTENSIONS ARE NOT THE ONLY WAY TO REJECT A NAME, and this is the limit
+    // of the price `ADR-472` section 10 item 4 set. `price-register.mjs`
+    // filters `docs/decisions/` on a pattern that requires the name to start
+    // with `ADR-`: the planted name carries the extension and fails the
+    // pattern. Inventing a name to satisfy a pattern is the fidelity to
+    // checker inputs `ADR-472` section 3.2 refused, so the residue is COUNTED
+    // and named in the report instead of being parsed for.
+    const module = checkerFixture(`
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+export function needsAPrefix(root = '${DIR}') {
+let total = 0;
+for (const name of readdirSync(root)) {
+  if (!/^merit-no-such-prefix-\\d+\\.md$/.test(name)) continue;
+  total += readFileSync(join(root, name), 'utf8').length;
+}
+return total;
+}
+`);
+    const verdicts = measuredVerdicts(
+      measure([{ module, name: 'needsAPrefix', rostered: true, args: ['default'] }]),
+    );
+    expect(enumerates(named(verdicts, 'needsAPrefix'))).toBe(true);
+    expect(enumeratesUnread(named(verdicts, 'needsAPrefix'))).toBe(true);
+    expect(measuredSummary(verdicts).blinded.join(' ')).toContain('#needsAPrefix');
+  });
+});
+
+describe('the derived extension set on this repository', () => {
+  test(
+    'the check runs on the union, the derivation is not vacuous, and no verdict moved',
+    () => {
+      // DERIVED AND NOT PINNED, for the reason the first case in this file
+      // gives. What is asserted is that the union is what the measurement is
+      // handed, that the parse read something, and that widening the planted
+      // tree left every leg where it was.
+      const seen = census();
+      const suffixes = suffixLiterals(seen.mods);
+      expect(() => {
+        legSuffixesAreDerived(suffixes);
+      }).not.toThrow();
+
+      const ext = plantedExtensions(seen.mods);
+      expect(ext.length).toBeGreaterThan(PLANTED_EXTENSIONS.length);
+      for (const one of PLANTED_EXTENSIONS) expect(ext).toContain(one);
+
+      const verdicts = measuredVerdicts(
+        measure(measurementPlan(seen.mods, seen.walkers), SELF, ext),
+      );
+      expect(legRosterIsMeasured(verdicts)).toEqual([]);
+      expect(legRosterIsComplete(verdicts)).toEqual([]);
+      expect(measuredSummary(verdicts).grew).toBeGreaterThan(0);
+    },
+    CORPUS_SCAN_MS,
+  );
+
+  test(
+    'the patch is generated from the set it is handed, and not from the written floor',
+    () => {
+      // THE SAME PROPERTY THE `ENUMERATORS` CASE ABOVE ASSERTS, FOR THE SECOND
+      // THING THE PATCH CARRIES. If the patch went on embedding the floor while
+      // the parent sized its rounds against the union, the small round would
+      // plant more files than there are extensions to cycle and the derivation
+      // would reach the child in name only.
+      expect(measurementPatch(REPO_ROOT, SELF, ['.only'])).toContain(JSON.stringify(['.only']));
+      expect(measurementPatch(REPO_ROOT, SELF)).toContain(JSON.stringify(PLANTED_EXTENSIONS));
     },
     CORPUS_SCAN_MS,
   );

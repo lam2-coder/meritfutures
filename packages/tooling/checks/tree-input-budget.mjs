@@ -1412,11 +1412,17 @@ export const MEASURE_ENV = 'MERIT_TREE_INPUT_BUDGET_MEASURING';
 export const MEASURE_CHILD = '--measure-child';
 
 /**
- * The extensions the planted files carry. THIS IS THE ONLY THING THE PLANTED
- * TREE KNOWS ABOUT ANY CHECKER'S INPUTS, and it is a list of suffixes rather
- * than a copy of anything: a checker that filters its listing to `.sql` has to
- * find at least one `.sql` name in it or the measurement learns nothing about
- * what it reads. The content behind every one of them is `PLANTED_LINE`.
+ * The extensions the planted files carry, AS A FLOOR AND NO LONGER AS THE WHOLE
+ * SET (`ADR-474`). It is a list of suffixes rather than a copy of anything: a
+ * checker that filters its listing to `.sql` has to find at least one `.sql`
+ * name in it or the measurement learns nothing about what it reads. The content
+ * behind every one of them is `PLANTED_LINE`.
+ *
+ * IT STAYS WRITTEN DOWN BECAUSE THE DERIVATION DOES NOT REACH ALL EIGHT.
+ * Nothing under `packages/tooling/checks/` spells `.yml` or `.txt` in a suffix
+ * test at all, so a set that REPLACED this list rather than adding to it would
+ * plant fewer kinds of name than the list it replaced, which is the same silent
+ * thinning `ADR-472` section 10 item 4 is about, arriving from the other side.
  */
 export const PLANTED_EXTENSIONS = [
   '.mjs',
@@ -1432,16 +1438,168 @@ export const PLANTED_EXTENSIONS = [
 /** What every planted file contains. One line, the same line, every time. */
 export const PLANTED_LINE = '// merit tree-input-budget planted file; no checker input is here\n';
 
+// -----------------------------------------------------------------------------
+// THE EXTENSION SET, READ OUT OF THE CHECKERS THEMSELVES (`ADR-474`)
+// -----------------------------------------------------------------------------
+// `ADR-472` section 10 item 4 named the gap and it is quoted rather than
+// paraphrased:
+//
+//   "THE PLANTED TREE KNOWS EIGHT EXTENSIONS AND THEY ARE WRITTEN DOWN.
+//    `PLANTED_EXTENSIONS` is the single place where the measurement carries
+//    knowledge about what a checker's inputs look like. A checker filtering on a
+//    ninth would enumerate a directory whose every name it rejects, which shows
+//    as an enumeration with no reads and is still a correct verdict, but the
+//    read comparison silently stops being available for it."
+//
+// SO THE SET IS READ OUT OF THE CHECKERS' OWN SUFFIX TESTS AND UNIONED WITH THE
+// FLOOR. One shape is parsed and it is the one this module already parses: the
+// single string-literal argument of `endsWith`, taken off `callsIn`, structure
+// from the blanked side and text from the kept one, exactly as everything else
+// here reads a literal.
+//
+// WHAT THIS PARSE DOES WHEN IT CANNOT DECIDE, WRITTEN DOWN BEFORE ANYBODY ASKS,
+// BECAUSE `ADR-470` SECTION 7 HOLDS FOUR PARSING DEFECTS OPEN AND EVERY ONE OF
+// THEM FAILED SILENTLY BY LOSING SOMETHING. This is the fifth parse in this
+// module and it is built so that its errors are GAINS:
+//
+//   IT ADDS AND NEVER SUBTRACTS. The floor is a floor. A suffix this parse
+//   fails to find is still planted if it was written down, so the worst a miss
+//   can do is leave the set where it already was. A parse that REPLACED the
+//   floor would turn every miss into exactly the silent thinning it exists to
+//   end
+//   A CANDIDATE IT CANNOT RULE OUT IS PLANTED. `endsWith('_at')` is a column
+//   name and `endsWith('package.json')` is a whole filename, and neither is an
+//   extension. Both are planted anyway, because a name carrying a suffix
+//   nothing filters on costs one file and serves nothing, while a name missing
+//   a suffix something DOES filter on costs the read comparison
+//   A LITERAL NO FILE CAN CARRY IS REFUSED AND COUNTED, NEVER DROPPED IN
+//   SILENCE. `endsWith('/')` in `absence-claims.mjs` is a suffix test on a PATH
+//   and not on a name, and no directory can hold a file whose name ends in a
+//   separator. Those literals are named in `--list` and counted in the report
+//   AN ARGUMENT THAT IS NOT A LITERAL IS COUNTED TOO, as `unfolded`. It is the
+//   only class this parse genuinely cannot see through, and a number that moves
+//   is a reader's signal that it grew
+//   AND A PARSE THAT DECIDES NOTHING AT ALL THROWS. `legSuffixesAreDerived` is
+//   leg A applied to this derivation: falling back to the floor and reporting a
+//   figure indistinguishable from a working one is the defect, not the remedy
+//
+// WHAT IT STILL CANNOT SERVE, AND EXTENSIONS ARE NOT THE ONLY WAY TO REJECT A
+// NAME. `price-register.mjs` filters its listing with `/^ADR-\d+\.md$/`, which
+// requires a name PREFIX. `merit-planted-1.md` carries the extension and fails
+// the pattern, so both of that checker's rostered walkers enumerate and read
+// nothing, on this tree, today, before this row touched anything. Inventing a
+// name to satisfy a pattern is the fidelity to checker inputs `ADR-472` section
+// 3.2 refused, so it is not attempted. `enumeratesUnread` MEASURES the residue
+// instead of parsing for it, and the report states the count.
+// -----------------------------------------------------------------------------
+
+/** The call whose single string-literal argument is the tail of a filename. */
+export const SUFFIX_TESTS = ['endsWith'];
+
+/**
+ * What a name a directory can actually hold may end in. `'/'`, `')'` and
+ * `'/${target}'` are all real arguments of real suffix tests in this tree and
+ * none of them is a filename tail.
+ */
+const PLANTABLE_SUFFIX = /^[\w.+-]{1,64}$/;
+
+/**
+ * @typedef {object} Suffixes
+ * @property {string[]} derived   suffixes read out of the checkers themselves
+ * @property {string[]} refused   literals no planted name can carry, kept by
+ *                                name so the report can state them
+ * @property {number} unfolded    suffix tests whose argument is not a literal
+ */
+
+/**
+ * EVERY SUFFIX THE CHECKERS THEMSELVES TEST A FILENAME AGAINST.
+ *
+ * @param {Map<string, Mod>} mods
+ * @param {string} [checks]
+ * @returns {Suffixes}
+ */
+export function suffixLiterals(mods, checks = CHECKS_DIR) {
+  /** @type {Set<string>} */
+  const derived = new Set();
+  /** @type {Set<string>} */
+  const refused = new Set();
+  let unfolded = 0;
+  for (const [file, mod] of mods) {
+    if (relative(checks, file).startsWith('..')) continue;
+    for (const call of callsIn(mod.src.blanked, mod.src.kept)) {
+      if (!SUFFIX_TESTS.includes(call.name) || call.args.length !== 1) continue;
+      const literal = LITERAL.exec(/** @type {string} */ (call.args[0]).trim());
+      if (literal === null) {
+        unfolded += 1;
+        continue;
+      }
+      const text = /** @type {string} */ (literal[2]);
+      if (PLANTABLE_SUFFIX.test(text)) derived.add(text);
+      else refused.add(text);
+    }
+  }
+  return { derived: [...derived].sort(), refused: [...refused].sort(), unfolded };
+}
+
+/**
+ * The floor and the derivation together. THE UNION AND NOT THE DERIVATION, for
+ * the reason `PLANTED_EXTENSIONS` gives.
+ *
+ * @param {Map<string, Mod>} mods
+ * @param {string} [checks]
+ * @param {string[]} [floor]
+ * @returns {string[]}
+ */
+export function plantedExtensions(mods, checks = CHECKS_DIR, floor = PLANTED_EXTENSIONS) {
+  return [...new Set([...floor, ...suffixLiterals(mods, checks).derived])].sort();
+}
+
+/**
+ * Leg A for the extension derivation. A parse that decides NOTHING is the
+ * silent failure `ADR-470` section 7 holds four instances of, so it THROWS
+ * rather than falling back to the floor and reporting a figure a reader cannot
+ * tell from a working one.
+ *
+ * @param {Suffixes} suffixes
+ */
+export function legSuffixesAreDerived(suffixes) {
+  if (suffixes.derived.length === 0) {
+    throw new Error(
+      `not one ${SUFFIX_TESTS.join('/')} literal was read out of ${rel(CHECKS_DIR)}, so the ` +
+        'planted tree is running on its written floor alone and the derivation reads nothing',
+    );
+  }
+}
+
 /**
  * TWO ROUNDS, DIFFERING ONLY IN HOW MANY FILES ARE PLANTED PER DIRECTORY. A
  * named read of one file reads the same one file in both; an enumeration reads
  * more in the second. The comparison is the measurement `ADR-470` section 10
  * item 2 asked for, and the round tags appear in the report.
+ *
+ * PER DIRECTORY IS A MULTIPLE OF THE EXTENSION COUNT AND NOT A NUMBER
+ * (`ADR-474`). `plant` cycles the extensions, so a round planting fewer files
+ * than there are extensions never reaches the last of them: with the set
+ * written as eight and the small round written as 8, a ninth extension would
+ * have been planted in the LARGE round only, and the comparison that ninth
+ * exists to make possible would have compared nothing against nothing. At the
+ * floor's eight these are 8 and 24, which is what they were written as.
  */
-export const ROUNDS = [
-  { tag: 'small', perDir: 8 },
-  { tag: 'large', perDir: 24 },
+export const ROUND_SIZES = [
+  { tag: 'small', perExtension: 1 },
+  { tag: 'large', perExtension: 3 },
 ];
+
+/**
+ * @param {string[]} ext
+ * @returns {{ tag: string, perDir: number }[]}
+ */
+export function roundsFor(ext) {
+  return ROUND_SIZES.map((one) => ({ tag: one.tag, perDir: ext.length * one.perExtension }));
+}
+
+/** The rounds the written floor alone gives, which is what they used to be. */
+export const ROUNDS = roundsFor(PLANTED_EXTENSIONS);
 
 /** A ceiling on materialised directories, so a walker cannot plant forever. */
 export const PLANT_CAP = 200;
@@ -1481,9 +1639,11 @@ export function exportedSurface(mods, checks = CHECKS_DIR) {
  *
  * @param {string} repoRoot
  * @param {string} self
+ * @param {string[]} [ext]  the planted extension set, derived by `run` and
+ *                          defaulting to the written floor
  * @returns {string}
  */
-export function measurementPatch(repoRoot, self) {
+export function measurementPatch(repoRoot, self, ext = PLANTED_EXTENSIONS) {
   return `
 const { createRequire } = await import('node:module');
 const require = createRequire(${JSON.stringify(self)});
@@ -1494,7 +1654,7 @@ const S = {
   repoRoot: ${JSON.stringify(repoRoot)},
   fixture: null,
   perDir: 0,
-  ext: ${JSON.stringify(PLANTED_EXTENSIONS)},
+  ext: ${JSON.stringify(ext)},
   line: ${JSON.stringify(PLANTED_LINE)},
   cap: ${String(PLANT_CAP)},
   materialised: new Set(),
@@ -1692,15 +1852,16 @@ export function measurementPlan(mods, walkers, checks = CHECKS_DIR) {
  *
  * @param {Invocation[]} calls
  * @param {string} [self]
+ * @param {string[]} [ext]
  * @returns {Row[]}
  */
-export function measure(calls, self = SELF) {
+export function measure(calls, self = SELF, ext = PLANTED_EXTENSIONS) {
   const base = mkdtempSync(join(tmpdir(), 'merit-measured-roster-'));
   const spec = join(base, 'spec.json');
   const out = join(base, 'out.json');
-  const patch = `data:text/javascript,${encodeURIComponent(measurementPatch(REPO_ROOT, self))}`;
+  const patch = `data:text/javascript,${encodeURIComponent(measurementPatch(REPO_ROOT, self, ext))}`;
   try {
-    writeFileSync(spec, JSON.stringify({ base, out, calls, rounds: ROUNDS }));
+    writeFileSync(spec, JSON.stringify({ base, out, calls, rounds: roundsFor(ext) }));
     execFileSync(process.execPath, ['--import', patch, self, MEASURE_CHILD, spec], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -1855,6 +2016,23 @@ export function measuredVerdicts(rows) {
 /** @param {Verdict} v @returns {boolean} */
 export const enumerates = (v) => v.dirs > 0 || v.spawns.length > 0;
 
+/**
+ * ENUMERATED, AND OPENED NOTHING THE PLANTED TREE HELD. `ADR-472` section 10
+ * item 4 is this shape exactly: a checker filtering on a name the planted tree
+ * does not carry enumerates a directory whose every name it rejects. The
+ * verdict stays right and the READ COMPARISON stops being available for it, so
+ * leg D's evidence thins with nothing saying so.
+ *
+ * IT IS COUNTED AND NAMED, AND IT IS NOT A FINDING. A walker that enumerates
+ * names and never opens one is doing its job, and a leg that reddened on this
+ * would be this check inventing a defect out of its own planted tree. The count
+ * stands beside `inconclusive` in the report, which is the same standing for
+ * the same reason, and a diff that moves it from two to three is visible there.
+ *
+ * @param {Verdict} v @returns {boolean}
+ */
+export const enumeratesUnread = (v) => enumerates(v) && v.read.every((n) => n === 0);
+
 /** @param {Verdict} v @returns {boolean} */
 export const grewWithTheTree = (v) =>
   v.read.length > 1 &&
@@ -1925,7 +2103,7 @@ export function legRosterIsComplete(verdicts) {
  * measured rather than the one it hoped for.
  *
  * @param {Map<string, Verdict>} verdicts
- * @returns {{ rostered: number, measured: number, inconclusive: number, probed: number, grew: number, spawning: string[] }}
+ * @returns {{ rostered: number, measured: number, inconclusive: number, probed: number, grew: number, spawning: string[], blinded: string[] }}
  */
 export function measuredSummary(verdicts) {
   let rostered = 0;
@@ -1935,6 +2113,8 @@ export function measuredSummary(verdicts) {
   let grew = 0;
   /** @type {string[]} */
   const spawning = [];
+  /** @type {string[]} */
+  const blinded = [];
   for (const [id, v] of verdicts) {
     if (!v.rostered) {
       probed += 1;
@@ -1944,12 +2124,12 @@ export function measuredSummary(verdicts) {
     if (enumerates(v)) measured += 1;
     else if (v.touched === 0) inconclusive += 1;
     if (grewWithTheTree(v)) grew += 1;
-    if (v.spawns.length > 0) {
-      const hash = id.lastIndexOf('#');
-      spawning.push(`${rel(id.slice(0, hash))}#${id.slice(hash + 1)}`);
-    }
+    const hash = id.lastIndexOf('#');
+    const name = `${rel(id.slice(0, hash))}#${id.slice(hash + 1)}`;
+    if (v.spawns.length > 0) spawning.push(name);
+    if (enumeratesUnread(v)) blinded.push(name);
   }
-  return { rostered, measured, inconclusive, probed, grew, spawning };
+  return { rostered, measured, inconclusive, probed, grew, spawning, blinded };
 }
 
 /**
@@ -2002,13 +2182,20 @@ export function run(argv = [], out = emit) {
   let seen;
   /** @type {Map<string, Verdict> | null} */
   let measured = null;
+  /** @type {Suffixes | null} */
+  let suffixes = null;
+  /** @type {string[]} */
+  let ext = PLANTED_EXTENSIONS;
   try {
     seen = census();
     legDerivationIsReal(seen);
     // THE MEASUREMENT IS SKIPPED IN THE CHILD AND NOWHERE ELSE. `run` is itself
     // a rostered walker, so a child measuring it would spawn a child of its own.
     if (process.env[MEASURE_ENV] !== '1') {
-      measured = measuredVerdicts(measure(measurementPlan(seen.mods, seen.walkers)));
+      suffixes = suffixLiterals(seen.mods);
+      legSuffixesAreDerived(suffixes);
+      ext = plantedExtensions(seen.mods);
+      measured = measuredVerdicts(measure(measurementPlan(seen.mods, seen.walkers), SELF, ext));
       legMeasurementIsReal(measured);
     }
   } catch (err) {
@@ -2038,6 +2225,30 @@ export function run(argv = [], out = emit) {
           `argvGuard=${walker.argvGuard === null ? 'none' : String(walker.argvGuard)}`,
       );
       out(`             ${run}`);
+      if (v !== undefined && enumeratesUnread(v)) {
+        out(
+          '             ENUMERATES AND READS NONE OF IT, so the read comparison is not available ' +
+            'for this walker. Its filter rejects every planted name (ADR-474)',
+        );
+      }
+    }
+    out('');
+    if (suffixes !== null) {
+      out(
+        `EXTENSIONS  ${String(ext.length)} planted: ${String(PLANTED_EXTENSIONS.length)} written ` +
+          `floor and ${String(suffixes.derived.length)} read out of ` +
+          `${SUFFIX_TESTS.join('/')} literal(s) in ${rel(CHECKS_DIR)}`,
+      );
+      out(`         set      ${ext.join(' ')}`);
+      out(`         derived  ${suffixes.derived.join(' ')}`);
+      out(
+        `         refused  ${String(suffixes.refused.length)}, no planted name can carry them: ` +
+          `${suffixes.refused.map((one) => `\`${one}\``).join(' ')}`,
+      );
+      out(
+        `         unfolded ${String(suffixes.unfolded)} suffix test(s) whose argument is not a ` +
+          'string literal, which is the one class this parse cannot see through',
+      );
     }
     out('');
     out(`POPULATION  ${String(population.length)} case(s) of ${String(seen.cases.length)}`);
@@ -2077,6 +2288,21 @@ export function run(argv = [], out = emit) {
           'function(s) there are callable with no argument at all, and were run, and none of ' +
           'them enumerates unrostered',
       );
+      // THE PLANTED TREE'S OWN KNOWLEDGE, STATED. `ADR-474`. A PASS that does
+      // not say how many kinds of name it planted, or how many walkers rejected
+      // every one of them, is a PASS over evidence nobody can size.
+      if (suffixes !== null) {
+        out(
+          `       the planted tree carries ${String(ext.length)} extension(s): ` +
+            `${String(PLANTED_EXTENSIONS.length)} written floor and ` +
+            `${String(suffixes.derived.length)} read out of the checkers' own ` +
+            `${SUFFIX_TESTS.join('/')} literal(s), ${String(suffixes.refused.length)} literal(s) ` +
+            `refused as unplantable and ${String(suffixes.unfolded)} argument(s) not a literal; ` +
+            `${String(m.blinded.length)} rostered walker(s) enumerate it and read none of it` +
+            (m.blinded.length === 0 ? '' : ` (${m.blinded.join(', ')})`) +
+            ', so the read comparison is not available for them',
+        );
+      }
     }
     return 0;
   }
