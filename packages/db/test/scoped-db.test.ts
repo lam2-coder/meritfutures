@@ -4468,9 +4468,9 @@ describe('P5-b: a handle for one identity cannot reach another identity`s row', 
 // FIVE COMPARISONS AND NOT FOUR. Type, nullability and DEFAULT are the three the
 // registry loops make; the fourth is the column-name fold those loops also make;
 // and the fifth is the GENERATION CLAUSE, which no loop in this file makes for
-// any table. It is written here for THIS table only, because this table has the
-// only generated `*_cents` column in the estate and a generic comparison over
-// the whole registry is a different diff on a different row.
+// any table. Written here for THIS table only: it carries the only generated
+// `*_cents` column NO REGISTRY LOOP REACHES. The estate has TWO of them, the other
+// being `reconciliations.delta_cents` (ADR-457); a generic one is another row's diff.
 //
 // THERE IS NO TOP-LEVEL IMPORT FOR `liveAccountState` AND THAT IS NOT AN
 // OVERSIGHT. The import block of this file sits above every line any document
