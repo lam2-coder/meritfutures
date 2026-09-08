@@ -148,7 +148,7 @@ const BUILDERS = {
     throws: 0,
   },
   insertUnderStatement: {
-    guards: [],
+    guards: ['refuseTermInValues'],
     throws: 8,
   },
   pairInsertStatement: {
@@ -197,12 +197,6 @@ const DECLARED_ABSENCE = {
   // ---- refuseTermInValues --------------------------------------------------
   'deleteStatementOn::refuseTermInValues':
     'SETTLED: DELETE builds no values object. See the tenancy cell above.',
-  'insertUnderStatement::refuseTermInValues':
-    'OPEN: NO REASON EXISTS FOR THIS ONE AND THAT IS THE FINDING. Every other builder that ' +
-    'takes a values object calls this guard; this one does not, and the word "term" does not ' +
-    'appear anywhere in its body. `ADR-458` section 6 records it, measures the exposure at one ' +
-    'live producer on `sessions`, and prices the repair. It is a declared debt and not a ' +
-    'settled asymmetry.',
 
   // ---- refuseGeneratedColumn -----------------------------------------------
   'scopedInsertStatement::refuseGeneratedColumn':
