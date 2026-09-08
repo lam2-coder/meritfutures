@@ -129,6 +129,13 @@ entry is.
 | 46  | `ADR-461:220` | 10.5  | OPEN       | UNASSESSED  | -                             | that entry's, unchanged.                                                        |
 | 47  | `ADR-461:222` | 10.6  | OPEN       | UNASSESSED  | -                             | a row whose subject is turning the forcing-constraint filter into a ...         |
 | 48  | `ADR-461:224` | 10.7  | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for.                              |
+| 49  | `ADR-464:164` | 8.1   | OPEN       | UNASSESSED  | -                             | one row, a census over seven clauses on the model of `ADR-461` section 3 ...    |
+| 50  | `ADR-464:166` | 8.2   | OPEN       | UNASSESSED  | -                             | none, and there is nothing to take. It is recorded so that a later row ...      |
+| 51  | `ADR-464:168` | 8.3   | OPEN       | UNASSESSED  | -                             | none, same reason as item 2.                                                    |
+| 52  | `ADR-464:170` | 8.4   | OPEN       | UNASSESSED  | -                             | the honest options are a per-row `assessed at` commit and a leg that goes ...   |
+| 53  | `ADR-464:172` | 8.5   | OPEN       | UNASSESSED  | -                             | that entry's section 10 item 3, unchanged, which is the citation-set ...        |
+| 54  | `ADR-464:174` | 8.6   | OPEN       | UNASSESSED  | -                             | that entry's, widened from one step to two, and still one row that owns a ...   |
+| 55  | `ADR-464:176` | 8.7   | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for.                              |
 
 ## What this register does not cover, stated as a bound
 

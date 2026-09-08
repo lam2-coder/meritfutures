@@ -381,9 +381,15 @@ describe('leg D, the state is written down and a verdict names who reached it', 
   test('the vocabularies are closed and are the ones the register documents', () => {
     expect(OBLIGATIONS).toEqual(['OPEN', 'DISCHARGED', 'WITHDRAWN']);
     expect(ACCURACIES).toEqual(['HOLDS', 'WRONG', 'UNCHECKABLE', 'UNASSESSED']);
+    // PADDING-TOLERANT ON PURPOSE. Prettier pads a markdown table's cells to the
+    // column width, so an assertion written as the literal `| \`OPEN\` |` passes
+    // before the formatter runs and fails after it, which is a case that tests
+    // the formatter rather than the register. This one asserts the legend ROW.
     const document = readFileSync(REGISTER, 'utf8');
     for (const value of [...OBLIGATIONS, ...ACCURACIES]) {
-      expect(document, `the register does not document ${value}`).toContain(`| \`${value}\` |`);
+      expect(document, `the register does not document ${value}`).toMatch(
+        new RegExp(`^\\|\\s*\`${value}\`\\s*\\|`, 'm'),
+      );
     }
   });
 });
