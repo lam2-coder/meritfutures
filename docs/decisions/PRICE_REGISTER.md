@@ -124,10 +124,10 @@ entry is.
 | 41  | `ADR-459:189` | 9.5   | OPEN       | UNCHECKABLE | [ADR-461](ADR-461.md) 6       | whoever writes the first one takes the ruling on whether `Promise<void>` is ... |
 | 42  | `ADR-461:212` | 10.1  | OPEN       | UNASSESSED  | -                             | none for the six already recorded elsewhere; for the rest, the same founder ... |
 | 43  | `ADR-461:214` | 10.2  | OPEN       | UNASSESSED  | -                             | a `services:` block copied from `corpus.yml:164` onto `CI-02 unit and ...       |
-| 44  | `ADR-461:216` | 10.3  | OPEN       | UNASSESSED  | -                             | a widening of whatever derives a citation set so that a prose pointer of ...    |
+| 44  | `ADR-461:216` | 10.3  | WITHDRAWN  | UNASSESSED  | [ADR-467](ADR-467.md) 8       | a widening of whatever derives a citation set so that a prose pointer of ...    |
 | 45  | `ADR-461:218` | 10.4  | DISCHARGED | UNASSESSED  | [ADR-464](ADR-464.md) 5       | a `CI-06` letter or an `RI-nn` asserting that every labelled price names a ...  |
 | 46  | `ADR-461:220` | 10.5  | OPEN       | UNASSESSED  | -                             | that entry's, unchanged.                                                        |
-| 47  | `ADR-461:222` | 10.6  | OPEN       | UNASSESSED  | -                             | a row whose subject is turning the forcing-constraint filter into a ...         |
+| 47  | `ADR-461:222` | 10.6  | DISCHARGED | UNASSESSED  | [ADR-465](ADR-465.md)         | a row whose subject is turning the forcing-constraint filter into a ...         |
 | 48  | `ADR-461:224` | 10.7  | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for.                              |
 | 49  | `ADR-464:166` | 8.1   | OPEN       | UNASSESSED  | -                             | one row, a census over seven clauses on the model of `ADR-461` section 3 ...    |
 | 50  | `ADR-464:168` | 8.2   | OPEN       | UNASSESSED  | -                             | none, and there is nothing to take. It is recorded so that a later row ...      |
@@ -146,6 +146,13 @@ entry is.
 | 63  | `ADR-465:255` | 10.4  | OPEN       | UNASSESSED  | -                             | a `testTimeout` on that one case, or on the three `REPO_ROOT` probes in that ... |
 | 64  | `ADR-465:257` | 10.5  | OPEN       | UNASSESSED  | -                             | a decision, not a row. It contributes 4 of 105 and produces the commonest ... |
 | 65  | `ADR-465:259` | 10.6  | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for. |
+| 66  | `ADR-466:271` | 10.1  | OPEN       | UNASSESSED  | -                             | the same one-argument change this row made, in four more files, with the ... |
+| 67  | `ADR-466:273` | 10.2  | OPEN       | UNASSESSED  | -                             | an `RI-nn` over the test files, on `RI-35` leg 6's own idiom, asserting that a ... |
+| 68  | `ADR-466:275` | 10.3  | OPEN       | UNASSESSED  | -                             | a check with a derived expectation and a stated tolerance, over the swept ... |
+| 69  | `ADR-466:277` | 10.4  | OPEN       | UNASSESSED  | -                             | none, until the swept scope actually doubles, at which point the real ... |
+| 70  | `ADR-466:279` | 10.5  | OPEN       | UNASSESSED  | -                             | none. A rate over two days is reported as a rate over two days and is not ... |
+| 71  | `ADR-466:281` | 10.6  | OPEN       | UNASSESSED  | -                             | none. It is a dated record and `ADR-386`:169 governs: the pointer is named ... |
+| 72  | `ADR-466:283` | 10.7  | OPEN       | UNASSESSED  | -                             | the seven rows appended at integration as OPEN / UNASSESSED with no basis, ... |
 
 ## What this register does not cover, stated as a bound
 

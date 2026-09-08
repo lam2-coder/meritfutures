@@ -188,12 +188,12 @@ export const REFUSAL_RULE = resolve(HERE, '../../eslint-plugin-merit/rules/refus
  * searches for `CONVENTION.source`, so there is one spelling and one place to
  * change it.
  *
- * `ADR-459` section 9 item 2 places this literal at `write-guard-set.mjs:270`
- * and that figure was wrong when it was written: at `bbb9e22d` the literal sat
- * at `:264`, with a second `refuse[A-Z]` form (leg C's call matcher) at `:278`
- * and a prose mention in this file's own header. `ADR-459` is a dated record and
- * is not repaired; `ADR-462` carries the correction, and this constant is the
- * repair that makes the line number stop mattering.
+ * `ADR-459` section 9 item 2 pins this literal to a line number of this file, and that figure was
+ * RIGHT at the base it was written against: the blob there is byte-identical to the one at the
+ * merge after PR #742. It went stale in row 460's commit, which shortened the file. No corrected
+ * number is restated here, because every number previously written into this comment to correct
+ * that one was already false in the commit that wrote it. `ADR-459` is a dated record and is not
+ * repaired; `ADR-467` rules this repair, and naming the constant is what retired the line number.
  */
 export const CONVENTION = /^refuse[A-Z]/;
 

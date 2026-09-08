@@ -476,6 +476,8 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-463](ADR-463.md) | a conforming name is now held to a refusal, the wider throw is forced by the polarity rather than chosen, and RI-06's header stops pinning a count its own check never pinned (2026-09-08, status: proposed) |
 | [ADR-464](ADR-464.md) | the pricing idiom gets a register and a checker, the population is fifty-five at this head and not forty-one, and the entry that derived the forty-one published a command that misses three of them (2026-09-08, status: proposed) |
 | [ADR-465](ADR-465.md) | derivation B is definable and its precision is 87 percent, and the thing that stops a census is not the filter but the fact that most forcing constraints name an obstacle this repository does not contain (2026-09-08, status: proposed) |
+| [ADR-466](ADR-466.md) | the five-second budget is raised to thirty on seven cases and on none of the hundred, the growth that reddens it is application source rather than the corpus, and the case that actually went red under load was in a file this row could not touch (2026-09-08, status: proposed) |
+| [ADR-467](ADR-467.md) | the comment that repaired a stale pointer was false in the commit that wrote it, so the repair restates no number and the priced widening is withdrawn (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
