@@ -809,6 +809,7 @@ describe('leg A over the measurement, which throws rather than reporting', () =>
     rostered: true,
     dirs: 0,
     touched: 0,
+    named: 0,
     spawns: [],
     read: [0, 0],
     planted: [8, 24],
