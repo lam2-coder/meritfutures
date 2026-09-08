@@ -136,6 +136,16 @@ entry is.
 | 53  | `ADR-464:174` | 8.5   | OPEN       | UNASSESSED  | -                             | that entry's section 10 item 3, unchanged, which is the citation-set ...        |
 | 54  | `ADR-464:176` | 8.6   | OPEN       | UNASSESSED  | -                             | that entry's, widened from one step to two, and still one row that owns a ...   |
 | 55  | `ADR-464:178` | 8.7   | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for.                              |
+| 56  | `ADR-462:192` | 9.1  | OPEN       | UNASSESSED  | -                             | a planning decision, not a check. The only mechanical candidate this row ... |
+| 57  | `ADR-462:194` | 9.2  | OPEN       | UNASSESSED  | -                             | one line, at that docblock, on the model of this row's own repair: name the ... |
+| 58  | `ADR-463:160` | 9.1  | OPEN       | UNASSESSED  | -                             | one line. Nothing depends on it and `RI-06` is unaffected. |
+| 59  | `ADR-463:161` | 9.2  | OPEN       | UNASSESSED  | -                             | one line, after row 462 lands. |
+| 60  | `ADR-465:249` | 10.1  | OPEN       | UNASSESSED  | -                             | none, until a founder or a rule says whether a claim whose obstacle is a ... |
+| 61  | `ADR-465:251` | 10.2  | OPEN       | UNASSESSED  | -                             | a dispatch-time convention that every row's ALLOCATION cell states its ... |
+| 62  | `ADR-465:253` | 10.3  | OPEN       | UNASSESSED  | -                             | none. The command is in a dated record and the corrected form is written ... |
+| 63  | `ADR-465:255` | 10.4  | OPEN       | UNASSESSED  | -                             | a `testTimeout` on that one case, or on the three `REPO_ROOT` probes in that ... |
+| 64  | `ADR-465:257` | 10.5  | OPEN       | UNASSESSED  | -                             | a decision, not a row. It contributes 4 of 105 and produces the commonest ... |
+| 65  | `ADR-465:259` | 10.6  | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for. |
 
 ## What this register does not cover, stated as a bound
 
