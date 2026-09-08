@@ -37,6 +37,7 @@ import {
   ri35,
 } from '../checks/absence-claims.mjs';
 import { REPO_ROOT } from '../checks/repo-invariants.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
 // THE BUDGET FOR A CASE WHOSE INPUT IS THE WHOLE TREE. ADR-466.
@@ -52,16 +53,26 @@ import { REPO_ROOT } from '../checks/repo-invariants.mjs';
 // is a fixed budget over an input that grows, so it reddens on its own schedule
 // and it reddens whichever pull request happens to be open when it crosses.
 //
-// THIS CONSTANT RAISES A BUDGET AND TOUCHES NO ASSERTION. What each of the seven
+// THIS BUDGET RAISES A WALL AND TOUCHES NO ASSERTION. What each of the seven
 // reads, what it compares and what it concludes are byte-identical either side
-// of this change. A timeout is not a control over the tree; it is the wall that
-// stops a hang from wedging CI, and 30 seconds stops a hang exactly as well as 5
-// does. The thing a 5000ms budget was catching here was the size of this
-// repository, which is not a defect.
+// of the change that gave them one. A timeout is not a control over the tree;
+// it is the wall that stops a hang from wedging CI. The thing the 5000ms
+// default was catching here was the size of this repository, which is not a
+// defect.
 //
-// MEASURED 2026-09-08 at `c20550b`, 4 CPU, 404 swept file(s) / 9,314,992 byte(s)
-// of swept source. Left column: full suite, no artificial load. Right column:
-// the same full suite with four background CPU spinners on four cores.
+// THE CONSTANT MOVED OUT OF THIS FILE AND THE FIGURE WENT UP (ADR-468). It was
+// declared here at 30_000 because ADR-466's fence named one file. ADR-468 held
+// the whole of `packages/tooling/test/` and found `ri35.run(REPO_ROOT)`, the
+// scan below, running a SECOND time from `repo-invariants.test.ts` through
+// `CHECKS`, where it ABORTED at 5212ms under load at `7f7ba90`. One scan may
+// not carry two budgets according to which suite called it, so the number lives
+// in `scan-budget.ts` with its derivation beside it, and every case in this
+// directory whose input is the tree imports the same one.
+//
+// MEASURED 2026-09-08 at `c20550b` BY ADR-466, AND LEFT HERE AS THE RECORD OF
+// THAT BASE. 4 CPU, 404 swept file(s) / 9,314,992 byte(s) of swept source. Left
+// column: full suite, no artificial load. Right column: the same full suite
+// with four background CPU spinners on four cores.
 //
 //   the widening moves no verdict over this repository   2858ms   4590ms
 //   RI-35 finds nothing                                  2640ms   4700ms
@@ -71,38 +82,14 @@ import { REPO_ROOT } from '../checks/repo-invariants.mjs';
 //   `event-sink-caller`s census survives ...              499ms    991ms
 //   `worker-queue-door-caller`s deleted figure ...        328ms    662ms
 //
-// THE 30000 IS A PRODUCT OF FOUR MEASURED FACTORS RATHER THAN A ROUND NUMBER
-// PICKED FOR COMFORT. 2858ms observed, TIMES 1.61 for contention (the same case
-// at 4590ms under the load above), TIMES 2.0 for the machine (ADR-465's
-// container reported 6183ms in the position where this one reports 2858ms, and
-// 6183 is an ABORT rather than a completion, so the true factor is worse than
-// 2.16), TIMES 3.2 for growth (the shipped `ri35.run` costs 2571ms over 9.31MB
-// of swept source and 8180ms over 52.0MB, measured against a scaled copy of this
-// tree, so a swept scope five times today's buys a factor of about 3.2).
-// 2858 x 1.61 x 2.0 x 3.2 = 29,450, and this is that rounded up.
-//
-// THE GROWTH ASSUMPTION, WRITTEN OUT SO A LATER READER CAN FALSIFY IT RATHER
-// THAN GUESS AT IT: this budget holds until the SWEPT scope reaches about five
-// times its 9.31MB, on a container twice as slow as this one and fully
-// contended. The swept scope is `apps/*&#47;src`, `packages/*&#47;src` and
-// `scripts/`, and it EXCLUDES `docs/` by construction (`shippedSources` says so
-// in words). So ADR-465's stated mechanism, "the corpus gains an ADR file per
-// row", is not what moves this number: the swept scope grew 185,066 byte(s)
-// across the 105 ADR file(s) between ADR-343 and ADR-448, which at the measured
-// ceiling of 290ms per swept megabyte is under half a millisecond of scan per
-// ADR. WHAT MOVES THIS NUMBER IS APPLICATION SOURCE, which is what P1 and P2 are
-// about to add, and the conclusion (a fixed budget over a growing input) is
-// unaffected by the correction.
-//
 // IT IS PER CASE AND NOT PER FILE, AND THE SPLIT IS MEASURED RATHER THAN
 // ASSERTED. Six OTHER cases here touch `REPO_ROOT` and none of them walks the
 // tree: they read named files, and they cost 0ms to 44ms across both runs above.
-// A file-wide budget would hand a 30-second wall to a hundred fixture cases
+// A file-wide budget would hand a corpus-sized wall to a hundred fixture cases
 // whose honest budget is a hundred milliseconds, and for those the only thing a
 // timeout does is bound a hang. The budget belongs to the INPUT, so it is
 // spelled at each case whose input is the tree.
 // =============================================================================
-const CORPUS_SCAN_MS = 30_000;
 
 const seeded: string[] = [];
 afterEach(() => {

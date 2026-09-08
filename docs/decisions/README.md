@@ -478,6 +478,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-465](ADR-465.md) | derivation B is definable and its precision is 87 percent, and the thing that stops a census is not the filter but the fact that most forcing constraints name an obstacle this repository does not contain (2026-09-08, status: proposed) |
 | [ADR-466](ADR-466.md) | the five-second budget is raised to thirty on seven cases and on none of the hundred, the growth that reddens it is application source rather than the corpus, and the case that actually went red under load was in a file this row could not touch (2026-09-08, status: proposed) |
 | [ADR-467](ADR-467.md) | the comment that repaired a stale pointer was false in the commit that wrote it, so the repair restates no number and the priced widening is withdrawn (2026-09-08, status: proposed) |
+| [ADR-468](ADR-468.md) | the budget is sixty and not thirty because two of the four factors measure differently here, the population is sixty-seven cases and not fourteen because it is derived from inputs rather than from a clock, and three of the eight files that walk this tree name `REPO_ROOT` nowhere (2026-09-08, status: proposed) |
 | [ADR-469](ADR-469.md) | the prose line-number pointer is a population of ninety-eight, sixteen of the forty-nine readable ones were dead, and every repair deletes the number (2026-09-08, status: proposed) |
 <!--/gen-->
 

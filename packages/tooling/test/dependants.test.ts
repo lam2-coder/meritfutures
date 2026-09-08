@@ -22,6 +22,7 @@ import {
   splitArgs,
   REPO_ROOT,
 } from '../checks/dependants.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
 // AN INSTRUMENT THAT ANSWERS "WHAT DEPENDS ON THIS FILE?", AND THE THREE ROWS
@@ -96,11 +97,15 @@ describe('the derivation refuses to answer rather than answer emptily', () => {
     expect(report.population.files).toBeGreaterThan(0);
   });
 
-  test('the population names the method it used, so a caller never has to assume one', () => {
-    const walked = population(tree({ 'a.ts': '' }));
-    expect(walked.method).toBe('directory walk');
-    expect(population(REPO_ROOT).method).toBe('git ls-files');
-  });
+  test(
+    'the population names the method it used, so a caller never has to assume one',
+    () => {
+      const walked = population(tree({ 'a.ts': '' }));
+      expect(walked.method).toBe('directory walk');
+      expect(population(REPO_ROOT).method).toBe('git ls-files');
+    },
+    CORPUS_SCAN_MS,
+  );
 });
 
 // -----------------------------------------------------------------------------
@@ -798,35 +803,51 @@ describe('the second hop, asked for and never assumed', () => {
 });
 
 describe('on this repository, where the answer has to be about the real tree', () => {
-  test('the derivation runs over the real population and the population is not trivial', () => {
-    // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED, and every kind above
-    // would report nothing over a tree that failed to enumerate.
-    const report = dependantsOf(REPO_ROOT, 'packages/tooling/checks/dependants.mjs');
-    expect(report.exists).toBe(true);
-    expect(report.population.files).toBeGreaterThan(1000);
-    expect(report.population.method).toBe('git ls-files');
-  });
+  test(
+    'the derivation runs over the real population and the population is not trivial',
+    () => {
+      // A CHECK THAT CANNOT RUN IS NOT A CHECK THAT PASSED, and every kind above
+      // would report nothing over a tree that failed to enumerate.
+      const report = dependantsOf(REPO_ROOT, 'packages/tooling/checks/dependants.mjs');
+      expect(report.exists).toBe(true);
+      expect(report.population.files).toBeGreaterThan(1000);
+      expect(report.population.method).toBe('git ls-files');
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('this suite is derived as an importing dependant of the module it tests', () => {
-    const report = dependantsOf(REPO_ROOT, 'packages/tooling/checks/dependants.mjs');
-    expect(report.sites.filter((s) => s.kind === 'import').map((s) => s.file)).toContain(
-      'packages/tooling/test/dependants.test.ts',
-    );
-  });
+  test(
+    'this suite is derived as an importing dependant of the module it tests',
+    () => {
+      const report = dependantsOf(REPO_ROOT, 'packages/tooling/checks/dependants.mjs');
+      expect(report.sites.filter((s) => s.kind === 'import').map((s) => s.file)).toContain(
+        'packages/tooling/test/dependants.test.ts',
+      );
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('the closure reaches this suite from the comment stripper in two composing steps', () => {
-    // Both ends of this are in `packages/tooling` and the middle is the module
-    // under test, so the case says something about the real graph without
-    // binding a file another row may rewrite.
-    const out = closure(REPO_ROOT, 'packages/tooling/checks/strip-comments.mjs', 2);
-    expect(out.reached.get('packages/tooling/checks/dependants.mjs')).toBe(1);
-    expect(out.reached.get('packages/tooling/test/dependants.test.ts')).toBeLessThanOrEqual(2);
-  });
+  test(
+    'the closure reaches this suite from the comment stripper in two composing steps',
+    () => {
+      // Both ends of this are in `packages/tooling` and the middle is the module
+      // under test, so the case says something about the real graph without
+      // binding a file another row may rewrite.
+      const out = closure(REPO_ROOT, 'packages/tooling/checks/strip-comments.mjs', 2);
+      expect(out.reached.get('packages/tooling/checks/dependants.mjs')).toBe(1);
+      expect(out.reached.get('packages/tooling/test/dependants.test.ts')).toBeLessThanOrEqual(2);
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('the module reads the one comment stripper rather than carrying a second copy', () => {
-    const report = dependantsOf(REPO_ROOT, 'packages/tooling/checks/strip-comments.mjs');
-    expect(report.sites.filter((s) => s.kind === 'import').map((s) => s.file)).toContain(
-      'packages/tooling/checks/dependants.mjs',
-    );
-  });
+  test(
+    'the module reads the one comment stripper rather than carrying a second copy',
+    () => {
+      const report = dependantsOf(REPO_ROOT, 'packages/tooling/checks/strip-comments.mjs');
+      expect(report.sites.filter((s) => s.kind === 'import').map((s) => s.file)).toContain(
+        'packages/tooling/checks/dependants.mjs',
+      );
+    },
+    CORPUS_SCAN_MS,
+  );
 });
