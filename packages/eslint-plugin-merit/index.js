@@ -1,6 +1,7 @@
 import enginePurity from './rules/engine-purity.js';
 import noCalendarInExpiryPath from './rules/no-calendar-in-expiry-path.js';
 import noRawDbClient from './rules/no-raw-db-client.js';
+import refusalNaming from './rules/refusal-naming.js';
 
 // =============================================================================
 // eslint-plugin-merit
@@ -30,8 +31,9 @@ const plugin = {
     'engine-purity': enginePurity,
     'no-calendar-in-expiry-path': noCalendarInExpiryPath,
     'no-raw-db-client': noRawDbClient,
+    'refusal-naming': refusalNaming,
   },
 };
 
 export default plugin;
-export { enginePurity, noCalendarInExpiryPath, noRawDbClient };
+export { enginePurity, noCalendarInExpiryPath, noRawDbClient, refusalNaming };
