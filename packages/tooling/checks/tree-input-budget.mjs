@@ -1502,6 +1502,7 @@ const S = {
   enumerated: new Set(),
   read: new Set(),
   touched: 0,
+  named: 0,
   spawned: [],
   wrote: [],
 };
@@ -1549,7 +1550,19 @@ const wrap = (host, names, kind) => {
           S.enumerated.add(q);
           if (!real.existsSync(q)) plant(q);
         }
-        if (kind === 'read' && S.planted.has(q)) S.read.add(q);
+        if (kind === 'read') {
+          if (S.planted.has(q)) S.read.add(q);
+          // A NAMED READ IS ANSWERED RATHER THAN REFUSED, and it is counted
+          // apart from the planted tree so that the count comparison stays a
+          // comparison. A walker whose first act is to read one file by name
+          // would otherwise die on ENOENT before reaching its walk, and leg D
+          // would call it stale for a file the measurement failed to provide.
+          else if (S.named < S.cap && !real.existsSync(q)) {
+            S.named += 1;
+            real.mkdirSync(path.dirname(q), { recursive: true });
+            real.writeFileSync(q, S.line);
+          }
+        }
       }
       return orig(q, ...a.slice(1));
     };
@@ -1585,6 +1598,7 @@ process.exit = (code) => {
  * @property {Set<string>} enumerated
  * @property {Set<string>} read
  * @property {number} touched
+ * @property {number} named
  * @property {string[]} spawned
  * @property {string[]} wrote
  */
@@ -1664,6 +1678,7 @@ export function measurementPlan(mods, walkers, checks = CHECKS_DIR) {
  * @property {number} planted   files planted for this call
  * @property {number} read      distinct planted files opened
  * @property {number} touched   any access at all under the planted root
+ * @property {number} named     files the run asked for BY NAME and was given
  * @property {string[]} spawned
  * @property {string[]} wrote
  * @property {string | null} error
@@ -1746,6 +1761,7 @@ export async function measureChild(specPath) {
       state.enumerated.clear();
       state.read.clear();
       state.touched = 0;
+      state.named = 0;
       state.spawned.length = 0;
       state.wrote.length = 0;
       state.perDir = round.perDir;
@@ -1780,6 +1796,7 @@ export async function measureChild(specPath) {
         planted: state.planted.size,
         read: state.read.size,
         touched: state.touched,
+        named: state.named,
         spawned: [...state.spawned],
         wrote: [...state.wrote],
         error,
@@ -1795,6 +1812,7 @@ export async function measureChild(specPath) {
  * @property {boolean} rostered
  * @property {number} dirs      the most directories enumerated in any round
  * @property {number} touched   the most accesses of any kind in any round
+ * @property {number} named     the most named files answered in any round
  * @property {string[]} spawns
  * @property {number[]} read    planted files opened, one per round, in order
  * @property {number[]} planted files planted, one per round, in order
@@ -1816,6 +1834,7 @@ export function measuredVerdicts(rows) {
       rostered: row.rostered,
       dirs: 0,
       touched: 0,
+      named: 0,
       spawns: [],
       read: [],
       planted: [],
@@ -1823,6 +1842,7 @@ export function measuredVerdicts(rows) {
     };
     held.dirs = Math.max(held.dirs, row.dirs);
     held.touched = Math.max(held.touched, row.touched);
+    held.named = Math.max(held.named, row.named);
     for (const one of row.spawned) if (!held.spawns.includes(one)) held.spawns.push(one);
     held.read.push(row.read);
     held.planted.push(row.planted);
@@ -2007,7 +2027,7 @@ export function run(argv = [], out = emit) {
           ? 'not measured'
           : enumerates(v)
             ? `MEASURED dirs=${String(v.dirs)} read=[${v.read.join(',')}] of ` +
-              `[${v.planted.join(',')}] planted` +
+              `[${v.planted.join(',')}] planted, ${String(v.named)} named read(s) answered` +
               (v.spawns.length > 0 ? ` spawn=\`${/** @type {string} */ (v.spawns[0])}\`` : '')
             : v.touched === 0
               ? 'INCONCLUSIVE, the call read nothing under the planted root'

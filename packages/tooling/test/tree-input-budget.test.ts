@@ -673,6 +673,11 @@ export function named(root = '${DIR}') {
   return readFileSync(join(root, 'one-named-file-that-is-not-there.md'), 'utf8');
 }
 
+export function readsThenWalks(root = '${DIR}') {
+  const held = readFileSync(join(root, 'one-named-file-that-is-not-there.md'), 'utf8');
+  return held.length + readdirSync(root).length;
+}
+
 export function quiet() {
   return 1;
 }
@@ -690,7 +695,7 @@ export function writes(root = '${DIR}') {
 /** The whole block's measurement, taken once, in one child. */
 function measureShapes(): Map<string, Verdict> {
   const module = checkerFixture(SHAPES);
-  const rostered = ['walks', 'named', 'quiet'];
+  const rostered = ['walks', 'named', 'quiet', 'readsThenWalks'];
   const probed = ['walksUnrostered', 'spawns', 'writes'];
   return measuredVerdicts(
     measure([
@@ -729,6 +734,21 @@ describe('leg D, a rostered walker that does not enumerate when it is run', () =
     expect(findings.join('\n')).not.toContain('#walks');
     expect(named(verdicts, 'named').touched).toBeGreaterThan(0);
     expect(named(verdicts, 'named').dirs).toBe(0);
+  });
+
+  test('a named read is ANSWERED rather than refused, and the walk behind it still happens', () => {
+    // THIS PAIR IS THE CONTROL THAT CHANGED THE INSTRUMENT. The first seed
+    // written for leg D read one file by name and then walked, and the leg
+    // named it anyway: the planted tree did not hold the file, the read threw,
+    // and the walk behind it never ran. A measurement that refuses a named read
+    // is measuring its own gaps. `readsThenWalks` and `named` are one line
+    // apart now, and the leg separates them.
+    const verdicts = measureShapes();
+    const walked = named(verdicts, 'readsThenWalks');
+    expect(walked.named).toBeGreaterThan(0);
+    expect(enumerates(walked)).toBe(true);
+    expect(legRosterIsMeasured(verdicts).join('\n')).not.toContain('#readsThenWalks');
+    expect(named(verdicts, 'named').named).toBeGreaterThan(0);
   });
 
   test('a walker that never reached the planted tree is INCONCLUSIVE and never a finding', () => {
