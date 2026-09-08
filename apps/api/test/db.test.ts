@@ -56,7 +56,7 @@
 // -----------------------------------------------------------------------------
 // `src/db.ts`'s header says "`grep -rln '@merit/db' apps/api/src` returning
 // exactly this file is that answer". It returns TWO: `src/routes/account-reads.ts`
-// imports `atMost` (ADR-157's range term) for its cursor pagination at `:912`.
+// imports `atMost` (ADR-157's range term) for its cursor pagination.
 // The first draft of case 3 below asserted the sentence as written and FAILED on
 // that line, which is the whole argument for the case existing: the convention
 // had drifted, no gate could see it, and the header still described the tree as

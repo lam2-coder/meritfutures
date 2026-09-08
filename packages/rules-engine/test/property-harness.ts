@@ -16,7 +16,7 @@
 // definitions were diffed before the collapse and were behaviourally identical;
 // the bridge's header records the one difference that had to be ruled on.
 //
-// `fold` (`floor-monotonicity.property.test.ts` line 299) was NOT collapsed and
+// `fold` (declared in `floor-monotonicity.property.test.ts`) was NOT collapsed and
 // neither was `foldSequence` below. The folds carry genuinely different shapes
 // and merging them is a different argument than merging three adapters.
 //
