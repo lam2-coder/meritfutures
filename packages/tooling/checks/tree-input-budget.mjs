@@ -447,9 +447,11 @@ function topLevelEquals(part) {
 
 /**
  * @typedef {object} Call
- * @property {string} name    the callee's last identifier
- * @property {string} whole   the callee as written. A leading `.` means the
- *                            receiver is an expression this fold cannot follow
+ * @property {string} name      the callee's last identifier
+ * @property {string} whole     the callee as written. A leading `.` means the
+ *                              receiver is an expression, not a name
+ * @property {string} receiver  the callee of the receiver CALL, when there is
+ *                              one: `expect(x).toBe(y)` has receiver `expect`
  * @property {string[]} args
  * @property {number} at
  */
@@ -461,33 +463,69 @@ const KEYWORDS = ['if', 'for', 'while', 'switch', 'catch', 'return', 'function',
  * Every call in a text, with its arguments split. A call whose arguments do not
  * balance is DROPPED rather than guessed at.
  *
- * @param {string} text
+ * STRUCTURE IS READ OFF `blanked` AND ARGUMENT TEXT OFF `kept`, at the same
+ * offsets. Reading structure off the kept side made the fixture sources inside
+ * this check's OWN suite into code: a `run()` written inside a template literal
+ * was folded as a call, and the check reported its own test file as a case that
+ * walks the tree. A string is data in every file, including the ones that quote
+ * this repository at themselves.
+ *
+ * @param {string} blanked
+ * @param {string} [kept]
  * @returns {Call[]}
  */
-export function callsIn(text) {
+export function callsIn(blanked, kept = blanked) {
   /** @type {Call[]} */
   const out = [];
-  for (const m of text.matchAll(CALLEE)) {
+  for (const m of blanked.matchAll(CALLEE)) {
     const written = /** @type {string} */ (m[1]);
     if (KEYWORDS.includes(written)) continue;
     const open = m.index + m[0].length - 1;
-    const close = closingParen(text, open);
+    const close = closingParen(blanked, open);
     if (close < 0) continue;
-    const args = splitArgs(text.slice(open + 1, close));
+    const args = splitArgs(kept.slice(open + 1, close));
     if (args === null) continue;
     const parts = written.split('.');
     // `check(id).run(root)`: the receiver is a CALL, so the match starts after a
     // `.` with no name in front of it. Recorded as `.run`, which is dotted, which
     // is unresolvable, which is exactly what it is.
-    const dotted = text[m.index - 1] === '.';
+    const dotted = blanked[m.index - 1] === '.';
     out.push({
       name: /** @type {string} */ (parts[parts.length - 1]),
       whole: dotted ? `.${written}` : written,
+      receiver: dotted ? receiverOf(blanked, m.index - 1) : '',
       args,
       at: m.index,
     });
   }
   return out;
+}
+
+/**
+ * The callee of the call a dotted call hangs off, or `''`. `expect(x).toBe(y)`
+ * answers `expect`, which is how a MATCHER is told from a reader: a matcher
+ * compares a directory and never opens one.
+ *
+ * @param {string} blanked
+ * @param {number} dot   index of the `.`
+ * @returns {string}
+ */
+function receiverOf(blanked, dot) {
+  let i = dot - 1;
+  while (i >= 0 && /[\w$.]/.test(/** @type {string} */ (blanked[i]))) i -= 1;
+  if (blanked[i] !== ')') return '';
+  let depth = 0;
+  for (; i >= 0; i -= 1) {
+    const ch = blanked[i];
+    if (ch === ')') depth += 1;
+    else if (ch === '(') {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+  }
+  if (i < 0) return '';
+  const before = /([A-Za-z_$][\w$]*)$/.exec(blanked.slice(0, i));
+  return before === null ? '' : /** @type {string} */ (before[1]);
 }
 
 // -----------------------------------------------------------------------------
@@ -740,6 +778,26 @@ export function carriersOf(blanked, param) {
 }
 
 /**
+ * A closure argument does not hand its enclosing root to the callee: it CAPTURES
+ * it, and its own body is already being read as part of the same body. Reading
+ * `names.filter((name) => existsSync(resolve(dir, name)))` as "dir was handed to
+ * something unresolvable" makes every callback in the estate a walk.
+ *
+ * @param {string} arg
+ * @returns {boolean}
+ */
+function isClosure(arg) {
+  let depth = 0;
+  for (let i = 0; i < arg.length; i += 1) {
+    const ch = arg[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
+    else if (depth === 0 && ch === '=' && arg[i + 1] === '>') return true;
+  }
+  return /^(?:async\s+)?function\b/.test(arg.trim());
+}
+
+/**
  * Whether an initialiser is still a PATH: a carrier aliased, a path composed
  * from one, or either of those on a branch of a choice. `walk` opens with
  * `const here = dir === '' ? root : join(root, dir)`, and a rule that read only
@@ -850,7 +908,9 @@ function paramVerdict(blanked, param, file, mods, out, key) {
   const carriers = carriersOf(blanked, param);
   let unknown = false;
   for (const call of callsIn(blanked)) {
-    const holder = call.args.findIndex((a) => [...carriers].some((c) => wordRe(c).test(a)));
+    const holder = call.args.findIndex(
+      (a) => !isClosure(a) && [...carriers].some((c) => wordRe(c).test(a)),
+    );
     if (holder < 0) continue;
     if (call.whole.includes('.')) {
       unknown = true;
@@ -985,7 +1045,7 @@ function argvGuardOf(fn) {
     const name = /** @type {{ name: string }} */ (fn.params[i]).name;
     if (name === '') continue;
     const guard = new RegExp(
-      `if\\s*\\(\\s*${name}\\.length\\s*(?:>\\s*0|!==?\\s*0)\\s*\\)\\s*\\{[\\s\\S]{0,800}?return`,
+      `if\\s*\\(\\s*${name}\\.length\\s*(?:>\\s*0|!==?\\s*0)\\s*\\)\\s*\\{?[\\s\\S]{0,800}?return`,
     );
     if (guard.test(fn.blanked)) return i;
   }
@@ -1013,13 +1073,22 @@ function argvGuardOf(fn) {
  */
 
 /**
+ * @typedef {object} CaseSite
+ * @property {number} at
+ * @property {string} head
+ * @property {string[]} args         literals kept, for the title
+ * @property {string[]} blankedArgs  literals blanked, for anything COUNTED
+ * @property {{ kept: string, blanked: string }} callback
+ */
+
+/**
  * Every case declaration in a file.
  *
  * @param {Source} src
- * @returns {{ at: number, head: string, args: string[] }[]}
+ * @returns {CaseSite[]}
  */
 export function caseSites(src) {
-  /** @type {{ at: number, head: string, args: string[] }[]} */
+  /** @type {CaseSite[]} */
   const out = [];
   const re = /(?<![\w$.])(test|it)((?:\.[A-Za-z_$][\w$]*)*)\s*\(/g;
   let m;
@@ -1038,8 +1107,15 @@ export function caseSites(src) {
       if (close < 0) continue;
     }
     const args = splitArgs(src.kept.slice(open + 1, close));
-    if (args === null) continue;
-    out.push({ at: m.index, head: `${/** @type {string} */ (m[1])}${chain}`, args });
+    const blanked = splitArgs(src.blanked.slice(open + 1, close));
+    if (args === null || blanked === null || args.length !== blanked.length) continue;
+    out.push({
+      at: m.index,
+      head: `${/** @type {string} */ (m[1])}${chain}`,
+      args,
+      blankedArgs: blanked,
+      callback: { kept: args[1] ?? '', blanked: blanked[1] ?? '' },
+    });
     re.lastIndex = close;
   }
   return out;
@@ -1053,35 +1129,37 @@ export function caseSites(src) {
  * keeps `transcript(checks, root = REPO_ROOT)`s six cases out of the population:
  * they name the constant and scan nothing.
  *
- * @param {string} body
+ * @param {{ kept: string, blanked: string }} body
  * @param {Map<string, Fn>} helpers
- * @returns {string}
+ * @returns {{ kept: string, blanked: string }}
  */
 export function reachableText(body, helpers) {
   /** @type {Set<string>} */
   const seen = new Set();
-  let text = body;
+  let kept = body.kept;
+  let blanked = body.blanked;
   let frontier = [body];
   while (frontier.length > 0) {
-    /** @type {string[]} */
+    /** @type {{ kept: string, blanked: string }[]} */
     const next = [];
     for (const chunk of frontier) {
-      for (const call of callsIn(chunk)) {
+      for (const call of callsIn(chunk.blanked, chunk.kept)) {
         if (call.whole.includes('.')) continue;
         const fn = helpers.get(call.whole);
         if (fn === undefined || seen.has(call.whole)) continue;
         seen.add(call.whole);
-        next.push(fn.body);
-        text += `\n${fn.body}`;
+        next.push({ kept: fn.body, blanked: fn.blanked });
+        kept += `\n${fn.body}`;
+        blanked += `\n${fn.blanked}`;
       }
     }
     frontier = next;
   }
-  return text;
+  return { kept, blanked };
 }
 
 /**
- * @param {string} text
+ * @param {{ kept: string, blanked: string }} text
  * @param {string} file
  * @param {Mod} mod
  * @param {Map<string, Mod>} mods
@@ -1092,13 +1170,14 @@ export function reachableText(body, helpers) {
 export function walksIn(text, file, mod, mods, verdicts, walkers) {
   /** @type {string[]} */
   const why = [];
-  for (const call of callsIn(text)) {
+  for (const call of callsIn(text.blanked, text.kept)) {
     const target = resolveCallee(call.whole, file, mods);
 
     // W1: an argument whose VALUE is a directory of this repository, unless the
-    // callee is path composition, or is a function this fold has read whole and
-    // which provably enumerates nothing with it.
-    if (!COMPOSERS.includes(call.name)) {
+    // callee is path composition, or a MATCHER, which compares a directory and
+    // never opens one, or a function this fold has read whole and which provably
+    // enumerates nothing with it.
+    if (!COMPOSERS.includes(call.name) && call.receiver !== 'expect') {
       for (let i = 0; i < call.args.length; i += 1) {
         const arg = /** @type {string} */ (call.args[i]);
         const folded = foldPath(arg, mod.src.path, mod.binds);
@@ -1171,14 +1250,18 @@ export function census(suite = SUITE_DIR, checks = CHECKS_DIR) {
   for (const file of suiteFiles) {
     const mod = /** @type {Mod} */ (mods.get(file));
     for (const site of caseSites(mod.src)) {
-      const text = reachableText(site.args[1] ?? '', mod.fns);
+      const text = reachableText(site.callback, mod.fns);
       const why = walksIn(text, file, mod, mods, verdicts, walkers);
       for (const one of why) forms[/** @type {keyof Forms} */ (one.slice(0, 2))] += 1;
       cases.push({
         file: rel(file),
         line: lineAt(mod.src.kept, site.at),
         title: titleOf(/** @type {string} */ (site.args[0] ?? '')),
-        budgeted: site.args.some((a) => wordRe(BUDGET).test(a)),
+        // COUNTED OFF THE BLANKED READING. A constant written inside a string
+        // is not a budget, and this check's own suite quotes fixture sources
+        // that carry it: read off the kept side, three fixtures made their
+        // enclosing case look budgeted and leg C reported all three.
+        budgeted: site.blankedArgs.some((a) => wordRe(BUDGET).test(a)),
         why,
       });
     }
