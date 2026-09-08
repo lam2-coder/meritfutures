@@ -461,6 +461,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-448](ADR-448.md) | the guard the sibling priced could not go where it was priced, the property it was priced against does not exist, and the widening beside it costs two files nobody owns (2026-09-07, status: proposed) |
 | [ADR-449](ADR-449.md) | the `schema.ts` header's census is ASSERTED rather than corrected a fourth time, the header edit is line-neutral because a non-neutral one is not satisfiable inside this fence, and the narrow generation comparison is KEPT because the general one provably cannot reach its table (2026-09-08, status: proposed) |
 | [ADR-450](ADR-450.md) | the eight pointers are invisible to BOTH citation checks and not to one of them, 89.5% of this tree's pointers bind NO NAME and are undecidable by any extension of this grammar, and the control is REFUSED because it cannot see seven of its own motivating case (2026-09-08, status: proposed) |
+| [ADR-451](ADR-451.md) | four cases asserted a write PostgreSQL refuses, the defect is twenty tables wide rather than the two the sibling named, and the widening it blocks is now green but watched by nothing (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
