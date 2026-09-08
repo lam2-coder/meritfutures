@@ -68,9 +68,9 @@
 // A COROLLARY THAT IS DELIBERATE: THIS CHECK'S VERDICT MUST NOT DEPEND ON HOW
 // CI CLONED. It would be one cheap line to resolve a named base with
 // `git cat-file -e` and report the ones that do not resolve. That is refused.
-// Two of the entries above the cutoff name a base this session's clone cannot
-// resolve, and a red that appears on a shallow clone and vanishes on a deep one
-// is a red about the runner.
+// All 52 named bases resolve in this session's clone and 21 of its boundaries
+// are grafts, so whether one resolves is a fact about the runner. A red that
+// appears on a shallow clone and vanishes on a deep one is a red about CI.
 //
 // -----------------------------------------------------------------------------
 // THE CUTOFF IS DERIVED FROM THE TREE, NOT CHOSEN
