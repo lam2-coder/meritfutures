@@ -482,6 +482,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-469](ADR-469.md) | the prose line-number pointer is a population of ninety-eight, sixteen of the forty-nine readable ones were dead, and every repair deletes the number (2026-09-08, status: proposed) |
 | [ADR-470](ADR-470.md) | the check exists and it is keyed on the VALUE a case is handed rather than on any identifier, the population it derives is thirty-three sites in eight files without reading `ADR-468`'s answer, and writing it found four parsing defects that each failed silently over a population that was quietly wrong (2026-09-08, status: proposed) |
 | [ADR-471](ADR-471.md) | seven of the thirteen were string literals and no repair may touch them, twelve of the thirteen line numbers had already moved, and the three that were repaired delete nine numbers and add none (2026-09-08, status: proposed) |
+| [ADR-472](ADR-472.md) | the roster is measured by running every walker against a planted tree of counted files, eight of nine enumerate and the ninth is inconclusive rather than clean, the first control found the instrument refusing a named read and calling that a finding, and leg C named seven cases of this row's own suite for a budget they had not earned (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
