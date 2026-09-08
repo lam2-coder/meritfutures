@@ -4605,16 +4605,17 @@ export type DeclaredRow<K extends TableKey> = (typeof TABLES)[K]['$inferSelect']
 //
 // **THE SECOND IS A REAL HOLE, IT IS NOT CLOSED HERE, AND THE REASON IS A
 // MEASUREMENT RATHER THAN A PREFERENCE.** `ADR-445` section 8 item 2 prices it
-// at "the same guard, widened, plus one leg". That price is INCOMPLETE, which
-// `ADR-448` section 8 records: a guard refusing identity columns turns FOUR
-// cases in `packages/db/test/write-accessor.test.ts` red, because
-// `someOtherColumn` there returns THE FIRST COLUMN THAT IS NOT THE TENANCY
-// COLUMN and on `ledger_entries` and `liability_snapshots` that column is `id`.
-// Those cases assert the accessor ACCEPTS an UPDATE PostgreSQL would refuse
-// with `428C9`, which is a finding in its own right and is worth more than the
-// widening. That file is in neither this row's fence nor the files row 449 was
-// told it holds, so the widening is NAMED AND PRICED rather than taken behind a
-// test edit this row cannot see the owner of.
+// at "the same guard, widened, plus one leg". That price is INCOMPLETE and
+// `ADR-448` section 8 item 2 carries the rest of it. The widening was SEEDED and
+// the suite run: it turns FOUR cases red across TWO files, three in
+// `packages/db/test/write-accessor.test.ts` and one in
+// `packages/db/test/keyed-accessor.test.ts`. Both files pick the column they
+// write with a helper that skips the TENANCY columns and takes the first one
+// left, and on `ledger_entries` and `liability_snapshots` the first one left is
+// `id`. **THOSE CASES ASSERT THE ACCESSOR ACCEPTS AN UPDATE POSTGRESQL ANSWERS
+// `428C9` TO**, which is a finding worth more than the widening. Neither file is
+// in this row's fence, so the widening is NAMED AND PRICED rather than taken
+// behind a test edit this row cannot see the owner of.
 //
 // -----------------------------------------------------------------------------
 // WHY THIS SITS AT THE BOTTOM OF THE FILE AND NOT BESIDE `refuseTenancyColumn`

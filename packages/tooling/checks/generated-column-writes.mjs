@@ -107,11 +107,13 @@
 //
 // **THE IDENTITY HALF IS STILL OPEN, ON BOTH STATEMENT KINDS, AND ITS PRICE IS
 // HIGHER THAN THE ENTRY THAT NAMED IT SAID.** `ADR-445` section 8 item 2 priced
-// it at "the same guard, widened, plus one leg". `ADR-448` measured the rest of
-// that price and it is a change to `packages/db/test/write-accessor.test.ts`,
-// whose `someOtherColumn` helper returns THE FIRST COLUMN THAT IS NOT THE
-// TENANCY COLUMN and therefore hands `id` to four cases that assert the accessor
-// ACCEPTS the write. Those cases assert an UPDATE PostgreSQL answers `428C9` to.
+// it at "the same guard, widened, plus one leg". `ADR-448` SEEDED the widening
+// and ran the suite: the rest of that price is a change to two helpers, in
+// `packages/db/test/write-accessor.test.ts` and
+// `packages/db/test/keyed-accessor.test.ts`, each of which skips the TENANCY
+// columns and takes the first column left, which on `ledger_entries` and
+// `liability_snapshots` is `id`. Four cases assert an UPDATE PostgreSQL
+// answers `428C9` to.
 // On the INSERT side the widening costs more still: leg B's probe names every
 // non-tenancy column, so a guard on the insert builders would refuse the probe
 // and leg B's own generated-column assertion would go vacuous to accommodate it.
@@ -625,11 +627,12 @@ export async function builtStatements(generated, root = REPO_ROOT) {
  * **THE IDENTITY COLUMNS ARE REACHED, COUNTED AND NOT ASSERTED ON, AND THAT IS
  * A NARROWER STATEMENT THAN IT WAS.** `ADR-445` section 8 item 2 left them out
  * because the accessor let a caller name one. It still does, and `ADR-448`
- * section 8 records why the widening did not land: four cases in
- * `packages/db/test/write-accessor.test.ts` drive an UPDATE naming `id` on
- * `ledger_entries` and `liability_snapshots`, so a guard refusing identity
- * columns turns them red, and that file is outside this row's fence. The count
- * is reported so the day it changes is visible; the refusal is not claimed.
+ * section 8 item 2 records why the widening did not land: seeded and measured,
+ * it turns four cases red across `packages/db/test/write-accessor.test.ts` and
+ * `packages/db/test/keyed-accessor.test.ts`, which drive an UPDATE naming `id`
+ * on `ledger_entries` and `liability_snapshots`. Neither file is in this row's
+ * fence. The count is reported so the day it changes is visible; the refusal is
+ * not claimed.
  *
  * THE PREDICATE IS SYNTHETIC AND THAT IS DELIBERATE. `updateStatementOn` runs
  * its guards on `values` before it consumes `where`, so the predicate is not
