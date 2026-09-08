@@ -28,15 +28,15 @@
 // the fold below has to tell the two apart to count either, and a classifier
 // that discards what it classified cannot be audited.
 //
-// THE IDENTITY COUNT IS REPORTED AND NOT ASSERTED ON, and `ADR-448` narrowed
-// the REASON without changing the disposition. What stood here said the reason
-// was that Drizzle emits an identity column into an INSERT column list when a
-// caller names it. That is still true and is no longer the whole of it: the
-// UPDATE builder would refuse one today if the guard were widened, and the
-// measured obstacle is four cases in `packages/db/test/write-accessor.test.ts`
-// that drive an UPDATE naming `id` and would go red. `ADR-448` section 8 carries
-// that finding and its price. `RI-14` is why the earlier reason is narrowed here
-// rather than deleted.
+// THE IDENTITY COUNT IS NOW ASSERTED ON, AND WHAT STOOD HERE IS FALSE. It read:
+// *THE IDENTITY COUNT IS REPORTED AND NOT ASSERTED ON*, and the measured
+// obstacle was four cases in `packages/db/test/write-accessor.test.ts` and
+// `packages/db/test/keyed-accessor.test.ts` that drove an UPDATE naming `id`.
+// `ADR-451` corrected those four and `ADR-452` took the widening and this leg in
+// one commit, so leg D now REFUSES every `always` identity column on the
+// registry BY NAME and the number it once only reported is an assertion.
+// `RI-14` is why the sentence is quoted here rather than deleted. The UPDATE
+// half is closed on both column kinds; THE INSERT HALF IS STILL OPEN.
 //
 // -----------------------------------------------------------------------------
 // THE FOUR LEGS, AND WHAT EACH ONE'S POPULATION ACTUALLY IS
@@ -82,12 +82,12 @@
 //    until this leg.
 //
 // D. THE REFUSAL. `unscopedUpdateStatement` is called for every STORED GENERATED
-//    column on the registry, through the same driverless handle, and the
-//    accessor must REFUSE each one by name. This is the only leg whose subject
-//    is a guard rather than a statement, because the UPDATE half is the only
-//    property here held by a guard rather than structurally. It also COUNTS the
-//    `always` identity columns it walks past, so the number this file reports is
-//    derived on the run rather than carried in prose.
+//    column AND every `always` IDENTITY column on the registry, through the same
+//    driverless handle, and the accessor must REFUSE each one by name. This is
+//    the only leg whose subject is a guard rather than a statement, because the
+//    UPDATE half is the only property here held by a guard rather than
+//    structurally. The identity half asserts rather than counts as of `ADR-452`,
+//    and its discriminator is the QUALIFIED name because every one is an `id`.
 //
 // -----------------------------------------------------------------------------
 // THE HALF THIS FILE DID NOT ASSERT, AND WHAT CLOSING IT CHANGED
@@ -105,20 +105,20 @@
 // the leg that watches it, so the demonstration this file used to point at is
 // gone from the suite beside it in the same commit that made it false.
 //
-// **THE IDENTITY HALF IS STILL OPEN, ON BOTH STATEMENT KINDS, AND ITS PRICE IS
-// HIGHER THAN THE ENTRY THAT NAMED IT SAID.** `ADR-445` section 8 item 2 priced
-// it at "the same guard, widened, plus one leg". `ADR-448` SEEDED the widening
-// and ran the suite: the rest of that price is a change to two helpers, in
-// `packages/db/test/write-accessor.test.ts` and
-// `packages/db/test/keyed-accessor.test.ts`, each of which skips the TENANCY
-// columns and takes the first column left, which on `ledger_entries` and
-// `liability_snapshots` is `id`. Four cases assert an UPDATE PostgreSQL
-// answers `428C9` to.
+// **THE IDENTITY HALF IS CLOSED ON THE UPDATE PATH AND STILL OPEN ON THE
+// INSERT PATH.** What stood here read *THE IDENTITY HALF IS STILL OPEN, ON BOTH
+// STATEMENT KINDS*, and half of that is now false. `ADR-445` section 8 item 2
+// priced the widening at "the same guard, widened, plus one leg"; `ADR-448`
+// SEEDED it and found the rest of the price was two test helpers, each of which
+// skips the TENANCY columns and takes the first column left, which on
+// `ledger_entries` and `liability_snapshots` is `id`. `ADR-451` paid that and
+// `ADR-452` took the widening. `RI-14` keeps the sentence beside its correction.
 // On the INSERT side the widening costs more still: leg B's probe names every
 // non-tenancy column, so a guard on the insert builders would refuse the probe
 // and leg B's own generated-column assertion would go vacuous to accommodate it.
-// Both are trades rather than transcriptions and `ADR-448` section 8 records
-// them with their prices instead of taking them inside a money-path diff.
+// That remains a trade rather than a transcription, and `ADR-448` section 8
+// item 3 records it with its price instead of taking it inside a money-path
+// diff. `ADR-452` leaves it exactly where it found it.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -627,12 +627,28 @@ export async function builtStatements(generated, root = REPO_ROOT) {
  * **THE IDENTITY COLUMNS ARE REACHED, COUNTED AND NOT ASSERTED ON, AND THAT IS
  * A NARROWER STATEMENT THAN IT WAS.** `ADR-445` section 8 item 2 left them out
  * because the accessor let a caller name one. It still does, and `ADR-448`
- * section 8 item 2 records why the widening did not land: seeded and measured,
- * it turns four cases red across `packages/db/test/write-accessor.test.ts` and
- * `packages/db/test/keyed-accessor.test.ts`, which drive an UPDATE naming `id`
- * on `ledger_entries` and `liability_snapshots`. Neither file is in this row's
- * fence. The count is reported so the day it changes is visible; the refusal is
- * not claimed.
+ * section 8 item 2 recorded why the widening did not land: seeded and measured,
+ * it turned four cases red across `packages/db/test/write-accessor.test.ts` and
+ * `packages/db/test/keyed-accessor.test.ts`, which drove an UPDATE naming `id`
+ * on `ledger_entries` and `liability_snapshots`. `ADR-451` corrected all four,
+ * and `ADR-452` took the widening and this leg in ONE commit because the two
+ * are the same claim: the clause alone lands a refusal nothing watches.
+ *
+ * THE IDENTITY HALF IS GATED ON `always` AND THE GATE IS THE POINT.
+ * `GeneratedIdentityConfig.type` is `'always' | 'byDefault'`, and PostgreSQL
+ * ACCEPTS a write naming a `GENERATED BY DEFAULT AS IDENTITY` column. A leg
+ * demanding a refusal for every identity column would demand a refusal of a
+ * statement the database allows, which is the error `ADR-448` section 8 item 1
+ * made in the other direction and `ADR-451` spent a row discharging. All 20 on
+ * the registry are `always` today, so the gate changes no number here and
+ * changes the answer on the column nobody has added yet.
+ *
+ * THE QUALIFIED NAME IS THE DISCRIMINATOR FOR THE IDENTITY HALF AND THE BARE
+ * ONE WOULD NOT DO. The stored half can ask for `delta_cents` in the message
+ * and be sure of what it read. Every identity column on this registry is named
+ * `id`, and `includes('id')` is satisfied by the words "identity" and "invalid",
+ * so the identity half requires `${key}.${columnName}` instead, which is the
+ * form the guard itself writes.
  *
  * THE PREDICATE IS SYNTHETIC AND THAT IS DELIBERATE. `updateStatementOn` runs
  * its guards on `values` before it consumes `where`, so the predicate is not
@@ -647,7 +663,9 @@ export async function builtStatements(generated, root = REPO_ROOT) {
  *
  * @param {string} [root]
  * @returns {Promise<{ findings: string[], refused: number, tables: number,
- *   identityReached: number, sample: string | undefined }>}
+ *   identityReached: number, identityRefused: number, identityTables: number,
+ *   addressed: number, sample: string | undefined,
+ *   identitySample: string | undefined }>}
  */
 export async function refusedWrites(root = REPO_ROOT) {
   const require_ = createRequire(join(root, 'packages/db/package.json'));
@@ -662,14 +680,92 @@ export async function refusedWrites(root = REPO_ROOT) {
   const findings = [];
   let refused = 0;
   let identityReached = 0;
+  let identityRefused = 0;
+  let addressed = 0;
   /** @type {string | undefined} */
   let sample;
+  /** @type {string | undefined} */
+  let identitySample;
   const tables = new Set();
+  const identityTables = new Set();
+
+  /**
+   * Drive the real UPDATE builder at one column and hand back what it threw.
+   *
+   * ONE PROBE SERVES BOTH HALVES SO THEY CANNOT DRIFT. The stored half and the
+   * identity half must exercise the SAME builder through the SAME parameter for
+   * the comparison between them to mean anything; two copies would let one be
+   * quietly weakened while the other stayed honest.
+   *
+   * @param {string} key
+   * @param {string} property
+   * @returns {Promise<string | undefined>} The message, or `undefined` if it built.
+   */
+  const probe = async (key, property) => {
+    try {
+      await accessor.unscopedUpdateStatement(
+        source,
+        key,
+        { [property]: sql`'merit-generated-column-probe'` },
+        sql`true`,
+      );
+      return undefined;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  };
+
+  /**
+   * Build an UPDATE that ADDRESSES a row by `property` and writes another
+   * column, and report what it threw.
+   *
+   * THIS PREDICATE IS REAL WHERE THE REFUSAL PROBE'S IS SYNTHETIC, AND THE
+   * DIFFERENCE IS THE POINT OF THE CASE. The refusal probe does not care what
+   * the predicate is, because `updateStatementOn` runs its guards on `values`
+   * before it consumes `where`. This one cares about nothing else: it goes
+   * through `unscopedAddressPredicate`, which is what `updateAt` calls, so what
+   * it exercises is the path `apps/worker/src/recon/sweep.ts` actually takes
+   * when it addresses `reconciliations` by its identity `id`.
+   *
+   * THE VALUE COLUMN SKIPS THE TENANCY COLUMNS, because `refuseTenancyColumn`
+   * would refuse those first and the probe would then report on another guard.
+   *
+   * @param {string} key
+   * @param {string} property The identity column, used as the ADDRESS.
+   * @param {Record<string, unknown>} columns
+   * @returns {Promise<string | undefined>} The message, or `undefined` if it built.
+   */
+  const address = async (key, property, columns) => {
+    const tenancy = new Set(accessor.tenancyColumns(key));
+    let writable;
+    for (const [candidate, column] of Object.entries(columns)) {
+      const cc = /** @type {{ name: unknown, generated: unknown,
+        generatedIdentity: { type?: unknown } | undefined }} */ (column);
+      if (cc.generated !== undefined && cc.generated !== null) continue;
+      if (cc.generatedIdentity?.type === 'always') continue;
+      if (tenancy.has(candidate) || tenancy.has(String(cc.name))) continue;
+      writable = candidate;
+      break;
+    }
+    if (writable === undefined) return 'no non-tenancy writable column to set';
+    try {
+      await accessor.unscopedUpdateStatement(
+        source,
+        key,
+        { [writable]: sql`'merit-generated-column-probe'` },
+        accessor.unscopedAddressPredicate(key, { [property]: 1n }),
+      );
+      return undefined;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  };
 
   for (const key of registry.TABLE_KEYS) {
     const table = registry.TABLES[key];
     const name = String(getTableName(table));
-    for (const [property, column] of Object.entries(getTableColumns(table))) {
+    const columns = getTableColumns(table);
+    for (const [property, column] of Object.entries(columns)) {
       const c = /** @type {{ name: unknown, generated: unknown, generatedIdentity: unknown }} */ (
         column
       );
@@ -677,22 +773,52 @@ export async function refusedWrites(root = REPO_ROOT) {
       const identity = /** @type {{ type?: unknown } | undefined} */ (c.generatedIdentity);
       if (identity !== undefined && identity !== null && identity.type === 'always') {
         identityReached += 1;
+        identityTables.add(name);
+        const threw = await probe(key, property);
+        if (threw === undefined) {
+          findings.push(
+            `${key}: the accessor built an UPDATE naming ${name}.${columnName}, which schema.ts ` +
+              'declares `GENERATED ALWAYS AS IDENTITY`. PostgreSQL refuses that statement with ' +
+              '428C9. `refuseGeneratedColumn` in packages/db/src/scoped-db.ts is the guard that ' +
+              'should have refused it first',
+          );
+        } else if (!threw.includes(`${key}.${columnName}`)) {
+          // THE QUALIFIED NAME IS THE DISCRIMINATOR HERE AND THE BARE ONE WOULD NOT
+          // DO. Every identity column on this registry is called `id`, so a
+          // `threw.includes('id')` would be satisfied by the words "identity" and
+          // "invalid" and would count an unrelated failure as this refusal. The
+          // guard writes `${key}.${column.name}`, so that is what is required.
+          findings.push(
+            `${key}: the accessor refused an UPDATE naming ${name}.${columnName}, but the ` +
+              'message does not name the column, so this leg cannot tell the guard from an ' +
+              `unrelated failure. It said: ${threw.split('\n')[0]}`,
+          );
+        } else {
+          identityRefused += 1;
+          identitySample ??= threw;
+        }
+
+        // AN ADDRESS IS A PREDICATE THAT READS THE COLUMN AND MUST KEEP WORKING.
+        // Widening the guard to identity columns makes this SHARPER rather than
+        // softer, because an identity column is exactly what an address is built
+        // from: the day someone moves the guard off `values` and onto the
+        // statement, every row addressed by its `id` stops being reachable, and
+        // this is the leg that says so.
+        const blocked = await address(key, property, columns);
+        if (blocked === undefined) {
+          addressed += 1;
+        } else {
+          findings.push(
+            `${key}: ${name}.${columnName} is an identity column and an UPDATE ADDRESSED by ` +
+              'it was refused. An address READS the column and only a write to it is refused, ' +
+              `so this is a guard reaching a parameter it must not. It said: ${blocked.split('\n')[0]}`,
+          );
+        }
       }
       if (c.generated === undefined || c.generated === null) continue;
 
       tables.add(name);
-      let threw;
-      try {
-        await accessor.unscopedUpdateStatement(
-          source,
-          key,
-          { [property]: sql`'merit-generated-column-probe'` },
-          sql`true`,
-        );
-        threw = undefined;
-      } catch (err) {
-        threw = err instanceof Error ? err.message : String(err);
-      }
+      const threw = await probe(key, property);
 
       if (threw === undefined) {
         findings.push(
@@ -722,7 +848,24 @@ export async function refusedWrites(root = REPO_ROOT) {
         'Zero is what a green run and a broken import both look like',
     );
   }
-  return { findings, refused, tables: tables.size, identityReached, sample };
+  if (identityRefused === 0) {
+    findings.push(
+      'no `GENERATED ALWAYS AS IDENTITY` column on the registry was refused, so the identity ' +
+        'half of this leg asserted nothing. Zero is what a green run and a broken import both ' +
+        'look like',
+    );
+  }
+  return {
+    findings,
+    refused,
+    tables: tables.size,
+    identityReached,
+    identityRefused,
+    identityTables: identityTables.size,
+    addressed,
+    sample,
+    identitySample,
+  };
 }
 
 /**
@@ -885,8 +1028,10 @@ export async function run(argv, emit = (line) => console.log(line)) {
         `${String(legC.blocks)} hand-written statement(s) across ` +
         `${String(legC.files)} shipped source file(s) mention none of them; ` +
         `the UPDATE builder refuses ${String(legD.refused)} of them by name on ` +
-        `${String(legD.tables)} table(s), beside ${String(legD.identityReached)} identity ` +
-        'column(s) it reaches and does not assert on',
+        `${String(legD.tables)} table(s), and refuses ${String(legD.identityRefused)} of ` +
+        `${String(legD.identityReached)} \`always\` identity column(s) by name on ` +
+        `${String(legD.identityTables)} table(s) while still ADDRESSING a row by ` +
+        `${String(legD.addressed)} of them`,
     );
     return 0;
   }
