@@ -89,7 +89,7 @@ import { REPO_ROOT } from '../checks/repo-invariants.mjs';
 // in words). So ADR-465's stated mechanism, "the corpus gains an ADR file per
 // row", is not what moves this number: the swept scope grew 185,066 byte(s)
 // across the 105 ADR file(s) between ADR-343 and ADR-448, which at the measured
-// ceiling of 280ms per swept megabyte is under half a millisecond of scan per
+// ceiling of 290ms per swept megabyte is under half a millisecond of scan per
 // ADR. WHAT MOVES THIS NUMBER IS APPLICATION SOURCE, which is what P1 and P2 are
 // about to add, and the conclusion (a fixed budget over a growing input) is
 // unaffected by the correction.
