@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -6,20 +6,36 @@ import { describe, expect, test } from 'vitest';
 
 import {
   BUDGET,
+  ENUMERATORS,
+  MEASURE_CHILD,
   REPO_ROOT,
+  ROUNDS,
+  SELF,
   bodyBrace,
   callsIn,
   carriersOf,
   census,
+  enumerates,
+  exportedSurface,
   foldPath,
   functions,
+  grewWithTheTree,
   isTreeDirectory,
   legBudgetCarried,
   legBudgetEarned,
   legDerivationIsReal,
+  legMeasurementIsReal,
+  legRosterIsComplete,
+  legRosterIsMeasured,
+  measure,
+  measuredSummary,
+  measuredVerdicts,
+  measurementPatch,
+  measurementPlan,
   readSource,
   run,
 } from '../checks/tree-input-budget.mjs';
+import type { Verdict } from '../checks/tree-input-budget.mjs';
 import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
@@ -602,4 +618,251 @@ describe('folding a path to a value', () => {
     expect(foldPath('mkdtempSync(prefix)', FILE, binds)).toBeNull();
     expect(foldPath('somethingElse', FILE, binds)).toBeNull();
   });
+});
+
+// =============================================================================
+// LEGS D AND E: THE ROSTER IS MEASURED AND NOT ONLY DERIVED
+// =============================================================================
+// `ADR-472`. Everything above this line reads source. Everything below RUNS the
+// roster against a tree with a counted number of files and compares what each
+// walker reads, which is the price `ADR-470` section 10 item 2 set.
+//
+// THE FIXTURE CHECKERS NAME THIS REPOSITORY BY VALUE AND CONTAIN NOTHING ELSE.
+// A fixture whose default root is a real directory of this repository is
+// redirected to the planted tree by the measurement patch, which is the whole
+// mechanism: the planted tree stands in for the repository, so a fixture needs
+// no corpus, no migration and no register to be measured walking one.
+//
+// AND THESE CASES DO NOT CARRY `CORPUS_SCAN_MS`, WHICH LEG C HAD TO SAY TWICE.
+// Every one of them was written with the budget pasted on out of habit, and the
+// check named all seven on the first run: their input is a fixture module and
+// one child process, not this repository, so the budget was a sixty-second wall
+// bounding a hang and nothing else. The cases that DO carry it below are the
+// two that call `census()` or `run()` over the real tree. This is leg C working
+// on the diff that added leg D, which is the only reason to trust either.
+// =============================================================================
+
+/** A checker directory outside this repository, holding one module. */
+function checkerFixture(source: string): string {
+  const root = mkdtempSync(join(tmpdir(), 'merit-measured-roster-'));
+  writeFileSync(join(root, 'fixture-checker.mjs'), source);
+  return join(root, 'fixture-checker.mjs');
+}
+
+/**
+ * FIVE SHAPES, ONE MODULE. Each default root is a real directory of this
+ * repository written as a literal, so the patch redirects it to the planted
+ * tree and the fixture never learns where it actually ran.
+ */
+const SHAPES = `
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export function walks(root = '${DIR}') {
+  let total = 0;
+  for (const name of readdirSync(root)) total += readFileSync(join(root, name), 'utf8').length;
+  return total;
+}
+
+export function walksUnrostered(root = '${DIR}') {
+  return readdirSync(root).length;
+}
+
+export function named(root = '${DIR}') {
+  return readFileSync(join(root, 'one-named-file-that-is-not-there.md'), 'utf8');
+}
+
+export function quiet() {
+  return 1;
+}
+
+export function spawns(root = '${DIR}') {
+  return execFileSync('git', ['-C', root, 'ls-files', '-z']);
+}
+
+export function writes(root = '${DIR}') {
+  writeFileSync(join(root, 'the-measurement-must-never-put-this-here.txt'), 'x');
+  return 1;
+}
+`;
+
+/** The whole block's measurement, taken once, in one child. */
+function measureShapes(): Map<string, Verdict> {
+  const module = checkerFixture(SHAPES);
+  const rostered = ['walks', 'named', 'quiet'];
+  const probed = ['walksUnrostered', 'spawns', 'writes'];
+  return measuredVerdicts(
+    measure([
+      ...rostered.map((name) => ({ module, name, rostered: true, args: ['default' as const] })),
+      ...probed.map((name) => ({ module, name, rostered: false, args: [] })),
+    ]),
+  );
+}
+
+const named = (verdicts: Map<string, Verdict>, name: string): Verdict => {
+  const found = [...verdicts].find(([id]) => id.endsWith(`#${name}`));
+  if (found === undefined) throw new Error(`${name} was not measured at all`);
+  return found[1];
+};
+
+describe('leg D, a rostered walker that does not enumerate when it is run', () => {
+  test('a walker that enumerates is measured, and what it reads grows with the planted tree', () => {
+    const v = named(measureShapes(), 'walks');
+    expect(enumerates(v)).toBe(true);
+    expect(v.dirs).toBe(1);
+    // THE COMPARISON IS THE MEASUREMENT. Two rounds, the same walker, more
+    // files planted in the second, and more of them read. A named read of one
+    // file reads one file in both rounds, which is the next case.
+    expect(v.planted).toEqual([ROUNDS[0]?.perDir, ROUNDS[1]?.perDir]);
+    expect(v.read[1]).toBeGreaterThan(v.read[0] as number);
+    expect(grewWithTheTree(v)).toBe(true);
+  });
+
+  test('a rostered walker that reads the planted tree and enumerates none of it is named', () => {
+    const verdicts = measureShapes();
+    const findings = legRosterIsMeasured(verdicts);
+    expect(findings.join('\n')).toContain('#named');
+    expect(findings.join('\n')).toContain('enumerates no directory of it');
+    // AND THE LEG DOES NOT OVER-FIRE. The walker beside it in the same
+    // measurement, in the same fixture, walks and is silent here.
+    expect(findings.join('\n')).not.toContain('#walks');
+    expect(named(verdicts, 'named').touched).toBeGreaterThan(0);
+    expect(named(verdicts, 'named').dirs).toBe(0);
+  });
+
+  test('a walker that never reached the planted tree is INCONCLUSIVE and never a finding', () => {
+    // THE THIRD OUTCOME IS NOT A ROUNDING ERROR. `quiet` is handed the empty
+    // argument this measurement supplies and returns without looking at
+    // anything. Calling that a stale roster entry would be this check
+    // inventing a defect out of its own calling convention.
+    const verdicts = measureShapes();
+    expect(named(verdicts, 'quiet').touched).toBe(0);
+    expect(enumerates(named(verdicts, 'quiet'))).toBe(false);
+    expect(legRosterIsMeasured(verdicts).join('\n')).not.toContain('#quiet');
+  });
+});
+
+describe('leg E, an enumeration with no argument at all that is not in the roster', () => {
+  test('a walk reached with nothing supplied is named, and so is one performed by a spawn', () => {
+    const verdicts = measureShapes();
+    const findings = legRosterIsComplete(verdicts).join('\n');
+    expect(findings).toContain('#walksUnrostered');
+    // `ADR-470` SECTION 3.4 ITEM 3, MEASURED. `git ls-files` is not in
+    // `ENUMERATORS` and never will be, because it is not an `fs` call at all.
+    // The measurement sees it because it watches the process boundary.
+    expect(findings).toContain('#spawns');
+    expect(findings).toContain('ls-files');
+    expect(named(verdicts, 'spawns').dirs).toBe(0);
+    expect(enumerates(named(verdicts, 'spawns'))).toBe(true);
+  });
+
+  test('a function that enumerates nothing is not named, whichever side of the roster it is on', () => {
+    const verdicts = measureShapes();
+    expect(legRosterIsComplete(verdicts).join('\n')).not.toContain('#quiet');
+    expect(legRosterIsComplete(verdicts).join('\n')).not.toContain('#named');
+    // AND A ROSTERED WALKER IS NEVER LEG E's, whatever it does.
+    expect(legRosterIsComplete(verdicts).join('\n')).not.toContain('#walks ');
+  });
+});
+
+describe('what a measured run is not allowed to do', () => {
+  test('it may not write, and the write it attempted is not in this repository afterwards', () => {
+    const verdicts = measureShapes();
+    const v = named(verdicts, 'writes');
+    expect(v.error).toContain('may not write');
+    // THE CONTROL, AND IT IS THE REASON THIS CAN RUN AT ALL. The fixture aims
+    // its write at a real directory of this repository. The patch records the
+    // path it was given, unredirected, and refuses.
+    expect(existsSync(join(DIR, 'the-measurement-must-never-put-this-here.txt'))).toBe(false);
+  });
+
+  test('it may not spawn, so no measured checker ever sees the real tree through a process', () => {
+    const v = named(measureShapes(), 'spawns');
+    expect(v.spawns.join(' ')).toContain('ls-files');
+    expect(v.error).toContain('may not spawn');
+  });
+});
+
+describe('leg A over the measurement, which throws rather than reporting', () => {
+  const verdict = (over: Partial<Verdict>): Verdict => ({
+    rostered: true,
+    dirs: 0,
+    touched: 0,
+    spawns: [],
+    read: [0, 0],
+    planted: [8, 24],
+    error: null,
+    ...over,
+  });
+
+  test('a measurement with no row at all is not a measurement', () => {
+    expect(() => {
+      legMeasurementIsReal(new Map());
+    }).toThrow(/no row at all/);
+  });
+
+  test('a measurement in which nothing enumerated is an instrument that is not reading', () => {
+    expect(() => {
+      legMeasurementIsReal(new Map([['m#a', verdict({})]]));
+    }).toThrow(/not one rostered walker was measured enumerating/);
+  });
+
+  test('two rounds that no walker distinguishes have compared nothing', () => {
+    // A WALKER CAN ENUMERATE AND STILL READ THE SAME FILES IN BOTH ROUNDS, so
+    // this is a separate throw from the one above rather than a stricter form
+    // of it: it is the only thing that says the two trees differ at all.
+    expect(() => {
+      legMeasurementIsReal(new Map([['m#a', verdict({ dirs: 1 })]]));
+    }).toThrow(/not distinguishable/);
+    expect(() => {
+      legMeasurementIsReal(new Map([['m#a', verdict({ dirs: 1, read: [1, 2] })]]));
+    }).not.toThrow();
+  });
+});
+
+describe('the measured roster on this repository', () => {
+  test(
+    'every rostered walker is measured enumerating or is named inconclusive, and neither leg fires',
+    () => {
+      const seen = census();
+      const verdicts = measuredVerdicts(measure(measurementPlan(seen.mods, seen.walkers)));
+      expect(legRosterIsMeasured(verdicts)).toEqual([]);
+      expect(legRosterIsComplete(verdicts)).toEqual([]);
+
+      // DERIVED AND NOT PINNED, for the reason the first case in this file
+      // gives. What is asserted is that the measurement accounts for the whole
+      // roster and that it is not vacuous.
+      const summary = measuredSummary(verdicts);
+      expect(summary.rostered).toBe(seen.walkers.size);
+      expect(summary.measured + summary.inconclusive).toBe(summary.rostered);
+      expect(summary.measured).toBeGreaterThan(0);
+      expect(summary.grew).toBeGreaterThan(0);
+      expect(summary.probed).toBeGreaterThan(0);
+      expect(summary.probed).toBeLessThan(exportedSurface(seen.mods));
+    },
+    CORPUS_SCAN_MS,
+  );
+
+  test(
+    'the patch and the fold read one register of enumeration primitives, not two',
+    () => {
+      // IF THESE EVER DIVERGE, THE ROSTER AND THE MEASUREMENT ARE ABOUT
+      // DIFFERENT THINGS and the agreement between them stops meaning anything.
+      expect(measurementPatch(REPO_ROOT, SELF)).toContain(JSON.stringify(ENUMERATORS));
+      expect(ENUMERATORS).toContain('readdirSync');
+    },
+    CORPUS_SCAN_MS,
+  );
+
+  test(
+    'the child mode is not a user-facing option and the usage text does not offer it',
+    () => {
+      const lines: string[] = [];
+      expect(run([MEASURE_CHILD], (line) => lines.push(line))).toBe(2);
+      expect(lines[0]).toContain('usage:');
+      expect(lines.join('\n')).not.toContain(MEASURE_CHILD);
+    },
+    CORPUS_SCAN_MS,
+  );
 });
