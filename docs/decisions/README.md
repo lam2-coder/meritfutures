@@ -462,6 +462,8 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-449](ADR-449.md) | the `schema.ts` header's census is ASSERTED rather than corrected a fourth time, the header edit is line-neutral because a non-neutral one is not satisfiable inside this fence, and the narrow generation comparison is KEPT because the general one provably cannot reach its table (2026-09-08, status: proposed) |
 | [ADR-450](ADR-450.md) | the eight pointers are invisible to BOTH citation checks and not to one of them, 89.5% of this tree's pointers bind NO NAME and are undecidable by any extension of this grammar, and the control is REFUSED because it cannot see seven of its own motivating case (2026-09-08, status: proposed) |
 | [ADR-451](ADR-451.md) | four cases asserted a write PostgreSQL refuses, the defect is twenty tables wide rather than the two the sibling named, and the widening it blocks is now green but watched by nothing (2026-09-08, status: proposed) |
+| [ADR-452](ADR-452.md) | the identity widening taken with the leg that watches it, and the SQLSTATE the corpus states for a stored generated column is wrong on a real database (2026-09-08, status: proposed) |
+| [ADR-453](ADR-453.md) | the fold paragraph's ARGUMENT is checked and holds of all fifteen, two further sentences beside it are FALSE about this tree, and the `either` paragraph's seven are this file's `.references()` rather than the DDL's (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
