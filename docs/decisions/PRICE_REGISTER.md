@@ -124,10 +124,10 @@ entry is.
 | 41  | `ADR-459:189` | 9.5   | OPEN       | UNCHECKABLE | [ADR-461](ADR-461.md) 6       | whoever writes the first one takes the ruling on whether `Promise<void>` is ... |
 | 42  | `ADR-461:212` | 10.1  | OPEN       | UNASSESSED  | -                             | none for the six already recorded elsewhere; for the rest, the same founder ... |
 | 43  | `ADR-461:214` | 10.2  | OPEN       | UNASSESSED  | -                             | a `services:` block copied from `corpus.yml:164` onto `CI-02 unit and ...       |
-| 44  | `ADR-461:216` | 10.3  | OPEN       | UNASSESSED  | -                             | a widening of whatever derives a citation set so that a prose pointer of ...    |
+| 44  | `ADR-461:216` | 10.3  | WITHDRAWN  | UNASSESSED  | [ADR-467](ADR-467.md) 8       | a widening of whatever derives a citation set so that a prose pointer of ...    |
 | 45  | `ADR-461:218` | 10.4  | DISCHARGED | UNASSESSED  | [ADR-464](ADR-464.md) 5       | a `CI-06` letter or an `RI-nn` asserting that every labelled price names a ...  |
 | 46  | `ADR-461:220` | 10.5  | OPEN       | UNASSESSED  | -                             | that entry's, unchanged.                                                        |
-| 47  | `ADR-461:222` | 10.6  | OPEN       | UNASSESSED  | -                             | a row whose subject is turning the forcing-constraint filter into a ...         |
+| 47  | `ADR-461:222` | 10.6  | DISCHARGED | UNASSESSED  | [ADR-465](ADR-465.md)         | a row whose subject is turning the forcing-constraint filter into a ...         |
 | 48  | `ADR-461:224` | 10.7  | OPEN       | UNASSESSED  | -                             | a founder ruling, which no row can substitute for.                              |
 | 49  | `ADR-464:166` | 8.1   | OPEN       | UNASSESSED  | -                             | one row, a census over seven clauses on the model of `ADR-461` section 3 ...    |
 | 50  | `ADR-464:168` | 8.2   | OPEN       | UNASSESSED  | -                             | none, and there is nothing to take. It is recorded so that a later row ...      |
