@@ -156,7 +156,7 @@ describe('leg B, the INSERTs the accessor actually builds', () => {
     const built = await builtStatements(generated([['identities', ['created_at']]]));
     expect(built.findings).toHaveLength(1);
     expect(built.findings[0]).toContain('identities.created_at');
-    expect(built.findings[0]).toContain('42601');
+    expect(built.findings[0]).toContain('428C9');
   });
 
   test('a set naming no column of any table leaves it with nothing to assert', async () => {
@@ -333,11 +333,11 @@ describe('leg D, the refusal the UPDATE builder now holds', () => {
     expect(legD.identityTables).toBeGreaterThan(0);
   });
 
-  // THE IDENTITY MESSAGE CARRIES ITS OWN SQLSTATE AND IT IS NOT THE STORED ONE.
-  // PostgreSQL answers `428C9` to a write naming a `GENERATED ALWAYS AS IDENTITY`
-  // column, which `ADR-448` section 8 item 2 states and this case holds: a
-  // refusal that reported `42601` here would send a reader to the wrong half of
-  // the DDL.
+  // THE SQLSTATE DOES NOT TELL THE TWO HALVES APART AND `ADR-448` READ IT AS IF
+  // IT DID. PostgreSQL answers `428C9` to a write naming a `GENERATED ALWAYS AS
+  // IDENTITY` column AND to one naming a stored generated column, measured in
+  // `ADR-454`. The rule on the line above is the discriminator; `42601` is
+  // `syntax_error`, and the line below pins that it never comes back.
   test('the identity refusal names the rule and its own SQLSTATE', async () => {
     const legD = await refusedWrites();
     const sample = legD.identitySample;
@@ -377,7 +377,8 @@ describe('leg D, the refusal the UPDATE builder now holds', () => {
     const sample = legD.sample;
     expect(sample).toBeTypeOf('string');
     expect(sample).toMatch(/GENERATED ALWAYS AS \(\.\.\.\) STORED/);
-    expect(sample).toMatch(/42601/);
+    expect(sample).toMatch(/428C9/);
+    expect(sample).not.toMatch(/42601/);
     expect(sample).toMatch(/never takes it from the caller/);
   });
 });

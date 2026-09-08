@@ -17,10 +17,10 @@
 //
 //   1. `<col> <type> GENERATED ALWAYS AS (<expr>) STORED` is a GENERATED COLUMN.
 //      The value is computed from the row and a statement that names it in an
-//      INSERT column list or an UPDATE `SET` is refused outright, `42601`.
+//      INSERT column list or an UPDATE `SET` is refused outright, `428C9`.
 //   2. `<col> bigint GENERATED ALWAYS AS IDENTITY` is an IDENTITY COLUMN. It is
-//      a sequence default with a lock on it, refused with `428C9` unless the
-//      statement carries `OVERRIDING SYSTEM VALUE`.
+//      a sequence default with a lock on it, refused with the SAME `428C9`
+//      unless it carries `OVERRIDING SYSTEM VALUE`, which does NOT rescue 1.
 //
 // LEGS A TO C TAKE THE FIRST AND ONLY THE FIRST, which is the one PostgreSQL's
 // own documentation calls a generated column and the one `ADR-443` section 11
@@ -594,7 +594,7 @@ export async function builtStatements(generated, root = REPO_ROOT) {
         findings.push(
           `${key}: the INSERT the accessor builds names ${name}.${column}, which the DDL ` +
             'declares `GENERATED ALWAYS AS (...) STORED`. PostgreSQL refuses that statement ' +
-            'with 42601. Either the DDL stopped generating the column or `schema.ts` declares ' +
+            'with 428C9. Either the DDL stopped generating the column or `schema.ts` declares ' +
             'it without `.generatedAlwaysAs(...)`',
         );
       }
@@ -824,7 +824,7 @@ export async function refusedWrites(root = REPO_ROOT) {
         findings.push(
           `${key}: the accessor built an UPDATE naming ${name}.${columnName}, which schema.ts ` +
             'declares `GENERATED ALWAYS AS (...) STORED`. PostgreSQL refuses that statement ' +
-            'with 42601. `refuseGeneratedColumn` in packages/db/src/scoped-db.ts is the guard ' +
+            'with 428C9. `refuseGeneratedColumn` in packages/db/src/scoped-db.ts is the guard ' +
             'that should have refused it first',
         );
         continue;
@@ -968,7 +968,7 @@ export function literalStatements(generated, root = REPO_ROOT) {
             findings.push(
               `${rel}:${String(i + 1)}: a hand-written statement names ${name}, which the DDL ` +
                 'declares `GENERATED ALWAYS AS (...) STORED`. PostgreSQL refuses a write to it ' +
-                'with 42601. If this mention is a read rather than a write, it still has to ' +
+                'with 428C9. If this mention is a read rather than a write, it still has to ' +
                 'move: this check does not parse the statement and will not guess',
             );
           }
