@@ -5,10 +5,14 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+  CONVENTION,
+  REFUSAL_RULE,
   SCOPED_DB,
   derive,
   legAbsences,
   legBuilderRoster,
+  legCallgraph,
+  legConventionShared,
   legGuardRoster,
   legMatrix,
   run,
@@ -44,7 +48,7 @@ function seeded(mutate: (source: string) => string): string {
   return path;
 }
 
-/** Every finding, from every leg, over one derived tree. */
+/** Every finding, from every leg over the accessor, on one derived tree. */
 function findingsFor(path: string): string[] {
   const derived = derive(path);
   return [
@@ -52,7 +56,28 @@ function findingsFor(path: string): string[] {
     ...legBuilderRoster(derived).findings,
     ...legMatrix(derived).findings,
     ...legAbsences(derived).findings,
+    ...legCallgraph(derived).findings,
   ];
+}
+
+/**
+ * The lint rule, mutated, written where only this suite can see it.
+ *
+ * SEPARATE FROM `seeded` BECAUSE THE FILE IS SEPARATE AND HAS ANOTHER OWNER.
+ * Leg F reads `refusal-naming.js`, which this package does not own and which
+ * concurrent work edits; every case below mutates a COPY for that reason and the
+ * real file is opened read-only, once, here.
+ */
+const REAL_RULE = readFileSync(REFUSAL_RULE, 'utf8');
+
+function seededRule(mutate: (source: string) => string): string {
+  const source = mutate(REAL_RULE);
+  expect(source, 'the seed did not match the lint rule and the case would be vacuous').not.toBe(
+    REAL_RULE,
+  );
+  const path = join(mkdtempSync(join(tmpdir(), 'merit-guard-rule-')), 'refusal-naming.js');
+  writeFileSync(path, source);
+  return path;
 }
 
 /** The three guards on the money-path update builder, in the source's spelling. */
@@ -238,6 +263,153 @@ describe('leg D, the motivating failure', () => {
     const builder = derived.builders.find((b) => b.name === 'insertUnderStatement');
     expect(builder?.guards).toContain('refuseTermInValues');
     expect(legAbsences(derived).findings).toEqual([]);
+  });
+});
+
+describe('leg E, the callgraph out of a builder', () => {
+  // ADR-459 SECTION 9 ITEM 1. The leg keys on BEING CALLED BY A BUILDER, so the
+  // cases below move each of its three terms in turn and read which of them was
+  // load-bearing. A leg whose terms have not each been falsified separately is a
+  // leg that might be passing on one of them.
+
+  test('a throwing helper reached from a builder under a non-verb name is named', () => {
+    // THE ARRIVAL ITEM 1 IS ABOUT. It returns a value, so `refusal-naming.js`
+    // does not see it; it is not named `refuse*`, so legs A and D do not; and
+    // the throw is in its own body rather than the builder's, so leg C does not.
+    const path = seeded(
+      (s) =>
+        s.replace(
+          '  refuseTermInValues(key, values);\n  return source\n    .update(',
+          '  refuseTermInValues(key, values);\n  values = checkedValues(values);\n  return source\n    .update(',
+        ) +
+        '\nfunction checkedValues(values: WriteValues): WriteValues {\n' +
+        "  if (values.x === 1) throw new Error('no');\n  return values;\n}\n",
+    );
+    const findings = legCallgraph(derive(path)).findings;
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('checkedValues');
+    expect(findings[0]).toContain('updateStatementOn');
+    expect(findings[0]).toContain('does not match');
+  });
+
+  test('the same helper named to the convention is not a finding, which is the escape route the leg offers', () => {
+    // THE POINT OF THE LEG IS NOT TO CONVICT, IT IS TO MAKE THE ARRIVAL VISIBLE
+    // TO THE OTHER LEGS. Renaming it moves it into leg A's roster, where it goes
+    // red for a better reason, so this case asserts leg E is silent AND that leg
+    // A has picked it up.
+    const path = seeded(
+      (s) =>
+        s.replace(
+          '  refuseTermInValues(key, values);\n  return source\n    .update(',
+          '  refuseTermInValues(key, values);\n  values = refuseCheckedValues(values);\n  return source\n    .update(',
+        ) +
+        '\nfunction refuseCheckedValues(values: WriteValues): WriteValues {\n' +
+        "  if (values.x === 1) throw new Error('no');\n  return values;\n}\n",
+    );
+    const derived = derive(path);
+    expect(legCallgraph(derived).findings).toEqual([]);
+    expect(legGuardRoster(derived).findings.some((f) => f.includes('refuseCheckedValues'))).toBe(
+      true,
+    );
+  });
+
+  test('a helper that does NOT throw is not a finding, which is the term that keeps the leg off every ordinary call', () => {
+    const path = seeded(
+      (s) =>
+        s.replace(
+          '  refuseTermInValues(key, values);\n  return source\n    .update(',
+          '  refuseTermInValues(key, values);\n  values = tidiedValues(values);\n  return source\n    .update(',
+        ) + '\nfunction tidiedValues(values: WriteValues): WriteValues {\n  return values;\n}\n',
+    );
+    expect(legCallgraph(derive(path)).findings).toEqual([]);
+  });
+
+  test('a builder calling another builder is not a finding, because that is leg B and leg C', () => {
+    const path = seeded((s) =>
+      s.replace(
+        '  refuseTermInValues(key, values);\n  return source\n    .update(',
+        '  refuseTermInValues(key, values);\n  void deleteStatementOn;\n  return source\n    .update(',
+      ),
+    );
+    // `deleteStatementOn` throws nothing today, so the reference alone proves
+    // little. The real assertion is the general one: no derived builder appears
+    // in any other builder's thrower list.
+    const derived = derive(path);
+    const builderNames = new Set(derived.builders.map((b) => b.name));
+    for (const builder of derived.builders) {
+      for (const name of builder.throwers) expect(builderNames.has(name)).toBe(false);
+    }
+  });
+
+  test('a declared non-guard the code no longer reaches is reported as stale, not left to rot', () => {
+    // The declaration and the code are two statements and this is the leg that
+    // notices they have stopped agreeing. Renaming the callee does both halves
+    // at once: `bothOf` becomes unreachable and a new undeclared thrower arrives.
+    const path = seeded((s) => s.replaceAll('bothOf(', 'bothOfPresent('));
+    const findings = legCallgraph(derive(path)).findings;
+    expect(findings.some((f) => f.includes('"bothOf"') && f.includes('stale'))).toBe(true);
+    expect(findings.some((f) => f.includes('"bothOfPresent"'))).toBe(true);
+  });
+
+  test('the three non-conforming throwers this leg found on the real tree are still the three, and all three are declared', () => {
+    // THE MEASUREMENT THAT DECIDED THE LEG'S DISPOSITION, PINNED. ADR-462 argues
+    // from exactly this set: the priced wording would be red on all three, and
+    // all three are legitimate. A fourth arriving is the finding, and it should
+    // arrive as a leg E finding rather than as a surprise in this list.
+    const derived = derive(SCOPED_DB);
+    const reached = [...new Set(derived.builders.flatMap((b) => b.throwers))].sort();
+    const nonConforming = reached.filter((name) => !CONVENTION.test(name));
+    expect(nonConforming).toEqual(['bothOf', 'columnByName', 'scopePredicate']);
+    expect(legCallgraph(derived).findings).toEqual([]);
+  });
+});
+
+describe('leg F, the convention is one literal written in two files', () => {
+  // ADR-459 SECTION 9 ITEM 2. The rule file has another owner, so the cases here
+  // pin BOTH halves of the contract: that a lost literal is red, and that an
+  // ordinary edit which merely MOVES it is not.
+
+  test('the real lint rule carries the literal this checker matches with', () => {
+    const result = legConventionShared();
+    expect(result.present).toBe(true);
+    expect(result.findings).toEqual([]);
+  });
+
+  test('a rule file that has lost the literal goes red', () => {
+    const path = seededRule((s) =>
+      s.replace('const CONVENTION = /^refuse[A-Z]/;', 'const CONVENTION = /^deny[A-Z]/;'),
+    );
+    const findings = legConventionShared(path).findings;
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('leg F');
+    expect(findings[0]).toContain('stopped agreeing');
+  });
+
+  test('a rule file whose literal is COMMENTED OUT goes red, which a raw-text search would call green', () => {
+    // `RI-25`'s LESSON, EXECUTED. That check's first version reported PASS with
+    // the call it asserts commented out. Commenting the convention out loses it
+    // exactly as surely as deleting it, and the stripper is what sees that.
+    const path = seededRule((s) =>
+      s.replace('const CONVENTION = /^refuse[A-Z]/;', '// const CONVENTION = /^refuse[A-Z]/;'),
+    );
+    expect(readFileSync(path, 'utf8')).toContain('/^refuse[A-Z]/');
+    expect(legConventionShared(path).findings).toHaveLength(1);
+  });
+
+  test('a rule file where the literal has MOVED is green, which is the whole reason this leg keys on presence', () => {
+    // THE COUPLING THIS LEG WAS BUILT AROUND. Other work edits that file and may
+    // move this line. A leg keyed on the line number, the file length or a hash
+    // would turn that work red for doing what it was asked to do, and this case
+    // is what stops a later session tightening leg F into exactly that.
+    const path = seededRule((s) => `// a line added above everything\n${s}\n// and one below\n`);
+    expect(legConventionShared(path).present).toBe(true);
+    expect(legConventionShared(path).findings).toEqual([]);
+  });
+
+  test('a rule file that cannot be read is a finding rather than a crash', () => {
+    const findings = legConventionShared(join(tmpdir(), 'merit-no-such-refusal-rule.js')).findings;
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('could not be read');
   });
 });
 
