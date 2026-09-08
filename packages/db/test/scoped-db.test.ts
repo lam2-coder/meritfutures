@@ -4442,3 +4442,197 @@ describe('P5-b: a handle for one identity cannot reach another identity`s row', 
     expect(SCOPED).toContain('walletSpendLimits');
   });
 });
+
+// =============================================================================
+// live_account_state. THE COMPARISONS STOP AT THE REGISTRY AND THIS TABLE IS
+// OUTSIDE IT, SO THEY ARE RUN HERE BY NAME.
+// =============================================================================
+// EVERY COMPARISON ABOVE ITERATES `DDL_NAMES`, WHICH IS DERIVED FROM
+// `TABLE_KEYS`. That is deliberate and it is what makes those loops total over
+// the registry by construction. It also means an UNREGISTERED relation is
+// reached by none of them: the drift fold, the type comparison, the nullability
+// comparison and the DEFAULT comparison all end at the registry's edge.
+//
+// `live_account_state` IS TRANSCRIBED IN `schema.ts` AND IS DELIBERATELY NOT
+// REGISTERED, and the reason is a grant rather than a preference. `0050` REVOKEs
+// ALL on it from `merit_app` and from PUBLIC, because FM-M12-08 ("the stats
+// worker holds no read grant on the live cache") is a statement about READING
+// and the API and the worker both run as `merit_app`. Every door in
+// `scoped-db.ts` opens on the one pool `client.ts` builds from one
+// `DATABASE_URL`, so a key in `TABLES` would publish a door onto a relation the
+// database is REQUIRED to refuse. The transcription is therefore worth having
+// and the registration is not, and the price of that is exactly these
+// assertions: what the registry would have bought, bought by hand, on the one
+// table that pays for it.
+//
+// FIVE COMPARISONS AND NOT FOUR. Type, nullability and DEFAULT are the three the
+// registry loops make; the fourth is the column-name fold those loops also make;
+// and the fifth is the GENERATION CLAUSE, which no loop in this file makes for
+// any table. It is written here for THIS table only, because this table has the
+// only generated `*_cents` column in the estate and a generic comparison over
+// the whole registry is a different diff on a different row.
+//
+// THERE IS NO TOP-LEVEL IMPORT FOR `liveAccountState` AND THAT IS NOT AN
+// OVERSIGHT. The import block of this file sits above every line any document
+// cites into it, so adding a name to it would move all twenty cited lines to buy
+// one symbol. The symbol is taken with a dynamic import inside the block that
+// needs it, and nothing above line 3984 moves.
+describe('live_account_state: the transcription is compared against `0050`', () => {
+  const LIVE = 'live_account_state';
+
+  /** The transcription's columns, by SQL name. */
+  const transcribed = async (): Promise<Record<string, PgColumn>> => {
+    const { liveAccountState } = await import('../src/schema.ts');
+    const columns = getTableColumns(liveAccountState as unknown as PgTable) as unknown as Record<
+      string,
+      PgColumn
+    >;
+    return Object.fromEntries(Object.values(columns).map((c) => [c.name, c]));
+  };
+
+  /**
+   * `GENERATED ALWAYS AS (expr) STORED`, and NOT `GENERATED ... AS IDENTITY`.
+   * The `AS (` is what separates them: an identity column writes no parenthesis
+   * and `DECLARED_IDENTITY` above is the reader for that one.
+   */
+  const GENERATED_ALWAYS_AS = /\bGENERATED\s+ALWAYS\s+AS\s*\((.+)\)\s*STORED\b/is;
+
+  test('exactly one migration builds this table, so the CREATE body IS the column set', () => {
+    // DERIVED RATHER THAN ASSUMED, which is the whole of ADR-094's rule: a table
+    // is read as of the LAST migration and never as of its `CREATE TABLE`. Here
+    // the two happen to coincide, and this assertion is what says so. The day a
+    // later migration adds a column to this table it goes red, and the
+    // transcription above it is stale on that same day.
+    const touching = readdirSync(MIGRATIONS)
+      .filter((f) => f.endsWith('.sql'))
+      .filter((f) => readFileSync(join(MIGRATIONS, f), 'utf8').includes(LIVE))
+      .sort();
+    expect(touching).toEqual(['0050_live_cache_and_role.sql']);
+  });
+
+  test('the column-name set equals the DDL as of the last migration', async () => {
+    const defs = foldTableDefs(LIVE);
+    expect([...defs.keys()].sort()).toEqual(Object.keys(await transcribed()).sort());
+  });
+
+  test("every column's TYPE and NULLABILITY equal the DDL", async () => {
+    const defs = foldTableDefs(LIVE);
+    const columns = await transcribed();
+    for (const [name, column] of Object.entries(columns)) {
+      const def = defs.get(name);
+      expect(def, `${LIVE}.${name} is not a column of the folded table`).toBeDefined();
+      expect(
+        tsType(column),
+        `${LIVE}.${name} is transcribed as a different TYPE from the one 0050 declares. ` +
+          `Its DDL is: ${def ?? ''}`,
+      ).toBe(ddlType(def ?? ''));
+      expect(
+        column.notNull,
+        `${LIVE}.${name} is transcribed as ${column.notNull ? 'NOT NULL' : 'nullable'} and 0050 ` +
+          `declares it ${declaredNotNull(def) ? 'NOT NULL' : 'nullable'}. Its DDL is: ${def ?? ''}`,
+      ).toBe(declaredNotNull(def));
+    }
+  });
+
+  test("every column's DEFAULT equals the DDL", async () => {
+    const defs = foldTableDefs(LIVE);
+    for (const [name, column] of Object.entries(await transcribed())) {
+      const def = defs.get(name);
+      expect(def, `${LIVE}.${name} is not a column of the folded table`).toBeDefined();
+      // NO ENTRY IN `TRANSCRIPTION_OMITS_DEFAULT` IS CONSULTED AND NONE IS
+      // ADDED. That register is ADR-438's record of three columns where the two
+      // sides disagree in the SAFE direction. This table contributes none: the
+      // three defaulted columns are transcribed with their defaults and the
+      // seven others carry none on either side.
+      expect(
+        omitsDefault(LIVE, name),
+        `${LIVE}.${name} is in TRANSCRIPTION_OMITS_DEFAULT and this table registers no ` +
+          `disagreement`,
+      ).toBe(false);
+      expect(
+        column.hasDefault,
+        `${LIVE}.${name} is transcribed as ${
+          column.hasDefault ? 'DEFAULTED, so a write may omit it' : 'carrying no default'
+        } and 0050 declares it ${
+          declaredDefault(def) ? `DEFAULT ${ddlDefault(def) || 'AS IDENTITY'}` : 'with no default'
+        }. Its DDL is: ${def ?? ''}`,
+      ).toBe(declaredDefault(def));
+    }
+  });
+
+  test('the GENERATION CLAUSE agrees: the same column, and the same expression', async () => {
+    const defs = foldTableDefs(LIVE);
+    const columns = await transcribed();
+
+    // ONE SET AGAINST THE OTHER, IN BOTH DIRECTIONS. A column generated in the
+    // DDL and not here would be WRITABLE in a type derived from this
+    // transcription, against a database that refuses a written value outright;
+    // a column generated here and not in the DDL would be omitted from a write
+    // the database then leaves to its own default or to NULL.
+    const generatedInDdl = [...defs.entries()]
+      .filter(([, def]) => GENERATED_ALWAYS_AS.test(def))
+      .map(([name]) => name)
+      .sort();
+    const generatedHere = Object.values(columns)
+      .filter((c) => (c as unknown as { generated?: unknown }).generated !== undefined)
+      .map((c) => c.name)
+      .sort();
+    expect(generatedHere).toEqual(generatedInDdl);
+
+    // AND IT IS NOT THE EMPTY SET ON BOTH SIDES. Two readers that degrade
+    // together agree, which is this file's standing hazard; the column is named
+    // as a literal so a degraded reader disagrees with the literal.
+    expect(generatedInDdl).toEqual(['intraday_movement_cents']);
+
+    // THE EXPRESSION, RENDERED AND COMPARED. Agreeing about WHICH column is
+    // generated says nothing about WHAT it is generated from, and this column is
+    // the movement figure API_CONTRACT section 8 renders to a trader.
+    for (const name of generatedInDdl) {
+      const declared = (GENERATED_ALWAYS_AS.exec(defs.get(name) ?? '')?.[1] ?? '').trim();
+      const generated = (columns[name] as unknown as { generated: { as: unknown; type: string } })
+        .generated;
+      // `always` and not `byDefault`: a generated column REFUSES a written
+      // value, and that refusal is the money-path fact on this column.
+      expect(generated.type).toBe('always');
+      const { sql: rendered } = new PgDialect().sqlToQuery(
+        (typeof generated.as === 'function'
+          ? (generated.as as () => unknown)()
+          : generated.as) as never,
+      ) as { sql: string };
+      expect(rendered.replace(/\s+/g, ' ').trim()).toBe(declared.replace(/\s+/g, ' ').trim());
+    }
+  });
+
+  test('every `*_cents` column is INTEGER CENTS on BOTH sides, and there are three of them', async () => {
+    // INV-02. THE COUNT IS DERIVED FROM THE DDL AND ASSERTED AGAINST THE
+    // TRANSCRIPTION, in that direction, so a `*_cents` column added to the table
+    // and left out of `schema.ts` is red here as well as in the name fold.
+    const defs = foldTableDefs(LIVE);
+    const columns = await transcribed();
+    const cents = [...defs.keys()].filter((n) => n.endsWith('_cents')).sort();
+    expect(cents).toEqual(['equity_cents', 'intraday_movement_cents', 'opening_equity_cents']);
+    for (const name of cents) {
+      // `bigint` on both sides. A TypeScript `bigint` cannot hold `1.5`, so no
+      // float reaches a money column through a type derived from this
+      // declaration, and `numeric` or `double precision` in the DDL would be
+      // caught here rather than by a reading.
+      expect(ddlType(defs.get(name) ?? ''), `0050 declares ${LIVE}.${name}`).toBe('bigint');
+      expect(tsType(columns[name] as PgColumn), `schema.ts declares ${LIVE}.${name}`).toBe(
+        'bigint',
+      );
+    }
+  });
+
+  test('the table is NOT registered, and the day it is this assertion is where the reason is', () => {
+    // A REFUSAL RECORDED AS AN ASSERTION RATHER THAN AS A COMMENT, on this
+    // file's own precedent for the aggregate P7 asked for. `0050` REVOKEs ALL on
+    // this table from `merit_app`, and every accessor door in this package
+    // connects as `merit_app`. So a row that adds this key to `TABLES` is not
+    // widening a registry, it is claiming a grant that does not exist, and it
+    // has to come here and read that before the suite goes green again.
+    expect(ALL_REGISTERED.map(([, sqlName]) => sqlName)).not.toContain(LIVE);
+    const migration = readFileSync(join(MIGRATIONS, '0050_live_cache_and_role.sql'), 'utf8');
+    expect(migration).toContain(`REVOKE ALL ON ${LIVE} FROM merit_app, PUBLIC;`);
+    expect(migration).toContain(`GRANT SELECT, INSERT, UPDATE ON ${LIVE} TO merit_live;`);
+  });
+});

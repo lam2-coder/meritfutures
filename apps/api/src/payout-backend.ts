@@ -243,13 +243,13 @@ function flag(row: Record<string, unknown>, column: string, table: string): bool
  * One `bigint NOT NULL` money column, AS A VALUE RATHER THAN AS A COLUMN OF A
  * BAG, because the typed catalogue door hands back a row and not a bag.
  *
- * **IT IS CHECKED AT RUN TIME EVEN WHERE `tsc` ALREADY SAYS `bigint`, AND THAT
- * IS ADR-303's OWN LIMIT 1 RATHER THAN CAUTION.** `CatalogRow<K>` is derived
- * from `schema.ts`, which is a TRANSCRIPTION of the DDL, and ADR-112 foreclosure
- * 4 records that nothing in this tree compares a transcribed column TYPE against
- * the migration that declares it. That door's own docblock states the rule this
- * function keeps: "a caller that reads money off one of these rows still checks
- * the value it read".
+ * **IT IS CHECKED AT RUN TIME EVEN WHERE `tsc` ALREADY SAYS `bigint`, AND THAT IS ADR-303's OWN
+ * LIMIT 1 RATHER THAN CAUTION.** `CatalogRow<K>` is derived from `schema.ts`, which is a
+ * TRANSCRIPTION of the DDL. This read "ADR-112 foreclosure 4 records that nothing in this tree
+ * compares a transcribed column TYPE against the migration that declares it." `RI-14` (ADR-444):
+ * FALSE when written; stated ONCE at limit 1 of `CatalogRow`
+ * (`packages/db/src/scoped-db.ts:3466`) and not restated here, which is also where "a caller that
+ * reads money off one of these rows still checks the value it read" is ruled.
  *
  * **AND IT DOES NOT COERCE.** `INV-02` is that money is `bigint` integer cents
  * AT EVERY BOUNDARY, and a `number` arriving on a payout basis has already been
@@ -402,11 +402,11 @@ async function stateLeg(handle: ScopedTx, accountId: string): Promise<RuleState>
  * every property below is checked by `tsc` against `schema.ts`, and a key that
  * does not exist is `TS2339` rather than a runtime throw on a money read.
  *
- * **THE RUNTIME CHECKS DO NOT COME OFF ON THE STRENGTH OF THAT TYPE, AND THAT
- * IS ADR-303's OWN LIMIT 1.** `CatalogRow<K>` is derived from a TRANSCRIPTION of
- * the DDL and nothing in this tree compares a transcribed column type against
- * the migration. `centsOf` is the check the door's docblock requires of a caller
- * that reads money off one of these rows.
+ * **THE RUNTIME CHECKS DO NOT COME OFF ON THE STRENGTH OF THAT TYPE, AND THAT IS ADR-303's OWN
+ * LIMIT 1.** `CatalogRow<K>` is derived from a TRANSCRIPTION of the DDL. This read "nothing in
+ * this tree compares a transcribed column type against the migration." `RI-14` (ADR-444): FALSE
+ * when written; stated ONCE at limit 1 of `CatalogRow` (`packages/db/src/scoped-db.ts:3466`).
+ * `centsOf` is the check that limit requires of a caller reading money off one of these rows.
  *
  * **THE MAPPING IS AN ACCEPTED `FM-16` AND IS REGISTERED RATHER THAN HIDDEN.**
  * ADR-303 limit 2 states it: the typed row is not a decoder, it SHRINKS one, and

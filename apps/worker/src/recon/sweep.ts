@@ -368,25 +368,25 @@ export function compareBalances(candidate: ReconCandidate): ReconVerdict {
 }
 
 // -----------------------------------------------------------------------------
-// Reading rows, which is where a missing column becomes an error instead of a balance
+// Reading rows, which is where a missing column becomes an error instead of a
+// balance
 // -----------------------------------------------------------------------------
 
 /**
- * **THE HAND-WRITTEN EXISTENCE MAPPING IS GONE (`ADR-430`).** `asRow` stood here, casting the
- * accessor's `unknown` back into a `ReconRow` that re-stated `Record<string, unknown>`, and it
- * is DELETED with the type it produced. `ReconTx.rowsWhere` hands back the row the key declares,
- * so the three readers below take that row directly.
+ * **THE HAND-WRITTEN EXISTENCE MAPPING IS GONE (`ADR-430`).** `asRow` stood
+ * here, casting the accessor's `unknown` back into a `ReconRow` that re-stated
+ * `Record<string, unknown>`, and it is DELETED with the type it produced.
+ * `ReconTx.rowsWhere` hands back the row the key declares, so the three readers
+ * below take that row directly.
  *
  * **`field` IS `keyof R & string` AND THAT IS THE WHOLE PURCHASE.** A column name used to be any
  * string at all and reached the row through an index signature; `tsc` now checks each one against
  * `schema.ts`. **IT CHECKS THE NAME AND NOTHING ELSE.** `ADR-299` section 5.1 item 5 rules that a
- * type derived from a TRANSCRIPTION retires no runtime check, so every refusal below is
- * unchanged, and on this slice that matters more than one directory over: these rows carry money.
- * The evidence this block gave for that ruling was not evidence. It read "`ADR-112` foreclosure 4
+ * type derived from a TRANSCRIPTION retires no runtime check. This read "`ADR-112` foreclosure 4
  * records that nothing in this tree compares a `schema.ts` column type against the DDL." `RI-14`
- * (ADR-441): IS FALSE, and was false when written. `scoped-db.test.ts:2728` compares TYPE and
- * NULLABILITY for every column of every registered non-view relation, against MIGRATION TEXT and
- * not the database, DEFAULT nowhere, foreclosure 4 about EXHAUSTIVENESS.
+ * (ADR-444): FALSE when written; stated ONCE at limit 1 of `CatalogRow`
+ * (`packages/db/src/scoped-db.ts:3466`). So every refusal below is unchanged, and on this slice
+ * that matters more than it did one directory over: these rows carry money.
  */
 function requireString<R extends object>(key: string, row: R, field: keyof R & string): string {
   const value = row[field];
