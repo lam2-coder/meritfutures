@@ -2722,7 +2722,7 @@ describe('a registered VIEW is checked against its own projection and against wh
     });
   }
 });
-
+// DESCRIBED ONCE at limit 1 of `CatalogRow` (`packages/db/src/scoped-db.ts:3466`).
 describe('the transcription states the DDL type and nullability, not only the column names', () => {
   for (const [key, sqlName] of DDL_NAMES) {
     test(`${sqlName}: every column's TYPE and NULLABILITY equal the DDL as of the LAST migration`, () => {
@@ -3211,7 +3211,7 @@ const MONEY_DEFAULT_SENTINELS: ReadonlyArray<readonly [TableKey, string, string]
   ['promotionalCreditGrants', 'consumed_cents', '0'],
   ['platformEntitlements', 'monthly_cost_cents', '0'],
 ];
-
+// DESCRIBED ONCE at limit 1 of `CatalogRow` (`packages/db/src/scoped-db.ts:3466`).
 describe('the transcription states the DDL DEFAULT, which is the fact a WRITE type rests on', () => {
   for (const [key, sqlName] of DDL_NAMES) {
     test(`${sqlName}: every column's DEFAULT equals the DDL as of the LAST migration`, () => {
@@ -4634,5 +4634,285 @@ describe('live_account_state: the transcription is compared against `0050`', () 
     const migration = readFileSync(join(MIGRATIONS, '0050_live_cache_and_role.sql'), 'utf8');
     expect(migration).toContain(`REVOKE ALL ON ${LIVE} FROM merit_app, PUBLIC;`);
     expect(migration).toContain(`GRANT SELECT, INSERT, UPDATE ON ${LIVE} TO merit_live;`);
+  });
+});
+
+// =============================================================================
+// ADR-449: THE `schema.ts` HEADER'S CENSUS, RECOMPUTED ON EVERY RUN
+// =============================================================================
+// FOUR FIGURE FAMILIES IN THAT HEADER HAD GONE STALE AND NONE OF THEM WAS
+// ASSERTED ANYWHERE. The header's own paragraph says the denominator "has been
+// stale twice and is recomputed here rather than incremented", and ADR-447
+// section 9 item 2 found it stale a third time. A `<!--gen:-->` span cannot live
+// in a `.ts` file, so the discipline the corpus uses for a live number in a
+// document has no form here; what replaces it is this block, which READS THE
+// HEADER TEXT and recomputes every figure it states.
+//
+// THE HEADER IS THE TEXT ABOVE THE FIRST `import`, and that boundary is asserted
+// rather than assumed: a reader that returned the empty string would make every
+// leg below vacuous, so the slice is checked for length and for an anchor phrase
+// before a single figure is compared.
+//
+// IT IS APPENDED AT THE END OF THE FILE FOR ADR-386's REASON, on the precedent
+// ADR-447 set here one row earlier. 44 distinct lines of this file are cited from
+// elsewhere in the tree and an insertion anywhere above moves the ones below it;
+// an append at the foot moves none. `schema.ts` is taken with a dynamic import
+// for the same reason: this file's import block ends at line 49, above every
+// cited line in it.
+describe('the schema.ts header states a census a run RECOMPUTES', () => {
+  const SCHEMA = fileURLToPath(new URL('../src/schema.ts', import.meta.url));
+
+  /** The header: everything above the first `import` statement. */
+  const header = (): string => {
+    const text = readFileSync(SCHEMA, 'utf8');
+    const at = text.search(/^import\b/m);
+    expect(at, '`schema.ts` has no top-level `import`, so the header has no end').toBeGreaterThan(
+      0,
+    );
+    return text.slice(0, at);
+  };
+
+  /**
+   * The one figure in the header spelled in WORDS rather than digits, and it has
+   * gone stale in that form too: it read "THE ONE HUNDRED AND TWELVE" while
+   * `TABLE_KEYS` held 116. Rendering it here is what lets the same recomputation
+   * bind both spellings.
+   */
+  const ONES = [
+    'ZERO',
+    'ONE',
+    'TWO',
+    'THREE',
+    'FOUR',
+    'FIVE',
+    'SIX',
+    'SEVEN',
+    'EIGHT',
+    'NINE',
+    'TEN',
+    'ELEVEN',
+    'TWELVE',
+    'THIRTEEN',
+    'FOURTEEN',
+    'FIFTEEN',
+    'SIXTEEN',
+    'SEVENTEEN',
+    'EIGHTEEN',
+    'NINETEEN',
+  ] as const;
+  const TENS = [
+    '',
+    '',
+    'TWENTY',
+    'THIRTY',
+    'FORTY',
+    'FIFTY',
+    'SIXTY',
+    'SEVENTY',
+    'EIGHTY',
+    'NINETY',
+  ] as const;
+  // A MISSING WORD THROWS RATHER THAN RENDERING `undefined`. A renderer that
+  // degraded to the empty string would compare the header against a shorter
+  // string and could agree with it, which is this file's standing hazard.
+  const word = (list: readonly string[], i: number): string => {
+    const found = list[i];
+    if (found === undefined) throw new Error(`the numeral renderer has no word for ${i}`);
+    return found;
+  };
+  const inWords = (n: number): string => {
+    const under100 = (m: number): string =>
+      m < 20
+        ? word(ONES, m)
+        : `${word(TENS, Math.floor(m / 10))}${m % 10 === 0 ? '' : `-${word(ONES, m % 10)}`}`;
+    if (n < 100) return under100(n);
+    const rest = n % 100;
+    return `${word(ONES, Math.floor(n / 100))} HUNDRED${rest === 0 ? '' : ` AND ${under100(rest)}`}`;
+  };
+
+  /**
+   * The `CREATE TABLE` count the header's denominator IS, derived the way the
+   * header describes it: over `packages/db/migrations`, with `--` comments
+   * removed first so a commented-out statement is not a table.
+   *
+   * SCHEMA-QUALIFIED NAMES ARE OUTSIDE IT AND THAT IS ASSERTED RATHER THAN LEFT
+   * TO THE REGEX. `pgboss` ships its own twelve tables in its own schema and no
+   * accessor in this package can address one; the pattern requires the open
+   * paren directly after an UNQUALIFIED name, so `CREATE TABLE pgboss.job (`
+   * does not match, and the leg below counts the qualified ones separately so a
+   * pattern that silently began swallowing them is red rather than generous.
+   */
+  const createdTables = (): string[] =>
+    [
+      ...allMigrationSql()
+        .replace(/--[^\n]*/g, '')
+        .matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-z_][a-z0-9_]*)"?\s*\(/gi),
+    ].map((m) => (m[1] as string).toLowerCase());
+
+  /** The relations DECLARED in `schema.ts`, whether or not `scope.ts` keys one. */
+  const declaredRelations = async (): Promise<number> => {
+    const [{ is }, { PgTable: PgTableValue }, schema] = await Promise.all([
+      import('drizzle-orm'),
+      import('drizzle-orm/pg-core'),
+      import('../src/schema.ts'),
+    ]);
+    return Object.values(schema).filter((v) => is(v, PgTableValue)).length;
+  };
+
+  /** The class tallies over `SCOPE_RULES`, which the header states three of. */
+  const classTallies = (): Map<string, number> => {
+    const out = new Map<string, number>();
+    for (const key of TABLE_KEYS) {
+      const name = SCOPE_RULES[key].class;
+      out.set(name, (out.get(name) ?? 0) + 1);
+    }
+    return out;
+  };
+
+  // THE SLICE IS REAL BEFORE ANY FIGURE IS READ OUT OF IT. Every leg below is a
+  // regex against this text, and a regex that finds nothing in an empty string
+  // is caught by its own `toBeDefined` -- but only if the legs are reached with
+  // something to search. This is what says they are.
+  test('the header is the text above the first import, and it is not empty', () => {
+    const text = header();
+    expect(text.length, 'the header slice is too short to be this file header').toBeGreaterThan(
+      3000,
+    );
+    expect(text).toContain('packages/db/src/schema.ts');
+    expect(text).toContain('PLUS ONE REGISTERED VIEW');
+    // THE SLICE ENDS AT A LINE BOUNDARY, which is what says the cut landed on
+    // the `import` and not inside a comment that happens to contain the word.
+    const lines = text.split('\n');
+    expect(lines[lines.length - 1], 'the header slice does not end at a line boundary').toBe('');
+    expect(lines.length - 1, 'the header is shorter than it has ever been').toBeGreaterThan(100);
+  });
+
+  // THE DENOMINATOR AND THE NUMERATOR, WHICH ARE ITEMS 1 AND 2 OF ADR-447
+  // SECTION 9 AND THE REASON THIS BLOCK EXISTS.
+  test('the registered-table count, the CREATE TABLE denominator and the view are the derived ones', () => {
+    const text = header();
+    const created = createdTables();
+    // NOT DEGENERATE IN EITHER DIRECTION: every registered table has to appear
+    // in the derived set, so a pattern that stopped matching is red here rather
+    // than agreeing with a header nobody moved.
+    for (const [, sqlName] of DDL_NAMES) {
+      expect(
+        created,
+        `${sqlName} is registered and the CREATE TABLE reader did not find it`,
+      ).toContain(sqlName);
+    }
+    expect(new Set(created).size, 'a table is created twice under one name').toBe(created.length);
+
+    const opener = /^\/\/ (\d+) REGISTERED TABLES OF (\d+), PLUS ONE REGISTERED VIEW\b/m.exec(text);
+    expect(opener, 'the header no longer opens with the census sentence this leg binds').not.toBe(
+      null,
+    );
+    expect(Number((opener as RegExpExecArray)[1]), 'registered TABLES in the header').toBe(
+      DDL_NAMES.length,
+    );
+    expect(
+      Number((opener as RegExpExecArray)[2]),
+      'the CREATE TABLE denominator in the header',
+    ).toBe(created.length);
+    expect(VIEW_NAMES.length, 'the header says PLUS ONE REGISTERED VIEW').toBe(1);
+
+    const others = /The other (\d+) tables are not reachable through ANY/.exec(text);
+    expect(others, 'the header no longer states how many tables no accessor reaches').not.toBe(
+      null,
+    );
+    expect(
+      Number((others as RegExpExecArray)[1]),
+      'the tables the migrations create and no accessor reaches',
+    ).toBe(created.length - DDL_NAMES.length);
+  });
+
+  // THE TOTALITY CLAUSE'S ARITHMETIC. ADR-447 declared `live_account_state` here
+  // with no key in `TABLES`, which is what made "total over the keys of this
+  // file" false; the two counts differing by one IS that fact as a number.
+  test('the declaration count and TABLE_KEYS.length are the derived ones, and they differ', async () => {
+    const text = header();
+    const declared = await declaredRelations();
+    const stated = /NOT TOTAL OVER THE (\d+) DECLARATIONS IN THIS FILE/.exec(text);
+    expect(stated, 'the header no longer states its own declaration count').not.toBe(null);
+    expect(Number((stated as RegExpExecArray)[1]), 'relations declared in schema.ts').toBe(
+      declared,
+    );
+
+    const keys = /it is not one of the (\d+) and it is one of the (\d+) keys/.exec(text);
+    expect(keys, 'the ADR-209 view paragraph no longer states both figures').not.toBe(null);
+    expect(Number((keys as RegExpExecArray)[1]), 'the CREATE TABLE denominator, restated').toBe(
+      createdTables().length,
+    );
+    expect(Number((keys as RegExpExecArray)[2]), 'TABLE_KEYS.length, restated').toBe(
+      TABLE_KEYS.length,
+    );
+    // AND THE GAP IS THE ONE ADR-447 OPENED, in this direction: a declaration
+    // with no key. The day the two are equal again the clause at `schema.ts:6`
+    // is over-cautious rather than wrong, and this is where that is noticed.
+    expect(
+      declared - TABLE_KEYS.length,
+      'schema.ts no longer declares exactly one relation that `TABLES` does not key, so the ' +
+        'header clause about totality is stating the wrong shape',
+    ).toBe(1);
+  });
+
+  // THE CLASS TALLIES, WHICH THE HEADER NAMES AS RECOMPUTED AND WHICH WERE
+  // ASSERTED NOWHERE. They read 45 `firm`, 3 `pair` and 64 served while
+  // `SCOPE_RULES` held 48, 3 and 65.
+  test('the class tallies in the header are the ones SCOPE_RULES holds', () => {
+    const text = header();
+    const tallies = classTallies();
+    const firm = tallies.get('firm') ?? 0;
+    const pair = tallies.get('pair') ?? 0;
+    const served = TABLE_KEYS.length - firm - pair;
+    expect(firm, 'no `firm` rule, so this leg is vacuous').toBeGreaterThan(0);
+    expect(pair, 'no `pair` rule, so this leg is vacuous').toBeGreaterThan(0);
+
+    const gap =
+      /(\d+) are `firm` and (\d+) are `pair` \(ADR-106\), so (\d+) of\n\/\/ the (\d+) are served by `scopedDb`/.exec(
+        text,
+      );
+    expect(
+      gap,
+      'the header no longer states the two refused classes and the served remainder',
+    ).not.toBe(null);
+    const read = gap as RegExpExecArray;
+    expect(Number(read[1]), '`firm` rules').toBe(firm);
+    expect(Number(read[2]), '`pair` rules').toBe(pair);
+    expect(Number(read[3]), 'rules served by `scopedDb`').toBe(served);
+    expect(Number(read[4]), 'TABLE_KEYS.length in the same sentence').toBe(TABLE_KEYS.length);
+
+    const reachable = /NOT ALL (\d+) ARE REACHABLE THROUGH THE SCOPED ONE/.exec(text);
+    expect(reachable, 'the header no longer opens that paragraph with the key count').not.toBe(
+      null,
+    );
+    expect(Number((reachable as RegExpExecArray)[1])).toBe(TABLE_KEYS.length);
+
+    // THE SIXTH CLASS, AND IT IS `either`. The sentence says one of the served
+    // is the only member of a sixth class, so both halves are bound: how many
+    // classes there are, and how many rules carry that one.
+    const sixth = /ONE OF THE (\d+) IS THE ONLY MEMBER OF A SIXTH CLASS/.exec(text);
+    expect(sixth, 'the header no longer names the sixth class').not.toBe(null);
+    expect(Number((sixth as RegExpExecArray)[1])).toBe(served);
+    expect(tallies.size, '`SCOPE_RULES` no longer holds exactly six classes').toBe(6);
+    expect(tallies.get('either'), '`either` is no longer a class of one').toBe(1);
+
+    const shape = /the only table of that shape in the (\d+): seven others/.exec(text);
+    expect(shape, 'the `either` paragraph no longer states its population').not.toBe(null);
+    expect(Number((shape as RegExpExecArray)[1])).toBe(TABLE_KEYS.length);
+  });
+
+  // THE ONE FIGURE SPELLED IN WORDS, which went stale in that spelling too and
+  // is the reason `inWords` is here rather than a literal.
+  test('the figure the header spells out is the same recomputed count', () => {
+    const text = header();
+    expect(inWords(116), 'the renderer is degenerate').toBe('ONE HUNDRED AND SIXTEEN');
+    expect(inWords(112), 'the renderer is degenerate').toBe('ONE HUNDRED AND TWELVE');
+    expect(inWords(65), 'the renderer is degenerate').toBe('SIXTY-FIVE');
+    const spelled = /^\/\/ THE ([A-Z ]+?) ARE NOT ONE PHASE'S SET/m.exec(text);
+    expect(spelled, 'the header no longer spells the key count out').not.toBe(null);
+    expect((spelled as RegExpExecArray)[1], 'the spelled key count in the header').toBe(
+      inWords(TABLE_KEYS.length),
+    );
   });
 });

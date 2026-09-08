@@ -1,36 +1,36 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// ONE HUNDRED AND ELEVEN TABLES OF 115, PLUS ONE VIEW, AND THAT IS REPORTED
-// RATHER THAN ROUNDED UP. The other 4 tables are not reachable through ANY
-// accessor: `SCOPE_RULES` is total over the keys of this file, so a relation
-// that is not here is a COMPILE ERROR at the call site rather than an unscoped
-// read at runtime.
+// 115 REGISTERED TABLES OF 118, PLUS ONE REGISTERED VIEW, AND THAT IS REPORTED
+// RATHER THAN ROUNDED UP. The other 3 tables are not reachable through ANY
+// accessor: `SCOPE_RULES` is total over `TABLES`, so a relation with no key
+// there is a COMPILE ERROR at the call site rather than an unscoped read at
+// runtime. IT IS NOT TOTAL OVER THE 117 DECLARATIONS IN THIS FILE (ADR-449).
 //
 // THE ONE VIEW IS `economic_calendar_current` AND ADR-209 IS WHY IT IS COUNTED
-// SEPARATELY. It is the only `CREATE VIEW` in the migration set, so "of 115" is
+// SEPARATELY. It is the only `CREATE VIEW` in the migration set, so "of 118" is
 // a count of `CREATE TABLE` and the view is outside that denominator in both
-// directions: it is not one of the 115 and it is one of the 112 keys.
+// directions: it is not one of the 118 and it is one of the 116 keys.
 //
-// THE DENOMINATOR HAS BEEN STALE TWICE AND IS RECOMPUTED HERE RATHER THAN
-// INCREMENTED. It read "111" while `0049`, `0050` and `0051` had taken the tree
-// to 114, and it then read "109 of 114" while `tradingCalendar` and `0065` had
-// taken it to 110 of 115 -- so four sessions in a row moved one of these figures
-// and left this sentence behind. Every number in this header is recomputed:
+// THE DENOMINATOR HAS BEEN STALE THREE TIMES AND IS NOW ASSERTED RATHER THAN
+// RECOMPUTED BY HAND. A `<!--gen:-->` span cannot live in a `.ts` file, so what
+// replaces the discipline is a case that reads THIS TEXT and recomputes every
+// figure it states: `the schema.ts header states a census a run RECOMPUTES` in
+// `test/scoped-db.test.ts` binds the count of relations DECLARED here,
 // `TABLE_KEYS.length`, a count of `CREATE TABLE` across `packages/db/migrations`,
-// and the class tallies over `SCOPE_RULES`. `test/scoped-db.test.ts` asserts the
-// first, which is why the staleness could survive here and not there, and the
-// rest are asserted nowhere, which is why they went stale in company.
+// and the class tallies over `SCOPE_RULES`. Every one of the four went stale at
+// least once while it was asserted nowhere; what each of them read before, and
+// why, is kept at the foot of this file beside the declaration that moved it.
 //
-// NOT ALL 112 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
-// RATHER THAN ONE. 45 are `firm` and 3 are `pair` (ADR-106), so 64 of
-// the 112 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// NOT ALL 116 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
+// RATHER THAN ONE. 48 are `firm` and 3 are `pair` (ADR-106), so 65 of
+// the 116 are served by `scopedDb`. A `pair` table belongs to TWO identities and
 // is scoped to neither: it is excluded from `ScopedTableKey` because returning
 // the row to either party hands them the other party's identity uuid, and from
 // `FirmTableKey` because `firmDb()` takes no reason on the ground that no
 // identity is at risk. `systemDb(reason)` is its only door.
 //
-// ONE OF THE 64 IS THE ONLY MEMBER OF A SIXTH CLASS AND IS SERVED RATHER THAN
+// ONE OF THE 65 IS THE ONLY MEMBER OF A SIXTH CLASS AND IS SERVED RATHER THAN
 // REFUSED (ADR-191). The sentence used to name it by ORDINAL, which made it a
 // figure that moves every time anything else is registered, and it had already
 // moved once. `events` is `either`: one nullable identity column of its
@@ -38,12 +38,12 @@
 // `owned` way, or the `derived` way, or neither, and the predicate is the
 // DISJUNCTION of the two legs. It is in `ScopedTableKey` where `pair` is not,
 // because no row that predicate returns discloses a second party through a
-// tenancy column. It is the only table of that shape in the 115: seven others
+// tenancy column. It is the only table of that shape in the 116: seven others
 // carry both an identities edge and an accounts edge and every one of the seven
 // declares its identity column NOT NULL, which makes them `owned` with no
 // disjunction to write.
 //
-// THE ONE HUNDRED AND TWELVE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE ONE HUNDRED AND SIXTEEN ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -5356,6 +5356,37 @@ export const firmParameters = pgTable(
 // itself, and an edit up there moves every one of them. ADR-447 section 9 owes
 // the repair with the citation on it, which is ADR-386:169's rule that a
 // pointer in a dated record is NAMED rather than left to be noticed.
+//
+// THAT REPAIR IS TAKEN BY ADR-449 AND THE FOUR STRUCK FIGURES ARE KEPT HERE
+// BESIDE IT, WHICH IS `RI-14`. The header's census is now READ AND RECOMPUTED by
+// `the schema.ts header states a census a run RECOMPUTES` in
+// `test/scoped-db.test.ts`, so a figure that goes stale is a RED SUITE rather
+// than a sentence a later row has to notice. What each of the four read before,
+// and why each was TRUE when written:
+//
+//   1. `schema.ts:6` read "`SCOPE_RULES` is total over the keys of this file".
+//      TRUE until ADR-447 declared `live_account_state` here with no key in
+//      `TABLES`. The clause now names `TABLES`, which is the population it was
+//      always about, and the safety property it explains never moved.
+//   2. `schema.ts:4` read "ONE HUNDRED AND ELEVEN TABLES OF 115, PLUS ONE VIEW"
+//      and "The other 4 tables". Recomputed: 115 registered tables of 118
+//      `CREATE TABLE` statements, and the other 3 are `identity_merges`,
+//      `identity_signal_weights` and this one.
+//   3. The header stated no count of its own DECLARATIONS. It states 117 now,
+//      and 117 against `TABLE_KEYS.length` of 116 IS the imprecision item 1
+//      records, stated as a number rather than left to a reader's arithmetic.
+//   4. The class tallies read "45 are `firm` and 3 are `pair` ... so 64 of the
+//      112". Recomputed over `SCOPE_RULES`: 48 `firm`, 3 `pair`, 65 served by
+//      `scopedDb`, of 116 keys.
+//
+// ONE FIGURE IN THAT HEADER IS DERIVED STALE AND IS NAMED RATHER THAN REPAIRED,
+// because it is a claim about the FOLD and not a census entry, and ADR-449 binds
+// the census only. `schema.ts:81` reads "ELEVEN of the 109 below carry later
+// columns" and names eleven tables. Derived over the migration set by splitting
+// on `;` and matching `ALTER TABLE <t> ... ADD COLUMN`: FIFTEEN tables carry
+// one, and the four the sentence does not name are `affiliate_commissions`,
+// `firm_parameters`, `liability_snapshots` and `wallet_withdrawals`. The
+// denominator is 116 declared tables and not 109. ADR-449 section 9 owes it.
 //
 // WHAT THAT COSTS IS THE FOUR COMPARISONS, AND THEY ARE PAID FOR BY NAME. The
 // drift, type, nullability and DEFAULT loops in `test/scoped-db.test.ts` all
