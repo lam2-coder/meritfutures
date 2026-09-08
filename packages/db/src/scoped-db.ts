@@ -2208,7 +2208,7 @@ export async function insertUnderStatement(
         'end rather than that this one is. insertUnder takes a hop and nothing else.',
     );
   }
-
+  refuseTermInValues(key, values);
   const table = TABLES[key] as PgTable;
   const property = propertyForColumn(table, rule.localColumn);
   if (property === undefined) {

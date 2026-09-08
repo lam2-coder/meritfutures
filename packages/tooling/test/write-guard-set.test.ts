@@ -208,20 +208,36 @@ describe('leg D, the motivating failure', () => {
   });
 
   test('a declared absence that the code has since closed is reported as stale', () => {
-    // The `OPEN` cell ADR-458 section 6 records, closed. The check does not
-    // celebrate: it says the declaration now contradicts the code.
+    // THE SEED MOVED AND THE PROPERTY DID NOT. This case used to close the
+    // `OPEN` cell ADR-458 section 6 records; ADR-460 closed that cell FOR REAL,
+    // so seeding it now finds no declaration to contradict and the case would
+    // assert nothing. It seeds a SETTLED cell instead, which is the same
+    // mechanism over the class of reason this tree has most of. The check does
+    // not celebrate a closed absence: it says the declaration now contradicts
+    // the code and asks for it to be deleted.
     const path = seeded((s) =>
       s.replace(
-        "  const rule: ScopeRule = SCOPE_RULES[key as TableKey];\n  if (rule.class !== 'derived') {",
-        "  refuseTermInValues(key, values);\n  const rule: ScopeRule = SCOPE_RULES[key as TableKey];\n  if (rule.class !== 'derived') {",
+        '  refuseTermInValues(key, values);\n  return source.insert(TABLES[key] as PgTable).values(values);',
+        '  refuseTenancyColumn(key, values);\n  refuseTermInValues(key, values);\n  return source.insert(TABLES[key] as PgTable).values(values);',
       ),
     );
     const findings = legAbsences(derive(path)).findings;
     expect(
       findings.some(
-        (f) => f.includes('insertUnderStatement::refuseTermInValues') && f.includes('stale'),
+        (f) => f.includes('unscopedInsertStatement::refuseTenancyColumn') && f.includes('stale'),
       ),
     ).toBe(true);
+  });
+
+  test('the cell ADR-458 section 6 opened is closed in the tree, and nothing declares it absent', () => {
+    // ADR-460 IS PINNED HERE RATHER THAN ONLY IN THE MATRIX. Leg C would go red
+    // if the guard were removed from the builder, and this says the other half:
+    // no reason may be declared for an absence that is not there. Re-adding the
+    // deleted `OPEN` cell without removing the call reddens this and leg D both.
+    const derived = derive(SCOPED_DB);
+    const builder = derived.builders.find((b) => b.name === 'insertUnderStatement');
+    expect(builder?.guards).toContain('refuseTermInValues');
+    expect(legAbsences(derived).findings).toEqual([]);
   });
 });
 
