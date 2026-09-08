@@ -22,6 +22,15 @@ import { refusalNaming } from '../index.js';
 // assertion, a `throw cause` rethrow, an async builder, a `.map` callback. If
 // any of them starts erroring, the rule has become the rule ADR-459 refused.
 //
+// LEG 3 IS THE OPPOSITE POLARITY AND ITS RISK IS THE MIRROR OF THE ABOVE. It
+// reports a `refuse[A-Z]` function that refuses NOTHING, so what it can get
+// wrong is calling a real refusal empty. The two shapes that could make it do
+// that are cased here as `valid` and not left to the header: a guard whose only
+// throw is inside a `.forEach` callback, and a guard that throws nowhere because
+// it DELEGATES to guards that do. A `refuse` function that throws directly is
+// covered three times over by the convention cases already at the top of this
+// half, and every one of them now exercises leg 3 as well as leg 1.
+//
 // THE PARSER IS `typescript-eslint`'s AND THAT IS NOT OPTIONAL FOR THIS RULE.
 // Leg 1 reads a `void` return ANNOTATION, which under espree is a parse error
 // rather than a result. A suite for this rule on the JavaScript subset would be
@@ -96,6 +105,29 @@ ruleTester.run('refusal-naming', refusalNaming, {
     // A refusal VERB on a function that does not throw is somebody else's
     // naming taste and not this rule's subject.
     'function validateShape(x: unknown): boolean { return x !== null; }',
+
+    // -----------------------------------------------------------------------
+    // LEG 3's TWO FALSE-POSITIVE SHAPES, which are the whole risk that leg
+    // carries. If either of these starts erroring, leg 3 is calling a real
+    // refusal empty, which is the failure this half exists to catch.
+    // -----------------------------------------------------------------------
+    // A guard whose refusal is spelled inside a callback. The throw belongs to
+    // the arrow's own frame, which is exactly what keeps leg 1 off `properties`
+    // above, and leg 3 reads the WIDER `throwsWithin` for this reason.
+    'function refuseEmptyRow(rows: string[]): void { rows.forEach((r) => { if (r === "") throw new Error("empty"); }); }',
+    // A guard that throws nowhere because it delegates to guards that do. Every
+    // name it delegates to carries the convention, so `write-guard-set.mjs`
+    // still sees the whole refusal.
+    'function refuseBoth(key: string, values: Record<string, unknown>): void { refuseTenancyColumn(key, values); refuseTermInValues(key, values); }',
+    // The same delegation through a member call, which is how a guard reached
+    // from a namespace object would be spelled.
+    'function refuseVia(key: string): void { guards.refuseUncatalogued(key); }',
+    // AN `async` REFUSAL THAT THROWS. Leg 3 keys on the NAME and not the shape,
+    // so `async` buys no exemption from it, and this case pins that a
+    // conforming name that DOES throw is still nobody's finding. The `async`
+    // exclusion in leg 1's shape test is untouched: a conforming name never
+    // reaches leg 1 at all.
+    'async function refuseLate(v: string): Promise<void> { if (v === "") throw new Error("empty"); await record(v); }',
   ],
 
   invalid: [
@@ -174,6 +206,46 @@ ruleTester.run('refusal-naming', refusalNaming, {
       name: 'a method on an object literal, which is a route to a shared guard that skips `function` entirely',
       code: 'const guards = { assertPinned(key: string): void { if (key === "") throw new Error(key); } };',
       errors: [{ messageId: 'unnamedRefusal', data: { name: 'assertPinned' } }],
+    },
+
+    // -------------------------------------------------------------------------
+    // LEG 3. ADR-459 section 9 item 3: a name in the guard set over no refusal.
+    // -------------------------------------------------------------------------
+    {
+      name: 'LEG 3: a conforming name that refuses nothing, which `write-guard-set.mjs` would count as a declared guard',
+      code: 'function refuseNothing(key: string): void { record(key); }',
+      errors: [{ messageId: 'refusalWithoutThrow', data: { name: 'refuseNothing' } }],
+    },
+    {
+      name: 'LEG 3 in the arrow spelling, whose name lives on the declarator',
+      code: 'const refuseEmptyValues = (values: Record<string, unknown>): void => { record(values); };',
+      errors: [{ messageId: 'refusalWithoutThrow', data: { name: 'refuseEmptyValues' } }],
+    },
+    {
+      name: 'LEG 3 on an object-literal method, the route a shared guard takes without the `function` keyword',
+      code: 'const guards = { refusePinned(key: string): void { record(key); } };',
+      errors: [{ messageId: 'refusalWithoutThrow', data: { name: 'refusePinned' } }],
+    },
+    {
+      name: 'DELEGATION TO A NAME THE CONVENTION DOES NOT COVER IS NOT DELEGATION: both halves are reported, and the pair is the composite being only as visible as its least visible part',
+      code: [
+        'function refuseCurrency(key: string, values: Record<string, unknown>): void { checkCurrency(values); }',
+        'function checkCurrency(values: Record<string, unknown>): void { if (values.currency !== "USD") throw new Error("currency"); }',
+      ].join('\n'),
+      errors: [
+        { messageId: 'refusalWithoutThrow', data: { name: 'refuseCurrency' } },
+        { messageId: 'unnamedRefusal', data: { name: 'checkCurrency' } },
+      ],
+    },
+    {
+      name: 'A CALL TO ITSELF IS NOT DELEGATION, because a refusal that delegates to itself refuses nothing',
+      code: 'function refuseLoop(value: string): void { if (value !== "") refuseLoop(""); }',
+      errors: [{ messageId: 'refusalWithoutThrow', data: { name: 'refuseLoop' } }],
+    },
+    {
+      name: 'AN `async` CONFORMING NAME THAT THROWS NOWHERE IS STILL REPORTED, and this is the case that will force ADR-459 section 9 item 5 the day somebody writes an async guard that refuses by awaiting a rejection',
+      code: 'async function refuseSlowly(value: string): Promise<void> { await record(value); }',
+      errors: [{ messageId: 'refusalWithoutThrow', data: { name: 'refuseSlowly' } }],
     },
   ],
 });
