@@ -309,15 +309,61 @@ describe('leg D, the refusal the UPDATE builder now holds', () => {
 
   // TWO INDEPENDENT READS OF THE IDENTITY POPULATION, COMPARED. Leg A folds the
   // DDL under `packages/db/migrations/` and counts `GENERATED ALWAYS AS IDENTITY`
-  // as text; leg D walks the Drizzle declarations through the registry. Leg D
-  // asserts NO refusal for these, because `ADR-448` section 8 records why the
-  // widening did not land, but the two counts still have to agree: the day a
-  // migration adds an identity column and `schema.ts` does not, this is the case
-  // that says so.
+  // as text; leg D walks the Drizzle declarations through the registry. The two
+  // counts have to agree: the day a migration adds an identity column and
+  // `schema.ts` does not, this is the case that says so.
   test('the identity columns leg D reaches are the ones the DDL declares', async () => {
     const legD = await refusedWrites();
     const set = derivedSet();
     expect(legD.identityReached).toBe(set.identityOccurrences);
+  });
+
+  // WHAT STOOD ABOVE SAID LEG D ASSERTS NO REFUSAL FOR THESE, AND `ADR-452` MADE
+  // IT FALSE. The count was reported and walked past, so the checker printed an
+  // identical `PASS` with and without the widening at `scoped-db.ts:4690` and a
+  // refusal nothing watched would have been indistinguishable from no refusal at
+  // all. `RI-14` keeps the record of that beside its correction, which is the
+  // checker's own header and `ADR-452`. THIS IS THE CASE THAT GOES RED IF THE
+  // CLAUSE IS REVERTED, and it was watched doing exactly that.
+  test('every always-identity column on the registry is refused, and by name', async () => {
+    const legD = await refusedWrites();
+    expect(legD.findings).toEqual([]);
+    expect(legD.identityRefused).toBe(legD.identityReached);
+    expect(legD.identityRefused).toBeGreaterThan(0);
+    expect(legD.identityTables).toBeGreaterThan(0);
+  });
+
+  // THE IDENTITY MESSAGE CARRIES ITS OWN SQLSTATE AND IT IS NOT THE STORED ONE.
+  // PostgreSQL answers `428C9` to a write naming a `GENERATED ALWAYS AS IDENTITY`
+  // column, which `ADR-448` section 8 item 2 states and this case holds: a
+  // refusal that reported `42601` here would send a reader to the wrong half of
+  // the DDL.
+  test('the identity refusal names the rule and its own SQLSTATE', async () => {
+    const legD = await refusedWrites();
+    const sample = legD.identitySample;
+    expect(sample).toBeTypeOf('string');
+    expect(sample).toMatch(/GENERATED ALWAYS AS IDENTITY/);
+    expect(sample).toMatch(/428C9/);
+    expect(sample).not.toMatch(/42601/);
+    expect(sample).toMatch(/never takes it from the caller/);
+  });
+
+  // THE ADDRESS PATH IS THE MONEY-PATH CONSTRAINT AND IT IS ASSERTED RATHER THAN
+  // ARGUED. `apps/worker/src/recon/sweep.ts:629` addresses `reconciliations` by
+  // its identity `id`, and widening the guard to identity columns makes that
+  // sharper rather than safer: an identity column is exactly what an address is
+  // built from. The guard reads `values` and never the predicate, and this case
+  // is what would go red the day someone moved it.
+  // THIS CASE IS DELIBERATELY NOT COUPLED TO `findings`. It asserts a DIFFERENT
+  // property from the refusal above and must stay green when the widening is
+  // reverted: reverting the clause stops the WRITE being refused and must not
+  // touch the ADDRESS at all. A case that also demanded an empty `findings`
+  // would go red for the refusal's reason and tell a reader nothing about the
+  // address, which is the money-path half.
+  test('an identity column still addresses a row, and only the write is refused', async () => {
+    const legD = await refusedWrites();
+    expect(legD.addressed).toBe(legD.identityReached);
+    expect(legD.addressed).toBeGreaterThan(0);
   });
 
   // THE MESSAGE IS THE DISCRIMINATOR AND IT IS ASSERTED RATHER THAN ASSUMED. Leg
