@@ -472,6 +472,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-459](ADR-459.md) | the rule that was priced would be red on 68 of this file's 81 throws, so what lands holds the guard SHAPE instead of the throw, and it is watched failing on four seeded refusals (2026-09-08, status: proposed) |
 | [ADR-460](ADR-460.md) | the guard goes in as a void call on a line that was already blank, so the expression-shaped variant the price named is not built and the 172 is wrong twice (2026-09-08, status: proposed) |
 | [ADR-461](ADR-461.md) | forty-one labelled prices swept against the tree, thirty-one hold, ten are wrong, and the two largest wrongs are a database CI already has and a substitution that was never available (2026-09-08, status: proposed) |
+| [ADR-462](ADR-462.md) | the priced leg is red on three legitimate functions and one of them IS the shape the price feared, so the predicate lands whole and its verdict lands declarable (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
