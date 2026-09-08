@@ -3589,11 +3589,11 @@ const MONEY_GENERATED_OPERANDS: readonly string[] = ['our_balance_cents', 'platf
  * THE GENERATED MONEY COLUMN THIS COMPARISON CANNOT REACH, NAMED SO THAT ITS
  * ABSENCE IS A MEASURED FACT RATHER THAN AN OVERSIGHT.
  *
- * `live_account_state` is CREATED by `0050` and transcribed NOWHERE, which is
- * ADR-112 foreclosure 4 and ADR-438 section 8 item 2. It carries a SIXTH
- * `GENERATED ALWAYS AS` column and that column is `*_cents`, so the migration
- * set's generated money population is TWO and this block's is ONE. The leg below
- * asserts the arithmetic rather than leaving it in prose.
+ * `live_account_state` is CREATED by `0050` and IS TRANSCRIBED, since ADR-447. What it is NOT is
+ * REGISTERED, and the registry is the predicate the leg below asserts: `0050` REVOKEs ALL on it
+ * from `merit_app`, so a key in `TABLES` would publish a door the database must refuse. ADR-112
+ * foreclosure 4 and ADR-438 section 8 item 2 predate that and read the absence as one of
+ * TRANSCRIPTION. ADR-457 re-derived both halves: the set's money is TWO and this block's ONE.
  */
 const UNREGISTERED_GENERATED_TABLE = 'live_account_state';
 const UNREGISTERED_GENERATED_COLUMN = 'intraday_movement_cents';
@@ -3850,9 +3850,9 @@ describe('the transcription states the DDL GENERATED expression, which is the fa
       'equity_cents - opening_equity_cents',
     );
     expect(read.storage).toBe('STORED');
-    // AND IT IS MONEY, WHICH IS WHY IT IS NAMED HERE RATHER THAN COUNTED. The
-    // migration set's generated MONEY population is TWO and this block reaches
-    // ONE of them.
+    // AND IT IS MONEY. The migration set's generated MONEY population is TWO
+    // and this block reaches ONE. THE ASSERTION BELOW IS VACUOUS: it reads a
+    // LITERAL declared above, so no edit to the TREE can falsify it. ADR-457.
     expect(
       UNREGISTERED_GENERATED_COLUMN.endsWith('_cents'),
       'the unreachable generated column is no longer a money column',
@@ -4468,9 +4468,9 @@ describe('P5-b: a handle for one identity cannot reach another identity`s row', 
 // FIVE COMPARISONS AND NOT FOUR. Type, nullability and DEFAULT are the three the
 // registry loops make; the fourth is the column-name fold those loops also make;
 // and the fifth is the GENERATION CLAUSE, which no loop in this file makes for
-// any table. It is written here for THIS table only, because this table has the
-// only generated `*_cents` column in the estate and a generic comparison over
-// the whole registry is a different diff on a different row.
+// any table. Written here for THIS table only: it carries the only generated
+// `*_cents` column NO REGISTRY LOOP REACHES. The estate has TWO of them, the other
+// being `reconciliations.delta_cents` (ADR-457); a generic one is another row's diff.
 //
 // THERE IS NO TOP-LEVEL IMPORT FOR `liveAccountState` AND THAT IS NOT AN
 // OVERSIGHT. The import block of this file sits above every line any document
