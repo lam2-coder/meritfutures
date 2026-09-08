@@ -148,11 +148,11 @@
 // widens the pattern without a reviewer reading the word.
 
 /**
- * The convention itself, and it is the same literal `write-guard-set.mjs` reads
- * at its own line 270. Written out here rather than imported because a lint
- * rule that imports a checker to learn its own subject is a load-order problem
- * bought for nothing; that the two agree is asserted by ADR-459, and a change
- * to either is a diff on a file whose header says what it means.
+ * The convention itself, the same literal `write-guard-set.mjs` reads into its
+ * own exported `CONVENTION`. NAMED RATHER THAN NUMBERED, on ADR-467 section 5.
+ * Written out here rather than imported because a lint rule that imports a
+ * checker to learn its own subject is a load-order problem bought for nothing;
+ * ADR-459 and that checker's own convention leg both assert the two agree.
  */
 const CONVENTION = /^refuse[A-Z]/;
 

@@ -47,10 +47,10 @@ const ADMIN_WRITES = join(ROOT, 'apps', 'api', 'src', 'routes', 'admin-writes.ts
 /**
  * The roles API_CONTRACT section 8 declares, in the order it writes them.
  *
- * THE LINE IS FOUND BY ITS OWN PREFIX AND NOT BY A LINE NUMBER, because five
- * documents in this corpus cite it at `API_CONTRACT:516` and it is at `:896`.
- * A citation drifts silently; a prefix match either finds the sentence or
- * throws.
+ * THE LINE IS FOUND BY ITS OWN PREFIX AND NOT BY A LINE NUMBER, because the
+ * number this corpus cites for it has already drifted twice, and the number this
+ * comment itself carried was stale too. A citation drifts silently; a prefix
+ * match either finds the sentence or throws.
  */
 function contractRoles(): readonly string[] {
   const body = readFileSync(API_CONTRACT, 'utf8');

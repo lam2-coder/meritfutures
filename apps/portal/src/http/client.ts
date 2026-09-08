@@ -616,7 +616,7 @@ export function createApiClient(input: {
 // caller supplies one, and no header at all when the caller passes `null`.
 //
 // WHO GENERATES IT: THE CALLER, AND A TRANSPORT THAT MINTED ONE WOULD DEFEAT
-// THE MECHANISM RATHER THAN IMPLEMENT IT. API_CONTRACT line 23 is the whole
+// THE MECHANISM RATHER THAN IMPLEMENT IT. API_CONTRACT's `Idempotency` paragraph is the whole
 // argument: "replaying a key with an identical body returns the original
 // response verbatim". A replay is a SECOND CALL, and a client that minted a
 // fresh key per call would send a different key on the retry, which is a second
@@ -627,7 +627,7 @@ export function createApiClient(input: {
 // (`docs/plans/M05-payout-system.md:85`). Before the first send is before this
 // function is entered.
 //
-// WHY THE FIELD IS REQUIRED AND `null` MUST BE WRITTEN OUT. API_CONTRACT line 23
+// WHY THE FIELD IS REQUIRED AND `null` MUST BE WRITTEN OUT. API_CONTRACT's `Idempotency` paragraph
 // requires a key on `POST /checkout`, `POST /accounts/:id/payout`,
 // `POST /accounts/:id/reset` and `POST /wallet/withdrawals`, and accepts one
 // everywhere else. THIS FILE HOLDS NO LIST OF THOSE FOUR, on purpose: three of
@@ -678,7 +678,7 @@ export function createApiClient(input: {
 // one slice over `client.ts` AND the four segments, which is the shape ADR-217
 // clause 5 used for the identical trade.
 
-/** The request line 23 of API_CONTRACT and section 6 above describe. */
+/** The request API_CONTRACT's `Idempotency` paragraph and section 6 above describe. */
 export type WriteRequest = {
   /**
    * An endpoint path as API_CONTRACT spells it, leading slash, with
@@ -709,7 +709,7 @@ export type WriteRequest = {
 const WRITE_CONTENT_TYPE = 'application/json';
 
 /**
- * The header API_CONTRACT line 23 names, spelled as this file spells `cookie`.
+ * The header API_CONTRACT's `Idempotency` paragraph names, spelled as this file spells `cookie`.
  *
  * LOWER CASE BECAUSE HEADER NAMES ARE CASE-INSENSITIVE AND THE READER IS
  * ALREADY LOWER CASE: `apps/api/src/routes/affiliate.ts:1003` reads
