@@ -760,15 +760,15 @@ describe('an addressed read returns one row or none', () => {
  * Does the DATABASE write this column rather than the caller?
  *
  * BOTH PROPERTIES, because they are two different refusals and only one of them
- * is about identity. `generated` is `GENERATED ALWAYS AS (...) STORED`, which
- * PostgreSQL answers `42601` to; `generatedIdentity` is `GENERATED ALWAYS AS
- * IDENTITY`, which it answers `428C9` to. Derived on this registry rather than
- * inherited: 5 stored-generated columns over 4 tables and 20 identity columns,
- * every one of them named `id` and every one of them `always`.
+ * is about identity: `generated` is `GENERATED ALWAYS AS (...) STORED` and
+ * `generatedIdentity` is `GENERATED ALWAYS AS IDENTITY`. `428C9` ANSWERS BOTH,
+ * on INSERT and on UPDATE, so the SQLSTATE is not what tells them apart and
+ * this block used to say it was. They part on the DETAIL line and on OVERRIDING
+ * SYSTEM VALUE, which lifts the identity refusal and not the other. Measured in
+ * ADR-456 on 16.13, which re-derived these too: 5 stored-generated columns over
+ * 4 tables and 20 identity columns, every one named `id` and every one `always`.
  *
- * IT READS THE COLUMN AND NOT A LIST OF NAMES, so a table that grows an identity
- * column is covered on the day it is declared rather than on the day somebody
- * remembers this file.
+ * IT READS THE COLUMN AND NOT A LIST OF NAMES, so a new such column is covered.
  */
 function databaseWrites(column: PgColumn): boolean {
   return column.generated !== undefined || column.generatedIdentity !== undefined;
