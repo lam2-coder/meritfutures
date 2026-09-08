@@ -121,6 +121,38 @@ export default [
   },
 
   {
+    // -------------------------------------------------------------------------
+    // ADR-459. THE GUARD NAMING CONVENTION, WHICH WAS LOAD-BEARING AND UNHELD.
+    // -------------------------------------------------------------------------
+    // `packages/tooling/checks/write-guard-set.mjs` asserts that the guard set
+    // on the accessor's write builders is complete, and its legs A and D find a
+    // guard by the name `refuse[A-Z]`. ADR-458 section 5 names the hole that
+    // leaves: "a refusal added under another name is invisible to legs A and
+    // D". Nine declarations honour the convention and, until this rule, nothing
+    // required the tenth to.
+    //
+    // THE GLOB IS `src` AND IT IS WIDER THAN ADR-458 PRICED, DELIBERATELY.
+    // That entry priced the rule over `scoped-db.ts` alone, which is where all
+    // nine guards live today. The wider glob was MEASURED before it was chosen:
+    // across all six files of this directory there are seven named functions
+    // that return nothing and throw, and all seven already match the
+    // convention, so widening buys an evasion closed at the cost of no
+    // exemption. The evasion is a guard extracted to a sibling file, which is
+    // somewhere legs A and D do not read either.
+    //
+    // `test/` IS OUT OF SCOPE, unlike VG-4's glob one block up, and for the
+    // reason that block gives for the opposite call. VG-4 bans a construct
+    // whose danger does not care who wrote it. This rule enforces a NAMING
+    // convention that a checker reads off `src`, and a fixture in a suite that
+    // throws to prove a guard fires is not a guard.
+    files: ['packages/db/src/**/*.ts'],
+    plugins: { merit },
+    rules: {
+      'merit/refusal-naming': 'error',
+    },
+  },
+
+  {
     // Test files may assert against `any`-shaped fixtures and may name a
     // construct the source is banned from using. STRATEGY section 4.5 scopes
     // the type-assertion ban to "outside test fixtures" for exactly this
