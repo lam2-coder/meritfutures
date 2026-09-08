@@ -523,7 +523,7 @@ const ri05 = {
 
 /** @type {Invariant[]} */
 // -----------------------------------------------------------------------------
-// RI-06  The three merit rules are registered AND attached to a glob
+// RI-06  Every merit rule is registered AND attached to a glob
 // -----------------------------------------------------------------------------
 // ADR-042 wires `merit/no-calendar-in-expiry-path` to a glob that MATCHES ZERO
 // FILES, because the hold, expiry and sweep path is P2 code. That is the right
