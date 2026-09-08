@@ -5396,18 +5396,25 @@ export const firmParameters = pgTable(
 //      file's declarations and the two differ by `live_account_state`. The
 //      NUMERATOR is FIFTEEN under either reading, because that one relation
 //      carries no later column, so the correction is to the denominator only.
-//   2. `schema.ts:70` read "`DROP COLUMN` and `RENAME` stay offenders that turn
-//      the suite red". TRUE until ADR-278 folded `RENAME COLUMN` and `0075`
-//      renamed `simulation_runs.calibration_observed_at` to
-//      `..._observed_on`. The vocabulary is FOUR members now and `DROP COLUMN`,
-//      with zero instances, is the only offender left. THIS IS THE THIRD TIME
-//      THIS ONE SENTENCE HAS OUTLIVED A RULING THAT WIDENED THE FOLD, after
-//      ADR-103 and ADR-216, and it is the second time it has named a
-//      REGISTERED table as unregisterable.
-//   3. `schema.ts:87` read "`otp_challenges` IS THE ONLY ONE OF THE ELEVEN THAT
-//      ALSO CARRIES AN `ALTER COLUMN`". TRUE until `0067` retyped
-//      `rule_states.phase` under ADR-216. Two of the fifteen carry one now,
-//      and they carry different members of the vocabulary.
+//   2. `schema.ts:70` AS THIS PARAGRAPH STOOD read "`DROP COLUMN` and `RENAME`
+//      stay offenders that turn the suite red". TRUE until ADR-278 folded
+//      `RENAME COLUMN` and `0075` renamed
+//      `simulation_runs.calibration_observed_at` to `..._observed_on`. The
+//      vocabulary is FOUR members now and `DROP COLUMN`, with zero instances,
+//      is the only offender left. THIS IS THE THIRD TIME THIS ONE SENTENCE HAS
+//      OUTLIVED A RULING THAT WIDENED THE FOLD, after ADR-103 and ADR-216, and
+//      it is the second time it has named a REGISTERED table as one that
+//      cannot be registered.
+//   3. `schema.ts:86` AS IT STOOD read "`otp_challenges` IS THE ONLY ONE OF THE
+//      ELEVEN THAT ALSO CARRIES AN `ALTER COLUMN`". TRUE until `0067` retyped
+//      `rule_states.phase` under ADR-216. Two of the fifteen carry one now, and
+//      they carry different members of the vocabulary.
+//
+//   THE TWO LINE NUMBERS IN ITEMS 2 AND 3 ARE BASE-RELATIVE and are kept that
+//   way deliberately: the paragraph they name is rewritten IN PLACE and is
+//   line-neutral, so the sentences they quote are gone from those lines and the
+//   corrected ones stand there instead. Item 1's `:81` still opens the sentence
+//   it names, which is what a repaired pointer in a live file looks like.
 //
 // THE ARGUMENT UNDER THE FIGURE IS THE HALF THAT NEEDED CHECKING, and it holds
 // for all fifteen INCLUDING THE FOUR: each one's `CREATE TABLE` body is a

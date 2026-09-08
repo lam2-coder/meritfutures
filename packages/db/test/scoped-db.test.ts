@@ -4929,11 +4929,20 @@ describe('the schema.ts header states a census a run RECOMPUTES', () => {
   // that pinned a break would go red on a reflow that changed no figure.
   // ---------------------------------------------------------------------------
 
-  /** The header with comment markers and line breaks removed. */
+  /**
+   * The header with its comment markers and line breaks removed.
+   *
+   * IT UNPREFIXES RATHER THAN STRIPPING, AND THAT IS `RI-30` RATHER THAN STYLE.
+   * A `.replace()` over a line-comment regex is the idiom that invariant is
+   * name-blind to, and it caught this helper on its first run. Importing
+   * `stripComments` would be the wrong repair as well as an unavailable one:
+   * that function DELETES a comment's text and this leg exists to READ it. A
+   * prefix test and a `slice` are neither the idiom nor a second stripper.
+   */
   const flat = (): string =>
     header()
       .split('\n')
-      .map((line) => line.replace(/^\/\/ ?/, ''))
+      .map((line) => (line.startsWith('//') ? line.slice(line.startsWith('// ') ? 3 : 2) : line))
       .join(' ')
       .replace(/\s+/g, ' ')
       .trim();
