@@ -907,3 +907,37 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_purchase_processor_columns.sql
+
+      # ADR-455. THE GENERATED EXPRESSIONS ARE EXECUTED RATHER THAN SPELLED.
+      #
+      # ADR-443 compared every `GENERATED ALWAYS AS` clause in `schema.ts`
+      # against the migrations and all five agreed. That entry states its own
+      # central limit in section 8 item 1: "both sides are STRINGS and neither
+      # is evaluated", and in item 2: "it is compared against the migrations as
+      # text, not against a database". Two documents spelling a clause the same
+      # way is a claim about spelling. This step is the claim about arithmetic.
+      #
+      # IT BELONGS HERE AND NOWHERE ELSE, because this is the one job in this
+      # repository that has a database. The comparison ADR-443 built runs in
+      # vitest and cannot reach one; its section 11 item 2 named the missing
+      # artifact as one that "runs SELECT against PostgreSQL 16".
+      #
+      # THE POPULATION IS READ FROM `pg_attribute`, NOT FROM EITHER DOCUMENT.
+      # SUCCESS 1 pins all six generated columns by name against the installed
+      # catalog, so a seventh is red on the day it lands and deleting one is red
+      # too. ADR-443 could see five, because the sixth is on a table `schema.ts`
+      # did not then transcribe; a probe that asks the database has no such
+      # blind spot.
+      #
+      # MONEY FIRST, AND THE ORDERING IS DELIBERATE. Two of the six are integer
+      # cents and a third is a basis-point ratio over two cents operands.
+      # `intraday_movement_cents` is the figure API_CONTRACT
+      # renders to a trader and NO probe in this repository had ever executed
+      # it; `delta_cents` is the reconciliation difference that blocks
+      # eligibility; `rcr_bp` is the ratio that pauses new sales. SUCCESS 6 and
+      # REJECTION 4 pin the integer overflow bound `0049` states in a comment,
+      # which ADR-443 section 8 item 2 explicitly records as unchecked.
+      - name: Probe ADR-455's generated column VALUES (ADR-443 section 8)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_generated_column_values.sql

@@ -54,13 +54,13 @@
 //    `columnCatalogue()` that answers exactly this question, and OQ-P1-04's
 //    ruling is one parser called twice rather than two expressions of one parse.
 //    IT CAN NOW BE IMPORTED, AND THE BLOCKER THIS PARAGRAPH NAMED IS SPENT.
-//    `gates.mjs:9392` reads `export const GATES = [`, and `:9598` opens the
-//    guard `const invokedDirectly = ...` closed at `:9601` by
+//    `gates.mjs:9429` reads `export const GATES = [`, and `:9635` opens the
+//    guard `const invokedDirectly = ...` closed at `:9638` by
 //    `if (invokedDirectly) process.exit(main());`, under a comment reading
 //    "Importable by the suite that reads this report, runnable by CI-06". That
 //    guard landed in `55824c62` on 2026-08-30 for ADR-294, three sessions after
-//    this header was written, and the same file also exports `EXIT` at `:9476`
-//    and `runGates` at `:9501`. So the duplication below is now a DEFERRAL WITH
+//    this header was written, and the same file also exports `EXIT` at `:9513`
+//    and `runGates` at `:9538`. So the duplication below is now a DEFERRAL WITH
 //    NO BLOCKER rather than a blocked repair, and its remedy clause at the foot
 //    of this paragraph is available and unclaimed.
 //
