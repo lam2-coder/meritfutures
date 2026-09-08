@@ -31,17 +31,17 @@
 // identity is at risk. `systemDb(reason)` is its only door.
 //
 // ONE OF THE 65 IS THE ONLY MEMBER OF A SIXTH CLASS AND IS SERVED RATHER THAN
-// REFUSED (ADR-191). The sentence used to name it by ORDINAL, which made it a
-// figure that moves every time anything else is registered, and it had already
-// moved once. `events` is `either`: one nullable identity column of its
-// own beside one nullable account column, so a row reaches an identity the
-// `owned` way, or the `derived` way, or neither, and the predicate is the
-// DISJUNCTION of the two legs. It is in `ScopedTableKey` where `pair` is not,
-// because no row that predicate returns discloses a second party through a
-// tenancy column. It is the only table of that shape in the 116: seven others
+// REFUSED (ADR-191). It was named by ORDINAL once, a figure that moves every
+// time anything else is registered. `events` is `either`: one nullable identity
+// column of its own beside one nullable account column, so a row reaches an
+// identity the `owned` way, or the `derived` way, or neither, and the predicate
+// is the DISJUNCTION of the two legs. It is in `ScopedTableKey` where `pair` is
+// not, because no row that predicate returns discloses a second party through a
+// tenancy column. THE EDGES BELOW ARE THIS FILE's `.references()` AND NOT THE
+// DDL's. It is the only table of that shape in the 116: seven others
 // carry both an identities edge and an accounts edge and every one of the seven
 // declares its identity column NOT NULL, which makes them `owned` with no
-// disjunction to write.
+// disjunction to write. `purchases` IS AN EIGHTH IN THE SQL (ADR-453).
 //
 // THE ONE HUNDRED AND SIXTEEN ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
@@ -59,44 +59,44 @@
 //
 // WHAT REPLACES IT IS MECHANICAL AND LIVES IN `test/scoped-db.test.ts`: the
 // suite reads each registered table's `CREATE TABLE` body out of
-// `packages/db/migrations/`, REPLAYS every later `ADD COLUMN` onto it in
-// migration order, and asserts column-name-set agreement with the declarations
-// below.
+// `packages/db/migrations/`, REPLAYS every later statement in the vocabulary
+// below onto it in migration order, and asserts column-name-set agreement with
+// the declarations below.
 //
 // A TABLE IS READ AS OF THE LAST MIGRATION AND NEVER AS OF ITS `CREATE TABLE`,
 // which is ADR-094. That entry ruled the replay's vocabulary CLOSED at one
-// member with a default of FAIL, and ADR-103 WIDENED IT TO TWO: `ADD COLUMN` is
-// folded, `ALTER COLUMN ... DROP NOT NULL` is folded and moves the NULLABILITY,
-// and `DROP COLUMN` and `RENAME` stay offenders that turn the suite red -- so
-// the day one of those lands the check fails rather than silently reading a
-// stale CREATE. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN OFFENDER" UNTIL
-// ADR-106, WHICH IS FALSE ABOUT THIS TREE AND WOULD HAVE TOLD A READER THAT
-// `otp_challenges` COULD NOT BE REGISTERED; ADR-094's clause was superseded by
-// ADR-103 and the sentence outlived it by one session. THE SAME SENTENCE SURVIVED
-// IN TWO MORE PLACES AND COST A SECOND TABLE TEN WAVES: the `trading_calendar_loads`
-// and `trading_calendar_revisions` headers below both said the neighbour
-// `trading_calendar` "cannot be registered" for that reason, and it is registered
-// here. A REFUSAL IN A COMMENT OUTLIVES THE RULING THAT SUPERSEDED IT, and the
-// only defence is that a comment naming a ruling is read against it. ELEVEN of
-// the 109 below carry later columns -- `sessions`, `plan_versions`, `rule_states`,
-// `contact_channels`, `notification_kinds`, `identity_phones`,
-// `phone_change_requests`, `admin_actions`, `payout_requests`,
-// `promotional_credit_grants` and `otp_challenges` -- and none of them could be
-// registered at all before ADR-094, which is why the ruling came before the
-// transcription rather than after it. `otp_challenges` IS THE ONLY ONE OF THE
-// ELEVEN THAT ALSO CARRIES AN `ALTER COLUMN`, and until it was registered the
-// fold's second member ran on no registered table at all. `trading_calendar` IS
-// THE SECOND REGISTERED CARRIER AND IS NOT ONE OF THE ELEVEN: it takes TWO
-// relaxations and no `ADD COLUMN` at all, so it is a table whose CREATE body is
-// its column set and whose NULLABILITY still moved. `events` IS NOT ONE OF
-// THE ELEVEN: `0017` is the whole of its DDL and no later migration touches it,
-// so the fold replays nothing onto it and the CREATE body is the column set.
-// `reserve_coverage_snapshots` IS NOT ONE OF THEM EITHER, and it is the table
-// that makes the distinction worth stating twice: `0049` both CREATEs it and
-// ALTERs `liability_snapshots` in the same file, so the fold replays a column
-// onto a NEIGHBOUR out of the migration that created this one and nothing onto
-// this one. `grep 'ALTER TABLE reserve_coverage_snapshots'` over
-// `packages/db/migrations` is empty (ADR-199).
+// member with a default of FAIL AND IT IS FOUR MEMBERS WIDE NOW: `ADD COLUMN`
+// is folded, `ALTER COLUMN ... DROP NOT NULL` is folded and moves the
+// NULLABILITY (ADR-103), `ALTER COLUMN ... TYPE` moves the TYPE (ADR-216), and
+// `RENAME COLUMN` moves the NAME (ADR-278). `DROP COLUMN` is the only offender
+// left and it has ZERO instances. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN
+// OFFENDER" UNTIL ADR-106 AND "`RENAME` STAYS AN OFFENDER" UNTIL ADR-453, and
+// each would have told a reader that a REGISTERED table cannot be registered:
+// `otp_challenges` for the first and `simulation_runs`, which `0075` renames a
+// column of, for the second. THE SAME SENTENCE SURVIVED IN TWO MORE PLACES AND
+// COST A SECOND TABLE TEN WAVES: the `trading_calendar_loads` and
+// `trading_calendar_revisions` headers below both said the neighbour
+// `trading_calendar` "cannot be registered" for that reason, and it is
+// registered here. A REFUSAL IN A COMMENT OUTLIVES THE RULING THAT SUPERSEDED
+// IT. FIFTEEN of the 117 DECLARED below carry later columns: `sessions`,
+// `plan_versions`, `rule_states`, `contact_channels`, `notification_kinds`,
+// `identity_phones`, `phone_change_requests`, `admin_actions`,
+// `payout_requests`, `promotional_credit_grants`, `otp_challenges`,
+// `affiliate_commissions`, `firm_parameters`, `liability_snapshots` and
+// `wallet_withdrawals`. NONE OF THE FIFTEEN COULD BE REGISTERED UNDER ADR-094's
+// SUPERSEDED RULE, and ADR-453 DERIVES that rather than restating it: for every
+// one of them the `CREATE TABLE` body is a PROPER SUBSET of the declaration
+// below and the difference is EXACTLY the later `ADD COLUMN` names, so a read
+// as of the CREATE is red on each. THE LAST FOUR NAMED TOOK THEIR COLUMNS AFTER
+// ADR-094 AND NOT BEFORE IT (`0049`, `0070`, `0072`, `0076`, `0078`), so for
+// those four the ruling came before the DRIFT and not only before the
+// transcription. `otp_challenges` AND `rule_states` ARE THE TWO OF THE FIFTEEN
+// THAT ALSO CARRY AN `ALTER COLUMN`, on different members: `DROP NOT NULL` in
+// `0029` and `TYPE` in `0067`. `trading_calendar`, `wallet_entries`,
+// `purchases` and `simulation_runs` CARRY NO `ADD COLUMN` AT ALL and are folded
+// anyway, so the carrier count and the fold's reach are two figures. `events`
+// and `reserve_coverage_snapshots` are ALTERed by NOTHING: `0049` CREATEs the
+// second and ALTERs `liability_snapshots`, a NEIGHBOUR, in the same file.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -5379,14 +5379,50 @@ export const firmParameters = pgTable(
 //      112". Recomputed over `SCOPE_RULES`: 48 `firm`, 3 `pair`, 65 served by
 //      `scopedDb`, of 116 keys.
 //
-// ONE FIGURE IN THAT HEADER IS DERIVED STALE AND IS NAMED RATHER THAN REPAIRED,
-// because it is a claim about the FOLD and not a census entry, and ADR-449 binds
-// the census only. `schema.ts:81` reads "ELEVEN of the 109 below carry later
-// columns" and names eleven tables. Derived over the migration set by splitting
-// on `;` and matching `ALTER TABLE <t> ... ADD COLUMN`: FIFTEEN tables carry
-// one, and the four the sentence does not name are `affiliate_commissions`,
-// `firm_parameters`, `liability_snapshots` and `wallet_withdrawals`. The
-// denominator is 116 declared tables and not 109. ADR-449 section 9 owes it.
+// ONE FIGURE IN THAT HEADER WAS DERIVED STALE BY ADR-449 AND NAMED RATHER THAN
+// REPAIRED, because it is a claim about the FOLD and not a census entry, and
+// that row bound the census only. ADR-453 TAKES IT, AND WHAT THE HEADER READ
+// BEFORE IS KEPT HERE BESIDE THE DECLARATION THAT MOVED IT, WHICH IS `RI-14`.
+// Three sentences moved and all three were TRUE when they were written:
+//
+//   1. `schema.ts:81` read "ELEVEN of the 109 below carry later columns" and
+//      named eleven tables. Recomputed over the migration set by splitting on
+//      `;` and matching `ALTER TABLE <t> ... ADD COLUMN`: FIFTEEN carry one,
+//      and the four the old sentence did not name are `affiliate_commissions`,
+//      `firm_parameters`, `liability_snapshots` and `wallet_withdrawals`. THE
+//      DENOMINATOR IS 117, WHICH IS THE COUNT OF RELATIONS DECLARED BELOW.
+//      ADR-449 section 9 item 1 wrote 116 for it; 116 is `TABLE_KEYS.length`
+//      and the word in the sentence is "below", so the population is this
+//      file's declarations and the two differ by `live_account_state`. The
+//      NUMERATOR is FIFTEEN under either reading, because that one relation
+//      carries no later column, so the correction is to the denominator only.
+//   2. `schema.ts:70` AS THIS PARAGRAPH STOOD read "`DROP COLUMN` and `RENAME`
+//      stay offenders that turn the suite red". TRUE until ADR-278 folded
+//      `RENAME COLUMN` and `0075` renamed
+//      `simulation_runs.calibration_observed_at` to `..._observed_on`. The
+//      vocabulary is FOUR members now and `DROP COLUMN`, with zero instances,
+//      is the only offender left. THIS IS THE THIRD TIME THIS ONE SENTENCE HAS
+//      OUTLIVED A RULING THAT WIDENED THE FOLD, after ADR-103 and ADR-216, and
+//      it is the second time it has named a REGISTERED table as one that
+//      cannot be registered.
+//   3. `schema.ts:86` AS IT STOOD read "`otp_challenges` IS THE ONLY ONE OF THE
+//      ELEVEN THAT ALSO CARRIES AN `ALTER COLUMN`". TRUE until `0067` retyped
+//      `rule_states.phase` under ADR-216. Two of the fifteen carry one now, and
+//      they carry different members of the vocabulary.
+//
+//   THE TWO LINE NUMBERS IN ITEMS 2 AND 3 ARE BASE-RELATIVE and are kept that
+//   way deliberately: the paragraph they name is rewritten IN PLACE and is
+//   line-neutral, so the sentences they quote are gone from those lines and the
+//   corrected ones stand there instead. Item 1's `:81` still opens the sentence
+//   it names, which is what a repaired pointer in a live file looks like.
+//
+// THE ARGUMENT UNDER THE FIGURE IS THE HALF THAT NEEDED CHECKING, and it holds
+// for all fifteen INCLUDING THE FOUR: each one's `CREATE TABLE` body is a
+// PROPER SUBSET of its declaration and the difference is EXACTLY the names its
+// later `ADD COLUMN`s add, so under ADR-094's superseded read-as-of-CREATE rule
+// every one of them is red. `the fold paragraph names the carriers a run
+// RECOMPUTES` in `test/scoped-db.test.ts` asserts that table by table, so the
+// argument is a RUN rather than a sentence a fifth row has to re-derive.
 //
 // WHAT THAT COSTS IS THE FOUR COMPARISONS, AND THEY ARE PAID FOR BY NAME. The
 // drift, type, nullability and DEFAULT loops in `test/scoped-db.test.ts` all
