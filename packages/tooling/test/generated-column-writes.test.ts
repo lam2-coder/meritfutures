@@ -9,8 +9,8 @@ import {
   builtStatements,
   literalLines,
   literalStatements,
+  refusedWrites,
   run,
-  updateTargets,
 } from '../checks/generated-column-writes.mjs';
 
 // =============================================================================
@@ -275,29 +275,63 @@ describe('the command line', () => {
 // section 8 item 1 rather than deleting the item: RI-14 keeps what was corrected
 // beside its correction.
 // =============================================================================
-describe('the UPDATE half, which does not hold', () => {
-  test('the accessor builds an UPDATE that writes a stored generated column', async () => {
-    const set = derivedSet();
-    const targets = await updateTargets(set.generated);
-    expect(targets.length).toBeGreaterThan(0);
-    for (const target of targets) {
-      expect(set.generated.get(target.table)?.has(target.column)).toBe(true);
-    }
+describe('leg D, the refusal the UPDATE builder now holds', () => {
+  // WHAT STOOD HERE WAS A DEMONSTRATION AND IT IS DELETED RATHER THAN REPAIRED.
+  // `ADR-445` shipped a `describe` block asserting the UPDATE builder DID name a
+  // stored generated column, and a helper, `updateTargets`, whose whole purpose
+  // was to hold that hole open on a real built statement so the commit closing
+  // it would go red. `ADR-448` closed it. The block and the helper are gone and
+  // what replaces them asserts the REFUSAL over the same registry and the same
+  // real builder. `RI-14` keeps the record of the correction beside the
+  // correction, which is `ADR-448` section 8 item 1 and this file's checker
+  // header, rather than in a case that no longer means anything.
+
+  test('every stored generated column on the registry is refused, and by name', async () => {
+    const legD = await refusedWrites();
+    expect(legD.findings).toEqual([]);
+    expect(legD.refused).toBeGreaterThan(0);
+    expect(legD.tables).toBeGreaterThan(0);
   });
 
-  // THE EXTENT IS DERIVED FROM BOTH SIDES AND NEITHER SIDE IS TYPED HERE. Every
-  // member of the set that sits on a registry table with an addressable write is
-  // reachable, and the case says so by computing both and comparing them.
-  test('every member on an addressable registry table is reachable, and no other', async () => {
+  // THE COLUMNS LEG D REFUSES ARE THE REGISTRY'S SUBSET OF THE DDL'S, AND THE
+  // INEQUALITY IS THE ASSERTION. `live_account_state` carries a generated column
+  // and is not a registry table, so the UPDATE builder cannot reach it and the
+  // two counts must differ. A case asserting equality would go red on a true
+  // tree; this one goes red if the registry silently gains or loses the table,
+  // and neither side of it is a number typed into this file.
+  test('the columns leg D refuses are the registry subset of the fold', async () => {
+    const legD = await refusedWrites();
     const set = derivedSet();
-    const targets = await updateTargets(set.generated);
-    const reached = new Set(targets.map((t) => `${t.table}.${t.column}`));
-    const all = new Set(
-      [...set.generated].flatMap(([table, columns]) => [...columns].map((c) => `${table}.${c}`)),
-    );
-    for (const one of reached) expect(all.has(one)).toBe(true);
-    // `live_account_state` is in the DDL and not in the registry, so at least
-    // one member is out of the UPDATE builder's reach and the two sets differ.
-    expect(reached.size).toBeLessThan(all.size);
+    const inDdl = [...set.generated.values()].reduce((n, columns) => n + columns.size, 0);
+    expect(legD.refused).toBeGreaterThan(0);
+    expect(legD.refused).toBeLessThan(inDdl);
+  });
+
+  // TWO INDEPENDENT READS OF THE IDENTITY POPULATION, COMPARED. Leg A folds the
+  // DDL under `packages/db/migrations/` and counts `GENERATED ALWAYS AS IDENTITY`
+  // as text; leg D walks the Drizzle declarations through the registry. Leg D
+  // asserts NO refusal for these, because `ADR-448` section 8 records why the
+  // widening did not land, but the two counts still have to agree: the day a
+  // migration adds an identity column and `schema.ts` does not, this is the case
+  // that says so.
+  test('the identity columns leg D reaches are the ones the DDL declares', async () => {
+    const legD = await refusedWrites();
+    const set = derivedSet();
+    expect(legD.identityReached).toBe(set.identityOccurrences);
+  });
+
+  // THE MESSAGE IS THE DISCRIMINATOR AND IT IS ASSERTED RATHER THAN ASSUMED. Leg
+  // D refuses to count a throw that does not name the column, so a builder that
+  // started failing for an unrelated reason would show up as a finding instead
+  // of as a pass. This case reads the message the guard actually produced on
+  // this tree and checks it carries what a reader needs: the rule, and the
+  // SQLSTATE PostgreSQL would have answered with.
+  test('the refusal names the rule and the SQLSTATE', async () => {
+    const legD = await refusedWrites();
+    const sample = legD.sample;
+    expect(sample).toBeTypeOf('string');
+    expect(sample).toMatch(/GENERATED ALWAYS AS \(\.\.\.\) STORED/);
+    expect(sample).toMatch(/42601/);
+    expect(sample).toMatch(/never takes it from the caller/);
   });
 });
