@@ -71,6 +71,49 @@
 // leg 1 is complete for the shape 7 of the 9 guards actually have.
 //
 // -----------------------------------------------------------------------------
+// LEG 3, THE OTHER DIRECTION, AND IT IS THE ONLY LEG THAT READS A CONFORMING NAME
+// -----------------------------------------------------------------------------
+// ADR-459 section 9 item 3, dispatched rather than self-invented. Legs 1 and 2
+// both ask whether a refusal is wearing the wrong name. NOTHING ASKED WHETHER A
+// CONFORMING NAME IS BACKED BY A REFUSAL, and the check that trusts the name is
+// why that matters: `write-guard-set.mjs` builds its guard list by filtering
+// declarations through `/^refuse[A-Z]/` and nothing else, so a function called
+// `refuseNothing` with an empty body is COUNTED as a declared write guard and
+// gets a matrix row of its own. That is the worse of the two failures. A guard
+// under the wrong name is INVISIBLE to the completeness check, which is a hole
+// that reads as a hole; a conforming name over no refusal makes the completeness
+// check report a guard the runtime does not have, which is a hole that reads as
+// a control.
+//
+// "ITS OWN THROW" MEANS SOMETHING WIDER HERE THAN IT DOES IN LEG 1, AND THE
+// DIFFERENCE IS FORCED BY THE POLARITY RATHER THAN CHOSEN. Leg 1 reports a
+// function that DOES throw, so attributing a callback's throw to the function
+// around it would MANUFACTURE reports. Leg 3 reports a function that does NOT,
+// so the same attribution SUPPRESSES them. A guard whose refusal is spelled
+// `rows.forEach((r) => { if (bad(r)) throw ... })` is a real refusal, and a leg 3
+// reading only the outer frame would call it empty and be wrong. So leg 3 reads
+// any `throw` lexically inside the function, nested frames included, while leg 1
+// keeps reading its own frame alone. The two fields are separate for that reason.
+//
+// A DELEGATING REFUSAL IS NOT AN EMPTY ONE, AND THE TEST FOR IT IS THE
+// CONVENTION ITSELF. A `refuseBoth(key, values)` whose whole body is
+// `refuseTenancyColumn(key, values); refuseTermInValues(key, values);` throws
+// nothing and refuses two things. It is not reported, because every guard it
+// delegates to CARRIES THE NAME legs A and D read, so the guard set still sees
+// the whole refusal. A `refuse` function delegating to a helper the convention
+// does not cover IS reported, and so is that helper, by leg 1 or leg 2: the
+// composite is only as visible as its least visible part, which is the rule's
+// whole subject. A call to ITSELF does not count, because a refusal that
+// delegates to itself refuses nothing.
+//
+// LEG 3 KEYS ON THE NAME, SO IT DOES NOT TOUCH THE `async` RULING LEFT OPEN
+// BELOW. That ruling is about whether a guard-SHAPED async function must be
+// renamed, and `pairInsertStatement` is the case holding it open. Leg 3 asks
+// only that a name somebody has ALREADY chosen be backed by a throw, which is a
+// question the `async` keyword does not change. ADR-459 section 9 item 5 stays
+// open and this leg does not close it.
+//
+// -----------------------------------------------------------------------------
 // WHAT IS DELIBERATELY OUT OF SCOPE
 // -----------------------------------------------------------------------------
 // `async` FUNCTIONS ARE NOT GUARD-SHAPED HERE AND EXCLUDING THEM IS NOT AN
@@ -181,6 +224,18 @@ const refusalNaming = {
         'still a guard (`refuseGeneratedColumn` returns the values it cleared), so returning a ' +
         'value is not what makes this permissible. Rename it to `refuse` plus what it refuses ' +
         '(ADR-458 section 11 item 2, ADR-459).',
+      refusalWithoutThrow:
+        '`{{name}}` matches the `refuse[A-Z]` convention, and that name is what ' +
+        '`packages/tooling/checks/write-guard-set.mjs` reads a write guard by: in `scoped-db.ts` ' +
+        'its guard list is every declaration matching that literal and nothing else, and a ' +
+        'sibling file is inside this rule for the reason its header gives, that a guard extracted ' +
+        'there is where legs A and D would not look either. But `{{name}}` throws nowhere inside ' +
+        'itself and calls no other `refuse` function, so it refuses nothing. A name in the guard ' +
+        'set over no refusal is worse than a refusal under the wrong name: the wrong name leaves ' +
+        'a hole that READS as a hole, while this makes the completeness check report a guard the ' +
+        'runtime does not have, and every builder answering leg D with a call to it answers with ' +
+        'a call to nothing. Make it throw, delegate it to a `refuse` function that does, or ' +
+        'rename it so the guard set stops counting it (ADR-459 section 9 item 3, ADR-463).',
     },
   },
 
@@ -191,12 +246,19 @@ const refusalNaming = {
      * makes "its OWN throw" mean what it says: a nested callback that throws
      * pushes its own frame and does not make its parent a refusal.
      *
-     * @type {{ node: any; throws: boolean; valueReturns: number }[]}
+     * `throwsWithin` and `calls` are LEG 3's fields and they are deliberately
+     * wider than `throws`: both are set on every frame currently open, not just
+     * the innermost, because leg 3 reports the ABSENCE of a refusal and a
+     * narrow reading there suppresses nothing and invents reports instead. The
+     * header states that polarity argument in full.
+     *
+     * @type {{ node: any; throws: boolean; throwsWithin: boolean; calls: Set<string>; valueReturns: number }[]}
      */
     const stack = [];
 
     /** @param {any} node */
-    const enter = (node) => stack.push({ node, throws: false, valueReturns: 0 });
+    const enter = (node) =>
+      stack.push({ node, throws: false, throwsWithin: false, calls: new Set(), valueReturns: 0 });
 
     /**
      * Returns nothing that a caller could use. An explicit `void` or `never`
@@ -223,10 +285,27 @@ const refusalNaming = {
     /** @param {any} node */
     const exit = (node) => {
       const frame = stack.pop();
-      if (!frame || !frame.throws) return;
+      if (!frame) return;
       const name = nameOf(node);
       // The convention is about names and an anonymous callback has none.
-      if (name === null || CONVENTION.test(name)) return;
+      if (name === null) return;
+
+      // LEG 3 TAKES EVERY NAME THAT MATCHES THE CONVENTION and legs 1 and 2
+      // take every name that does not, so no node is ever reported twice and
+      // the file's guard population is partitioned rather than sampled.
+      if (CONVENTION.test(name)) {
+        const delegates = [...frame.calls].some((called) => called !== name);
+        if (!frame.throwsWithin && !delegates) {
+          context.report({
+            node: node.id ?? node,
+            messageId: 'refusalWithoutThrow',
+            data: { name },
+          });
+        }
+        return;
+      }
+
+      if (!frame.throws) return;
 
       if (returnsNothing(node, frame)) {
         context.report({ node: node.id ?? node, messageId: 'unnamedRefusal', data: { name } });
@@ -248,6 +327,34 @@ const refusalNaming = {
       ThrowStatement() {
         const frame = stack[stack.length - 1];
         if (frame) frame.throws = true;
+        // Leg 3's wider reading: a callback's throw is still a throw inside
+        // every function that lexically contains the callback.
+        for (const open of stack) open.throwsWithin = true;
+      },
+
+      /**
+       * Leg 3's delegation route, and it records only calls to a name the
+       * convention already covers. A `refuse` function whose refusal is
+       * delegated to `checkCurrency` is NOT delegating to anything the guard
+       * set can see, so it is not recorded here and stays reportable, while
+       * `checkCurrency` itself is leg 1's or leg 2's.
+       *
+       * @param {any} node
+       */
+      CallExpression(node) {
+        const callee = node.callee;
+        /** @type {string | null} */
+        let called = null;
+        if (callee.type === 'Identifier') called = callee.name;
+        else if (
+          callee.type === 'MemberExpression' &&
+          !callee.computed &&
+          callee.property.type === 'Identifier'
+        ) {
+          called = callee.property.name;
+        }
+        if (called === null || !CONVENTION.test(called)) return;
+        for (const open of stack) open.calls.add(called);
       },
 
       ReturnStatement(node) {
