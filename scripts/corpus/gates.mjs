@@ -1990,6 +1990,42 @@ const ci06h = {
           "that 0006's closed processor vocabulary survived the relaxation, or " +
           'that the anchor still refuses a duplicate reference (0081)',
       ],
+      // ADR-455. Pinned in the commit that wires it.
+      //
+      // THIS ONE PINS THE ONLY EXECUTION OF FIVE OF THE SIX GENERATED COLUMNS.
+      // ADR-443 compared every generation expression as TEXT and said so about
+      // itself: "both sides are STRINGS and neither is evaluated". Deleting this
+      // step returns the corpus to a state where six columns the database
+      // computes are asserted only by spelling, and `probe_reserve_coverage.sql`
+      // would again be the only file that has ever executed one of them.
+      //
+      // THREE OF THE SIX ARE INTEGER CENTS AND ONE IS ON THE LIVE PANEL.
+      // SUCCESS 2 is the only assertion anywhere that
+      // `intraday_movement_cents` is `equity - opening` rather than the swap,
+      // which computes an equally plausible number and renders every winning day
+      // as a loss. SUCCESS 4 is the same assertion for `delta_cents`, whose sign
+      // decides whether a reconciliation reads as a surplus or a shortfall.
+      // SUCCESS 3 and SUCCESS 8 are the only assertions that a STORED generated
+      // column is recomputed on UPDATE, which is the verb the live path takes
+      // all day and which no INSERT assertion can see.
+      //
+      // AND SUCCESS 1 IS WHY IT DOES NOT GO STALE: the population is read from
+      // `pg_attribute` rather than from either document, so a seventh generated
+      // column is red on the day it lands.
+      [
+        'probe_generated_column_values.sql',
+        "ADR-455's generated column VALUES are no longer executed, so nothing " +
+          'asserts that the six expressions the database computes compute what ' +
+          'the corpus says they mean: that `intraday_movement_cents` and ' +
+          '`delta_cents` subtract in the direction that renders a loss as a loss ' +
+          'and a shortfall as a shortfall, that both are recomputed on UPDATE ' +
+          'and refuse a hand-written value, that a movement spanning bigint ' +
+          "raises rather than wrapping, that `rcr_bp` holds 0049's stated " +
+          'overflow bound of 214748x and refuses one above it, that ' +
+          '`pre_identity_auth` is neither silenceable nor rate-limit exempt, ' +
+          'and that a fifth report digest is refused by the NOT NULL on ' +
+          '`cadence` rather than by the CHECK on `digest` (ADR-443 section 8)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);

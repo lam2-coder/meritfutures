@@ -50,7 +50,7 @@
 -- THE COUNTERFACTUAL, AS OBSERVED. Executed against `0001`..`0049` the file
 -- dies in SUCCESS 1, at the census, with the six-column population reading five
 -- and `live_account_state` absent: `0050` is the migration that creates the
--- money column SUCCESS 2 measures. Recorded in DELTA_MANIFEST section 27.
+-- money column SUCCESS 2 measures. Recorded in DELTA_MANIFEST section 60.
 -- =============================================================================
 
 \set ON_ERROR_STOP on
