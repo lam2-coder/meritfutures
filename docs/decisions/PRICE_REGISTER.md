@@ -170,6 +170,14 @@ entry is.
 | 87  | `ADR-473:243` | 10.1  | OPEN       | UNASSESSED  | -                             | the split, as `n ELIGIBLE / n INELIGIBLE / n UNCLASSIFIED`, in the section that ... |
 | 88  | `ADR-473:245` | 10.2  | OPEN       | UNASSESSED  | -                             | extend the existing convention rather than invent one: one shared seed constant ... |
 | 89  | `ADR-473:247` | 10.3  | OPEN       | UNASSESSED  | -                             | an entry publishing a `file:line` list names the ref the list was compiled ... |
+| 90  | `ADR-474:274` | 10.1  | OPEN       | UNASSESSED  | -                             | a decision about whether an END-ANCHORED regular-expression literal's tail ... |
+| 91  | `ADR-474:276` | 10.2  | OPEN       | UNASSESSED  | -                             | a decision about whether the count belongs in a PIN, the way `write-guard-set.mjs` ... |
+| 92  | `ADR-474:278` | 10.3  | OPEN       | UNASSESSED  | -                             | a decision about whether a checker may DECLARE the name shape its planted tree ... |
+| 93  | `ADR-474:280` | 10.4  | OPEN       | UNASSESSED  | -                             | a decision about whether the derived half of the set needs a cap, and what a ... |
+| 94  | `ADR-475:197` | 10.1  | OPEN       | UNASSESSED  | -                             | when three entries numbered above 474 have published an owed `file:line` list, ... |
+| 95  | `ADR-475:199` | 10.2  | OPEN       | UNASSESSED  | -                             | the stronger form stays a convention, and a row that wants it gated needs the ... |
+| 96  | `ADR-475:201` | 10.3  | OPEN       | UNASSESSED  | -                             | any future derivation over that vocabulary uses word boundaries ... |
+| 97  | `ADR-475:205` | 10.5  | OPEN       | UNASSESSED  | -                             | none proposed here; a row taking one of them should take both, because the ... |
 
 ## What this register does not cover, stated as a bound
 
