@@ -13,6 +13,7 @@ import {
   main,
   units,
 } from '../checks/absence-grammar-census.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
 // AN INSTRUMENT THAT COUNTS THE SENTENCES SAYING NOTHING CHECKS SOMETHING
@@ -304,25 +305,37 @@ describe('over the repository itself, the SHAPE and never a figure', () => {
   // ceiling by construction rather than by coincidence.
   const REPO = join(dirname(new URL(import.meta.url).pathname), '../../..');
 
-  test('the floor is not empty, so neither grammar is reporting an empty scope', () => {
-    expect(
-      census(REPO).sites.filter((site) => site.grammar === 'machinery').length,
-    ).toBeGreaterThan(0);
-  });
+  test(
+    'the floor is not empty, so neither grammar is reporting an empty scope',
+    () => {
+      expect(
+        census(REPO).sites.filter((site) => site.grammar === 'machinery').length,
+      ).toBeGreaterThan(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('NARROW nests inside WIDE, so the interval is an interval', () => {
-    const sites = census(REPO).sites;
-    const narrow = sites.filter((site) => site.grammar === 'machinery');
-    expect(sites.length).toBeGreaterThanOrEqual(narrow.length);
-  });
+  test(
+    'NARROW nests inside WIDE, so the interval is an interval',
+    () => {
+      const sites = census(REPO).sites;
+      const narrow = sites.filter((site) => site.grammar === 'machinery');
+      expect(sites.length).toBeGreaterThanOrEqual(narrow.length);
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('the claim this row was commissioned over is inside the population it derives', () => {
-    // THE ONE SITE ASSERTED BY PATH, AND IT IS THIS ROW'S OWN SUBJECT. It is
-    // named by SUBJECT and never by line, because the file is another row's this
-    // wave and a line number here would be a pointer into a moving target.
-    const sites = census(REPO).sites.filter(
-      (site) => site.file === 'packages/db/src/scoped-db.ts' && /compares/i.test(site.sentence),
-    );
-    expect(sites.length).toBeGreaterThan(0);
-  });
+  test(
+    'the claim this row was commissioned over is inside the population it derives',
+    () => {
+      // THE ONE SITE ASSERTED BY PATH, AND IT IS THIS ROW'S OWN SUBJECT. It is
+      // named by SUBJECT and never by line, because the file is another row's this
+      // wave and a line number here would be a pointer into a moving target.
+      const sites = census(REPO).sites.filter(
+        (site) => site.file === 'packages/db/src/scoped-db.ts' && /compares/i.test(site.sentence),
+      );
+      expect(sites.length).toBeGreaterThan(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 });

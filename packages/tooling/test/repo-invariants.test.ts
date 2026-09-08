@@ -30,6 +30,7 @@ import {
 import { ri11 } from '../checks/ui-server-endpoints.mjs';
 import { SUBJECTS } from '../checks/response-shape-copies.mjs';
 import { ABSENCE_CLAIMS } from '../checks/absence-claims.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
 // EACH INVARIANT IS WATCHED FAILING BEFORE IT IS TRUSTED
@@ -867,9 +868,18 @@ const findings = (id: string, root: string): string[] => check(id).run(root);
 // The clean direction, both trees
 // -----------------------------------------------------------------------------
 describe('clean tree: every invariant holds', () => {
-  test.each(CHECKS.map((c) => [c.id, c.title] as const))('%s %s', (id) => {
-    expect(findings(id, REPO_ROOT)).toEqual([]);
-  });
+  // ONE CALL SITE, ONE INPUT, ONE BUDGET. Every case this table generates is one
+  // invariant run over the whole repository, so every one of them has the tree
+  // for an input and the same figure covers all of them. Their observed costs
+  // run from 1ms to a case that ABORTED at 5212ms under load, and splitting them
+  // by that spread would put a per-case number on a generated list. ADR-468.
+  test.each(CHECKS.map((c) => [c.id, c.title] as const))(
+    '%s %s',
+    (id) => {
+      expect(findings(id, REPO_ROOT)).toEqual([]);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   test('the synthetic fixture itself satisfies every invariant', () => {
     const root = cleanTree();
@@ -1207,36 +1217,44 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   // `DB_ADMITTED` is emptied, widened, or filled with names that declare nothing.
   // The two below read the REPOSITORY, and they are the only assertions in this
   // file about the list as it ships.
-  test('the shipped admission is doing work: the real tree is a finding without it', () => {
-    // THE DIRECTION AN ADMISSION LIST FAILS IN IS SILENCE. With the list as it
-    // ships RI-08 is clean over the whole workspace; with it emptied,
-    // `apps/api/package.json` is exactly the finding ADR-117 section 4 promised
-    // the manifest line would become, and ADR-120 is the second diff that
-    // answered it.
-    expect(findings('RI-08', REPO_ROOT)).toEqual([]);
-    const out = withDbAdmitted([], () => findings('RI-08', REPO_ROOT).join('\n'));
-    expect(out).toContain('apps/api/package.json: dependencies.@merit/db');
-  });
+  test(
+    'the shipped admission is doing work: the real tree is a finding without it',
+    () => {
+      // THE DIRECTION AN ADMISSION LIST FAILS IN IS SILENCE. With the list as it
+      // ships RI-08 is clean over the whole workspace; with it emptied,
+      // `apps/api/package.json` is exactly the finding ADR-117 section 4 promised
+      // the manifest line would become, and ADR-120 is the second diff that
+      // answered it.
+      expect(findings('RI-08', REPO_ROOT)).toEqual([]);
+      const out = withDbAdmitted([], () => findings('RI-08', REPO_ROOT).join('\n'));
+      expect(out).toContain('apps/api/package.json: dependencies.@merit/db');
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('every admitted package really declares the accessor', () => {
-    // A STALE ADMISSION IS THE SAME DEFECT AS A STALE NAME, ONE STEP LATER. The
-    // check THROWS on an admission naming a package that does not exist, because
-    // that reads as though the accessor is permitted somewhere it is not. An
-    // admission naming a package that exists and declares nothing reads the same
-    // way and throws nothing, so it is asserted here: a name earns its place by
-    // being a package that actually reaches the trader database, and "we might
-    // need it later" is the list joining itself.
-    //
-    // ASSERTED AS A PROPERTY OVER THE LIST AND NEVER AS A COPY OF IT. A second
-    // spelling of `DB_ADMITTED` here would be RI-04's own defect (see
-    // `cleanTree`), and six approval clauses in this corpus have drifted on an
-    // enumeration while the ruling held every time.
-    expect(DB_ADMITTED.length).toBeGreaterThan(0);
-    const unadmitted = withDbAdmitted([], () => findings('RI-08', REPO_ROOT).join('\n'));
-    for (const name of DB_ADMITTED) {
-      expect(unadmitted).toContain(`${name} is not in DB_ADMITTED`);
-    }
-  });
+  test(
+    'every admitted package really declares the accessor',
+    () => {
+      // A STALE ADMISSION IS THE SAME DEFECT AS A STALE NAME, ONE STEP LATER. The
+      // check THROWS on an admission naming a package that does not exist, because
+      // that reads as though the accessor is permitted somewhere it is not. An
+      // admission naming a package that exists and declares nothing reads the same
+      // way and throws nothing, so it is asserted here: a name earns its place by
+      // being a package that actually reaches the trader database, and "we might
+      // need it later" is the list joining itself.
+      //
+      // ASSERTED AS A PROPERTY OVER THE LIST AND NEVER AS A COPY OF IT. A second
+      // spelling of `DB_ADMITTED` here would be RI-04's own defect (see
+      // `cleanTree`), and six approval clauses in this corpus have drifted on an
+      // enumeration while the ruling held every time.
+      expect(DB_ADMITTED.length).toBeGreaterThan(0);
+      const unadmitted = withDbAdmitted([], () => findings('RI-08', REPO_ROOT).join('\n'));
+      for (const name of DB_ADMITTED) {
+        expect(unadmitted).toContain(`${name} is not in DB_ADMITTED`);
+      }
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // ---------------------------------------------------------------------------
   // RI-10, AND BOTH DIRECTIONS ARE SEEDED BECAUSE BOTH HAPPENED ON 2026-08-25
@@ -3117,30 +3135,34 @@ describe('RI-19 binds the two statements of one clearing condition', () => {
 });
 
 describe('RI-19 is about a real pair on the real tree, which is separate from its verdict', () => {
-  test('it binds `B5`s condition across `liability.ts` and its case, with two terms', () => {
-    // "IT RETURNED AN EMPTY ARRAY" IS NOT EVIDENCE THAT IT LOOKED. RI-04 passed
-    // green for three sessions while checking nothing, so this case asserts the
-    // SUBJECT: the pair RI-19 found, which side is canonical, and how many terms
-    // it derived. Every number here is read out of the tree at run time.
-    const { pairs, declared } = clearingConditionPairs(REPO_ROOT);
-    expect(declared).toBeGreaterThanOrEqual(2);
-    const b5 = pairs.get('apps/api::admin-source-liability');
-    expect(b5).toBeDefined();
-    expect(b5?.module.map((m) => m.file)).toEqual(['apps/api/src/admin-source/liability.ts']);
-    expect(b5?.case.map((c) => c.file)).toEqual(['apps/api/test/admin-source-liability.test.ts']);
-    // THE MODULE ENUMERATES AND THE CASE RESTATES, which is session 392's repair
-    // in its own words: the condition is written ONCE, in the module.
-    // **THE COUNT MOVED FROM THREE TO TWO AND THAT IS THE SUBJECT MOVING, NOT
-    // THIS CASE WEAKENING.** All three of `B5`s original terms were spent by
-    // ADR-206, ADR-208 and ADR-264 while the figure stayed absent, so ADR-269
-    // restated the condition over the two terms that actually hold it. The
-    // numbers are read out of the tree at run time and this case is what
-    // notices the day they move again.
-    expect(b5?.module[0]?.terms.length).toBe(2);
-    expect(b5?.module[0]?.count).toBe(2);
-    expect(b5?.case[0]?.count).toBe(2);
-    expect(b5?.case[0]?.terms.length).toBe(0);
-  });
+  test(
+    'it binds `B5`s condition across `liability.ts` and its case, with two terms',
+    () => {
+      // "IT RETURNED AN EMPTY ARRAY" IS NOT EVIDENCE THAT IT LOOKED. RI-04 passed
+      // green for three sessions while checking nothing, so this case asserts the
+      // SUBJECT: the pair RI-19 found, which side is canonical, and how many terms
+      // it derived. Every number here is read out of the tree at run time.
+      const { pairs, declared } = clearingConditionPairs(REPO_ROOT);
+      expect(declared).toBeGreaterThanOrEqual(2);
+      const b5 = pairs.get('apps/api::admin-source-liability');
+      expect(b5).toBeDefined();
+      expect(b5?.module.map((m) => m.file)).toEqual(['apps/api/src/admin-source/liability.ts']);
+      expect(b5?.case.map((c) => c.file)).toEqual(['apps/api/test/admin-source-liability.test.ts']);
+      // THE MODULE ENUMERATES AND THE CASE RESTATES, which is session 392's repair
+      // in its own words: the condition is written ONCE, in the module.
+      // **THE COUNT MOVED FROM THREE TO TWO AND THAT IS THE SUBJECT MOVING, NOT
+      // THIS CASE WEAKENING.** All three of `B5`s original terms were spent by
+      // ADR-206, ADR-208 and ADR-264 while the figure stayed absent, so ADR-269
+      // restated the condition over the two terms that actually hold it. The
+      // numbers are read out of the tree at run time and this case is what
+      // notices the day they move again.
+      expect(b5?.module[0]?.terms.length).toBe(2);
+      expect(b5?.module[0]?.count).toBe(2);
+      expect(b5?.case[0]?.count).toBe(2);
+      expect(b5?.case[0]?.terms.length).toBe(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 });
 
 // -----------------------------------------------------------------------------
@@ -3965,9 +3987,13 @@ describe('RI-26 keeps a temporal column name honest about its own type', () => {
     expect(findings('RI-26', estate())).toEqual([]);
   });
 
-  test('the real repository holds', () => {
-    expect(findings('RI-26', REPO_ROOT)).toEqual([]);
-  });
+  test(
+    'the real repository holds',
+    () => {
+      expect(findings('RI-26', REPO_ROOT)).toEqual([]);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // LEG 1, FORWARD.
   test('a NEW `_at` column declared `date` is a finding', () => {
