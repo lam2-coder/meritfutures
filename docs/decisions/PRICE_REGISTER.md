@@ -163,6 +163,13 @@ entry is.
 | 80  | `ADR-470:327` | 10.4  | OPEN       | UNASSESSED  | -                             | the published derivation command for this figure is replaced by the checker, whose ... |
 | 81  | `ADR-471:135` | 9.1   | OPEN       | UNASSESSED  | -                             | an eligibility pass over any `file:line` list a decision entry publishes as ... |
 | 82  | `ADR-471:139` | 9.2   | OPEN       | UNASSESSED  | -                             | a decision about seeding, and the mechanism that follows from it. Either fast-check ... |
+| 83  | `ADR-472:238` | 10.1  | OPEN       | UNASSESSED  | -                             | a decision about whether a rostered walker no invented argument can reach should ... |
+| 84  | `ADR-472:240` | 10.2  | OPEN       | UNASSESSED  | -                             | a decision about whether argument values should come from the CALL SITES the ... |
+| 85  | `ADR-472:242` | 10.3  | OPEN       | UNASSESSED  | -                             | a decision about whether a spawn should be ANSWERED with a planted listing ... |
+| 86  | `ADR-472:244` | 10.4  | OPEN       | UNASSESSED  | -                             | deriving the extension set from the checkers' own string literals, which this ... |
+| 87  | `ADR-473:243` | 10.1  | OPEN       | UNASSESSED  | -                             | the split, as `n ELIGIBLE / n INELIGIBLE / n UNCLASSIFIED`, in the section that ... |
+| 88  | `ADR-473:245` | 10.2  | OPEN       | UNASSESSED  | -                             | extend the existing convention rather than invent one: one shared seed constant ... |
+| 89  | `ADR-473:247` | 10.3  | OPEN       | UNASSESSED  | -                             | an entry publishing a `file:line` list names the ref the list was compiled ... |
 
 ## What this register does not cover, stated as a bound
 
