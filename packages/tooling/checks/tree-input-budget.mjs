@@ -107,13 +107,67 @@
 // dynamic `check.run(root)` is read at the CALL SITE by W1, where the root is
 // visible, and not through the property, which is why `findings(id, REPO_ROOT)`
 // is caught and `runChecks(checks, { root })` inside a helper is not. A checker
-// that walks through a primitive not in `ENUMERATORS`. And a semantic change: a
-// rostered function that stops walking keeps its roster entry, because the
-// roster is derived from a parameter reaching an enumerator and not from a
-// measurement of the run.
+// that walks through a primitive not in `ENUMERATORS`.
+//
+// -----------------------------------------------------------------------------
+// THE ROSTER IS MEASURED AND NOT ONLY DERIVED (`ADR-472`)
+// -----------------------------------------------------------------------------
+// `ADR-470` section 10 item 2 held the last gap open: a rostered function that
+// STOPS walking keeps its roster entry and nothing notices, and a function that
+// STARTS walking through a primitive outside `ENUMERATORS` never gets one. Both
+// are failures of a roster derived from source alone, so both are answered by
+// RUNNING the roster rather than by reading it harder.
+//
+//   Leg D  EVERY ROSTERED WALKER IS MEASURED ENUMERATING. Each one is called in
+//          a child process against a PLANTED tree with a counted number of
+//          files, and what it reads is recorded
+//   Leg E  ANYTHING THAT ENUMERATES WHEN CALLED WITH NO ARGUMENT AT ALL IS IN
+//          THE ROSTER. That is the roster's own definition run backwards, over
+//          every exported function of `packages/tooling/checks/` whose
+//          parameters all carry defaults
+//
+// THE HARD HALF IS DOING THAT WITHOUT A SECOND COPY OF EVERY CHECKER'S INPUTS,
+// AND THE ANSWER IS THAT THE MEASUREMENT WATCHES THE ENUMERATION AND NEVER THE
+// RESULT. A checker handed eight placeholder files instead of its corpus throws,
+// and it throws AFTER it has enumerated, which is the only thing being asked.
+// So the planted tree needs no fidelity to anything: one line of placeholder
+// text, eight extensions, and a directory shape MATERIALISED ON DEMAND out of
+// the paths the checker itself asks for. Nothing in this module knows what any
+// checker's inputs mean, and nothing in it has to.
+//
+// THE INSTRUMENT IS A DORMANT PATCH OVER `node:fs` AND `node:child_process`,
+// installed by `--import` in the child BEFORE any module of this repository is
+// instantiated, and ARMED only around one call. While armed, every path inside
+// this repository is served from the planted tree, every write and every spawn
+// throws instead of happening, and `process.exit` throws. While disarmed it is
+// a pass-through, which is what lets the child do its own bookkeeping through
+// the same functions.
+//
+// A SPAWN COUNTS AS AN ENUMERATION AND THAT IS THE POINT. `git ls-files` is the
+// primitive outside `ENUMERATORS` that section 3.4 item 3 named as invisible;
+// the measurement sees it because it watches the process boundary rather than
+// the parser.
+//
+// WHAT THE MEASUREMENT STILL CANNOT SEE, WRITTEN DOWN BEFORE ANYBODY ASKS. A
+// walker whose walk is gated behind an argument this measurement will not
+// invent is INCONCLUSIVE rather than clean: it is counted, named in the report
+// and never reported as a finding. Leg E reaches only what can be called with
+// no argument, which is a stated fraction of the exported surface. And a walker
+// that enumerates only under some argument shape is a walker neither leg reaches.
 // =============================================================================
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -1226,7 +1280,7 @@ export function walksIn(text, file, mod, mods, verdicts, walkers) {
  *
  * @param {string} [suite]
  * @param {string} [checks]
- * @returns {{ cases: Case[], files: string[], walkers: Map<string, Walker>, forms: Forms }}
+ * @returns {{ cases: Case[], files: string[], walkers: Map<string, Walker>, forms: Forms, mods: Map<string, Mod> }}
  */
 export function census(suite = SUITE_DIR, checks = CHECKS_DIR) {
   const suiteFiles = readdirSync(suite)
@@ -1266,7 +1320,7 @@ export function census(suite = SUITE_DIR, checks = CHECKS_DIR) {
       });
     }
   }
-  return { cases, files: suiteFiles.map(rel), walkers, forms };
+  return { cases, files: suiteFiles.map(rel), walkers, forms, mods };
 }
 
 /**
@@ -1340,6 +1394,589 @@ export function legBudgetEarned(cases) {
 }
 
 // -----------------------------------------------------------------------------
+// THE MEASURED ROSTER
+// -----------------------------------------------------------------------------
+// `ADR-472`. Everything above derives the roster by reading source. Everything
+// below RUNS it, in a child process, against a tree this module plants and
+// counts. The two derivations share no step, which is the only reason either
+// one is worth believing.
+// -----------------------------------------------------------------------------
+
+/** This module, by path. The child is this same file in another mode. */
+export const SELF = fileURLToPath(import.meta.url);
+
+/** Set in the child, so a measured `run()` cannot spawn a measurement of its own. */
+export const MEASURE_ENV = 'MERIT_TREE_INPUT_BUDGET_MEASURING';
+
+/** The child mode's flag. Not a user-facing option and the usage text omits it. */
+export const MEASURE_CHILD = '--measure-child';
+
+/**
+ * The extensions the planted files carry. THIS IS THE ONLY THING THE PLANTED
+ * TREE KNOWS ABOUT ANY CHECKER'S INPUTS, and it is a list of suffixes rather
+ * than a copy of anything: a checker that filters its listing to `.sql` has to
+ * find at least one `.sql` name in it or the measurement learns nothing about
+ * what it reads. The content behind every one of them is `PLANTED_LINE`.
+ */
+export const PLANTED_EXTENSIONS = [
+  '.mjs',
+  '.ts',
+  '.test.ts',
+  '.md',
+  '.sql',
+  '.json',
+  '.yml',
+  '.txt',
+];
+
+/** What every planted file contains. One line, the same line, every time. */
+export const PLANTED_LINE = '// merit tree-input-budget planted file; no checker input is here\n';
+
+/**
+ * TWO ROUNDS, DIFFERING ONLY IN HOW MANY FILES ARE PLANTED PER DIRECTORY. A
+ * named read of one file reads the same one file in both; an enumeration reads
+ * more in the second. The comparison is the measurement `ADR-470` section 10
+ * item 2 asked for, and the round tags appear in the report.
+ */
+export const ROUNDS = [
+  { tag: 'small', perDir: 8 },
+  { tag: 'large', perDir: 24 },
+];
+
+/** A ceiling on materialised directories, so a walker cannot plant forever. */
+export const PLANT_CAP = 200;
+
+/**
+ * The denominator leg E's population is a fraction of: every exported function
+ * of the checks directory. A report that states seven without stating the
+ * surface it is seven of is a report about a population nobody can size, which
+ * is the defect this whole estate is about.
+ *
+ * @param {Map<string, Mod>} mods
+ * @param {string} [checks]
+ * @returns {number}
+ */
+export function exportedSurface(mods, checks = CHECKS_DIR) {
+  let total = 0;
+  for (const [file, mod] of mods) {
+    if (relative(checks, file).startsWith('..')) continue;
+    for (const fn of mod.fns.values()) if (fn.exported) total += 1;
+  }
+  return total;
+}
+
+/**
+ * THE DORMANT PATCH, INSTALLED BY `--import` BEFORE ANY MODULE OF THIS
+ * REPOSITORY IS INSTANTIATED.
+ *
+ * It must run before anything else because an ESM `import { readdirSync }`
+ * binds at instantiation: patching the module afterwards reaches nothing that
+ * is already loaded, which was measured rather than assumed. `--import` is the
+ * only ordering guarantee available, and the patch is a `data:` module so that
+ * it can import nothing of this repository and leave no file behind.
+ *
+ * WHILE DISARMED IT IS A PASS-THROUGH. `fixture === null` is the disarmed
+ * state, and the child does all of its own bookkeeping in it, through these
+ * same functions.
+ *
+ * @param {string} repoRoot
+ * @param {string} self
+ * @returns {string}
+ */
+export function measurementPatch(repoRoot, self) {
+  return `
+const { createRequire } = await import('node:module');
+const require = createRequire(${JSON.stringify(self)});
+const fs = require('node:fs');
+const cp = require('node:child_process');
+const path = require('node:path');
+const S = {
+  repoRoot: ${JSON.stringify(repoRoot)},
+  fixture: null,
+  perDir: 0,
+  ext: ${JSON.stringify(PLANTED_EXTENSIONS)},
+  line: ${JSON.stringify(PLANTED_LINE)},
+  cap: ${String(PLANT_CAP)},
+  materialised: new Set(),
+  planted: new Set(),
+  enumerated: new Set(),
+  read: new Set(),
+  touched: 0,
+  named: 0,
+  spawned: [],
+  wrote: [],
+};
+globalThis.__meritTreeInputBudgetMeasure = S;
+const real = {
+  mkdirSync: fs.mkdirSync,
+  writeFileSync: fs.writeFileSync,
+  existsSync: fs.existsSync,
+};
+const inRepo = (p) =>
+  typeof p === 'string' && (p === S.repoRoot || p.startsWith(S.repoRoot + path.sep));
+const to = (p) => (S.fixture !== null && inRepo(p) ? S.fixture + p.slice(S.repoRoot.length) : p);
+const under = (q) =>
+  S.fixture !== null &&
+  typeof q === 'string' &&
+  (q === S.fixture || q.startsWith(S.fixture + path.sep));
+const plant = (dir) => {
+  if (S.materialised.has(dir) || S.materialised.size >= S.cap) return;
+  S.materialised.add(dir);
+  real.mkdirSync(dir, { recursive: true });
+  for (let i = 0; i < S.perDir; i += 1) {
+    const f = path.join(dir, 'merit-planted-' + String(i + 1) + S.ext[i % S.ext.length]);
+    real.writeFileSync(f, S.line);
+    S.planted.add(f);
+  }
+};
+const wrap = (host, names, kind) => {
+  for (const name of names) {
+    const orig = host[name];
+    if (typeof orig !== 'function') continue;
+    host[name] = (...a) => {
+      if (S.fixture === null) return orig(...a);
+      if (kind === 'write') {
+        S.wrote.push(String(a[0]));
+        throw new Error('a measured run may not write');
+      }
+      if (kind === 'spawn') {
+        S.spawned.push((String(a[0]) + ' ' + (Array.isArray(a[1]) ? a[1].join(' ') : '')).trim());
+        throw new Error('a measured run may not spawn');
+      }
+      const q = to(a[0]);
+      if (under(q)) {
+        S.touched += 1;
+        if (kind === 'enum') {
+          S.enumerated.add(q);
+          if (!real.existsSync(q)) plant(q);
+        }
+        if (kind === 'read') {
+          if (S.planted.has(q)) S.read.add(q);
+          // A NAMED READ IS ANSWERED RATHER THAN REFUSED, and it is counted
+          // apart from the planted tree so that the count comparison stays a
+          // comparison. A walker whose first act is to read one file by name
+          // would otherwise die on ENOENT before reaching its walk, and leg D
+          // would call it stale for a file the measurement failed to provide.
+          else if (S.named < S.cap && !real.existsSync(q)) {
+            S.named += 1;
+            real.mkdirSync(path.dirname(q), { recursive: true });
+            real.writeFileSync(q, S.line);
+          }
+        }
+      }
+      return orig(q, ...a.slice(1));
+    };
+  }
+};
+wrap(fs, ${JSON.stringify(ENUMERATORS)}, 'enum');
+wrap(fs, ['readFileSync', 'readFile', 'openSync'], 'read');
+wrap(fs, ['statSync', 'lstatSync', 'existsSync'], 'stat');
+wrap(
+  fs,
+  ['writeFileSync', 'appendFileSync', 'mkdirSync', 'rmSync', 'rmdirSync', 'unlinkSync',
+   'renameSync', 'copyFileSync', 'cpSync', 'symlinkSync', 'chmodSync', 'truncateSync',
+   'writeFile', 'appendFile', 'mkdir', 'rm', 'unlink', 'rename', 'createWriteStream'],
+  'write',
+);
+wrap(cp, ['execSync', 'execFileSync', 'spawnSync', 'exec', 'execFile', 'spawn', 'fork'], 'spawn');
+require('node:fs');
+require('node:child_process');
+const exit = process.exit;
+process.exit = (code) => {
+  if (S.fixture === null) return exit(code);
+  throw new Error('a measured run may not exit');
+};
+`;
+}
+
+/**
+ * @typedef {object} State
+ * @property {string | null} fixture
+ * @property {number} perDir
+ * @property {Set<string>} materialised
+ * @property {Set<string>} planted
+ * @property {Set<string>} enumerated
+ * @property {Set<string>} read
+ * @property {number} touched
+ * @property {number} named
+ * @property {string[]} spawned
+ * @property {string[]} wrote
+ */
+
+/** @returns {State | null} */
+function measurementState() {
+  const held = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (globalThis))[
+    '__meritTreeInputBudgetMeasure'
+  ];
+  return held === undefined ? null : /** @type {State} */ (held);
+}
+
+/**
+ * @typedef {object} Invocation
+ * @property {string} module
+ * @property {string} name
+ * @property {boolean} rostered
+ * @property {('default' | 'empty')[]} args
+ */
+
+/**
+ * WHAT TO CALL, AND WITH WHAT.
+ *
+ * A ROSTERED WALKER IS CALLED WITH ITS DEFAULTS IN PLACE. Every parameter that
+ * has a default is passed `undefined`, which is what makes the default apply,
+ * and every parameter that has none is passed the EMPTY ARRAY. The empty array
+ * is uniform and is never anything shaped like a checker's real input: a walker
+ * that will not walk on an empty argument is reported INCONCLUSIVE rather than
+ * as a finding, which is the honest reading of what was measured.
+ *
+ * A PROBE IS CALLED WITH NO ARGUMENT AT ALL, and the probe set is every
+ * exported function of the checks directory whose parameters ALL carry
+ * defaults. That is the roster's own definition run backwards: a function that
+ * enumerates with nothing supplied has a defaulted root or is rootless, so it
+ * belongs in the roster, and leg E says so.
+ *
+ * @param {Map<string, Mod>} mods
+ * @param {Map<string, Walker>} walkers
+ * @param {string} [checks]
+ * @returns {Invocation[]}
+ */
+export function measurementPlan(mods, walkers, checks = CHECKS_DIR) {
+  /** @type {Invocation[]} */
+  const calls = [];
+  for (const walker of walkers.values()) {
+    const fn = mods.get(walker.module)?.fns.get(walker.name);
+    if (fn === undefined) continue;
+    calls.push({
+      module: walker.module,
+      name: walker.name,
+      rostered: true,
+      args: fn.params.map(
+        (p) => /** @type {'default' | 'empty'} */ (p.def === null ? 'empty' : 'default'),
+      ),
+    });
+  }
+  for (const [file, mod] of mods) {
+    if (relative(checks, file).startsWith('..')) continue;
+    for (const [name, fn] of mod.fns) {
+      if (!fn.exported) continue;
+      if (walkers.has(`${file}#${name}`)) continue;
+      if (!fn.params.every((p) => p.def !== null)) continue;
+      calls.push({ module: file, name, rostered: false, args: [] });
+    }
+  }
+  return calls;
+}
+
+/**
+ * @typedef {object} Row
+ * @property {string} round
+ * @property {number} perDir
+ * @property {string} module
+ * @property {string} name
+ * @property {boolean} rostered
+ * @property {number} dirs      distinct directories enumerated under the planted root
+ * @property {number} planted   files planted for this call
+ * @property {number} read      distinct planted files opened
+ * @property {number} touched   any access at all under the planted root
+ * @property {number} named     files the run asked for BY NAME and was given
+ * @property {string[]} spawned
+ * @property {string[]} wrote
+ * @property {string | null} error
+ */
+
+/**
+ * THE PARENT HALF. One child process, both rounds, every call.
+ *
+ * A MEASUREMENT THAT DID NOT RUN IS NOT A MEASUREMENT, so a child that fails
+ * throws here rather than returning an empty list that would read as clean.
+ *
+ * @param {Invocation[]} calls
+ * @param {string} [self]
+ * @returns {Row[]}
+ */
+export function measure(calls, self = SELF) {
+  const base = mkdtempSync(join(tmpdir(), 'merit-measured-roster-'));
+  const spec = join(base, 'spec.json');
+  const out = join(base, 'out.json');
+  const patch = `data:text/javascript,${encodeURIComponent(measurementPatch(REPO_ROOT, self))}`;
+  try {
+    writeFileSync(spec, JSON.stringify({ base, out, calls, rounds: ROUNDS }));
+    execFileSync(process.execPath, ['--import', patch, self, MEASURE_CHILD, spec], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, [MEASURE_ENV]: '1' },
+      timeout: 300_000,
+    });
+    return /** @type {Row[]} */ (JSON.parse(readFileSync(out, 'utf8')));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+}
+
+/**
+ * THE CHILD HALF. It runs with the patch installed and disarmed, imports every
+ * module it will call BEFORE arming anything so that import-time work is not
+ * attributed to any call, then arms the patch around one call at a time.
+ *
+ * @param {string} specPath
+ * @returns {Promise<number>}
+ */
+export async function measureChild(specPath) {
+  const state = measurementState();
+  if (state === null) {
+    process.stderr.write('the measurement patch is not installed, so nothing was measured\n');
+    return 2;
+  }
+  const spec =
+    /** @type {{ base: string, out: string, calls: Invocation[], rounds: typeof ROUNDS }} */ (
+      JSON.parse(readFileSync(specPath, 'utf8'))
+    );
+
+  /** @type {Map<string, Record<string, unknown> | null>} */
+  const loaded = new Map();
+  for (const call of spec.calls) {
+    if (loaded.has(call.module)) continue;
+    try {
+      loaded.set(call.module, await import(pathToFileURL(call.module).href));
+    } catch {
+      loaded.set(call.module, null);
+    }
+  }
+
+  const quiet = { log: console.log, error: console.error, warn: console.warn };
+  /** @type {Row[]} */
+  const rows = [];
+  for (const round of spec.rounds) {
+    for (let i = 0; i < spec.calls.length; i += 1) {
+      const call = /** @type {Invocation} */ (spec.calls[i]);
+      const fixture = join(spec.base, round.tag, String(i));
+      // THE PLANTED ROOT IS LEFT UNCREATED ON PURPOSE. Creating it here made a
+      // walker that enumerates the root itself find an EMPTY directory that
+      // already existed, so nothing was planted into it and the run read zero
+      // of zero files. Materialisation is on demand, and the root is the first
+      // thing demanded.
+      mkdirSync(dirname(fixture), { recursive: true });
+      state.materialised.clear();
+      state.planted.clear();
+      state.enumerated.clear();
+      state.read.clear();
+      state.touched = 0;
+      state.named = 0;
+      state.spawned.length = 0;
+      state.wrote.length = 0;
+      state.perDir = round.perDir;
+      /** @type {string | null} */
+      let error = null;
+      console.log = () => {};
+      console.error = () => {};
+      console.warn = () => {};
+      state.fixture = fixture;
+      try {
+        const mod = loaded.get(call.module);
+        const fn = mod === null || mod === undefined ? undefined : mod[call.name];
+        if (typeof fn !== 'function') throw new Error('not an exported function');
+        /** @type {(...a: unknown[]) => unknown} */ (fn)(
+          ...call.args.map((kind) => (kind === 'default' ? undefined : [])),
+        );
+      } catch (err) {
+        error = String(err instanceof Error ? err.message : err).slice(0, 200);
+      } finally {
+        state.fixture = null;
+        console.log = quiet.log;
+        console.error = quiet.error;
+        console.warn = quiet.warn;
+      }
+      rows.push({
+        round: round.tag,
+        perDir: round.perDir,
+        module: call.module,
+        name: call.name,
+        rostered: call.rostered,
+        dirs: state.enumerated.size,
+        planted: state.planted.size,
+        read: state.read.size,
+        touched: state.touched,
+        named: state.named,
+        spawned: [...state.spawned],
+        wrote: [...state.wrote],
+        error,
+      });
+    }
+  }
+  writeFileSync(spec.out, JSON.stringify(rows));
+  return 0;
+}
+
+/**
+ * @typedef {object} Verdict
+ * @property {boolean} rostered
+ * @property {number} dirs      the most directories enumerated in any round
+ * @property {number} touched   the most accesses of any kind in any round
+ * @property {number} named     the most named files answered in any round
+ * @property {string[]} spawns
+ * @property {number[]} read    planted files opened, one per round, in order
+ * @property {number[]} planted files planted, one per round, in order
+ * @property {string | null} error
+ */
+
+/**
+ * ONE VERDICT PER FUNCTION, FOLDED OVER THE ROUNDS.
+ *
+ * @param {Row[]} rows
+ * @returns {Map<string, Verdict>}
+ */
+export function measuredVerdicts(rows) {
+  /** @type {Map<string, Verdict>} */
+  const out = new Map();
+  for (const row of rows) {
+    const id = `${row.module}#${row.name}`;
+    const held = out.get(id) ?? {
+      rostered: row.rostered,
+      dirs: 0,
+      touched: 0,
+      named: 0,
+      spawns: [],
+      read: [],
+      planted: [],
+      error: null,
+    };
+    held.dirs = Math.max(held.dirs, row.dirs);
+    held.touched = Math.max(held.touched, row.touched);
+    held.named = Math.max(held.named, row.named);
+    for (const one of row.spawned) if (!held.spawns.includes(one)) held.spawns.push(one);
+    held.read.push(row.read);
+    held.planted.push(row.planted);
+    if (held.error === null) held.error = row.error;
+    out.set(id, held);
+  }
+  return out;
+}
+
+/** @param {Verdict} v @returns {boolean} */
+export const enumerates = (v) => v.dirs > 0 || v.spawns.length > 0;
+
+/** @param {Verdict} v @returns {boolean} */
+export const grewWithTheTree = (v) =>
+  v.read.length > 1 &&
+  v.read.some((n, i) => i > 0 && n > 0 && n > /** @type {number} */ (v.read[i - 1]));
+
+/**
+ * LEG D. EVERY ROSTERED WALKER IS MEASURED ENUMERATING.
+ *
+ * THE THREE OUTCOMES ARE NOT TWO. A walker that enumerates or spawns is
+ * measured. A walker that reads the planted tree and enumerates NOTHING in it
+ * is a finding, because its roster entry says it walks and the run says it
+ * reads. A walker that never reached the planted tree at all is INCONCLUSIVE,
+ * because the empty argument it was handed is the likelier explanation, and a
+ * finding raised on that would be this check inventing a defect.
+ *
+ * @param {Map<string, Verdict>} verdicts
+ * @returns {string[]}
+ */
+export function legRosterIsMeasured(verdicts) {
+  /** @type {string[]} */
+  const out = [];
+  for (const [id, v] of verdicts) {
+    if (!v.rostered || enumerates(v)) continue;
+    if (v.touched === 0) continue;
+    const hash = id.lastIndexOf('#');
+    out.push(
+      `${rel(id.slice(0, hash))}#${id.slice(hash + 1)} is in the roster and a measured run of it ` +
+        `reads a planted tree ${String(v.touched)} time(s) and enumerates no directory of it. ` +
+        'The roster says this function walks and the run says it does not, so one of the two is ' +
+        'stale (ADR-472)',
+    );
+  }
+  return out;
+}
+
+/**
+ * LEG E. ANYTHING THAT ENUMERATES WITH NO ARGUMENT AT ALL IS IN THE ROSTER.
+ *
+ * This is the direction a fold over source cannot cover: a function that walks
+ * through a primitive `ENUMERATORS` does not name never gets an entry, and
+ * `git ls-files` is the live example. The measurement sees a spawn because it
+ * watches the process boundary rather than the parser.
+ *
+ * @param {Map<string, Verdict>} verdicts
+ * @returns {string[]}
+ */
+export function legRosterIsComplete(verdicts) {
+  /** @type {string[]} */
+  const out = [];
+  for (const [id, v] of verdicts) {
+    if (v.rostered || !enumerates(v)) continue;
+    const hash = id.lastIndexOf('#');
+    const how =
+      v.spawns.length > 0
+        ? `spawns \`${/** @type {string} */ (v.spawns[0])}\``
+        : `enumerates ${String(v.dirs)} directory(ies)`;
+    out.push(
+      `${rel(id.slice(0, hash))}#${id.slice(hash + 1)} ${how} when it is called with no argument ` +
+        'at all, and it is not in the roster. A walk reached with nothing supplied is a defaulted ' +
+        'root or a rootless walker by definition, so the roster is missing it (ADR-472)',
+    );
+  }
+  return out;
+}
+
+/**
+ * The three counts the report states, so that a PASS names the population it
+ * measured rather than the one it hoped for.
+ *
+ * @param {Map<string, Verdict>} verdicts
+ * @returns {{ rostered: number, measured: number, inconclusive: number, probed: number, grew: number, spawning: string[] }}
+ */
+export function measuredSummary(verdicts) {
+  let rostered = 0;
+  let measured = 0;
+  let inconclusive = 0;
+  let probed = 0;
+  let grew = 0;
+  /** @type {string[]} */
+  const spawning = [];
+  for (const [id, v] of verdicts) {
+    if (!v.rostered) {
+      probed += 1;
+      continue;
+    }
+    rostered += 1;
+    if (enumerates(v)) measured += 1;
+    else if (v.touched === 0) inconclusive += 1;
+    if (grewWithTheTree(v)) grew += 1;
+    if (v.spawns.length > 0) {
+      const hash = id.lastIndexOf('#');
+      spawning.push(`${rel(id.slice(0, hash))}#${id.slice(hash + 1)}`);
+    }
+  }
+  return { rostered, measured, inconclusive, probed, grew, spawning };
+}
+
+/**
+ * Leg A for the measurement: a measured roster in which nothing was measured is
+ * an absence check over an empty scope, so it THROWS rather than reporting.
+ *
+ * @param {Map<string, Verdict>} verdicts
+ */
+export function legMeasurementIsReal(verdicts) {
+  if (verdicts.size === 0) throw new Error('the measurement returned no row at all');
+  const summary = measuredSummary(verdicts);
+  if (summary.rostered === 0) throw new Error('no rostered walker was measured');
+  if (summary.measured === 0) {
+    throw new Error(
+      'not one rostered walker was measured enumerating, so the instrument is not reading ' +
+        'anything and every verdict below it is worthless',
+    );
+  }
+  if (summary.grew === 0) {
+    throw new Error(
+      'no walker read more planted files from the larger tree than from the smaller one, so the ' +
+        'two rounds are not distinguishable and nothing was compared',
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
 // CLI
 // -----------------------------------------------------------------------------
 
@@ -1363,9 +2000,17 @@ export function run(argv = [], out = emit) {
 
   /** @type {ReturnType<typeof census>} */
   let seen;
+  /** @type {Map<string, Verdict> | null} */
+  let measured = null;
   try {
     seen = census();
     legDerivationIsReal(seen);
+    // THE MEASUREMENT IS SKIPPED IN THE CHILD AND NOWHERE ELSE. `run` is itself
+    // a rostered walker, so a child measuring it would spawn a child of its own.
+    if (process.env[MEASURE_ENV] !== '1') {
+      measured = measuredVerdicts(measure(measurementPlan(seen.mods, seen.walkers)));
+      legMeasurementIsReal(measured);
+    }
   } catch (err) {
     out(`ERROR  the derivation did not run: ${String(err)}`);
     return 2;
@@ -1376,11 +2021,23 @@ export function run(argv = [], out = emit) {
   if (listing) {
     out(`WALKERS  ${String(seen.walkers.size)} derived from ${rel(CHECKS_DIR)}`);
     for (const walker of [...seen.walkers.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+      const v = measured?.get(`${walker.module}#${walker.name}`);
+      const run =
+        v === undefined
+          ? 'not measured'
+          : enumerates(v)
+            ? `MEASURED dirs=${String(v.dirs)} read=[${v.read.join(',')}] of ` +
+              `[${v.planted.join(',')}] planted, ${String(v.named)} named read(s) answered` +
+              (v.spawns.length > 0 ? ` spawn=\`${/** @type {string} */ (v.spawns[0])}\`` : '')
+            : v.touched === 0
+              ? 'INCONCLUSIVE, the call read nothing under the planted root'
+              : `READS BUT DOES NOT ENUMERATE, ${String(v.touched)} access(es)`;
       out(
         `         ${rel(walker.module)}#${walker.name}  ` +
           `rootParams=[${walker.rootParams.join(',')}] rootless=${String(walker.rootless)} ` +
           `argvGuard=${walker.argvGuard === null ? 'none' : String(walker.argvGuard)}`,
       );
+      out(`             ${run}`);
     }
     out('');
     out(`POPULATION  ${String(population.length)} case(s) of ${String(seen.cases.length)}`);
@@ -1391,7 +2048,12 @@ export function run(argv = [], out = emit) {
     return 0;
   }
 
-  const findings = [...legBudgetCarried(seen.cases), ...legBudgetEarned(seen.cases)];
+  const findings = [
+    ...legBudgetCarried(seen.cases),
+    ...legBudgetEarned(seen.cases),
+    ...(measured === null ? [] : legRosterIsMeasured(measured)),
+    ...(measured === null ? [] : legRosterIsComplete(measured)),
+  ];
 
   if (findings.length === 0) {
     const suites = new Set(population.map((one) => one.file));
@@ -1403,10 +2065,26 @@ export function run(argv = [], out = emit) {
         `${String(seen.files.length)} suite file(s), by ${String(seen.forms.W1)} root value(s), ` +
         `${String(seen.forms.W2)} defaulted root(s) and ${String(seen.forms.W3)} rootless call(s)`,
     );
+    if (measured !== null) {
+      const m = measuredSummary(measured);
+      out(
+        `       the roster is MEASURED: ${String(m.measured)} of ${String(m.rostered)} walker(s) ` +
+          `enumerate a planted tree when run, ${String(m.inconclusive)} inconclusive; ` +
+          `${String(m.grew)} read more of the larger planted tree than of the smaller; ` +
+          `${String(m.spawning.length)} enumerate by spawning a process` +
+          (m.spawning.length === 0 ? '' : ` (${m.spawning.join(', ')})`) +
+          `; ${String(m.probed)} of the ${String(exportedSurface(seen.mods))} exported ` +
+          'function(s) there are callable with no argument at all, and were run, and none of ' +
+          'them enumerates unrostered',
+      );
+    }
     return 0;
   }
 
-  out(`FAIL   the budget does not follow the input (${String(findings.length)})`);
+  out(
+    `FAIL   the budget does not follow the input, or the roster does not follow the run ` +
+      `(${String(findings.length)})`,
+  );
   for (const finding of findings) out(`       ${finding}`);
   out('');
   out(
@@ -1423,4 +2101,26 @@ export function run(argv = [], out = emit) {
 const invokedDirectly =
   process.argv[1] !== undefined &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
-if (invokedDirectly) process.exit(run(process.argv.slice(2)));
+if (invokedDirectly) {
+  const argv = process.argv.slice(2);
+  // THE CHILD MODE IS NOT A USER-FACING OPTION and the usage text omits it. It
+  // is this same file, re-entered with the measurement patch installed.
+  // NOT `await`. A top-level await here leaves this module still EVALUATING
+  // while the child imports it back, and a dynamic import of a module that is
+  // mid-evaluation never settles: `run` and `census` are exports of this file
+  // and are two of the calls the child makes. The promise chain runs after
+  // evaluation finishes, so the cycle resolves.
+  if (argv[0] === MEASURE_CHILD && argv.length === 2) {
+    void measureChild(/** @type {string} */ (argv[1])).then(
+      (code) => {
+        process.exit(code);
+      },
+      (err) => {
+        process.stderr.write(`${String(err)}\n`);
+        process.exit(2);
+      },
+    );
+  } else {
+    process.exit(run(argv));
+  }
+}
