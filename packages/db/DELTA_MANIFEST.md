@@ -854,6 +854,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **57** | session 542, `0050` ([ADR-164](../../docs/decisions/ADR-164.md) via [P6](../../docs/plans/P6-live-tier.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0050` lands, and the fifth role it creates is a cluster object that no object count in this file can see. The `SELECT`-grant perturbation produces two findings on one table, the second being that neither declared set then describes it |
 | **58** | session 542, `0073` ([ADR-237](../../docs/decisions/ADR-237.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0073` lands. The removal counterfactual is unavailable because `0074` has a foreign key onto `operators(actor)`, so coverage is established at the constraint instead, which is `0052`'s shape one migration set later |
 | **59** | session 542, `0074` ([ADR-252](../../docs/decisions/ADR-252.md)), written by [ADR-351](../../docs/decisions/ADR-351.md) | **allocated.** `0074` lands, **and `RI-37`'s backlog register reaches ZERO with it.** The section separates what that closes, every merged migration having a record, from what it does not, four of the eleven being watched by nothing |
+| **60** | session 650, NO MIGRATION ([ADR-455](../../docs/decisions/ADR-455.md)) | **allocated.** The first section here that records no landing. The six `GENERATED ALWAYS AS` expressions the database computes are EXECUTED against a live PostgreSQL 16.13 and their COMPUTED VALUES compared against what the corpus says they mean, which is the limit [ADR-443](../../docs/decisions/ADR-443.md) section 8 item 1 states about itself. All six agree |
 | **24** | session 135, `0046` ([ADR-079](../../docs/decisions/ADR-079.md)), TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0046` lands, and the constraint it replaces was pointed at the wrong column all along. **Named as owed by the `25` row on 2026-08-23 and again by the `45` and `48` rows on 2026-09-05**, and written here on the amended rule above rather than on session 135's behalf |
 | **26** | [ADR-128](../../docs/decisions/ADR-128.md)'s session 240, `0048` and `0049`, TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0048` and `0049` land. **One number for two migrations, which is the `14` row's shape and not a defect**: a section records a landing and a landing may be two files |
 | **28** | session 293, `0051` ([ADR-169](../../docs/decisions/ADR-169.md)), TRANSCRIBED by [ADR-337](../../docs/decisions/ADR-337.md) | **allocated.** `0051` lands and `OI-06 (payout destinations)` closes. **`27` IS NOT ADDED BESIDE IT, AND THAT IS THE DIFFERENCE BETWEEN NAMING A GAP AND MEASURING ONE.** `27` heads no section in this file at all, so nothing claims it and this table owes it no row. The `31` row states that precisely and the `45` and `48` rows compressed it to *"26 to 30"*, which is why **eight** rows land here rather than nine |
@@ -3583,3 +3584,70 @@ Applying every migration on disk **with `0074` removed** dies at [`0076:162`](mi
 **EVERY MIGRATION IN THIS ESTATE NOW HAS A LANDING RECORD AND THAT IS A STATEMENT ABOUT SECTIONS, NOT ABOUT TRUTH.** `RI-37` reads no content: it cannot tell a section measured against a database from one reconstructed out of an ADR, which is the distinction [ADR-334](../../docs/decisions/ADR-334.md) refused to blur when it opened the register rather than writing twenty sections in one diff.
 
 **AND THE COVERAGE PICTURE THE ELEVEN LEAVE BEHIND IS THE REAL RESIDUE.** Four of them are watched by nothing this repository runs against a database, and two of those four, this file and `0063`, open with `E2 READ: MONEY PATH`. **A closed register and an unwatched money-path constraint are not in tension**, because the register was never about coverage; it was about whether anybody had written down what a merged file did. That is now done for all of them, and the four probes it revealed are owed and named in [ADR-351](../../docs/decisions/ADR-351.md) section 9.
+
+---
+
+## 60. No migration lands, and the six expressions the database computes are executed for the first time (2026-09-08)
+
+**Session 650, [ADR-455](../../docs/decisions/ADR-455.md), [ALLOCATION](../../docs/decisions/ALLOCATION.md) row `455`.** **THIS SECTION RECORDS NO LANDING.** Every other numbered section here is a migration's landing record; this one is a READING of the estate and changes nothing in it. It is written here because [ADR-455](../../docs/decisions/ADR-455.md)'s probe cites it for a counterfactual and because the install transcript belongs beside the other install transcripts. **No migration was written, reserved or spent; the highest remains `0082`.**
+
+**WHY IT EXISTS.** [ADR-443](../../docs/decisions/ADR-443.md) compared every `GENERATED ALWAYS AS` clause in [`schema.ts`](src/schema.ts) against the migrations and all five agreed. Its section 8 item 1 states the limit: *"both sides are STRINGS and neither is evaluated"*. Its item 2: *"it is compared against the migrations as text, not against a database"*. Six columns in this estate are computed by PostgreSQL and no document comparison can say what any of them computes.
+
+### The install, forward-only from empty, and the population derived from it
+
+| Query | Result |
+|---|---|
+| migration files applied under `ON_ERROR_STOP`, in filename order, against an empty PostgreSQL **16.13** | **75 files, exit 0**, numbers `0001`..`0082` with **7 reserved gaps** (`0058`, `0060`, `0061`, `0062`, `0069`, `0071`, `0077`) |
+| `public` object counts on the fully applied set | tables **118**, indexes **414**, CHECK constraints **518** |
+| `pg_attribute.attgenerated <> ''` over `public` | **6 columns, and all six are `s` (STORED)**. Zero VIRTUAL |
+| ... of which `attname LIKE '%\_cents'` | **2**, `live_account_state.intraday_movement_cents` and `reconciliations.delta_cents` |
+| generated columns contributed by `pgboss` | **0**. `0079:329` copies `pgboss.job` with `INCLUDING GENERATED` and that table declares none |
+| the same census against `0001`..`0049` | **5**, `live_account_state` absent. `0050` is the migration that adds the sixth |
+
+**THE POPULATION IS SIX AND IT WAS DERIVED THREE WAYS THAT AGREE.** The migration text spells `GENERATED ALWAYS AS` outside an identity **6** times, [`schema.ts`](src/schema.ts) transcribes **6**, and the installed catalog reports **6**. [ADR-443](../../docs/decisions/ADR-443.md) reported 6 in the DDL and **5** transcribed; the transcription has since caught up and `live_account_state` is now in [`schema.ts`](src/schema.ts), which is [ADR-455](../../docs/decisions/ADR-455.md) section 7.
+
+### What each column computes, executed rather than spelled
+
+**EVERY VALUE BELOW WAS READ BACK OUT OF POSTGRESQL AFTER IT COMPUTED IT.**
+
+| Column | Operands | Computed | Verdict |
+|---|---|---|---|
+| **`live_account_state.intraday_movement_cents`** | `5000000`, `5012345` | `12345` | **AGREES.** `equity - opening`, signed |
+| | `5000000`, `4987655` | `-12345` | a loss reads as a loss |
+| | `5000000`, `5000000` | `0` | |
+| | `5000000`, `-1` | `-5000001` | through zero, which `0050` refuses to constrain away |
+| | `-500`, `-100` | `400` | both operands negative |
+| | `bigint` min against `bigint` max | **`22003` `bigint out of range`** | it raises, it does not wrap |
+| **`reconciliations.delta_cents`** | `5000000`, `5000000` | `0` | **AGREES.** `ours - theirs`, signed |
+| | `5000123`, `5000000` | `123` | we hold more reads positive |
+| | `5000000`, `5000123` | `-123` | we hold less reads negative |
+| | `-250`, `-100` | `-150` | |
+| **`reserve_coverage_snapshots.rcr_bp`** | reserve `0`, CVaR99 `10000000` | `0` bp | **AGREES** |
+| | reserve `214748`, CVaR99 `1` | `2147480000` bp | `0049`'s stated bound HOLDS |
+| | reserve `214749`, CVaR99 `1` | **`22003` `integer out of range`** | one above the bound refuses |
+| **`notification_kinds.mutable`** | `security` / `money` / `account_state` / `marketing` / `pre_identity_auth` | `f` / `f` / `t` / `t` / **`f`** | **AGREES**, including `0029`'s claim that the untouched column "already gives the right answer" for the fifth class |
+| **`notification_kinds.rate_limit_exempt`** | the same five | `t` / `t` / `f` / `f` / **`f`** | **AGREES.** `pre_identity_auth` is non-exempt, which is `0029` item 5's SMS-pumping argument |
+| **`report_schedules.cadence`** | the four digests | `daily` / `weekly` / `weekly` / `monthly` | **AGREES** |
+| | a fifth digest | **`23502`, `COLUMN_NAME = cadence`** | exactly what `0040` records having executed |
+
+**RECOMPUTATION ON UPDATE WAS ASSERTED SEPARATELY AND HOLDS ON ALL THREE TABLES TESTED.** A tick moved to `4900000` against an opening of `5000000` restores the movement to `-100000`; a reconciliation moved to `250` against `100` restores the delta to `150`; a kind reclassified from `marketing` to `money` moves `mutable` to `f` and `rate_limit_exempt` to `t`. **A generated column correct only at `INSERT` would pass every insert assertion in this repository and still show a trader the movement from the first tick of the day, all day.**
+
+**AND THE GENERATED DELTA AGREES WITH THE CHECK THAT RESTATES IT.** `0014` says the same fact twice, once as `delta_cents` and once as `reconciliations_status_matches_delta`, a CHECK written over the two balances rather than over the column. Over four rows, no `match` carries a non-zero delta and no `mismatch` carries a zero one. **Neither document comparison can see that claim at all**, because it is a relation between two objects rather than a property of one.
+
+### The counterfactual, and the assertions were watched RED fourteen times
+
+Applying `0001`..`0049` and running the probe: it **dies in SUCCESS 1**, at the census, reading five columns with `live_account_state.intraday_movement_cents` absent. **Exit 3.**
+
+**FOURTEEN SEEDED PERTURBATIONS, ONE PER ASSERTION, EACH WATCHED FIRING**: a column deleted from the pinned population, a sign flip on each of the two money columns, the overflow bound moved by one, `pre_identity_auth` claimed exempt, a weekly digest wired to monthly, the wrong column named in `REJECTION 5`, the two recomputation assertions, the delta-versus-CHECK predicate inverted, and the four rejection SQLSTATEs. **The file was restored to the committed bytes after each.** Detail in [ADR-455](../../docs/decisions/ADR-455.md) section 6.
+
+### The delta
+
+**NONE.** No table, column, constraint, index, trigger or grant changed. The estate this section reads is byte-identical before and after it.
+
+### The part a reader should carry forward
+
+**EVERY ONE OF THE SIX COMPUTES WHAT THE CORPUS SAYS IT MEANS, AND THAT IS THE RESULT RATHER THAN AN ABSENCE OF ONE.** [ADR-455](../../docs/decisions/ADR-455.md) went looking for a generated money column that computed something other than what the corpus believes, which is the worst defect this estate could carry, and there is not one. **What changed is the KIND of claim on record**: before this, the strongest statement available about `delta_cents` was that two documents spell it the same way.
+
+**THE ONE CORRECTION IS TO [ADR-443](../../docs/decisions/ADR-443.md) SECTION 11 ITEM 2**, which reads *"A GENERATED EXPRESSION IS COMPARED AS TEXT AND NOBODY HAS EXECUTED ONE"*. [`probe_reserve_coverage.sql`](../../scripts/db/probe_reserve_coverage.sql) had been executing `rcr_bp` since `0049` landed, at four coverage figures including the breaker boundary. **One of the six was already executed and the entry did not know it.** What was genuinely unexecuted was five of the six, and the OVERFLOW BOUND that entry's own section 8 item 2 names as unchecked.
+
+**AND THE NUMBERING OF THIS DOCUMENT HAS A HOLE AT 27**, which runs `26` then `28`. It is recorded rather than repaired: renumbering would move every section pointer in the corpus, and [`probe_reserve_coverage.sql:39`](../../scripts/db/probe_reserve_coverage.sql) and [`probe_audited_writes.sql:61`](../../scripts/db/probe_audited_writes.sql) both cite `26` by number.
