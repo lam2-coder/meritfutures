@@ -192,7 +192,7 @@ function addressFor(key: TableKey, pinned: readonly string[]): Record<string, un
 const scopedAddress = (key: TableKey): Record<string, unknown> | undefined =>
   addressFor(key, pinnedFor(key));
 
-/** A one-column SET that is legal on this table: never a tenancy column, never empty. */
+/** A one-column SET that is legal here: never tenancy, never database-written, never empty. */
 function setFor(key: TableKey): Record<string, unknown> {
   const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
   const pinned = pinnedFor(key);
@@ -206,9 +206,9 @@ function setFor(key: TableKey): Record<string, unknown> {
     // into whichever identity owns the account it is repointed at.
     ...(rule.class === 'either' ? [rule.column, rule.localColumn] : []),
   ]);
-  for (const [property, column] of Object.entries(columns)) {
-    if (!forbidden.has(column.name)) return { [property]: sampleValue(column) };
-  }
+  const writable = Object.entries(columns).filter(([, c]) => !databaseWrites(c));
+  const chosen = writable.find(([, column]) => !forbidden.has(column.name));
+  if (chosen) return { [chosen[0]]: sampleValue(chosen[1]) };
   throw new Error(`${key} has no column a SET could name`);
 }
 
@@ -727,3 +727,49 @@ describe('an addressed read returns one row or none', () => {
     ).rejects.toThrow(/returned 2 rows/);
   });
 });
+
+// =============================================================================
+// THE COLUMNS A CALLER MAY NOT WRITE BECAUSE THE DATABASE WRITES THEM
+// =============================================================================
+// APPENDED HERE RATHER THAN DECLARED BESIDE `setFor`, AND THE PLACEMENT IS A
+// CONSTRAINT RATHER THAN A TASTE. ADR-386, at `repo-invariants.mjs:3008`, rules
+// that the binding property is that NO CITED LINE MOVES. This file carries three
+// cited lines, at 196, 442 and 663, and one of the documents citing the
+// sibling suite is `packages/tooling/checks/generated-column-writes.mjs`, a LIVE
+// file outside session 646's fence, so a pointer this row cannot repair sits
+// downstream of every insertion. ADR-426's remedy, quoted in ADR-448 section 3,
+// is the one taken: appending below the last cited line moves nothing. The three
+// lines inside `setFor` were REPLACED, not inserted between, for the same reason.
+//
+// WHAT THIS CORRECTS, KEPT BESIDE THE CORRECTION (RI-14). `setFor` skipped the
+// TENANCY columns and returned the first column left. On every table carrying an
+// identity `id` that first column left IS `id`, so the SET it built named a
+// column declared `GENERATED ALWAYS AS IDENTITY`. PostgreSQL answers `428C9` to
+// such an UPDATE. Four cases across this file and `write-accessor.test.ts` were
+// therefore green while asserting a statement no database would have run, which
+// ADR-448 section 8 item 1 records as owed WHETHER OR NOT the identity widening
+// in its item 2 is ever taken: the cases are wrong on their own terms.
+//
+// `isGenerated` DOES NOT EXIST AND IS NOT READ HERE. ADR-445 section 8 item 1
+// priced a guard against it; ADR-448 section 4 found it undefined on every
+// column; session 646 re-derived that on the pinned `drizzle-orm` and agrees --
+// `'isGenerated' in column` is false on all 1367 columns of the registry. The two
+// properties Drizzle does declare are the two read below.
+
+/**
+ * Does the DATABASE write this column rather than the caller?
+ *
+ * BOTH PROPERTIES, because they are two different refusals and only one of them
+ * is about identity. `generated` is `GENERATED ALWAYS AS (...) STORED`, which
+ * PostgreSQL answers `42601` to; `generatedIdentity` is `GENERATED ALWAYS AS
+ * IDENTITY`, which it answers `428C9` to. Derived on this registry rather than
+ * inherited: 5 stored-generated columns over 4 tables and 20 identity columns,
+ * every one of them named `id` and every one of them `always`.
+ *
+ * IT READS THE COLUMN AND NOT A LIST OF NAMES, so a table that grows an identity
+ * column is covered on the day it is declared rather than on the day somebody
+ * remembers this file.
+ */
+function databaseWrites(column: PgColumn): boolean {
+  return column.generated !== undefined || column.generatedIdentity !== undefined;
+}

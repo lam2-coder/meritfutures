@@ -176,14 +176,14 @@ const dialect = new PgDialect();
 const renderedPredicate = (key: TableKey): { sql: string; params: unknown[] } =>
   dialect.sqlToQuery(scopePredicate(key, IDENTITY)) as { sql: string; params: unknown[] };
 
-/** One non-tenancy column of a table, for a SET or a VALUES that has to say something. */
+/** One column a CALLER may write: never tenancy, never database-written, for a SET or VALUES. */
 function someOtherColumn(key: TableKey): string {
   const tenancy = tenancyColumn(key);
   const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
   for (const [property, column] of Object.entries(columns)) {
-    if (column.name !== tenancy) return property;
+    if (column.name !== tenancy && !databaseWrites(column)) return property;
   }
-  throw new Error(`${key} has no column that is not its tenancy column`);
+  throw new Error(`${key} has no column a caller may write`);
 }
 
 /**
@@ -963,3 +963,48 @@ describe('the pool the transaction needs is reachable and is a pool', () => {
     await closeClient();
   });
 });
+
+// =============================================================================
+// THE COLUMNS A CALLER MAY NOT WRITE BECAUSE THE DATABASE WRITES THEM
+// =============================================================================
+// APPENDED BELOW THE LAST CITED LINE, WHICH IS LINE 887, AND THE PLACEMENT IS A
+// CONSTRAINT. ADR-386, at `repo-invariants.mjs:3008`, rules that the binding
+// property is that NO CITED LINE MOVES, not line-count neutrality. Six lines of
+// this file are cited, at 10, 111, 180, 311, 479 and 887, and
+// `packages/tooling/checks/generated-column-writes.mjs:505` is one of the citing
+// documents. That file is LIVE and it is outside session 646's fence, so an
+// insertion above line 111 would leave a pointer this row is forbidden to repair.
+// The one line changed inside `someOtherColumn` was REPLACED rather than added.
+//
+// THE HELPER IS DUPLICATED IN `keyed-accessor.test.ts` RATHER THAN SHARED, and
+// that is a fence and not a preference: a shared module would be a new file, and
+// session 646 owns these two test files and no third. It is eight tokens of
+// predicate over a property Drizzle declares, and the count it implies is
+// asserted nowhere here, so the two copies cannot silently disagree about a
+// number. If a later row is given both files plus a home for a helper, lifting it
+// is one move.
+//
+// WHAT THIS CORRECTS, KEPT BESIDE THE CORRECTION (RI-14). `someOtherColumn`
+// skipped the tenancy column and returned the first column left, which on every
+// table carrying an identity `id` is `id` itself. Three cases in this file, at
+// lines 311, 479 and 887, therefore drove an UPDATE naming a column declared
+// `GENERATED ALWAYS AS IDENTITY`, which PostgreSQL answers `428C9` to. They were
+// green because no database is involved. ADR-448 section 8 item 1 records this as
+// owed on its own terms, whether or not that entry's item 2 widening is taken.
+
+/**
+ * Does the DATABASE write this column rather than the caller?
+ *
+ * BOTH PROPERTIES, because they are two different refusals. `generated` is
+ * `GENERATED ALWAYS AS (...) STORED` and PostgreSQL answers `42601`;
+ * `generatedIdentity` is `GENERATED ALWAYS AS IDENTITY` and it answers `428C9`.
+ *
+ * `isGenerated` IS NOT READ BECAUSE IT DOES NOT EXIST. ADR-445 section 8 item 1
+ * priced a guard against that name, ADR-448 section 4 found it undefined on every
+ * column, and session 646 re-derived it on the pinned `drizzle-orm` rather than
+ * inheriting the finding: `'isGenerated' in column` is false on all 1367 columns
+ * the registry exposes. The two properties read here are the two that exist.
+ */
+function databaseWrites(column: PgColumn): boolean {
+  return column.generated !== undefined || column.generatedIdentity !== undefined;
+}
