@@ -91,6 +91,12 @@ import { stripComments } from './strip-comments.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * @typedef {{ name: string; line: number; body: string }} Declared
+ * @typedef {{ name: string; line: number; guards: string[]; throws: number }} Builder
+ * @typedef {{ functions: Declared[]; guards: string[]; builders: Builder[] }} Derived
+ */
+
 /** The one file this check reads. */
 export const SCOPED_DB = resolve(HERE, '../../db/src/scoped-db.ts');
 
@@ -121,6 +127,8 @@ const GUARD_ROSTER = [
  * named guard, which legs A and D see, or as a bare `throw new Error(...)` in a
  * builder's body, which they do not. The count is what sees the second shape.
  * Editing an existing message does not move it; adding a refusal does.
+ *
+ * @type {Record<string, { guards: string[]; throws: number }>}
  */
 const BUILDERS = {
   scopedInsertStatement: {
@@ -163,6 +171,8 @@ const BUILDERS = {
  * `refuseTenancyColumn` is not reused there. This table is where those comments
  * stop being prose a reader has to find and start being a declaration a check
  * counts.
+ *
+ * @type {Record<string, string>}
  */
 const DECLARED_ABSENCE = {
   // ---- refuseTenancyColumn -------------------------------------------------
@@ -207,8 +217,14 @@ const DECLARED_ABSENCE = {
     'SETTLED: DELETE builds no values object. See the tenancy cell above.',
 };
 
-/** A function declaration in `scoped-db.ts`, with its body. */
+/**
+ * A function declaration in `scoped-db.ts`, with its body.
+ *
+ * @param {string} source
+ * @returns {Declared[]}
+ */
 function declarations(source) {
+  /** @type {Declared[]} */
   const found = [];
   for (const match of source.matchAll(/^(?:export )?(?:async )?function (\w+)/gm)) {
     const open = source.indexOf('{', match.index + match[0].length);
@@ -225,9 +241,10 @@ function declarations(source) {
         }
       }
     }
-    if (close === -1) continue;
+    const name = match[1];
+    if (close === -1 || name === undefined) continue;
     found.push({
-      name: match[1],
+      name,
       line: source.slice(0, match.index).split('\n').length,
       body: source.slice(open, close + 1),
     });
@@ -241,6 +258,9 @@ function declarations(source) {
  * TAKES A PATH SO THE SUITE CAN WATCH THIS RED. The default is the real file;
  * the suite hands it a mutated COPY, which is the only way to seed a missing
  * guard without editing the tree the check ships with.
+ *
+ * @param {string} [sourcePath]
+ * @returns {Derived}
  */
 export function derive(sourcePath = SCOPED_DB) {
   const source = stripComments(readFileSync(sourcePath, 'utf8'), { literals: 'blank' });
@@ -269,8 +289,13 @@ export function derive(sourcePath = SCOPED_DB) {
   return { functions, guards, builders };
 }
 
-/** Leg A. Every `refuse*` declared is a guard somebody placed on purpose. */
+/**
+ * Leg A. Every `refuse*` declared is a guard somebody placed on purpose.
+ *
+ * @param {Derived} derived
+ */
 export function legGuardRoster(derived) {
+  /** @type {string[]} */
   const findings = [];
   for (const name of derived.guards) {
     if (!GUARD_ROSTER.includes(name)) {
@@ -292,8 +317,13 @@ export function legGuardRoster(derived) {
   return { findings, count: derived.guards.length };
 }
 
-/** Leg B. Every function that builds a write is a builder somebody guarded. */
+/**
+ * Leg B. Every function that builds a write is a builder somebody guarded.
+ *
+ * @param {Derived} derived
+ */
 export function legBuilderRoster(derived) {
+  /** @type {string[]} */
   const findings = [];
   for (const builder of derived.builders) {
     if (!Object.hasOwn(BUILDERS, builder.name)) {
@@ -315,8 +345,13 @@ export function legBuilderRoster(derived) {
   return { findings, count: derived.builders.length };
 }
 
-/** Leg C. The matrix is what it was pinned as, guards and inline refusals both. */
+/**
+ * Leg C. The matrix is what it was pinned as, guards and inline refusals both.
+ *
+ * @param {Derived} derived
+ */
 export function legMatrix(derived) {
+  /** @type {string[]} */
   const findings = [];
   let cells = 0;
   for (const builder of derived.builders) {
@@ -350,8 +385,11 @@ export function legMatrix(derived) {
  * every builder. A guard no builder calls is not a write guard at all
  * (`refuseNullBound` constructs a term, `refusePinnedColumn` reads an address)
  * and this leg says nothing about it.
+ *
+ * @param {Derived} derived
  */
 export function legAbsences(derived) {
+  /** @type {string[]} */
   const findings = [];
   const writeGuards = [...new Set(derived.builders.flatMap((b) => b.guards))].sort();
   let declared = 0;
@@ -386,7 +424,8 @@ export function legAbsences(derived) {
   for (const key of Object.keys(DECLARED_ABSENCE)) {
     const [builderName, guard] = key.split('::');
     const builder = derived.builders.find((b) => b.name === builderName);
-    if (builder === undefined) continue; // leg B owns a builder that has gone.
+    // leg B owns a builder that has gone.
+    if (builder === undefined || guard === undefined) continue;
     if (builder.guards.includes(guard)) {
       findings.push(
         `leg D: "${key}" declares why that guard is absent, and the builder now CALLS it. The ` +
@@ -398,17 +437,23 @@ export function legAbsences(derived) {
   return { findings, declared, open, writeGuards };
 }
 
+/** @param {string} line */
 const emit = (line) => {
   process.stdout.write(`${line}\n`);
 };
 
-/** Run every leg. Exit 0 only when all four hold. */
+/**
+ * Run every leg. Exit 0 only when all four hold.
+ *
+ * @param {string[]} [argv]
+ */
 export function run(argv = []) {
   if (argv.length > 0) {
     emit('It takes no argument. Every input it has is derived from the tree on the run.');
     return 2;
   }
 
+  /** @type {Derived} */
   let derived;
   try {
     derived = derive();
