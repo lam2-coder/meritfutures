@@ -1218,7 +1218,7 @@ function updateStatementOn(
   refuseTermInValues(key, values);
   return source
     .update(TABLES[key] as PgTable)
-    .set(values)
+    .set(refuseGeneratedColumn(key, values))
     .where(where)
     .returning();
 }
@@ -4579,3 +4579,122 @@ export async function transaction<T>(
  * item 5 draws it, and `apps/worker/src/digests/rows.ts` spent it.
  */
 export type DeclaredRow<K extends TableKey> = (typeof TABLES)[K]['$inferSelect'];
+
+// =============================================================================
+// THE STORED GENERATED COLUMNS, REFUSED ON THE STATEMENT THAT NAMES ONE
+// =============================================================================
+// ADR-448. `ADR-445` section 6 measured the hole and section 8 item 1 priced
+// the repair: `updateStatementOn` called `refuseTenancyColumn` and
+// `refuseTermInValues` and then reached `.set(values)` with the caller's keys
+// unfiltered, so a caller naming `reconciliations.delta_cents` got a `42601`
+// from PostgreSQL and no earlier word from this accessor. Drizzle's `.set()`
+// maps over THE CALLER'S KEYS where `.values()` maps over the TABLE'S COLUMNS,
+// which is why the INSERT half held structurally and this half did not.
+//
+// -----------------------------------------------------------------------------
+// TWO FEATURES ARE SPELLED `GENERATED ALWAYS AS` AND ONLY THE FIRST IS REFUSED
+// -----------------------------------------------------------------------------
+//   1. `GENERATED ALWAYS AS (<expr>) STORED` is a GENERATED COLUMN. Naming it
+//      in an UPDATE `SET` is `42601`. Derived on this tree: 5 such columns on
+//      the registry, on 4 tables. THIS IS WHAT THE GUARD BELOW REFUSES.
+//   2. `GENERATED ALWAYS AS IDENTITY` is an IDENTITY COLUMN, a sequence default
+//      with a lock on it. Naming it is `428C9` unless the statement carries
+//      `OVERRIDING SYSTEM VALUE`, which nothing this accessor builds does.
+//      Derived on this tree: 20 such columns, every one of them `id`, every one
+//      of them `always`.
+//
+// **THE SECOND IS A REAL HOLE, IT IS NOT CLOSED HERE, AND THE REASON IS A
+// MEASUREMENT RATHER THAN A PREFERENCE.** `ADR-445` section 8 item 2 prices it
+// at "the same guard, widened, plus one leg". That price is INCOMPLETE, which
+// `ADR-448` section 8 records: a guard refusing identity columns turns FOUR
+// cases in `packages/db/test/write-accessor.test.ts` red, because
+// `someOtherColumn` there returns THE FIRST COLUMN THAT IS NOT THE TENANCY
+// COLUMN and on `ledger_entries` and `liability_snapshots` that column is `id`.
+// Those cases assert the accessor ACCEPTS an UPDATE PostgreSQL would refuse
+// with `428C9`, which is a finding in its own right and is worth more than the
+// widening. That file is in neither this row's fence nor the files row 449 was
+// told it holds, so the widening is NAMED AND PRICED rather than taken behind a
+// test edit this row cannot see the owner of.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS SITS AT THE BOTTOM OF THE FILE AND NOT BESIDE `refuseTenancyColumn`
+// -----------------------------------------------------------------------------
+// `ADR-445` section 8 item 1 prices it "beside `refuseTenancyColumn` at `:473`"
+// and THAT PLACEMENT IS NOT SATISFIABLE FROM THIS ROW'S FENCE. Derived on this
+// base: `scoped-db.ts` carries 168 distinct cited line numbers and 135 of them
+// sit below `:473`. `ADR-386` rules the binding property is that NO CITED LINE
+// MOVES, and where one must, every pointer in a LIVE file is repaired. Those
+// pointers include `apps/api/test/wiring.test.ts`, `apps/api/src/routes/
+// payouts.ts` and `apps/worker/test/recon-sweep.test.ts`, none of which this
+// row owns, so a guard at `:473` lands with pointers it is forbidden to repair.
+//
+// The file's own tail already records the remedy in the words "Appending below
+// the last cited line moves nothing". The highest cited line is `:4581` and
+// this block opens after it, so the definition moves nothing at all. The CALL
+// is the one edit inside the builder and it REPLACES the text of `:1221`
+// rather than inserting a line above it, which is why the guard returns the
+// values it cleared instead of returning `void` like the two guards beside it.
+// THAT SHAPE IS FORCED BY THE CITATION CONSTRAINT AND IS NOT A PREFERENCE.
+
+/**
+ * Refuse a values object that names a STORED GENERATED column.
+ *
+ * READ OFF THE DRIZZLE DECLARATION RATHER THAN THE DDL, because the DDL is not
+ * loaded at runtime and `schema.ts` is what the statement is built from. If the
+ * two ever disagree, `generated-column-writes.mjs` is the leg that says so: it
+ * folds the migrations and compares them against the statements this file
+ * builds, which is a comparison neither side can make about itself.
+ *
+ * **`isGenerated` DOES NOT EXIST ON A DRIZZLE COLUMN AND `ADR-445` SECTION 8
+ * ITEM 1 NAMES IT.** Drizzle's `Column` base declares exactly two properties of
+ * this kind, `generated` and `generatedIdentity`, and no third, on the
+ * `drizzle-orm` version `pnpm-workspace.yaml:120` pins and
+ * `packages/db/package.json:14` takes from the catalogue. A guard written to
+ * that entry's literal wording would have read `undefined` on every column in
+ * the estate, refused nothing, and passed a suite that never saw it fire.
+ * Recorded rather than quietly corrected, per `RI-14`.
+ *
+ * THE DEPENDENCY IS NOT A FILE IN THIS TREE, SO NO POINTER INTO IT IS WRITTEN
+ * HERE. What holds that paragraph up is leg D of
+ * `packages/tooling/checks/generated-column-writes.mjs`, which drives the real
+ * builder over the real registry and requires a refusal that NAMES the column.
+ * The day a Drizzle upgrade renames the property, leg D goes red rather than
+ * this comment going quietly false.
+ *
+ * BOTH SPELLINGS ARE REFUSED, for the reason `refuseTenancyColumn` gives about
+ * its own pair: the values object is keyed by Drizzle PROPERTY names and the
+ * DDL names the SQL column, so a caller can reach `delta_cents` as `deltaCents`
+ * or as `delta_cents` and only one of those looks like the migration's word.
+ *
+ * THE MESSAGE NAMES THE COLUMN, THE RULE AND THE SQLSTATE, on the same
+ * reasoning as `refuseTenancyColumn`'s: a reader who reaches this throw needs
+ * to know WHERE THE RULE LIVES, which is the DDL and not this file. A refusal
+ * that only said "refused" would send them here to look for a policy that is
+ * not here.
+ *
+ * **IT GUARDS `values` AND NEVER AN ADDRESS.** `apps/worker/src/recon/sweep.ts`
+ * addresses `reconciliations` by its identity `id` and must keep working; an
+ * address is a predicate over a column and READS it, while `SET id = ...`
+ * WRITES it. The two reach this file through different parameters and only one
+ * of them is checked.
+ *
+ * @returns the values it cleared, so the call can stand in the `.set(...)`
+ * position without inserting a line above a cited one. See the block header.
+ */
+function refuseGeneratedColumn(key: TableKey, values: WriteValues): WriteValues {
+  const columns = getTableColumns(TABLES[key] as PgTable) as Record<string, PgColumn>;
+  for (const named of Object.keys(values)) {
+    for (const [property, column] of Object.entries(columns)) {
+      if (named !== property && named !== column.name) continue;
+      if (column.generated === undefined) continue;
+      throw new Error(
+        `"${named}" is ${key}.${column.name}, which schema.ts declares ` +
+          '`GENERATED ALWAYS AS (...) STORED`, and a write never takes it from the caller. ' +
+          'PostgreSQL refuses a statement that names it with 42601. The database computes the ' +
+          'value from the row, so a caller supplying one would be stating a second opinion the ' +
+          'row cannot hold.',
+      );
+    }
+  }
+  return values;
+}

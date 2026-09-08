@@ -39,7 +39,7 @@ export default [
     // unscoped query with a shorter lifetime, and CI-04's integration suite
     // reaches its database through the accessor like everything else.
     files: ['apps/**/*.ts', 'packages/**/*.ts'],
-    ignores: ['packages/db/**'],
+    ignores: ['packages/db/**', 'packages/tooling/checks/generated-column-writes.mjs'],
     plugins: { merit },
     rules: {
       'merit/no-raw-db-client': 'error',

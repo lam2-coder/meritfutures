@@ -6,7 +6,7 @@
 //
 //   node packages/tooling/checks/generated-column-writes.mjs
 //
-// Exit code is 0 only when all three legs below pass. There is no partial mode
+// Exit code is 0 only when all four legs below pass. There is no partial mode
 // and no leg that can be skipped: half of this check silently passing is how
 // the property it names becomes false while it is green.
 //
@@ -22,18 +22,24 @@
 //      a sequence default with a lock on it, refused with `428C9` unless the
 //      statement carries `OVERRIDING SYSTEM VALUE`.
 //
-// THIS FILE'S SUBJECT IS THE FIRST AND ONLY THE FIRST, which is the one
-// PostgreSQL's own documentation calls a generated column and the one `ADR-443`
-// section 11 item 3 names. The second is DERIVED ANYWAY, on every run, and for
-// one reason: the fold below has to tell the two apart to count either, and a
-// classifier that discards what it classified cannot be audited. The identity
-// count is reported and NOT asserted on, because Drizzle emits an identity
-// column into an INSERT column list when a caller names it and this file would
-// therefore be red on landing over a defect that is not its subject. It is
-// recorded in `ADR-445` instead, with its price.
+// LEGS A TO C TAKE THE FIRST AND ONLY THE FIRST, which is the one PostgreSQL's
+// own documentation calls a generated column and the one `ADR-443` section 11
+// item 3 names. The second is DERIVED ANYWAY, on every run, and for one reason:
+// the fold below has to tell the two apart to count either, and a classifier
+// that discards what it classified cannot be audited.
+//
+// THE IDENTITY COUNT IS REPORTED AND NOT ASSERTED ON, and `ADR-448` narrowed
+// the REASON without changing the disposition. What stood here said the reason
+// was that Drizzle emits an identity column into an INSERT column list when a
+// caller names it. That is still true and is no longer the whole of it: the
+// UPDATE builder would refuse one today if the guard were widened, and the
+// measured obstacle is four cases in `packages/db/test/write-accessor.test.ts`
+// that drive an UPDATE naming `id` and would go red. `ADR-448` section 8 carries
+// that finding and its price. `RI-14` is why the earlier reason is narrowed here
+// rather than deleted.
 //
 // -----------------------------------------------------------------------------
-// THE THREE LEGS, AND WHAT EACH ONE'S POPULATION ACTUALLY IS
+// THE FOUR LEGS, AND WHAT EACH ONE'S POPULATION ACTUALLY IS
 // -----------------------------------------------------------------------------
 // A. THE SET. Folded out of the DDL under `packages/db/migrations/` on every
 //    run, never listed here. `ADR-445` section 4 is why that is a hard
@@ -75,29 +81,42 @@
 //    that the column "is named nowhere" was held by prose and by nothing else
 //    until this leg.
 //
-// -----------------------------------------------------------------------------
-// THE HALF THIS FILE DOES NOT ASSERT, NAMED HERE RATHER THAN LEFT TO BE FOUND
-// -----------------------------------------------------------------------------
-// **THE UPDATE PATH DOES NOT HOLD THE PROPERTY AND THIS FILE DOES NOT PRETEND
-// IT DOES.** `updateStatementOn` at `packages/db/src/scoped-db.ts:1211` passes
-// the caller's values straight to Drizzle's `.set()`, which maps over THE
-// CALLER'S KEYS rather than over the table's columns, so an UPDATE built for a
-// caller that names a generated column names it too. It is demonstrated, on a
-// real built statement, in `packages/tooling/test/generated-column-writes.test.ts`,
-// and it is `ADR-445` section 8's owed item with the repair priced.
+// D. THE REFUSAL. `unscopedUpdateStatement` is called for every STORED GENERATED
+//    column on the registry, through the same driverless handle, and the
+//    accessor must REFUSE each one by name. This is the only leg whose subject
+//    is a guard rather than a statement, because the UPDATE half is the only
+//    property here held by a guard rather than structurally. It also COUNTS the
+//    `always` identity columns it walks past, so the number this file reports is
+//    derived on the run rather than carried in prose.
 //
-// A leg asserting it would be RED ON LANDING, and the two ways to make it green
-// are both refused. Narrowing the population until the red disappears is a
-// check whose name claims more than its body tests, which is what `ADR-429`
-// section 10 rules against and what this whole file is written to avoid.
-// Repairing `updateStatementOn` is the right fix and `packages/db/src/` is
-// outside this row's fence.
+// -----------------------------------------------------------------------------
+// THE HALF THIS FILE DID NOT ASSERT, AND WHAT CLOSING IT CHANGED
+// -----------------------------------------------------------------------------
+// **WHAT STOOD HERE WAS TRUE WHEN WRITTEN AND IS FALSE NOW.** It read: *THE
+// UPDATE PATH DOES NOT HOLD THE PROPERTY AND THIS FILE DOES NOT PRETEND IT
+// DOES.* `updateStatementOn` passed the caller's values straight to Drizzle's
+// `.set()`, which maps over THE CALLER'S KEYS rather than over the table's
+// columns, so an UPDATE built for a caller that named a generated column named
+// it too. `ADR-445` section 8 item 1 priced the repair; `ADR-448` took it.
 //
-// SO THE HOLE IS CARRIED BY A TEST THAT FAILS WHEN IT IS CLOSED, rather than by
-// a sentence. That is deliberate. A demonstration that goes red on the repair
-// makes whoever lands the repair read `ADR-445` and delete the demonstration in
-// the same commit, which is `RI-14`: what was corrected is kept beside its
-// correction until somebody corrects it.
+// The paragraph is kept above rather than deleted because `RI-14` keeps what was
+// corrected beside its correction. The sentence it recorded is now held by
+// `refuseDatabaseWrittenColumn` in `packages/db/src/scoped-db.ts`, and leg D is
+// the leg that watches it, so the demonstration this file used to point at is
+// gone from the suite beside it in the same commit that made it false.
+//
+// **THE IDENTITY HALF IS STILL OPEN, ON BOTH STATEMENT KINDS, AND ITS PRICE IS
+// HIGHER THAN THE ENTRY THAT NAMED IT SAID.** `ADR-445` section 8 item 2 priced
+// it at "the same guard, widened, plus one leg". `ADR-448` measured the rest of
+// that price and it is a change to `packages/db/test/write-accessor.test.ts`,
+// whose `someOtherColumn` helper returns THE FIRST COLUMN THAT IS NOT THE
+// TENANCY COLUMN and therefore hands `id` to four cases that assert the accessor
+// ACCEPTS the write. Those cases assert an UPDATE PostgreSQL answers `428C9` to.
+// On the INSERT side the widening costs more still: leg B's probe names every
+// non-tenancy column, so a guard on the insert builders would refuse the probe
+// and leg B's own generated-column assertion would go vacuous to accommodate it.
+// Both are trades rather than transcriptions and `ADR-448` section 8 records
+// them with their prices instead of taking them inside a money-path diff.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -590,82 +609,117 @@ export async function builtStatements(generated, root = REPO_ROOT) {
 }
 
 /**
- * THE HOLE, DERIVED RATHER THAN DESCRIBED: the stored generated columns the
- * accessor's UPDATE builder puts in a `SET` when a caller names them.
+ * LEG D: EVERY STORED GENERATED COLUMN ON THE REGISTRY IS REFUSED BY THE
+ * ACCESSOR'S UPDATE BUILDER, WATCHED FIRING RATHER THAN ARGUED.
  *
- * NO LEG CALLS THIS AND THAT IS STATED RATHER THAN LEFT TO BE NOTICED. It exists
- * so that `packages/tooling/test/generated-column-writes.test.ts` can hold the
- * hole open on a REAL built statement instead of on a sentence, and so that the
- * commit repairing `updateStatementOn` at `packages/db/src/scoped-db.ts:1211`
- * turns that test red and has to read `ADR-445` section 8 to make it green.
+ * This replaces the helper `ADR-445` shipped to hold its own finding open. That
+ * helper derived the columns the UPDATE builder WOULD put in a `SET`, and the
+ * last `describe` block of the suite beside this file asserted the list was
+ * non-empty: a demonstration of a hole, green only while the hole was open.
+ * `ADR-448` closed the hole with `refuseGeneratedColumn` in
+ * `packages/db/src/scoped-db.ts`, so the demonstration is deleted in the same
+ * commit and this leg stands where it stood. **THE SUBJECT IS INVERTED AND THE
+ * MACHINERY IS NOT**: the same registry, the same driverless handle, the same
+ * real builder, asserting the refusal instead of the reach.
  *
- * `Drizzle`'s `.set()` maps over THE CALLER'S KEYS, where `.values()` maps over
- * the TABLE'S COLUMNS. That one difference is the whole finding: an INSERT
- * cannot name a generated column whatever it is handed, and an UPDATE names
- * whatever it is handed.
+ * **THE IDENTITY COLUMNS ARE REACHED, COUNTED AND NOT ASSERTED ON, AND THAT IS
+ * A NARROWER STATEMENT THAN IT WAS.** `ADR-445` section 8 item 2 left them out
+ * because the accessor let a caller name one. It still does, and `ADR-448`
+ * section 8 records why the widening did not land: four cases in
+ * `packages/db/test/write-accessor.test.ts` drive an UPDATE naming `id` on
+ * `ledger_entries` and `liability_snapshots`, so a guard refusing identity
+ * columns turns them red, and that file is outside this row's fence. The count
+ * is reported so the day it changes is visible; the refusal is not claimed.
  *
- * @param {Map<string, Set<string>>} generated
+ * THE PREDICATE IS SYNTHETIC AND THAT IS DELIBERATE. `updateStatementOn` runs
+ * its guards on `values` before it consumes `where`, so the predicate is not
+ * this leg's subject; building a real one from `uniqueKeys` would reach only the
+ * addressable tables and would fail on a `bigint` identity column for a reason
+ * that has nothing to do with the refusal being watched.
+ *
+ * A THROW IS NOT COUNTED AS A REFUSAL UNLESS IT NAMES THE COLUMN. A leg that
+ * counted any exception would go green the day the builder started throwing for
+ * an unrelated reason, which is the failure mode this whole file exists to
+ * refuse.
+ *
  * @param {string} [root]
- * @returns {Promise<{ key: string, table: string, column: string }[]>}
+ * @returns {Promise<{ findings: string[], refused: number, tables: number,
+ *   identityReached: number, sample: string | undefined }>}
  */
-export async function updateTargets(generated, root = REPO_ROOT) {
+export async function refusedWrites(root = REPO_ROOT) {
   const require_ = createRequire(join(root, 'packages/db/package.json'));
   const { drizzle } = await import(require_.resolve('drizzle-orm/pg-proxy'));
   const { getTableColumns, getTableName, sql } = await import(require_.resolve('drizzle-orm'));
   const accessor = await import(join(root, ACCESSOR));
   const registry = await import(join(root, REGISTRY));
 
-  /** @type {string[]} */
-  const sent = [];
-  const source = drizzle(
-    /** @param {string} text */ async (text) => {
-      sent.push(text);
-      return { rows: [] };
-    },
-  );
+  const source = drizzle(async () => ({ rows: [] }));
 
-  /** @type {{ key: string, table: string, column: string }[]} */
-  const found = [];
+  /** @type {string[]} */
+  const findings = [];
+  let refused = 0;
+  let identityReached = 0;
+  /** @type {string | undefined} */
+  let sample;
+  const tables = new Set();
+
   for (const key of registry.TABLE_KEYS) {
     const table = registry.TABLES[key];
     const name = String(getTableName(table));
-    const members = generated.get(name);
-    if (members === undefined || members.size === 0) continue;
-
-    const addresses = accessor.uniqueKeys(key);
-    const address = addresses[0];
-    if (address === undefined) continue;
-
-    const pinned = new Set(accessor.tenancyColumns(key));
-    /** @type {Record<string, unknown>} */
-    const values = {};
     for (const [property, column] of Object.entries(getTableColumns(table))) {
-      if (pinned.has(String(/** @type {{ name: unknown }} */ (column).name))) continue;
-      values[property] = sql`'merit-generated-column-probe'`;
-    }
-
-    sent.length = 0;
-    try {
-      const where = accessor.unscopedWritePredicate(
-        key,
-        Object.fromEntries(address.map((/** @type {string} */ p) => [p, 'merit-probe'])),
+      const c = /** @type {{ name: unknown, generated: unknown, generatedIdentity: unknown }} */ (
+        column
       );
-      await accessor.unscopedUpdateStatement(source, key, values, where);
-    } catch {
-      continue;
-    }
-    const statement = sent.find((t) => /^update\s+/i.test(t));
-    if (statement === undefined) continue;
-    const assignments = /^update\s+"[^"]+"\s+set\s+([\s\S]*?)\s+(?:where|returning)\s/i.exec(
-      statement,
-    );
-    if (assignments === null) continue;
-    for (const target of captured(assignments, 1).matchAll(/"([^"]+)"\s*=/g)) {
-      const column = captured(target, 1);
-      if (members.has(column)) found.push({ key: String(key), table: name, column });
+      const columnName = String(c.name);
+      const identity = /** @type {{ type?: unknown } | undefined} */ (c.generatedIdentity);
+      if (identity !== undefined && identity !== null && identity.type === 'always') {
+        identityReached += 1;
+      }
+      if (c.generated === undefined || c.generated === null) continue;
+
+      tables.add(name);
+      let threw;
+      try {
+        await accessor.unscopedUpdateStatement(
+          source,
+          key,
+          { [property]: sql`'merit-generated-column-probe'` },
+          sql`true`,
+        );
+        threw = undefined;
+      } catch (err) {
+        threw = err instanceof Error ? err.message : String(err);
+      }
+
+      if (threw === undefined) {
+        findings.push(
+          `${key}: the accessor built an UPDATE naming ${name}.${columnName}, which schema.ts ` +
+            'declares `GENERATED ALWAYS AS (...) STORED`. PostgreSQL refuses that statement ' +
+            'with 42601. `refuseGeneratedColumn` in packages/db/src/scoped-db.ts is the guard ' +
+            'that should have refused it first',
+        );
+        continue;
+      }
+      if (!threw.includes(columnName)) {
+        findings.push(
+          `${key}: the accessor refused an UPDATE naming ${name}.${columnName}, but the message ` +
+            'does not name the column, so this leg cannot tell the guard from an unrelated ' +
+            `failure. It said: ${threw.split('\n')[0]}`,
+        );
+        continue;
+      }
+      refused += 1;
+      sample ??= threw;
     }
   }
-  return found;
+
+  if (refused === 0) {
+    findings.push(
+      'no stored generated column on the registry was refused, so this leg asserted nothing. ' +
+        'Zero is what a green run and a broken import both look like',
+    );
+  }
+  return { findings, refused, tables: tables.size, identityReached, sample };
 }
 
 /**
@@ -813,7 +867,9 @@ export async function run(argv, emit = (line) => console.log(line)) {
     return 2;
   }
 
-  const findings = [...set.findings, ...legB.findings, ...legC.findings];
+  const legD = await refusedWrites();
+
+  const findings = [...set.findings, ...legB.findings, ...legC.findings, ...legD.findings];
   const total = [...set.generated.values()].reduce((n, s) => n + s.size, 0);
 
   if (findings.length === 0) {
@@ -824,7 +880,10 @@ export async function run(argv, emit = (line) => console.log(line)) {
         `${String(legB.tables)} built INSERT(s) name none of them, of which ` +
         `${String(legB.covered)} are on a table that carries one; ` +
         `${String(legC.blocks)} hand-written statement(s) across ` +
-        `${String(legC.files)} shipped source file(s) mention none of them`,
+        `${String(legC.files)} shipped source file(s) mention none of them; ` +
+        `the UPDATE builder refuses ${String(legD.refused)} of them by name on ` +
+        `${String(legD.tables)} table(s), beside ${String(legD.identityReached)} identity ` +
+        'column(s) it reaches and does not assert on',
     );
     return 0;
   }
