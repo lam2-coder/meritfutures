@@ -53,8 +53,8 @@ import * as engine from '../src/index.ts';
 //                              are DEFEATED BY WITHHOLDING IN PRODUCTION:
 //                              nothing else computes the digest, and
 //                              apps/worker/src/batch/replay.ts walks
-//                              HASHED_COLUMNS at :167 and ENGINE_GATE_LEAVES at
-//                              :173 to name the diverged field, so withholding
+//                              HASHED_COLUMNS and ENGINE_GATE_LEAVES BY NAME to
+//                              name the diverged field, so withholding
 //                              a table makes the batch hand-maintain a second
 //                              copy of C-07's order. EXCLUDED_COLUMNS has NO
 //                              production consumer and is exported for a

@@ -19,6 +19,7 @@ import {
   readRegister,
   run,
 } from '../checks/price-register.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
 // EVERY LEG IS WATCHED FAILING, AND THE MOTIVATING FAILURE IS WATCHED BY NAME
@@ -415,24 +416,32 @@ describe('the register is not a parser trap', () => {
 });
 
 describe('the real corpus and the real register', () => {
-  test('every leg holds on the tree this check ships with', () => {
-    expect(run()).toBe(0);
-  });
+  test(
+    'every leg holds on the tree this check ships with',
+    () => {
+      expect(run()).toBe(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('the corpus prices things, so the check is not passing on an empty set', () => {
-    // NO NUMBER IS PINNED HERE ON PURPOSE. Rows land beside this one and each may
-    // price something; a pinned total would make this case go red for the one
-    // reason that is not a defect. What is asserted is that the population is
-    // non-empty and that the register is exactly it, which is the property.
-    const prices = derive();
-    expect(prices.length).toBeGreaterThan(0);
-    expect(new Set(prices.map((p) => p.entry)).size).toBeGreaterThan(1);
-    expect(
-      readRegister()
-        .map((r) => r.anchor)
-        .sort(),
-    ).toEqual(prices.map(anchorOf).sort());
-  });
+  test(
+    'the corpus prices things, so the check is not passing on an empty set',
+    () => {
+      // NO NUMBER IS PINNED HERE ON PURPOSE. Rows land beside this one and each may
+      // price something; a pinned total would make this case go red for the one
+      // reason that is not a defect. What is asserted is that the population is
+      // non-empty and that the register is exactly it, which is the property.
+      const prices = derive();
+      expect(prices.length).toBeGreaterThan(0);
+      expect(new Set(prices.map((p) => p.entry)).size).toBeGreaterThan(1);
+      expect(
+        readRegister()
+          .map((r) => r.anchor)
+          .sort(),
+      ).toEqual(prices.map(anchorOf).sort());
+    },
+    CORPUS_SCAN_MS,
+  );
 
   test('it takes no argument', () => {
     expect(run(['--fix'])).toBe(2);

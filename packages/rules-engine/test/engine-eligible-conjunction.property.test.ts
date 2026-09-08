@@ -45,11 +45,11 @@
 // A dropped term in `allGatesPass` is caught only by a state where THAT gate is
 // the sole failing one. Five of the six have such a state. `buffer` (R-35) does
 // not, and the reason is arithmetic rather than a gap in the generators:
-// `gates.ts` line 185 reads `pass: state.withdrawableCents > 0n` while R-39
+// `gates.ts`'s `buffer.pass` reads `state.withdrawableCents > 0n` while R-39
 // requires `min(withdrawable, cap) >= min_payout_cents`, which CV-15 fixes at
 // 10,000c. So `buffer.pass === false` implies `minimumAmount.pass === false` in
 // EVERY state, and the term is present, honest and incapable of binding, which
-// `gates.ts` line 178 already calls out as PW-01 domination.
+// `gates.ts`'s own comment on `buffer` already calls out as PW-01 domination.
 //
 // THE COMPENSATING CONTROL IS TO ASSERT THE DOMINATION ITSELF, below, so the
 // reason the mutant is unkillable is a checked fact rather than a claim in a
@@ -475,7 +475,7 @@ describe('every one of the six terms can decide engineEligible on its own', () =
   });
 
   // THE ONE MUTANT NO PROPERTY CAN KILL, ASSERTED AS THE DOMINATION IT IS.
-  // `gates.ts` line 185 makes R-35 `withdrawable > 0` and R-39 needs at least
+  // `gates.ts`'s `buffer.pass` makes R-35 `withdrawable > 0` and R-39 needs at least
   // CV-15's 10,000c, so dropping `gates.buffer.pass` from the conjunction
   // changes no verdict on any state whatsoever. That is a fact about the two
   // rules rather than a hole in this suite, and it is checked here so it stops

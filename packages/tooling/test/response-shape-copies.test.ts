@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 import { CHECKS, REPO_ROOT, workspacePackages } from '../checks/repo-invariants.mjs';
 import { SUBJECTS, copiesOf, typescriptFences } from '../checks/response-shape-copies.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 /**
  * The check AS THE RUNNER COMPOSES IT, pulled out of `CHECKS` rather than built
@@ -365,15 +366,19 @@ describe('the repository today', () => {
   // "eight" would be a stored answer that goes stale the moment the code half
   // lands, and this assertion is what tells the session that lands it that the
   // work is done.
-  test('every RI-18 finding on the real tree is about the ADR-188 delta and nothing else', () => {
-    const found = ri18.run(REPO_ROOT);
-    for (const finding of found) {
-      expect(finding).toContain(`\`${SUBJECT}.`);
-      expect(finding).toContain('docs/architecture/API_CONTRACT.md');
-    }
-    // No anomaly: every copy parsed whole, so the divergence below is a real
-    // disagreement and not a shape this reader could not follow.
-    expect(found.filter((f) => f.includes('compared as a LEAF'))).toEqual([]);
-    expect(found.filter((f) => f.includes('carries no type annotation'))).toEqual([]);
-  });
+  test(
+    'every RI-18 finding on the real tree is about the ADR-188 delta and nothing else',
+    () => {
+      const found = ri18.run(REPO_ROOT);
+      for (const finding of found) {
+        expect(finding).toContain(`\`${SUBJECT}.`);
+        expect(finding).toContain('docs/architecture/API_CONTRACT.md');
+      }
+      // No anomaly: every copy parsed whole, so the divergence below is a real
+      // disagreement and not a shape this reader could not follow.
+      expect(found.filter((f) => f.includes('compared as a LEAF'))).toEqual([]);
+      expect(found.filter((f) => f.includes('carries no type annotation'))).toEqual([]);
+    },
+    CORPUS_SCAN_MS,
+  );
 });

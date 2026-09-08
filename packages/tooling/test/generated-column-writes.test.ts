@@ -12,6 +12,7 @@ import {
   refusedWrites,
   run,
 } from '../checks/generated-column-writes.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
 // EVERY LEG IS WATCHED FAILING, AND ONE OF THEM IS WATCHED FAILING FOR REAL
@@ -120,33 +121,45 @@ describe('leg A, the set folded out of the DDL', () => {
   // THE REAL TREE. This is the case that binds the checker to this repository:
   // the fold accounts for its whole input, and it finds the column that
   // `schema.ts` does not carry.
-  test('accounts for every GENERATED ALWAYS AS in this repository', () => {
-    const set = derivedSet();
-    expect(set.findings).toEqual([]);
-    expect(set.files).toBeGreaterThan(0);
-    expect(set.generatedOccurrences).toBeGreaterThan(0);
-    expect(set.identityOccurrences).toBeGreaterThan(0);
-  });
+  test(
+    'accounts for every GENERATED ALWAYS AS in this repository',
+    () => {
+      const set = derivedSet();
+      expect(set.findings).toEqual([]);
+      expect(set.files).toBeGreaterThan(0);
+      expect(set.generatedOccurrences).toBeGreaterThan(0);
+      expect(set.identityOccurrences).toBeGreaterThan(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // ADR-445 SECTION 4. `live_account_state` is in the DDL and not in
   // `schema.ts`, so a set derived from the schema would be missing exactly the
   // member the sibling row transcribing that table is about to make reachable.
-  test('holds a column no Drizzle table in this tree declares', () => {
-    const set = derivedSet();
-    expect(set.generated.get('live_account_state')).toEqual(new Set(['intraday_movement_cents']));
-  });
+  test(
+    'holds a column no Drizzle table in this tree declares',
+    () => {
+      const set = derivedSet();
+      expect(set.generated.get('live_account_state')).toEqual(new Set(['intraday_movement_cents']));
+    },
+    CORPUS_SCAN_MS,
+  );
 });
 
 describe('leg B, the INSERTs the accessor actually builds', () => {
-  test('the real registry builds an INSERT for every key and none names a member', async () => {
-    const set = derivedSet();
-    const built = await builtStatements(set.generated);
-    expect(built.findings).toEqual([]);
-    expect(built.tables).toBeGreaterThan(0);
-    // A run in which no table carried a member would be a green that asserted
-    // nothing, and this is the case that would notice.
-    expect(built.covered).toBeGreaterThan(0);
-  });
+  test(
+    'the real registry builds an INSERT for every key and none names a member',
+    async () => {
+      const set = derivedSet();
+      const built = await builtStatements(set.generated);
+      expect(built.findings).toEqual([]);
+      expect(built.tables).toBeGreaterThan(0);
+      // A run in which no table carried a member would be a green that asserted
+      // nothing, and this is the case that would notice.
+      expect(built.covered).toBeGreaterThan(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // FALSIFIED ON THE REAL TREE. The set is the lie and everything else is real:
   // the accessor, the registry, the Drizzle handle and the statement. If a
@@ -212,16 +225,20 @@ describe('leg C, the hand-written statements', () => {
     expect(literalStatements(generated([['t', ['cadence']]]), root).findings).toEqual([]);
   });
 
-  test('the real shipped tree names no member in any hand-written statement', () => {
-    const set = derivedSet();
-    const found = literalStatements(set.generated);
-    expect(found.findings).toEqual([]);
-    expect(found.files).toBeGreaterThan(0);
-    // apps/worker/src/live/ports.ts carries one. Zero blocks would mean the
-    // walk or the verb pattern had stopped working, which is the direction an
-    // absence check fails green in.
-    expect(found.blocks).toBeGreaterThan(0);
-  });
+  test(
+    'the real shipped tree names no member in any hand-written statement',
+    () => {
+      const set = derivedSet();
+      const found = literalStatements(set.generated);
+      expect(found.findings).toEqual([]);
+      expect(found.files).toBeGreaterThan(0);
+      // apps/worker/src/live/ports.ts carries one. Zero blocks would mean the
+      // walk or the verb pattern had stopped working, which is the direction an
+      // absence check fails green in.
+      expect(found.blocks).toBeGreaterThan(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   test('literalLines keeps a multi-line template on its own lines', () => {
     const lines = literalLines('const q = `\nINSERT INTO t\n  (a)\n`;\n');
@@ -246,12 +263,16 @@ describe('leg C, the hand-written statements', () => {
 // already have and it is stated here rather than inherited quietly.
 // =============================================================================
 describe('the command line', () => {
-  test('passes over this tree, and says what it derived', async () => {
-    const lines: string[] = [];
-    const code = await run([], (line) => lines.push(line));
-    expect(lines.join('\n')).toContain('PASS');
-    expect(code).toBe(0);
-  });
+  test(
+    'passes over this tree, and says what it derived',
+    async () => {
+      const lines: string[] = [];
+      const code = await run([], (line) => lines.push(line));
+      expect(lines.join('\n')).toContain('PASS');
+      expect(code).toBe(0);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   test('takes no argument, because every input it has comes off the tree', async () => {
     const lines: string[] = [];
@@ -299,24 +320,32 @@ describe('leg D, the refusal the UPDATE builder now holds', () => {
   // two counts must differ. A case asserting equality would go red on a true
   // tree; this one goes red if the registry silently gains or loses the table,
   // and neither side of it is a number typed into this file.
-  test('the columns leg D refuses are the registry subset of the fold', async () => {
-    const legD = await refusedWrites();
-    const set = derivedSet();
-    const inDdl = [...set.generated.values()].reduce((n, columns) => n + columns.size, 0);
-    expect(legD.refused).toBeGreaterThan(0);
-    expect(legD.refused).toBeLessThan(inDdl);
-  });
+  test(
+    'the columns leg D refuses are the registry subset of the fold',
+    async () => {
+      const legD = await refusedWrites();
+      const set = derivedSet();
+      const inDdl = [...set.generated.values()].reduce((n, columns) => n + columns.size, 0);
+      expect(legD.refused).toBeGreaterThan(0);
+      expect(legD.refused).toBeLessThan(inDdl);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // TWO INDEPENDENT READS OF THE IDENTITY POPULATION, COMPARED. Leg A folds the
   // DDL under `packages/db/migrations/` and counts `GENERATED ALWAYS AS IDENTITY`
   // as text; leg D walks the Drizzle declarations through the registry. The two
   // counts have to agree: the day a migration adds an identity column and
   // `schema.ts` does not, this is the case that says so.
-  test('the identity columns leg D reaches are the ones the DDL declares', async () => {
-    const legD = await refusedWrites();
-    const set = derivedSet();
-    expect(legD.identityReached).toBe(set.identityOccurrences);
-  });
+  test(
+    'the identity columns leg D reaches are the ones the DDL declares',
+    async () => {
+      const legD = await refusedWrites();
+      const set = derivedSet();
+      expect(legD.identityReached).toBe(set.identityOccurrences);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   // WHAT STOOD ABOVE SAID LEG D ASSERTS NO REFUSAL FOR THESE, AND `ADR-452` MADE
   // IT FALSE. The count was reported and walked past, so the checker printed an

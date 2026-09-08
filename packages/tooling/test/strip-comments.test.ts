@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 import { REPO_ROOT } from '../checks/repo-invariants.mjs';
 import { stripComments } from '../checks/strip-comments.mjs';
+import { CORPUS_SCAN_MS } from './scan-budget.js';
 
 // =============================================================================
 // THE ONE COMMENT STRIPPER, AND THE THREE DEFECTS IT EXISTS TO END
@@ -118,66 +119,74 @@ describe('a block-comment opener inside a line comment', () => {
     expect(code).not.toContain('P3-l');
   });
 
-  test('the idiom silently deletes source the scanner keeps, over the whole tree', () => {
-    // **THIS CASE AND THE ONE BELOW NAMED `apps/worker/src/index.ts` UNTIL
-    // ADR-327, AND WHAT HAPPENED TO THEM IS THIS SUITE'S OWN SUBJECT.** The
-    // barrel's phantom span opened on the `/**` inside a single prose glob, in a
-    // sentence saying the `pgboss` grant was owed. `0082` discharged that
-    // blocker, ADR-327 retired the sentence, the opener went with it, and two
-    // cases about an IDIOM turned red on a comment edit in another package.
-    //
-    // ADR-279 section 2 reported 55,728 characters to 2,753 on that one file.
-    // The number was never the property and the FILE was never the property
-    // either: what matters is that the idiom removes source across the tree and
-    // that every absence check reading its output is asking a question of a file
-    // with the declarations taken out. So both halves are derived here.
-    let total = 0;
-    let losing = 0;
-    for (const path of sourceTree()) {
-      const source = readFileSync(path, 'utf8');
-      const eaten = stripComments(source).length - naive(source).length;
-      if (eaten > 0) {
-        total += eaten;
-        losing += 1;
+  test(
+    'the idiom silently deletes source the scanner keeps, over the whole tree',
+    () => {
+      // **THIS CASE AND THE ONE BELOW NAMED `apps/worker/src/index.ts` UNTIL
+      // ADR-327, AND WHAT HAPPENED TO THEM IS THIS SUITE'S OWN SUBJECT.** The
+      // barrel's phantom span opened on the `/**` inside a single prose glob, in a
+      // sentence saying the `pgboss` grant was owed. `0082` discharged that
+      // blocker, ADR-327 retired the sentence, the opener went with it, and two
+      // cases about an IDIOM turned red on a comment edit in another package.
+      //
+      // ADR-279 section 2 reported 55,728 characters to 2,753 on that one file.
+      // The number was never the property and the FILE was never the property
+      // either: what matters is that the idiom removes source across the tree and
+      // that every absence check reading its output is asking a question of a file
+      // with the declarations taken out. So both halves are derived here.
+      let total = 0;
+      let losing = 0;
+      for (const path of sourceTree()) {
+        const source = readFileSync(path, 'utf8');
+        const eaten = stripComments(source).length - naive(source).length;
+        if (eaten > 0) {
+          total += eaten;
+          losing += 1;
+        }
       }
-    }
-    expect(losing).toBeGreaterThan(200);
-    expect(total).toBeGreaterThan(50_000);
+      expect(losing).toBeGreaterThan(200);
+      expect(total).toBeGreaterThan(50_000);
 
-    // And it is concentrated rather than spread thin: one file loses more than
-    // ten thousand characters on its own.
-    const { path, eaten } = worstVictim();
-    expect(eaten, `${path} is the worst case and the idiom barely touches it`).toBeGreaterThan(
-      10_000,
-    );
-  });
+      // And it is concentrated rather than spread thin: one file loses more than
+      // ten thousand characters on its own.
+      const { path, eaten } = worstVictim();
+      expect(eaten, `${path} is the worst case and the idiom barely touches it`).toBeGreaterThan(
+        10_000,
+      );
+    },
+    CORPUS_SCAN_MS,
+  );
 
-  test('a local clock read placed inside the phantom span survives the scanner', () => {
-    // SEED 12, AS ADR-277 SECTION 7 LEFT IT AND ADR-279 SECTION 2 WATCHED IT ON
-    // THE REAL TREE: under the idiom `RI-28` reported PASS with this line live in
-    // a shipped source file. The span is now derived along with the file, so the
-    // seed lands inside it by construction rather than by somebody having checked
-    // once that a chosen line number was still inside it.
-    const { path, source } = worstVictim();
-    const span = phantomSpan(source);
-    expect(span, `${path} carries no phantom block for the idiom to open`).not.toBeNull();
+  test(
+    'a local clock read placed inside the phantom span survives the scanner',
+    () => {
+      // SEED 12, AS ADR-277 SECTION 7 LEFT IT AND ADR-279 SECTION 2 WATCHED IT ON
+      // THE REAL TREE: under the idiom `RI-28` reported PASS with this line live in
+      // a shipped source file. The span is now derived along with the file, so the
+      // seed lands inside it by construction rather than by somebody having checked
+      // once that a chosen line number was still inside it.
+      const { path, source } = worstVictim();
+      const span = phantomSpan(source);
+      expect(span, `${path} carries no phantom block for the idiom to open`).not.toBeNull();
 
-    // The end of the line the OPENER sits on, which is inside the span and is a
-    // line boundary, so the seeded declaration lands as its own statement.
-    const at = source.indexOf('\n', span?.index ?? 0);
-    expect(at, 'the phantom span holds no line boundary to seed at').toBeGreaterThan(-1);
-    expect(at).toBeLessThan((span?.index ?? 0) + (span?.[0].length ?? 0));
+      // The end of the line the OPENER sits on, which is inside the span and is a
+      // line boundary, so the seeded declaration lands as its own statement.
+      const at = source.indexOf('\n', span?.index ?? 0);
+      expect(at, 'the phantom span holds no line boundary to seed at').toBeGreaterThan(-1);
+      expect(at).toBeLessThan((span?.index ?? 0) + (span?.[0].length ?? 0));
 
-    // THE SENTINEL IS UNIQUE AND `getHours` IS NOT. The derived victim is
-    // whatever file the idiom mangles most, and one candidate carries the string
-    // `getHours` in its own fixtures, which would have made this case pass for a
-    // reason that has nothing to do with the seed.
-    const seeded = `${source.slice(0, at)}\nexport const SEEDED_PHANTOM_CLOCK = new Date().getHours();${source.slice(at)}`;
-    expect(seeded).not.toBe(source);
+      // THE SENTINEL IS UNIQUE AND `getHours` IS NOT. The derived victim is
+      // whatever file the idiom mangles most, and one candidate carries the string
+      // `getHours` in its own fixtures, which would have made this case pass for a
+      // reason that has nothing to do with the seed.
+      const seeded = `${source.slice(0, at)}\nexport const SEEDED_PHANTOM_CLOCK = new Date().getHours();${source.slice(at)}`;
+      expect(seeded).not.toBe(source);
 
-    expect(naive(seeded)).not.toContain('SEEDED_PHANTOM_CLOCK');
-    expect(stripComments(seeded)).toContain('SEEDED_PHANTOM_CLOCK = new Date().getHours()');
-  });
+      expect(naive(seeded)).not.toContain('SEEDED_PHANTOM_CLOCK');
+      expect(stripComments(seeded)).toContain('SEEDED_PHANTOM_CLOCK = new Date().getHours()');
+    },
+    CORPUS_SCAN_MS,
+  );
 });
 
 describe('what the scanner keeps', () => {
@@ -242,26 +251,30 @@ describe('literals: blank', () => {
     expect(stripComments(source, { literals: 'blank' })).not.toContain('hour');
   });
 
-  test('the two modes agree on length and on every newline, over the whole tree', () => {
-    // `RI-28` DEPENDS ON THIS AND NOT ON A COMMENT. It reads one file twice,
-    // hunts three call spellings in the blanked text and the `process.env.TZ`
-    // key in the text that still holds literals, and reports `file:line` from a
-    // single `lineAt` over the blanked one. That is only true while an index
-    // into one reading is the same index into the other.
-    const files = sourceFilesUnder(REPO_ROOT);
-    expect(files.length).toBeGreaterThan(500);
-    const disagree = files.filter((file) => {
-      const source = readFileSync(file, 'utf8');
-      const keep = stripComments(source);
-      const blank = stripComments(source, { literals: 'blank' });
-      if (keep.length !== blank.length) return true;
-      for (let i = 0; i < keep.length; i++) {
-        if ((keep[i] === '\n') !== (blank[i] === '\n')) return true;
-      }
-      return false;
-    });
-    expect(disagree).toEqual([]);
-  });
+  test(
+    'the two modes agree on length and on every newline, over the whole tree',
+    () => {
+      // `RI-28` DEPENDS ON THIS AND NOT ON A COMMENT. It reads one file twice,
+      // hunts three call spellings in the blanked text and the `process.env.TZ`
+      // key in the text that still holds literals, and reports `file:line` from a
+      // single `lineAt` over the blanked one. That is only true while an index
+      // into one reading is the same index into the other.
+      const files = sourceFilesUnder(REPO_ROOT);
+      expect(files.length).toBeGreaterThan(500);
+      const disagree = files.filter((file) => {
+        const source = readFileSync(file, 'utf8');
+        const keep = stripComments(source);
+        const blank = stripComments(source, { literals: 'blank' });
+        if (keep.length !== blank.length) return true;
+        for (let i = 0; i < keep.length; i++) {
+          if ((keep[i] === '\n') !== (blank[i] === '\n')) return true;
+        }
+        return false;
+      });
+      expect(disagree).toEqual([]);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   test('quotes, length and newlines are preserved so every offset still maps', () => {
     const source = "const a = 'one\\ntwo';\nconst b = 2;";

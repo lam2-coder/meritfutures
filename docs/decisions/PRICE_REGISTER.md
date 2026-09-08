@@ -153,6 +153,10 @@ entry is.
 | 70  | `ADR-466:279` | 10.5  | OPEN       | UNASSESSED  | -                             | none. A rate over two days is reported as a rate over two days and is not ... |
 | 71  | `ADR-466:281` | 10.6  | OPEN       | UNASSESSED  | -                             | none. It is a dated record and `ADR-386`:169 governs: the pointer is named ... |
 | 72  | `ADR-466:283` | 10.7  | OPEN       | UNASSESSED  | -                             | the seven rows appended at integration as OPEN / UNASSESSED with no basis, ... |
+| 73  | `ADR-468:377` | 10.1  | OPEN       | UNASSESSED  | -                             | a checker over `packages/tooling/test/` that folds the tree-reaching call ... |
+| 74  | `ADR-468:379` | 10.2  | OPEN       | UNASSESSED  | -                             | a check that times the shipped scans against the tree, compares them ... |
+| 75  | `ADR-468:381` | 10.3  | OPEN       | UNASSESSED  | -                             | a recorded figure for what the CI runner actually costs on the binding ... |
+| 76  | `ADR-468:383` | 10.4  | OPEN       | UNASSESSED  | -                             | a measurement of the worst spawn cost under load on the CI runner, and a ... |
 
 ## What this register does not cover, stated as a bound
 

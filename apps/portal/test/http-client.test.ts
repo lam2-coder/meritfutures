@@ -436,7 +436,7 @@ test('the caller supplies the key and this file never mints one', async () => {
   await client.post(write({ path: '/accounts/acc_1/payout', idempotencyKey: 'key-abc-123' }));
 
   // TWO CALLS, ONE KEY. A transport that minted a key per call would send two
-  // different keys on a retry, which API_CONTRACT line 23 makes a second payout
+  // different keys on a retry, which API_CONTRACT's `Idempotency` paragraph makes a second payout
   // rather than a replay of the first.
   const sent = calls.map(
     (call) => (call.init.headers as Record<string, string>)['idempotency-key'],

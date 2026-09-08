@@ -244,7 +244,7 @@ export { CapScheduleCodecError, decodeCapScheduleCents } from './plan/cap-schedu
 //   `stateHash`, `canonicalStateSerialization`, `HASHED_COLUMNS` and
 //   `ENGINE_GATE_LEAVES` are DEFEATED BY WITHHOLDING IN PRODUCTION. Nothing
 //   else computes the digest, `apps/worker/src/batch/replay.ts` walks the
-//   column table at `:167` and the leaf table at `:173` to name which field
+//   column table and the leaf table, both reached by name, to say which field
 //   diverged, and withholding either table makes the batch hand-maintain a
 //   second copy of C-07's order. `StateHashError` rides with them: it computes
 //   nothing and has no second implementation to drift from, which is the
