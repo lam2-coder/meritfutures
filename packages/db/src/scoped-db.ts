@@ -4586,7 +4586,7 @@ export type DeclaredRow<K extends TableKey> = (typeof TABLES)[K]['$inferSelect']
 // ADR-448. `ADR-445` section 6 measured the hole and section 8 item 1 priced
 // the repair: `updateStatementOn` called `refuseTenancyColumn` and
 // `refuseTermInValues` and then reached `.set(values)` with the caller's keys
-// unfiltered, so a caller naming `reconciliations.delta_cents` got a `42601`
+// unfiltered, so a caller naming `reconciliations.delta_cents` got a `428C9`
 // from PostgreSQL and no earlier word from this accessor. Drizzle's `.set()`
 // maps over THE CALLER'S KEYS where `.values()` maps over the TABLE'S COLUMNS,
 // which is why the INSERT half held structurally and this half did not.
@@ -4595,13 +4595,13 @@ export type DeclaredRow<K extends TableKey> = (typeof TABLES)[K]['$inferSelect']
 // TWO FEATURES ARE SPELLED `GENERATED ALWAYS AS` AND ONLY THE FIRST IS REFUSED
 // -----------------------------------------------------------------------------
 //   1. `GENERATED ALWAYS AS (<expr>) STORED` is a GENERATED COLUMN. Naming it
-//      in an UPDATE `SET` is `42601`. Derived on this tree: 5 such columns on
-//      the registry, on 4 tables. THIS IS WHAT THE GUARD BELOW REFUSES.
+//      in an UPDATE `SET` is `428C9`, the SAME code as 2 below. Derived on this
+//      tree: 5 such columns, on 4 tables. THIS IS WHAT THE GUARD BELOW REFUSES.
 //   2. `GENERATED ALWAYS AS IDENTITY` is an IDENTITY COLUMN, a sequence default
 //      with a lock on it. Naming it is `428C9` unless the statement carries
-//      `OVERRIDING SYSTEM VALUE`, which nothing this accessor builds does.
-//      Derived on this tree: 20 such columns, every one of them `id`, every one
-//      of them `always`.
+//      `OVERRIDING SYSTEM VALUE`, which nothing this accessor builds does and
+//      which does NOT rescue 1. Derived on this tree: 20 such columns, every
+//      one of them `id`, every one of them `always`.
 //
 // **THE SECOND IS A REAL HOLE, IT IS NOT CLOSED HERE, AND THE REASON IS A
 // MEASUREMENT RATHER THAN A PREFERENCE.** `ADR-445` section 8 item 2 prices it
@@ -4708,7 +4708,7 @@ function refuseGeneratedColumn(key: TableKey, values: WriteValues): WriteValues 
       throw new Error(
         `"${named}" is ${key}.${column.name}, which schema.ts declares ` +
           '`GENERATED ALWAYS AS (...) STORED`, and a write never takes it from the caller. ' +
-          'PostgreSQL refuses a statement that names it with 42601. The database computes the ' +
+          'PostgreSQL refuses a statement that names it with 428C9. The database computes the ' +
           'value from the row, so a caller supplying one would be stating a second opinion the ' +
           'row cannot hold.',
       );

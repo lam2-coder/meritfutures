@@ -464,6 +464,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-451](ADR-451.md) | four cases asserted a write PostgreSQL refuses, the defect is twenty tables wide rather than the two the sibling named, and the widening it blocks is now green but watched by nothing (2026-09-08, status: proposed) |
 | [ADR-452](ADR-452.md) | the identity widening taken with the leg that watches it, and the SQLSTATE the corpus states for a stored generated column is wrong on a real database (2026-09-08, status: proposed) |
 | [ADR-453](ADR-453.md) | the fold paragraph's ARGUMENT is checked and holds of all fifteen, two further sentences beside it are FALSE about this tree, and the `either` paragraph's seven are this file's `.references()` rather than the DDL's (2026-09-08, status: proposed) |
+| [ADR-454](ADR-454.md) | the SQLSTATE the corpus states for a stored generated column is `42601`, a real PostgreSQL says `428C9`, and the live source is repaired line-neutrally (2026-09-08, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
